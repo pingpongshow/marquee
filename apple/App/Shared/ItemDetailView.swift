@@ -318,8 +318,15 @@ struct ItemDetailView: View {
     @ViewBuilder private func contents(_ d: ItemDetail) -> some View {
         if !children.isEmpty {
             switch d.type {
-            case .show, .artist, .collection:
-                ShelfRow(title: d.type == .show ? "Seasons" : d.type == .artist ? "Albums" : "In this collection") {
+            case .artist:
+                // Plexamp-style sections by release type (MusicBrainz, META-3).
+                ForEach(releaseSections(children), id: \.title) { section in
+                    ShelfRow(title: section.title) {
+                        ForEach(section.items, id: \.id) { PosterCard(item: $0) }
+                    }
+                }
+            case .show, .collection:
+                ShelfRow(title: d.type == .show ? "Seasons" : "In this collection") {
                     ForEach(children, id: \.id) { PosterCard(item: $0) }
                 }
             case .season:

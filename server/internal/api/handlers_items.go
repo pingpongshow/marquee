@@ -91,6 +91,9 @@ func toAPISummary(s items.Summary) ItemSummary {
 	if s.ExtraType != "" {
 		out.ExtraType = ptr(ItemSummaryExtraType(s.ExtraType))
 	}
+	if s.ReleaseType != "" {
+		out.ReleaseType = ptr(ItemSummaryReleaseType(s.ReleaseType))
+	}
 	if t, err := time.Parse(time.RFC3339Nano, s.LastViewedAt); err == nil {
 		out.LastViewedAt = &t
 	}
@@ -210,6 +213,7 @@ func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 		MatchState: ItemDetailMatchState(sum.MatchState), AddedAt: sum.AddedAt, Images: sum.Images,
 		ViewOffsetMs: sum.ViewOffsetMs, ViewCount: sum.ViewCount, WatchedLeafCount: sum.WatchedLeafCount, LastViewedAt: sum.LastViewedAt,
 		UserRating: sum.UserRating, Watchlisted: sum.Watchlisted, ExtraType: (*ItemDetailExtraType)(sum.ExtraType),
+		ReleaseType: (*ItemDetailReleaseType)(sum.ReleaseType),
 		AudienceRating: nz(float32(d.AudienceRating)), Credits: make([]Credit, len(d.Credits)),
 		Summary: nz(d.Plot), Tagline: nz(d.Tagline), ContentRating: nz(d.ContentRating), Studio: nz(d.Studio),
 		Genres: d.Genres, ExternalIds: d.ExternalIDs, LockedFields: d.LockedFields,

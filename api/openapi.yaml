@@ -4202,6 +4202,10 @@ components:
           type: string
           description: Set for extras (LIB-8).
           enum: [trailer, featurette, behind_the_scenes, deleted_scene, interview, scene, short, other]
+        releaseType:
+          type: string
+          description: "Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown."
+          enum: [album, ep, single, compilation, live, soundtrack, remix, demo, other]
 
     ItemImages:
       type: object
