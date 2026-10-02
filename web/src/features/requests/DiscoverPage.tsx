@@ -4,7 +4,7 @@ import { clsx } from "clsx";
 import { Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, unwrap } from "@/api/client";
-import { Alert, Badge, Button, Input, Spinner } from "@/components/ui";
+import { Alert, Badge, Button, Dialog, Input, Spinner } from "@/components/ui";
 import {
   availabilityLabel,
   type DiscoverItem,
@@ -30,6 +30,7 @@ export function DiscoverPage() {
   const [category, setCategory] =
     useState<(typeof categories)[number]["id"]>("trending");
   const [picked, setPicked] = useState<DiscoverItem | null>(null);
+  const [viewing, setViewing] = useState<DiscoverItem | null>(null);
   useEffect(() => {
     const t = setTimeout(() => setTerm(q.trim()), 350);
     return () => clearTimeout(t);
@@ -116,6 +117,7 @@ export function DiscoverPage() {
               key={`${it.mediaType}-${it.tmdbId}`}
               item={it}
               onRequest={() => setPicked(it)}
+              onOpen={() => setViewing(it)}
             />
           ))}
           {results.data?.results.length === 0 && (
@@ -127,16 +129,102 @@ export function DiscoverPage() {
       {picked && (
         <RequestDialog item={picked} onClose={() => setPicked(null)} />
       )}
+      {viewing && (
+        <DetailsDialog
+          item={viewing}
+          onClose={() => setViewing(null)}
+          onRequest={() => {
+            setPicked(viewing);
+            setViewing(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+const requestable = (item: DiscoverItem) =>
+  item.availability === "none" ||
+  (item.mediaType === "tv" && item.availability === "partial");
+
+/** A title's description, with Request or Open (REQ-2). */
+function DetailsDialog({
+  item,
+  onClose,
+  onRequest,
+}: {
+  item: DiscoverItem;
+  onClose: () => void;
+  onRequest: () => void;
+}) {
+  const label = availabilityLabel[item.availability];
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title={item.title}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Close
+          </Button>
+          {item.itemId ? (
+            <Link
+              to="/item/$itemId"
+              params={{ itemId: String(item.itemId) }}
+              className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-black"
+            >
+              Open in library
+            </Link>
+          ) : null}
+          {requestable(item) && (
+            <Button variant="primary" onClick={onRequest}>
+              Request
+            </Button>
+          )}
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {item.backdropUrl && (
+          <img
+            src={item.backdropUrl}
+            alt=""
+            className="aspect-video w-full rounded-md object-cover"
+          />
+        )}
+        <div className="flex gap-4">
+          {item.posterUrl && !item.backdropUrl && (
+            <img
+              src={item.posterUrl}
+              alt=""
+              className="w-28 shrink-0 rounded-md object-cover"
+            />
+          )}
+          <div className="space-y-2">
+            <p className="text-sm text-muted">
+              {[item.year, item.mediaType === "tv" ? "Series" : "Movie", label]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+            <p className="text-sm leading-relaxed">
+              {item.overview || "No description available."}
+            </p>
+          </div>
+        </div>
+      </div>
+    </Dialog>
   );
 }
 
 function Card({
   item,
   onRequest,
+  onOpen,
 }: {
   item: DiscoverItem;
   onRequest: () => void;
+  onOpen: () => void;
 }) {
   const label = availabilityLabel[item.availability];
   const poster = (
@@ -167,13 +255,14 @@ function Card({
   );
   return (
     <div className="space-y-1.5">
-      {item.itemId ? (
-        <Link to="/item/$itemId" params={{ itemId: String(item.itemId) }}>
-          {poster}
-        </Link>
-      ) : (
-        poster
-      )}
+      <button
+        type="button"
+        className="block w-full text-left"
+        onClick={onOpen}
+        aria-label={`About ${item.title}`}
+      >
+        {poster}
+      </button>
       <div className="truncate text-sm font-medium" title={item.title}>
         {item.title}
       </div>
@@ -183,8 +272,7 @@ function Card({
             .filter(Boolean)
             .join(" · ")}
         </span>
-        {(item.availability === "none" ||
-          (item.mediaType === "tv" && item.availability === "partial")) && (
+        {requestable(item) && (
           <Button
             size="sm"
             variant="primary"

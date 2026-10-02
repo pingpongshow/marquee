@@ -75,7 +75,7 @@ struct DiscoverView: View {
         if let id = it.itemId {
             NavigationLink(value: Route.item(id)) { label }.buttonStyle(cardStyle)
         } else {
-            Button { if requestable(it) { picked = it } } label: { label }
+            Button { picked = it } label: { label } // its details, with Request when it can be
                 .buttonStyle(cardStyle)
                 .accessibilityLabel(requestable(it) ? "Request \(it.title)" : "\(it.title), \(it.availability.label)")
         }
@@ -138,7 +138,7 @@ extension DiscoverItem: @retroactive Identifiable {
     public var id: String { "\(mediaType.rawValue)-\(tmdbId)" }
 }
 
-/// Ask for a movie, or chosen seasons of a show.
+/// A title's details, and asking for a movie or chosen seasons of a show.
 struct RequestSheet: View {
     @Environment(AppSession.self) private var app
     @Environment(\.dismiss) private var dismiss
@@ -153,19 +153,21 @@ struct RequestSheet: View {
         NavigationStack {
             Form {
                 header
-                if item.mediaType == .tv { seasonsSection }
+                if canRequest && item.mediaType == .tv { seasonsSection }
                 if let error { Text(error).foregroundStyle(.red) }
                 if done { Label("Requested", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
             }
-            .navigationTitle("Request")
+            .navigationTitle(canRequest ? "Request" : "Details")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Request") { submit() }
-                        .disabled(busy || done || (item.mediaType == .tv && seasons.isEmpty))
+                ToolbarItem(placement: .cancellationAction) { Button(canRequest ? "Cancel" : "Done") { dismiss() } }
+                if canRequest {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Request") { submit() }
+                            .disabled(busy || done || (item.mediaType == .tv && seasons.isEmpty))
+                    }
                 }
             }
             .task { await loadShow() }
@@ -181,18 +183,23 @@ struct RequestSheet: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(item.title).font(.headline)
                     Text(subtitle).font(.caption).foregroundStyle(.secondary)
-                    if let o = item.overview { Text(o).font(.caption).lineLimit(6) }
+                    Text(item.overview ?? "No description available.").font(.caption)
                 }
             }
         } footer: {
-            Text("An admin approves requests before they're downloaded.")
+            if canRequest { Text("An admin approves requests before they're downloaded.") }
         }
+    }
+
+    private var canRequest: Bool {
+        item.availability == Availability.none || (item.mediaType == .tv && item.availability == .partial)
     }
 
     private var subtitle: String {
         var parts: [String] = []
         if let y = item.year { parts.append(String(y)) }
         parts.append(item.mediaType == .tv ? "Series" : "Movie")
+        if item.availability != Availability.none { parts.append(item.availability.label) }
         return parts.joined(separator: " · ")
     }
 
