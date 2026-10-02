@@ -28,6 +28,7 @@ import okhttp3.Call
 import okhttp3.HttpUrl
 
 import app.marquee.api.models.DeclineRequestRequest
+import app.marquee.api.models.DiscoverFilters200Response
 import app.marquee.api.models.DiscoverPage
 import app.marquee.api.models.Error
 import app.marquee.api.models.ListSeerrUsers200ResponseInner
@@ -362,13 +363,103 @@ open class RequestsApi(basePath: kotlin.String = defaultBasePath, client: Call.F
     }
 
     /**
+     * GET /requests/discover/filters
+     * Discover&#39;s filters: TV networks, film studios and movie and TV genres.
+     * 
+     * @return DiscoverFilters200Response
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun discoverFilters() : DiscoverFilters200Response {
+        val localVarResponse = discoverFiltersWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as DiscoverFilters200Response
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /requests/discover/filters
+     * Discover&#39;s filters: TV networks, film studios and movie and TV genres.
+     * 
+     * @return ApiResponse<DiscoverFilters200Response?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun discoverFiltersWithHttpInfo() : ApiResponse<DiscoverFilters200Response?> {
+        val localVariableConfig = discoverFiltersRequestConfig()
+
+        return request<Unit, DiscoverFilters200Response>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation discoverFilters
+     *
+     * @return RequestConfig
+     */
+    fun discoverFiltersRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/requests/discover/filters",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * enum for parameter category
      */
      enum class CategoryDiscoverRequestable(val value: kotlin.String) {
          @SerialName(value = "trending") TRENDING("trending"),
          @SerialName(value = "movies") MOVIES("movies"),
          @SerialName(value = "tv") TV("tv"),
-         @SerialName(value = "upcoming") UPCOMING("upcoming");
+         @SerialName(value = "upcoming") UPCOMING("upcoming"),
+         @SerialName(value = "upcoming_tv") UPCOMING_TV("upcoming_tv");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * enum for parameter sort
+     */
+     enum class SortDiscoverRequestable(val value: kotlin.String) {
+         @SerialName(value = "popular") POPULAR("popular"),
+         @SerialName(value = "rating") RATING("rating"),
+         @SerialName(value = "newest") NEWEST("newest"),
+         @SerialName(value = "title") TITLE("title");
 
         /**
          * Override [toString()] to avoid using the enum variable name as the value, and instead use
@@ -382,10 +473,14 @@ open class RequestsApi(basePath: kotlin.String = defaultBasePath, client: Call.F
 
     /**
      * GET /requests/discover
-     * Trending, popular and upcoming titles from Seerr (REQ-2).
+     * Trending, popular and upcoming titles from Seerr (REQ-2), optionally by network, studio or genre, in an order. A network means shows; a studio means films.
      * 
      * @param category  (optional, default to Category.TRENDING)
      * @param page  (optional, default to 1)
+     * @param network A TV network (from /requests/discover/filters). (optional)
+     * @param studio A film studio. (optional)
+     * @param genre A movie or TV genre (matching the category). (optional)
+     * @param sort For movies and tv. (optional, default to Sort.POPULAR)
      * @return DiscoverPage
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -395,8 +490,8 @@ open class RequestsApi(basePath: kotlin.String = defaultBasePath, client: Call.F
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun discoverRequestable(category: CategoryDiscoverRequestable? = CategoryDiscoverRequestable.TRENDING, page: kotlin.Int? = 1) : DiscoverPage {
-        val localVarResponse = discoverRequestableWithHttpInfo(category = category, page = page)
+    fun discoverRequestable(category: CategoryDiscoverRequestable? = CategoryDiscoverRequestable.TRENDING, page: kotlin.Int? = 1, network: kotlin.Long? = null, studio: kotlin.Long? = null, genre: kotlin.Long? = null, sort: SortDiscoverRequestable? = SortDiscoverRequestable.POPULAR) : DiscoverPage {
+        val localVarResponse = discoverRequestableWithHttpInfo(category = category, page = page, network = network, studio = studio, genre = genre, sort = sort)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as DiscoverPage
@@ -415,18 +510,22 @@ open class RequestsApi(basePath: kotlin.String = defaultBasePath, client: Call.F
 
     /**
      * GET /requests/discover
-     * Trending, popular and upcoming titles from Seerr (REQ-2).
+     * Trending, popular and upcoming titles from Seerr (REQ-2), optionally by network, studio or genre, in an order. A network means shows; a studio means films.
      * 
      * @param category  (optional, default to Category.TRENDING)
      * @param page  (optional, default to 1)
+     * @param network A TV network (from /requests/discover/filters). (optional)
+     * @param studio A film studio. (optional)
+     * @param genre A movie or TV genre (matching the category). (optional)
+     * @param sort For movies and tv. (optional, default to Sort.POPULAR)
      * @return ApiResponse<DiscoverPage?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun discoverRequestableWithHttpInfo(category: CategoryDiscoverRequestable?, page: kotlin.Int?) : ApiResponse<DiscoverPage?> {
-        val localVariableConfig = discoverRequestableRequestConfig(category = category, page = page)
+    fun discoverRequestableWithHttpInfo(category: CategoryDiscoverRequestable?, page: kotlin.Int?, network: kotlin.Long?, studio: kotlin.Long?, genre: kotlin.Long?, sort: SortDiscoverRequestable?) : ApiResponse<DiscoverPage?> {
+        val localVariableConfig = discoverRequestableRequestConfig(category = category, page = page, network = network, studio = studio, genre = genre, sort = sort)
 
         return request<Unit, DiscoverPage>(
             localVariableConfig
@@ -438,9 +537,13 @@ open class RequestsApi(basePath: kotlin.String = defaultBasePath, client: Call.F
      *
      * @param category  (optional, default to Category.TRENDING)
      * @param page  (optional, default to 1)
+     * @param network A TV network (from /requests/discover/filters). (optional)
+     * @param studio A film studio. (optional)
+     * @param genre A movie or TV genre (matching the category). (optional)
+     * @param sort For movies and tv. (optional, default to Sort.POPULAR)
      * @return RequestConfig
      */
-    fun discoverRequestableRequestConfig(category: CategoryDiscoverRequestable?, page: kotlin.Int?) : RequestConfig<Unit> {
+    fun discoverRequestableRequestConfig(category: CategoryDiscoverRequestable?, page: kotlin.Int?, network: kotlin.Long?, studio: kotlin.Long?, genre: kotlin.Long?, sort: SortDiscoverRequestable?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -449,6 +552,18 @@ open class RequestsApi(basePath: kotlin.String = defaultBasePath, client: Call.F
                 }
                 if (page != null) {
                     put("page", listOf(page.toString()))
+                }
+                if (network != null) {
+                    put("network", listOf(network.toString()))
+                }
+                if (studio != null) {
+                    put("studio", listOf(studio.toString()))
+                }
+                if (genre != null) {
+                    put("genre", listOf(genre.toString()))
+                }
+                if (sort != null) {
+                    put("sort", listOf(sort.value))
                 }
             }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()

@@ -1561,8 +1561,25 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Trending, popular and upcoming titles from Seerr (REQ-2). */
+        /** Trending, popular and upcoming titles from Seerr (REQ-2), optionally by network, studio or genre, in an order. A network means shows; a studio means films. */
         get: operations["discoverRequestable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests/discover/filters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Discover's filters: TV networks, film studios and movie and TV genres. */
+        get: operations["discoverFilters"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2787,6 +2804,11 @@ export interface components {
             /** @description The last problem sending a play. */
             error?: string;
         };
+        NamedId: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+        };
         /** @description Public ratings of a title, through Seerr. Each part is absent when unknown. */
         TitleRatings: {
             rottenTomatoes?: {
@@ -3199,6 +3221,8 @@ export interface components {
             url: string;
             /** @enum {string} */
             protocol: "file" | "hls" | "progressive";
+            /** @description The media type url is served with (e.g. video/mp4, audio/flac, application/vnd.apple.mpegurl), for players such as Chromecast that need it. */
+            contentType?: string;
             /**
              * Format: int64
              * @description Where to start (the resume position unless startMs was given).
@@ -6805,8 +6829,16 @@ export interface operations {
     discoverRequestable: {
         parameters: {
             query?: {
-                category?: "trending" | "movies" | "tv" | "upcoming";
+                category?: "trending" | "movies" | "tv" | "upcoming" | "upcoming_tv";
                 page?: number;
+                /** @description A TV network (from /requests/discover/filters). */
+                network?: number;
+                /** @description A film studio. */
+                studio?: number;
+                /** @description A movie or TV genre (matching the category). */
+                genre?: number;
+                /** @description For movies and tv. */
+                sort?: "popular" | "rating" | "newest" | "title";
             };
             header?: never;
             path?: never;
@@ -6825,6 +6857,34 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    discoverFilters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Filters. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        networks: components["schemas"]["NamedId"][];
+                        studios: components["schemas"]["NamedId"][];
+                        movieGenres: components["schemas"]["NamedId"][];
+                        tvGenres: components["schemas"]["NamedId"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
             502: components["responses"]["BadGateway"];
             503: components["responses"]["ServiceUnavailable"];
         };

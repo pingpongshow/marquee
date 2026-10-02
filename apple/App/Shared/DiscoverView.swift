@@ -11,13 +11,21 @@ struct DiscoverView: View {
     @State private var mine: [MediaRequest] = []
     @State private var error: String?
     @State private var picked: DiscoverItem?
+    @State private var browse = DiscoverBrowse()
+    @State private var filters: DiscoverFilters?
+    @State private var page = 1
+    @State private var hasMore = false
+    @State private var loadingMore = false
 
     var body: some View {
         content
             .navigationTitle("Discover")
             .searchable(text: $query, prompt: "Find a movie or show to request")
-            .task { status = try? await app.requestsStatus() }
-            .task(id: "\(category.rawValue)|\(query)") { await load() }
+            .task {
+                status = try? await app.requestsStatus()
+                filters = try? await app.discoverFilters()
+            }
+            .task(id: "\(category.rawValue)|\(query)|\(browse.hashValue)") { await load() }
             .sheet(item: $picked, onDismiss: { Task { await load() } }) { RequestSheet(item: $0) }
     }
 
@@ -30,20 +38,17 @@ struct DiscoverView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     if query.isEmpty {
-                        Picker("Category", selection: $category) {
-                            Text("Trending").tag(DiscoverCategory.trending)
-                            Text("Movies").tag(DiscoverCategory.movies)
-                            Text("Shows").tag(DiscoverCategory.tv)
-                            Text("Coming Soon").tag(DiscoverCategory.upcoming)
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.horizontal, sidePadding)
+                        categoryChips
+                        if category == .movies || category == .tv { filterMenus }
                     }
                     if let error { Text(error).foregroundStyle(.red).padding(.horizontal, sidePadding) }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: cardWidth), spacing: gridSpacing)], spacing: gridSpacing) {
-                        ForEach(items, id: \.tmdbId) { it in card(it) }
+                        ForEach(items, id: \.id) { it in
+                            card(it).onAppear { if it.id == items.last?.id { Task { await loadMore() } } }
+                        }
                     }
                     .padding(.horizontal, sidePadding)
+                    if loadingMore { ProgressView().frame(maxWidth: .infinity) }
                     if !mine.isEmpty { myRequests }
                 }
                 .padding(.vertical)
@@ -109,12 +114,100 @@ struct DiscoverView: View {
         .padding(.horizontal, sidePadding)
     }
 
+    private static let categories: [(DiscoverCategory, String)] = [
+        (.trending, "Trending"), (.movies, "Movies"), (.tv, "TV Shows"), (.upcoming, "Upcoming Movies"), (.upcomingTv, "Upcoming Shows"),
+    ]
+
+    private var categoryChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(Self.categories, id: \.0) { c, label in
+                    Button {
+                        category = c
+                        browse = DiscoverBrowse()
+                    } label: {
+                        Text(label).font(.subheadline.weight(category == c ? .semibold : .regular))
+                            .padding(.horizontal, 14).padding(.vertical, 7)
+                            .background(category == c ? Color.marqueeGold : Color.secondary.opacity(0.18), in: Capsule())
+                            .foregroundStyle(category == c ? Color.black : Color.primary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(category == c ? .isSelected : [])
+                }
+            }
+            .padding(.horizontal, sidePadding)
+        }
+    }
+
+    /// Network (shows) or studio (films), genre and order.
+    private var filterMenus: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                if category == .tv {
+                    filterMenu("Network", all: "All Networks", options: filters?.networks ?? [], value: $browse.network)
+                } else {
+                    filterMenu("Studio", all: "All Studios", options: filters?.studios ?? [], value: $browse.studio)
+                }
+                filterMenu("Genre", all: "All Genres", options: (category == .tv ? filters?.tvGenres : filters?.movieGenres) ?? [], value: $browse.genre)
+                Menu {
+                    Picker("Sort", selection: $browse.sort) {
+                        Text("Popular").tag(DiscoverSort.popular)
+                        Text("Top Rated").tag(DiscoverSort.rating)
+                        Text("Newest").tag(DiscoverSort.newest)
+                        Text("A–Z").tag(DiscoverSort.title)
+                    }
+                } label: {
+                    menuLabel(["popular": "Popular", "rating": "Top Rated", "newest": "Newest", "title": "A–Z"][browse.sort.rawValue] ?? "Sort")
+                }
+            }
+            .padding(.horizontal, sidePadding)
+        }
+    }
+
+    private func filterMenu(_ title: String, all: String, options: [NamedID], value: Binding<Int64?>) -> some View {
+        Menu {
+            Picker(title, selection: value) {
+                Text(all).tag(Int64?.none)
+                ForEach(options, id: \.id) { o in Text(o.name).tag(Int64?.some(o.id)) }
+            }
+        } label: {
+            menuLabel(options.first { $0.id == value.wrappedValue }?.name ?? all)
+        }
+        .accessibilityLabel(title)
+    }
+
+    private func menuLabel(_ text: String) -> some View {
+        HStack(spacing: 4) {
+            Text(text)
+            Image(systemName: "chevron.down").font(.caption2)
+        }
+        .font(.subheadline)
+        .padding(.horizontal, 12).padding(.vertical, 7)
+        .background(Color.secondary.opacity(0.18), in: Capsule())
+    }
+
+    /// The next page, when the last card shows.
+    private func loadMore() async {
+        guard hasMore, !loadingMore else { return }
+        loadingMore = true
+        defer { loadingMore = false }
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard let p = try? await (q.isEmpty ? app.discoverRequestable(category, page: page + 1, browse: browse) : app.searchRequestable(q, page: page + 1)) else { return }
+        page = p.page
+        hasMore = p.page < p.totalPages
+        let seen = Set(items.map(\.id))
+        items += p.results.filter { !seen.contains($0.id) }
+    }
+
     private func load() async {
         guard status?.enabled != false, status?.canRequest != false else { return }
         do {
             let q = query.trimmingCharacters(in: .whitespaces)
             if !q.isEmpty { try await Task.sleep(for: .milliseconds(350)) }
-            items = q.isEmpty ? try await app.discoverRequestable(category) : try await app.searchRequestable(q)
+            let p = q.isEmpty ? try await app.discoverRequestable(category, browse: browse) : try await app.searchRequestable(q)
+            items = p.results
+            page = p.page
+            hasMore = p.page < p.totalPages
             mine = (try? await app.requests()) ?? []
             error = nil
         } catch is CancellationError {

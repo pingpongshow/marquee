@@ -8,6 +8,19 @@ public typealias RequestableShow = Components.Schemas.RequestableShow
 public typealias Availability = Components.Schemas.Availability
 public typealias TitleRatings = Components.Schemas.TitleRatings
 public typealias DiscoverCategory = Operations.DiscoverRequestable.Input.Query.CategoryPayload
+public typealias DiscoverSort = Operations.DiscoverRequestable.Input.Query.SortPayload
+public typealias DiscoverPage = Components.Schemas.DiscoverPage
+public typealias DiscoverFilters = Operations.DiscoverFilters.Output.Ok.Body.JsonPayload
+public typealias NamedID = Components.Schemas.NamedId
+
+/// What narrows a Discover list (REQ-2).
+public struct DiscoverBrowse: Hashable, Sendable {
+    public var network: Int64?
+    public var studio: Int64?
+    public var genre: Int64?
+    public var sort: DiscoverSort = .popular
+    public init() {}
+}
 
 /// Requests through Seerr (REQ-1, REQ-2): find titles that aren't here and ask for them;
 /// admins approve each one.
@@ -24,22 +37,32 @@ public extension AppSession {
         try await requestsAPI.requestsStatus().ok.body.json
     }
 
-    func searchRequestable(_ q: String, page: Int = 1) async throws -> [DiscoverItem] {
+    func searchRequestable(_ q: String, page: Int = 1) async throws -> DiscoverPage {
         switch try await requestsAPI.searchRequestable(query: .init(q: q, page: page)) {
-        case let .ok(ok): return try ok.body.json.results
+        case let .ok(ok): return try ok.body.json
         case let .badGateway(e): throw MarqueeError((try? e.body.json.message) ?? "Seerr didn't answer")
         case let .serviceUnavailable(e): throw MarqueeError((try? e.body.json.message) ?? "Requests aren't set up")
         default: throw MarqueeError("Couldn't search")
         }
     }
 
-    func discoverRequestable(_ category: DiscoverCategory, page: Int = 1) async throws -> [DiscoverItem] {
-        switch try await requestsAPI.discoverRequestable(query: .init(category: category, page: page)) {
-        case let .ok(ok): return try ok.body.json.results
+    /// A page of a Discover list, optionally by network (shows), studio (films), genre and order.
+    func discoverRequestable(_ category: DiscoverCategory, page: Int = 1, browse: DiscoverBrowse = .init()) async throws -> DiscoverPage {
+        let browsing = category == .movies || category == .tv
+        switch try await requestsAPI.discoverRequestable(query: .init(
+            category: category, page: page,
+            network: browsing ? browse.network : nil, studio: browsing ? browse.studio : nil,
+            genre: browsing ? browse.genre : nil, sort: browsing ? browse.sort : nil)) {
+        case let .ok(ok): return try ok.body.json
         case let .badGateway(e): throw MarqueeError((try? e.body.json.message) ?? "Seerr didn't answer")
         case let .serviceUnavailable(e): throw MarqueeError((try? e.body.json.message) ?? "Requests aren't set up")
         default: throw MarqueeError("Couldn't load Discover")
         }
+    }
+
+    /// Discover's filters: networks, studios and genres.
+    func discoverFilters() async throws -> DiscoverFilters {
+        try await requestsAPI.discoverFilters().ok.body.json
     }
 
     /// A title's Rotten Tomatoes and IMDb ratings (REQ-2).
