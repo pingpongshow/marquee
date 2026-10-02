@@ -39,7 +39,8 @@ func (s *Store) SetWatched(ctx context.Context, uid, itemID int64, watched bool)
 			_, err = tx.ExecContext(ctx, `INSERT INTO user_item_state(user_id, item_id, play_count, view_offset_ms, last_viewed_at)
 				VALUES (?, ?, 1, 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 				ON CONFLICT(user_id, item_id) DO UPDATE SET play_count = MAX(play_count, 1), view_offset_ms = 0,
-				last_viewed_at = excluded.last_viewed_at, updated_at = excluded.last_viewed_at`, uid, id)
+				last_viewed_at = excluded.last_viewed_at, updated_at = excluded.last_viewed_at,
+				watchlisted_at = CASE WHEN (SELECT type FROM items WHERE id = excluded.item_id) IN ('movie', 'episode', 'video') THEN NULL ELSE watchlisted_at END`, uid, id)
 		} else {
 			_, err = tx.ExecContext(ctx, `UPDATE user_item_state SET play_count = 0, view_offset_ms = 0,
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE user_id = ? AND item_id = ?`, uid, id)

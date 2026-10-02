@@ -133,4 +133,28 @@ final class MarqueeUITests: XCTestCase {
         app.buttons["3 stars"].tap()
         shot("m5-rated")
     }
+
+    /// Collections in a movie library and the watchlist (META-7, USER-8). Needs the "Test
+    /// Saga" collection on the test server.
+    func testCollectionsAndWatchlist() {
+        connectAndSignIn()
+        openLibrary("Movies")
+        XCTAssertTrue(app.navigationBars["Movies"].waitForExistence(timeout: 10))
+        app.buttons["Sort and filter"].tap()
+        app.buttons["Collections"].tap()
+        let saga = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Test Saga'")).firstMatch
+        XCTAssertTrue(saga.waitForExistence(timeout: 10))
+        saga.tap()
+        XCTAssertTrue(app.staticTexts["In this collection"].waitForExistence(timeout: 10))
+        shot("c1-collection")
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH '20 Valley'")).firstMatch.tap()
+        let add = app.buttons["Watchlist"]
+        XCTAssertTrue(add.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Test Saga"].exists, "the movie shows its collection")
+        add.tap()
+        XCTAssertTrue(app.buttons["On Watchlist"].waitForExistence(timeout: 5))
+        shot("c2-watchlisted")
+        app.buttons["On Watchlist"].tap()
+        XCTAssertTrue(app.buttons["Watchlist"].waitForExistence(timeout: 5))
+    }
 }

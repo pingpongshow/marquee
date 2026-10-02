@@ -33,6 +33,8 @@ export function subtitleFor(item: ItemSummary) {
       return item.childCount === 1 ? "1 album" : `${item.childCount} albums`;
     case "album":
       return item.year ? String(item.year) : `${item.childCount} tracks`;
+    case "collection":
+      return item.childCount === 1 ? "1 title" : `${item.childCount} titles`;
     default:
       return item.year ? String(item.year) : "";
   }

@@ -41,6 +41,7 @@ struct SearchView: View {
         case .album: "Albums"
         case .track: "Tracks"
         case .video: "Videos"
+        case .collection: "Collections"
         }
     }
 }

@@ -563,6 +563,9 @@ func (s *Service) applyMovie(ctx context.Context, itemID int64, m *tmdb.Movie) e
 	if err := setArtwork(ctx, tx, itemID, m.Images, m.PosterPath, m.BackdropPath); err != nil {
 		return err
 	}
+	if err := setCollection(ctx, tx, itemID, m.Collection); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 

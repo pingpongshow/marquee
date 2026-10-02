@@ -270,10 +270,7 @@ type Movie struct {
 	PosterPath    string    `json:"poster_path"`
 	BackdropPath  string    `json:"backdrop_path"`
 	IMDBID        string    `json:"imdb_id"`
-	Collection    *struct {
-		ID   int    `json:"id"`
-		Name string `json:"name"`
-	} `json:"belongs_to_collection"`
+	Collection    *CollectionRef `json:"belongs_to_collection"`
 	Credits      Credits `json:"credits"`
 	Images       Images  `json:"images"`
 	ReleaseDates struct {
@@ -311,6 +308,21 @@ func (c *Client) imageLangs() string {
 		return "en,null"
 	}
 	return lang + ",en,null"
+}
+
+// CollectionRef is the TMDB collection (film series) a movie belongs to.
+type CollectionRef struct {
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
+	PosterPath   string `json:"poster_path"`
+	BackdropPath string `json:"backdrop_path"`
+}
+
+// MovieBasic fetches a movie without credits and images (enough for its collection).
+func (c *Client) MovieBasic(ctx context.Context, id int) (*Movie, error) {
+	var m Movie
+	err := c.get(ctx, "/movie/"+strconv.Itoa(id), nil, &m)
+	return &m, err
 }
 
 func (c *Client) Movie(ctx context.Context, id int) (*Movie, error) {

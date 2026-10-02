@@ -65,6 +65,13 @@ public extension AppSession {
         if watched { _ = try await api.markWatched(path: .init(itemId: id)) } else { _ = try await api.markUnwatched(path: .init(itemId: id)) }
     }
 
+    /// Adds to or removes from the watchlist (USER-8).
+    func setWatchlist(_ id: Int64, _ on: Bool) async throws {
+        if on { _ = try await api.addToWatchlist(path: .init(itemId: id)).noContent } else { _ = try await api.removeFromWatchlist(path: .init(itemId: id)).noContent }
+    }
+
+    func watchlist() async throws -> [Item] { try await api.getWatchlist().ok.body.json }
+
     func playlists(kind: Schemas.PlaylistKind? = nil) async throws -> [Playlist] {
         try await api.listPlaylists(query: .init(kind: kind)).ok.body.json
     }

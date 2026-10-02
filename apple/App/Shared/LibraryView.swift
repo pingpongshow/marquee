@@ -11,6 +11,7 @@ struct LibraryView: View {
     @State private var loading = false
     @State private var sort: ItemSort = .title
     @State private var unwatchedOnly = false
+    @State private var showCollections = false
     @State private var error: String?
 
     private static let page = 120
@@ -35,6 +36,12 @@ struct LibraryView: View {
         .toolbar {
             ToolbarItem {
                 Menu {
+                    if library?._type == .movies {
+                        Picker("Show", selection: $showCollections) {
+                            Text("Movies").tag(false)
+                            Text("Collections").tag(true)
+                        }
+                    }
                     Picker("Sort", selection: $sort) {
                         Text("Title").tag(ItemSort.title)
                         Text("Recently added").tag(ItemSort._hyphen_added)
@@ -49,7 +56,7 @@ struct LibraryView: View {
                 }
             }
         }
-        .task(id: "\(sort)-\(unwatchedOnly)") { await reload() }
+        .task(id: "\(sort)-\(unwatchedOnly)-\(showCollections)") { await reload() }
     }
 
     #if os(tvOS)
@@ -72,7 +79,8 @@ struct LibraryView: View {
         loading = true
         defer { loading = false }
         do {
-            let page = try await app.items(library: libraryID, sort: sort, offset: items.count, limit: Self.page, watch: unwatchedOnly ? .unwatched : nil)
+            let page = try await app.items(library: libraryID, sort: sort, offset: items.count, limit: Self.page,
+                                           watch: unwatchedOnly && !showCollections ? .unwatched : nil, type: showCollections ? .collection : nil)
             items += page.items.filter { new in !items.contains { $0.id == new.id } }
             total = page.total
             error = nil

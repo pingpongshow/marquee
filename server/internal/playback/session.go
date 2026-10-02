@@ -646,7 +646,8 @@ func (m *Manager) Progress(ctx context.Context, id string, positionMS int64, sta
 		_, err := m.DB.ExecContext(ctx, `INSERT INTO user_item_state(user_id, item_id, play_count, view_offset_ms, last_viewed_at)
 			VALUES (?, ?, 1, 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			ON CONFLICT(user_id, item_id) DO UPDATE SET play_count = play_count + 1, view_offset_ms = 0,
-			last_viewed_at = excluded.last_viewed_at, updated_at = excluded.last_viewed_at`, s.UserID, s.ItemID)
+			last_viewed_at = excluded.last_viewed_at, updated_at = excluded.last_viewed_at,
+			watchlisted_at = NULL`, s.UserID, s.ItemID) // watched: off the watchlist (USER-8)
 		return err
 	case !nowWatched && positionMS > 10_000 && s.ItemType != "track":
 		_, err := m.DB.ExecContext(ctx, `INSERT INTO user_item_state(user_id, item_id, view_offset_ms, last_viewed_at)

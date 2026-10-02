@@ -1,10 +1,10 @@
 import { clsx } from "clsx";
-import { Disc3, Film, Music, Tv, Video } from "lucide-react";
+import { Disc3, Film, Layers, Music, Tv, Video } from "lucide-react";
 import { useState } from "react";
 import { imageUrl } from "@/api/client";
 import type { ItemSummary } from "@/api/types";
 
-const icons = { movie: Film, show: Tv, season: Tv, episode: Tv, artist: Music, album: Disc3, track: Music, video: Video };
+const icons = { movie: Film, show: Tv, season: Tv, episode: Tv, artist: Music, album: Disc3, track: Music, video: Video, collection: Layers };
 
 // Deterministic hue per title so placeholder posters are distinguishable.
 function hue(s: string) {

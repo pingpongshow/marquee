@@ -11,6 +11,8 @@ struct ItemDetailView: View {
     @State private var children: [Item] = []
     @State private var related: [Item] = []
     @State private var soundsLike: [Item] = []
+    @State private var series: [(collection: Item, members: [Item])] = []
+    @State private var watchlisted = false
     @State private var error: String?
     @State private var audioID: Int64?
     @State private var subtitleID: Int64?
@@ -22,6 +24,11 @@ struct ItemDetailView: View {
                     header(d)
                     contents(d)
                     cast(d)
+                    ForEach(series, id: \.collection.id) { s in
+                        ShelfRow(title: s.collection.title, destination: .item(s.collection.id)) {
+                            ForEach(s.members, id: \.id) { PosterCard(item: $0) }
+                        }
+                    }
                     if !soundsLike.isEmpty {
                         ShelfRow(title: d.type == .artist ? "Artists that sound similar" : "Albums that sound similar") {
                             ForEach(soundsLike, id: \.id) { PosterCard(item: $0) }
@@ -56,6 +63,13 @@ struct ItemDetailView: View {
             if d.base.childCount > 0 { children = try await app.children(id) }
             if [.movie, .show, .artist, .album].contains(d.type) { related = (try? await app.related(id)) ?? [] }
             if d.type == .artist || d.type == .album { soundsLike = (try? await app.sonicSimilar(id, limit: 15)) ?? [] }
+            watchlisted = d.base.watchlisted ?? false
+            var found: [(collection: Item, members: [Item])] = []
+            for c in d.info.collections ?? [] {
+                let members = ((try? await app.children(c.id)) ?? []).filter { $0.id != id }
+                if !members.isEmpty { found.append((c, members)) }
+            }
+            series = found
         } catch {
             self.error = error.localizedDescription
         }
@@ -165,6 +179,18 @@ struct ItemDetailView: View {
             case .track:
                 Button { music.play([d.base]) } label: { Label("Play", systemImage: "play.fill") }.buttonStyle(.borderedProminent)
                 radioButton(d)
+            case .collection:
+                EmptyView()
+            }
+            if [.movie, .show, .episode, .video].contains(d.type) {
+                Button {
+                    watchlisted.toggle()
+                    let on = watchlisted
+                    Task { do { try await app.setWatchlist(d.id, on) } catch { watchlisted = !on } }
+                } label: {
+                    Label(watchlisted ? "On Watchlist" : "Watchlist", systemImage: watchlisted ? "bookmark.fill" : "bookmark")
+                }
+                .buttonStyle(.bordered)
             }
             if d.base.isPlayableVideo || d.type == .show || d.type == .season {
                 Button {
@@ -235,8 +261,8 @@ struct ItemDetailView: View {
     @ViewBuilder private func contents(_ d: ItemDetail) -> some View {
         if !children.isEmpty {
             switch d.type {
-            case .show, .artist:
-                ShelfRow(title: d.type == .show ? "Seasons" : "Albums") {
+            case .show, .artist, .collection:
+                ShelfRow(title: d.type == .show ? "Seasons" : d.type == .artist ? "Albums" : "In this collection") {
                     ForEach(children, id: \.id) { PosterCard(item: $0) }
                 }
             case .season:

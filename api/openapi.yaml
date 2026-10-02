@@ -1017,6 +1017,131 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /items/{itemId}/watchlist:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    put:
+      tags: [items]
+      operationId: addToWatchlist
+      summary: Save to your watchlist (USER-8). Movies and episodes leave it once watched.
+      responses:
+        "204": { description: Added. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [items]
+      operationId: removeFromWatchlist
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /watchlist:
+    get:
+      tags: [items]
+      operationId: getWatchlist
+      summary: Your watchlist, most recently added first.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ItemSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /libraries/{libraryId}/collections:
+    parameters:
+      - $ref: "#/components/parameters/LibraryId"
+    post:
+      tags: [items]
+      operationId: createCollection
+      summary: Create a manual collection (META-7, admin only). List collections with the library's items endpoint and type=collection.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, minLength: 1, maxLength: 200 }
+                itemIds:
+                  type: array
+                  items: { type: integer, format: int64 }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemSummary" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /collections/{collectionId}:
+    parameters:
+      - name: collectionId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    delete:
+      tags: [items]
+      operationId: deleteCollection
+      summary: Delete a collection; its items stay in the library (admin only).
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /collections/{collectionId}/items:
+    parameters:
+      - name: collectionId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    post:
+      tags: [items]
+      operationId: addToCollection
+      summary: Add items from the same library to a collection (admin only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [itemIds]
+              properties:
+                itemIds:
+                  type: array
+                  minItems: 1
+                  items: { type: integer, format: int64 }
+      responses:
+        "204": { description: Added. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /collections/{collectionId}/items/{itemId}:
+    parameters:
+      - name: collectionId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+      - $ref: "#/components/parameters/ItemId"
+    delete:
+      tags: [items]
+      operationId: removeFromCollection
+      summary: Take an item out of a collection (admin only).
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /items/{itemId}/next:
     parameters:
       - $ref: "#/components/parameters/ItemId"
@@ -2502,7 +2627,7 @@ components:
     # ---------- Items ----------
     ItemType:
       type: string
-      enum: [movie, show, season, episode, artist, album, track, video]
+      enum: [movie, show, season, episode, artist, album, track, video, collection]
 
     LibraryFilters:
       type: object
@@ -2767,6 +2892,7 @@ components:
         lastViewedAt: { type: string, format: date-time }
         watchedLeafCount: { type: integer, description: "Shows, seasons, artists, albums: how many episodes/tracks the user has watched." }
         userRating: { type: number, description: "The user's rating, 0–10 (10 = loved)." }
+        watchlisted: { type: boolean, description: On the user's watchlist (USER-8). }
 
     ItemImages:
       type: object
@@ -2853,6 +2979,10 @@ components:
               type: array
               description: Fields edited by an administrator; agents never overwrite them.
               items: { type: string }
+            collections:
+              type: array
+              description: Collections the item belongs to (META-7).
+              items: { $ref: "#/components/schemas/ItemSummary" }
             summary: { type: string }
             audienceRating: { type: number, description: "TMDB user score, 0–10" }
             ratings: { $ref: "#/components/schemas/Ratings" }

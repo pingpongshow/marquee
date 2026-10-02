@@ -209,6 +209,9 @@ func run() error {
 			refreshAllRatings(ctx, meta, libraries)
 			return "Done", nil
 		}})
+	scheduler.Register(tasks.Task{ID: "collections", Name: "Update collections", Every: 7 * 24 * time.Hour,
+		Description: "Groups movies into their film series (TMDB collections), including movies matched before collections existed.",
+		Run:         meta.SyncCollections})
 	// Music intelligence (M6.5): the sonic sidecar embeds tracks; the index serves radios etc.
 	sonicSvc := &sonic.Service{DB: database, Client: &sonic.Client{BaseURL: envOr("MARQUEE_SONIC_URL", "http://127.0.0.1:32501")},
 		Index: sonic.NewIndex(), Enabled: func() bool { return store.Get().Music.SonicAnalysis }}

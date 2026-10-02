@@ -1308,6 +1308,10 @@ extension Components {
             public var browseRoots: [Swift.String]?
             /// - Remark: Generated from `#/components/schemas/LibraryGlobalSettings/watchedThresholdPercent`.
             public var watchedThresholdPercent: Swift.Int?
+            /// Find intros and end credits in TV episodes by comparing their audio, for Skip Intro and Skip Credits (PLAY-12). Markers from Plex or the files take precedence.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LibraryGlobalSettings/detectIntros`.
+            public var detectIntros: Swift.Bool?
             /// Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie.
             ///
             /// - Remark: Generated from `#/components/schemas/LibraryGlobalSettings/trickplay`.
@@ -1320,6 +1324,7 @@ extension Components {
             ///   - ignorePatterns:
             ///   - browseRoots: Directories the folder picker may browse.
             ///   - watchedThresholdPercent:
+            ///   - detectIntros: Find intros and end credits in TV episodes by comparing their audio, for Skip Intro and Skip Credits (PLAY-12). Markers from Plex or the files take precedence.
             ///   - trickplay: Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie.
             public init(
                 watchFilesystem: Swift.Bool? = nil,
@@ -1327,6 +1332,7 @@ extension Components {
                 ignorePatterns: [Swift.String]? = nil,
                 browseRoots: [Swift.String]? = nil,
                 watchedThresholdPercent: Swift.Int? = nil,
+                detectIntros: Swift.Bool? = nil,
                 trickplay: Swift.Bool? = nil
             ) {
                 self.watchFilesystem = watchFilesystem
@@ -1334,6 +1340,7 @@ extension Components {
                 self.ignorePatterns = ignorePatterns
                 self.browseRoots = browseRoots
                 self.watchedThresholdPercent = watchedThresholdPercent
+                self.detectIntros = detectIntros
                 self.trickplay = trickplay
             }
             public enum CodingKeys: String, CodingKey {
@@ -1342,6 +1349,7 @@ extension Components {
                 case ignorePatterns
                 case browseRoots
                 case watchedThresholdPercent
+                case detectIntros
                 case trickplay
             }
         }
@@ -3377,6 +3385,7 @@ extension Components {
             case album = "album"
             case track = "track"
             case video = "video"
+            case collection = "collection"
         }
         /// - Remark: Generated from `#/components/schemas/LibraryFilters`.
         public struct LibraryFilters: Codable, Hashable, Sendable {
@@ -4403,6 +4412,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ItemSummary/userRating`.
             public var userRating: Swift.Double?
+            /// On the user's watchlist (USER-8).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemSummary/watchlisted`.
+            public var watchlisted: Swift.Bool?
             /// Creates a new `ItemSummary`.
             ///
             /// - Parameters:
@@ -4433,6 +4446,7 @@ extension Components {
             ///   - lastViewedAt:
             ///   - watchedLeafCount: Shows, seasons, artists, albums: how many episodes/tracks the user has watched.
             ///   - userRating: The user's rating, 0–10 (10 = loved).
+            ///   - watchlisted: On the user's watchlist (USER-8).
             public init(
                 id: Swift.Int64,
                 libraryId: Swift.Int64,
@@ -4460,7 +4474,8 @@ extension Components {
                 viewCount: Swift.Int? = nil,
                 lastViewedAt: Foundation.Date? = nil,
                 watchedLeafCount: Swift.Int? = nil,
-                userRating: Swift.Double? = nil
+                userRating: Swift.Double? = nil,
+                watchlisted: Swift.Bool? = nil
             ) {
                 self.id = id
                 self.libraryId = libraryId
@@ -4489,6 +4504,7 @@ extension Components {
                 self.lastViewedAt = lastViewedAt
                 self.watchedLeafCount = watchedLeafCount
                 self.userRating = userRating
+                self.watchlisted = watchlisted
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -4518,6 +4534,7 @@ extension Components {
                 case lastViewedAt
                 case watchedLeafCount
                 case userRating
+                case watchlisted
             }
         }
         /// Artwork ids for /images/{artworkId}. Seasons and episodes fall back to the show's art, tracks to the album's.
@@ -4870,6 +4887,10 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/lockedFields`.
                 public var lockedFields: [Swift.String]
+                /// Collections the item belongs to (META-7).
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/collections`.
+                public var collections: [Components.Schemas.ItemSummary]?
                 /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/summary`.
                 public var summary: Swift.String?
                 /// TMDB user score, 0–10
@@ -4920,6 +4941,7 @@ extension Components {
                 ///
                 /// - Parameters:
                 ///   - lockedFields: Fields edited by an administrator; agents never overwrite them.
+                ///   - collections: Collections the item belongs to (META-7).
                 ///   - summary:
                 ///   - audienceRating: TMDB user score, 0–10
                 ///   - ratings:
@@ -4933,6 +4955,7 @@ extension Components {
                 ///   - chapters:
                 public init(
                     lockedFields: [Swift.String],
+                    collections: [Components.Schemas.ItemSummary]? = nil,
                     summary: Swift.String? = nil,
                     audienceRating: Swift.Double? = nil,
                     ratings: Components.Schemas.Ratings? = nil,
@@ -4946,6 +4969,7 @@ extension Components {
                     chapters: [Components.Schemas.Chapter]
                 ) {
                     self.lockedFields = lockedFields
+                    self.collections = collections
                     self.summary = summary
                     self.audienceRating = audienceRating
                     self.ratings = ratings
@@ -4960,6 +4984,7 @@ extension Components {
                 }
                 public enum CodingKeys: String, CodingKey {
                     case lockedFields
+                    case collections
                     case summary
                     case audienceRating
                     case ratings
