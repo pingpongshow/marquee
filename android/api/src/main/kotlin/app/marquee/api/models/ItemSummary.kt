@@ -62,6 +62,7 @@ import kotlinx.serialization.Contextual
  * @param userRating The user's rating, 0–10 (10 = loved).
  * @param watchlisted On the user's watchlist (USER-8).
  * @param extraType Set for extras (LIB-8).
+ * @param releaseType Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
  */
 @Serializable
 
@@ -161,7 +162,11 @@ data class ItemSummary (
 
     /* Set for extras (LIB-8). */
     @SerialName(value = "extraType")
-    val extraType: ItemSummary.ExtraType? = null
+    val extraType: ItemSummary.ExtraType? = null,
+
+    /* Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown. */
+    @SerialName(value = "releaseType")
+    val releaseType: ItemSummary.ReleaseType? = null
 
 ) {
 
@@ -191,6 +196,23 @@ data class ItemSummary (
         @SerialName(value = "interview") INTERVIEW("interview"),
         @SerialName(value = "scene") SCENE("scene"),
         @SerialName(value = "short") SHORT("short"),
+        @SerialName(value = "other") OTHER("other");
+    }
+    /**
+     * Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
+     *
+     * Values: ALBUM,EP,SINGLE,COMPILATION,LIVE,SOUNDTRACK,REMIX,DEMO,OTHER
+     */
+    @Serializable
+    enum class ReleaseType(val value: kotlin.String) {
+        @SerialName(value = "album") ALBUM("album"),
+        @SerialName(value = "ep") EP("ep"),
+        @SerialName(value = "single") SINGLE("single"),
+        @SerialName(value = "compilation") COMPILATION("compilation"),
+        @SerialName(value = "live") LIVE("live"),
+        @SerialName(value = "soundtrack") SOUNDTRACK("soundtrack"),
+        @SerialName(value = "remix") REMIX("remix"),
+        @SerialName(value = "demo") DEMO("demo"),
         @SerialName(value = "other") OTHER("other");
     }
 

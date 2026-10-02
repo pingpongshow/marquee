@@ -6168,6 +6168,24 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ItemSummary/extraType`.
             public var extraType: Components.Schemas.ItemSummary.ExtraTypePayload?
+            /// Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemSummary/releaseType`.
+            @frozen public enum ReleaseTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case album = "album"
+                case ep = "ep"
+                case single = "single"
+                case compilation = "compilation"
+                case live = "live"
+                case soundtrack = "soundtrack"
+                case remix = "remix"
+                case demo = "demo"
+                case other = "other"
+            }
+            /// Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemSummary/releaseType`.
+            public var releaseType: Components.Schemas.ItemSummary.ReleaseTypePayload?
             /// Creates a new `ItemSummary`.
             ///
             /// - Parameters:
@@ -6200,6 +6218,7 @@ extension Components {
             ///   - userRating: The user's rating, 0–10 (10 = loved).
             ///   - watchlisted: On the user's watchlist (USER-8).
             ///   - extraType: Set for extras (LIB-8).
+            ///   - releaseType: Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
             public init(
                 id: Swift.Int64,
                 libraryId: Swift.Int64,
@@ -6229,7 +6248,8 @@ extension Components {
                 watchedLeafCount: Swift.Int? = nil,
                 userRating: Swift.Double? = nil,
                 watchlisted: Swift.Bool? = nil,
-                extraType: Components.Schemas.ItemSummary.ExtraTypePayload? = nil
+                extraType: Components.Schemas.ItemSummary.ExtraTypePayload? = nil,
+                releaseType: Components.Schemas.ItemSummary.ReleaseTypePayload? = nil
             ) {
                 self.id = id
                 self.libraryId = libraryId
@@ -6260,6 +6280,7 @@ extension Components {
                 self.userRating = userRating
                 self.watchlisted = watchlisted
                 self.extraType = extraType
+                self.releaseType = releaseType
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -6291,6 +6312,7 @@ extension Components {
                 case userRating
                 case watchlisted
                 case extraType
+                case releaseType
             }
         }
         /// Artwork ids for /images/{artworkId}. Seasons and episodes fall back to the show's art, tracks to the album's.

@@ -151,6 +151,7 @@ function Children({ item }: { item: ItemDetail }) {
   const list = children.data.items;
   const heading = { show: "Seasons", season: "Episodes", artist: "Albums", album: "Tracks", collection: "In this collection" }[item.type as string] ?? "Contents";
 
+  if (item.type === "artist") return <ArtistReleases list={list} />;
   // Episodes and tracks are rows; seasons and albums are poster cards.
   const rows = item.type === "season" || item.type === "album";
   return (
@@ -184,20 +185,50 @@ function Children({ item }: { item: ItemDetail }) {
           ))}
         </ol>
       ) : (
-        <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-x-4 gap-y-6">
-          {list.map((c) => (
-            <li key={c.id}>
-              <Link to="/item/$itemId" params={{ itemId: String(c.id) }} className="group block">
-                <Poster item={c} shape={c.type === "album" ? "square" : "poster"} className="group-hover:ring-2 group-hover:ring-accent" />
-                <div className="mt-2 truncate text-sm font-medium">{c.title}</div>
-                <div className="truncate text-xs text-muted">{subtitleFor(c)}</div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <CardGrid list={list} />
       )}
     </section>
   );
+}
+
+function CardGrid({ list }: { list: ItemSummary[] }) {
+  return (
+    <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-x-4 gap-y-6">
+      {list.map((c) => (
+        <li key={c.id}>
+          <Link to="/item/$itemId" params={{ itemId: String(c.id) }} className="group block">
+            <Poster item={c} shape={c.type === "album" ? "square" : "poster"} className="group-hover:ring-2 group-hover:ring-accent" />
+            <div className="mt-2 truncate text-sm font-medium">{c.title}</div>
+            <div className="truncate text-xs text-muted">{subtitleFor(c)}</div>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Plexamp-style sections of an artist's releases, by MusicBrainz release type (META-3). */
+const releaseSections: [string, string[]][] = [
+  ["Albums", ["album", ""]],
+  ["Singles & EPs", ["ep", "single"]],
+  ["Live Albums", ["live"]],
+  ["Compilations", ["compilation"]],
+  ["Soundtracks", ["soundtrack"]],
+  ["Remixes", ["remix"]],
+  ["Demos", ["demo"]],
+  ["Other", ["other"]],
+];
+
+function ArtistReleases({ list }: { list: ItemSummary[] }) {
+  const groups = releaseSections
+    .map(([title, types]) => [title, list.filter((c) => types.includes(c.releaseType ?? ""))] as const)
+    .filter(([, l]) => l.length > 0);
+  return groups.map(([title, l]) => (
+    <section key={title} className="mt-10">
+      <h2 className="mb-4 text-lg font-semibold">{title}</h2>
+      <CardGrid list={l} />
+    </section>
+  ));
 }
 
 const extraNames: Record<string, string> = {
