@@ -1308,6 +1308,10 @@ extension Components {
             public var browseRoots: [Swift.String]?
             /// - Remark: Generated from `#/components/schemas/LibraryGlobalSettings/watchedThresholdPercent`.
             public var watchedThresholdPercent: Swift.Int?
+            /// Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LibraryGlobalSettings/trickplay`.
+            public var trickplay: Swift.Bool?
             /// Creates a new `LibraryGlobalSettings`.
             ///
             /// - Parameters:
@@ -1316,18 +1320,21 @@ extension Components {
             ///   - ignorePatterns:
             ///   - browseRoots: Directories the folder picker may browse.
             ///   - watchedThresholdPercent:
+            ///   - trickplay: Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie.
             public init(
                 watchFilesystem: Swift.Bool? = nil,
                 scanOnStartup: Swift.Bool? = nil,
                 ignorePatterns: [Swift.String]? = nil,
                 browseRoots: [Swift.String]? = nil,
-                watchedThresholdPercent: Swift.Int? = nil
+                watchedThresholdPercent: Swift.Int? = nil,
+                trickplay: Swift.Bool? = nil
             ) {
                 self.watchFilesystem = watchFilesystem
                 self.scanOnStartup = scanOnStartup
                 self.ignorePatterns = ignorePatterns
                 self.browseRoots = browseRoots
                 self.watchedThresholdPercent = watchedThresholdPercent
+                self.trickplay = trickplay
             }
             public enum CodingKeys: String, CodingKey {
                 case watchFilesystem
@@ -1335,6 +1342,7 @@ extension Components {
                 case ignorePatterns
                 case browseRoots
                 case watchedThresholdPercent
+                case trickplay
             }
         }
         /// - Remark: Generated from `#/components/schemas/MetadataSettings`.
@@ -1783,6 +1791,7 @@ extension Components {
                 case scan = "scan"
                 case _import = "import"
                 case stream = "stream"
+                case task = "task"
             }
             /// - Remark: Generated from `#/components/schemas/ActivityTask/kind`.
             public var kind: Components.Schemas.ActivityTask.KindPayload
@@ -4078,6 +4087,65 @@ extension Components {
                 case title
                 case description
                 case items
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/Trickplay`.
+        public struct Trickplay: Codable, Hashable, Sendable {
+            /// Thumbnail n shows the video at n × intervalMs.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Trickplay/intervalMs`.
+            public var intervalMs: Swift.Int64
+            /// One thumbnail's width in pixels.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Trickplay/width`.
+            public var width: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/Trickplay/height`.
+            public var height: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/Trickplay/columns`.
+            public var columns: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/Trickplay/rows`.
+            public var rows: Swift.Int
+            /// Thumbnails in total.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Trickplay/count`.
+            public var count: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/Trickplay/sheets`.
+            public var sheets: Swift.Int
+            /// Creates a new `Trickplay`.
+            ///
+            /// - Parameters:
+            ///   - intervalMs: Thumbnail n shows the video at n × intervalMs.
+            ///   - width: One thumbnail's width in pixels.
+            ///   - height:
+            ///   - columns:
+            ///   - rows:
+            ///   - count: Thumbnails in total.
+            ///   - sheets:
+            public init(
+                intervalMs: Swift.Int64,
+                width: Swift.Int,
+                height: Swift.Int,
+                columns: Swift.Int,
+                rows: Swift.Int,
+                count: Swift.Int,
+                sheets: Swift.Int
+            ) {
+                self.intervalMs = intervalMs
+                self.width = width
+                self.height = height
+                self.columns = columns
+                self.rows = rows
+                self.count = count
+                self.sheets = sheets
+            }
+            public enum CodingKeys: String, CodingKey {
+                case intervalMs
+                case width
+                case height
+                case columns
+                case rows
+                case count
+                case sheets
             }
         }
         /// - Remark: Generated from `#/components/schemas/Lyrics`.

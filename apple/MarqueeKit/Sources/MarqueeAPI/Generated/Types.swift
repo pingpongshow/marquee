@@ -428,6 +428,16 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `PUT /items/{itemId}/rating`.
     /// - Remark: Generated from `#/paths//items/{itemId}/rating/put(rateItem)`.
     func rateItem(_ input: Operations.RateItem.Input) async throws -> Operations.RateItem.Output
+    /// Seek-bar preview thumbnails for a video (PLAY-13), as sprite sheets of columns × rows tiles.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/trickplay`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/trickplay/get(getTrickplay)`.
+    func getTrickplay(_ input: Operations.GetTrickplay.Input) async throws -> Operations.GetTrickplay.Output
+    /// One sprite sheet; thumbnail n is on sheet n / (columns × rows).
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/trickplay/{sheet}`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/trickplay/{sheet}/get(getTrickplaySheet)`.
+    func getTrickplaySheet(_ input: Operations.GetTrickplaySheet.Input) async throws -> Operations.GetTrickplaySheet.Output
     /// A track's lyrics (MUSIC-10), timed when available, from the file, a .lrc sidecar or LRCLIB.
     ///
     /// - Remark: HTTP `GET /items/{itemId}/lyrics`.
@@ -1469,6 +1479,32 @@ extension APIProtocol {
             path: path,
             headers: headers,
             body: body
+        ))
+    }
+    /// Seek-bar preview thumbnails for a video (PLAY-13), as sprite sheets of columns × rows tiles.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/trickplay`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/trickplay/get(getTrickplay)`.
+    public func getTrickplay(
+        path: Operations.GetTrickplay.Input.Path,
+        headers: Operations.GetTrickplay.Input.Headers = .init()
+    ) async throws -> Operations.GetTrickplay.Output {
+        try await getTrickplay(Operations.GetTrickplay.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// One sprite sheet; thumbnail n is on sheet n / (columns × rows).
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/trickplay/{sheet}`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/trickplay/{sheet}/get(getTrickplaySheet)`.
+    public func getTrickplaySheet(
+        path: Operations.GetTrickplaySheet.Input.Path,
+        headers: Operations.GetTrickplaySheet.Input.Headers = .init()
+    ) async throws -> Operations.GetTrickplaySheet.Output {
+        try await getTrickplaySheet(Operations.GetTrickplaySheet.Input(
+            path: path,
+            headers: headers
         ))
     }
     /// A track's lyrics (MUSIC-10), timed when available, from the file, a .lrc sidecar or LRCLIB.
