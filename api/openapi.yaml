@@ -1017,6 +1017,83 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /items/{itemId}/subtitles/search:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [playback]
+      operationId: searchSubtitles
+      summary: Search OpenSubtitles for a movie's or episode's subtitles (PLAY-7). Results made for this exact file come first.
+      parameters:
+        - name: languages
+          in: query
+          description: Comma-separated ISO 639-1 codes, e.g. "en,es".
+          schema: { type: string, default: en }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SubtitleResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
+  /items/{itemId}/subtitles:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    post:
+      tags: [playback]
+      operationId: downloadSubtitle
+      summary: Download a subtitle from OpenSubtitles and add it to the item's subtitle choices.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fileId, language]
+              properties:
+                fileId: { type: integer, format: int64, description: The result's OpenSubtitles file id. }
+                language: { type: string }
+                release: { type: string }
+                hearingImpaired: { type: boolean }
+      responses:
+        "201":
+          description: Added.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [streamId]
+                properties:
+                  streamId: { type: integer, format: int64 }
+                  remaining: { type: integer, description: Downloads OpenSubtitles allows today. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
+  /items/{itemId}/subtitles/{streamId}:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+      - name: streamId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    delete:
+      tags: [playback]
+      operationId: removeSubtitle
+      summary: Remove a downloaded subtitle (admin only).
+      responses:
+        "204": { description: Removed. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /items/{itemId}/watchlist:
     parameters:
       - $ref: "#/components/parameters/ItemId"
@@ -1926,6 +2003,11 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
+    BadGateway:
+      description: An outside service (e.g. OpenSubtitles) failed or refused the request.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
 
   schemas:
     Error:
@@ -2280,6 +2362,8 @@ components:
         tmdbApiKeySet: { type: boolean, readOnly: true }
         fanartApiKeySet: { type: boolean, readOnly: true }
         openSubtitlesApiKeySet: { type: boolean, readOnly: true }
+        openSubtitlesUsername: { type: string, description: Optional OpenSubtitles account; logging in raises the daily download limit. }
+        openSubtitlesPasswordSet: { type: boolean, readOnly: true }
         omdbApiKeySet: { type: boolean, readOnly: true }
         omdbDailyLimit: { type: integer, minimum: 1, description: Requests per day (free OMDb keys allow 1000). }
         animeEpisodeOrdering: { type: string, enum: [seasonal, absolute] }
@@ -2291,6 +2375,8 @@ components:
         tmdbApiKey: { type: string }
         fanartApiKey: { type: string }
         openSubtitlesApiKey: { type: string }
+        openSubtitlesUsername: { type: string }
+        openSubtitlesPassword: { type: string }
         omdbApiKey: { type: string }
         omdbDailyLimit: { type: integer, minimum: 1 }
         animeEpisodeOrdering: { type: string, enum: [seasonal, absolute] }
@@ -2887,6 +2973,20 @@ components:
         items:
           type: array
           items: { $ref: "#/components/schemas/ItemSummary" }
+
+    SubtitleResult:
+      type: object
+      required: [fileId, language, release, downloads, hearingImpaired, hashMatch, aiTranslated]
+      properties:
+        fileId: { type: integer, format: int64 }
+        language: { type: string, description: ISO 639-1 (e.g. en, pt-BR). }
+        release: { type: string }
+        fileName: { type: string }
+        downloads: { type: integer }
+        hearingImpaired: { type: boolean }
+        foreignPartsOnly: { type: boolean }
+        aiTranslated: { type: boolean, description: Machine or AI translated. }
+        hashMatch: { type: boolean, description: Made for this exact file. }
 
     Stats:
       type: object

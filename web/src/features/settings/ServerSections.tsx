@@ -168,26 +168,42 @@ function SecretField({ label, help, isSet, value, onChange }: { label: string; h
 export function MetadataSettings() {
   // Secrets are write-only: the server returns *Set flags; the draft carries new values to send.
   const s = useSectionDraft("metadata", (d) => {
-    const x = d as typeof d & { tmdbApiKey?: string; fanartApiKey?: string; openSubtitlesApiKey?: string; omdbApiKey?: string };
+    const x = d as typeof d & { tmdbApiKey?: string; fanartApiKey?: string; openSubtitlesApiKey?: string; omdbApiKey?: string; openSubtitlesPassword?: string };
     return {
       tmdbApiKey: x.tmdbApiKey,
       fanartApiKey: x.fanartApiKey,
       openSubtitlesApiKey: x.openSubtitlesApiKey,
+      openSubtitlesUsername: d.openSubtitlesUsername,
+      openSubtitlesPassword: x.openSubtitlesPassword,
       omdbApiKey: x.omdbApiKey,
       omdbDailyLimit: d.omdbDailyLimit,
       animeEpisodeOrdering: d.animeEpisodeOrdering,
     };
   });
   if (!s.draft) return <Spinner />;
-  const d = s.draft as typeof s.draft & { tmdbApiKey?: string; fanartApiKey?: string; openSubtitlesApiKey?: string; omdbApiKey?: string };
-  const set = (k: "tmdbApiKey" | "fanartApiKey" | "openSubtitlesApiKey" | "omdbApiKey") => (v: string | undefined) => s.update({ [k]: v } as Partial<typeof d>);
+  const d = s.draft as typeof s.draft & { tmdbApiKey?: string; fanartApiKey?: string; openSubtitlesApiKey?: string; omdbApiKey?: string; openSubtitlesPassword?: string };
+  const set = (k: "tmdbApiKey" | "fanartApiKey" | "openSubtitlesApiKey" | "omdbApiKey" | "openSubtitlesPassword") => (v: string | undefined) => s.update({ [k]: v } as Partial<typeof d>);
   return (
     <>
       <div className="space-y-6">
         <Card title="Providers" description="Movies, TV and anime use TMDB, with AniList for anime. Music uses MusicBrainz (no key needed).">
           <SecretField label="TMDB API key" help={<>Free at themoviedb.org → Settings → API. Required for movie and TV metadata.</>} isSet={!!d.tmdbApiKeySet} value={d.tmdbApiKey} onChange={set("tmdbApiKey")} />
           <SecretField label="Fanart.tv API key" help="Optional. Adds logos, clear art and artist images." isSet={!!d.fanartApiKeySet} value={d.fanartApiKey} onChange={set("fanartApiKey")} />
-          <SecretField label="OpenSubtitles API key" help="Optional. Enables subtitle search from the player." isSet={!!d.openSubtitlesApiKeySet} value={d.openSubtitlesApiKey} onChange={set("openSubtitlesApiKey")} />
+          <SecretField
+            label="OpenSubtitles API key"
+            help="Optional. Enables “Find subtitles” in the player. Get one at opensubtitles.com → API consumers."
+            isSet={!!d.openSubtitlesApiKeySet}
+            value={d.openSubtitlesApiKey}
+            onChange={set("openSubtitlesApiKey")}
+          />
+          {(d.openSubtitlesApiKeySet || d.openSubtitlesApiKey) && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="OpenSubtitles username" help="Optional. Signing in allows more downloads a day.">
+                {(id) => <Input id={id} autoComplete="off" value={d.openSubtitlesUsername ?? ""} onChange={(e) => s.update({ openSubtitlesUsername: e.target.value })} />}
+              </Field>
+              <SecretField label="OpenSubtitles password" help="Stored on the server and only sent to OpenSubtitles." isSet={!!d.openSubtitlesPasswordSet} value={d.openSubtitlesPassword} onChange={set("openSubtitlesPassword")} />
+            </div>
+          )}
         </Card>
         <Card title="Ratings" description="IMDb, Rotten Tomatoes and Metacritic scores for movies and shows, from OMDb.">
           <SecretField

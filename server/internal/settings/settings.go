@@ -106,6 +106,8 @@ type Metadata struct {
 	TMDBAPIKey           string `json:"tmdbApiKey"`
 	FanartAPIKey         string `json:"fanartApiKey"`
 	OpenSubtitlesAPIKey  string `json:"openSubtitlesApiKey"`
+	OpenSubtitlesUser    string `json:"openSubtitlesUsername"`
+	OpenSubtitlesPass    string `json:"openSubtitlesPassword"`
 	OMDbAPIKey           string `json:"omdbApiKey"`
 	OMDbDailyLimit       int    `json:"omdbDailyLimit"`
 	AnimeEpisodeOrdering string `json:"animeEpisodeOrdering"`

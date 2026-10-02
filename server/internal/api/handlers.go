@@ -20,6 +20,7 @@ import (
 	"marquee/internal/plex"
 	"marquee/internal/settings"
 	"marquee/internal/sonic"
+	"marquee/internal/subtitles"
 	"marquee/internal/tasks"
 	"marquee/internal/trickplay"
 	"marquee/internal/webhooks"
@@ -44,6 +45,7 @@ type Handlers struct {
 	Tasks            *tasks.Scheduler
 	Trickplay        *trickplay.Service
 	Webhooks         *webhooks.Dispatcher
+	Subtitles        *subtitles.Service
 	QuickConnect     auth.QuickConnect
 	Sonic            *sonic.Service
 	Lyrics           *lyrics.Service
