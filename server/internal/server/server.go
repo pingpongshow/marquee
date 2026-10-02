@@ -18,6 +18,7 @@ import (
 type Deps struct {
 	Handlers   *api.Handlers
 	Stream     http.Handler // media URLs under /api/v1/stream/
+	Downloads  http.Handler // offline download files under /api/v1/download/
 	Auth       *auth.Service
 	Classifier *netclass.Classifier
 	WebDir     string
@@ -42,6 +43,9 @@ func New(d Deps) http.Handler {
 	})
 	if d.Stream != nil {
 		mux.Handle("/api/v1/stream/", d.Stream)
+	}
+	if d.Downloads != nil {
+		mux.Handle("/api/v1/download/", d.Downloads)
 	}
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "unknown API endpoint")

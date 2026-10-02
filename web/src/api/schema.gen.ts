@@ -955,6 +955,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/downloads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your conversions for offline viewing, newest first. */
+        get: operations["listDownloads"];
+        put?: never;
+        /** Prepare an item to download for offline playback. "original" is ready at once; other qualities are converted on the server (one at a time) and become ready later. */
+        post: operations["createDownload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/downloads/{downloadId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                downloadId: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getDownload"];
+        put?: never;
+        post?: never;
+        /** Remove a conversion from the server (apps do this once they have the file). */
+        delete: operations["deleteDownload"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Record progress made while offline (a downloaded item played without a session). */
+        put: operations["syncProgress"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/webhooks/test": {
         parameters: {
             query?: never;
@@ -2347,6 +2403,29 @@ export interface components {
             title: string;
             description?: string;
             items: components["schemas"]["ItemSummary"][];
+        };
+        Download: {
+            /** @description "original-<item>" for originals. */
+            id: string;
+            /** Format: int64 */
+            itemId: number;
+            /** @enum {string} */
+            quality: "original" | "high" | "medium" | "low";
+            /** @enum {string} */
+            status: "queued" | "converting" | "ready" | "failed";
+            /** @description Conversion progress */
+            progress: number;
+            /**
+             * Format: int64
+             * @description Bytes
+             */
+            size?: number;
+            /** @description Where to fetch the file once ready (supports HTTP ranges; send the token as for streams). */
+            url?: string;
+            fileName?: string;
+            error?: string;
+            /** Format: date-time */
+            createdAt?: string;
         };
         SubtitleResult: {
             /** Format: int64 */
@@ -4512,6 +4591,147 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    listDownloads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Download"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createDownload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: int64 */
+                    itemId: number;
+                    /**
+                     * Format: int64
+                     * @description A specific version; default is the best.
+                     */
+                    fileId?: number;
+                    /**
+                     * @description high 1080p, medium 720p, low 480p (HEVC MP4).
+                     * @enum {string}
+                     */
+                    quality: "original" | "high" | "medium" | "low";
+                };
+            };
+        };
+        responses: {
+            /** @description Ready or queued. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Download"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getDownload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                downloadId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Download"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteDownload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                downloadId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    syncProgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: int64 */
+                    positionMs: number;
+                    /** @description Played to the end (counts a play). */
+                    watched?: boolean;
+                    /** Format: date-time */
+                    playedAt?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Recorded. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     testWebhook: {

@@ -9,6 +9,7 @@ import (
 
 	"marquee/internal/auth"
 	"marquee/internal/avatars"
+	"marquee/internal/downloads"
 	"marquee/internal/images"
 	"marquee/internal/items"
 	"marquee/internal/library"
@@ -46,6 +47,7 @@ type Handlers struct {
 	Trickplay        *trickplay.Service
 	Webhooks         *webhooks.Dispatcher
 	Subtitles        *subtitles.Service
+	Downloads        *downloads.Service
 	QuickConnect     auth.QuickConnect
 	Sonic            *sonic.Service
 	Lyrics           *lyrics.Service
