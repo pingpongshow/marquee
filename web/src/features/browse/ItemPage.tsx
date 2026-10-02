@@ -200,6 +200,35 @@ function Children({ item }: { item: ItemDetail }) {
   );
 }
 
+const extraNames: Record<string, string> = {
+  trailer: "Trailer", featurette: "Featurette", behind_the_scenes: "Behind the scenes", deleted_scene: "Deleted scene",
+  interview: "Interview", scene: "Scene", short: "Short", other: "Extra",
+};
+
+/** Trailers, featurettes and other extras (LIB-8); they play like any video. */
+function Extras({ item }: { item: ItemDetail }) {
+  if (!item.extras?.length) return null;
+  return (
+    <section className="mt-10">
+      <h2 className="mb-4 text-lg font-semibold">Extras</h2>
+      <ul className="flex gap-4 overflow-x-auto pb-2">
+        {item.extras.map((x) => (
+          <li key={x.id} className="w-60 shrink-0">
+            <Link to="/play/$itemId" params={{ itemId: String(x.id) }} search={{}} className="group block">
+              <Poster item={x} shape="wide" width={300} className="group-hover:ring-2 group-hover:ring-accent" />
+              <div className="mt-2 truncate text-sm font-medium">{x.title}</div>
+              <div className="truncate text-xs text-muted">
+                {extraNames[x.extraType ?? "other"]}
+                {x.durationMs ? ` · ${formatTrackTime(x.durationMs)}` : ""}
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /** Other titles in the item's collections (film series). */
 function CollectionShelves({ item }: { item: ItemDetail }) {
   return (item.collections ?? []).map((c) => <CollectionShelf key={c.id} collection={c} current={item.id} />);
@@ -326,6 +355,7 @@ export function ItemPage() {
         </div>
       </div>
       <Children item={d} />
+      <Extras item={d} />
       <CollectionShelves item={d} />
       <Cast credits={d.credits} />
       <Related item={d} />
