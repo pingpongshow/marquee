@@ -222,6 +222,10 @@ private fun RequestDialog(item: DiscoverItem, onDone: (Boolean) -> Unit) {
     val can = item.requestable()
     val scope = rememberCoroutineScope()
     val isShow = item.mediaType == DiscoverItem.MediaType.TV
+    val ratings by produceState<app.marquee.api.models.TitleRatings?>(null) {
+        val mt = if (isShow) app.marquee.api.apis.RequestsApi.MediaTypeTitleRatings.TV else app.marquee.api.apis.RequestsApi.MediaTypeTitleRatings.MOVIE
+        value = withContext(Dispatchers.IO) { runCatching { marquee.requests.titleRatings(mt, item.tmdbId) }.getOrNull() }
+    }
     val show by produceState<RequestableShow?>(null) { if (isShow) value = withContext(Dispatchers.IO) { runCatching { marquee.requests.requestableShow(item.tmdbId) }.getOrNull() } }
     var chosen by remember { mutableStateOf<Set<Int>?>(null) }
     val open = show?.seasons?.filter { it.availability == Availability.NONE }?.map { it.number }?.toSet() ?: emptySet()
@@ -238,6 +242,14 @@ private fun RequestDialog(item: DiscoverItem, onDone: (Boolean) -> Unit) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(listOfNotNull(item.year?.toString(), if (isShow) "Series" else "Movie", item.availability.label.takeIf { it.isNotBlank() }).joinToString(" · "),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        // Critic and audience ratings, where known.
+                        val chips = listOfNotNull(
+                            ratings?.rottenTomatoes?.criticsScore?.let { "Critics $it%" },
+                            ratings?.rottenTomatoes?.audienceScore?.let { "Audience $it%" },
+                            ratings?.imdb?.rating?.let { "IMDb %.1f".format(it) },
+                            item.tmdbRating?.let { "TMDB %.1f".format(it) },
+                        )
+                        if (chips.isNotEmpty()) Text(chips.joinToString("  ·  "), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                         Text(item.overview ?: "No description available.", maxLines = 14, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
                     }
                 }

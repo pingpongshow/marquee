@@ -142,7 +142,98 @@ func (s *Service) enrichArtist(ctx context.Context, mb *musicbrainz.Client, t mb
 	if err := addGenres(ctx, tx, t.id, a.Genres, t.locked); err != nil {
 		return false, err
 	}
-	return true, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	s.artistExtras(ctx, t, a)
+	return true, nil
+}
+
+// artistExtras adds a Wikipedia bio when the artist has none, and the artist's most-listened
+// tracks that are in the library (ListenBrainz). Failures are only logged: these are extras.
+func (s *Service) artistExtras(ctx context.Context, t mbTodo, a musicbrainz.Artist) {
+	s.mu.Lock()
+	if s.web == nil {
+		s.web = musicbrainz.NewWeb(MBUserAgent)
+	}
+	web := s.web
+	s.mu.Unlock()
+	if q := a.Wikidata(); q != "" && !lockedIn(t.locked, "summary") {
+		var cur sql.NullString
+		s.DB.QueryRowContext(ctx, `SELECT summary FROM items WHERE id = ?`, t.id).Scan(&cur)
+		if strings.TrimSpace(cur.String) == "" {
+			lang := "en"
+			if s.Settings != nil {
+				lang, _, _ = strings.Cut(s.Settings.Get().General.MetadataLanguage, "-")
+			}
+			if bio, err := web.Bio(ctx, q, lang); err == nil {
+				s.DB.ExecContext(ctx, `UPDATE items SET summary = ? WHERE id = ?`, bio, t.id)
+			} else if !errors.Is(err, musicbrainz.ErrNotFound) {
+				slog.Debug("wikipedia bio", "artist", t.title, "err", err)
+			}
+		}
+	}
+	top, err := web.TopRecordings(ctx, a.ID)
+	if err != nil {
+		if !errors.Is(err, musicbrainz.ErrNotFound) {
+			slog.Debug("listenbrainz", "artist", t.title, "err", err)
+		}
+		return
+	}
+	s.setPopular(ctx, t.id, top)
+}
+
+// popularCount is how many popular tracks are kept per artist.
+const popularCount = 10
+
+// setPopular matches an artist's top recordings to their tracks in the library, by recording
+// MBID and then by title, and keeps the first popularCount.
+func (s *Service) setPopular(ctx context.Context, artistID int64, top []musicbrainz.Recording) {
+	rows, err := s.DB.QueryContext(ctx, `SELECT t.id, t.title, COALESCE(x.value, '') FROM items t
+		LEFT JOIN external_ids x ON x.item_id = t.id AND x.provider = 'musicbrainz'
+		WHERE t.type = 'track' AND t.grandparent_id = ? ORDER BY t.id`, artistID)
+	if err != nil {
+		return
+	}
+	byMBID, byTitle := map[string]int64{}, map[string]int64{}
+	for rows.Next() {
+		var id int64
+		var title, mbid string
+		if rows.Scan(&id, &title, &mbid) == nil {
+			if mbid != "" {
+				byMBID[mbid] = id
+			}
+			if k := naming.Normalize(title); byTitle[k] == 0 {
+				byTitle[k] = id
+			}
+		}
+	}
+	rows.Close()
+	var picked []int64
+	seen := map[int64]bool{}
+	for _, r := range top {
+		id := byMBID[r.MBID]
+		if id == 0 {
+			id = byTitle[naming.Normalize(r.Name)]
+		}
+		if id != 0 && !seen[id] {
+			seen[id] = true
+			picked = append(picked, id)
+			if len(picked) == popularCount {
+				break
+			}
+		}
+	}
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return
+	}
+	defer tx.Rollback()
+	tx.ExecContext(ctx, `DELETE FROM music_popular WHERE artist_id = ?`, artistID)
+	for i, id := range picked {
+		tx.ExecContext(ctx, `INSERT INTO music_popular (artist_id, track_id, rank) VALUES (?, ?, ?)`, artistID, id, i+1)
+	}
+	tx.Commit()
 }
 
 func (s *Service) enrichAlbum(ctx context.Context, mb *musicbrainz.Client, t mbTodo) (bool, error) {

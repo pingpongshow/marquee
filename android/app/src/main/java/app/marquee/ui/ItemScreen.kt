@@ -43,6 +43,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -65,7 +66,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private data class Page(val detail: ItemDetail, val children: List<ItemSummary>, val related: List<ItemSummary>, val similar: List<ItemSummary>)
+private data class Page(val detail: ItemDetail, val children: List<ItemSummary>, val related: List<ItemSummary>, val similar: List<ItemSummary>,
+    val popular: List<ItemSummary> = emptyList())
 
 /** Detail page for any item: header, play buttons, contents, cast and related titles. */
 @Composable
@@ -82,7 +84,9 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 val related = if (d.type in listOf(ItemType.MOVIE, ItemType.SHOW, ItemType.ALBUM, ItemType.ARTIST)) runCatching { marquee.items.relatedItems(itemId) }.getOrDefault(emptyList()) else emptyList()
                 // Music: what sounds like it, from the sonic analysis (MUSIC-2).
                 val similar = if (d.type in listOf(ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK)) runCatching { marquee.music.sonicSimilar(itemId, 20) }.getOrDefault(emptyList()) else emptyList()
-                Page(d, children, related, similar)
+                // An artist's most-listened tracks in the library (MUSIC-15).
+                val popular = if (d.type == ItemType.ARTIST) runCatching { marquee.items.listPopularTracks(itemId).items }.getOrDefault(emptyList()) else emptyList()
+                Page(d, children, related, similar, popular)
             }
         }
     }
@@ -199,6 +203,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                     }
                 }
                 ItemType.ARTIST -> Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    if (pg.popular.isNotEmpty()) PopularTracks(d.title, pg.popular)
                     // Plexamp-style sections by release type (MusicBrainz, META-3).
                     releaseSections(pg.children).forEach { (title, list) ->
                         Shelf(title, list, sidePadding) { _, it ->
@@ -297,3 +302,24 @@ fun releaseSections(items: List<ItemSummary>): List<Pair<String, List<ItemSummar
     "Compilations" to setOf("compilation"), "Soundtracks" to setOf("soundtrack"), "Remixes" to setOf("remix"),
     "Demos" to setOf("demo"), "Other" to setOf("other"),
 ).map { (title, types) -> title to items.filter { (it.releaseType?.value ?: "") in types } }.filter { it.second.isNotEmpty() }
+
+/** An artist's most-listened tracks: five, or all of them. */
+@Composable
+private fun PopularTracks(artist: String, tracks: List<ItemSummary>) {
+    val music = LocalMusic.current
+    var all by remember { mutableStateOf(false) }
+    Column {
+        Text("Popular", Modifier.padding(horizontal = sidePadding, vertical = 4.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        (if (all) tracks else tracks.take(5)).forEachIndexed { i, t ->
+            ListItem(
+                headlineContent = { Text(t.title, maxLines = 1) },
+                supportingContent = { t.parentTitle?.let { Text(it, maxLines = 1) } },
+                leadingContent = { Text("${i + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                trailingContent = { Text(t.durationMs?.let { formatTime(it) } ?: "") },
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+                modifier = Modifier.focusCard({ music.play(tracks, i, source = "$artist – Popular") }),
+            )
+        }
+        if (tracks.size > 5) TextButton({ all = !all }, Modifier.padding(horizontal = sidePadding).focusRing()) { Text(if (all) "Show fewer" else "Show all ${tracks.size}") }
+    }
+}

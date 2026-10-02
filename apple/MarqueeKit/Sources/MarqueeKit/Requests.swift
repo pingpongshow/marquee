@@ -6,6 +6,7 @@ public typealias MediaRequest = Components.Schemas.MediaRequest
 public typealias RequestsStatus = Components.Schemas.RequestsStatus
 public typealias RequestableShow = Components.Schemas.RequestableShow
 public typealias Availability = Components.Schemas.Availability
+public typealias TitleRatings = Components.Schemas.TitleRatings
 public typealias DiscoverCategory = Operations.DiscoverRequestable.Input.Query.CategoryPayload
 
 /// Requests through Seerr (REQ-1, REQ-2): find titles that aren't here and ask for them;
@@ -39,6 +40,21 @@ public extension AppSession {
         case let .serviceUnavailable(e): throw MarqueeError((try? e.body.json.message) ?? "Requests aren't set up")
         default: throw MarqueeError("Couldn't load Discover")
         }
+    }
+
+    /// A title's Rotten Tomatoes and IMDb ratings (REQ-2).
+    func titleRatings(_ item: DiscoverItem) async throws -> TitleRatings {
+        try await requestsAPI.titleRatings(path: .init(mediaType: item.mediaType == .tv ? .tv : .movie, tmdbId: item.tmdbId)).ok.body.json
+    }
+
+    /// Ratings to show as short chips: Critics 83%, Audience 85%, IMDb 8.7, TMDB 7.9.
+    func ratingChips(_ item: DiscoverItem, _ r: TitleRatings?) -> [(label: String, value: String)] {
+        var out: [(String, String)] = []
+        if let s = r?.rottenTomatoes?.criticsScore { out.append(("Critics", "\(s)%")) }
+        if let s = r?.rottenTomatoes?.audienceScore { out.append(("Audience", "\(s)%")) }
+        if let s = r?.imdb?.rating { out.append(("IMDb", String(format: "%.1f", s))) }
+        if let s = item.tmdbRating { out.append(("TMDB", String(format: "%.1f", s))) }
+        return out
     }
 
     func requestableShow(_ tmdbID: Int64) async throws -> RequestableShow {

@@ -212,6 +212,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /items/{itemId}/children`.
     /// - Remark: Generated from `#/paths//items/{itemId}/children/get(listItemChildren)`.
     func listItemChildren(_ input: Operations.ListItemChildren.Input) async throws -> Operations.ListItemChildren.Output
+    /// An artist's most-listened tracks that are in the library, most popular first (ListenBrainz, MUSIC-15). Empty until MusicBrainz enrichment has looked the artist up.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/popular`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/popular/get(listPopularTracks)`.
+    func listPopularTracks(_ input: Operations.ListPopularTracks.Input) async throws -> Operations.ListPopularTracks.Output
     /// Artwork resized to a cached width. Responses are immutable (a changed image gets a new id).
     ///
     /// Usable directly in <img> tags; authenticate with the `token` query parameter.
@@ -528,6 +533,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /requests/tv/{tmdbId}`.
     /// - Remark: Generated from `#/paths//requests/tv/{tmdbId}/get(requestableShow)`.
     func requestableShow(_ input: Operations.RequestableShow.Input) async throws -> Operations.RequestableShow.Output
+    /// A title's Rotten Tomatoes and IMDb ratings, for Discover's details (REQ-2). Empty when there are none.
+    ///
+    /// - Remark: HTTP `GET /requests/ratings/{mediaType}/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//requests/ratings/{mediaType}/{tmdbId}/get(titleRatings)`.
+    func titleRatings(_ input: Operations.TitleRatings.Input) async throws -> Operations.TitleRatings.Output
     /// Requests, newest first. Users see their own; admins can ask for everyone's.
     ///
     /// - Remark: HTTP `GET /requests`.
@@ -1210,6 +1220,19 @@ extension APIProtocol {
         try await listItemChildren(Operations.ListItemChildren.Input(
             path: path,
             query: query,
+            headers: headers
+        ))
+    }
+    /// An artist's most-listened tracks that are in the library, most popular first (ListenBrainz, MUSIC-15). Empty until MusicBrainz enrichment has looked the artist up.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/popular`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/popular/get(listPopularTracks)`.
+    public func listPopularTracks(
+        path: Operations.ListPopularTracks.Input.Path,
+        headers: Operations.ListPopularTracks.Input.Headers = .init()
+    ) async throws -> Operations.ListPopularTracks.Output {
+        try await listPopularTracks(Operations.ListPopularTracks.Input(
+            path: path,
             headers: headers
         ))
     }
@@ -1971,6 +1994,19 @@ extension APIProtocol {
         headers: Operations.RequestableShow.Input.Headers = .init()
     ) async throws -> Operations.RequestableShow.Output {
         try await requestableShow(Operations.RequestableShow.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// A title's Rotten Tomatoes and IMDb ratings, for Discover's details (REQ-2). Empty when there are none.
+    ///
+    /// - Remark: HTTP `GET /requests/ratings/{mediaType}/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//requests/ratings/{mediaType}/{tmdbId}/get(titleRatings)`.
+    public func titleRatings(
+        path: Operations.TitleRatings.Input.Path,
+        headers: Operations.TitleRatings.Input.Headers = .init()
+    ) async throws -> Operations.TitleRatings.Output {
+        try await titleRatings(Operations.TitleRatings.Input(
             path: path,
             headers: headers
         ))

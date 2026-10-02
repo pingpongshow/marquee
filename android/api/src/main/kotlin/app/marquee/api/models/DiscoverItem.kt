@@ -40,6 +40,7 @@ import kotlinx.serialization.Contextual
  * @param overview 
  * @param posterUrl 
  * @param backdropUrl 
+ * @param tmdbRating TMDB's user score, 0–10 (absent with too few votes).
  * @param itemId The title in this library, when it's here.
  * @param requestId The caller's open Marquee request for it.
  */
@@ -70,6 +71,10 @@ data class DiscoverItem (
 
     @SerialName(value = "backdropUrl")
     val backdropUrl: kotlin.String? = null,
+
+    /* TMDB's user score, 0–10 (absent with too few votes). */
+    @SerialName(value = "tmdbRating")
+    val tmdbRating: kotlin.Double? = null,
 
     /* The title in this library, when it's here. */
     @SerialName(value = "itemId")

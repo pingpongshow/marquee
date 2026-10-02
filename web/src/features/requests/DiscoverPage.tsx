@@ -207,6 +207,7 @@ function DetailsDialog({
                 .filter(Boolean)
                 .join(" · ")}
             </p>
+            <TitleRatings item={item} />
             <p className="text-sm leading-relaxed">
               {item.overview || "No description available."}
             </p>
@@ -214,6 +215,81 @@ function DetailsDialog({
         </div>
       </div>
     </Dialog>
+  );
+}
+
+/** Critic and audience ratings: Rotten Tomatoes, IMDb and TMDB, where known. */
+function TitleRatings({ item }: { item: DiscoverItem }) {
+  const ratings = useQuery({
+    queryKey: ["requests", "ratings", item.mediaType, item.tmdbId],
+    queryFn: () =>
+      unwrap(
+        api.GET("/requests/ratings/{mediaType}/{tmdbId}", {
+          params: { path: { mediaType: item.mediaType, tmdbId: item.tmdbId } },
+        }),
+      ),
+    staleTime: 24 * 3_600_000,
+  });
+  const rt = ratings.data?.rottenTomatoes;
+  const imdb = ratings.data?.imdb;
+  const chips: {
+    label: string;
+    value: string;
+    title?: string;
+    url?: string;
+  }[] = [];
+  if (rt?.criticsScore != null)
+    chips.push({
+      label: "Critics",
+      value: `${rt.criticsScore}%`,
+      title: rt.criticsRating
+        ? `Rotten Tomatoes: ${rt.criticsRating}`
+        : "Rotten Tomatoes",
+      url: rt.url,
+    });
+  if (rt?.audienceScore != null)
+    chips.push({
+      label: "Audience",
+      value: `${rt.audienceScore}%`,
+      title: "Rotten Tomatoes audience score",
+      url: rt.url,
+    });
+  if (imdb?.rating != null)
+    chips.push({ label: "IMDb", value: imdb.rating.toFixed(1), url: imdb.url });
+  if (item.tmdbRating)
+    chips.push({ label: "TMDB", value: item.tmdbRating.toFixed(1) });
+  if (!chips.length) return ratings.isPending ? <div className="h-7" /> : null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {chips.map((c) => {
+        const body = (
+          <>
+            <span className="text-faint">{c.label}</span>{" "}
+            <span className="font-semibold">{c.value}</span>
+          </>
+        );
+        return c.url ? (
+          <a
+            key={c.label}
+            href={c.url}
+            target="_blank"
+            rel="noreferrer"
+            title={c.title}
+            className="rounded bg-surface-2 px-2 py-1 text-xs hover:bg-surface-3"
+          >
+            {body}
+          </a>
+        ) : (
+          <span
+            key={c.label}
+            title={c.title}
+            className="rounded bg-surface-2 px-2 py-1 text-xs"
+          >
+            {body}
+          </span>
+        );
+      })}
+    </div>
   );
 }
 

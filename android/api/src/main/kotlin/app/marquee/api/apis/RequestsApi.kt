@@ -38,6 +38,7 @@ import app.marquee.api.models.RequestableShow
 import app.marquee.api.models.RequestsStatus
 import app.marquee.api.models.TestSeerr200Response
 import app.marquee.api.models.TestSeerrRequest
+import app.marquee.api.models.TitleRatings
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -926,6 +927,99 @@ open class RequestsApi(basePath: kotlin.String = defaultBasePath, client: Call.F
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/requests/seerr/test",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * enum for parameter mediaType
+     */
+     enum class MediaTypeTitleRatings(val value: kotlin.String) {
+         @SerialName(value = "movie") MOVIE("movie"),
+         @SerialName(value = "tv") TV("tv");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * GET /requests/ratings/{mediaType}/{tmdbId}
+     * A title&#39;s Rotten Tomatoes and IMDb ratings, for Discover&#39;s details (REQ-2). Empty when there are none.
+     * 
+     * @param mediaType 
+     * @param tmdbId 
+     * @return TitleRatings
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun titleRatings(mediaType: MediaTypeTitleRatings, tmdbId: kotlin.Long) : TitleRatings {
+        val localVarResponse = titleRatingsWithHttpInfo(mediaType = mediaType, tmdbId = tmdbId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as TitleRatings
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /requests/ratings/{mediaType}/{tmdbId}
+     * A title&#39;s Rotten Tomatoes and IMDb ratings, for Discover&#39;s details (REQ-2). Empty when there are none.
+     * 
+     * @param mediaType 
+     * @param tmdbId 
+     * @return ApiResponse<TitleRatings?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun titleRatingsWithHttpInfo(mediaType: MediaTypeTitleRatings, tmdbId: kotlin.Long) : ApiResponse<TitleRatings?> {
+        val localVariableConfig = titleRatingsRequestConfig(mediaType = mediaType, tmdbId = tmdbId)
+
+        return request<Unit, TitleRatings>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation titleRatings
+     *
+     * @param mediaType 
+     * @param tmdbId 
+     * @return RequestConfig
+     */
+    fun titleRatingsRequestConfig(mediaType: MediaTypeTitleRatings, tmdbId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/requests/ratings/{mediaType}/{tmdbId}".replace("{"+"mediaType"+"}", encodeURIComponent(mediaType.value.toString())).replace("{"+"tmdbId"+"}", encodeURIComponent(tmdbId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
