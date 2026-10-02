@@ -16,6 +16,7 @@ struct ItemDetailView: View {
     @State private var error: String?
     @State private var audioID: Int64?
     @State private var subtitleID: Int64?
+    @State private var fileID: Int64?
 
     var body: some View {
         ScrollView {
@@ -226,11 +227,25 @@ struct ItemDetailView: View {
     /// Audio and subtitle choices for videos (the player's own menu also switches text
     /// subtitles while playing).
     @ViewBuilder private func trackPickers(_ d: ItemDetail) -> some View {
-        let streams = d.info.versions.first?.files.first?.streams ?? []
+        let versions = d.info.versions
+        let chosen = versions.first { $0.files.first?.id == fileID } ?? versions.first
+        let streams = chosen?.files.first?.streams ?? []
         let audio = streams.filter { $0.kind == .audio }
         let subs = streams.filter { $0.kind == .subtitle }
-        if audio.count > 1 || !subs.isEmpty {
+        if audio.count > 1 || !subs.isEmpty || versions.count > 1 {
             HStack(spacing: 16) {
+                if versions.count > 1 {
+                    // 4K and 1080p, or a director's cut (LIB-7); streams differ per file.
+                    Picker("Version", selection: $fileID) {
+                        Text("Best version").tag(Int64?.none)
+                        ForEach(versions, id: \.id) { v in Text(versionLabel(v)).tag(v.files.first.map { Int64?.some($0.id) } ?? nil) }
+                    }
+                    .onChange(of: fileID) {
+                        audioID = nil
+                        subtitleID = nil
+                        PendingTracks.shared.set(item: d.id, audio: nil, subtitle: nil, file: fileID)
+                    }
+                }
                 if audio.count > 1 {
                     Picker("Audio", selection: $audioID) {
                         Text("Automatic").tag(Int64?.none)
@@ -247,9 +262,21 @@ struct ItemDetailView: View {
             }
             .pickerStyle(.menu)
             .font(.callout)
-            .onChange(of: audioID) { PendingTracks.shared.set(item: d.id, audio: audioID, subtitle: subtitleID) }
-            .onChange(of: subtitleID) { PendingTracks.shared.set(item: d.id, audio: audioID, subtitle: subtitleID) }
+            .onChange(of: audioID) { PendingTracks.shared.set(item: d.id, audio: audioID, subtitle: subtitleID, file: fileID) }
+            .onChange(of: subtitleID) { PendingTracks.shared.set(item: d.id, audio: audioID, subtitle: subtitleID, file: fileID) }
         }
+    }
+
+    private func versionLabel(_ v: Schemas.MediaVersion) -> String {
+        let f = v.files.first
+        var tech: [String] = []
+        if let h = f?.height {
+            tech.append((f?.width ?? 0) >= 3200 || h >= 2000 ? "4K" : h >= 1000 ? "1080p" : h >= 700 ? "720p" : "SD")
+        }
+        if let hdr = f?.hdrFormat { tech.append(hdr == .dolbyVision ? "Dolby Vision" : hdr.rawValue.uppercased()) }
+        if let c = f?.videoCodec { tech.append(["hevc": "HEVC", "h264": "H.264", "av1": "AV1"][c] ?? c.uppercased()) }
+        let t = tech.joined(separator: " · ")
+        return v.label.isEmpty ? (t.isEmpty ? "Version" : t) : (t.isEmpty ? v.label : "\(v.label) (\(t))")
     }
 
     private func streamLabel(_ s: Schemas.MediaStream) -> String {
@@ -324,9 +351,9 @@ struct ItemDetailView: View {
 /// Track choices made on the detail page, used when that item is played next.
 @MainActor final class PendingTracks {
     static let shared = PendingTracks()
-    private var choices: [Int64: (audio: Int64?, subtitle: Int64?)] = [:]
-    func set(item: Int64, audio: Int64?, subtitle: Int64?) { choices[item] = (audio, subtitle) }
-    func take(_ item: Int64) -> (audio: Int64?, subtitle: Int64?) { choices.removeValue(forKey: item) ?? (nil, nil) }
+    private var choices: [Int64: (audio: Int64?, subtitle: Int64?, file: Int64?)] = [:]
+    func set(item: Int64, audio: Int64?, subtitle: Int64?, file: Int64? = nil) { choices[item] = (audio, subtitle, file) }
+    func take(_ item: Int64) -> (audio: Int64?, subtitle: Int64?, file: Int64?) { choices.removeValue(forKey: item) ?? (nil, nil, nil) }
 }
 
 func languageName(_ code: String?) -> String {
