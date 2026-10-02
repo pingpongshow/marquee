@@ -42,6 +42,7 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			PreferHevcRemote:        ptr(s.Transcoder.PreferHEVCRemote),
 			ToneMapping:             ptr(s.Transcoder.ToneMapping),
 			ThrottleSegmentsAhead:   ptr(s.Transcoder.ThrottleSegmentsAhead),
+			NvencSessions:           ptr(s.Transcoder.NVENCSessions),
 			RemoteLadder:            &ladder,
 		},
 		Library: LibraryGlobalSettings{
@@ -109,6 +110,7 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		set(&s.Transcoder.PreferHEVCRemote, t.PreferHevcRemote)
 		set(&s.Transcoder.ToneMapping, t.ToneMapping)
 		set(&s.Transcoder.ThrottleSegmentsAhead, t.ThrottleSegmentsAhead)
+		set(&s.Transcoder.NVENCSessions, t.NvencSessions)
 		if t.RemoteLadder != nil {
 			s.Transcoder.RemoteLadder = make([]settings.QualityRung, len(*t.RemoteLadder))
 			for i, r := range *t.RemoteLadder {

@@ -72,6 +72,9 @@ func withIdentity(d Deps, next http.Handler) http.Handler {
 		}
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "same-origin")
+		// The web app must not be framed by other sites (clickjacking).
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

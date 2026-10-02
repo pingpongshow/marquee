@@ -53,7 +53,7 @@ Priority key:
 | PLAY-7 | Subtitles: pass through text subtitles as WebVTT. Deliver ASS/SSA styled (with embedded fonts) to clients that can render it. Burn in image subtitles (PGS/VobSub). | P0 |
 | PLAY-8 | Audio and subtitle track selection, with per-user language preferences and "remember per show". | P0 |
 | PLAY-9 | **Automatic quality selection.** The server picks the best bitrate per session from the network class (local or remote), measured client bandwidth, server settings, user limits and client settings. See §3a. | P0 |
-| PLAY-15 | Adaptive bitrate during playback: multi-rung HLS ladder for remote sessions. The player switches rungs as throughput changes, and the server re-evaluates the session ceiling when bandwidth or the number of concurrent remote streams changes. | P0 |
+| PLAY-15 | Adaptive bitrate during playback (implemented, D53): multi-rung HLS ladder for remote sessions. The player switches rungs as throughput changes, and the server re-evaluates the session ceiling when bandwidth or the number of concurrent remote streams changes. | P0 |
 | PLAY-16 | Encoder capacity awareness: track active NVENC sessions (the consumer driver limit is about 8 concurrent encodes), overflow to QSV and then CPU, and queue or downgrade rather than fail. | P0 |
 | PLAY-10 | Music streaming: direct play, or transcode to AAC/Opus at a selectable bitrate. Supports gapless playback and ReplayGain. | P0 |
 | PLAY-11 | Concurrent transcode limit, transcode throttling (stay N seconds ahead) and cleanup of the temporary transcode directory. | P0 |

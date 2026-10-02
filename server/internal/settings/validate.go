@@ -66,6 +66,9 @@ func (s Settings) Validate() error {
 	if t.ThrottleSegmentsAhead < 2 {
 		return invalid("throttle must keep at least 2 segments ahead")
 	}
+	if t.NVENCSessions < 0 || t.NVENCSessions > 64 {
+		return invalid("NVENC sessions must be between 0 and 64")
+	}
 	for _, r := range t.RemoteLadder {
 		if r.MaxHeight <= 0 || r.VideoKbps <= 0 || r.Label == "" {
 			return invalid("invalid quality rung %+v", r)

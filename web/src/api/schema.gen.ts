@@ -1333,6 +1333,8 @@ export interface components {
             preferHevcRemote?: boolean;
             toneMapping?: boolean;
             throttleSegmentsAhead?: number;
+            /** @description Concurrent NVENC encodes before new jobs go to Quick Sync or the CPU (consumer NVIDIA drivers cap this). 0 = no cap. */
+            nvencSessions?: number;
             remoteLadder?: components["schemas"]["QualityRung"][];
         };
         LibraryGlobalSettings: {

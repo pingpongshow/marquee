@@ -80,10 +80,13 @@ export function TranscoderSettings() {
             <Field label="Maximum simultaneous transcodes" help="Further streams wait or fall back to lower quality.">
               {(id) => <Input id={id} type="number" min={1} value={d.maxConcurrentTranscodes ?? 1} onChange={(e) => s.update({ maxConcurrentTranscodes: Number(e.target.value) })} />}
             </Field>
+            <Field label="NVIDIA encode sessions" help="NVENC jobs that may run at once. Beyond this, new streams use Quick Sync or the CPU instead of failing. 0 = no limit.">
+              {(id) => <Input id={id} type="number" min={0} max={64} value={d.nvencSessions ?? 8} onChange={(e) => s.update({ nvencSessions: Number(e.target.value) })} />}
+            </Field>
           </div>
           <Toggle label="Use HEVC for remote streams" help="About 40% less bandwidth at the same quality on devices that support it (all recent Apple devices)." checked={!!d.preferHevcRemote} onChange={(v) => s.update({ preferHevcRemote: v })} />
           <Toggle label="HDR tone mapping" help="Converts HDR to SDR when a device can’t display HDR, so colours aren’t washed out." checked={!!d.toneMapping} onChange={(v) => s.update({ toneMapping: v })} />
-          <Field label="Transcode ahead (segments)" help="How far ahead of the viewer the transcoder works before pausing. Each segment is about 4 seconds.">
+          <Field label="Transcode ahead (segments)" help="How far ahead of the viewer the transcoder works before pausing. Each segment is 6 seconds.">
             {(id) => <Input id={id} type="number" min={2} value={d.throttleSegmentsAhead ?? 10} onChange={(e) => s.update({ throttleSegmentsAhead: Number(e.target.value) })} />}
           </Field>
         </Card>
