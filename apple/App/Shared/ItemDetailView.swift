@@ -17,6 +17,7 @@ struct ItemDetailView: View {
     @State private var audioID: Int64?
     @State private var subtitleID: Int64?
     @State private var fileID: Int64?
+    @State private var findingSubs = false
 
     var body: some View {
         ScrollView {
@@ -245,7 +246,7 @@ struct ItemDetailView: View {
         let streams = chosen?.files.first?.streams ?? []
         let audio = streams.filter { $0.kind == .audio }
         let subs = streams.filter { $0.kind == .subtitle }
-        if audio.count > 1 || !subs.isEmpty || versions.count > 1 {
+        if audio.count > 1 || !subs.isEmpty || versions.count > 1 || (!isTV && (d.type == .movie || d.type == .episode)) {
             HStack(spacing: 16) {
                 if versions.count > 1 {
                     // 4K and 1080p, or a director's cut (LIB-7); streams differ per file.
@@ -272,9 +273,20 @@ struct ItemDetailView: View {
                         ForEach(subs, id: \.id) { s in Text(streamLabel(s)).tag(Int64?.some(s.id)) }
                     }
                 }
+                #if os(iOS)
+                if d.type == .movie || d.type == .episode {
+                    Button("Find Subtitles…", systemImage: "captions.bubble") { findingSubs = true }
+                }
+                #endif
             }
             .pickerStyle(.menu)
             .font(.callout)
+            .sheet(isPresented: $findingSubs) {
+                SubtitleSearchSheet(itemID: d.id) { stream in
+                    subtitleID = stream
+                    Task { await load() }
+                }
+            }
             .onChange(of: audioID) { PendingTracks.shared.set(item: d.id, audio: audioID, subtitle: subtitleID, file: fileID) }
             .onChange(of: subtitleID) { PendingTracks.shared.set(item: d.id, audio: audioID, subtitle: subtitleID, file: fileID) }
         }

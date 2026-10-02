@@ -10,6 +10,7 @@ struct MainView: View {
     @State private var video = VideoPresenter()
     @State private var showNowPlaying = false
     @State private var playlistPicker = PlaylistPicker.shared
+    @State private var adventure = AdventurePicker.shared
 
     var body: some View {
         TabView {
@@ -45,6 +46,7 @@ struct MainView: View {
         .environment(video)
         .task { await loadLibraries() }
         .sheet(item: $playlistPicker.item) { item in AddToPlaylistSheet(item: item) }
+        .sheet(item: $adventure.from) { item in AdventureSheet(from: item) }
         .fullScreenCover(item: $video.request) { req in
             PlayerView(request: req)
                 .environment(video)

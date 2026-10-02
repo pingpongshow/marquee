@@ -197,4 +197,42 @@ final class MarqueeUITests: XCTestCase {
         entry.press(forDuration: 1.2)
         app.buttons["Delete Download"].tap()
     }
+
+    /// Your Stats (ADM-4) and Sonic Adventure from a track's menu (MUSIC-4).
+    func testStatsAndAdventure() {
+        connectAndSignIn()
+        app.buttons["Settings"].firstMatch.tap()
+        let stats = app.buttons["Your Stats"]
+        XCTAssertTrue(stats.waitForExistence(timeout: 10))
+        stats.tap()
+        XCTAssertTrue(app.staticTexts["Plays"].waitForExistence(timeout: 10) || app.staticTexts["Nothing played in this period."].exists)
+        app.buttons["All time"].tap()
+        XCTAssertTrue(app.staticTexts["Top artists"].waitForExistence(timeout: 10))
+        shot("s1-stats")
+
+        // A track's menu → Sonic Adventure → pick a destination.
+        openLibrary("Music")
+        let artist = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calm Pads'")).firstMatch
+        XCTAssertTrue(artist.waitForExistence(timeout: 10))
+        artist.tap()
+        let album = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Floating'")).firstMatch
+        XCTAssertTrue(album.waitForExistence(timeout: 10))
+        album.tap()
+        let track = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Floating 2'")).firstMatch
+        XCTAssertTrue(track.waitForExistence(timeout: 10))
+        track.press(forDuration: 1.2)
+        app.buttons["Sonic Adventure…"].tap()
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        search.tap()
+        search.typeText("Thump")
+        let dest = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Thump'")).firstMatch
+        XCTAssertTrue(dest.waitForExistence(timeout: 10))
+        shot("s2-adventure")
+        dest.tap()
+        XCTAssertTrue(app.buttons["miniPlayer"].waitForExistence(timeout: 15))
+        app.buttons["miniPlayer"].tap()
+        XCTAssertTrue(app.staticTexts["PLAYING FROM"].waitForExistence(timeout: 5))
+        shot("s3-adventure-playing")
+    }
 }
