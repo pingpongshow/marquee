@@ -241,6 +241,9 @@ func run() error {
 			refreshAllRatings(ctx, meta, libraries)
 			return "Done", nil
 		}})
+	scheduler.Register(tasks.Task{ID: "refresh-metadata", Name: "Refresh metadata", Window: true,
+		Description: "Updates shows with new or recently aired episodes (titles and summaries TMDB fills in after airing) and movies not refreshed for six months. Edited fields stay as they are.",
+		Run:         meta.RefreshStale})
 	scheduler.Register(tasks.Task{ID: "collections", Name: "Update collections", Every: 7 * 24 * time.Hour,
 		Description: "Groups movies into their film series (TMDB collections), including movies matched before collections existed.",
 		Run:         meta.SyncCollections})
