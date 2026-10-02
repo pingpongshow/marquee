@@ -257,23 +257,23 @@ type ExternalIDs struct {
 }
 
 type Movie struct {
-	ID            int       `json:"id"`
-	Title         string    `json:"title"`
-	OriginalTitle string    `json:"original_title"`
-	Overview      string    `json:"overview"`
-	Tagline       string    `json:"tagline"`
-	ReleaseDate   string    `json:"release_date"`
-	Runtime       int       `json:"runtime"`
-	VoteAverage   float64   `json:"vote_average"`
-	Genres        []Genre   `json:"genres"`
-	Companies     []Company `json:"production_companies"`
-	PosterPath    string    `json:"poster_path"`
-	BackdropPath  string    `json:"backdrop_path"`
-	IMDBID        string    `json:"imdb_id"`
+	ID            int            `json:"id"`
+	Title         string         `json:"title"`
+	OriginalTitle string         `json:"original_title"`
+	Overview      string         `json:"overview"`
+	Tagline       string         `json:"tagline"`
+	ReleaseDate   string         `json:"release_date"`
+	Runtime       int            `json:"runtime"`
+	VoteAverage   float64        `json:"vote_average"`
+	Genres        []Genre        `json:"genres"`
+	Companies     []Company      `json:"production_companies"`
+	PosterPath    string         `json:"poster_path"`
+	BackdropPath  string         `json:"backdrop_path"`
+	IMDBID        string         `json:"imdb_id"`
 	Collection    *CollectionRef `json:"belongs_to_collection"`
-	Credits      Credits `json:"credits"`
-	Images       Images  `json:"images"`
-	ReleaseDates struct {
+	Credits       Credits        `json:"credits"`
+	Images        Images         `json:"images"`
+	ReleaseDates  struct {
 		Results []struct {
 			Country string `json:"iso_3166_1"`
 			Dates   []struct {

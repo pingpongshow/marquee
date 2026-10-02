@@ -22,6 +22,7 @@ import (
 	"marquee/internal/sonic"
 	"marquee/internal/tasks"
 	"marquee/internal/trickplay"
+	"marquee/internal/webhooks"
 )
 
 // Handlers implements StrictServerInterface.
@@ -42,6 +43,7 @@ type Handlers struct {
 	Scans            *tasks.Scans
 	Tasks            *tasks.Scheduler
 	Trickplay        *trickplay.Service
+	Webhooks         *webhooks.Dispatcher
 	QuickConnect     auth.QuickConnect
 	Sonic            *sonic.Service
 	Lyrics           *lyrics.Service

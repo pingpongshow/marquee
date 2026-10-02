@@ -206,7 +206,7 @@ func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 		OriginallyAvailableAt: sum.OriginallyAvailableAt, Available: sum.Available,
 		MatchState: ItemDetailMatchState(sum.MatchState), AddedAt: sum.AddedAt, Images: sum.Images,
 		ViewOffsetMs: sum.ViewOffsetMs, ViewCount: sum.ViewCount, WatchedLeafCount: sum.WatchedLeafCount, LastViewedAt: sum.LastViewedAt,
-		UserRating:     sum.UserRating, Watchlisted: sum.Watchlisted,
+		UserRating: sum.UserRating, Watchlisted: sum.Watchlisted,
 		AudienceRating: nz(float32(d.AudienceRating)), Credits: make([]Credit, len(d.Credits)),
 		Summary: nz(d.Plot), Tagline: nz(d.Tagline), ContentRating: nz(d.ContentRating), Studio: nz(d.Studio),
 		Genres: d.Genres, ExternalIds: d.ExternalIDs, LockedFields: d.LockedFields,

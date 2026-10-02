@@ -908,6 +908,10 @@ extension Components {
             public var tasks: Components.Schemas.TaskSettings
             /// - Remark: Generated from `#/components/schemas/ServerSettings/music`.
             public var music: Components.Schemas.MusicSettings?
+            /// Replaces the whole list when sent.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ServerSettings/webhooks`.
+            public var webhooks: [Components.Schemas.Webhook]?
             /// Creates a new `ServerSettings`.
             ///
             /// - Parameters:
@@ -920,6 +924,7 @@ extension Components {
             ///   - metadata:
             ///   - tasks:
             ///   - music:
+            ///   - webhooks: Replaces the whole list when sent.
             public init(
                 security: Components.Schemas.SecuritySettings,
                 general: Components.Schemas.GeneralSettings,
@@ -929,7 +934,8 @@ extension Components {
                 library: Components.Schemas.LibraryGlobalSettings,
                 metadata: Components.Schemas.MetadataSettings,
                 tasks: Components.Schemas.TaskSettings,
-                music: Components.Schemas.MusicSettings? = nil
+                music: Components.Schemas.MusicSettings? = nil,
+                webhooks: [Components.Schemas.Webhook]? = nil
             ) {
                 self.security = security
                 self.general = general
@@ -940,6 +946,7 @@ extension Components {
                 self.metadata = metadata
                 self.tasks = tasks
                 self.music = music
+                self.webhooks = webhooks
             }
             public enum CodingKeys: String, CodingKey {
                 case security
@@ -951,6 +958,7 @@ extension Components {
                 case metadata
                 case tasks
                 case music
+                case webhooks
             }
         }
         /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate`.
@@ -973,6 +981,10 @@ extension Components {
             public var tasks: Components.Schemas.TaskSettings?
             /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/music`.
             public var music: Components.Schemas.MusicSettings?
+            /// Replaces the whole list when sent.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/webhooks`.
+            public var webhooks: [Components.Schemas.Webhook]?
             /// Creates a new `ServerSettingsUpdate`.
             ///
             /// - Parameters:
@@ -985,6 +997,7 @@ extension Components {
             ///   - metadata:
             ///   - tasks:
             ///   - music:
+            ///   - webhooks: Replaces the whole list when sent.
             public init(
                 security: Components.Schemas.SecuritySettings? = nil,
                 general: Components.Schemas.GeneralSettings? = nil,
@@ -994,7 +1007,8 @@ extension Components {
                 library: Components.Schemas.LibraryGlobalSettings? = nil,
                 metadata: Components.Schemas.MetadataSettingsUpdate? = nil,
                 tasks: Components.Schemas.TaskSettings? = nil,
-                music: Components.Schemas.MusicSettings? = nil
+                music: Components.Schemas.MusicSettings? = nil,
+                webhooks: [Components.Schemas.Webhook]? = nil
             ) {
                 self.security = security
                 self.general = general
@@ -1005,6 +1019,7 @@ extension Components {
                 self.metadata = metadata
                 self.tasks = tasks
                 self.music = music
+                self.webhooks = webhooks
             }
             public enum CodingKeys: String, CodingKey {
                 case security
@@ -1016,6 +1031,71 @@ extension Components {
                 case metadata
                 case tasks
                 case music
+                case webhooks
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/Webhook`.
+        public struct Webhook: Codable, Hashable, Sendable {
+            /// Assigned by the server.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Webhook/id`.
+            public var id: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Webhook/name`.
+            public var name: Swift.String
+            /// http(s) URL that receives a JSON POST per event.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Webhook/url`.
+            public var url: Swift.String
+            /// When set, payloads are signed: X-Marquee-Signature: sha256=<HMAC-SHA256 of the body>.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Webhook/secret`.
+            public var secret: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Webhook/EventsPayload`.
+            @frozen public enum EventsPayloadPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case playback_started = "playback.started"
+                case playback_paused = "playback.paused"
+                case playback_resumed = "playback.resumed"
+                case playback_stopped = "playback.stopped"
+                case playback_watched = "playback.watched"
+                case library_added = "library.added"
+            }
+            /// - Remark: Generated from `#/components/schemas/Webhook/events`.
+            public typealias EventsPayload = [Components.Schemas.Webhook.EventsPayloadPayload]
+            /// - Remark: Generated from `#/components/schemas/Webhook/events`.
+            public var events: Components.Schemas.Webhook.EventsPayload
+            /// - Remark: Generated from `#/components/schemas/Webhook/enabled`.
+            public var enabled: Swift.Bool
+            /// Creates a new `Webhook`.
+            ///
+            /// - Parameters:
+            ///   - id: Assigned by the server.
+            ///   - name:
+            ///   - url: http(s) URL that receives a JSON POST per event.
+            ///   - secret: When set, payloads are signed: X-Marquee-Signature: sha256=<HMAC-SHA256 of the body>.
+            ///   - events:
+            ///   - enabled:
+            public init(
+                id: Swift.String? = nil,
+                name: Swift.String,
+                url: Swift.String,
+                secret: Swift.String? = nil,
+                events: Components.Schemas.Webhook.EventsPayload,
+                enabled: Swift.Bool
+            ) {
+                self.id = id
+                self.name = name
+                self.url = url
+                self.secret = secret
+                self.events = events
+                self.enabled = enabled
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case name
+                case url
+                case secret
+                case events
+                case enabled
             }
         }
         /// - Remark: Generated from `#/components/schemas/MusicSettings`.

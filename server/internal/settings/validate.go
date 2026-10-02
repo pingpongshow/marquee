@@ -104,8 +104,25 @@ func (s Settings) Validate() error {
 	if r := s.Tasks.BackupRetention; r < 1 || r > 60 {
 		return invalid("backup retention must be 1–60")
 	}
+	if len(s.Webhooks) > 20 {
+		return invalid("at most 20 webhooks")
+	}
+	for _, w := range s.Webhooks {
+		u, err := url.Parse(w.URL)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return invalid("webhook %q needs an http(s) URL", w.Name)
+		}
+		for _, e := range w.Events {
+			if !validWebhookEvents[e] {
+				return invalid("unknown webhook event %q", e)
+			}
+		}
+	}
 	return nil
 }
+
+var validWebhookEvents = map[string]bool{"playback.started": true, "playback.paused": true, "playback.resumed": true,
+	"playback.stopped": true, "playback.watched": true, "library.added": true}
 
 func parseClock(s string) (int, error) {
 	var h, m int

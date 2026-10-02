@@ -85,6 +85,7 @@ type Session struct {
 	positionMS int64
 	state      string
 	watched    bool
+	started    bool // has reported playing (for webhooks)
 	preload    bool // prepared for gapless playback; not yet playing
 	historyID  int64
 	transcoder *Transcoder
@@ -141,6 +142,8 @@ type Manager struct {
 	TranscodeDir string
 	Encoders     Encoders
 	FFprobe      string
+	// Events, when set, hears playback.started/paused/resumed/watched/stopped (webhooks).
+	Events func(kind string, s *Session, positionMS int64)
 
 	mu       sync.Mutex
 	sessions map[string]*Session
@@ -623,10 +626,22 @@ func (m *Manager) Progress(ctx context.Context, id string, positionMS int64, sta
 	if takeOver {
 		s.preload = false
 	}
+	prev, started := s.state, s.started
+	if state == "playing" {
+		s.started = true
+	}
 	s.positionMS, s.state = positionMS, state
 	s.mu.Unlock()
 	if takeOver {
 		m.stopOthers(ctx, s)
+	}
+	switch {
+	case state == "playing" && !started:
+		m.emit("playback.started", s, positionMS)
+	case started && prev == "playing" && state == "paused":
+		m.emit("playback.paused", s, positionMS)
+	case started && prev == "paused" && state == "playing":
+		m.emit("playback.resumed", s, positionMS)
 	}
 	s.mu.Lock()
 	alreadyWatched := s.watched
@@ -643,6 +658,7 @@ func (m *Manager) Progress(ctx context.Context, id string, positionMS int64, sta
 
 	switch {
 	case nowWatched && !alreadyWatched:
+		m.emit("playback.watched", s, positionMS)
 		_, err := m.DB.ExecContext(ctx, `INSERT INTO user_item_state(user_id, item_id, play_count, view_offset_ms, last_viewed_at)
 			VALUES (?, ?, 1, 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			ON CONFLICT(user_id, item_id) DO UPDATE SET play_count = play_count + 1, view_offset_ms = 0,
@@ -682,7 +698,19 @@ func (m *Manager) Stop(ctx context.Context, id string) error {
 	m.DB.ExecContext(ctx, `UPDATE play_history SET stopped_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), position_ms = ?, video_encoder = ?
 		WHERE id = ?`, snap.PositionMS, nullStr(encoder), s.historyID)
 	slog.Info("playback stopped", "user", s.UserName, "title", s.Title, "position", time.Duration(snap.PositionMS)*time.Millisecond)
+	s.mu.Lock()
+	started := s.started
+	s.mu.Unlock()
+	if started {
+		m.emit("playback.stopped", s, snap.PositionMS)
+	}
 	return nil
+}
+
+func (m *Manager) emit(kind string, s *Session, positionMS int64) {
+	if m.Events != nil {
+		m.Events(kind, s, positionMS)
+	}
 }
 
 func nullStr(s string) any {
