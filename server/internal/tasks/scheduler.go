@@ -204,10 +204,14 @@ func (s *Scheduler) execute(ctx context.Context, t Task) {
 		status, msg, runID)
 }
 
+const interrupted = "interrupted by server restart"
+
 // lastStart is when the task last started (zero if never).
 func (s *Scheduler) lastStart(ctx context.Context, id string) time.Time {
 	var started sql.NullString
-	s.DB.QueryRowContext(ctx, `SELECT MAX(started_at) FROM task_runs WHERE task = ? AND status IN ('running', 'succeeded', 'failed')`, id).Scan(&started)
+	// Runs cut short by a restart don't count, so they start again (within the window).
+	s.DB.QueryRowContext(ctx, `SELECT MAX(started_at) FROM task_runs WHERE task = ? AND status IN ('running', 'succeeded', 'failed')
+		AND COALESCE(message, '') != ?`, id, interrupted).Scan(&started)
 	t, _ := time.Parse(time.RFC3339Nano, started.String)
 	return t
 }
@@ -240,7 +244,7 @@ func (s *Scheduler) due(ctx context.Context, t Task, now time.Time) bool {
 
 // Run checks every minute for due tasks until ctx is cancelled.
 func (s *Scheduler) Run(ctx context.Context) {
-	s.DB.ExecContext(ctx, `UPDATE task_runs SET status = 'failed', message = 'interrupted by server restart',
+	s.DB.ExecContext(ctx, `UPDATE task_runs SET status = 'failed', message = '`+interrupted+`',
 		finished_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE status = 'running'`)
 	tick := time.NewTicker(time.Minute)
 	defer tick.Stop()
