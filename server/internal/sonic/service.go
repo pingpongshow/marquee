@@ -152,7 +152,7 @@ func (s *Service) analyzePass(ctx context.Context, h Health) (string, int, error
 		for j, p := range chunk {
 			paths[j] = p.path
 		}
-		model, results, err := s.Client.Analyze(ctx, paths)
+		model, results, err := s.analyzeBatch(ctx, paths)
 		if err != nil {
 			return "", 0, fmt.Errorf("after %d tracks: %w", analysed, err)
 		}
@@ -189,6 +189,34 @@ func (s *Service) analyzePass(ctx context.Context, h Health) (string, int, error
 	}
 	slog.Info("sonic analysis finished", "analysed", analysed, "failed", failed, "took", time.Since(start).Round(time.Second))
 	return msg, len(todo), nil
+}
+
+// analyzeBatch analyses paths together, and if the batch fails (one bad file can break
+// it), one at a time so a single file can't stall the whole library. It only fails when
+// the sidecar itself is unreachable.
+func (s *Service) analyzeBatch(ctx context.Context, paths []string) (string, []Analysis, error) {
+	model, results, err := s.Client.Analyze(ctx, paths)
+	if err == nil || len(paths) == 1 || ctx.Err() != nil {
+		return model, results, err
+	}
+	slog.Warn("sonic batch failed; retrying files one by one", "err", err)
+	results = make([]Analysis, len(paths))
+	ok := false
+	for i, p := range paths {
+		m, r, err := s.Client.Analyze(ctx, []string{p})
+		if err != nil || len(r) == 0 {
+			if _, herr := s.Client.Health(ctx); herr != nil {
+				return "", nil, herr // the sidecar went away: don't mark files as unreadable
+			}
+			results[i] = Analysis{Path: p, Error: fmt.Sprint("analysis failed: ", err)}
+			continue
+		}
+		model, results[i], ok = m, r[0], true
+	}
+	if !ok {
+		return "", nil, err
+	}
+	return model, results, nil
 }
 
 func nonEmpty(s, def string) string {

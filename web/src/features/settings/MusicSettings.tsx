@@ -30,7 +30,7 @@ export function MusicSettings() {
               <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
                 <span className="flex items-center gap-2">
                   <Cpu className="size-4 text-muted" aria-hidden />
-                  {st.available ? `${st.model} on ${st.device === "cuda" ? "the GPU" : "the CPU"}` : "The analysis service isn't running"}
+                  {st.available ? `${st.model?.split("#")[0]} on ${st.device === "cuda" ? "the GPU" : "the CPU"}` : "The analysis service isn't running"}
                 </span>
                 <span className="text-muted">
                   {st.analyzed.toLocaleString()} of {st.total.toLocaleString()} tracks analysed{st.failed ? ` · ${st.failed} unreadable` : ""}

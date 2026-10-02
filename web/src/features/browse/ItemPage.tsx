@@ -166,7 +166,7 @@ function Children({ item }: { item: ItemDetail }) {
                 onClick={(e) => {
                   if (c.type === "track") {
                     e.preventDefault(); // tracks play instead of opening a page
-                    music.play(list.filter((t) => t.type === "track"), list.filter((t) => t.type === "track").indexOf(c));
+                    music.play(list.filter((t) => t.type === "track"), list.filter((t) => t.type === "track").indexOf(c), { source: item.title });
                   }
                 }}
                 className={music.current?.item.id === c.id ? "flex items-center gap-4 px-4 py-3 text-accent hover:bg-surface-2" : "flex items-center gap-4 px-4 py-3 hover:bg-surface-2"}

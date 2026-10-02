@@ -119,7 +119,14 @@ export function LibraryPage() {
   useEffect(() => setScrollEl(gridRef.current?.closest("main") ?? null), [gridRef]);
   const [scrollMargin, setScrollMargin] = useState(0);
   useLayoutEffect(() => {
-    if (gridRef.current && scrollEl) setScrollMargin(gridRef.current.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop);
+    const grid = gridRef.current;
+    if (!grid || !scrollEl) return;
+    const measure = () => setScrollMargin(grid.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop);
+    measure();
+    // Content above the grid (filters, the music Discover panel) can change height after it loads.
+    const ro = new ResizeObserver(measure);
+    if (grid.parentElement) for (const el of Array.from(grid.parentElement.children)) if (el !== grid) ro.observe(el);
+    return () => ro.disconnect();
   }, [gridRef, scrollEl, filtersOpen, filtered, total]);
   const virt = useVirtualizer({ count: rows, getScrollElement: () => scrollEl, estimateSize: () => rowHeight, overscan: 4, scrollMargin });
   useEffect(() => virt.measure(), [rowHeight, virt]);

@@ -24,6 +24,8 @@ from pydantic import BaseModel
 from transformers import ClapModel, ClapProcessor
 
 MODEL_ID = os.environ.get("SONIC_MODEL", "laion/larger_clap_general")
+# Reported to the server as the analysis version: bumping the suffix re-analyses the library.
+ANALYSIS_ID = f"{MODEL_ID}#2"
 SR = 48_000          # CLAP's sample rate
 WINDOW = 10.0        # seconds per CLAP window
 FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
@@ -93,9 +95,16 @@ def features(path: str, d: float):
             c = np.corrcoef(chroma, np.roll(prof, i))[0, 1]
             if c > best[0]:
                 best = (c, i, mode)
-    rms = float(np.sqrt(np.mean(y ** 2)))
-    energy = float(np.clip((20 * np.log10(rms + 1e-9) + 40) / 35, 0, 1))  # ~-40 dBFS → 0, ~-5 dBFS → 1
-    return round(bpm, 1), NOTES[best[1]], best[2], round(energy, 3)
+    return round(bpm, 1), NOTES[best[1]], best[2], energy(y, 22_050)
+
+
+def energy(y: np.ndarray, sr: int) -> float:
+    """0–1: how intense a track feels. Loudness alone barely varies across mastered music,
+    so it's blended with rhythmic drive (onset strength) and brightness (spectral centroid)."""
+    loud = np.clip((20 * np.log10(np.sqrt(np.mean(y ** 2)) + 1e-9) + 30) / 20, 0, 1)  # -30 dBFS → 0, -10 → 1
+    drive = np.clip(librosa.onset.onset_strength(y=y, sr=sr).mean() / 1.8, 0, 1)
+    bright = np.clip((librosa.feature.spectral_centroid(y=y, sr=sr).mean() - 800) / 2700, 0, 1)
+    return round(float(0.35 * loud + 0.45 * drive + 0.2 * bright), 3)
 
 
 def embed_audio(clips):
@@ -119,12 +128,15 @@ class TextRequest(BaseModel):
 
 def analyze_one(path: str):
     d, clips = excerpts(path)
+    clips = [c for c in clips if len(c) >= SR]  # empty or sub-second decodes break the CLAP processor
+    if not clips:
+        raise RuntimeError("no decodable audio")
     return d, clips, features(path, d)
 
 
 @app.get("/health")
 def health():
-    return {"model": MODEL_ID, "device": device, "dims": int(model.config.projection_dim)}
+    return {"model": ANALYSIS_ID, "device": device, "dims": int(model.config.projection_dim)}
 
 
 @app.post("/analyze")
@@ -142,13 +154,24 @@ def analyze(req: AnalyzeRequest):
         except Exception as e:  # noqa: BLE001 — report per file, keep the batch going
             results[p] = {"path": p, "error": str(e)}
     if clips:
-        emb = embed_audio(clips)
-        for p in set(owners):
+        try:
+            emb = embed_audio(clips)
+        except Exception:  # noqa: BLE001 — find the bad file instead of failing the whole batch
+            log.exception("batch embedding failed; retrying per file")
+            emb = np.zeros((len(clips), int(model.config.projection_dim)), dtype=np.float32)
+            for p in set(owners):
+                idx = [i for i, o in enumerate(owners) if o == p]
+                try:
+                    emb[idx] = embed_audio([clips[i] for i in idx])
+                except Exception as e:  # noqa: BLE001
+                    results[p] = {"path": p, "error": f"embedding failed: {e}"[:300]}
+                    owners = [o if o != p else None for o in owners]
+        for p in set(o for o in owners if o):
             idx = [i for i, o in enumerate(owners) if o == p]
             v = emb[idx].mean(axis=0)
             v /= np.linalg.norm(v) + 1e-9
             results[p]["embedding"] = [round(float(x), 6) for x in v]
-    return {"model": MODEL_ID, "results": [results[p] for p in req.paths]}
+    return {"model": ANALYSIS_ID, "results": [results[p] for p in req.paths]}
 
 
 @app.post("/embed_text")
@@ -159,4 +182,4 @@ def embed_text(req: TextRequest):
         inputs = processor(text=req.texts, return_tensors="pt", padding=True)
         inputs = {k: v.to(device) for k, v in inputs.items()}
         e = torch.nn.functional.normalize(model.get_text_features(**inputs).float(), dim=-1)
-    return {"model": MODEL_ID, "embeddings": [[round(float(x), 6) for x in v] for v in e.cpu().numpy()]}
+    return {"model": ANALYSIS_ID, "embeddings": [[round(float(x), 6) for x in v] for v in e.cpu().numpy()]}

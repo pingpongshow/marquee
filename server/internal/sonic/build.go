@@ -87,6 +87,17 @@ func (x *Index) Flow(anchor []float32, first *Track, o Options) []*Track {
 // so each flows into the next. Used for Sonic Sage prompts and mixes.
 func (x *Index) Pick(v []float32, n int, o Options) []*Track {
 	pool := x.Nearest(v, max(300, n*10), o.allowed)
+	// Drop the weakest part of the pool: in a small library (or for a prompt few tracks
+	// match) the pool reaches tracks that have nothing to do with the request. In a large
+	// library the pool is tight and this cuts almost nothing.
+	if len(pool) > 5 {
+		floor := pool[0].Score - 0.6*(pool[0].Score-pool[len(pool)-1].Score)
+		cut := len(pool)
+		for cut > 5 && pool[cut-1].Score < floor {
+			cut--
+		}
+		pool = pool[:cut]
+	}
 	var chosen []*Track
 	used := map[int]bool{}
 	for len(chosen) < n {
@@ -113,18 +124,18 @@ func (x *Index) Pick(v []float32, n int, o Options) []*Track {
 		used[best] = true
 		chosen = append(chosen, pool[best].Track)
 	}
-	return order(chosen)
+	return order(chosen, v)
 }
 
-// order chains tracks greedily by similarity, starting from the most central one.
-func order(ts []*Track) []*Track {
+// order chains tracks greedily by similarity, starting from the one closest to v (the
+// prompt or mix centre) so the strongest match plays first.
+func order(ts []*Track, v []float32) []*Track {
 	if len(ts) < 3 {
 		return ts
 	}
-	centre := Mean(ts)
 	start := 0
 	for i, t := range ts {
-		if dot(centre, t.Vec) > dot(centre, ts[start].Vec) {
+		if dot(v, t.Vec) > dot(v, ts[start].Vec) {
 			start = i
 		}
 	}

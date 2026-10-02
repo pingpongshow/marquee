@@ -62,10 +62,10 @@ export function PlayButtons({ item }: { item: ItemDetail }) {
       )}
       {(item.type === "album" || item.type === "artist") && (
         <>
-          <Button variant="primary" loading={busy} onClick={() => run(async () => music.play(await fetchLeaves(item.id)))}>
+          <Button variant="primary" loading={busy} onClick={() => run(async () => music.play(await fetchLeaves(item.id), 0, { source: item.title }))}>
             <Play className="size-4 fill-current" /> Play
           </Button>
-          <Button loading={busy} onClick={() => run(async () => music.play(await fetchLeaves(item.id), 0, { shuffle: true }))}>
+          <Button loading={busy} onClick={() => run(async () => music.play(await fetchLeaves(item.id), 0, { shuffle: true, source: item.title }))}>
             <Shuffle className="size-4" /> Shuffle
           </Button>
         </>

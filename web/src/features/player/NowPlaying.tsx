@@ -289,8 +289,8 @@ export function NowPlaying() {
         </button>
       </header>
       <div className="flex min-h-0 flex-1 gap-8 px-6 pb-8 lg:px-12">
-        <div className={clsx("flex min-w-0 flex-1 flex-col items-center justify-center gap-6", panel && "max-lg:hidden")}>
-          <Art item={t} size={640} className="aspect-square w-full max-w-[min(32rem,55vh)] shadow-2xl" />
+        <div className={clsx("flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center-safe gap-6 overflow-y-auto", panel && "max-lg:hidden")}>
+          <Art item={t} size={640} className="aspect-square w-full max-w-[max(8rem,min(32rem,calc(100dvh-24rem)))] shadow-2xl" />
           <div className="w-full max-w-[32rem] text-center">
             <div className="truncate text-2xl font-bold">{t.title}</div>
             <div className="mt-1 truncate text-white/70">
