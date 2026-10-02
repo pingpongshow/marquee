@@ -52,6 +52,30 @@ public extension AppSession {
         }
     }
 
+    /// Searches OpenSubtitles for an item (PLAY-7). languages: ISO 639-1, comma-separated.
+    func searchSubtitles(_ id: Int64, languages: String) async throws -> [Schemas.SubtitleResult] {
+        switch try await musicAPI.searchSubtitles(path: .init(itemId: id), query: .init(languages: languages)) {
+        case let .ok(ok): return try ok.body.json
+        case let .badRequest(e): throw MarqueeError((try? e.body.json.message) ?? "Subtitle search isn't set up")
+        case let .badGateway(e): throw MarqueeError((try? e.body.json.message) ?? "OpenSubtitles didn't answer")
+        default: throw MarqueeError("Couldn't search for subtitles")
+        }
+    }
+
+    /// Downloads a subtitle and returns its new stream id.
+    func downloadSubtitle(_ id: Int64, result r: Schemas.SubtitleResult) async throws -> Int64 {
+        switch try await musicAPI.downloadSubtitle(path: .init(itemId: id), body: .json(.init(fileId: r.fileId, language: r.language, release: r.release, hearingImpaired: r.hearingImpaired))) {
+        case let .created(c): return try c.body.json.streamId
+        case let .badGateway(e): throw MarqueeError((try? e.body.json.message) ?? "OpenSubtitles didn't answer")
+        default: throw MarqueeError("Couldn't download the subtitle")
+        }
+    }
+
+    /// Playback statistics: your own (ADM-4, "year in music"); days 0 = all time.
+    func stats(days: Int) async throws -> Schemas.Stats {
+        try await musicAPI.getStats(query: .init(days: days, limit: 10)).ok.body.json
+    }
+
     /// Rates an item 0–10 (half stars; 10 = loved), or clears the rating with nil (MUSIC-11).
     func rate(_ id: Int64, _ rating: Double?) async throws {
         _ = try await musicAPI.rateItem(path: .init(itemId: id), body: .json(.init(rating: rating))).noContent
