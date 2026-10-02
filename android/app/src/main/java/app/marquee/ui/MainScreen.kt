@@ -121,6 +121,7 @@ private fun Routes(nav: NavHostController) {
             "player/{id}?start={start}",
             listOf(navArgument("id") { type = NavType.LongType }, navArgument("start") { type = NavType.LongType; defaultValue = -1L }),
         ) { PlayerScreen(nav, it.arguments!!.getLong("id"), it.arguments!!.getLong("start").takeIf { s -> s >= 0 }) }
+        composable("downloads") { DownloadsScreen(nav) }
         composable("nowplaying") { NowPlayingScreen(onClose = { nav.popBackStack() }) }
     }
 }

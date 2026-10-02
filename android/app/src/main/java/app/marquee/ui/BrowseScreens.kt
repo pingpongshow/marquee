@@ -1,5 +1,6 @@
 package app.marquee.ui
 
+import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,14 +66,22 @@ fun openItem(nav: NavHostController, item: ItemSummary, play: Boolean = false) {
 @Composable
 fun HomeScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
-    val hubs by produceState<Result<List<Hub>>?>(null) { value = withContext(Dispatchers.IO) { runCatching { marquee.hubs.homeHubs() } } }
+    val connection by marquee.connection.collectAsState()
+    val hubs by produceState<Result<List<Hub>>?>(null, connection) { value = withContext(Dispatchers.IO) { runCatching { marquee.hubs.homeHubs() } } }
     val cardWidth = if (marquee.isTv) 130.dp else 120.dp
     when (val h = hubs) {
         null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         else -> LazyColumn(contentPadding = PaddingValues(vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(26.dp)) {
             item { Text("Home", Modifier.padding(horizontal = sidePadding), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
-            marquee.lastError?.let { e -> item { Text(e, Modifier.padding(horizontal = sidePadding), color = MaterialTheme.colorScheme.error) } }
-            h.exceptionOrNull()?.let { e -> item { Text("Couldn't load: ${e.message}", Modifier.padding(horizontal = sidePadding), color = MaterialTheme.colorScheme.error) } }
+            marquee.lastError?.let { e ->
+                item {
+                    Column(Modifier.padding(horizontal = sidePadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(e, color = MaterialTheme.colorScheme.error)
+                        if (!marquee.isTv) OutlinedButton({ nav.navigate("downloads") }) { Text("Open Downloads") }
+                    }
+                }
+            }
+            if (!marquee.isOffline) h.exceptionOrNull()?.let { e -> item { Text("Couldn't load: ${e.message}", Modifier.padding(horizontal = sidePadding), color = MaterialTheme.colorScheme.error) } }
             itemsIndexed(h.getOrDefault(emptyList()), key = { _, it -> it.id }) { hi, hub ->
                 val wide = hub.id == "continue-watching"
                 Shelf(hub.title, hub.items, sidePadding) { i, it ->
@@ -91,6 +100,18 @@ fun LibrariesScreen(nav: NavHostController) {
     val libs by produceState<List<Library>?>(null) { value = withContext(Dispatchers.IO) { runCatching { marquee.libraries.listLibraries() }.getOrDefault(emptyList()) } }
     LazyColumn(contentPadding = PaddingValues(vertical = 16.dp)) {
         item { Text("Libraries", Modifier.padding(horizontal = sidePadding, vertical = 8.dp), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+        // Phones and tablets keep downloads; TVs stream.
+        if (!marquee.isTv) item {
+            ListItem(
+                headlineContent = { Text("Downloads") },
+                supportingContent = { Text("On this device") },
+                leadingContent = { Icon(Icons.Filled.DownloadDone, null) },
+                trailingContent = { Icon(Icons.Filled.ChevronRight, null) },
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+                modifier = Modifier.focusCard({ nav.navigate("downloads") }),
+            )
+            HorizontalDivider()
+        }
         itemsIndexed(libs ?: emptyList(), key = { _, it -> it.id }) { i, lib ->
             ListItem(
                 headlineContent = { Text(lib.name) },

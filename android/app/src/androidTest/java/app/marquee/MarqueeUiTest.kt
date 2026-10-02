@@ -273,4 +273,99 @@ class MarqueeUiTest {
             onMain { browser.release() }
         }
     }
+
+    /** Phones: a converted movie and an album download, then play from the device (M7, MUSIC-14). */
+    @Test fun downloadAndPlayOffline() {
+        assumeTrue("phones and tablets only", !isTv)
+        connectAndSignIn()
+        openLibrary("Movies")
+        rule.waitText("00 Preview Test")
+        tap("00 Preview Test")
+        rule.waitText("Download", substring = true)
+        if (rule.onAllNodesWithText("Downloaded").fetchSemanticsNodes().isNotEmpty()) {
+            tap("Downloaded")
+            tap("Delete Download")
+        }
+        tap("Download")
+        tap("Low (480p)")
+        rule.waitText("Downloaded", 240_000) // converted on the server, then fetched
+        shot("d1-downloaded")
+
+        // The album too.
+        back()
+        rule.waitText("00 Preview Test")
+        openLibrary("Music")
+        rule.waitText("Calm Pads", substring = true)
+        tap("Calm Pads", substring = true)
+        rule.onAllNodes(hasContentDescription("Floating")).onFirst().performClick()
+        rule.waitText("Radio")
+        tap("Download")
+
+        tap("Libraries")
+        rule.waitText("Downloads")
+        tap("Downloads")
+        rule.waitText("Movies and TV")
+        rule.waitText("Floating 4", 60_000)
+        shot("d2-downloads")
+        tap("00 Preview Test")
+        val playing = hasContentDescription("Video player") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Playing")
+        rule.waitUntilAtLeastOneExists(playing, 15_000)
+        Thread.sleep(3000)
+        shot("d3-playing-download")
+        back()
+        rule.waitText("Floating 2")
+        tap("Floating 2")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Pause"), 15_000)
+        shot("d4-music-from-device")
+        rule.onAllNodes(hasContentDescription("Pause")).onFirst().performClick()
+
+        // Clean up.
+        listOf("00 Preview Test", "Floating 1", "Floating 2", "Floating 3", "Floating 4").forEach { t ->
+            rule.onAllNodes(hasContentDescription("Delete $t")).fetchSemanticsNodes().firstOrNull()?.let {
+                rule.onNode(hasContentDescription("Delete $t")).performClick()
+            }
+        }
+    }
+
+    /** Phones: with the network off, downloads still play and the play is sent once it's back. */
+    @Test fun offlinePlayback() {
+        assumeTrue("phones and tablets only", !isTv)
+        connectAndSignIn()
+        openLibrary("Music")
+        rule.waitText("Calm Pads", substring = true)
+        tap("Calm Pads", substring = true)
+        rule.onAllNodes(hasContentDescription("Floating")).onFirst().performClick()
+        rule.waitText("Radio")
+        if (rule.onAllNodesWithText("Download").fetchSemanticsNodes().isNotEmpty()) tap("Download")
+        tap("Libraries")
+        tap("Downloads")
+        rule.waitText("Floating 4", 60_000)
+        rule.waitUntil(60_000) { rule.onAllNodesWithText("In progress").fetchSemanticsNodes().isEmpty() }
+
+        // Offline: the app comes back up without the server.
+        shell("svc wifi disable"); shell("svc data disable")
+        try {
+            scenario.close()
+            scenario = ActivityScenario.launch(Intent(context, MainActivity::class.java))
+            rule.waitText("Open Downloads", 40_000)
+            shot("o1-offline-home")
+            tap("Open Downloads")
+            rule.waitText("You're offline", substring = true)
+            tap("Floating 3")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Pause"), 15_000)
+            Thread.sleep(2000)
+            shot("o2-offline-playing")
+            rule.onAllNodes(hasContentDescription("Pause")).onFirst().performClick()
+        } finally {
+            shell("svc wifi enable"); shell("svc data enable")
+        }
+        listOf("Floating 1", "Floating 2", "Floating 3", "Floating 4").forEach { t ->
+            if (rule.onAllNodes(hasContentDescription("Delete $t")).fetchSemanticsNodes().isNotEmpty()) rule.onNode(hasContentDescription("Delete $t")).performClick()
+        }
+    }
+
+    private fun shell(cmd: String) {
+        InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(cmd).close()
+        Thread.sleep(1500)
+    }
 }

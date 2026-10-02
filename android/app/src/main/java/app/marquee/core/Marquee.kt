@@ -12,6 +12,7 @@ import app.marquee.api.apis.PlaybackApi
 import app.marquee.api.apis.PlaylistsApi
 import app.marquee.api.apis.SearchApi
 import app.marquee.api.apis.SystemApi
+import app.marquee.api.apis.DownloadsApi
 import app.marquee.api.apis.UsersApi
 import app.marquee.api.models.AuthResult
 import app.marquee.api.models.DeviceInfo
@@ -72,8 +73,11 @@ class Marquee(context: Context) {
     val music get() = MusicApi(base, http)
     val playlists get() = PlaylistsApi(base, http)
     val users get() = UsersApi(base, http)
+    val downloads get() = DownloadsApi(base, http)
 
     val isRemote: Boolean get() = info?.networkClass == NetworkClass.REMOTE
+    /** Signed in but the server can't be reached. */
+    val isOffline: Boolean get() = token != null && baseUrl == null
 
     val device: DeviceInfo
         get() = DeviceInfo(
@@ -120,11 +124,16 @@ class Marquee(context: Context) {
     }
 
     /** Picks the best address for the current network and checks the session. */
-    suspend fun reconnect(): Unit = detached { reconnectNow() }
+    /** Picks the best address; quiet keeps the current screens up (a background retry). */
+    suspend fun reconnect(quiet: Boolean = false): Unit = detached { reconnectNow(quiet) }
 
-    private suspend fun reconnectNow() {
+    private val _connection = MutableStateFlow(0)
+    /** Bumped on every successful (re)connection, so screens can reload. */
+    val connection: StateFlow<Int> = _connection
+
+    private suspend fun reconnectNow(quiet: Boolean = false) {
         val record = server ?: run { _state.value = State.NoServer; return }
-        _state.value = State.Connecting
+        if (!quiet) _state.value = State.Connecting
         var chosen: Pair<String, SystemInfo>? = null
         for (url in record.candidates) {
             val i = probe(url)
@@ -132,12 +141,14 @@ class Marquee(context: Context) {
         }
         if (chosen == null) {
             lastError = "Can't reach ${record.name}. Check that you're on the home network or connected to Tailscale."
+            baseUrl = null // offline: downloads still play
             _state.value = if (token == null) State.SignedOut else State.SignedIn
             return
         }
         lastError = null
         baseUrl = chosen.first
         info = chosen.second
+        _connection.value++
         if (token == null) { _state.value = State.SignedOut; return }
         val me = withContext(Dispatchers.IO) { runCatching { auth.getMe() } }
         me.onSuccess { _me.value = it; _state.value = State.SignedIn }
