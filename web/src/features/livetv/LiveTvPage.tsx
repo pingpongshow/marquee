@@ -69,9 +69,9 @@ export function LiveTvPage() {
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-bold whitespace-nowrap">Live TV</h1>
-        <div className="ml-4 flex gap-1" role="tablist">
+        <div className="flex gap-1 sm:ml-4" role="tablist">
           {(status.data?.canRecord
             ? (["guide", "now", "recordings"] as const)
             : (["guide", "now"] as const)
@@ -98,8 +98,8 @@ export function LiveTvPage() {
         </div>
         <div
           className={clsx(
-            "ml-auto w-48 shrink-0",
-            tab === "recordings" && "invisible",
+            "w-full shrink-0 sm:ml-auto sm:w-48",
+            tab === "recordings" && "hidden sm:invisible sm:block",
           )}
         >
           <Select
@@ -240,6 +240,7 @@ export function ChannelLogo({
     <img
       src={channel.logoUrl}
       alt=""
+      loading="lazy"
       onError={() => setBroken(true)}
       className={clsx("object-contain", className)}
     />
@@ -335,7 +336,8 @@ function Guide({
       </div>
       <div
         ref={scroller}
-        className="relative overflow-x-auto rounded-lg bg-surface"
+        // Scrolls both ways itself (with a height cap) so the time header can stick to its top.
+        className="relative max-h-[75vh] overflow-auto overscroll-contain rounded-lg bg-surface"
         role="grid"
         aria-label="TV guide"
       >

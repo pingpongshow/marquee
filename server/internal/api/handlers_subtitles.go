@@ -23,7 +23,7 @@ func (h *Handlers) SearchSubtitles(ctx context.Context, req SearchSubtitlesReque
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		return SearchSubtitles404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "this item has no file"))}, nil
-	case errors.Is(err, subtitles.ErrNotVideo), errors.Is(err, subtitles.ErrNotConfigured):
+	case errors.Is(err, subtitles.ErrNotVideo), errors.Is(err, subtitles.ErrNotConfigured), errors.Is(err, subtitles.ErrInvalid):
 		return SearchSubtitles400JSONResponse{BadRequestJSONResponse(apiErr("not_available", err.Error()))}, nil
 	case err != nil:
 		return SearchSubtitles502JSONResponse{BadGatewayJSONResponse(apiErr("provider", err.Error()))}, nil

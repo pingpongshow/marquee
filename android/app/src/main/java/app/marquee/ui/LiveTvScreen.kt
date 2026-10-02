@@ -92,7 +92,9 @@ import app.marquee.api.models.LiveProgramme
 import app.marquee.api.models.PlayLiveChannelRequest
 import app.marquee.core.AndroidProfile
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -346,12 +348,25 @@ private fun WhatsOnRow(c: LiveChannel, onWatch: () -> Unit) {
 private fun LiveVideo(channelId: Long, muted: Boolean, modifier: Modifier, onState: (String?) -> Unit = {}, onPlaying: (Boolean) -> Unit = {}) {
     val marquee = LocalMarquee.current
     val context = LocalContext.current
-    val player = remember(channelId) { ExoPlayer.Builder(context).build() }
+    val player = remember(channelId) { videoPlayer(context) }
     val session = remember(channelId) { arrayOfNulls<String>(1) } // read when the player goes away
-    LaunchedEffect(muted, player) { player.volume = if (muted) 0f else 1f }
+    LaunchedEffect(muted, player) {
+        player.volume = if (muted) 0f else 1f
+        // A muted preview leaves music alone; with sound it takes audio focus like any video.
+        player.setAudioAttributes(videoAudio, !muted)
+    }
     LaunchedEffect(channelId) {
         onState(null)
-        val s = withContext(Dispatchers.IO) { runCatching { marquee.livetv.playLiveChannel(channelId, PlayLiveChannelRequest(AndroidProfile.profile)) } }
+        // Tuned on the session's own scope: if this goes away while the server is tuning,
+        // the stream is stopped as soon as it arrives rather than left running.
+        val pending = marquee.scope.async { runCatching { marquee.livetv.playLiveChannel(channelId, PlayLiveChannelRequest(AndroidProfile.profile)) } }
+        val s = try {
+            pending.await()
+        } catch (e: CancellationException) {
+            marquee.scope.launch { pending.await().getOrNull()?.let { runCatching { marquee.livetv.stopLiveSession(it.id) } } }
+            throw e
+        }
+        session[0] = s.getOrNull()?.id
         s.onSuccess {
             withContext(Dispatchers.Main) {
                 player.setMediaItem(MediaItem.fromUri(marquee.absolute(it.url)!!))
@@ -359,7 +374,6 @@ private fun LiveVideo(channelId: Long, muted: Boolean, modifier: Modifier, onSta
                 player.playWhenReady = true
             }
         }.onFailure { onState(it.message ?: "Couldn't tune the channel") }
-        session[0] = s.getOrNull()?.id
     }
     DisposableEffect(player) {
         val l = object : Player.Listener { override fun onIsPlayingChanged(isPlaying: Boolean) = onPlaying(isPlaying) }
@@ -408,25 +422,7 @@ fun LiveWatchScreen(nav: NavHostController, startId: Long) {
     var playing by remember { mutableStateOf(false) }
     val c = channels.firstOrNull { it.id == current }
     // Phones: full screen in landscape, as for video.
-    val context = LocalContext.current
-    DisposableEffect(Unit) {
-        val activity = context as? android.app.Activity
-        val window = activity?.window
-        val bars = window?.let { androidx.core.view.WindowCompat.getInsetsController(it, it.decorView) }
-        window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        if (!marquee.isTv) {
-            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-            bars?.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            bars?.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-        }
-        onDispose {
-            window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            if (!marquee.isTv) {
-                activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                bars?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-            }
-        }
-    }
+    VideoWindow()
     fun step(d: Int) {
         if (channels.isEmpty()) return
         val i = channels.indexOfFirst { it.id == current }.coerceAtLeast(0)

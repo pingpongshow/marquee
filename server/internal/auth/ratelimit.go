@@ -62,6 +62,17 @@ func (l *loginLimiter) fail(ip, user string) {
 		m   map[string]*failures
 		key string
 	}{{l.byIP, ip}, {l.byUser, user}} {
+		if entry.key == "" {
+			continue
+		}
+		if len(entry.m) > 10000 {
+			// Forget windows that have passed, so the maps don't grow without bound.
+			for k, old := range entry.m {
+				if now.Sub(old.first) > window {
+					delete(entry.m, k)
+				}
+			}
+		}
 		f := entry.m[entry.key]
 		if f == nil || now.Sub(f.first) > window {
 			f = &failures{first: now}

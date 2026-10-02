@@ -43,6 +43,8 @@ class Marquee(context: Context) {
     /** For fire-and-forget calls that must outlive a screen (progress reports, stopping sessions). */
     val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
     val isTv: Boolean = context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+    /** Video screens open (main thread only); see VideoWindow. */
+    var videoScreens = 0
     /** Chromecast (phones and tablets; a TV is itself the screen). */
     val cast: MarqueeCast by lazy { MarqueeCast(context.applicationContext, this) }
 
@@ -162,7 +164,7 @@ class Marquee(context: Context) {
         val me = withContext(Dispatchers.IO) { runCatching { auth.getMe() } }
         me.onSuccess { _me.value = it; _state.value = State.SignedIn }
             .onFailure { e ->
-                if (e.message?.contains("401") == true) signOutLocally() else _state.value = State.SignedIn
+                if ((e as? app.marquee.api.infrastructure.ClientException)?.statusCode == 401) signOutLocally() else _state.value = State.SignedIn
             }
     }
 
@@ -210,17 +212,27 @@ class Marquee(context: Context) {
 
     // URLs
 
-    /** Artwork URL (images authenticate with the token parameter). */
+    /**
+     * The query parameter that authenticates image, person photo and avatar URLs: the
+     * image key from /me, which grants images and nothing else (D85), so the sign-in token
+     * never ends up in artwork URIs handed to other apps. Falls back to the token until
+     * /me has loaded.
+     */
+    private val imageAuth: String
+        get() = me.value?.imageKey?.let { "key=$it" } ?: "token=${token ?: ""}"
+
+    /** Artwork URL (images authenticate with the image key). */
     fun imageUrl(artworkId: Long?, width: Int): String? {
         if (artworkId == null || baseUrl == null) return null
-        return "$baseUrl/api/v1/images/$artworkId?w=${width * 2}&token=${token ?: ""}"
+        return "$baseUrl/api/v1/images/$artworkId?w=${width * 2}&$imageAuth"
     }
 
-    /** Resolves a server-relative URL (streams, avatars). */
+    /** Resolves a server-relative URL (streams, avatars, person photos). */
     fun absolute(path: String?): String? {
         if (path == null || baseUrl == null) return null
         if (path.startsWith("http")) return path
-        val tokenParam = if (path.startsWith("/api/v1/users/")) (if (path.contains("?")) "&" else "?") + "token=${token ?: ""}" else ""
-        return baseUrl + path + tokenParam
+        val needsKey = path.startsWith("/api/v1/users/") || path.startsWith("/api/v1/people/") || path.startsWith("/api/v1/images/")
+        val keyParam = if (needsKey) (if (path.contains("?")) "&" else "?") + imageAuth else ""
+        return baseUrl + path + keyParam
     }
 }

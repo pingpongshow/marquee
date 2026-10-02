@@ -148,11 +148,11 @@ func (h *Handlers) ReportPlayback(ctx context.Context, req ReportPlaybackRequest
 	if _, ok := session(ctx); !ok {
 		return ReportPlayback401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if _, ok := h.ownSession(ctx, req.SessionId); !ok {
+	s, ok := h.ownSession(ctx, req.SessionId)
+	if !ok {
 		return ReportPlayback404JSONResponse{NotFoundJSONResponse(apiErr("not_found", playback.ErrNoSession.Error()))}, nil
 	}
 	if req.Body.State == PlaybackProgressStateError {
-		s, _ := h.Playback.Get(req.SessionId)
 		msg := ""
 		set(&msg, req.Body.Error)
 		slog.WarnContext(ctx, "client playback error", "title", s.Title, "method", s.Decision.Method, "device", s.DeviceName,

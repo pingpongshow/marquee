@@ -3,6 +3,7 @@ package app.marquee.core
 import android.app.DownloadManager
 import android.content.Context
 import android.net.Uri
+import android.util.AtomicFile
 import app.marquee.api.infrastructure.Serializer
 import app.marquee.api.models.CreateDownloadRequest
 import app.marquee.api.models.Download
@@ -24,6 +25,7 @@ import kotlinx.serialization.builtins.serializer
 import okhttp3.Request
 import java.io.File
 import java.time.OffsetDateTime
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Offline downloads on phones and tablets (M7, MUSIC-14), as on the iPhone (D64): videos as
@@ -75,26 +77,52 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
 
     private val _entries = MutableStateFlow(load())
     val entries: StateFlow<Map<Long, Entry>> = _entries
-    private var pending: List<Pending> = runCatching { json.decodeFromString(ListSerializer(Pending.serializer()), pendingFile.readText()) }.getOrDefault(emptyList())
+    /** Offline plays waiting to be sent; guarded by pendingLock. */
+    private var pending: List<Pending> = runCatching { json.decodeFromString(ListSerializer(Pending.serializer()), readFile(pendingFile)) }.getOrDefault(emptyList())
+    private val pendingLock = Any()
     private var watcher: Job? = null
 
+    private val playlistsSerializer = kotlinx.serialization.builtins.MapSerializer(Long.serializer(), kotlinx.serialization.builtins.SetSerializer(Long.serializer()))
     /** Playlists kept on the device (MUSIC-19): playlist id -> its items when last synced. */
     private val _playlists = MutableStateFlow<Map<Long, Set<Long>>>(
-        runCatching { json.decodeFromString(kotlinx.serialization.builtins.MapSerializer(Long.serializer(), kotlinx.serialization.builtins.SetSerializer(Long.serializer())), playlistsFile.readText()) }.getOrDefault(emptyMap()),
+        runCatching { json.decodeFromString(playlistsSerializer, readFile(playlistsFile)) }.getOrDefault(emptyMap()),
     )
     val playlists: StateFlow<Map<Long, Set<Long>>> = _playlists
 
     private fun load(): Map<Long, Entry> = runCatching {
-        json.decodeFromString(ListSerializer(Entry.serializer()), indexFile.readText()).associateBy { it.item.id }
+        json.decodeFromString(ListSerializer(Entry.serializer()), readFile(indexFile)).associateBy { it.item.id }
     }.getOrDefault(emptyMap())
 
-    private fun save() {
-        runCatching { indexFile.writeText(json.encodeToString(ListSerializer(Entry.serializer()), _entries.value.values.toList())) }
+    // Files are replaced whole (a new copy, then renamed over the old), so a crash or two
+    // writers at once can never leave half a list behind.
+    private fun readFile(f: File): String = String(AtomicFile(f).readFully())
+
+    @Synchronized
+    private fun writeFile(f: File, text: String) {
+        val a = AtomicFile(f)
+        val out = runCatching { a.startWrite() }.getOrNull() ?: return
+        runCatching { out.write(text.toByteArray()); a.finishWrite(out) }.onFailure { a.failWrite(out) }
     }
 
-    private fun set(id: Long, f: (Entry) -> Entry) {
+    /** One writer for the index, so saves never interleave. */
+    private val writer = Dispatchers.IO.limitedParallelism(1)
+    private val dirty = AtomicBoolean(false)
+
+    /**
+     * Writes the index (the latest state, whoever asked) off the main thread. Progress
+     * updates wait a few seconds so a busy transfer doesn't rewrite the file every second.
+     */
+    private fun save(soon: Boolean = false) {
+        dirty.set(true)
+        marquee.scope.launch(writer) {
+            if (soon) delay(3000)
+            if (dirty.getAndSet(false)) writeFile(indexFile, json.encodeToString(ListSerializer(Entry.serializer()), _entries.value.values.toList()))
+        }
+    }
+
+    private fun set(id: Long, progressOnly: Boolean = false, f: (Entry) -> Entry) {
         _entries.update { m -> m[id]?.let { m + (id to f(it)) } ?: m }
-        save()
+        save(soon = progressOnly)
     }
 
     /** After signing in: resumes conversions and transfers, and sends offline plays. */
@@ -138,9 +166,7 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
     }
 
     private fun savePlaylists() {
-        runCatching {
-            playlistsFile.writeText(json.encodeToString(kotlinx.serialization.builtins.MapSerializer(Long.serializer(), kotlinx.serialization.builtins.SetSerializer(Long.serializer())), _playlists.value))
-        }
+        runCatching { writeFile(playlistsFile, json.encodeToString(playlistsSerializer, _playlists.value)) }
     }
 
     // Starting and removing
@@ -192,21 +218,26 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
     /** A play of a downloaded item: kept locally and sent to the server when it's reachable. */
     fun recordProgress(id: Long, positionMs: Long, watched: Boolean) {
         set(id) { it.copy(resumeMs = if (watched) 0 else positionMs) }
-        pending = pending.filterNot { it.itemId == id && !it.watched } + Pending(id, positionMs, watched, System.currentTimeMillis())
-        runCatching { pendingFile.writeText(json.encodeToString(ListSerializer(Pending.serializer()), pending)) }
+        updatePending { list -> list.filterNot { it.itemId == id && !it.watched } + Pending(id, positionMs, watched, System.currentTimeMillis()) }
         marquee.scope.launch { flushProgress() }
     }
 
+    private fun updatePending(f: (List<Pending>) -> List<Pending>) = synchronized(pendingLock) {
+        pending = f(pending)
+        runCatching { writeFile(pendingFile, json.encodeToString(ListSerializer(Pending.serializer()), pending)) }
+    }
+
     suspend fun flushProgress() = lock.withLock {
-        if (pending.isEmpty() || marquee.token == null || marquee.baseUrl == null) return@withLock
-        val left = pending.filter { p ->
+        val batch = synchronized(pendingLock) { pending }
+        if (batch.isEmpty() || marquee.token == null || marquee.baseUrl == null) return@withLock
+        val sent = batch.filter { p ->
             val at = OffsetDateTime.ofInstant(java.time.Instant.ofEpochMilli(p.atMs), java.time.ZoneOffset.UTC)
             kotlinx.coroutines.withContext(Dispatchers.IO) {
-                runCatching { marquee.playback.syncProgress(p.itemId, SyncProgressRequest(p.positionMs, p.watched, at)) }.isFailure
+                runCatching { marquee.playback.syncProgress(p.itemId, SyncProgressRequest(p.positionMs, p.watched, at)) }.isSuccess
             }
-        }
-        pending = left
-        runCatching { pendingFile.writeText(json.encodeToString(ListSerializer(Pending.serializer()), pending)) }
+        }.toSet()
+        // Plays recorded while this was sending stay for next time.
+        if (sent.isNotEmpty()) updatePending { list -> list.filterNot { it in sent } }
     }
 
     // Transfers
@@ -253,7 +284,7 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
         when (info.status) {
             Download.Status.READY -> { set(e.item.id) { it.copy(size = info.propertySize ?: it.size) }; info.url?.let { fetch(e.item.id, it, info.fileName) } }
             Download.Status.FAILED -> set(e.item.id) { it.copy(state = State.Failed, error = info.error ?: "Conversion failed") }
-            else -> set(e.item.id) { it.copy(progress = info.progress) }
+            else -> set(e.item.id, progressOnly = true) { it.copy(progress = info.progress) }
         }
     }
 
@@ -275,7 +306,7 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
                     val reason = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
                     set(e.item.id) { it.copy(state = State.Failed, error = "Download failed ($reason)", transfer = null) }
                 }
-                else -> if (total > 0) set(e.item.id) { it.copy(progress = done.toDouble() / total) }
+                else -> if (total > 0) set(e.item.id, progressOnly = true) { it.copy(progress = done.toDouble() / total) }
             }
         }
     }

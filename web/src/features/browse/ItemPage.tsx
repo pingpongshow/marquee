@@ -7,7 +7,7 @@ import { api, imageUrl, personPhotoUrl, unwrap } from "@/api/client";
 import { itemChildrenQuery, itemQuery, meQuery } from "@/api/queries";
 import type { Credit, ItemDetail, ItemSummary, MediaStream } from "@/api/types";
 import { Alert, Spinner } from "@/components/ui";
-import { useMusic } from "../player/MusicPlayer";
+import { useMusicState } from "../player/MusicPlayer";
 import { ItemActions } from "./ItemActions";
 import { ItemMenu } from "./ItemMenu";
 import { Rating } from "../music/Rating";
@@ -82,6 +82,7 @@ function RatingBadges({ item }: { item: ItemDetail }) {
   if (r?.imdb) badges.push({ label: "IMDb", value: r.imdb.toFixed(1), title: r.imdbVotes ? `${r.imdbVotes.toLocaleString()} votes` : "IMDb rating" });
   if (r?.rottenTomatoes != null) badges.push({ label: r.rottenTomatoes >= 60 ? "🍅" : "🤢", value: `${r.rottenTomatoes}%`, title: "Rotten Tomatoes critics" });
   if (r?.metacritic != null) badges.push({ label: "Metacritic", value: String(r.metacritic), title: "Metacritic" });
+  if (r?.anilist != null) badges.push({ label: "AniList", value: `${r.anilist}%`, title: "AniList average score" });
   if (item.audienceRating) badges.push({ label: "TMDB", value: item.audienceRating.toFixed(1), title: "TMDB user score" });
   if (!badges.length) return null;
   return (
@@ -147,7 +148,7 @@ function Cast({ credits }: { credits: Credit[] }) {
 }
 
 function Children({ item }: { item: ItemDetail }) {
-  const music = useMusic();
+  const music = useMusicState();
   const children = useQuery({ ...itemChildrenQuery(item.id), enabled: item.childCount > 0 });
   if (!children.data?.items.length) return null;
   const list = children.data.items;
@@ -217,7 +218,7 @@ function CardGrid({ list }: { list: ItemSummary[] }) {
 
 /** The artist's most-listened tracks in the library (ListenBrainz, MUSIC-15). */
 function PopularTracks({ artist }: { artist: ItemDetail }) {
-  const music = useMusic();
+  const music = useMusicState();
   const [all, setAll] = useState(false);
   const popular = useQuery({
     queryKey: ["items", artist.id, "popular"],
@@ -411,7 +412,7 @@ export function ItemPage() {
           <div className="mt-2">
             <Rating key={d.id} itemId={d.id} value={d.userRating} />
           </div>
-          <PlayButtons item={d} />
+          <PlayButtons key={d.id} item={d} />
           <div className="mt-4 flex items-center gap-3">
             <ItemMenu item={d} />
             {me.data?.isAdmin && <ItemActions item={d} />}

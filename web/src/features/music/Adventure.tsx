@@ -5,7 +5,7 @@ import { api, imageUrl, unwrap } from "@/api/client";
 import { searchQuery } from "@/api/queries";
 import type { ItemSummary } from "@/api/types";
 import { Alert, Dialog, Input, Spinner } from "@/components/ui";
-import { useMusic } from "../player/MusicPlayer";
+import { useMusicActions } from "../player/MusicPlayer";
 
 /** Sonic Adventure (MUSIC-4): pick a destination track and travel there through music that sounds in between. */
 export function AdventureDialog({
@@ -15,7 +15,7 @@ export function AdventureDialog({
   from: ItemSummary;
   onClose: () => void;
 }) {
-  const music = useMusic();
+  const music = useMusicActions();
   const [q, setQ] = useState("");
   const results = useQuery({
     ...searchQuery(q, 15),

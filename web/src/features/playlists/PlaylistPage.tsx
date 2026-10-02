@@ -9,7 +9,7 @@ import type { ItemSummary, PlaylistEntry } from "@/api/types";
 import { Alert, Button, Dialog, Input, Spinner } from "@/components/ui";
 import { formatDuration, formatTrackTime } from "../browse/format";
 import { ItemMenu } from "../browse/ItemMenu";
-import { useMusic } from "../player/MusicPlayer";
+import { useMusicState } from "../player/MusicPlayer";
 import { PlaylistMosaic } from "./PlaylistMosaic";
 import { RulesEditor, rulesValid } from "./RulesEditor";
 import type { SmartRules } from "@/api/types";
@@ -35,7 +35,7 @@ export function PlaylistPage() {
   const id = Number(playlistId);
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const music = useMusic();
+  const music = useMusicState();
   const pl = useQuery(playlistQuery(id));
   const entries = useQuery(playlistItemsQuery(id));
   const [renaming, setRenaming] = useState<string | null>(null);

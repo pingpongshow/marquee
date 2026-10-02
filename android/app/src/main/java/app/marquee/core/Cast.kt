@@ -121,13 +121,20 @@ class MarqueeCast(private val context: Context, private val marquee: Marquee) {
         override fun onSessionSuspended(s: CastSession, reason: Int) {}
         override fun onSessionStarting(s: CastSession) {}
         override fun onSessionStartFailed(s: CastSession, error: Int) { _device.value = null }
-        override fun onSessionEnding(s: CastSession) { lastPosition = remote?.approximateStreamPosition ?: lastPosition }
+        override fun onSessionEnding(s: CastSession) {
+            lastPosition = remote?.approximateStreamPosition ?: lastPosition
+            if (endingPlaying == null) endingPlaying = _playing.value
+        }
         override fun onSessionResuming(s: CastSession, id: String) {}
         override fun onSessionResumeFailed(s: CastSession, error: Int) {}
     }
 
     private var lastPosition = 0L
     private var started = false
+    /** Whether the receiver was playing as casting began to stop (it may report idle on the way out). */
+    private var endingPlaying: Boolean? = null
+    /** Whether the receiver was playing when casting last stopped: only then does the phone carry on. */
+    var playingAtEnd = false; private set
 
     /** Starts listening for Cast sessions (call once, on the main thread). */
     fun init() {
@@ -150,6 +157,7 @@ class MarqueeCast(private val context: Context, private val marquee: Marquee) {
 
     fun disconnect() {
         lastPosition = remote?.approximateStreamPosition ?: lastPosition
+        endingPlaying = _playing.value
         castContext?.sessionManager?.endCurrentSession(true)
     }
 
@@ -171,11 +179,14 @@ class MarqueeCast(private val context: Context, private val marquee: Marquee) {
     }
 
     private fun connected(s: CastSession) {
+        endingPlaying = null
         _device.value = s.castDevice?.friendlyName ?: "Chromecast"
         s.remoteMediaClient?.registerCallback(remoteCallback)
     }
 
     private fun disconnected() {
+        playingAtEnd = endingPlaying ?: _playing.value
+        endingPlaying = null
         _device.value = null
         _playing.value = false
         ticker?.cancel()

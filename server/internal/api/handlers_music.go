@@ -247,7 +247,7 @@ func (h *Handlers) MusicMixes(ctx context.Context, req MusicMixesRequestObject) 
 		return MusicMixes401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	out := MusicMixes200JSONResponse{}
-	for i, m := range h.Sonic.DailyMixes(ctx, s.User.ID, keepFor(access(ctx), req.Params.LibraryId)) {
+	for i, m := range h.Sonic.DailyMixes(ctx, s.User.ID, mixScope(req.Params.LibraryId), keepFor(access(ctx), req.Params.LibraryId)) {
 		st, err := h.station(ctx, m.Station)
 		if err != nil {
 			return nil, internal(ctx, "mixes", err)
@@ -371,4 +371,12 @@ func (h *Handlers) MusicDJ(ctx context.Context, req MusicDJRequestObject) (Music
 		return none, nil
 	}
 	return MusicDJ200JSONResponse(toAPISummary(d.Summary)), nil
+}
+
+// mixScope keys cached mixes by library ("" = all the caller can see).
+func mixScope(lib *int64) string {
+	if lib == nil {
+		return ""
+	}
+	return strconv.FormatInt(*lib, 10)
 }

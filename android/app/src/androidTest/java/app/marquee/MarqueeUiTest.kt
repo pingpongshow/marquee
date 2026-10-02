@@ -164,6 +164,7 @@ class MarqueeUiTest {
         rule.onNode(hasContentDescription("Close Now Playing")).performClick()
 
         // An album with an .lrc sidecar: synced lyrics, then a rating.
+        scrollTo(hasText("Calm Pads", substring = true))
         tap("Calm Pads", substring = true)
         rule.waitText("Floating")
         rule.onAllNodes(hasContentDescription("Floating")).onFirst().performClick()

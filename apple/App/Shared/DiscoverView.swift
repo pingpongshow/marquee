@@ -16,6 +16,8 @@ struct DiscoverView: View {
     @State private var page = 1
     @State private var hasMore = false
     @State private var loadingMore = false
+    /// Bumped by every fresh load, so a page that arrives for an older list is dropped.
+    @State private var generation = 0
 
     var body: some View {
         content
@@ -189,10 +191,12 @@ struct DiscoverView: View {
     /// The next page, when the last card shows.
     private func loadMore() async {
         guard hasMore, !loadingMore else { return }
+        let gen = generation
         loadingMore = true
-        defer { loadingMore = false }
+        defer { if gen == generation { loadingMore = false } }
         let q = query.trimmingCharacters(in: .whitespaces)
-        guard let p = try? await (q.isEmpty ? app.discoverRequestable(category, page: page + 1, browse: browse) : app.searchRequestable(q, page: page + 1)) else { return }
+        guard let p = try? await (q.isEmpty ? app.discoverRequestable(category, page: page + 1, browse: browse) : app.searchRequestable(q, page: page + 1)),
+              gen == generation else { return }
         page = p.page
         hasMore = p.page < p.totalPages
         let seen = Set(items.map(\.id))
@@ -201,10 +205,15 @@ struct DiscoverView: View {
 
     private func load() async {
         guard status?.enabled != false, status?.canRequest != false else { return }
+        generation += 1
+        loadingMore = false
+        hasMore = false // no paging until the new first page is in
+        let gen = generation
         do {
             let q = query.trimmingCharacters(in: .whitespaces)
             if !q.isEmpty { try await Task.sleep(for: .milliseconds(350)) }
             let p = q.isEmpty ? try await app.discoverRequestable(category, browse: browse) : try await app.searchRequestable(q)
+            guard gen == generation else { return }
             items = p.results
             page = p.page
             hasMore = p.page < p.totalPages

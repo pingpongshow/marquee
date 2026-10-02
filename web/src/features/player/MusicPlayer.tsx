@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -17,31 +18,37 @@ export type Levelling = "off" | "track" | "album" | "auto";
 export type DJMode = "stretch" | "groupie" | "deep_cuts" | "contempo";
 export type Source = { title: string; radio?: RadioRequest };
 
-type Ctx = {
+/** Player state that changes on track/queue/setting changes, not with the playhead. */
+type State = {
   source?: Source;
+  levelling: Levelling;
+  /** Crossfade between tracks in seconds (0 = off); never within an album played in order. */
+  crossfade: number;
+  /** Guest DJ (MUSIC-6): weaves a track in every few songs. */
+  dj: DJMode | null;
+  /** Sleep timer: an epoch time to pause at, "track" (end of this track), or null. */
+  sleep: number | "track" | null;
+  queue: Q.Queue;
+  current?: Q.Entry;
+  playing: boolean;
+  volume: number;
+  expanded: boolean;
+};
+
+/** The playhead, which updates several times a second while playing. */
+type Time = { time: number; duration: number };
+
+/** Stable functions: components that only start playback never re-render with the player. */
+type Actions = {
   /** Plays a generated station; radios top themselves up as they play. */
   playStation: (
     station: { title: string; items: ItemSummary[] },
     radio?: RadioRequest,
   ) => void;
-  levelling: Levelling;
   setLevelling: (l: Levelling) => void;
-  /** Crossfade between tracks in seconds (0 = off); never within an album played in order. */
-  crossfade: number;
   setCrossfade: (s: number) => void;
-  /** Guest DJ (MUSIC-6): weaves a track in every few songs. */
-  dj: DJMode | null;
   setDJ: (m: DJMode | null) => void;
-  /** Sleep timer: an epoch time to pause at, "track" (end of this track), or null. */
-  sleep: number | "track" | null;
   setSleep: (s: number | "track" | null) => void;
-  queue: Q.Queue;
-  current?: Q.Entry;
-  playing: boolean;
-  time: number;
-  duration: number;
-  volume: number;
-  expanded: boolean;
   /** source names what's playing (an album or playlist) for the Now Playing header. */
   play: (
     tracks: ItemSummary[],
@@ -64,12 +71,29 @@ type Ctx = {
   close: () => void;
 };
 
-const MusicContext = createContext<Ctx | null>(null);
+const ActionsContext = createContext<Actions | null>(null);
+const StateContext = createContext<(Actions & State) | null>(null);
+const TimeContext = createContext<Time>({ time: 0, duration: 0 });
 
-export function useMusic() {
-  const ctx = useContext(MusicContext);
-  if (!ctx) throw new Error("useMusic outside MusicProvider");
+/** Just the player's actions (play, queue…); never re-renders as music plays. */
+export function useMusicActions() {
+  const ctx = useContext(ActionsContext);
+  if (!ctx) throw new Error("useMusicActions outside MusicProvider");
   return ctx;
+}
+
+/** Actions and player state, without the playhead (re-renders on track and setting changes). */
+export function useMusicState() {
+  const ctx = useContext(StateContext);
+  if (!ctx) throw new Error("useMusicState outside MusicProvider");
+  return ctx;
+}
+
+/** Everything, including the playhead: re-renders several times a second while playing. */
+export function useMusic() {
+  const state = useMusicState();
+  const time = useContext(TimeContext);
+  return useMemo(() => ({ ...state, ...time }), [state, time]);
 }
 
 /** A playback session bound to one of the two audio elements, with its levelling gains. */
@@ -185,6 +209,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const audios = useRef<(HTMLAudioElement | null)[]>([null, null]);
   const active = useRef(0);
   const loaded = useRef<[Loaded | null, Loaded | null]>([null, null]);
+  // Bumped whenever an element is (re)loaded or unloaded, so a slow load that has been
+  // overtaken (fast skipping) drops its own session instead of taking over the element.
+  const loadGen = useRef([0, 0]);
   const [queue, setQueue] = useState<Q.Queue>(Q.emptyQueue);
   const queueRef = useRef(queue);
   const [playing, setPlaying] = useState(false);
@@ -296,6 +323,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const unload = useCallback((i: number) => {
+    loadGen.current[i]!++;
     const l = loaded.current[i];
     loaded.current[i] = null;
     const a = audios.current[i];
@@ -308,10 +336,21 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     if (l?.sessionId) finishSession(l.sessionId, position);
   }, []);
 
-  /** Loads an entry into element i. */
+  /** Loads an entry into element i; false when a newer load or unload overtook it. */
   const loadInto = useCallback(
-    async (i: number, entry: Q.Entry, preload = false) => {
-      const s = await openSession(entry.item, preload);
+    async (i: number, entry: Q.Entry, preload = false): Promise<boolean> => {
+      const gen = ++loadGen.current[i]!;
+      let s;
+      try {
+        s = await openSession(entry.item, preload);
+      } catch (e) {
+        if (loadGen.current[i] !== gen) return false;
+        throw e;
+      }
+      if (loadGen.current[i] !== gen) {
+        stopSession(s.id);
+        return false;
+      }
       if (loaded.current[i]) stopSession(loaded.current[i]!.sessionId);
       loaded.current[i] = {
         key: entry.key,
@@ -326,6 +365,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       a.preload = "auto";
       a.load();
       loaded.current[i]!.ready = true;
+      return true;
     },
     [],
   );
@@ -346,7 +386,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         active.current = idle;
       } else {
         try {
-          await loadInto(active.current, entry);
+          if (!(await loadInto(active.current, entry))) return; // overtaken
         } catch {
           // Skip tracks that can't be played.
           if (!cancelled)
@@ -525,9 +565,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         sessionId: "",
         ready: false,
       }; // reserve
-      loadInto(idle, following, true).catch(
-        () => (loaded.current[idle] = null),
-      );
+      const gen = loadGen.current[idle]! + 1;
+      loadInto(idle, following, true).catch(() => {
+        if (loadGen.current[idle] === gen) loaded.current[idle] = null;
+      });
     }
     // Crossfade into what follows, except within an album played in order (gapless albums
     // stay gapless, like Plexamp's sweet fades) and when the sleep timer ends this track.
@@ -619,126 +660,149 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     applyGain(active.current);
   };
 
-  const setVolume = (v: number) => {
-    setVolumeState(v);
-    volumeRef.current = v;
-    applyGain(active.current);
-    try {
-      localStorage.setItem("marquee.volume", String(v));
-    } catch {
-      /* storage unavailable */
-    }
-  };
+  const actions = useMemo<Actions>(
+    () => ({
+      playStation: (station, radio) => {
+        unload(1 - active.current);
+        setSource({ title: station.title, radio });
+        setQueue((q) => Q.load(q, station.items, 0));
+      },
+      setLevelling: (l) => {
+        setLevellingState(l);
+        levellingRef.current = l;
+        applyGain(active.current);
+        try {
+          localStorage.setItem("marquee.levelling", l);
+        } catch {
+          /* storage unavailable */
+        }
+      },
+      setCrossfade: (s) => {
+        setCrossfadeState(s);
+        crossfadeRef.current = s;
+        store("marquee.crossfade", s);
+      },
+      setDJ: (m) => {
+        setDJState(m);
+        djCount.current = 0;
+        store("marquee.dj", m);
+      },
+      setSleep,
+      play: (tracks, start = 0, opts) => {
+        unload(1 - active.current);
+        setSource(opts?.source ? { title: opts.source } : undefined);
+        setQueue((q) => Q.load(q, tracks, start, opts?.shuffle));
+      },
+      playNext: (tracks) => {
+        unload(1 - active.current); // the preloaded "next" track may have changed
+        setQueue((q) => Q.playNext(q, tracks));
+      },
+      addToQueue: (tracks) => setQueue((q) => Q.append(q, tracks)),
+      remove: (key) => {
+        unload(1 - active.current);
+        setQueue((q) => Q.remove(q, key));
+      },
+      move: (key, to) => {
+        unload(1 - active.current);
+        setQueue((q) => Q.move(q, key, to));
+      },
+      jump: (key) => setQueue((q) => Q.jump(q, key)),
+      next,
+      prev,
+      toggle,
+      seek: (s) => {
+        const a = activeEl();
+        if (a) a.currentTime = s;
+      },
+      setVolume: (v) => {
+        setVolumeState(v);
+        volumeRef.current = v;
+        applyGain(active.current);
+        try {
+          localStorage.setItem("marquee.volume", String(v));
+        } catch {
+          /* storage unavailable */
+        }
+      },
+      toggleShuffle: () => {
+        unload(1 - active.current);
+        setQueue((q) => Q.toggleShuffle(q));
+      },
+      cycleRepeat: () => {
+        unload(1 - active.current);
+        setQueue((q) => Q.cycleRepeat(q));
+      },
+      setExpanded,
+      close,
+    }),
+    [unload, applyGain, next, prev, toggle, activeEl, close],
+  );
 
-  const ctx: Ctx = {
-    source,
-    playStation: (station, radio) => {
-      unload(1 - active.current);
-      setSource({ title: station.title, radio });
-      setQueue((q) => Q.load(q, station.items, 0));
-    },
-    levelling,
-    setLevelling: (l) => {
-      setLevellingState(l);
-      levellingRef.current = l;
-      applyGain(active.current);
-      try {
-        localStorage.setItem("marquee.levelling", l);
-      } catch {
-        /* storage unavailable */
-      }
-    },
-    crossfade,
-    setCrossfade: (s) => {
-      setCrossfadeState(s);
-      crossfadeRef.current = s;
-      store("marquee.crossfade", s);
-    },
-    dj,
-    setDJ: (m) => {
-      setDJState(m);
-      djCount.current = 0;
-      store("marquee.dj", m);
-    },
-    sleep,
-    setSleep,
-    queue,
-    current: cur,
-    playing,
-    time,
-    duration,
-    volume,
-    expanded,
-    play: (tracks, start = 0, opts) => {
-      unload(1 - active.current);
-      setSource(opts?.source ? { title: opts.source } : undefined);
-      setQueue((q) => Q.load(q, tracks, start, opts?.shuffle));
-    },
-    playNext: (tracks) => {
-      unload(1 - active.current); // the preloaded "next" track may have changed
-      setQueue((q) => Q.playNext(q, tracks));
-    },
-    addToQueue: (tracks) => setQueue((q) => Q.append(q, tracks)),
-    remove: (key) => {
-      unload(1 - active.current);
-      setQueue((q) => Q.remove(q, key));
-    },
-    move: (key, to) => {
-      unload(1 - active.current);
-      setQueue((q) => Q.move(q, key, to));
-    },
-    jump: (key) => setQueue((q) => Q.jump(q, key)),
-    next,
-    prev,
-    toggle,
-    seek: (s) => {
-      const a = activeEl();
-      if (a) a.currentTime = s;
-    },
-    setVolume,
-    toggleShuffle: () => {
-      unload(1 - active.current);
-      setQueue((q) => Q.toggleShuffle(q));
-    },
-    cycleRepeat: () => {
-      unload(1 - active.current);
-      setQueue((q) => Q.cycleRepeat(q));
-    },
-    setExpanded,
-    close,
-  };
+  const state = useMemo(
+    () => ({
+      ...actions,
+      source,
+      levelling,
+      crossfade,
+      dj,
+      sleep,
+      queue,
+      current: cur,
+      playing,
+      volume,
+      expanded,
+    }),
+    [
+      actions,
+      source,
+      levelling,
+      crossfade,
+      dj,
+      sleep,
+      queue,
+      cur,
+      playing,
+      volume,
+      expanded,
+    ],
+  );
+  const timeValue = useMemo(() => ({ time, duration }), [time, duration]);
 
   return (
-    <MusicContext.Provider value={ctx}>
-      {children}
-      {[0, 1].map((i) => (
-        <audio
-          key={i}
-          crossOrigin="anonymous"
-          ref={(a) => {
-            audios.current[i] = a;
-          }}
-          onPlay={() => {
-            if (i !== active.current) return;
-            setPlaying(true);
-            report("playing");
-          }}
-          onPause={() => {
-            if (i !== active.current) return;
-            setPlaying(false);
-            report("paused");
-          }}
-          onTimeUpdate={() => onTimeUpdate(i)}
-          onDurationChange={(e) =>
-            i === active.current && setDuration(e.currentTarget.duration)
-          }
-          onLoadedMetadata={(e) =>
-            i === active.current && setDuration(e.currentTarget.duration)
-          }
-          onEnded={() => onEnded(i)}
-        />
-      ))}
-      {cur && (expanded ? <NowPlaying /> : <MiniPlayer />)}
-    </MusicContext.Provider>
+    <ActionsContext.Provider value={actions}>
+      <StateContext.Provider value={state}>
+        <TimeContext.Provider value={timeValue}>
+          {children}
+          {[0, 1].map((i) => (
+            <audio
+              key={i}
+              crossOrigin="anonymous"
+              ref={(a) => {
+                audios.current[i] = a;
+              }}
+              onPlay={() => {
+                if (i !== active.current) return;
+                setPlaying(true);
+                report("playing");
+              }}
+              onPause={() => {
+                if (i !== active.current) return;
+                setPlaying(false);
+                report("paused");
+              }}
+              onTimeUpdate={() => onTimeUpdate(i)}
+              onDurationChange={(e) =>
+                i === active.current && setDuration(e.currentTarget.duration)
+              }
+              onLoadedMetadata={(e) =>
+                i === active.current && setDuration(e.currentTarget.duration)
+              }
+              onEnded={() => onEnded(i)}
+            />
+          ))}
+          {cur && (expanded ? <NowPlaying /> : <MiniPlayer />)}
+        </TimeContext.Provider>
+      </StateContext.Provider>
+    </ActionsContext.Provider>
   );
 }

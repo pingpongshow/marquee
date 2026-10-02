@@ -368,6 +368,7 @@ struct ChannelLogo: View {
 /// A muted live preview with "Now On" (iPhone/iPad).
 struct LivePreview: View {
     @Environment(AppSession.self) private var app
+    @Environment(MusicPlayer.self) private var music
     let channel: LiveChannel
     let onExpand: () -> Void
     @State private var player = AVPlayer()
@@ -389,7 +390,11 @@ struct LivePreview: View {
         }
         .overlay(alignment: .top) {
             HStack {
-                Button { muted.toggle(); player.isMuted = muted } label: { Image(systemName: muted ? "speaker.slash.fill" : "speaker.wave.2.fill") }
+                Button {
+                    muted.toggle()
+                    player.isMuted = muted
+                    if !muted { music.pause() }
+                } label: { Image(systemName: muted ? "speaker.slash.fill" : "speaker.wave.2.fill") }
                     .accessibilityLabel(muted ? "Unmute" : "Mute")
                 Spacer()
                 Button(action: onExpand) { Image(systemName: "arrow.up.left.and.arrow.down.right") }
@@ -409,13 +414,15 @@ struct LivePreview: View {
         stop()
         do {
             let s = try await app.playLive(channel.id)
+            // Moved on (another channel, or the preview went away) while tuning: let it go.
+            if Task.isCancelled { await app.stopLive(s.id); return }
             session = s.id
             player.replaceCurrentItem(with: AVPlayerItem(url: s.url))
             player.isMuted = muted
             player.play()
             error = nil
         } catch {
-            self.error = error.localizedDescription
+            if !Task.isCancelled { self.error = error.localizedDescription }
         }
     }
 
@@ -429,6 +436,7 @@ struct LivePreview: View {
 /// Full-screen live TV with channel up/down.
 struct LiveWatchView: View {
     @Environment(AppSession.self) private var app
+    @Environment(MusicPlayer.self) private var music
     @Environment(\.dismiss) private var dismiss
     let channels: [LiveChannel]
     @State private var current: Int64
@@ -492,14 +500,17 @@ struct LiveWatchView: View {
         stop()
         do {
             let s = try await app.playLive(current)
+            // Changed channel or closed while tuning: stop the session that just started.
+            if Task.isCancelled { await app.stopLive(s.id); return }
             session = s.id
             let item = AVPlayerItem(url: s.url)
             if let c = channel { item.externalMetadata = metadata(c) }
             player.replaceCurrentItem(with: item)
+            music.pause() // live TV takes over from the music
             player.play()
             error = nil
         } catch {
-            self.error = error.localizedDescription
+            if !Task.isCancelled { self.error = error.localizedDescription }
         }
     }
 

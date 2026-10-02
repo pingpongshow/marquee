@@ -20,6 +20,8 @@ struct ItemDetailView: View {
     @State private var subtitleID: Int64?
     @State private var fileID: Int64?
     @State private var findingSubs = false
+    /// A Play, Shuffle or Radio that failed, shown as an alert.
+    @State private var actionError: String?
 
     var body: some View {
         ScrollView {
@@ -62,6 +64,11 @@ struct ItemDetailView: View {
         #endif
         .navigationTitle(detail?.title ?? "")
         .task { await load() }
+        .alert("Couldn't play", isPresented: Binding(get: { actionError != nil }, set: { if !$0 { actionError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(actionError ?? "")
+        }
         .onChange(of: video.request) { if video.request == nil { Task { await load() } } }
     }
 
@@ -159,11 +166,12 @@ struct ItemDetailView: View {
     }
 
     @ViewBuilder private func ratings(_ d: ItemDetail) -> some View {
-        if let r = d.info.ratings, r.imdb != nil || r.rottenTomatoes != nil {
+        if let r = d.info.ratings, r.imdb != nil || r.rottenTomatoes != nil || r.metacritic != nil || r.anilist != nil {
             HStack(spacing: 12) {
                 if let imdb = r.imdb { Label(String(format: "%.1f", imdb), systemImage: "star.fill").foregroundStyle(.yellow) }
                 if let rt = r.rottenTomatoes { Label("\(rt)%", systemImage: "leaf.fill").foregroundStyle(rt >= 60 ? .red : .green) }
                 if let mc = r.metacritic { Text("MC \(mc)").foregroundStyle(.secondary) }
+                if let al = r.anilist { Text("AniList \(al)%").foregroundStyle(.secondary) } // anime (META-2)
             }
             .font(.caption.bold())
         }
@@ -183,15 +191,18 @@ struct ItemDetailView: View {
                 }
             case .show, .season:
                 Button {
-                    Task { if let ep = try? await app.leaves(d.id, unwatched: true).first { video.play(ep.id) } }
+                    run {
+                        guard let ep = try await app.leaves(d.id, unwatched: true).first else { throw MarqueeError("There are no unwatched episodes.") }
+                        video.play(ep.id)
+                    }
                 } label: {
                     Label((d.base.watchedLeafCount ?? 0) > 0 ? "Continue" : "Play", systemImage: "play.fill")
                 }
                 .buttonStyle(.borderedProminent)
             case .album, .artist:
-                Button { Task { music.play(try await app.leaves(d.id), source: d.title) } } label: { Label("Play", systemImage: "play.fill") }
+                Button { run { music.play(try await app.leaves(d.id), source: d.title) } } label: { Label("Play", systemImage: "play.fill") }
                     .buttonStyle(.borderedProminent)
-                Button { Task { music.play(try await app.leaves(d.id), shuffle: true, source: d.title) } } label: { Label("Shuffle", systemImage: "shuffle") }
+                Button { run { music.play(try await app.leaves(d.id), shuffle: true, source: d.title) } } label: { Label("Shuffle", systemImage: "shuffle") }
                     .buttonStyle(.bordered)
                 radioButton(d)
             case .track:
@@ -234,11 +245,22 @@ struct ItemDetailView: View {
     private func radioButton(_ d: ItemDetail) -> some View {
         Button {
             let req = RadioRequest(seed: .item, itemId: d.id, limit: 50)
-            Task { if let st = try? await app.radio(req) { music.playStation(st, radio: req) } }
+            run {
+                let st = try await app.radio(req)
+                guard !st.items.isEmpty else { throw MarqueeError("Couldn't find anything to play for this station.") }
+                music.playStation(st, radio: req)
+            }
         } label: {
             Label("Radio", systemImage: "dot.radiowaves.left.and.right")
         }
         .buttonStyle(.bordered)
+    }
+
+    /// Runs a play action, showing what went wrong instead of doing nothing.
+    private func run(_ work: @escaping @MainActor () async throws -> Void) {
+        Task {
+            do { try await work() } catch is CancellationError {} catch { actionError = error.localizedDescription }
+        }
     }
 
     /// Audio and subtitle choices for videos (the player's own menu also switches text

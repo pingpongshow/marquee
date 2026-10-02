@@ -9,7 +9,7 @@ import { Menu, MenuDivider, MenuItem } from "@/components/Menu";
 import { AdventureDialog } from "../music/Adventure";
 import { useRadio } from "../music/useRadio";
 import { AddToPlaylistDialog } from "../playlists/AddToPlaylist";
-import { useMusic } from "../player/MusicPlayer";
+import { useMusicActions } from "../player/MusicPlayer";
 import { AddToCollectionDialog } from "./AddToCollection";
 
 const music = new Set(["track", "album", "artist"]);
@@ -17,7 +17,7 @@ const watchable = new Set(["movie", "show", "episode", "video"]);
 
 /** The "…" menu on tracks, albums, artists and videos: queue and playlist actions. */
 export function ItemMenu({ item, className }: { item: ItemSummary; className?: string }) {
-  const player = useMusic();
+  const player = useMusicActions();
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
   const [adventure, setAdventure] = useState(false);

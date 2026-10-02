@@ -5,6 +5,7 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  lazyRouteComponent,
 } from "@tanstack/react-router";
 import { systemInfoQuery } from "@/api/queries";
 import { Alert, Spinner } from "@/components/ui";
@@ -21,16 +22,37 @@ import { MusicProvider } from "@/features/player/MusicPlayer";
 import { PlayerPage } from "@/features/player/PlayerPage";
 import { PlaylistPage } from "@/features/playlists/PlaylistPage";
 import { PlaylistsPage } from "@/features/playlists/PlaylistsPage";
-import { LiveTvPage, LiveWatchPage } from "@/features/livetv/LiveTvPage";
 import { MoodStylePage } from "@/features/music/MoodStylePage";
-import { DiscoverPage } from "@/features/requests/DiscoverPage";
 import { SearchPage } from "@/features/search/SearchPage";
-import { AccountPage } from "@/features/users/AccountPage";
 import { LinkPage } from "@/features/users/LinkDevice";
-import { SettingsLayout } from "@/features/settings/SettingsLayout";
-import { SettingsSectionPage } from "@/features/settings/SettingsSectionPage";
 import { useAuth } from "@/lib/auth";
 import { Shell } from "./Shell";
+
+// Heavier, less-visited pages load on demand to keep the first download small.
+const LiveTvPage = lazyRouteComponent(
+  () => import("@/features/livetv/LiveTvPage"),
+  "LiveTvPage",
+);
+const LiveWatchPage = lazyRouteComponent(
+  () => import("@/features/livetv/LiveTvPage"),
+  "LiveWatchPage",
+);
+const DiscoverPage = lazyRouteComponent(
+  () => import("@/features/requests/DiscoverPage"),
+  "DiscoverPage",
+);
+const AccountPage = lazyRouteComponent(
+  () => import("@/features/users/AccountPage"),
+  "AccountPage",
+);
+const SettingsLayout = lazyRouteComponent(
+  () => import("@/features/settings/SettingsLayout"),
+  "SettingsLayout",
+);
+const SettingsSectionPage = lazyRouteComponent(
+  () => import("@/features/settings/SettingsSectionPage"),
+  "SettingsSectionPage",
+);
 
 /** Decides between first-run setup, sign-in, and the app itself. */
 function Gate() {

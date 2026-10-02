@@ -23,17 +23,31 @@ export function Menu({
 }) {
   const [open, setOpen] = useState(false);
   const [side, setSide] = useState(align);
+  const [shift, setShift] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
   const menu = useRef<HTMLDivElement>(null);
-  // Open on the other side when the preferred one would run off the screen.
+  // Open on the other side when the preferred one would run off the screen; when neither fits,
+  // nudge it back on screen. Measured once per open from the anchor, so it can't oscillate.
   useLayoutEffect(() => {
-    if (!open) return setSide(align);
-    const r = menu.current?.getBoundingClientRect();
-    if (!r) return;
-    if (r.left < 8 && side === "right") setSide("left");
-    else if (r.right > window.innerWidth - 8 && side === "left")
-      setSide("right");
-  }, [open, side, align]);
+    if (!open) {
+      setSide(align);
+      setShift(0);
+      return;
+    }
+    const a = ref.current?.getBoundingClientRect();
+    const w = menu.current?.offsetWidth;
+    if (!a || !w) return;
+    const vw = window.innerWidth;
+    const leftOf = (s: "left" | "right") =>
+      s === "right" ? a.right - w : a.left;
+    const fits = (s: "left" | "right") =>
+      leftOf(s) >= 8 && leftOf(s) + w <= vw - 8;
+    const other = align === "right" ? "left" : "right";
+    const chosen = fits(align) || !fits(other) ? align : other;
+    const left = leftOf(chosen);
+    setSide(chosen);
+    setShift(Math.min(Math.max(left, 8), Math.max(8, vw - 8 - w)) - left);
+  }, [open, align]);
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) =>
@@ -70,6 +84,7 @@ export function Menu({
             "absolute z-40 mt-1 w-56 max-w-[calc(100vw-16px)] overflow-hidden rounded-lg border border-border bg-surface py-1 text-text shadow-2xl",
             side === "right" ? "right-0" : "left-0",
           )}
+          style={shift ? { transform: `translateX(${shift}px)` } : undefined}
           onClick={(e) => {
             e.stopPropagation();
             setOpen(false);

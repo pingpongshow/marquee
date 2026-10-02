@@ -29,7 +29,7 @@ Priority key:
 | ID | Requirement | Pri |
 |---|---|---|
 | META-1 | Movies and TV from TMDB (primary). TVDB is optional as an alternate ordering source. | P0 |
-| META-2 | Anime: AniList/AniDB enrichment and the anime-lists mapping (AniDB↔TVDB↔TMDB). Per-show episode ordering: aired, absolute or DVD. | P0 |
+| META-2 | Anime: AniList/AniDB enrichment and the anime-lists mapping (AniDB↔TVDB↔TMDB). Per-show episode ordering: aired, absolute or DVD. ✅ AniList via the anime-lists mapping (D84). | P0 |
 | META-3 | Music: embedded tags first, then MusicBrainz, Cover Art Archive and Fanart.tv for artist art. ✅ Tags, Deezer art (D26) and MusicBrainz genres, release types and dates (D77). | P0 |
 | META-4 | Personal videos: folder and filename based. Date comes from file metadata. Thumbnails are extracted from a video frame. | P0 |
 | META-5 | Fix Match / Unmatch / manual search, edit any field, lock edited fields, and custom posters/backgrounds. | P0 |

@@ -311,8 +311,17 @@ func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 const immutable = "private, max-age=31536000, immutable"
 
 func (h *Handlers) GetImage(ctx context.Context, req GetImageRequestObject) (GetImageResponseObject, error) {
-	if _, ok := session(ctx); !ok {
+	s, ok := session(ctx)
+	if !ok {
 		return GetImage401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	// Artwork ids are sequential: profiles see only art of items they may see.
+	if !s.User.IsAdmin {
+		var itemID int64
+		if h.DB.QueryRowContext(ctx, `SELECT item_id FROM artwork WHERE id = ?`, req.ArtworkId).Scan(&itemID) != nil ||
+			h.Items.Visible(ctx, access(ctx), itemID) != nil {
+			return GetImage404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "image not found"))}, nil
+		}
 	}
 	w := 0
 	if req.Params.W != nil {

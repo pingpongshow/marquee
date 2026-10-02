@@ -7,13 +7,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 )
 
 // ErrNotVideo is returned for items that can't have subtitles.
-var ErrNotVideo = errors.New("only movies, episodes and videos have subtitles")
+var (
+	ErrNotVideo = errors.New("only movies, episodes and videos have subtitles")
+	ErrInvalid  = errors.New("invalid subtitle request")
+)
 
 // Service searches for an item's subtitles and attaches downloads to it.
 type Service struct {
@@ -105,6 +109,9 @@ func (s *Service) Search(ctx context.Context, itemID int64, languages string) ([
 	return s.client().Search(ctx, q)
 }
 
+// langCode is an ISO 639 code, optionally with a region (pt-br).
+var langCode = regexp.MustCompile(`^[a-z]{2,3}(-[a-z]{2})?$`)
+
 // Download fetches a subtitle and attaches it to the item's file. It returns the new
 // stream's id and how many downloads OpenSubtitles allows today.
 func (s *Service) Download(ctx context.Context, itemID, providerFileID int64, language, release string, hearingImpaired bool) (int64, int, error) {
@@ -112,11 +119,15 @@ func (s *Service) Download(ctx context.Context, itemID, providerFileID int64, la
 	if err != nil {
 		return 0, 0, err
 	}
+	// The language goes into a file name: only a plain language code is accepted.
+	lang := ISO6392(language)
+	if !langCode.MatchString(lang) {
+		return 0, 0, fmt.Errorf("%w: unknown language %q", ErrInvalid, language)
+	}
 	data, _, remaining, err := s.client().Download(ctx, providerFileID)
 	if err != nil {
 		return 0, 0, err
 	}
-	lang := ISO6392(language)
 	dir := filepath.Join(s.Dir, strconv.FormatInt(t.fileID, 10))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return 0, 0, err

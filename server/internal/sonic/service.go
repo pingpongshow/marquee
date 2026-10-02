@@ -420,8 +420,9 @@ type Mix struct {
 }
 
 type mixCacheKey struct {
-	user int64
-	day  string
+	user  int64
+	day   string
+	scope string // which libraries the mixes were made from
 }
 
 var (
@@ -432,8 +433,10 @@ var (
 // DailyMixes clusters the listener's taste into up to four groups and builds a 25-track
 // mix around each, mixing favourites with similar tracks they haven't played lately, then
 // adds the history-based mixes (MUSIC-17). Mixes stay the same for the day.
-func (s *Service) DailyMixes(ctx context.Context, userID int64, keep Filter) []Mix {
-	key := mixCacheKey{userID, time.Now().Format("2006-01-02")}
+//
+// scope names what keep allows (e.g. the library id), so different filters get their own mixes.
+func (s *Service) DailyMixes(ctx context.Context, userID int64, scope string, keep Filter) []Mix {
+	key := mixCacheKey{userID, time.Now().Format("2006-01-02"), scope}
 	mixMu.Lock()
 	if m, ok := mixCache[key]; ok {
 		mixMu.Unlock()
@@ -466,6 +469,11 @@ func (s *Service) DailyMixes(ctx context.Context, userID int64, keep Filter) []M
 	}
 	mixes = append(mixes, s.historyMixes(ctx, userID, keep, keepLiked, avoid, r)...)
 	mixMu.Lock()
+	for k := range mixCache {
+		if k.day != key.day {
+			delete(mixCache, k) // yesterday's mixes
+		}
+	}
 	mixCache[key] = mixes
 	mixMu.Unlock()
 	return mixes

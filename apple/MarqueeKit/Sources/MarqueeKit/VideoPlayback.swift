@@ -37,6 +37,11 @@ public final class VideoPlayback {
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
     @ObservationIgnored private var endObserver: NSObjectProtocol?
+    /// The current item's status (one at a time: a restart replaces it).
+    @ObservationIgnored private var itemStatus: NSKeyValueObservation?
+    /// Called when the stream restarts in place (an audio change, a fallback, back from
+    /// casting), so watch together doesn't take the restart's pause for the viewer's.
+    @ObservationIgnored public var onRestart: (() -> Void)?
     @ObservationIgnored private var lastReport = Date.distantPast
     @ObservationIgnored private var fallback = 0
     /// The version being played (nil = the server's best).
@@ -93,6 +98,7 @@ public final class VideoPlayback {
         errorMessage = nil
         finished = false
         guard let client = app.client else { return }
+        if player.currentItem != nil || session != nil { onRestart?() }
         if item?.id != itemID {
             item = try? await app.item(itemID)
             self.fileID = fileID
@@ -146,20 +152,27 @@ public final class VideoPlayback {
     }
 
     public func stop() async {
-        report(.paused, force: true)
+        // The final position reaches the server before the session ends.
+        let last = report(.paused, force: true)
         player.pause()
         player.replaceCurrentItem(with: nil)
+        await last?.value
         await stopSession()
         if let timeObserver { player.removeTimeObserver(timeObserver) }
         timeObserver = nil
+        if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
+        endObserver = nil
+        itemStatus?.invalidate()
+        itemStatus = nil
     }
 
     /// Hands playback to another device (Chromecast): ends this stream but stays ready for
     /// `start` to carry on here later.
     public func handOff() async {
-        report(.paused, force: true)
+        let last = report(.paused, force: true)
         player.pause()
         player.replaceCurrentItem(with: nil)
+        await last?.value
         await stopSession()
     }
 
@@ -190,11 +203,12 @@ public final class VideoPlayback {
     }
 
     private func observe(_ playerItem: AVPlayerItem) {
-        observations.append(playerItem.observe(\.status) { [weak self] it, _ in
+        itemStatus?.invalidate()
+        itemStatus = playerItem.observe(\.status) { [weak self] it, _ in
             guard it.status == .failed else { return }
             let message = it.error?.localizedDescription ?? "unknown error"
             Task { @MainActor in await self?.failed(message) }
-        })
+        }
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         endObserver = NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: playerItem, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -227,7 +241,9 @@ public final class VideoPlayback {
         if Date().timeIntervalSince(lastReport) >= 10, player.timeControlStatus == .playing { report(.playing) }
     }
 
-    private func report(_ state: Schemas.PlaybackProgress.StatePayload, force: Bool = false) {
+    /// Sends the position; returns the request so callers can wait for it.
+    @discardableResult
+    private func report(_ state: Schemas.PlaybackProgress.StatePayload, force: Bool = false) -> Task<Void, Never>? {
         if let offline {
             // Offline: remember the position; queue it for the server when paused or done.
             let pos = Int64(max(0, player.currentTime().seconds) * 1000)
@@ -239,12 +255,12 @@ public final class VideoPlayback {
             } else if state == .paused || force {
                 offline.downloads.recordProgress(itemID: offline.itemID, positionMs: pos, watched: false)
             }
-            return
+            return nil
         }
-        guard let s = session, let client = app.client else { return }
-        if !force, Date().timeIntervalSince(lastReport) < 1 { return }
+        guard let s = session, let client = app.client else { return nil }
+        if !force, Date().timeIntervalSince(lastReport) < 1 { return nil }
         lastReport = Date()
         let pos = Int64(max(0, player.currentTime().seconds) * 1000)
-        Task { _ = try? await client.reportPlayback(path: .init(sessionId: s.id), body: .json(.init(positionMs: pos, state: state))) }
+        return Task { _ = try? await client.reportPlayback(path: .init(sessionId: s.id), body: .json(.init(positionMs: pos, state: state))) }
     }
 }

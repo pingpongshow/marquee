@@ -49,6 +49,8 @@ type Service struct {
 	wake chan struct{}
 	mu   sync.Mutex
 	live map[string]float64 // progress of running jobs
+	// cancel stops the job converting now (by id), when it's deleted meanwhile.
+	cancel map[string]context.CancelFunc
 }
 
 func newID() string {
@@ -156,6 +158,12 @@ func (s *Service) Delete(ctx context.Context, userID int64, id string) error {
 	if j.Path != "" {
 		os.Remove(j.Path)
 	}
+	// Stop the conversion if it's running (its partial file is removed when it stops).
+	s.mu.Lock()
+	if c := s.cancel[id]; c != nil {
+		c()
+	}
+	s.mu.Unlock()
 	_, err = s.DB.ExecContext(ctx, `DELETE FROM download_jobs WHERE id = ?`, id)
 	return err
 }
@@ -206,18 +214,30 @@ func (s *Service) next(ctx context.Context) bool {
 		return fail(err)
 	}
 	slog.Info("converting for download", "item", j.ItemID, "quality", j.Quality, "encoder", job.Encoder)
-	err = s.Playback.RunOffline(ctx, job, dur, func(p float64) {
+	jobCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	s.mu.Lock()
+	if s.cancel == nil {
+		s.cancel = map[string]context.CancelFunc{}
+	}
+	s.cancel[j.ID] = cancel
+	s.mu.Unlock()
+	err = s.Playback.RunOffline(jobCtx, job, dur, func(p float64) {
 		s.mu.Lock()
 		s.live[j.ID] = p
 		s.mu.Unlock()
 	})
 	s.mu.Lock()
 	delete(s.live, j.ID)
+	delete(s.cancel, j.ID)
 	s.mu.Unlock()
 	if err != nil {
 		os.Remove(out)
 		if ctx.Err() != nil {
 			return false
+		}
+		if jobCtx.Err() != nil {
+			return true // deleted while converting: on to the next
 		}
 		return fail(err)
 	}

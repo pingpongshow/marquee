@@ -1,5 +1,5 @@
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, unwrap } from "./client";
+import { api, session, unwrap } from "./client";
 import type { LibraryCreate, LibraryUpdate, MeUpdate, ServerSettingsUpdate, UserCreate, UserUpdate } from "./types";
 
 export const systemInfoQuery = queryOptions({
@@ -10,7 +10,11 @@ export const systemInfoQuery = queryOptions({
 
 export const meQuery = queryOptions({
   queryKey: ["me"],
-  queryFn: () => unwrap(api.GET("/me")),
+  queryFn: async () => {
+    const me = await unwrap(api.GET("/me"));
+    session.setImageKey(me.imageKey);
+    return me;
+  },
   staleTime: 60_000,
 });
 
@@ -163,7 +167,8 @@ export function useUpdateMe() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: MeUpdate) => unwrap(api.PATCH("/me", { body })),
-    onSuccess: (me) => qc.setQueryData(meQuery.queryKey, me),
+    // PATCH /me carries no image key; keep the one from GET /me.
+    onSuccess: (me) => qc.setQueryData(meQuery.queryKey, (old) => ({ ...me, imageKey: me.imageKey ?? old?.imageKey })),
   });
 }
 

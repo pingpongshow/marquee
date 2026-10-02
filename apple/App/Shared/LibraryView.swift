@@ -13,6 +13,10 @@ struct LibraryView: View {
     @State private var unwatchedOnly = false
     @State private var showCollections = false
     @State private var error: String?
+    /// Each item's place in the grid (for paging) and the duplicate check.
+    @State private var positions: [Int64: Int] = [:]
+    /// Bumped by every reload, so a page that arrives for an older sort is dropped.
+    @State private var generation = 0
 
     private static let page = 120
 
@@ -23,9 +27,9 @@ struct LibraryView: View {
                 MusicDiscoverView(libraryID: libraryID).padding(.top)
             }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: minWidth, maximum: minWidth * 1.4), spacing: gap, alignment: .top)], spacing: gap) {
-                ForEach(Array(items.enumerated()), id: \.element.id) { i, item in
+                ForEach(items, id: \.id) { item in
                     PosterCard(item: item, width: minWidth)
-                        .onAppear { if i >= items.count - 30 { Task { await loadMore() } } }
+                        .onAppear { if (positions[item.id] ?? 0) >= items.count - 30 { Task { await loadMore() } } }
                 }
             }
             .padding(.horizontal, sidePadding)
@@ -69,23 +73,34 @@ struct LibraryView: View {
 
     private func reload() async {
         if library == nil { library = try? await app.libraries().first { $0.id == libraryID } }
+        generation += 1
+        loading = false // a load for the old sort may still be running; it's dropped
         items = []
+        positions = [:]
         total = 0
         await loadMore()
     }
 
     private func loadMore() async {
         guard !loading, items.isEmpty || items.count < total else { return }
+        let gen = generation
         loading = true
-        defer { loading = false }
+        defer { if gen == generation { loading = false } }
         do {
             let page = try await app.items(library: libraryID, sort: sort, offset: items.count, limit: Self.page,
                                            watch: unwatchedOnly && !showCollections ? .unwatched : nil, type: showCollections ? .collection : nil)
-            items += page.items.filter { new in !items.contains { $0.id == new.id } }
+            guard gen == generation else { return }
+            var fresh: [Item] = []
+            for item in page.items where positions[item.id] == nil {
+                positions[item.id] = items.count + fresh.count
+                fresh.append(item)
+            }
+            items += fresh
             total = page.total
             error = nil
         } catch {
-            self.error = error.localizedDescription
+            // Cancelled (the sort changed) or overtaken by a newer load: not an error.
+            if gen == generation, !Task.isCancelled { self.error = error.localizedDescription }
         }
     }
 }

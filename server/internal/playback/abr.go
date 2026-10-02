@@ -69,6 +69,9 @@ func (m *Manager) RungTranscoder(s *Session, n int) (*Transcoder, error) {
 	if n < 1 || n > len(s.rungs) || s.transcoder == nil {
 		return nil, fmt.Errorf("no variant %d", n)
 	}
+	if s.transcoder.isStopped() {
+		return nil, errStopped // the session ended: no new rungs
+	}
 	r := &s.rungs[n-1]
 	r.lastUsed = time.Now()
 	if r.t == nil {

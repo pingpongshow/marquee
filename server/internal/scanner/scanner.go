@@ -134,16 +134,20 @@ func (s *Scanner) Scan(ctx context.Context, lib library.Library, ignore []string
 	}
 
 	// 3. Probe changed/new files in parallel; write results from this goroutine.
-	w := &writer{db: s.DB, lib: lib, dirs: wr.Dirs, existing: existing, missing: missing}
-	if err := w.begin(ctx); err != nil {
-		return st, err
-	}
+	w := &writer{db: s.DB, lib: lib, dirs: wr.Dirs, existing: existing, missing: missing, keyCache: map[string]int64{}}
 	defer w.rollback()
 	if len(restore) > 0 {
+		if err := w.begin(ctx); err != nil {
+			return st, err
+		}
 		if err := w.restore(ctx, restore); err != nil {
 			return st, err
 		}
 		st.Restored = len(restore)
+		if err := w.tx.Commit(); err != nil {
+			return st, err
+		}
+		w.tx = nil
 	}
 
 	jobs := make(chan candidate)
@@ -182,6 +186,9 @@ func (s *Scanner) Scan(ctx context.Context, lib library.Library, ignore []string
 	done := 0
 	lastReport := time.Time{}
 	for r := range results {
+		if err := w.ensure(ctx); err != nil {
+			return st, err
+		}
 		done++
 		if time.Since(lastReport) > 500*time.Millisecond {
 			report(Progress{Phase: "probing", Done: done, Total: len(work), Current: r.c.Rel})
@@ -196,6 +203,9 @@ func (s *Scanner) Scan(ctx context.Context, lib library.Library, ignore []string
 			w.tx.ExecContext(ctx, `INSERT INTO probe_failures(path, library_id, size, mtime, error) VALUES (?, ?, ?, ?, ?)
 				ON CONFLICT(path) DO UPDATE SET size = excluded.size, mtime = excluded.mtime, error = excluded.error,
 				failed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`, r.c.Path, lib.ID, r.c.Size, r.c.MTime, r.err.Error())
+			if err := w.maybeCommit(ctx); err != nil {
+				return st, err
+			}
 			continue
 		}
 		if _, ok := knownBad[r.c.Path]; ok {

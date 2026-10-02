@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { api, unwrap } from "@/api/client";
+import { ApiError, api, unwrap } from "@/api/client";
 import type { components } from "@/api/schema.gen";
 
 export type WatchGroup = components["schemas"]["WatchGroup"];
@@ -89,12 +89,14 @@ export function useWatchTogether(
       .catch((e: Error) => setError(e.message));
   }, [initialGroup, apply]);
 
-  // Follow the group: long polling.
+  // Follow the group: long polling. Network hiccups are retried with backoff; the group is
+  // only given up when it's gone (404/410) or the server stays unreachable.
   const id = group?.id;
   useEffect(() => {
     if (!id) return;
     let stop = false;
     (async () => {
+      let failures = 0;
       while (!stop) {
         const since = groupRef.current?.version ?? 0;
         try {
@@ -103,12 +105,24 @@ export function useWatchTogether(
               params: { path: { groupId: id }, query: { since } },
             }),
           );
+          failures = 0;
           if (!stop) apply(g);
         } catch (e) {
           if (stop) return;
+          const status = e instanceof ApiError ? e.status : 0;
+          if (status !== 404 && status !== 410 && ++failures <= 3) {
+            await new Promise((r) => setTimeout(r, 1000 * 2 ** (failures - 1)));
+            continue;
+          }
           setError((e as Error).message);
           setGroup(null);
           groupRef.current = null;
+          if (status !== 404 && status !== 410)
+            void api
+              .POST("/syncplay/groups/{groupId}/leave", {
+                params: { path: { groupId: id } },
+              })
+              .catch(() => {});
           return;
         }
       }
@@ -117,6 +131,15 @@ export function useWatchTogether(
       stop = true;
     };
   }, [id, apply]);
+
+  // A joiner gets the group's state before the video has loaded; apply it once it can be.
+  useEffect(() => {
+    const v = video.current;
+    if (!v) return;
+    const onMeta = () => groupRef.current && apply(groupRef.current);
+    v.addEventListener("loadedmetadata", onMeta);
+    return () => v.removeEventListener("loadedmetadata", onMeta);
+  }, [video, apply]);
 
   // Send what the viewer does.
   useEffect(() => {

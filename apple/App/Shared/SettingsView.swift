@@ -33,7 +33,8 @@ struct SettingsView: View {
                 if let u = app.server?.lanURL { LabeledContent("Home address", value: u.absoluteString) }
                 if let u = app.server?.remoteURL { LabeledContent("Away address", value: u.absoluteString) }
                 LabeledContent("Server version", value: app.info?.version ?? "")
-                Button("Reconnect") { Task { await app.reconnect() } }
+                Button(app.isReconnecting ? "Reconnecting…" : "Reconnect") { Task { await app.reconnect() } }
+                    .disabled(app.isReconnecting)
             } header: {
                 Text("Server")
             }

@@ -32,8 +32,23 @@ import java.util.concurrent.ConcurrentHashMap
  * there, and a station keeps going like it does in the app.
  */
 @OptIn(UnstableApi::class)
-class MusicLibrary(private val marquee: Marquee, private val music: () -> MusicController) : MediaLibrarySession.Callback {
+class MusicLibrary(private val marquee: Marquee, private val ownPackage: String, private val music: () -> MusicController) : MediaLibrarySession.Callback {
     private val mixes = ConcurrentHashMap<String, Station>()
+
+    /**
+     * The service is exported for Auto and Assistant, so other apps could bind to it too.
+     * Only the app itself, trusted system controllers (the notification, lock screen,
+     * Bluetooth) and Google's car, assistant and watch apps get in.
+     */
+    override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
+        val pkg = controller.packageName
+        val allowed = pkg == ownPackage || controller.isTrusted || pkg in trustedPackages || pkg.startsWith("com.google.android.apps.automotive.")
+        if (!allowed) {
+            android.util.Log.w("Marquee", "rejected media controller $pkg")
+            return MediaSession.ConnectionResult.reject()
+        }
+        return super.onConnect(session, controller)
+    }
 
     private fun <T> io(block: suspend () -> T): ListenableFuture<T> = marquee.scope.future(Dispatchers.IO) { block() }
 
@@ -126,13 +141,18 @@ class MusicLibrary(private val marquee: Marquee, private val music: () -> MusicC
             )
         }
         return io {
-            val (items, start) = if (query != null) search(query) else expand(only.mediaId)
+            // A server error plays nothing rather than leaving Auto or Assistant waiting.
+            val (items, start) = runCatching { if (query != null) search(query) else expand(only.mediaId) }.getOrElse { emptyList<MediaItem>() to 0 }
             MediaSession.MediaItemsWithStartPosition(items, start, 0)
         }
     }
 
     override fun onAddMediaItems(mediaSession: MediaSession, controller: MediaSession.ControllerInfo, mediaItems: MutableList<MediaItem>): ListenableFuture<MutableList<MediaItem>> =
-        io { mediaItems.flatMap { if (it.mediaId.toLongOrNull() != null) listOf(withUri(it)) else expand(it.mediaId).first }.toMutableList() }
+        io {
+            mediaItems.flatMap {
+                if (it.mediaId.toLongOrNull() != null) listOf(withUri(it)) else runCatching { expand(it.mediaId).first }.getOrDefault(emptyList())
+            }.toMutableList()
+        }
 
     private fun withUri(item: MediaItem) = item.buildUpon().setUri("marquee://track/${item.mediaId}").build()
 
@@ -191,7 +211,8 @@ class MusicLibrary(private val marquee: Marquee, private val music: () -> MusicC
     override fun onGetSearchResult(
         session: MediaLibrarySession, browser: MediaSession.ControllerInfo, query: String, page: Int, pageSize: Int, params: LibraryParams?,
     ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = io {
-        val items = marquee.search.search(query, 10).groups.flatMap { g ->
+        val groups = runCatching { marquee.search.search(query, 10).groups }.getOrElse { return@io LibraryResult.ofError(SessionError.ERROR_IO) }
+        val items = groups.flatMap { g ->
             g.items.mapNotNull {
                 when (g.type) {
                     ItemType.ARTIST -> folder("artist:${it.id}", it.title, playable = true, art = it.images?.poster, type = MediaMetadata.MEDIA_TYPE_ARTIST)
@@ -210,5 +231,15 @@ class MusicLibrary(private val marquee: Marquee, private val music: () -> MusicC
         const val PLAYLISTS = "playlists"
         const val ARTISTS = "artists"
         const val ALBUMS = "albums"
+
+        /** Android Auto, Assistant, Wear OS and the system UI. */
+        private val trustedPackages = setOf(
+            "com.google.android.projection.gearhead",
+            "com.google.android.googlequicksearchbox",
+            "com.google.android.carassistant",
+            "com.android.systemui",
+            "com.google.android.wearable.app",
+            "com.google.android.autosimulator",
+        )
     }
 }

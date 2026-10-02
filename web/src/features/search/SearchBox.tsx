@@ -82,7 +82,7 @@ export function SearchBox() {
               {g.items.map((it) => (
                 <button key={it.id} onClick={() => go(it)} className="flex w-full items-center gap-3 px-4 py-1.5 text-left hover:bg-surface-2">
                   <span className="h-12 w-8 shrink-0 overflow-hidden rounded bg-surface-3">
-                    {it.images?.poster && <img src={imageUrl(it.images.poster, 40)} alt="" className="size-full object-cover" />}
+                    {it.images?.poster && <img src={imageUrl(it.images.poster, 40)} alt="" loading="lazy" className="size-full object-cover" />}
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-sm">{it.title}</span>

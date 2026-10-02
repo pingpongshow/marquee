@@ -236,7 +236,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 LazyRow(contentPadding = PaddingValues(horizontal = sidePadding), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     items(cast) { c ->
                         Column(Modifier.width(84.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Avatar(c.name, if (c.hasPhoto == true) marquee.absolute("/api/v1/people/${c.personId}/photo?w=160&token=${marquee.token}") else null, 72)
+                            Avatar(c.name, if (c.hasPhoto == true) marquee.absolute("/api/v1/people/${c.personId}/photo?w=160") else null, 72)
                             Text(c.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
                             c.character?.let { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         }
@@ -287,6 +287,16 @@ private fun Meta(d: ItemDetail) {
     Text(listOfNotNull(d.year?.toString(), d.contentRating, d.durationMs?.takeIf { d.type in listOf(ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO) }?.let { formatTime(it) }).joinToString(" · "),
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     if (d.genres.isNotEmpty()) Text(d.genres.joinToString(", "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    // Critic and community ratings, where known (AniList for anime).
+    d.ratings?.let { r ->
+        val parts = listOfNotNull(
+            r.imdb?.let { "IMDb %.1f".format(it) },
+            r.rottenTomatoes?.let { "RT $it%" },
+            r.metacritic?.let { "Metacritic $it" },
+            r.anilist?.let { "AniList $it%" },
+        )
+        if (parts.isNotEmpty()) Text(parts.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 /** TV: the backdrop fills the screen's top with the details and actions over it, in view from the start. */
