@@ -98,20 +98,24 @@ val museSuggestions = listOf("Rainy Sunday jazz", "Late-night drive synthwave", 
 
 /** Muse, stations and daily mixes at the top of a music library (M6.5). */
 @Composable
-fun MusicDiscover(libraryId: Long) {
+fun MusicDiscover(libraryId: Long, onBrowse: (kind: String, name: String) -> Unit = { _, _ -> }) {
     val marquee = LocalMarquee.current
     val music = LocalMusic.current
     val scope = rememberCoroutineScope()
-    data class Data(val status: MusicStatus?, val mixes: List<Station>, val decades: List<String>)
+    data class Data(val status: MusicStatus?, val mixes: List<Station>, val decades: List<String>, val styles: List<String> = emptyList())
     val data by produceState<Data?>(null, libraryId) {
         value = withContext(Dispatchers.IO) {
             val st = runCatching { marquee.music.musicStatus() }.getOrNull()
             if (st?.enabled != true) Data(st, emptyList(), emptyList())
-            else Data(
-                st,
-                runCatching { marquee.music.musicMixes(libraryId) }.getOrDefault(emptyList()),
-                runCatching { marquee.items.libraryFilters(libraryId, ItemType.ALBUM).decades.map { it.value }.take(6) }.getOrDefault(emptyList()),
-            )
+            else {
+                val f = runCatching { marquee.items.libraryFilters(libraryId, ItemType.ALBUM) }.getOrNull()
+                Data(
+                    st,
+                    runCatching { marquee.music.musicMixes(libraryId) }.getOrDefault(emptyList()),
+                    f?.decades?.map { it.value }?.take(6).orEmpty(),
+                    f?.genres?.sortedByDescending { it.count }?.map { it.value }?.take(18).orEmpty(),
+                )
+            }
         }
     }
     var prompt by remember { mutableStateOf("") }
@@ -181,6 +185,10 @@ fun MusicDiscover(libraryId: Long) {
                     d.decades.map { dec -> Chip("${dec}s", Icons.Filled.Radio) { radio(RadioRequest(RadioRequest.Seed.DECADE, value = dec, libraryId = libraryId)) } },
             )
         }
+
+        // Moods and styles (MUSIC-18): each opens a page with its radio and music.
+        TileRow("Moods", musicMoods) { onBrowse("mood", it) }
+        if (d.styles.isNotEmpty()) TileRow("Styles", d.styles) { onBrowse("style", it) }
 
         if (d.mixes.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Mixes for you", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -361,6 +369,25 @@ fun LevellingButton() {
         DropdownMenu(open, { open = false }) {
             Levelling.entries.forEach { l ->
                 DropdownMenuItem({ Text(l.label, fontWeight = if (l == mode) FontWeight.Bold else FontWeight.Normal) }, { music.setLevelling(l); open = false })
+            }
+        }
+    }
+}
+
+@Composable
+private fun TileRow(title: String, names: List<String>, onOpen: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 6.dp)) {
+            items(names) { n ->
+                val h = (n.fold(7) { a, c -> (a * 37 + c.code) % 360 }).toFloat()
+                val tint = Color.hsv(h, 0.6f, 0.55f)
+                Box(
+                    Modifier.size(width = 130.dp, height = 72.dp).focusRing(RoundedCornerShape(10.dp)).clip(RoundedCornerShape(10.dp))
+                        .background(Brush.linearGradient(listOf(tint, tint.copy(alpha = 0.4f)))).clickable { onOpen(n) }
+                        .semantics { contentDescription = "$n ${title.lowercase().removeSuffix("s")}" }.padding(10.dp),
+                    contentAlignment = Alignment.BottomStart,
+                ) { Text(n, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 2) }
             }
         }
     }

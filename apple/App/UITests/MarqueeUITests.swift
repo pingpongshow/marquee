@@ -309,6 +309,22 @@ final class MarqueeUITests: XCTestCase {
         app.buttons["Close player"].tap()
     }
 
+    /// Moods and styles (MUSIC-18): a mood page lists tracks and starts its radio.
+    func testMoodsAndStyles() {
+        connectAndSignIn()
+        openLibrary("Music")
+        let chill = app.buttons["Chill mood"]
+        XCTAssertTrue(chill.waitForExistence(timeout: 15))
+        for _ in 0..<5 where !chill.isHittable { app.swipeUp() }
+        shot("ms1-tiles")
+        chill.tap()
+        XCTAssertTrue(app.buttons["Play Chill Radio"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Tracks"].waitForExistence(timeout: 20), "the mood's tracks load")
+        shot("ms2-mood")
+        app.buttons["Play Chill Radio"].tap()
+        XCTAssertTrue(app.buttons["miniPlayer"].waitForExistence(timeout: 15))
+    }
+
     func testStatsAndAdventure() {
         connectAndSignIn()
         app.buttons["Settings"].firstMatch.tap()
