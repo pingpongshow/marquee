@@ -58,7 +58,11 @@ const searchRoute = createRoute({
 const playRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/play/$itemId",
-  validateSearch: (s: Record<string, unknown>): { t?: number; pl?: number } => ({ t: typeof s.t === "number" ? s.t : undefined, pl: typeof s.pl === "number" ? s.pl : undefined }),
+  validateSearch: (s: Record<string, unknown>): { t?: number; pl?: number; f?: number } => ({
+    t: typeof s.t === "number" ? s.t : undefined,
+    pl: typeof s.pl === "number" ? s.pl : undefined,
+    f: typeof s.f === "number" ? s.f : undefined, // a specific version's file (LIB-7)
+  }),
   component: PlayerPage,
 });
 const linkRoute = createRoute({ getParentRoute: () => rootRoute, path: "/link", component: LinkPage });
