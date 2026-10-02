@@ -523,17 +523,26 @@ final class MarqueeUITests: XCTestCase {
         // Move the guide on 90 minutes, so what's on screen hasn't started, and pick one.
         XCTAssertTrue(app.buttons["Later"].waitForExistence(timeout: 10))
         app.buttons["Later"].tap()
-        sleep(2)
+        // Wait for the later window: nothing on now is shown any more.
+        let onNow = app.buttons.matching(NSPredicate(format: "label CONTAINS 'minutes left'"))
+        let moved = expectation(for: NSPredicate(format: "count == 0"), evaluatedWith: onNow)
+        wait(for: [moved], timeout: 15)
         let later = app.buttons.matching(NSPredicate(format: "label MATCHES %@", ".*, [0-9]{1,2}:[0-9]{2}.(AM|PM), .*"))
         XCTAssertTrue(later.firstMatch.waitForExistence(timeout: 15))
         let screen = app.windows.firstMatch.frame
         let upcoming = try XCTUnwrap(later.allElementsBoundByIndex.first { screen.contains($0.frame) })
-        let title = String(upcoming.label.split(separator: ",").first ?? "")
         upcoming.tap()
         let record = app.buttons["Record"]
         XCTAssertTrue(record.waitForExistence(timeout: 10))
         shot("r1-programme")
         record.tap()
+        // What was scheduled, from the server.
+        var title = ""
+        for _ in 0..<20 where title.isEmpty {
+            title = try adminList("/livetv/recordings").first { $0["status"] as? String == "scheduled" }?["title"] as? String ?? ""
+            if title.isEmpty { sleep(1) }
+        }
+        XCTAssertFalse(title.isEmpty, "a recording was scheduled")
         let marked = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ AND label ENDSWITH 'will record'", title + ",")).firstMatch
         XCTAssertTrue(marked.waitForExistence(timeout: 10), "the guide marks it")
         shot("r2-guide-marked")

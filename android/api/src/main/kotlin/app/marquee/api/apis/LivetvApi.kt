@@ -287,11 +287,84 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     }
 
     /**
+     * PUT /livetv/channels/{channelId}/hidden
+     * Hide a channel from the caller&#39;s guide (LIVE-4).
+     * 
+     * @param channelId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun hideLiveChannel(channelId: kotlin.Long) : Unit {
+        val localVarResponse = hideLiveChannelWithHttpInfo(channelId = channelId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /livetv/channels/{channelId}/hidden
+     * Hide a channel from the caller&#39;s guide (LIVE-4).
+     * 
+     * @param channelId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun hideLiveChannelWithHttpInfo(channelId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = hideLiveChannelRequestConfig(channelId = channelId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation hideLiveChannel
+     *
+     * @param channelId 
+     * @return RequestConfig
+     */
+    fun hideLiveChannelRequestConfig(channelId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/livetv/channels/{channelId}/hidden".replace("{"+"channelId"+"}", encodeURIComponent(channelId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * GET /livetv/channels
      * Channels in number order, with what&#39;s on now and next.
      * 
      * @param group Only this group (category). (optional)
      * @param favorites Only the caller&#39;s favourites. (optional)
+     * @param recent The channels the caller watched last, newest first (LIVE-4). (optional)
+     * @param hidden Only the channels the caller hid (otherwise they&#39;re left out). (optional)
      * @return kotlin.collections.List<LiveChannel>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -301,8 +374,8 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun listLiveChannels(group: kotlin.String? = null, favorites: kotlin.Boolean? = null) : kotlin.collections.List<LiveChannel> {
-        val localVarResponse = listLiveChannelsWithHttpInfo(group = group, favorites = favorites)
+    fun listLiveChannels(group: kotlin.String? = null, favorites: kotlin.Boolean? = null, recent: kotlin.Boolean? = null, hidden: kotlin.Boolean? = null) : kotlin.collections.List<LiveChannel> {
+        val localVarResponse = listLiveChannelsWithHttpInfo(group = group, favorites = favorites, recent = recent, hidden = hidden)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<LiveChannel>
@@ -325,14 +398,16 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * 
      * @param group Only this group (category). (optional)
      * @param favorites Only the caller&#39;s favourites. (optional)
+     * @param recent The channels the caller watched last, newest first (LIVE-4). (optional)
+     * @param hidden Only the channels the caller hid (otherwise they&#39;re left out). (optional)
      * @return ApiResponse<kotlin.collections.List<LiveChannel>?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun listLiveChannelsWithHttpInfo(group: kotlin.String?, favorites: kotlin.Boolean?) : ApiResponse<kotlin.collections.List<LiveChannel>?> {
-        val localVariableConfig = listLiveChannelsRequestConfig(group = group, favorites = favorites)
+    fun listLiveChannelsWithHttpInfo(group: kotlin.String?, favorites: kotlin.Boolean?, recent: kotlin.Boolean?, hidden: kotlin.Boolean?) : ApiResponse<kotlin.collections.List<LiveChannel>?> {
+        val localVariableConfig = listLiveChannelsRequestConfig(group = group, favorites = favorites, recent = recent, hidden = hidden)
 
         return request<Unit, kotlin.collections.List<LiveChannel>>(
             localVariableConfig
@@ -344,9 +419,11 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      *
      * @param group Only this group (category). (optional)
      * @param favorites Only the caller&#39;s favourites. (optional)
+     * @param recent The channels the caller watched last, newest first (LIVE-4). (optional)
+     * @param hidden Only the channels the caller hid (otherwise they&#39;re left out). (optional)
      * @return RequestConfig
      */
-    fun listLiveChannelsRequestConfig(group: kotlin.String?, favorites: kotlin.Boolean?) : RequestConfig<Unit> {
+    fun listLiveChannelsRequestConfig(group: kotlin.String?, favorites: kotlin.Boolean?, recent: kotlin.Boolean?, hidden: kotlin.Boolean?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -355,6 +432,12 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
                 }
                 if (favorites != null) {
                     put("favorites", listOf(favorites.toString()))
+                }
+                if (recent != null) {
+                    put("recent", listOf(recent.toString()))
+                }
+                if (hidden != null) {
+                    put("hidden", listOf(hidden.toString()))
                 }
             }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
@@ -661,6 +744,7 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * @param end 
      * @param group  (optional)
      * @param favorites  (optional)
+     * @param recent  (optional)
      * @return kotlin.collections.List<LiveGuide200ResponseInner>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -670,8 +754,8 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun liveGuide(start: java.time.OffsetDateTime, end: java.time.OffsetDateTime, group: kotlin.String? = null, favorites: kotlin.Boolean? = null) : kotlin.collections.List<LiveGuide200ResponseInner> {
-        val localVarResponse = liveGuideWithHttpInfo(start = start, end = end, group = group, favorites = favorites)
+    fun liveGuide(start: java.time.OffsetDateTime, end: java.time.OffsetDateTime, group: kotlin.String? = null, favorites: kotlin.Boolean? = null, recent: kotlin.Boolean? = null) : kotlin.collections.List<LiveGuide200ResponseInner> {
+        val localVarResponse = liveGuideWithHttpInfo(start = start, end = end, group = group, favorites = favorites, recent = recent)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<LiveGuide200ResponseInner>
@@ -696,14 +780,15 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * @param end 
      * @param group  (optional)
      * @param favorites  (optional)
+     * @param recent  (optional)
      * @return ApiResponse<kotlin.collections.List<LiveGuide200ResponseInner>?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun liveGuideWithHttpInfo(start: java.time.OffsetDateTime, end: java.time.OffsetDateTime, group: kotlin.String?, favorites: kotlin.Boolean?) : ApiResponse<kotlin.collections.List<LiveGuide200ResponseInner>?> {
-        val localVariableConfig = liveGuideRequestConfig(start = start, end = end, group = group, favorites = favorites)
+    fun liveGuideWithHttpInfo(start: java.time.OffsetDateTime, end: java.time.OffsetDateTime, group: kotlin.String?, favorites: kotlin.Boolean?, recent: kotlin.Boolean?) : ApiResponse<kotlin.collections.List<LiveGuide200ResponseInner>?> {
+        val localVariableConfig = liveGuideRequestConfig(start = start, end = end, group = group, favorites = favorites, recent = recent)
 
         return request<Unit, kotlin.collections.List<LiveGuide200ResponseInner>>(
             localVariableConfig
@@ -717,9 +802,10 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * @param end 
      * @param group  (optional)
      * @param favorites  (optional)
+     * @param recent  (optional)
      * @return RequestConfig
      */
-    fun liveGuideRequestConfig(start: java.time.OffsetDateTime, end: java.time.OffsetDateTime, group: kotlin.String?, favorites: kotlin.Boolean?) : RequestConfig<Unit> {
+    fun liveGuideRequestConfig(start: java.time.OffsetDateTime, end: java.time.OffsetDateTime, group: kotlin.String?, favorites: kotlin.Boolean?, recent: kotlin.Boolean?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -730,6 +816,9 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
                 }
                 if (favorites != null) {
                     put("favorites", listOf(favorites.toString()))
+                }
+                if (recent != null) {
+                    put("recent", listOf(recent.toString()))
                 }
             }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
@@ -1171,6 +1260,77 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.DELETE,
             path = "/livetv/channels/{channelId}/favorite".replace("{"+"channelId"+"}", encodeURIComponent(channelId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /livetv/channels/{channelId}/hidden
+     * Show a hidden channel again.
+     * 
+     * @param channelId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun unhideLiveChannel(channelId: kotlin.Long) : Unit {
+        val localVarResponse = unhideLiveChannelWithHttpInfo(channelId = channelId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /livetv/channels/{channelId}/hidden
+     * Show a hidden channel again.
+     * 
+     * @param channelId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun unhideLiveChannelWithHttpInfo(channelId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = unhideLiveChannelRequestConfig(channelId = channelId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation unhideLiveChannel
+     *
+     * @param channelId 
+     * @return RequestConfig
+     */
+    fun unhideLiveChannelRequestConfig(channelId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/livetv/channels/{channelId}/hidden".replace("{"+"channelId"+"}", encodeURIComponent(channelId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

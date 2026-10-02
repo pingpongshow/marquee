@@ -231,3 +231,46 @@ func TestLiveStream(t *testing.T) {
 		t.Error("files left behind")
 	}
 }
+
+func TestHiddenRecentAndGroups(t *testing.T) {
+	s, _, uid := setup(t)
+	ctx := context.Background()
+	s.Refresh(ctx)
+	all, _ := s.Channels(ctx, uid, Filter{})
+	if len(all) != 3 {
+		t.Fatalf("channels: %d", len(all))
+	}
+	// Hidden channels leave the guide and are listed on their own.
+	if err := s.SetHidden(ctx, uid, all[0].ID, true); err != nil {
+		t.Fatal(err)
+	}
+	if l, _ := s.Channels(ctx, uid, Filter{}); len(l) != 2 {
+		t.Errorf("hidden still listed: %d", len(l))
+	}
+	if l, _ := s.Channels(ctx, uid, Filter{Hidden: true}); len(l) != 1 || !l[0].Hidden {
+		t.Errorf("hidden list: %+v", l)
+	}
+	now := time.Now()
+	if rows, _ := s.Guide(ctx, uid, Filter{}, now.Add(-time.Hour), now.Add(time.Hour)); len(rows) != 2 {
+		t.Errorf("guide rows: %d", len(rows))
+	}
+	s.SetHidden(ctx, uid, all[0].ID, false)
+	if err := s.SetHidden(ctx, uid, 9999, true); err != ErrNotFound {
+		t.Errorf("unknown channel: %v", err)
+	}
+	// Recently watched, newest first.
+	s.Watched(ctx, uid, all[2].ID)
+	time.Sleep(5 * time.Millisecond)
+	s.Watched(ctx, uid, all[0].ID)
+	if l, _ := s.Channels(ctx, uid, Filter{Recent: true}); len(l) != 2 || l[0].ID != all[0].ID || l[1].ID != all[2].ID {
+		t.Errorf("recent: %+v", l)
+	}
+	// A restricted profile sees only its groups; an empty list means none.
+	kids := []string{"Kids, Family"}
+	if l, _ := s.Channels(ctx, uid, Filter{Groups: &kids}); len(l) != 1 || l[0].Group != "Kids, Family" {
+		t.Errorf("groups: %+v", l)
+	}
+	if l, _ := s.Channels(ctx, uid, Filter{Groups: &[]string{}}); len(l) != 0 {
+		t.Errorf("no live tv: %+v", l)
+	}
+}

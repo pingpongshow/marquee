@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -252,6 +253,7 @@ type Channel struct {
 	Group      string
 	HasLogo    bool
 	Favorite   bool
+	Hidden     bool
 	Now, Next  *Prog
 	StreamURL  string
 	SourceID   string
@@ -273,13 +275,24 @@ type Prog struct {
 type Filter struct {
 	Group     string
 	Favorites bool
+	// Recent lists the channels the user watched last, newest first (LIVE-4).
+	Recent bool
+	// Hidden lists only the channels the user hid; otherwise they're left out.
+	Hidden bool
+	// Groups limits a restricted profile to these channel groups (nil = all).
+	Groups *[]string
 }
 
+// RecentLimit is how many recently watched channels are listed.
+const RecentLimit = 12
+
 func (s *Service) channels(ctx context.Context, userID int64, f Filter) ([]Channel, error) {
-	q := `SELECT c.id, c.number, c.name, c.group_name, c.logo_url, c.stream_url, c.source_id, f.user_id IS NOT NULL
+	q := `SELECT c.id, c.number, c.name, c.group_name, c.logo_url, c.stream_url, c.source_id, f.user_id IS NOT NULL, h.user_id IS NOT NULL
 		FROM live_channels c LEFT JOIN live_favorites f ON f.channel_id = c.id AND f.user_id = ?
+		LEFT JOIN live_hidden h ON h.channel_id = c.id AND h.user_id = ?
+		LEFT JOIN live_recent r ON r.channel_id = c.id AND r.user_id = ?
 		WHERE c.present = 1`
-	args := []any{userID}
+	args := []any{userID, userID, userID}
 	if f.Group != "" {
 		q += ` AND c.group_name = ?`
 		args = append(args, f.Group)
@@ -287,7 +300,21 @@ func (s *Service) channels(ctx context.Context, userID int64, f Filter) ([]Chann
 	if f.Favorites {
 		q += ` AND f.user_id IS NOT NULL`
 	}
-	rows, err := s.DB.QueryContext(ctx, q+` ORDER BY c.sort_key, c.name`, args...)
+	if f.Hidden {
+		q += ` AND h.user_id IS NOT NULL`
+	} else {
+		q += ` AND h.user_id IS NULL`
+	}
+	if f.Groups != nil {
+		q += ` AND c.group_name IN (SELECT value FROM json_each(?))`
+		b, _ := json.Marshal(*f.Groups)
+		args = append(args, string(b))
+	}
+	order := ` ORDER BY c.sort_key, c.name`
+	if f.Recent {
+		order = ` AND r.user_id IS NOT NULL ORDER BY r.watched_at DESC LIMIT ` + strconv.Itoa(RecentLimit)
+	}
+	rows, err := s.DB.QueryContext(ctx, q+order, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +322,7 @@ func (s *Service) channels(ctx context.Context, userID int64, f Filter) ([]Chann
 	var out []Channel
 	for rows.Next() {
 		var c Channel
-		if err := rows.Scan(&c.ID, &c.Number, &c.Name, &c.Group, &c.LogoSource, &c.StreamURL, &c.SourceID, &c.Favorite); err != nil {
+		if err := rows.Scan(&c.ID, &c.Number, &c.Name, &c.Group, &c.LogoSource, &c.StreamURL, &c.SourceID, &c.Favorite, &c.Hidden); err != nil {
 			return nil, err
 		}
 		c.HasLogo = c.LogoSource != ""
@@ -437,6 +464,26 @@ func (s *Service) UserAgent(sourceID string) string {
 		}
 	}
 	return ""
+}
+
+// SetHidden hides a channel from the user's guide, or shows it again (LIVE-4).
+func (s *Service) SetHidden(ctx context.Context, userID, channelID int64, on bool) error {
+	if _, err := s.Channel(ctx, channelID); err != nil {
+		return err
+	}
+	var err error
+	if on {
+		_, err = s.DB.ExecContext(ctx, `INSERT OR IGNORE INTO live_hidden (user_id, channel_id) VALUES (?, ?)`, userID, channelID)
+	} else {
+		_, err = s.DB.ExecContext(ctx, `DELETE FROM live_hidden WHERE user_id = ? AND channel_id = ?`, userID, channelID)
+	}
+	return err
+}
+
+// Watched remembers that the user tuned a channel, for "Recently watched".
+func (s *Service) Watched(ctx context.Context, userID, channelID int64) {
+	s.DB.ExecContext(ctx, `INSERT INTO live_recent (user_id, channel_id, watched_at) VALUES (?, ?, ?)
+		ON CONFLICT (user_id, channel_id) DO UPDATE SET watched_at = excluded.watched_at`, userID, channelID, time.Now().UTC().Format(time.RFC3339Nano))
 }
 
 func (s *Service) SetFavorite(ctx context.Context, userID, channelID int64, on bool) error {

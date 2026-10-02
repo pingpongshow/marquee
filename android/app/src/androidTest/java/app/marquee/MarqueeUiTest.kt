@@ -690,15 +690,21 @@ class MarqueeUiTest {
         // Move the guide on 90 minutes so the programmes shown haven't started.
         rule.waitUntilAtLeastOneExists(hasContentDescription("Later"), 10_000)
         rule.onNode(hasContentDescription("Later")).performClick()
+        // Wait for the later window: nothing on now ("25m left") is shown any more.
+        rule.waitUntil(15_000) { rule.onAllNodesWithText("m left", substring = true).fetchSemanticsNodes().isEmpty() }
         val programme = hasContentDescription(", Marquee News", substring = true) and hasClickAction()
         rule.waitUntilAtLeastOneExists(programme, 10_000)
-        Thread.sleep(1500)
-        val node = rule.onAllNodes(programme).onFirst()
-        val title = node.fetchSemanticsNode().config[SemanticsProperties.ContentDescription].first().substringBefore(",")
-        node.performClick()
+        rule.onAllNodes(programme).onFirst().performClick()
         rule.waitText("Record series", 10_000)
         shot("r1-programme")
         tap("Record")
+        // What was scheduled, from the server.
+        var title = ""
+        rule.waitUntil(10_000) {
+            val list = org.json.JSONArray(adminApi("GET", "/livetv/recordings"))
+            title = (0 until list.length()).map { list.getJSONObject(it) }.firstOrNull { it.getString("status") == "scheduled" }?.getString("title") ?: ""
+            title.isNotEmpty()
+        }
         rule.waitUntilAtLeastOneExists(hasContentDescription("$title, Marquee News, will record"), 10_000)
         shot("r2-guide-marked")
 
