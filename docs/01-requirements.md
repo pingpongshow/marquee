@@ -1,6 +1,6 @@
 # Requirements
 
-_Last updated: 2026-10-01_
+_Last updated: 2026-10-02_
 
 Priority key:
 - **P0:** required for the first usable release.
@@ -100,11 +100,34 @@ The owner wants the best music experience possible: everything Plexamp and Plex'
 | MUSIC-8 | **Smart playlists:** rule-based (genre, artist, year, rating, play count, last played, added date, mood, BPM, key…) with limits and sort, kept up to date automatically. | P1 |
 | MUSIC-9 | **Playback quality:** gapless playback, loudness levelling (ReplayGain tags or EBU R128 analysis, track/album mode), optional crossfade and "sweet fades" that respect gapless albums, and a 10-band EQ on clients that support it. | P1 |
 | MUSIC-10 | **Lyrics:** embedded, `.lrc` sidecars and LRCLIB, with synced, scrolling lyrics in the player (also META-9). | P1 |
-| MUSIC-11 | **Ratings and taste:** 1–5 star / love ratings on tracks, albums and artists. Skips and plays feed recommendations. Per-user listening stats ("Year in music"). | P1 |
+| MUSIC-11 | **Ratings and taste:** 1–5 star ratings in half stars (every client can set halves, not only show them) / love ratings on tracks, albums and artists. Skips and plays feed recommendations. Per-user listening stats ("Year in music"). | P1 |
 | MUSIC-12 | **Scrobbling:** optional Last.fm and ListenBrainz scrobbling per user. | P2 |
 | MUSIC-13 | **Plexamp-style player:** full-screen now playing with artwork-coloured backgrounds, queue editing (drag to reorder, play next, add to queue), shuffle/repeat, sleep timer, waveform or visualizer, and a mini-player. | P1 |
 | MUSIC-14 | **Apple and Android:** offline downloads with smart sync (e.g. "keep my top 500 and today's mix"), CarPlay / Android Auto, lock-screen and widget controls, and Siri / Assistant "play … on Marquee" where the platforms allow. | P1 |
 | MUSIC-15 | **Discovery:** artist bios and photos, similar artists in your library, popular tracks (via Last.fm/ListenBrainz data) for an artist, and "Recently played" / "Most played" hubs. | P1 |
+| MUSIC-16 | **A Marquee name for natural-language playlists:** "Sonic Sage" is Plex's name. Rename it across the server, API, web, Apple and Android apps and the docs (name to be chosen, see Q17). | P1 |
+| MUSIC-17 | **Mixes for you from listening history:** curated mixes like Plexamp's, from what each person plays, skips and rates (taste clusters, "discovery" of rarely played library tracks near their taste, rediscover, decade and mood mixes), refreshed daily. Builds on MUSIC-7. | P1 |
+| MUSIC-18 | **Browse and play by mood and style:** Plexamp-style mood, style and genre pages with stations and playlists for each (moods from sonic analysis and tags, styles from tags/MusicBrainz), on every client. | P1 |
+| MUSIC-19 | **Playlist downloads:** download whole playlists (including smart playlists and mixes) for offline playback on Apple and Android, kept in sync as they change. | P1 |
+
+## 3c. Live TV
+
+Plex-style Live TV on every client (see the owner's reference screenshot: Guide / What's On tabs, a live preview with "Now On", a time-scrolling guide grid with channel logos, favourites and a now line).
+
+| ID | Requirement | Pri |
+|---|---|---|
+| LIVE-1 | **Sources:** M3U playlists with XMLTV guides (admin-added), free ad-supported channels (Pluto TV and similar, where their terms allow), and an optional **Dispatcharr** integration (its channels, groups, logos and EPG) when the admin sets it up. | P1 |
+| LIVE-2 | **Guide:** a grid of channels × time with now/next, a "now" line, day picker, jump back/forward, categories and favourites; plus a "What's On" view of what's airing now. | P1 |
+| LIVE-3 | **Watching:** tune a channel with a muted live preview in the guide, full screen, channel up/down, and the server remuxing or transcoding streams for each client like any other playback (LAN and Tailscale). | P1 |
+| LIVE-4 | **Per-user:** favourite channels, hidden channels, recently watched, and access rules (e.g. kids' profiles). | P1 |
+| LIVE-5 | **DVR (later):** record programmes and series to a library. | P2 |
+
+## 3d. Requests (Seerr)
+
+| ID | Requirement | Pri |
+|---|---|---|
+| REQ-1 | **Seerr integration:** the admin connects the Seerr instance on the server (URL and API key). Users search for movies and shows that aren't in the library and request them from any Marquee client; request status shows in the app. Marquee users map to Seerr users so quotas and approvals apply. | P1 |
+| REQ-2 | **Discover:** trending, popular and upcoming titles from Seerr, marked "In library", "Requested" or "Request", in a Discover tab. | P2 |
 
 ## 4. Users, auth & state
 
@@ -161,8 +184,8 @@ The owner wants the best music experience possible: everything Plexamp and Plex'
 - 4K HDR10 / Dolby Vision / Atmos direct play where the device supports it.
 - Match frame rate and dynamic range.
 
-### Android / Android TV (P2, planned now)
-- Same API and feature set. The client architecture must not assume Apple-only capabilities.
+### Android / Android TV (P1, built 2026-10-02)
+- Same API and feature set as the Apple apps. One app for phones, tablets and Android TV (D66).
 
 ## 7. Server administration
 

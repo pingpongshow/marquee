@@ -13,6 +13,9 @@ _Last updated: 2026-10-02_
 | Q15 | Sonic Sage with an LLM: allow an optional cloud LLM (e.g. Claude API key) to interpret longer prompts, or keep everything local? | Privacy (prompts and track titles would be sent) vs. prompt quality. | Optional and off by default; local CLAP works without it. |
 | Q16 | Request Apple's CarPlay audio entitlement for the developer team? | The app has a CarPlay audio scene (mixes, stations, library, downloads). Simulator builds include the entitlement; device builds can only include it once Apple grants it to the team (a request form on developer.apple.com). | CarPlay stays off on devices until granted; nothing else is affected. |
 | Q13 | Photos: build our own (P2), or leave photos to the Immich instance already on the host? | Scope. | Leave to Immich. Revisit after v1.0. |
+| Q17 | New name for "Sonic Sage" (MUSIC-16)? Suggestions: **Muse**, **Vibe**, **Prompt Radio**, **Marquee DJ**, **Moodboard**. | It appears in every client, the API and the docs. | Owner to pick; "Muse" until then. |
+| Q18 | Pluto TV and similar free channels: their terms restrict use outside their own apps. Use them only through user-supplied M3U/XMLTV or Dispatcharr (which the admin controls), rather than built into Marquee? | Legal/ToS risk and breakage when their APIs change. | Support them through M3U/Dispatcharr sources the admin adds. |
+| Q19 | Seerr: which instance (URL) and API key? It's on the server already; which Marquee users may request, and should requests need approval? | Needed to build and test REQ-1 against the real instance. | Owner to provide when we reach M9. |
 
 ## Answered
 
