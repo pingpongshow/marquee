@@ -87,6 +87,7 @@ type Library struct {
 	IgnorePatterns          []string `json:"ignorePatterns"`
 	BrowseRoots             []string `json:"browseRoots"`
 	WatchedThresholdPercent int      `json:"watchedThresholdPercent"`
+	Trickplay               bool     `json:"trickplay"`
 }
 
 type Metadata struct {
@@ -140,6 +141,7 @@ func Defaults() Settings {
 			IgnorePatterns:          []string{"*_staging.*", "*.part", "*.partial", "*.tmp", "*sample*", ".*"},
 			BrowseRoots:             []string{"/media"},
 			WatchedThresholdPercent: 90,
+			Trickplay:               true,
 		},
 		Metadata: Metadata{AnimeEpisodeOrdering: "seasonal", OMDbDailyLimit: 950},
 		Tasks:    Tasks{MaintenanceWindowStart: "03:00", MaintenanceWindowHours: 4, BackupRetention: 7},

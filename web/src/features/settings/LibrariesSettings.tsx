@@ -126,6 +126,12 @@ export function LibrariesSettings() {
           <Card title="Scanning" description="Applies to all libraries.">
             <Toggle label="Scan automatically when files change" help="Watches library folders and picks up new, renamed and deleted files within seconds." checked={!!scanning.draft.watchFilesystem} onChange={(v) => scanning.update({ watchFilesystem: v })} />
             <Toggle label="Scan all libraries when the server starts" checked={!!scanning.draft.scanOnStartup} onChange={(v) => scanning.update({ scanOnStartup: v })} />
+            <Toggle
+              label="Make seek previews"
+              help="Thumbnails shown while seeking through videos, made in the maintenance window. Uses roughly 3–7 MB per movie; a large library takes a few nights."
+              checked={!!scanning.draft.trickplay}
+              onChange={(v) => scanning.update({ trickplay: v })}
+            />
             <Field label="Mark as watched after (%)" help="Progress past this point counts as watched.">
               {(id) => <Input id={id} type="number" min={50} max={100} value={scanning.draft!.watchedThresholdPercent ?? 90} onChange={(e) => scanning.update({ watchedThresholdPercent: Number(e.target.value) })} />}
             </Field>

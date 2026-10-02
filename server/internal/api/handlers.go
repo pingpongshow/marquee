@@ -21,6 +21,7 @@ import (
 	"marquee/internal/settings"
 	"marquee/internal/sonic"
 	"marquee/internal/tasks"
+	"marquee/internal/trickplay"
 )
 
 // Handlers implements StrictServerInterface.
@@ -40,6 +41,7 @@ type Handlers struct {
 	LibrariesChanged func()
 	Scans            *tasks.Scans
 	Tasks            *tasks.Scheduler
+	Trickplay        *trickplay.Service
 	QuickConnect     auth.QuickConnect
 	Sonic            *sonic.Service
 	Lyrics           *lyrics.Service

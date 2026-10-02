@@ -4,10 +4,10 @@ import { clsx } from "clsx";
 import Hls from "hls.js";
 import { ArrowLeft, Captions, Info, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, Settings2, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, imageUrl, session as authSession, unwrap } from "@/api/client";
+import { api, imageUrl, session as authSession, trickplaySheetUrl, unwrap } from "@/api/client";
 import { itemQuery, systemInfoQuery } from "@/api/queries";
 import type { components } from "@/api/schema.gen";
-import type { ItemDetail, ItemSummary, MediaStream } from "@/api/types";
+import type { ItemDetail, ItemSummary, MediaStream, Trickplay } from "@/api/types";
 import { Spinner } from "@/components/ui";
 import { languageName } from "../browse/format";
 import { deviceProfile } from "./deviceProfile";
@@ -84,6 +84,12 @@ export function VideoPlayer({ itemId, startMs, playlistId }: { itemId: number; s
   const navigate = useNavigate();
   const qc = useQueryClient();
   const item = useQuery(itemQuery(itemId));
+  const trickplay = useQuery({
+    queryKey: ["trickplay", itemId],
+    queryFn: () => unwrap(api.GET("/items/{itemId}/trickplay", { params: { path: { itemId } } })),
+    retry: false,
+    staleTime: Infinity,
+  });
   const info = useQuery(systemInfoQuery);
   const remote = info.data?.networkClass === "remote";
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -473,7 +479,14 @@ export function VideoPlayer({ itemId, startMs, playlistId }: { itemId: number; s
 
       {/* Bottom controls */}
       <div className={clsx("absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-6 pt-16 pb-5 transition-opacity", chrome ? "opacity-100" : "pointer-events-none opacity-0")}>
-        <SeekBar time={time} duration={duration} markers={sess?.markers ?? []} bufferedEnd={bufferedEnd} onSeek={(t) => videoRef.current && (videoRef.current.currentTime = t)} />
+        <SeekBar
+          time={time}
+          duration={duration}
+          markers={sess?.markers ?? []}
+          bufferedEnd={bufferedEnd}
+          preview={trickplay.data ? { ...trickplay.data, itemId } : undefined}
+          onSeek={(t) => videoRef.current && (videoRef.current.currentTime = t)}
+        />
         <div className="mt-3 flex items-center gap-3 text-white">
           <button onClick={toggle} className="rounded-full p-2 hover:bg-white/10" aria-label={playing ? "Pause" : "Play"}>
             {playing ? <Pause className="size-7 fill-current" /> : <Play className="size-7 fill-current" />}
@@ -612,12 +625,14 @@ function SeekBar({
   duration,
   markers,
   bufferedEnd: bufEnd,
+  preview,
   onSeek,
 }: {
   time: number;
   duration: number;
   markers: PlaybackSession["markers"];
   bufferedEnd: number;
+  preview?: Trickplay & { itemId: number };
   onSeek: (t: number) => void;
 }) {
   const [hover, setHover] = useState<number | null>(null);
@@ -649,11 +664,40 @@ function SeekBar({
       </div>
       <div className="absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent opacity-0 group-hover:opacity-100" style={{ left: pct(time) }} />
       {hover !== null && (
-        <div className="absolute bottom-6 -translate-x-1/2 rounded bg-black/80 px-2 py-0.5 text-xs text-white tabular-nums" style={{ left: pct(hover) }}>
-          {fmt(hover)}
+        <div
+          className="pointer-events-none absolute bottom-6 flex -translate-x-1/2 flex-col items-center gap-1"
+          // Keep the preview on screen near the ends of the bar.
+          style={{ left: `clamp(${PREVIEW_W / 2}px, ${pct(hover)}, calc(100% - ${PREVIEW_W / 2}px))` }}
+        >
+          {preview && <PreviewThumb t={hover} p={preview} />}
+          <div className="rounded bg-black/80 px-2 py-0.5 text-xs text-white tabular-nums">{fmt(hover)}</div>
         </div>
       )}
     </div>
+  );
+}
+
+const PREVIEW_W = 224;
+
+/** One trickplay tile, cut from its sprite sheet with background positioning. */
+function PreviewThumb({ t, p }: { t: number; p: Trickplay & { itemId: number } }) {
+  const n = Math.min(p.count - 1, Math.max(0, Math.floor((t * 1000) / p.intervalMs)));
+  const per = p.columns * p.rows;
+  const sheet = Math.floor(n / per);
+  const tile = n % per;
+  const scale = PREVIEW_W / p.width;
+  const h = Math.round(p.height * scale);
+  return (
+    <div
+      className="overflow-hidden rounded border border-white/30 bg-black shadow-xl"
+      style={{
+        width: PREVIEW_W,
+        height: h,
+        backgroundImage: `url(${trickplaySheetUrl(p.itemId, sheet)})`,
+        backgroundSize: `${p.columns * PREVIEW_W}px ${p.rows * h}px`,
+        backgroundPosition: `-${(tile % p.columns) * PREVIEW_W}px -${Math.floor(tile / p.columns) * h}px`,
+      }}
+    />
   );
 }
 

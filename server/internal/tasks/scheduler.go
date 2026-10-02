@@ -22,8 +22,13 @@ var (
 type Task struct {
 	ID, Name, Description string
 	Window                bool
-	Every                 time.Duration
-	Run                   func(ctx context.Context) (string, error)
+	// Bounded window tasks are stopped (their context ends) when the window closes and
+	// pick up where they left off next time. Run Now ignores the window.
+	Bounded bool
+	Every   time.Duration
+	Run     func(ctx context.Context) (string, error)
+	// Progress, when set, reports a running task's progress for the activity indicator.
+	Progress func() (done, total int)
 }
 
 func (t Task) Schedule() string {
@@ -115,6 +120,19 @@ func (s *Scheduler) List(ctx context.Context) ([]TaskInfo, error) {
 	return out, nil
 }
 
+// Running lists the tasks running now.
+func (s *Scheduler) Running() []Task {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []Task
+	for _, t := range s.tasks {
+		if s.running[t.ID] {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
 func (s *Scheduler) isRunning(id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -123,6 +141,11 @@ func (s *Scheduler) isRunning(id string) bool {
 
 // RunNow starts a task in the background.
 func (s *Scheduler) RunNow(ctx context.Context, id string) error {
+	return s.start(ctx, id, time.Time{})
+}
+
+// start runs a task in the background, stopping it at deadline when that is set.
+func (s *Scheduler) start(ctx context.Context, id string, deadline time.Time) error {
 	t, ok := s.find(id)
 	if !ok {
 		return ErrUnknownTask
@@ -137,7 +160,15 @@ func (s *Scheduler) RunNow(ctx context.Context, id string) error {
 	}
 	s.running[id] = true
 	s.mu.Unlock()
-	go s.execute(context.WithoutCancel(ctx), t)
+	run := context.WithoutCancel(ctx)
+	var cancel context.CancelFunc = func() {}
+	if !deadline.IsZero() {
+		run, cancel = context.WithDeadline(run, deadline)
+	}
+	go func() {
+		defer cancel()
+		s.execute(run, t)
+	}()
 	return nil
 }
 
@@ -168,7 +199,8 @@ func (s *Scheduler) execute(ctx context.Context, t Task) {
 	} else {
 		slog.Info("task finished", "task", t.ID, "result", msg)
 	}
-	s.DB.ExecContext(ctx, `UPDATE task_runs SET status = ?, message = ?, progress = 1, finished_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`,
+	// The run's context may have hit its deadline; recording the result must still work.
+	s.DB.ExecContext(context.WithoutCancel(ctx), `UPDATE task_runs SET status = ?, message = ?, progress = 1, finished_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`,
 		status, msg, runID)
 }
 
@@ -219,7 +251,14 @@ func (s *Scheduler) Run(ctx context.Context) {
 		now := s.now()
 		for _, t := range tasks {
 			if !s.isRunning(t.ID) && s.due(ctx, t, now) {
-				s.RunNow(ctx, t.ID)
+				var deadline time.Time
+				if t.Window && t.Bounded {
+					cfg := s.Settings.Get().Tasks
+					if in, ws := inWindow(now, cfg.MaintenanceWindowStart, cfg.MaintenanceWindowHours); in {
+						deadline = ws.Add(time.Duration(cfg.MaintenanceWindowHours) * time.Hour)
+					}
+				}
+				s.start(ctx, t.ID, deadline)
 			}
 		}
 		select {

@@ -103,6 +103,11 @@ export function personPhotoUrl(personId: number, width: number) {
   return `/api/v1/people/${personId}/photo?w=${w}&token=${encodeURIComponent(token ?? "")}`;
 }
 
+/** A seek-preview sprite sheet (PLAY-13). */
+export function trickplaySheetUrl(itemId: number, sheet: number) {
+  return `/api/v1/items/${itemId}/trickplay/${sheet}?token=${encodeURIComponent(token ?? "")}`;
+}
+
 /** Profile picture URL usable in <img> (signed-in viewers authenticate with the token parameter). */
 export function avatarSrc(avatarUrl: string) {
   return token ? `${avatarUrl}&token=${encodeURIComponent(token)}` : avatarUrl;
