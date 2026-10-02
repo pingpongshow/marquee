@@ -1,0 +1,30 @@
+# Marquee on the Unraid host. Copy to /mnt/docker/marquee/ with a .env (see .env.example).
+name: marquee
+services:
+  marquee:
+    image: marquee:${MARQUEE_VERSION:-latest}
+    build:
+      context: ./src
+      dockerfile: deploy/Dockerfile
+      args:
+        VERSION: ${MARQUEE_VERSION:-dev}
+    container_name: marquee
+    restart: unless-stopped
+    user: "${PUID:-99}:${PGID:-100}"
+    group_add:
+      - "${RENDER_GID:-18}"   # host group owning /dev/dri/renderD* (Intel Quick Sync)
+    runtime: nvidia           # NVIDIA NVENC/NVDEC
+    devices:
+      - /dev/dri:/dev/dri
+    ports:
+      - "32500:32500"
+    environment:
+      TZ: ${TZ:-America/Los_Angeles}
+      MARQUEE_LOG_LEVEL: ${MARQUEE_LOG_LEVEL:-info}
+    volumes:
+      - ./config:/config
+      - /mnt/data/Video:/media/video:ro
+      - /mnt/data/Music:/media/music:ro
+      - /mnt/docker/plex:/plex:ro          # Plex import (read-only)
+    tmpfs:
+      - /transcode:size=16g,uid=${PUID:-99},gid=${PGID:-100},mode=0750

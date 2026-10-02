@@ -1,0 +1,1899 @@
+openapi: 3.0.3
+info:
+  title: Marquee API
+  version: 1.0.0-m1
+  description: |
+    Marquee media server API. This spec is the single source of truth: the Go server
+    interfaces and all client SDKs are generated from it. It is extended milestone by
+    milestone (see docs/05-roadmap.md); only implemented endpoints are listed.
+
+    Authentication: `Authorization: Bearer <token>` on every request except those marked
+    `security: []`.
+servers:
+  - url: /api/v1
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: system
+  - name: auth
+  - name: settings
+  - name: libraries
+  - name: filesystem
+  - name: items
+  - name: images
+  - name: activity
+  - name: users
+  - name: search
+  - name: plex
+  - name: playback
+  - name: hubs
+
+paths:
+  /system/info:
+    get:
+      tags: [system]
+      operationId: getSystemInfo
+      summary: Public server identity and status (used for discovery and connection checks).
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SystemInfo" }
+
+  /system/health:
+    get:
+      tags: [system]
+      operationId: getHealth
+      summary: Liveness/readiness probe.
+      security: []
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503":
+          description: Unhealthy
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+
+  /setup:
+    post:
+      tags: [auth]
+      operationId: completeSetup
+      summary: First-run setup. Creates the admin account. Only allowed while setupRequired is true.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetupRequest" }
+      responses:
+        "200":
+          description: Setup complete; returns a session for the new admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Logged in.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResult" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /auth/profiles:
+    get:
+      tags: [auth]
+      operationId: listSignInProfiles
+      summary: Profiles for the "Who's watching?" sign-in screen. Empty when PIN sign-in isn't allowed from the caller's network.
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Profile" }
+
+  /auth/pin:
+    post:
+      tags: [auth]
+      operationId: pinLogin
+      summary: Sign in by choosing a profile and entering its 4-digit PIN (managed profiles without a PIN need none).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PinLoginRequest" }
+      responses:
+        "200":
+          description: Signed in.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResult" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: Revoke the current session token.
+      responses:
+        "204": { description: Logged out. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /me:
+    get:
+      tags: [auth]
+      operationId: getMe
+      responses:
+        "200":
+          description: Current user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    patch:
+      tags: [auth]
+      operationId: updateMe
+      summary: Update your own profile, password, PIN or preferences.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MeUpdate" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /users:
+    get:
+      tags: [users]
+      operationId: listUsers
+      summary: All users (admin only).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [users]
+      operationId: createUser
+      summary: Create a user or managed profile (admin only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserCreate" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /users/{userId}:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    patch:
+      tags: [users]
+      operationId: updateUser
+      summary: Update a user (admin only). Omitted fields are unchanged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserUpdate" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      tags: [users]
+      operationId: deleteUser
+      summary: Delete a user and their devices, watch history and playlists (admin only). The last admin cannot be deleted.
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /profiles:
+    get:
+      tags: [users]
+      operationId: listProfiles
+      summary: Profiles that can be switched to from this device (Plex Home equivalent).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Profile" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /profiles/{userId}/switch:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    post:
+      tags: [users]
+      operationId: switchProfile
+      summary: Switch this device to another profile. Requires that profile's PIN (or password if it has no PIN).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SwitchProfileRequest" }
+      responses:
+        "200":
+          description: Switched; use the new token from now on.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResult" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /devices:
+    get:
+      tags: [users]
+      operationId: listDevices
+      summary: Signed-in devices. Admins see every user's devices; others see their own.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Device" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /devices/{deviceId}:
+    delete:
+      tags: [users]
+      operationId: revokeDevice
+      summary: Sign a device out.
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "204": { description: Signed out. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /search:
+    get:
+      tags: [search]
+      operationId: search
+      summary: Search titles across the libraries the user can access.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: limit
+          in: query
+          description: Maximum results per type.
+          schema: { type: integer, minimum: 1, maximum: 50, default: 10 }
+      responses:
+        "200":
+          description: Results grouped by item type, best matches first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SearchResults" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /settings:
+    get:
+      tags: [settings]
+      operationId: getSettings
+      summary: Server settings (admin only). Secret values are never returned, only whether they are set.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServerSettings" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    patch:
+      tags: [settings]
+      operationId: updateSettings
+      summary: Partially update settings (admin only). Omitted sections and fields are unchanged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ServerSettingsUpdate" }
+      responses:
+        "200":
+          description: Updated settings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServerSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /libraries:
+    get:
+      tags: [libraries]
+      operationId: listLibraries
+      summary: Libraries visible to the current user.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Library" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [libraries]
+      operationId: createLibrary
+      summary: Create a library (admin only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LibraryCreate" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Library" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /libraries/{libraryId}:
+    parameters:
+      - $ref: "#/components/parameters/LibraryId"
+    get:
+      tags: [libraries]
+      operationId: getLibrary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Library" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [libraries]
+      operationId: updateLibrary
+      summary: Update a library (admin only). Type cannot be changed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LibraryUpdate" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Library" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [libraries]
+      operationId: deleteLibrary
+      summary: Delete a library and its metadata (admin only). Media files are never touched.
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /libraries/{libraryId}/scan:
+    parameters:
+      - $ref: "#/components/parameters/LibraryId"
+    post:
+      tags: [libraries]
+      operationId: scanLibrary
+      summary: Queue a scan of one library (admin only). Returns immediately; poll the library for progress.
+      responses:
+        "202":
+          description: Queued (or already queued/running).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Library" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [libraries]
+      operationId: cancelLibraryScan
+      summary: Cancel a queued or running scan (admin only).
+      responses:
+        "204": { description: Cancelled. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /libraries/scan:
+    post:
+      tags: [libraries]
+      operationId: scanAllLibraries
+      summary: Queue a scan of every library (admin only).
+      responses:
+        "202": { description: Queued. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /libraries/{libraryId}/items:
+    parameters:
+      - $ref: "#/components/parameters/LibraryId"
+    get:
+      tags: [items]
+      operationId: listLibraryItems
+      summary: Top-level items of a library (movies, shows, artists or videos), or all items of a given type.
+      parameters:
+        - name: type
+          in: query
+          description: Item type to list. Defaults to the library's top-level type.
+          schema: { $ref: "#/components/schemas/ItemType" }
+        - $ref: "#/components/parameters/Sort"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [items]
+      operationId: getItem
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/metadata:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    patch:
+      tags: [items]
+      operationId: editItem
+      summary: Edit metadata fields (admin only). Edited fields are locked so agents won't overwrite them.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ItemEdit" }
+      responses:
+        "200":
+          description: Updated item.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/match:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [items]
+      operationId: searchMatches
+      summary: Candidate matches for Fix Match (admin only, movies and shows).
+      parameters:
+        - name: title
+          in: query
+          description: Defaults to the item's title.
+          schema: { type: string }
+        - name: year
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MatchCandidate" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [items]
+      operationId: applyMatch
+      summary: Match the item to a specific provider entry and refresh its metadata (admin only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MatchRequest" }
+      responses:
+        "200":
+          description: Matched.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/refresh:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    post:
+      tags: [items]
+      operationId: refreshItem
+      summary: Re-download metadata for a matched movie or show, keeping locked fields (admin only).
+      responses:
+        "200":
+          description: Refreshed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/children:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [items]
+      operationId: listItemChildren
+      summary: Seasons of a show, episodes of a season, albums of an artist, tracks of an album.
+      parameters:
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /images/{artworkId}:
+    get:
+      tags: [images]
+      operationId: getImage
+      summary: Artwork resized to a cached width. Responses are immutable (a changed image gets a new id).
+      description: Usable directly in <img> tags; authenticate with the `token` query parameter.
+      parameters:
+        - name: artworkId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+        - $ref: "#/components/parameters/ImageWidth"
+      responses:
+        "200":
+          description: Image.
+          headers:
+            Cache-Control: { schema: { type: string } }
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /people/{personId}/photo:
+    get:
+      tags: [images]
+      operationId: getPersonPhoto
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+        - $ref: "#/components/parameters/ImageWidth"
+      responses:
+        "200":
+          description: Image.
+          headers:
+            Cache-Control: { schema: { type: string } }
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /activity:
+    get:
+      tags: [activity]
+      operationId: getActivity
+      summary: What the server is doing right now (for the header activity indicator).
+      description: Administrators see background tasks. Playback sessions are added in M3.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Activity" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /logs:
+    get:
+      tags: [activity]
+      operationId: getLogs
+      summary: Recent server log lines, newest last (admin only).
+      parameters:
+        - name: level
+          in: query
+          description: Minimum level.
+          schema: { type: string, enum: [debug, info, warn, error], default: info }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 5000, default: 500 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/LogEntry" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /plex-import:
+    get:
+      tags: [plex]
+      operationId: getPlexImport
+      summary: Whether a Plex database is available, import progress and the last report (admin only).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlexImportStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [plex]
+      operationId: startPlexImport
+      summary: Start an import in the background (admin only). Safe to run again; nothing is duplicated.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlexImportRequest" }
+      responses:
+        "202":
+          description: Started.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlexImportStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /plex-import/preview:
+    post:
+      tags: [plex]
+      operationId: previewPlexImport
+      summary: Read a snapshot of the Plex database and show what an import would do (admin only).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pathMappings:
+                  type: array
+                  description: Leave out to use the suggested mappings.
+                  items: { $ref: "#/components/schemas/PlexPathMapping" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlexImportPreview" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /playback/sessions:
+    get:
+      tags: [playback]
+      operationId: listPlaybackSessions
+      summary: Active playback sessions. Administrators see everyone's; others see their own.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PlaybackSessionInfo" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [playback]
+      operationId: startPlayback
+      summary: Start playing an item. The server decides between direct play, direct stream and transcode for this device and network.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlaybackRequest" }
+      responses:
+        "200":
+          description: Ready to play.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlaybackSession" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503":
+          description: The server is at its transcode limit.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /playback/sessions/{sessionId}:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [playback]
+      operationId: reportPlayback
+      summary: Report position and state (every ~10 seconds, and on pause/seek). Updates resume points and watched status.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlaybackProgress" }
+      responses:
+        "204": { description: Recorded. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [playback]
+      operationId: stopPlayback
+      summary: Stop playback. Administrators can stop anyone's session.
+      responses:
+        "204": { description: Stopped. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /playback/bandwidth-test:
+    get:
+      tags: [playback]
+      operationId: bandwidthTest
+      summary: Random bytes for the client to time its download speed (used for automatic remote quality).
+      parameters:
+        - name: kb
+          in: query
+          schema: { type: integer, minimum: 16, maximum: 8192, default: 1024 }
+      responses:
+        "200":
+          description: Random data.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /items/{itemId}/watched:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    post:
+      tags: [items]
+      operationId: markWatched
+      summary: Mark watched (shows, seasons, artists and albums mark everything inside).
+      responses:
+        "204": { description: Marked. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [items]
+      operationId: markUnwatched
+      responses:
+        "204": { description: Marked unwatched. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/next:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [items]
+      operationId: nextItem
+      summary: The episode after this one (Up Next), if any.
+      responses:
+        "200":
+          description: Next episode.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemSummary" }
+        "204": { description: Nothing follows. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /hubs/home:
+    get:
+      tags: [hubs]
+      operationId: homeHubs
+      summary: Rows for the Home screen (Continue Watching, Recently Added…).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Hub" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /filesystem/browse:
+    get:
+      tags: [filesystem]
+      operationId: browseFilesystem
+      summary: List directories under the configured browse roots, for the library folder picker (admin only).
+      parameters:
+        - name: path
+          in: query
+          required: false
+          description: Directory to list. Omit to list the browse roots.
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DirectoryListing" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    ImageWidth:
+      name: w
+      in: query
+      description: Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920.
+      schema: { type: integer, minimum: 1, maximum: 3840 }
+    Sort:
+      name: sort
+      in: query
+      description: Sort order. Prefix with "-" for descending.
+      schema:
+        type: string
+        enum: [title, -title, added, -added, year, -year, released, -released]
+        default: title
+    Offset:
+      name: offset
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+    LibraryId:
+      name: libraryId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+
+  responses:
+    BadRequest:
+      description: Invalid request.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Not allowed for this user.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Not found.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Conflicts with current state.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    TooManyRequests:
+      description: Rate limited.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string, example: not_found }
+        message: { type: string }
+
+    NetworkClass:
+      type: string
+      description: How the server classified the caller's connection. Remote includes Tailscale.
+      enum: [local, remote]
+
+    SystemInfo:
+      type: object
+      required: [serverId, serverName, version, apiVersion, setupRequired, networkClass]
+      properties:
+        serverId: { type: string, description: Stable unique server identifier. }
+        serverName: { type: string }
+        version: { type: string }
+        apiVersion: { type: string, example: "1" }
+        setupRequired: { type: boolean }
+        networkClass: { $ref: "#/components/schemas/NetworkClass" }
+        pinSignIn: { type: boolean, description: The sign-in screen should offer the profile picker with PINs from this network. }
+
+    Health:
+      type: object
+      required: [status, checks]
+      properties:
+        status: { type: string, enum: [ok, degraded, error] }
+        checks:
+          type: object
+          additionalProperties: { type: string }
+
+    DeviceInfo:
+      type: object
+      required: [clientId, name, platform]
+      properties:
+        clientId: { type: string, description: Stable per-install identifier generated by the client. }
+        name: { type: string, example: Living Room Apple TV }
+        platform: { type: string, enum: [web, ios, ipados, tvos, android, androidtv, other] }
+        product: { type: string, example: Marquee for tvOS }
+        version: { type: string }
+
+    SetupRequest:
+      type: object
+      required: [serverName, username, password, device]
+      properties:
+        serverName: { type: string, minLength: 1, maxLength: 64 }
+        username: { type: string, minLength: 1, maxLength: 64 }
+        password: { type: string, minLength: 8, maxLength: 256 }
+        device: { $ref: "#/components/schemas/DeviceInfo" }
+
+    LoginRequest:
+      type: object
+      required: [username, password, device]
+      properties:
+        username: { type: string }
+        password: { type: string }
+        device: { $ref: "#/components/schemas/DeviceInfo" }
+
+    AuthResult:
+      type: object
+      required: [token, user]
+      properties:
+        token: { type: string }
+        user: { $ref: "#/components/schemas/User" }
+
+    User:
+      type: object
+      required: [id, username, displayName, isAdmin, isManaged, createdAt, restrictions, preferences]
+      properties:
+        id: { type: integer, format: int64 }
+        username: { type: string }
+        displayName: { type: string }
+        isAdmin: { type: boolean }
+        isManaged: { type: boolean, description: Managed profiles (e.g. children) sign in only by switching profile with a PIN. }
+        hasPin: { type: boolean }
+        hasPassword: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        lastSeenAt: { type: string, format: date-time }
+        restrictions: { $ref: "#/components/schemas/UserRestrictions" }
+        preferences: { $ref: "#/components/schemas/UserPreferences" }
+
+    UserRestrictions:
+      type: object
+      properties:
+        libraryIds:
+          type: array
+          nullable: true
+          description: Libraries this user can see. Null or absent = all libraries.
+          items: { type: integer, format: int64 }
+        maxContentRating:
+          type: string
+          nullable: true
+          description: Highest allowed rating, e.g. PG-13 or TV-14. Unrated items are hidden when set.
+          enum: [G, PG, PG-13, R, NC-17, TV-Y, TV-Y7, TV-G, TV-PG, TV-14, TV-MA, null]
+        allowRemote: { type: boolean, description: May stream from outside the home network. Default true. }
+        remoteQualityKbps: { type: integer, minimum: 0, description: Cap for remote streams. 0 = server default. }
+
+    UserPreferences:
+      type: object
+      properties:
+        audioLanguage: { type: string, description: ISO 639-2, e.g. eng, jpn }
+        subtitleLanguage: { type: string }
+        subtitleMode: { type: string, enum: [off, forced, foreign, always] }
+        localQualityKbps: { type: integer, minimum: 0, description: 0 = original }
+        remoteQualityKbps: { type: integer, minimum: 0, description: 0 = automatic }
+
+    UserCreate:
+      type: object
+      required: [username]
+      properties:
+        username: { type: string, minLength: 1, maxLength: 64 }
+        displayName: { type: string, maxLength: 64 }
+        password: { type: string, minLength: 8, maxLength: 256 }
+        pin: { type: string, pattern: "^[0-9]{4}$" }
+        isAdmin: { type: boolean }
+        isManaged: { type: boolean }
+        restrictions: { $ref: "#/components/schemas/UserRestrictions" }
+
+    UserUpdate:
+      description: Restrictions, when sent, replace the user's restrictions entirely.
+      type: object
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 64 }
+        password: { type: string, minLength: 8, maxLength: 256 }
+        pin: { type: string, pattern: "^([0-9]{4})?$", description: Empty string removes the PIN. }
+        isAdmin: { type: boolean }
+        restrictions: { $ref: "#/components/schemas/UserRestrictions" }
+
+    MeUpdate:
+      type: object
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 64 }
+        currentPassword: { type: string, description: Required to change the password. }
+        newPassword: { type: string, minLength: 8, maxLength: 256 }
+        pin: { type: string, pattern: "^([0-9]{4})?$" }
+        preferences: { $ref: "#/components/schemas/UserPreferences" }
+
+    Profile:
+      type: object
+      required: [id, displayName, isManaged, requires]
+      properties:
+        id: { type: integer, format: int64 }
+        displayName: { type: string }
+        isManaged: { type: boolean }
+        requires: { type: string, enum: [none, pin, password], description: What switching to this profile asks for. }
+
+    PinLoginRequest:
+      type: object
+      required: [userId, device]
+      properties:
+        userId: { type: integer, format: int64 }
+        pin: { type: string }
+        password: { type: string, description: For profiles that have a password but no PIN. }
+        device: { $ref: "#/components/schemas/DeviceInfo" }
+
+    SwitchProfileRequest:
+      type: object
+      required: [device]
+      properties:
+        pin: { type: string }
+        password: { type: string }
+        device: { $ref: "#/components/schemas/DeviceInfo" }
+
+    Device:
+      type: object
+      required: [id, userId, userName, name, platform, lastSeenAt, createdAt, current]
+      properties:
+        id: { type: integer, format: int64 }
+        userId: { type: integer, format: int64 }
+        userName: { type: string }
+        name: { type: string }
+        platform: { type: string }
+        product: { type: string }
+        version: { type: string }
+        lastIp: { type: string }
+        lastSeenAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        current: { type: boolean, description: This is the device making the request. }
+
+    SearchResults:
+      type: object
+      required: [query, groups]
+      properties:
+        query: { type: string }
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/SearchGroup" }
+
+    SearchGroup:
+      type: object
+      required: [type, items]
+      properties:
+        type: { $ref: "#/components/schemas/ItemType" }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ItemSummary" }
+
+    # ---------- Settings ----------
+    ServerSettings:
+      type: object
+      required: [general, network, remoteAccess, transcoder, library, metadata, tasks, security]
+      properties:
+        security: { $ref: "#/components/schemas/SecuritySettings" }
+        general: { $ref: "#/components/schemas/GeneralSettings" }
+        network: { $ref: "#/components/schemas/NetworkSettings" }
+        remoteAccess: { $ref: "#/components/schemas/RemoteAccessSettings" }
+        transcoder: { $ref: "#/components/schemas/TranscoderSettings" }
+        library: { $ref: "#/components/schemas/LibraryGlobalSettings" }
+        metadata: { $ref: "#/components/schemas/MetadataSettings" }
+        tasks: { $ref: "#/components/schemas/TaskSettings" }
+
+    ServerSettingsUpdate:
+      type: object
+      properties:
+        security: { $ref: "#/components/schemas/SecuritySettings" }
+        general: { $ref: "#/components/schemas/GeneralSettings" }
+        network: { $ref: "#/components/schemas/NetworkSettings" }
+        remoteAccess: { $ref: "#/components/schemas/RemoteAccessSettings" }
+        transcoder: { $ref: "#/components/schemas/TranscoderSettings" }
+        library: { $ref: "#/components/schemas/LibraryGlobalSettings" }
+        metadata: { $ref: "#/components/schemas/MetadataSettingsUpdate" }
+        tasks: { $ref: "#/components/schemas/TaskSettings" }
+
+    SecuritySettings:
+      type: object
+      properties:
+        pinSignIn:
+          type: string
+          enum: [off, local, everywhere]
+          description: Where profiles can sign in with a 4-digit PIN. "local" = home network only (recommended).
+
+    GeneralSettings:
+      type: object
+      properties:
+        serverName: { type: string, minLength: 1, maxLength: 64 }
+        metadataLanguage: { type: string, example: en-US }
+
+    NetworkSettings:
+      type: object
+      properties:
+        lanSubnets:
+          type: array
+          description: CIDRs treated as the local network. Everything else (including Tailscale) is remote.
+          items: { type: string, example: 10.1.1.0/24 }
+        lanUrl:
+          type: string
+          description: Address advertised to local clients.
+          example: http://10.1.1.10:32500
+        bonjourEnabled: { type: boolean }
+
+    RemoteAccessSettings:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        remoteUrl:
+          type: string
+          description: Address advertised to remote clients (e.g. the Tailscale serve URL).
+          example: https://tower.example-tailnet.ts.net
+        uploadSpeedKbps:
+          type: integer
+          minimum: 0
+          description: Server's internet upload speed. Divided fairly across remote streams. 0 = unknown.
+        totalRemoteLimitKbps: { type: integer, minimum: 0, description: 0 = unlimited. }
+        perStreamRemoteLimitKbps: { type: integer, minimum: 0, description: 0 = unlimited. }
+        minStreamKbps: { type: integer, minimum: 0, description: Floor when sharing the upload budget. }
+
+    EncoderKind:
+      type: string
+      enum: [nvenc, qsv, vaapi, software]
+
+    QualityRung:
+      type: object
+      required: [label, maxHeight, videoKbps]
+      properties:
+        label: { type: string, example: 1080p 8 Mbps }
+        maxHeight: { type: integer, example: 1080 }
+        videoKbps: { type: integer, example: 8000 }
+
+    TranscoderSettings:
+      type: object
+      properties:
+        encoderOrder:
+          type: array
+          items: { $ref: "#/components/schemas/EncoderKind" }
+        maxConcurrentTranscodes: { type: integer, minimum: 1 }
+        preset: { type: string, enum: [speed, balanced, quality] }
+        preferHevcRemote: { type: boolean }
+        toneMapping: { type: boolean }
+        throttleSegmentsAhead: { type: integer, minimum: 2 }
+        remoteLadder:
+          type: array
+          items: { $ref: "#/components/schemas/QualityRung" }
+
+    LibraryGlobalSettings:
+      type: object
+      properties:
+        watchFilesystem: { type: boolean }
+        scanOnStartup: { type: boolean }
+        ignorePatterns:
+          type: array
+          items: { type: string, example: "*_staging.*" }
+        browseRoots:
+          type: array
+          description: Directories the folder picker may browse.
+          items: { type: string, example: /media }
+        watchedThresholdPercent: { type: integer, minimum: 50, maximum: 100 }
+
+    MetadataSettings:
+      type: object
+      properties:
+        tmdbApiKeySet: { type: boolean, readOnly: true }
+        fanartApiKeySet: { type: boolean, readOnly: true }
+        openSubtitlesApiKeySet: { type: boolean, readOnly: true }
+        omdbApiKeySet: { type: boolean, readOnly: true }
+        omdbDailyLimit: { type: integer, minimum: 1, description: Requests per day (free OMDb keys allow 1000). }
+        animeEpisodeOrdering: { type: string, enum: [seasonal, absolute] }
+
+    MetadataSettingsUpdate:
+      type: object
+      description: Secret keys are write-only. Send an empty string to clear one.
+      properties:
+        tmdbApiKey: { type: string }
+        fanartApiKey: { type: string }
+        openSubtitlesApiKey: { type: string }
+        omdbApiKey: { type: string }
+        omdbDailyLimit: { type: integer, minimum: 1 }
+        animeEpisodeOrdering: { type: string, enum: [seasonal, absolute] }
+
+    TaskSettings:
+      type: object
+      properties:
+        maintenanceWindowStart: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", example: "03:00" }
+        maintenanceWindowHours: { type: integer, minimum: 1, maximum: 12 }
+        backupRetention: { type: integer, minimum: 1, maximum: 60 }
+
+    # ---------- Libraries ----------
+    LibraryType:
+      type: string
+      enum: [movies, shows, anime, music, videos, photos]
+
+    LibraryOptions:
+      type: object
+      properties:
+        language: { type: string, example: en-US }
+        episodeOrdering: { type: string, enum: [aired, absolute, dvd], description: TV/anime only. }
+        ignorePatterns:
+          type: array
+          items: { type: string }
+        includeInHome: { type: boolean }
+        includeInSearch: { type: boolean }
+        scanIntervalHours: { type: integer, minimum: 0, description: 0 = rely on file watching only. }
+
+    Library:
+      type: object
+      required: [id, name, type, paths, options, itemCount, createdAt, updatedAt, scanStatus]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        type: { $ref: "#/components/schemas/LibraryType" }
+        paths:
+          type: array
+          items: { type: string }
+        options: { $ref: "#/components/schemas/LibraryOptions" }
+        itemCount: { type: integer }
+        scanStatus: { type: string, enum: [idle, queued, scanning] }
+        scanProgress: { $ref: "#/components/schemas/ScanProgress" }
+        lastScanResult: { type: string, description: "Summary of the last scan, e.g. 6596 files: 12 added…" }
+        lastScanError: { type: string }
+        lastScannedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    LibraryCreate:
+      type: object
+      required: [name, type, paths]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 64 }
+        type: { $ref: "#/components/schemas/LibraryType" }
+        paths:
+          type: array
+          minItems: 1
+          items: { type: string }
+        options: { $ref: "#/components/schemas/LibraryOptions" }
+
+    LibraryUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 64 }
+        paths:
+          type: array
+          minItems: 1
+          items: { type: string }
+        options: { $ref: "#/components/schemas/LibraryOptions" }
+
+    ScanProgress:
+      type: object
+      required: [phase, done, total]
+      properties:
+        phase: { type: string, enum: [walking, probing, cleanup, metadata] }
+        done: { type: integer }
+        total: { type: integer }
+        current: { type: string, description: File currently being processed (relative path). }
+
+    # ---------- Activity ----------
+    Activity:
+      type: object
+      required: [tasks, serverVersion]
+      properties:
+        serverVersion: { type: string, description: Lets clients notice a server upgrade and reload. }
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/ActivityTask" }
+
+    ActivityTask:
+      type: object
+      required: [id, kind, title, state]
+      properties:
+        id: { type: string, description: "Stable id, e.g. scan:3" }
+        kind: { type: string, enum: [scan, import, stream] }
+        title: { type: string, example: Scanning Movies }
+        state: { type: string, enum: [queued, running] }
+        libraryId: { type: integer, format: int64 }
+        progress: { $ref: "#/components/schemas/ScanProgress" }
+
+    LogEntry:
+      type: object
+      required: [time, level, message]
+      properties:
+        time: { type: string, format: date-time }
+        level: { type: string, enum: [debug, info, warn, error] }
+        message: { type: string }
+        attrs:
+          type: object
+          additionalProperties: { type: string }
+
+    # ---------- Plex import ----------
+    PlexPathMapping:
+      type: object
+      required: [plexPath, marqueePath]
+      properties:
+        plexPath: { type: string, example: /movies }
+        marqueePath: { type: string, example: /media/video/Movies }
+
+    PlexSectionPreview:
+      type: object
+      required: [id, name, type, roots, files, matchedFiles]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        type: { type: string, enum: [movies, shows, music, other] }
+        roots: { type: array, items: { type: string } }
+        libraryId: { type: integer, format: int64, description: Marquee library it pairs with. }
+        files: { type: integer }
+        matchedFiles: { type: integer }
+
+    PlexAccountPreview:
+      type: object
+      required: [id, name, isOwner, watched, inProgress, ratings, history, playlists, suggestedAction]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        isOwner: { type: boolean }
+        watched: { type: integer }
+        inProgress: { type: integer }
+        ratings: { type: integer }
+        history: { type: integer }
+        playlists: { type: integer }
+        suggestedAction: { type: string, enum: [create, link, skip] }
+        suggestedUserId: { type: integer, format: int64 }
+        suggestedUsername: { type: string }
+
+    PlexImportPreview:
+      type: object
+      required: [sections, accounts, pathMappings, files, matchedFiles, unmatchedSample]
+      properties:
+        sections: { type: array, items: { $ref: "#/components/schemas/PlexSectionPreview" } }
+        accounts: { type: array, items: { $ref: "#/components/schemas/PlexAccountPreview" } }
+        pathMappings: { type: array, items: { $ref: "#/components/schemas/PlexPathMapping" } }
+        files: { type: integer }
+        matchedFiles: { type: integer }
+        unmatchedSample: { type: array, items: { type: string } }
+
+    PlexAccountChoice:
+      type: object
+      required: [plexId, action]
+      properties:
+        plexId: { type: integer, format: int64 }
+        action: { type: string, enum: [create, link, merge, skip], description: "merge: combine with another Plex account in this import (one person with several Plex accounts)." }
+        userId: { type: integer, format: int64, description: Marquee user to link to. }
+        username: { type: string, description: Username for a new user. }
+        mergeInto: { type: integer, format: int64, description: Plex account id whose Marquee user this account joins. }
+
+    PlexImportRequest:
+      type: object
+      required: [pathMappings, accounts]
+      properties:
+        pathMappings: { type: array, items: { $ref: "#/components/schemas/PlexPathMapping" } }
+        accounts: { type: array, items: { $ref: "#/components/schemas/PlexAccountChoice" } }
+        include: { $ref: "#/components/schemas/PlexImportInclude" }
+
+    PlexImportInclude:
+      type: object
+      description: What to import. Everything defaults to true.
+      properties:
+        matches: { type: boolean }
+        watchState: { type: boolean }
+        history: { type: boolean }
+        playlists: { type: boolean }
+        markers: { type: boolean }
+        artwork: { type: boolean }
+
+    PlexImportReport:
+      type: object
+      required: [startedAt, finishedAt, files, matchedFiles, unmatchedSample, usersCreated, usersLinked, matchesAgreed, matchesApplied,
+        matchesKept, matchFailures, artwork, artworkMissing, watchStateItems, ratings, historyImported, historySkipped, markers,
+        playlists, playlistItems, playlistItemsMissing, warnings]
+      properties:
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time }
+        files: { type: integer }
+        matchedFiles: { type: integer }
+        unmatchedSample: { type: array, items: { type: string } }
+        usersCreated: { type: integer }
+        usersLinked: { type: integer }
+        matchesAgreed: { type: integer }
+        matchesApplied: { type: integer }
+        matchesKept: { type: array, items: { type: string }, description: Disagreements where Marquee's match was kept; review with Fix Match. }
+        matchFailures: { type: array, items: { type: string } }
+        artwork: { type: integer }
+        artworkMissing: { type: integer }
+        watchStateItems: { type: integer }
+        ratings: { type: integer }
+        historyImported: { type: integer }
+        historySkipped: { type: integer }
+        markers: { type: integer }
+        playlists: { type: integer }
+        playlistItems: { type: integer }
+        playlistItemsMissing: { type: integer }
+        warnings: { type: array, items: { type: string } }
+
+    PlexImportStatus:
+      type: object
+      required: [available, running]
+      properties:
+        available: { type: boolean, description: A Plex database was found at the Plex data mount (/plex). }
+        databasePath: { type: string }
+        running: { type: boolean }
+        progress:
+          type: object
+          required: [step, done, total]
+          properties:
+            step: { type: string }
+            done: { type: integer }
+            total: { type: integer }
+        lastError: { type: string }
+        lastReport: { $ref: "#/components/schemas/PlexImportReport" }
+
+    # ---------- Playback ----------
+    DeviceProfile:
+      type: object
+      description: What the client can play. Codec names follow ffprobe (h264, hevc, av1, vp9, aac, ac3, eac3, opus, flac, mp3…).
+      required: [containers, videoCodecs, audioCodecs, hls, hlsVideoCodecs, hlsAudioCodecs]
+      properties:
+        containers: { type: array, items: { type: string }, description: Containers playable from a file URL (mp4, webm, mkv…). }
+        videoCodecs: { type: array, items: { type: string } }
+        audioCodecs: { type: array, items: { type: string } }
+        maxAudioChannels: { type: integer }
+        maxHeight: { type: integer }
+        tenBit: { type: boolean }
+        hdr: { type: array, items: { type: string, enum: [hdr10, hdr10plus, hlg, dolby_vision] } }
+        hls: { type: boolean }
+        hlsVideoCodecs: { type: array, items: { type: string } }
+        hlsAudioCodecs: { type: array, items: { type: string } }
+        textSubtitles: { type: boolean, description: Can show WebVTT sidecar subtitles. }
+
+    PlaybackRequest:
+      type: object
+      required: [itemId, profile]
+      properties:
+        itemId: { type: integer, format: int64 }
+        fileId: { type: integer, format: int64, description: A specific version/file. Default is the best available. }
+        audioStreamId: { type: integer, format: int64 }
+        subtitleStreamId: { type: integer, format: int64, description: "-1 turns subtitles off; omit for automatic (the user's subtitle preference)." }
+        startMs: { type: integer, format: int64, description: Omit to resume where the user left off. }
+        maxBitrateKbps: { type: integer, description: "The app's quality setting; 0/omitted = original (home) or automatic (remote)." }
+        measuredKbps: { type: integer, description: Measured download speed from /playback/bandwidth-test. }
+        profile: { $ref: "#/components/schemas/DeviceProfile" }
+
+    PlaybackDecision:
+      type: object
+      required: [method, summary, reasons, videoCopy, audioCopy, burnSubtitle, toneMap]
+      properties:
+        method: { type: string, enum: [direct_play, direct_stream, transcode] }
+        summary: { type: string, example: Transcode h264 720p 3800 kbps }
+        reasons: { type: array, items: { type: string } }
+        videoCopy: { type: boolean }
+        videoCodec: { type: string }
+        height: { type: integer }
+        videoKbps: { type: integer }
+        audioCopy: { type: boolean }
+        audioCodec: { type: string }
+        audioChannels: { type: integer }
+        burnSubtitle: { type: boolean }
+        toneMap: { type: boolean }
+
+    Marker:
+      type: object
+      required: [kind, startMs, endMs]
+      properties:
+        kind: { type: string, enum: [intro, credits] }
+        startMs: { type: integer, format: int64 }
+        endMs: { type: integer, format: int64 }
+
+    PlaybackSession:
+      type: object
+      required: [id, itemId, url, protocol, startMs, durationMs, decision, networkClass, markers]
+      properties:
+        id: { type: string }
+        itemId: { type: integer, format: int64 }
+        fileId: { type: integer, format: int64 }
+        url: { type: string, description: "Path to play: a file (direct play), progressive audio, or an HLS master playlist." }
+        protocol: { type: string, enum: [file, hls, progressive] }
+        startMs: { type: integer, format: int64, description: Where to start (the resume position unless startMs was given). }
+        durationMs: { type: integer, format: int64 }
+        decision: { $ref: "#/components/schemas/PlaybackDecision" }
+        limitKbps: { type: integer, description: Bitrate ceiling applied; absent = none. }
+        limitReason: { type: string }
+        networkClass: { $ref: "#/components/schemas/NetworkClass" }
+        audioStreamId: { type: integer, format: int64 }
+        subtitleStreamId: { type: integer, format: int64 }
+        subtitleUrl: { type: string, description: WebVTT for the selected text subtitle (absent when burned in or off). }
+        markers: { type: array, items: { $ref: "#/components/schemas/Marker" } }
+
+    PlaybackProgress:
+      type: object
+      required: [positionMs, state]
+      properties:
+        positionMs: { type: integer, format: int64 }
+        state: { type: string, enum: [playing, paused, buffering, error] }
+        error: { type: string, description: "With state error: what the player reported (logged on the server for diagnosis)." }
+
+    PlaybackSessionInfo:
+      type: object
+      required: [id, userId, userName, deviceName, itemId, itemType, title, method, summary, networkClass, positionMs, durationMs, state, bitrateKbps, startedAt]
+      properties:
+        id: { type: string }
+        userId: { type: integer, format: int64 }
+        userName: { type: string }
+        deviceName: { type: string }
+        clientIp: { type: string }
+        itemId: { type: integer, format: int64 }
+        itemType: { $ref: "#/components/schemas/ItemType" }
+        title: { type: string }
+        method: { type: string, enum: [direct_play, direct_stream, transcode] }
+        summary: { type: string }
+        reasons: { type: array, items: { type: string } }
+        encoder: { type: string }
+        networkClass: { $ref: "#/components/schemas/NetworkClass" }
+        positionMs: { type: integer, format: int64 }
+        durationMs: { type: integer, format: int64 }
+        state: { type: string }
+        bitrateKbps: { type: integer }
+        startedAt: { type: string, format: date-time }
+
+    Hub:
+      type: object
+      required: [id, title, items]
+      properties:
+        id: { type: string, example: continue-watching }
+        title: { type: string }
+        libraryId: { type: integer, format: int64 }
+        items: { type: array, items: { $ref: "#/components/schemas/ItemSummary" } }
+
+    # ---------- Items ----------
+    ItemType:
+      type: string
+      enum: [movie, show, season, episode, artist, album, track, video]
+
+    ItemSummary:
+      type: object
+      required: [id, libraryId, type, title, childCount, leafCount, available, matchState, addedAt]
+      properties:
+        id: { type: integer, format: int64 }
+        libraryId: { type: integer, format: int64 }
+        type: { $ref: "#/components/schemas/ItemType" }
+        title: { type: string }
+        originalTitle: { type: string }
+        year: { type: integer }
+        index: { type: integer, description: Season, episode or track number. }
+        absoluteIndex: { type: integer, description: Absolute episode number (anime). }
+        disc: { type: integer }
+        parentId: { type: integer, format: int64 }
+        grandparentId: { type: integer, format: int64 }
+        parentTitle: { type: string }
+        grandparentTitle: { type: string }
+        artistCredit: { type: string, description: Track or album artist as credited. }
+        childCount: { type: integer }
+        leafCount: { type: integer }
+        durationMs: { type: integer, format: int64 }
+        originallyAvailableAt: { type: string, format: date }
+        available: { type: boolean, description: False when all of the item's files are missing (e.g. an offline drive). }
+        matchState: { type: string, enum: [unmatched, matched, local, failed] }
+        addedAt: { type: string, format: date-time }
+        images: { $ref: "#/components/schemas/ItemImages" }
+        viewOffsetMs: { type: integer, format: int64, description: Resume position for the current user. }
+        viewCount: { type: integer }
+        lastViewedAt: { type: string, format: date-time }
+        watchedLeafCount: { type: integer, description: "Shows, seasons, artists, albums: how many episodes/tracks the user has watched." }
+
+    ItemImages:
+      type: object
+      description: Artwork ids for /images/{artworkId}. Seasons and episodes fall back to the show's art, tracks to the album's.
+      properties:
+        poster: { type: integer, format: int64 }
+        backdrop: { type: integer, format: int64 }
+        thumb: { type: integer, format: int64 }
+        logo: { type: integer, format: int64 }
+
+    ItemEdit:
+      type: object
+      description: Fields to change. Each changed field is locked. List fields in unlock to hand them back to the agents.
+      properties:
+        title: { type: string, minLength: 1, maxLength: 300 }
+        sortTitle: { type: string, maxLength: 300 }
+        originalTitle: { type: string, maxLength: 300 }
+        year: { type: integer, minimum: 1800, maximum: 2200 }
+        originallyAvailableAt: { type: string, format: date }
+        summary: { type: string, maxLength: 10000 }
+        tagline: { type: string, maxLength: 500 }
+        contentRating: { type: string, maxLength: 20 }
+        studio: { type: string, maxLength: 200 }
+        unlock:
+          type: array
+          items: { type: string, enum: [title, sortTitle, originalTitle, year, originallyAvailableAt, summary, tagline, contentRating, studio] }
+
+    MatchCandidate:
+      type: object
+      required: [provider, id, title]
+      properties:
+        provider: { type: string, enum: [tmdb] }
+        id: { type: string }
+        title: { type: string }
+        originalTitle: { type: string }
+        year: { type: integer }
+        overview: { type: string }
+        posterUrl: { type: string, description: Small poster hosted by the provider. }
+        current: { type: boolean, description: The item is currently matched to this entry. }
+
+    MatchRequest:
+      type: object
+      required: [provider, id]
+      properties:
+        provider: { type: string, enum: [tmdb] }
+        id: { type: string }
+
+    Ratings:
+      type: object
+      description: External ratings (OMDb). Absent values are unknown.
+      properties:
+        imdb: { type: number, description: "0–10" }
+        imdbVotes: { type: integer }
+        rottenTomatoes: { type: integer, description: Tomatometer critic score 0–100 }
+        metacritic: { type: integer, description: "0–100" }
+
+    Credit:
+      type: object
+      required: [personId, name, role]
+      properties:
+        personId: { type: integer, format: int64 }
+        name: { type: string }
+        role: { type: string, enum: [actor, director, writer, creator, producer, composer] }
+        character: { type: string }
+        hasPhoto: { type: boolean }
+
+    ItemPage:
+      type: object
+      required: [items, total, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ItemSummary" }
+        total: { type: integer }
+        offset: { type: integer }
+
+    ItemDetail:
+      allOf:
+        - $ref: "#/components/schemas/ItemSummary"
+        - type: object
+          required: [genres, externalIds, versions, chapters, credits, lockedFields]
+          properties:
+            lockedFields:
+              type: array
+              description: Fields edited by an administrator; agents never overwrite them.
+              items: { type: string }
+            summary: { type: string }
+            audienceRating: { type: number, description: "TMDB user score, 0–10" }
+            ratings: { $ref: "#/components/schemas/Ratings" }
+            credits:
+              type: array
+              items: { $ref: "#/components/schemas/Credit" }
+            tagline: { type: string }
+            contentRating: { type: string }
+            studio: { type: string }
+            genres:
+              type: array
+              items: { type: string }
+            externalIds:
+              type: object
+              additionalProperties: { type: string }
+              description: "Provider → ID, e.g. tmdb: 603, imdb: tt0133093."
+            versions:
+              type: array
+              items: { $ref: "#/components/schemas/MediaVersion" }
+            chapters:
+              type: array
+              items: { $ref: "#/components/schemas/Chapter" }
+
+    MediaVersion:
+      type: object
+      required: [id, label, files]
+      properties:
+        id: { type: integer, format: int64 }
+        label: { type: string }
+        files:
+          type: array
+          items: { $ref: "#/components/schemas/MediaFile" }
+
+    MediaFile:
+      type: object
+      required: [id, size, available, partIndex, streams]
+      properties:
+        id: { type: integer, format: int64 }
+        path: { type: string, description: Absolute path inside the server. Only returned to administrators. }
+        size: { type: integer, format: int64 }
+        container: { type: string }
+        durationMs: { type: integer, format: int64 }
+        bitrateKbps: { type: integer }
+        width: { type: integer }
+        height: { type: integer }
+        videoCodec: { type: string }
+        audioCodec: { type: string }
+        hdrFormat: { type: string, enum: [hdr10, hdr10plus, hlg, dolby_vision] }
+        dvProfile: { type: integer }
+        partIndex: { type: integer }
+        available: { type: boolean }
+        streams:
+          type: array
+          items: { $ref: "#/components/schemas/MediaStream" }
+
+    MediaStream:
+      type: object
+      required: [id, kind, codec, default, forced, hearingImpaired, external]
+      properties:
+        id: { type: integer, format: int64 }
+        kind: { type: string, enum: [video, audio, subtitle] }
+        codec: { type: string }
+        profile: { type: string }
+        language: { type: string, description: ISO 639-2 code. }
+        title: { type: string }
+        default: { type: boolean }
+        forced: { type: boolean }
+        hearingImpaired: { type: boolean }
+        external: { type: boolean, description: Sidecar subtitle file. }
+        channels: { type: integer }
+        channelLayout: { type: string }
+        sampleRate: { type: integer }
+        bitrateKbps: { type: integer }
+        width: { type: integer }
+        height: { type: integer }
+        frameRate: { type: number }
+        bitDepth: { type: integer }
+
+    Chapter:
+      type: object
+      required: [startMs, endMs]
+      properties:
+        title: { type: string }
+        startMs: { type: integer, format: int64 }
+        endMs: { type: integer, format: int64 }
+
+    # ---------- Filesystem ----------
+    DirectoryEntry:
+      type: object
+      required: [name, path]
+      properties:
+        name: { type: string }
+        path: { type: string }
+
+    DirectoryListing:
+      type: object
+      required: [entries]
+      properties:
+        path: { type: string, nullable: true, description: Null when listing the browse roots. }
+        parent: { type: string, nullable: true, description: Null at a browse root. }
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/DirectoryEntry" }
