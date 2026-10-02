@@ -282,6 +282,21 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /items/{itemId}/watched`.
     /// - Remark: Generated from `#/paths//items/{itemId}/watched/delete(markUnwatched)`.
     func markUnwatched(_ input: Operations.MarkUnwatched.Input) async throws -> Operations.MarkUnwatched.Output
+    /// Search OpenSubtitles for a movie's or episode's subtitles (PLAY-7). Results made for this exact file come first.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/subtitles/search`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/subtitles/search/get(searchSubtitles)`.
+    func searchSubtitles(_ input: Operations.SearchSubtitles.Input) async throws -> Operations.SearchSubtitles.Output
+    /// Download a subtitle from OpenSubtitles and add it to the item's subtitle choices.
+    ///
+    /// - Remark: HTTP `POST /items/{itemId}/subtitles`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/subtitles/post(downloadSubtitle)`.
+    func downloadSubtitle(_ input: Operations.DownloadSubtitle.Input) async throws -> Operations.DownloadSubtitle.Output
+    /// Remove a downloaded subtitle (admin only).
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/subtitles/{streamId}`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/subtitles/{streamId}/delete(removeSubtitle)`.
+    func removeSubtitle(_ input: Operations.RemoveSubtitle.Input) async throws -> Operations.RemoveSubtitle.Output
     /// Save to your watchlist (USER-8). Movies and episodes leave it once watched.
     ///
     /// - Remark: HTTP `PUT /items/{itemId}/watchlist`.
@@ -1144,6 +1159,49 @@ extension APIProtocol {
         headers: Operations.MarkUnwatched.Input.Headers = .init()
     ) async throws -> Operations.MarkUnwatched.Output {
         try await markUnwatched(Operations.MarkUnwatched.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Search OpenSubtitles for a movie's or episode's subtitles (PLAY-7). Results made for this exact file come first.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/subtitles/search`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/subtitles/search/get(searchSubtitles)`.
+    public func searchSubtitles(
+        path: Operations.SearchSubtitles.Input.Path,
+        query: Operations.SearchSubtitles.Input.Query = .init(),
+        headers: Operations.SearchSubtitles.Input.Headers = .init()
+    ) async throws -> Operations.SearchSubtitles.Output {
+        try await searchSubtitles(Operations.SearchSubtitles.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Download a subtitle from OpenSubtitles and add it to the item's subtitle choices.
+    ///
+    /// - Remark: HTTP `POST /items/{itemId}/subtitles`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/subtitles/post(downloadSubtitle)`.
+    public func downloadSubtitle(
+        path: Operations.DownloadSubtitle.Input.Path,
+        headers: Operations.DownloadSubtitle.Input.Headers = .init(),
+        body: Operations.DownloadSubtitle.Input.Body
+    ) async throws -> Operations.DownloadSubtitle.Output {
+        try await downloadSubtitle(Operations.DownloadSubtitle.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Remove a downloaded subtitle (admin only).
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/subtitles/{streamId}`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/subtitles/{streamId}/delete(removeSubtitle)`.
+    public func removeSubtitle(
+        path: Operations.RemoveSubtitle.Input.Path,
+        headers: Operations.RemoveSubtitle.Input.Headers = .init()
+    ) async throws -> Operations.RemoveSubtitle.Output {
+        try await removeSubtitle(Operations.RemoveSubtitle.Input(
             path: path,
             headers: headers
         ))

@@ -208,5 +208,33 @@ extension Components {
                 self.body = body
             }
         }
+        public struct BadGateway: Sendable, Hashable {
+            /// - Remark: Generated from `#/components/responses/BadGateway/content`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/components/responses/BadGateway/content/application\/json`.
+                case json(Components.Schemas._Error)
+                /// The associated value of the enum case if `self` is `.json`.
+                ///
+                /// - Throws: An error if `self` is not `.json`.
+                /// - SeeAlso: `.json`.
+                public var json: Components.Schemas._Error {
+                    get throws {
+                        switch self {
+                        case let .json(body):
+                            return body
+                        }
+                    }
+                }
+            }
+            /// Received HTTP response body
+            public var body: Components.Responses.BadGateway.Body
+            /// Creates a new `BadGateway`.
+            ///
+            /// - Parameters:
+            ///   - body: Received HTTP response body
+            public init(body: Components.Responses.BadGateway.Body) {
+                self.body = body
+            }
+        }
     }
 }

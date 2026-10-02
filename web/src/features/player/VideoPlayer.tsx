@@ -5,12 +5,13 @@ import Hls from "hls.js";
 import { ArrowLeft, Captions, Info, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, Settings2, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, imageUrl, session as authSession, trickplaySheetUrl, unwrap } from "@/api/client";
-import { itemQuery, systemInfoQuery } from "@/api/queries";
+import { itemQuery, meQuery, systemInfoQuery } from "@/api/queries";
 import type { components } from "@/api/schema.gen";
 import type { ItemDetail, ItemSummary, MediaStream, Trickplay } from "@/api/types";
 import { Spinner } from "@/components/ui";
 import { languageName } from "../browse/format";
 import { deviceProfile } from "./deviceProfile";
+import { SubtitleSearchDialog } from "./SubtitleSearch";
 
 type PlaybackSession = components["schemas"]["PlaybackSession"];
 
@@ -84,6 +85,7 @@ export function VideoPlayer({ itemId, startMs, playlistId }: { itemId: number; s
   const navigate = useNavigate();
   const qc = useQueryClient();
   const item = useQuery(itemQuery(itemId));
+  const me = useQuery(meQuery);
   const trickplay = useQuery({
     queryKey: ["trickplay", itemId],
     queryFn: () => unwrap(api.GET("/items/{itemId}/trickplay", { params: { path: { itemId } } })),
@@ -316,6 +318,7 @@ export function VideoPlayer({ itemId, startMs, playlistId }: { itemId: number; s
       .catch(() => setNext(null));
   }, [item.data?.type, itemId, playlistId]);
 
+  const [finding, setFinding] = useState(false);
   const restart = (patch: Partial<Selection>) => {
     const v = videoRef.current;
     setRestartAt(v ? Math.round(v.currentTime * 1000) : 0);
@@ -476,6 +479,17 @@ export function VideoPlayer({ itemId, startMs, playlistId }: { itemId: number; s
 
       {/* Up Next */}
       {showUpNext && next && <UpNext next={next} onPlay={playNext} onDismiss={() => setNextDismissed(true)} secondsLeft={Math.max(0, Math.ceil(duration - time))} />}
+      {finding && (
+        <SubtitleSearchDialog
+          itemId={itemId}
+          preferred={me.data?.preferences?.subtitleLanguage}
+          onClose={() => setFinding(false)}
+          onAdded={(id) => {
+            setFinding(false);
+            restart({ subtitle: id });
+          }}
+        />
+      )}
 
       {/* Bottom controls */}
       <div className={clsx("absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-6 pt-16 pb-5 transition-opacity", chrome ? "opacity-100" : "pointer-events-none opacity-0")}>
@@ -561,6 +575,16 @@ export function VideoPlayer({ itemId, startMs, playlistId }: { itemId: number; s
                   {s.external ? " · External" : ""}
                 </MenuItem>
               ))}
+              {(item.data?.type === "movie" || item.data?.type === "episode") && (
+                <MenuItem
+                  onClick={() => {
+                    setMenu(null);
+                    setFinding(true);
+                  }}
+                >
+                  Find subtitles…
+                </MenuItem>
+              )}
             </>
           )}
           {menu === "settings" && (

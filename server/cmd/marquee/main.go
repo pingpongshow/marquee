@@ -39,6 +39,7 @@ import (
 	"marquee/internal/server"
 	"marquee/internal/settings"
 	"marquee/internal/sonic"
+	"marquee/internal/subtitles"
 	"marquee/internal/tasks"
 	"marquee/internal/trickplay"
 	"marquee/internal/watcher"
@@ -267,6 +268,11 @@ func run() error {
 	scheduler.Register(tasks.Task{ID: "intros", Name: "Find intros and credits", Window: true, Bounded: true,
 		Description: "Compares the audio of episodes in each season to find intros and end credits for Skip Intro and Skip Credits.",
 		Run:         intros.Run, Progress: intros.Progress})
+	subs := &subtitles.Service{DB: database, Dir: filepath.Join(cfg.ConfigDir, "subtitles"), Config: func() subtitles.Config {
+		m := store.Get().Metadata
+		return subtitles.Config{APIKey: m.OpenSubtitlesAPIKey, Username: m.OpenSubtitlesUser, Password: m.OpenSubtitlesPass,
+			UserAgent: "Marquee v" + config.Version, Base: os.Getenv("MARQUEE_OPENSUBTITLES_URL")}
+	}}
 	lyricsSvc := &lyrics.Service{DB: database, Online: func() bool { return store.Get().Music.OnlineLyrics }}
 	go scheduler.Run(ctx)
 
@@ -284,7 +290,7 @@ func run() error {
 		Handlers: &api.Handlers{
 			DB: database, Auth: authSvc, Settings: store, Libraries: libraries,
 			Items: items.NewStore(database), Scans: scans, Version: config.Version,
-			Tasks: scheduler, Trickplay: trick, Webhooks: hooks, Backups: backups, Restart: stop, Sonic: sonicSvc, Lyrics: lyricsSvc,
+			Tasks: scheduler, Trickplay: trick, Webhooks: hooks, Subtitles: subs, Backups: backups, Restart: stop, Sonic: sonicSvc, Lyrics: lyricsSvc,
 			Avatars:  &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
 			Images:   images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
 			Logs:     logs,

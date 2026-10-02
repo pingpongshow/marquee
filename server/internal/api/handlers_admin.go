@@ -58,12 +58,14 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			DetectIntros:            ptr(s.Library.DetectIntros),
 		},
 		Metadata: MetadataSettings{
-			TmdbApiKeySet:          ptr(s.Metadata.TMDBAPIKey != ""),
-			FanartApiKeySet:        ptr(s.Metadata.FanartAPIKey != ""),
-			OpenSubtitlesApiKeySet: ptr(s.Metadata.OpenSubtitlesAPIKey != ""),
-			OmdbApiKeySet:          ptr(s.Metadata.OMDbAPIKey != ""),
-			OmdbDailyLimit:         ptr(s.Metadata.OMDbDailyLimit),
-			AnimeEpisodeOrdering:   ptr(MetadataSettingsAnimeEpisodeOrdering(s.Metadata.AnimeEpisodeOrdering)),
+			TmdbApiKeySet:            ptr(s.Metadata.TMDBAPIKey != ""),
+			FanartApiKeySet:          ptr(s.Metadata.FanartAPIKey != ""),
+			OpenSubtitlesApiKeySet:   ptr(s.Metadata.OpenSubtitlesAPIKey != ""),
+			OpenSubtitlesUsername:    nz(s.Metadata.OpenSubtitlesUser),
+			OpenSubtitlesPasswordSet: ptr(s.Metadata.OpenSubtitlesPass != ""),
+			OmdbApiKeySet:            ptr(s.Metadata.OMDbAPIKey != ""),
+			OmdbDailyLimit:           ptr(s.Metadata.OMDbDailyLimit),
+			AnimeEpisodeOrdering:     ptr(MetadataSettingsAnimeEpisodeOrdering(s.Metadata.AnimeEpisodeOrdering)),
 		},
 		Tasks: TaskSettings{
 			MaintenanceWindowStart: ptr(s.Tasks.MaintenanceWindowStart),
@@ -154,6 +156,8 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		set(&s.Metadata.TMDBAPIKey, m.TmdbApiKey)
 		set(&s.Metadata.FanartAPIKey, m.FanartApiKey)
 		set(&s.Metadata.OpenSubtitlesAPIKey, m.OpenSubtitlesApiKey)
+		set(&s.Metadata.OpenSubtitlesUser, m.OpenSubtitlesUsername)
+		set(&s.Metadata.OpenSubtitlesPass, m.OpenSubtitlesPassword)
 		set(&s.Metadata.OMDbAPIKey, m.OmdbApiKey)
 		set(&s.Metadata.OMDbDailyLimit, m.OmdbDailyLimit)
 		if m.AnimeEpisodeOrdering != nil {

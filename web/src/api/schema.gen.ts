@@ -731,6 +731,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/items/{itemId}/subtitles/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        /** Search OpenSubtitles for a movie's or episode's subtitles (PLAY-7). Results made for this exact file come first. */
+        get: operations["searchSubtitles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/subtitles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Download a subtitle from OpenSubtitles and add it to the item's subtitle choices. */
+        post: operations["downloadSubtitle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/subtitles/{streamId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+                streamId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a downloaded subtitle (admin only). */
+        delete: operations["removeSubtitle"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/items/{itemId}/watchlist": {
         parameters: {
             query?: never;
@@ -1709,6 +1767,9 @@ export interface components {
             readonly tmdbApiKeySet?: boolean;
             readonly fanartApiKeySet?: boolean;
             readonly openSubtitlesApiKeySet?: boolean;
+            /** @description Optional OpenSubtitles account; logging in raises the daily download limit. */
+            openSubtitlesUsername?: string;
+            readonly openSubtitlesPasswordSet?: boolean;
             readonly omdbApiKeySet?: boolean;
             /** @description Requests per day (free OMDb keys allow 1000). */
             omdbDailyLimit?: number;
@@ -1720,6 +1781,8 @@ export interface components {
             tmdbApiKey?: string;
             fanartApiKey?: string;
             openSubtitlesApiKey?: string;
+            openSubtitlesUsername?: string;
+            openSubtitlesPassword?: string;
             omdbApiKey?: string;
             omdbDailyLimit?: number;
             /** @enum {string} */
@@ -2285,6 +2348,21 @@ export interface components {
             description?: string;
             items: components["schemas"]["ItemSummary"][];
         };
+        SubtitleResult: {
+            /** Format: int64 */
+            fileId: number;
+            /** @description ISO 639-1 (e.g. en */
+            language: string;
+            release: string;
+            fileName?: string;
+            downloads: number;
+            hearingImpaired: boolean;
+            foreignPartsOnly?: boolean;
+            /** @description Machine or AI translated. */
+            aiTranslated: boolean;
+            /** @description Made for this exact file. */
+            hashMatch: boolean;
+        };
         Stats: {
             /** Format: date-time */
             since?: string;
@@ -2640,6 +2718,15 @@ export interface components {
         };
         /** @description A helper service isn't running. */
         ServiceUnavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description An outside service (e.g. OpenSubtitles) failed or refused the request. */
+        BadGateway: {
             headers: {
                 [name: string]: unknown;
             };
@@ -4071,6 +4158,103 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    searchSubtitles: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated ISO 639-1 codes, e.g. "en,es". */
+                languages?: string;
+            };
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubtitleResult"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            502: components["responses"]["BadGateway"];
+        };
+    };
+    downloadSubtitle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: int64
+                     * @description The result's OpenSubtitles file id.
+                     */
+                    fileId: number;
+                    language: string;
+                    release?: string;
+                    hearingImpaired?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Added. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: int64 */
+                        streamId: number;
+                        /** @description Downloads OpenSubtitles allows today. */
+                        remaining?: number;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            502: components["responses"]["BadGateway"];
+        };
+    };
+    removeSubtitle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+                streamId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     addToWatchlist: {

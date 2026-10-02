@@ -198,6 +198,11 @@ func (w *writer) writeStreams(ctx context.Context, fileID int64, c candidate, re
 				return err
 			}
 		}
+		// Subtitles downloaded from OpenSubtitles live outside the (read-only) media folder.
+		if _, err := w.tx.ExecContext(ctx, `INSERT INTO streams (file_id, kind, codec, language, title, is_hearing_impaired, external_path)
+			SELECT file_id, 'subtitle', 'subrip', language, title, hearing_impaired, path FROM downloaded_subtitles WHERE file_id = ?`, fileID); err != nil {
+			return err
+		}
 	} else if lrc := findSidecar(c.Path, dirFiles, "lrc"); lrc != "" {
 		if _, err := w.tx.ExecContext(ctx, `INSERT OR REPLACE INTO sidecars(file_id, kind, path) VALUES (?, 'lyrics', ?)`, fileID, lrc); err != nil {
 			return err
