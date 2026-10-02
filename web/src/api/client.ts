@@ -103,6 +103,11 @@ export function personPhotoUrl(personId: number, width: number) {
   return `/api/v1/people/${personId}/photo?w=${w}&token=${encodeURIComponent(token ?? "")}`;
 }
 
+/** Profile picture URL usable in <img> (signed-in viewers authenticate with the token parameter). */
+export function avatarSrc(avatarUrl: string) {
+  return token ? `${avatarUrl}&token=${encodeURIComponent(token)}` : avatarUrl;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,

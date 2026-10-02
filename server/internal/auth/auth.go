@@ -30,6 +30,7 @@ type User struct {
 	IsManaged    bool
 	HasPIN       bool
 	HasPassword  bool
+	Avatar       int64 // profile picture version; 0 = none
 	CreatedAt    time.Time
 	LastSeenAt   *time.Time
 	Restrictions Restrictions
@@ -174,14 +175,14 @@ type querier interface {
 }
 
 const userCols = `u.id, u.username, u.display_name, u.is_admin, u.is_managed, u.pin_hash IS NOT NULL,
-	u.password_hash IS NOT NULL, u.created_at, u.restrictions, u.preferences,
+	u.password_hash IS NOT NULL, u.avatar_version, u.created_at, u.restrictions, u.preferences,
 	(SELECT MAX(last_seen_at) FROM devices d WHERE d.user_id = u.id)`
 
 func scanUser(row interface{ Scan(...any) error }) (User, error) {
 	var u User
 	var created, restr, prefs string
 	var seen sql.NullString
-	if err := row.Scan(&u.ID, &u.Username, &u.DisplayName, &u.IsAdmin, &u.IsManaged, &u.HasPIN, &u.HasPassword,
+	if err := row.Scan(&u.ID, &u.Username, &u.DisplayName, &u.IsAdmin, &u.IsManaged, &u.HasPIN, &u.HasPassword, &u.Avatar,
 		&created, &restr, &prefs, &seen); err != nil {
 		return User{}, err
 	}

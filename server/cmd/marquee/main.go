@@ -14,6 +14,7 @@ import (
 
 	"marquee/internal/api"
 	"marquee/internal/auth"
+	"marquee/internal/avatars"
 	"marquee/internal/config"
 	"marquee/internal/db"
 	"marquee/internal/images"
@@ -182,6 +183,7 @@ func run() error {
 		Handlers: &api.Handlers{
 			DB: database, Auth: authSvc, Settings: store, Libraries: libraries,
 			Items: items.NewStore(database), Scans: scans, Version: config.Version,
+			Avatars:  &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
 			Images:   images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
 			Logs:     logs,
 			Metadata: meta,
