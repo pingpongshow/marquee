@@ -129,7 +129,7 @@ struct NowPlayingView: View {
                 #endif
                 .shadow(color: .black.opacity(0.5), radius: 30, y: 10)
             VStack(spacing: 4) {
-                Text(t.title).font(.title2.bold()).lineLimit(1)
+                Text(t.title).font(.title2.bold()).lineLimit(1).accessibilityIdentifier("nowPlayingTitle")
                 Text([t.artistCredit ?? t.grandparentTitle, t.parentTitle].compactMap { $0 }.joined(separator: " · ")).foregroundStyle(.secondary).lineLimit(1)
             }
             VStack(spacing: 4) {
@@ -177,6 +177,7 @@ struct NowPlayingView: View {
                 SleepMenu().labelStyle(.iconOnly)
                 DJMenu()
                 LevellingMenu()
+                CrossfadeMenu()
             }
             .font(.title3)
             .foregroundStyle(.secondary)

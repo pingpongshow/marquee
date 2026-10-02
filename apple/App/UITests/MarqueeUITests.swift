@@ -353,6 +353,46 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(download.waitForExistence(timeout: 5))
     }
 
+    /// Crossfade (MUSIC-9): with 4 s set, the next track takes over before the current ends.
+    func testCrossfade() throws {
+        connectAndSignIn()
+        openLibrary("Music")
+        let radio = app.buttons["Library Radio"]
+        XCTAssertTrue(radio.waitForExistence(timeout: 15))
+        radio.tap()
+        let mini = app.buttons["miniPlayer"]
+        XCTAssertTrue(mini.waitForExistence(timeout: 20))
+        sleep(2)
+        mini.tap()
+        let menu = app.buttons["Crossfade off"].firstMatch
+        if menu.waitForExistence(timeout: 5) {
+            menu.tap()
+            app.buttons["4 seconds"].tap()
+        }
+        XCTAssertTrue(app.buttons["Crossfade 4 seconds"].waitForExistence(timeout: 5))
+        let slider = app.sliders.firstMatch
+        XCTAssertTrue(slider.waitForExistence(timeout: 5))
+        let titleText = app.staticTexts["nowPlayingTitle"]
+        XCTAssertTrue(titleText.waitForExistence(timeout: 5))
+        let title = titleText.label
+        slider.adjust(toNormalizedSliderPosition: 0.6)
+        sleep(1)
+        // Time left, from the "-0:16" label.
+        let left = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH '-'")).firstMatch.label
+        let parts = left.dropFirst().split(separator: ":").compactMap { Double($0) }
+        let remaining = parts.count == 2 ? parts[0] * 60 + parts[1] : 0
+        XCTAssertGreaterThan(remaining, 6, "seek landed far enough from the end: \(left)")
+        let start = Date()
+        let changed = NSPredicate(format: "label != %@", title)
+        expectation(for: changed, evaluatedWith: titleText)
+        waitForExpectations(timeout: remaining + 5)
+        let took = Date().timeIntervalSince(start)
+        XCTAssertLessThan(took, remaining - 2, "next track should take over ~4 s before the end (took \(took)s of \(remaining)s)")
+        shot("cf1-after-crossfade")
+        app.buttons["Crossfade 4 seconds"].tap()
+        app.buttons["Off"].tap()
+    }
+
     func testStatsAndAdventure() {
         connectAndSignIn()
         app.buttons["Settings"].firstMatch.tap()
