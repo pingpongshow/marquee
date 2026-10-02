@@ -51,6 +51,8 @@ type Service struct {
 	Dir     string // <cache>/trickplay
 	Workers int
 	Enabled func() bool
+	// CUDA decodes on the NVIDIA GPU (about 8× faster for 4K HEVC), falling back to the CPU.
+	CUDA bool
 
 	done, total atomic.Int64
 }
@@ -180,21 +182,42 @@ func thumbHeight(w, h int) int {
 	return max(2, int(math.Round(float64(Width)*float64(h)/float64(w)/2))*2)
 }
 
-// Args is the FFmpeg command for a file's sheets.
-func Args(path string, height int, hdr bool, outPattern string) []string {
+// Args is the FFmpeg command for a file's sheets, decoding on the GPU when cuda is set.
+func Args(path string, height int, hdr, cuda bool, outPattern string) []string {
 	// round=up makes tile n the last keyframe at or before n × Interval (the default
 	// rounding picks one up to half an interval later).
 	chain := []string{fmt.Sprintf("fps=1/%d:round=up", int(Interval.Seconds()))}
-	if hdr {
-		chain = append(chain, "tonemapx=tonemap=bt2390:desat=0:peak=100:t=bt709:m=bt709:p=bt709:format=yuv420p")
+	in := []string{"-threads", "2"}
+	if cuda {
+		in = []string{"-hwaccel", "cuda", "-hwaccel_output_format", "cuda"}
+		if hdr {
+			chain = append(chain, "tonemap_cuda=format=nv12:p=bt709:t=bt709:m=bt709:tonemap=bt2390:peak=100:desat=0")
+		}
+		chain = append(chain, fmt.Sprintf("scale_cuda=%d:%d:format=nv12", Width, height), "hwdownload", "format=nv12")
+	} else {
+		if hdr {
+			chain = append(chain, "tonemapx=tonemap=bt2390:desat=0:peak=100:t=bt709:m=bt709:p=bt709:format=yuv420p")
+		}
+		chain = append(chain, fmt.Sprintf("scale=%d:%d:flags=fast_bilinear", Width, height))
 	}
-	chain = append(chain, fmt.Sprintf("scale=%d:%d:flags=fast_bilinear", Width, height), fmt.Sprintf("tile=%dx%d", Columns, Rows))
-	return []string{"-hide_banner", "-v", "error", "-threads", "2", "-skip_frame", "nokey", "-i", path,
-		"-an", "-sn", "-dn", "-map", "0:v:0", "-vf", strings.Join(chain, ","), "-fps_mode", "passthrough",
-		"-q:v", "5", "-f", "image2", outPattern}
+	chain = append(chain, fmt.Sprintf("tile=%dx%d", Columns, Rows))
+	args := append([]string{"-hide_banner", "-v", "error"}, in...)
+	return append(args, "-skip_frame", "nokey", "-i", path, "-an", "-sn", "-dn", "-map", "0:v:0",
+		"-vf", strings.Join(chain, ","), "-fps_mode", "passthrough", "-q:v", "5", "-f", "image2", outPattern)
 }
 
 func (s *Service) generate(ctx context.Context, j job) error {
+	if s.CUDA {
+		err := s.generateWith(ctx, j, true)
+		if err == nil || ctx.Err() != nil {
+			return err
+		}
+		slog.Debug("trickplay: GPU decode failed, using the CPU", "path", j.path, "err", err)
+	}
+	return s.generateWith(ctx, j, false)
+}
+
+func (s *Service) generateWith(ctx context.Context, j job, cuda bool) error {
 	h := thumbHeight(j.width, j.height)
 	final := filepath.Join(s.Dir, strconv.FormatInt(j.fileID, 10))
 	tmp := final + ".tmp"
@@ -202,7 +225,7 @@ func (s *Service) generate(ctx context.Context, j job) error {
 	if err := os.MkdirAll(tmp, 0o755); err != nil {
 		return err
 	}
-	args := Args(j.path, h, j.hdr, filepath.Join(tmp, "%d.jpg"))
+	args := Args(j.path, h, j.hdr, cuda, filepath.Join(tmp, "%d.jpg"))
 	cmd := exec.CommandContext(ctx, s.FFmpeg, args...)
 	if nice, err := exec.LookPath("nice"); err == nil {
 		cmd = exec.CommandContext(ctx, nice, append([]string{"-n", "15", s.FFmpeg}, args...)...)
