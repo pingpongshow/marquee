@@ -176,6 +176,11 @@ func (h *Handlers) DownloadFiles() http.Handler {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
+		// Same rule as streaming: accounts without remote access can't download away from home.
+		if requestInfo(r.Context()).Class == netclass.Remote && !sess.User.IsAdmin && !sess.User.Restrictions.RemoteAllowed() {
+			http.Error(w, "downloading away from home isn't allowed for this account", http.StatusForbidden)
+			return
+		}
 		rest := strings.TrimPrefix(r.URL.Path, "/api/v1/download/")
 		var path, name string
 		switch {

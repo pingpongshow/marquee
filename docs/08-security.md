@@ -1,6 +1,6 @@
 # Security
 
-_Last updated: 2026-10-02. Status: checklist passed for M6 (v0.9.x)._
+_Last updated: 2026-10-02. Status: checklist passed for M7 (v0.19.x)._
 
 Marquee runs on a home server, reachable on the LAN and, for remote clients only, over the owner's existing Tailscale network (WireGuard-encrypted). Nothing is exposed to the public internet.
 
@@ -17,6 +17,10 @@ Marquee runs on a home server, reachable on the LAN and, for remote clients only
 | Clickjacking / content sniffing | `X-Frame-Options: DENY`, `Content-Security-Policy: frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin` on every response. |
 | Privilege escalation between users | Every handler checks the session; admin-only endpoints check the admin flag; library and content-rating restrictions are applied in SQL for every listing (tested). Playlists are per user. |
 | Remote clients misusing bandwidth | Remote sessions are classified by source address (Tailscale ranges are always remote); per-user and global remote caps, fair upload share (§3a). |
+| Webhooks reaching internal services (SSRF) | Only admins can add webhook URLs or send tests; URLs must be http(s); payloads are signed (HMAC-SHA256) so receivers can reject forgeries; deliveries time out after 10 s and a full queue drops events. |
+| Downloads leaking files | Originals are served only for items the user can see, from the same file lookup as playback (no paths from the client); converted files belong to the user who asked for them; accounts without remote access can't download away from home. |
+| Third-party credentials | The OpenSubtitles API key and password are write-only in the API (only "is set" is returned) and are sent only to OpenSubtitles. |
+| Tokens on Apple devices | Device tokens live in the Keychain. The Apple TV Top Shelf snapshot (in the app's app-group container) holds artwork URLs that carry the token, as AVPlayer and image views already do. |
 | Vulnerable dependencies | `govulncheck` (Go, toolchain pinned to the patched release) and `npm audit` (web) run before releases. |
 
 ## Release checklist
@@ -31,6 +35,7 @@ Marquee runs on a home server, reachable on the LAN and, for remote clients only
 - govulncheck: no reachable vulnerabilities after pinning `toolchain go1.26.8` and upgrading kin-openapi and x/crypto.
 - npm audit: 0 vulnerabilities.
 - Remote path checked from a tailnet device: classified `remote`, PIN sign-in withheld, security headers present.
+- M7 re-check (v0.19): govulncheck reports nothing reachable (only GO-2026-5932, the deprecated `x/crypto/openpgp` package, which Marquee doesn't import; no fix exists). npm audit: 0. Fixed during review: the raw download route now applies the same remote-access rule as playback.
 
 ## Notes for the owner
 
