@@ -49,8 +49,8 @@ data class StatsDaysInner (
     @SerialName(value = "music")
     val music: kotlin.Int,
 
-    @Contextual @SerialName(value = "hours")
-    val hours: java.math.BigDecimal
+    @SerialName(value = "hours")
+    val hours: kotlin.Double
 
 ) {
 

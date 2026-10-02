@@ -1,0 +1,320 @@
+package app.marquee.music
+
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.StarHalf
+import androidx.compose.material.icons.filled.Waves
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.dp
+import app.marquee.api.infrastructure.ClientException
+import app.marquee.api.models.ItemType
+import app.marquee.api.models.Lyrics
+import app.marquee.api.models.MusicSageRequest
+import app.marquee.api.models.MusicStatus
+import app.marquee.api.models.RadioRequest
+import app.marquee.api.models.Station
+import app.marquee.ui.Gold
+import app.marquee.ui.LocalMarquee
+import app.marquee.ui.LocalMusic
+import app.marquee.ui.focusRing
+import app.marquee.ui.initialFocus
+import app.marquee.ui.sidePadding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+/** The moods offered as stations (same as the web and Apple apps). */
+val musicMoods = listOf("Chill", "Energetic", "Focus", "Melancholy", "Party", "Romantic", "Dreamy", "Aggressive")
+
+/** Example Sonic Sage prompts. */
+val sageSuggestions = listOf("Rainy Sunday jazz", "Late-night drive synthwave", "Upbeat 80s pop for cleaning the house", "Acoustic songs for a quiet evening")
+
+/** Sonic Sage, stations and daily mixes at the top of a music library (M6.5). */
+@Composable
+fun MusicDiscover(libraryId: Long) {
+    val marquee = LocalMarquee.current
+    val music = LocalMusic.current
+    val scope = rememberCoroutineScope()
+    data class Data(val status: MusicStatus?, val mixes: List<Station>, val decades: List<String>)
+    val data by produceState<Data?>(null, libraryId) {
+        value = withContext(Dispatchers.IO) {
+            val st = runCatching { marquee.music.musicStatus() }.getOrNull()
+            if (st?.enabled != true) Data(st, emptyList(), emptyList())
+            else Data(
+                st,
+                runCatching { marquee.music.musicMixes(libraryId) }.getOrDefault(emptyList()),
+                runCatching { marquee.items.libraryFilters(libraryId, ItemType.ALBUM).decades.map { it.value }.take(6) }.getOrDefault(emptyList()),
+            )
+        }
+    }
+    var prompt by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val d = data ?: return
+    val st = d.status ?: return
+    if (!st.enabled) return
+
+    fun run(work: suspend () -> Unit) {
+        if (busy) return
+        busy = true
+        error = null
+        scope.launch {
+            runCatching { work() }.onFailure { error = it.message ?: "Couldn't start that" }
+            busy = false
+        }
+    }
+    fun sage(text: String) {
+        val p = text.trim()
+        if (p.length < 2) return
+        run {
+            val station = withContext(Dispatchers.IO) { marquee.music.musicSage(MusicSageRequest(p, 40, libraryId)) }
+            if (station.items.isEmpty()) throw IllegalStateException("Sonic Sage found nothing for that.")
+            music.playStation(station)
+        }
+    }
+    fun radio(req: RadioRequest) = run { music.startRadio(req) }
+
+    Column(Modifier.padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        if (st.analyzed < st.total) {
+            Text(
+                if (st.available) "Listening to your music: ${st.analyzed} of ${st.total} tracks analysed. Radios and mixes improve as it goes."
+                else "The sonic analysis service isn't running, so radios and Sonic Sage are unavailable.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Filled.AutoAwesome, null, tint = Gold)
+                Text("Sonic Sage", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    prompt, { prompt = it }, Modifier.weight(1f), singleLine = true,
+                    placeholder = { Text("Describe what you want to hear…") },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+                    keyboardActions = KeyboardActions(onGo = { sage(prompt) }),
+                )
+                Button({ sage(prompt) }, Modifier.focusRing(), enabled = prompt.trim().length >= 2 && !busy) {
+                    if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("Play")
+                }
+            }
+            ChipRow(sageSuggestions.map { s -> Chip(s, null) { prompt = s; sage(s) } })
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Stations", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            ChipRow(
+                listOf(
+                    // TV starts here: the D-pad's first stop in a music library.
+                    Chip("Library Radio", Icons.Filled.Radio, focus = marquee.isTv) { radio(RadioRequest(RadioRequest.Seed.LIBRARY, libraryId = libraryId)) },
+                    Chip("Favourites Radio", Icons.Filled.Favorite) { radio(RadioRequest(RadioRequest.Seed.FAVOURITES, libraryId = libraryId)) },
+                ) + musicMoods.map { m -> Chip(m, Icons.Filled.Waves) { radio(RadioRequest(RadioRequest.Seed.MOOD, value = m.lowercase(), libraryId = libraryId)) } } +
+                    d.decades.map { dec -> Chip("${dec}s", Icons.Filled.Radio) { radio(RadioRequest(RadioRequest.Seed.DECADE, value = dec, libraryId = libraryId)) } },
+            )
+        }
+
+        if (d.mixes.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Mixes for you", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(vertical = 6.dp)) {
+                itemsIndexed(d.mixes) { i, m -> MixCard(m, i) { music.playStation(m) } }
+            }
+        }
+    }
+}
+
+private class Chip(val label: String, val icon: ImageVector?, val focus: Boolean = false, val onClick: () -> Unit)
+
+@Composable
+private fun ChipRow(chips: List<Chip>) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 4.dp)) {
+        items(chips) { c ->
+            AssistChip(
+                onClick = c.onClick,
+                label = { Text(c.label) },
+                leadingIcon = c.icon?.let { { Icon(it, null, Modifier.size(AssistChipDefaults.IconSize)) } },
+                modifier = Modifier.focusRing(RoundedCornerShape(8.dp)).initialFocus(c.focus),
+            )
+        }
+    }
+}
+
+private val mixColors = listOf(Color(0xFF7C4DFF), Color(0xFF00897B), Color(0xFFE65100), Color(0xFF1E88E5), Color(0xFFC2185B), Color(0xFF558B2F))
+
+/** A daily mix: a tinted square with its name; plays the mix. */
+@Composable
+private fun MixCard(station: Station, index: Int, onPlay: () -> Unit) {
+    val tint = mixColors[index % mixColors.size]
+    Column(Modifier.width(140.dp)) {
+        Box(
+            Modifier.fillMaxWidth().aspectRatio(1f).focusRing(RoundedCornerShape(10.dp)).clip(RoundedCornerShape(10.dp))
+                .background(Brush.linearGradient(listOf(tint, tint.copy(alpha = 0.35f))))
+                .semantics { contentDescription = "Play ${station.title}" }
+                .clickable(onClick = onPlay),
+            contentAlignment = Alignment.BottomStart,
+        ) {
+            Icon(Icons.Filled.Headphones, null, Modifier.align(Alignment.TopEnd).padding(10.dp), tint = Color.White.copy(alpha = 0.8f))
+            Text(station.title, Modifier.padding(10.dp), color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2)
+        }
+        station.description?.let { Text(it, Modifier.padding(top = 6.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2) }
+    }
+}
+
+/** Star rating, half stars; the last tap on the same value clears it (MUSIC-11). */
+@Composable
+fun RatingStars(rating: Double?, onRate: (Double?) -> Unit, size: Int = 26) {
+    val stars = (rating ?: 0.0) / 2
+    val state = if (rating == null) "Not rated" else "${"%.1f".format(stars).removeSuffix(".0")} of 5 stars"
+    Row(Modifier.semantics { contentDescription = "Rating"; stateDescription = state }, verticalAlignment = Alignment.CenterVertically) {
+        for (star in 1..5) {
+            val icon = when {
+                stars >= star -> Icons.Filled.Star
+                stars >= star - 0.5 -> Icons.Filled.StarHalf
+                else -> Icons.Filled.StarBorder
+            }
+            IconButton(onClick = { val v = star * 2.0; onRate(if (rating == v) null else v) }, modifier = Modifier.size((size + 14).dp)) {
+                Icon(icon, "$star star${if (star == 1) "" else "s"}", Modifier.size(size.dp), tint = if (stars >= star - 0.5) Gold else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+/** Lyrics for a track, following along when they're synced. */
+@Composable
+fun LyricsPanel(trackId: Long, positionMs: Long, onSeek: (Long) -> Unit, modifier: Modifier = Modifier) {
+    val marquee = LocalMarquee.current
+    val lyrics by produceState<Result<Lyrics?>?>(null, trackId) {
+        value = withContext(Dispatchers.IO) {
+            // 404: the track has no lyrics.
+            runCatching<Lyrics?> { marquee.music.getLyrics(trackId) }.recoverCatching { e -> if ((e as? ClientException)?.statusCode == 404) null else throw e }
+        }
+    }
+    val l = lyrics
+    when {
+        l == null -> Box(modifier, contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        l.getOrNull() == null -> Box(modifier, contentAlignment = Alignment.Center) {
+            Text("No lyrics for this track.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        else -> {
+            val ly = l.getOrNull()!!
+            val active = if (ly.synced) ly.lines.indexOfLast { it.timeMs != null && it.timeMs!! <= positionMs + 150 } else -1
+            val state = rememberLazyListState()
+            LaunchedEffect(active) { if (active >= 0) state.animateScrollToItem((active - 2).coerceAtLeast(0)) }
+            LazyColumn(modifier, state = state, verticalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(vertical = 24.dp)) {
+                itemsIndexed(ly.lines) { i, line ->
+                    val alpha by animateFloatAsState(if (!ly.synced || i == active) 1f else 0.45f, label = "lyric")
+                    Text(
+                        line.text.ifBlank { "♪" },
+                        Modifier.fillMaxWidth().then(if (line.timeMs != null) Modifier.focusRing(RoundedCornerShape(6.dp)).clickable { onSeek(line.timeMs!!) } else Modifier),
+                        style = if (ly.synced) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (i == active) FontWeight.Bold else FontWeight.Medium,
+                        color = Color.White.copy(alpha = alpha),
+                    )
+                }
+            }
+        }
+    }
+}
+
+private val sleepMinutes = listOf(15, 30, 45, 60, 90)
+
+/** Sleep timer and Guest DJ choices for Now Playing. */
+@Composable
+fun SleepButton() {
+    val music = LocalMusic.current
+    val sleep by music.sleep.collectAsState()
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton({ open = true }, Modifier.focusRing()) {
+            Icon(Icons.Filled.Bedtime, if (sleep == null) "Sleep timer" else "Sleep timer on", tint = if (sleep == null) MaterialTheme.colorScheme.onSurfaceVariant else Gold)
+        }
+        DropdownMenu(open, { open = false }) {
+            sleepMinutes.forEach { m ->
+                DropdownMenuItem({ Text("$m minutes") }, { music.setSleep(MusicController.Sleep.At(System.currentTimeMillis() + m * 60_000L)); open = false })
+            }
+            DropdownMenuItem({ Text("End of track") }, { music.setSleep(MusicController.Sleep.EndOfTrack); open = false })
+            if (sleep != null) DropdownMenuItem({ Text("Turn off", color = MaterialTheme.colorScheme.error) }, { music.setSleep(null); open = false })
+        }
+    }
+}
+
+@Composable
+fun DJButton() {
+    val music = LocalMusic.current
+    val dj by music.dj.collectAsState()
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton({ open = true }, Modifier.focusRing()) {
+            Icon(Icons.Filled.RecordVoiceOver, dj?.label ?: "Guest DJ", tint = if (dj == null) MaterialTheme.colorScheme.onSurfaceVariant else Gold)
+        }
+        DropdownMenu(open, { open = false }) {
+            DropdownMenuItem({ Text("Guest DJ off") }, { music.setDJ(null); open = false })
+            MusicController.DJ.entries.forEach { d ->
+                DropdownMenuItem(
+                    { Column { Text(d.label, fontWeight = if (d == dj) FontWeight.Bold else FontWeight.Normal); Text(d.blurb, style = MaterialTheme.typography.bodySmall) } },
+                    { music.setDJ(d); open = false },
+                )
+            }
+        }
+    }
+}

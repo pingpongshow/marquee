@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -18,7 +19,9 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import android.view.KeyEvent
 import org.junit.After
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -126,5 +129,86 @@ class MarqueeUiTest {
             rule.waitText("PLAYING FROM")
         }
         shot("09-now-playing")
+    }
+
+    /**
+     * Sonic Sage, Now Playing's source, lyrics and ratings (M6.5). Needs the test music
+     * library and the sonic analysis sidecar.
+     */
+    @Test fun musicFeatures() {
+        connectAndSignIn()
+        openLibrary("Music")
+        rule.waitText("Sonic Sage", 20_000)
+        shot("m1-discover")
+        rule.onNode(hasSetTextAction()).performTextInput("white noise and static hiss")
+        rule.onNode(hasText("Play") and hasClickAction() and !hasContentDescription("Play")).performClick()
+        openNowPlaying()
+        rule.waitText("white noise and static hiss")
+        rule.waitUntilAtLeastOneExists(hasText("Hiss Theory", substring = true) or hasText("Static Kids", substring = true), 10_000)
+        shot("m2-now-playing-sage")
+        rule.onNode(hasContentDescription("Up Next")).performClick()
+        Thread.sleep(1000)
+        shot("m3-up-next")
+        rule.onNode(hasContentDescription("Close Now Playing")).performClick()
+
+        // An album with an .lrc sidecar: synced lyrics, then a rating.
+        tap("Calm Pads", substring = true)
+        rule.waitText("Floating")
+        rule.onAllNodes(hasContentDescription("Floating")).onFirst().performClick()
+        rule.waitText("Radio")
+        shot("m4-album")
+        tap("Play")
+        openNowPlaying()
+        rule.waitText("Floating 1")
+        rule.onNode(hasContentDescription("Lyrics")).performClick()
+        rule.waitText("Floating on a quiet sea")
+        Thread.sleep(3000)
+        shot("m5-lyrics")
+        rule.onNode(hasContentDescription("Lyrics")).performClick()
+        rule.onNode(hasContentDescription("3 stars")).performClick()
+        // Saved on the server: the stars only stay lit when the request succeeds.
+        val rated = hasContentDescription("Rating") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "3 of 5 stars")
+        Thread.sleep(1500)
+        rule.waitUntilAtLeastOneExists(rated, 5_000)
+        shot("m6-rated")
+        rule.onNode(hasContentDescription("3 stars")).performClick() // clears it again
+        rule.onNode(hasContentDescription("Start Radio")).performClick()
+        rule.waitText("Floating 1 Radio", 15_000, substring = true)
+        shot("m7-track-radio")
+    }
+
+    private fun openNowPlaying() {
+        if (isTv) {
+            rule.waitText("Playing", 20_000)
+            tap("Playing")
+        } else {
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Open Now Playing"), 20_000)
+            rule.onNode(hasContentDescription("Open Now Playing")).performClick()
+        }
+        rule.waitText("PLAYING FROM")
+    }
+
+    /** Android TV: Home to a show, a season and back again with the remote alone. */
+    @Test fun tvRemoteNavigation() {
+        assumeTrue("TV only", isTv)
+        connectAndSignIn()
+        key(KeyEvent.KEYCODE_DPAD_DOWN) // Continue Watching → Recently Added Anime
+        key(KeyEvent.KEYCODE_DPAD_CENTER)
+        rule.waitText("Seasons")
+        shot("t1-show")
+        key(KeyEvent.KEYCODE_DPAD_DOWN) // Play → Season 1
+        key(KeyEvent.KEYCODE_DPAD_CENTER)
+        rule.waitText("Episodes")
+        shot("t2-season")
+        key(KeyEvent.KEYCODE_BACK)
+        rule.waitText("Seasons")
+        key(KeyEvent.KEYCODE_BACK)
+        rule.waitText("Continue Watching")
+    }
+
+    private fun key(code: Int) {
+        rule.waitForIdle()
+        Thread.sleep(400)
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(code)
     }
 }

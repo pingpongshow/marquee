@@ -47,8 +47,8 @@ data class StatsCount (
     @SerialName(value = "plays")
     val plays: kotlin.Int,
 
-    @Contextual @SerialName(value = "hours")
-    val hours: java.math.BigDecimal,
+    @SerialName(value = "hours")
+    val hours: kotlin.Double,
 
     /* The item or user, when there is one. */
     @SerialName(value = "id")

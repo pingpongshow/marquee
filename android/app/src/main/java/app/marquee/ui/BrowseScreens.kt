@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import app.marquee.api.models.LibraryType
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
@@ -109,7 +111,7 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
     val items = remember { mutableStateListOf<ItemSummary>() }
     var total by remember { mutableIntStateOf(-1) }
     var loading by remember { mutableStateOf(false) }
-    var name by remember { mutableStateOf("") }
+    var library by remember { mutableStateOf<Library?>(null) }
     val scope = rememberCoroutineScope()
     fun loadMore() {
         if (loading || (total >= 0 && items.size >= total)) return
@@ -121,16 +123,19 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
         }
     }
     LaunchedEffect(libraryId) {
-        name = withContext(Dispatchers.IO) { runCatching { marquee.libraries.getLibrary(libraryId).name }.getOrDefault("") }
+        library = withContext(Dispatchers.IO) { runCatching { marquee.libraries.getLibrary(libraryId) }.getOrNull() }
         loadMore()
     }
     val min = if (marquee.isTv) 130.dp else 110.dp
+    val isMusic = library?.type == LibraryType.MUSIC
     Column {
-        Text(name, Modifier.padding(horizontal = sidePadding, vertical = 12.dp), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(library?.name ?: "", Modifier.padding(horizontal = sidePadding, vertical = 12.dp), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         LazyVerticalGrid(GridCells.Adaptive(min), contentPadding = PaddingValues(sidePadding), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            // Music libraries open with Sonic Sage, stations and mixes above the artists.
+            if (isMusic) item(span = { GridItemSpan(maxLineSpan) }) { app.marquee.music.MusicDiscover(libraryId) }
             itemsIndexed(items, key = { _, it -> it.id }) { i, it ->
                 if (i >= items.size - 30) LaunchedEffect(i) { loadMore() }
-                PosterCard(it, marquee.imageUrl(it.images?.poster, 240), min, { openItem(nav, it) }, autoFocus = marquee.isTv && i == 0)
+                PosterCard(it, marquee.imageUrl(it.images?.poster, 240), min, { openItem(nav, it) }, autoFocus = marquee.isTv && i == 0 && !isMusic)
             }
         }
     }

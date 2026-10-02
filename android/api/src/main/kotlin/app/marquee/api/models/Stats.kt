@@ -59,14 +59,14 @@ data class Stats (
     @SerialName(value = "plays")
     val plays: kotlin.Int,
 
-    @Contextual @SerialName(value = "hours")
-    val hours: java.math.BigDecimal,
+    @SerialName(value = "hours")
+    val hours: kotlin.Double,
 
-    @Contextual @SerialName(value = "videoHours")
-    val videoHours: java.math.BigDecimal,
+    @SerialName(value = "videoHours")
+    val videoHours: kotlin.Double,
 
-    @Contextual @SerialName(value = "musicHours")
-    val musicHours: java.math.BigDecimal,
+    @SerialName(value = "musicHours")
+    val musicHours: kotlin.Double,
 
     /* People who played something. */
     @SerialName(value = "users")
