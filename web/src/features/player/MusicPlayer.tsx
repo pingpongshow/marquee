@@ -24,7 +24,8 @@ type Ctx = {
   duration: number;
   volume: number;
   expanded: boolean;
-  play: (tracks: ItemSummary[], start?: number, opts?: { shuffle?: boolean }) => void;
+  /** source names what's playing (an album or playlist) for the Now Playing header. */
+  play: (tracks: ItemSummary[], start?: number, opts?: { shuffle?: boolean; source?: string }) => void;
   playNext: (tracks: ItemSummary[]) => void;
   addToQueue: (tracks: ItemSummary[]) => void;
   remove: (key: number) => void;
@@ -418,7 +419,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     expanded,
     play: (tracks, start = 0, opts) => {
       unload(1 - active.current);
-      setSource(undefined);
+      setSource(opts?.source ? { title: opts.source } : undefined);
       setQueue((q) => Q.load(q, tracks, start, opts?.shuffle));
     },
     playNext: (tracks) => {
