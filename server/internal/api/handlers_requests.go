@@ -21,6 +21,9 @@ func toAPIDiscover(items []requests.Item, page, total int) DiscoverPage {
 		if it.Year > 0 {
 			d.Year = ptr(it.Year)
 		}
+		if it.TMDBRating > 0 {
+			d.TmdbRating = ptr(float32(it.TMDBRating))
+		}
 		if it.ItemID > 0 {
 			d.ItemId = ptr(it.ItemID)
 		}
@@ -310,4 +313,34 @@ func (h *Handlers) TestSeerr(ctx context.Context, req TestSeerrRequestObject) (T
 		out.Error = ptr(err.Error())
 	}
 	return out, nil
+}
+
+func (h *Handlers) TitleRatings(ctx context.Context, req TitleRatingsRequestObject) (TitleRatingsResponseObject, error) {
+	if _, ok := session(ctx); !ok {
+		return TitleRatings401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	r, err := h.Requests.Ratings(ctx, string(req.MediaType), req.TmdbId)
+	if errors.Is(err, requests.ErrNotConfigured) {
+		return TitleRatings503JSONResponse{ServiceUnavailableJSONResponse(apiErr("not_configured", err.Error()))}, nil
+	} else if err != nil {
+		return nil, internal(ctx, "titleRatings", err)
+	}
+	var out TitleRatings
+	if rt := r.RT; rt != nil && (rt.CriticsScore != nil || rt.AudienceScore != nil) {
+		out.RottenTomatoes = &struct {
+			AudienceRating *string `json:"audienceRating,omitempty"`
+			AudienceScore  *int    `json:"audienceScore,omitempty"`
+			CriticsRating  *string `json:"criticsRating,omitempty"`
+			CriticsScore   *int    `json:"criticsScore,omitempty"`
+			Url            *string `json:"url,omitempty"`
+		}{nz(rt.AudienceRating), rt.AudienceScore, nz(rt.CriticsRating), rt.CriticsScore, nz(rt.URL)}
+	}
+	if im := r.IMDb; im != nil && im.CriticsScore != nil {
+		v := float32(*im.CriticsScore)
+		out.Imdb = &struct {
+			Rating *float32 `json:"rating,omitempty"`
+			Url    *string  `json:"url,omitempty"`
+		}{&v, nz(im.URL)}
+	}
+	return TitleRatings200JSONResponse(out), nil
 }

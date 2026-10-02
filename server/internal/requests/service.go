@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"slices"
 	"strconv"
+	"sync"
 	"time"
 
 	"marquee/internal/settings"
@@ -27,6 +28,45 @@ const tmdbImages = "https://image.tmdb.org/t/p/"
 type Service struct {
 	DB       *sql.DB
 	Settings *settings.Store
+
+	ratingsMu sync.Mutex
+	ratings   map[string]cachedRatings
+}
+
+type cachedRatings struct {
+	r   RatingsRaw
+	at  time.Time
+	ttl time.Duration
+}
+
+// Ratings are a title's public critic and audience ratings (REQ-2), kept for a day. Titles
+// Seerr has no ratings for return empty ratings, not an error.
+func (s *Service) Ratings(ctx context.Context, mediaType string, tmdbID int64) (RatingsRaw, error) {
+	key := fmt.Sprintf("%s/%d", mediaType, tmdbID)
+	s.ratingsMu.Lock()
+	if c, ok := s.ratings[key]; ok && time.Since(c.at) < c.ttl {
+		s.ratingsMu.Unlock()
+		return c.r, nil
+	}
+	s.ratingsMu.Unlock()
+	if !s.Enabled() {
+		return RatingsRaw{}, ErrNotConfigured
+	}
+	r, err := s.seerr().Ratings(ctx, mediaType, tmdbID)
+	ttl := 24 * time.Hour
+	if err != nil {
+		ttl = time.Hour
+		// Seerr answers 404 (or 500) when RT or IMDb has nothing for the title.
+		slog.Debug("seerr ratings", "title", key, "err", err)
+		r = RatingsRaw{}
+	}
+	s.ratingsMu.Lock()
+	if s.ratings == nil {
+		s.ratings = map[string]cachedRatings{}
+	}
+	s.ratings[key] = cachedRatings{r, time.Now(), ttl}
+	s.ratingsMu.Unlock()
+	return r, nil
 }
 
 func (s *Service) seerr() *Seerr {
@@ -70,6 +110,7 @@ type Item struct {
 	Overview     string
 	PosterURL    string
 	BackdropURL  string
+	TMDBRating   float64 // TMDB's user score, 0–10 (0 = too few votes)
 	Availability string
 	ItemID       int64 // in this library
 	RequestID    int64 // the caller's open request
@@ -105,6 +146,9 @@ func (s *Service) annotate(ctx context.Context, userID int64, results []Result) 
 		}
 		it := Item{TMDBID: r.ID, MediaType: r.MediaType, Title: r.DisplayTitle(), Year: r.Year(), Overview: r.Overview,
 			PosterURL: image("w342", r.PosterPath), BackdropURL: image("w780", r.BackdropPath), Availability: seerrAvailability(r.MediaStatus())}
+		if r.VoteCount >= 5 {
+			it.TMDBRating = r.VoteAverage
+		}
 		it.ItemID = s.libraryItem(ctx, r.MediaType, r.ID)
 		if it.ItemID != 0 && it.Availability != Available {
 			if r.MediaType == "movie" {

@@ -43,6 +43,11 @@ public extension AppSession {
         try await api.listItemChildren(path: .init(itemId: id), query: .init(limit: 500)).ok.body.json.items
     }
 
+    /// An artist's most-listened tracks in the library (MUSIC-15).
+    func popularTracks(_ artistID: Int64) async throws -> [Item] {
+        try await api.listPopularTracks(path: .init(itemId: artistID)).ok.body.json.items
+    }
+
     /// Playable items under a container, in play order.
     func leaves(_ id: Int64, shuffle: Bool = false, unwatched: Bool = false) async throws -> [Item] {
         try await api.itemLeaves(path: .init(itemId: id), query: .init(shuffle: shuffle, unwatched: unwatched)).ok.body.json

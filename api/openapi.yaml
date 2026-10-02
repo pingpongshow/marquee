@@ -780,6 +780,22 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /items/{itemId}/popular:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [items]
+      operationId: listPopularTracks
+      summary: "An artist's most-listened tracks that are in the library, most popular first (ListenBrainz, MUSIC-15). Empty until MusicBrainz enrichment has looked the artist up."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /images/{artworkId}:
     get:
       tags: [images]
@@ -1945,6 +1961,23 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "502": { $ref: "#/components/responses/BadGateway" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /requests/ratings/{mediaType}/{tmdbId}:
+    parameters:
+      - { name: mediaType, in: path, required: true, schema: { type: string, enum: [movie, tv] } }
+      - { name: tmdbId, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      tags: [requests]
+      operationId: titleRatings
+      summary: "A title's Rotten Tomatoes and IMDb ratings, for Discover's details (REQ-2). Empty when there are none."
+      responses:
+        "200":
+          description: Ratings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TitleRatings" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
 
   /requests:
@@ -3361,9 +3394,28 @@ components:
         overview: { type: string }
         posterUrl: { type: string }
         backdropUrl: { type: string }
+        tmdbRating: { type: number, description: "TMDB's user score, 0–10 (absent with too few votes)." }
         availability: { $ref: "#/components/schemas/Availability" }
         itemId: { type: integer, format: int64, description: "The title in this library, when it's here." }
         requestId: { type: integer, format: int64, description: The caller's open Marquee request for it. }
+
+    TitleRatings:
+      type: object
+      description: Public ratings of a title, through Seerr. Each part is absent when unknown.
+      properties:
+        rottenTomatoes:
+          type: object
+          properties:
+            criticsScore: { type: integer, description: Tomatometer percentage. }
+            criticsRating: { type: string, description: "e.g. Certified Fresh, Fresh, Rotten." }
+            audienceScore: { type: integer, description: Popcornmeter percentage. }
+            audienceRating: { type: string, description: "e.g. Upright, Spilled." }
+            url: { type: string }
+        imdb:
+          type: object
+          properties:
+            rating: { type: number, description: "IMDb user rating, 0–10." }
+            url: { type: string }
 
     DiscoverPage:
       type: object

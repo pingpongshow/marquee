@@ -182,6 +182,34 @@ func (h *Handlers) ListItemChildren(ctx context.Context, req ListItemChildrenReq
 	return ListItemChildren200JSONResponse(page(list, total, offset)), nil
 }
 
+func (h *Handlers) ListPopularTracks(ctx context.Context, req ListPopularTracksRequestObject) (ListPopularTracksResponseObject, error) {
+	if _, ok := session(ctx); !ok {
+		return ListPopularTracks401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	if err := h.Items.Visible(ctx, access(ctx), req.ItemId); errors.Is(err, items.ErrNotFound) {
+		return ListPopularTracks404JSONResponse{NotFoundJSONResponse(apiErr("not_found", err.Error()))}, nil
+	} else if err != nil {
+		return nil, internal(ctx, "popular", err)
+	}
+	var ids []int64
+	rows, err := h.DB.QueryContext(ctx, `SELECT track_id FROM music_popular WHERE artist_id = ? ORDER BY rank`, req.ItemId)
+	if err != nil {
+		return nil, internal(ctx, "popular", err)
+	}
+	for rows.Next() {
+		var id int64
+		if rows.Scan(&id) == nil {
+			ids = append(ids, id)
+		}
+	}
+	rows.Close()
+	list, err := h.Items.ByIDs(ctx, access(ctx), ids)
+	if err != nil {
+		return nil, internal(ctx, "popular", err)
+	}
+	return ListPopularTracks200JSONResponse(page(list, len(list), 0)), nil
+}
+
 func (h *Handlers) GetItem(ctx context.Context, req GetItemRequestObject) (GetItemResponseObject, error) {
 	if _, ok := session(ctx); !ok {
 		return GetItem401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil

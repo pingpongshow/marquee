@@ -40,15 +40,17 @@ const (
 
 // Result is a movie or show as Seerr lists it.
 type Result struct {
-	ID           int64  `json:"id"`
-	MediaType    string `json:"mediaType"`
-	Title        string `json:"title"`
-	Name         string `json:"name"`
-	ReleaseDate  string `json:"releaseDate"`
-	FirstAirDate string `json:"firstAirDate"`
-	Overview     string `json:"overview"`
-	PosterPath   string `json:"posterPath"`
-	BackdropPath string `json:"backdropPath"`
+	ID           int64   `json:"id"`
+	MediaType    string  `json:"mediaType"`
+	Title        string  `json:"title"`
+	Name         string  `json:"name"`
+	ReleaseDate  string  `json:"releaseDate"`
+	FirstAirDate string  `json:"firstAirDate"`
+	Overview     string  `json:"overview"`
+	PosterPath   string  `json:"posterPath"`
+	BackdropPath string  `json:"backdropPath"`
+	VoteAverage  float64 `json:"voteAverage"`
+	VoteCount    int     `json:"voteCount"`
 	MediaInfo    *struct {
 		Status  int `json:"status"`
 		Seasons []struct {
@@ -238,6 +240,33 @@ func (s *Seerr) RequestState(ctx context.Context, id int64) (status, media int, 
 	}
 	err = s.do(ctx, http.MethodGet, fmt.Sprintf("/request/%d", id), nil, &r)
 	return r.Status, r.Media.Status, err
+}
+
+// RatingsRaw are a title's public ratings as Seerr gives them: Rotten Tomatoes for shows;
+// Rotten Tomatoes and IMDb ("ratingscombined") for movies.
+type RatingsRaw struct {
+	RT *struct {
+		URL            string `json:"url"`
+		CriticsRating  string `json:"criticsRating"`
+		CriticsScore   *int   `json:"criticsScore"`
+		AudienceRating string `json:"audienceRating"`
+		AudienceScore  *int   `json:"audienceScore"`
+	} `json:"rt"`
+	IMDb *struct {
+		URL          string   `json:"url"`
+		CriticsScore *float64 `json:"criticsScore"`
+	} `json:"imdb"`
+}
+
+// Ratings fetches a title's public ratings.
+func (s *Seerr) Ratings(ctx context.Context, mediaType string, tmdbID int64) (RatingsRaw, error) {
+	var out RatingsRaw
+	if mediaType == "movie" {
+		err := s.do(ctx, http.MethodGet, fmt.Sprintf("/movie/%d/ratingscombined", tmdbID), nil, &out)
+		return out, err
+	}
+	err := s.do(ctx, http.MethodGet, fmt.Sprintf("/tv/%d/ratings", tmdbID), nil, &out.RT)
+	return out, err
 }
 
 func (s *Seerr) Users(ctx context.Context) ([]User, error) {

@@ -42,6 +42,24 @@ type Artist struct {
 	SortName string  `json:"sort-name"`
 	Score    int     `json:"score"`
 	Genres   []Genre `json:"genres"`
+	Rels     []struct {
+		Type string `json:"type"`
+		URL  struct {
+			Resource string `json:"resource"`
+		} `json:"url"`
+	} `json:"relations"`
+}
+
+// Wikidata is the artist's Wikidata id (e.g. Q44190), from its links.
+func (a Artist) Wikidata() string {
+	for _, r := range a.Rels {
+		if r.Type == "wikidata" {
+			if i := strings.LastIndex(r.URL.Resource, "/"); i >= 0 {
+				return r.URL.Resource[i+1:]
+			}
+		}
+	}
+	return ""
 }
 
 type ReleaseGroup struct {
@@ -127,7 +145,7 @@ func quote(s string) string {
 // Artist looks an artist up by MBID, with genres.
 func (c *Client) Artist(ctx context.Context, mbid string) (Artist, error) {
 	var a Artist
-	err := c.get(ctx, "/artist/"+url.PathEscape(mbid), url.Values{"inc": {"genres"}}, &a)
+	err := c.get(ctx, "/artist/"+url.PathEscape(mbid), url.Values{"inc": {"genres url-rels"}}, &a)
 	return a, err
 }
 
