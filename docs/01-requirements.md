@@ -101,7 +101,7 @@ The owner wants the best music experience possible: everything Plexamp and Plex'
 | MUSIC-9 | **Playback quality:** gapless playback, loudness levelling (ReplayGain tags or EBU R128 analysis, track/album mode), optional crossfade and "sweet fades" that respect gapless albums, and a 10-band EQ on clients that support it. | P1 |
 | MUSIC-10 | **Lyrics:** embedded, `.lrc` sidecars and LRCLIB, with synced, scrolling lyrics in the player (also META-9). | P1 |
 | MUSIC-11 | **Ratings and taste:** 1–5 star ratings in half stars (every client can set halves, not only show them) / love ratings on tracks, albums and artists. Skips and plays feed recommendations. Per-user listening stats ("Year in music"). | P1 |
-| MUSIC-12 | **Scrobbling:** optional Last.fm and ListenBrainz scrobbling per user. ✅ ListenBrainz (D80); Last.fm needs the owner's API key. | P2 |
+| MUSIC-12 | **Scrobbling:** optional Last.fm and ListenBrainz scrobbling per user. ✅ ListenBrainz (D80) and Last.fm once the owner enters its API key (D81). | P2 |
 | MUSIC-13 | **Plexamp-style player:** full-screen now playing with artwork-coloured backgrounds, queue editing (drag to reorder, play next, add to queue), shuffle/repeat, sleep timer, waveform or visualizer, and a mini-player. | P1 |
 | MUSIC-14 | **Apple and Android:** offline downloads with smart sync (e.g. "keep my top 500 and today's mix"), CarPlay / Android Auto, lock-screen and widget controls, and Siri / Assistant "play … on Marquee" where the platforms allow. | P1 |
 | MUSIC-15 | **Discovery:** artist bios and photos, similar artists in your library, popular tracks (via Last.fm/ListenBrainz data) for an artist, and "Recently played" / "Most played" hubs.  ✅ Bios and popular tracks D79. | P1 |

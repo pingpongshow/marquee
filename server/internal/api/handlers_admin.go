@@ -80,6 +80,7 @@ func toAPISettings(s settings.Settings) ServerSettings {
 		Integrations: &IntegrationSettings{
 			SeerrUrl:         ptr(s.Integrations.SeerrURL),
 			SeerrApiKeySet:   ptr(s.Integrations.SeerrAPIKey != ""),
+			LastFmConfigured: ptr(s.Integrations.LastFMAPIKey != "" && s.Integrations.LastFMSecret != ""),
 			LiveTvSources:    ptr(toAPILiveSources(s.Integrations.LiveTVSources)),
 			DvrPaddingBefore: ptr(s.Integrations.DVRPaddingBefore),
 			DvrPaddingAfter:  ptr(s.Integrations.DVRPaddingAfter),
@@ -186,6 +187,12 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 			s.Integrations.SeerrURL = strings.TrimRight(strings.TrimSpace(*i.SeerrUrl), "/")
 		}
 		set(&s.Integrations.SeerrAPIKey, i.SeerrApiKey)
+		if i.LastFmApiKey != nil {
+			s.Integrations.LastFMAPIKey = strings.TrimSpace(*i.LastFmApiKey)
+		}
+		if i.LastFmSecret != nil {
+			s.Integrations.LastFMSecret = strings.TrimSpace(*i.LastFmSecret)
+		}
 		set(&s.Integrations.DVRPaddingBefore, i.DvrPaddingBefore)
 		set(&s.Integrations.DVRPaddingAfter, i.DvrPaddingAfter)
 		if i.LiveTvSources != nil {

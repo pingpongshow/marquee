@@ -131,7 +131,10 @@ func run() error {
 		return webhooks.Server{ID: store.ServerID(), Name: store.Get().General.ServerName, Version: config.Version}
 	}}
 	go hooks.Run(ctx)
-	scrobbler := &scrobble.Service{DB: database}
+	scrobbler := &scrobble.Service{DB: database, LastFM: func() (string, string) {
+		i := store.Get().Integrations
+		return i.LastFMAPIKey, i.LastFMSecret
+	}}
 	player.Events = func(kind string, s *playback.Session, pos int64) {
 		if s.ItemType == "track" && (kind == "playback.started" || kind == "playback.watched") {
 			go scrobbler.Played(ctx, s.UserID, s.ItemID, kind == "playback.started", s.StartedAt)

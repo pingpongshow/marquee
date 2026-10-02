@@ -280,6 +280,73 @@ paths:
         "204": { description: Disconnected. }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+  /me/scrobbling/lastfm:
+    get:
+      tags: [users]
+      operationId: lastFmStatus
+      summary: "Whether the caller's plays go to Last.fm, and whether Last.fm is set up on this server (MUSIC-12)."
+      responses:
+        "200":
+          description: Status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScrobbleStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [users]
+      operationId: lastFmAuthUrl
+      summary: "Start connecting Last.fm: the last.fm page where the person approves Marquee. Last.fm sends them back to callbackUrl with ?token=…"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                callbackUrl: { type: string }
+      responses:
+        "200":
+          description: Where to go.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+    put:
+      tags: [users]
+      operationId: connectLastFm
+      summary: Finish connecting Last.fm with the token last.fm returned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "200":
+          description: Connected.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScrobbleStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+    delete:
+      tags: [users]
+      operationId: disconnectLastFm
+      summary: Stop sending plays to Last.fm.
+      responses:
+        "204": { description: Disconnected. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
   /me:
     get:
       tags: [auth]
@@ -3460,7 +3527,8 @@ components:
       required: [connected]
       properties:
         connected: { type: boolean }
-        username: { type: string, description: The ListenBrainz account. }
+        available: { type: boolean, description: "Last.fm: the server has Last.fm's API keys, so people can connect." }
+        username: { type: string, description: The account plays go to. }
         error: { type: string, description: The last problem sending a play. }
 
     TitleRatings:
@@ -3550,6 +3618,7 @@ components:
       properties:
         seerrUrl: { type: string, description: "Seerr's address, e.g. http://10.1.1.10:5055. Empty turns requests off." }
         seerrApiKeySet: { type: boolean, readOnly: true }
+        lastFmConfigured: { type: boolean, readOnly: true, description: "Last.fm's API key and shared secret are set, so people can connect Last.fm (MUSIC-12)." }
         dvrPaddingBefore: { type: integer, minimum: 0, maximum: 60, description: Minutes recordings start early. }
         dvrPaddingAfter: { type: integer, minimum: 0, maximum: 120, description: Minutes recordings run late. }
         liveTvSources:
@@ -3561,6 +3630,8 @@ components:
       properties:
         seerrUrl: { type: string }
         seerrApiKey: { type: string, description: Write-only. }
+        lastFmApiKey: { type: string, description: "Last.fm API key. Write-only; empty turns Last.fm off." }
+        lastFmSecret: { type: string, description: Last.fm shared secret. Write-only. }
         dvrPaddingBefore: { type: integer, minimum: 0, maximum: 60 }
         dvrPaddingAfter: { type: integer, minimum: 0, maximum: 120 }
         liveTvSources:

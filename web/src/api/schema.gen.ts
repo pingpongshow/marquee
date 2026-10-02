@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Prometheus metrics (ADM-7): playback, transcodes, Live TV, recordings, libraries and requests. Open to the home network; from elsewhere, admins only. */
+        get: operations["getMetrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/system/health": {
         parameters: {
             query?: never;
@@ -187,6 +204,26 @@ export interface paths {
         post?: never;
         /** Stop sending plays to ListenBrainz. */
         delete: operations["disconnectListenBrainz"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/scrobbling/lastfm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether the caller's plays go to Last.fm, and whether Last.fm is set up on this server (MUSIC-12). */
+        get: operations["lastFmStatus"];
+        /** Finish connecting Last.fm with the token last.fm returned. */
+        put: operations["connectLastFm"];
+        /** Start connecting Last.fm: the last.fm page where the person approves Marquee. Last.fm sends them back to callbackUrl with ?token=… */
+        post: operations["lastFmAuthUrl"];
+        /** Stop sending plays to Last.fm. */
+        delete: operations["disconnectLastFm"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2743,7 +2780,9 @@ export interface components {
         };
         ScrobbleStatus: {
             connected: boolean;
-            /** @description The ListenBrainz account. */
+            /** @description Last.fm: the server has Last.fm's API keys, so people can connect. */
+            available?: boolean;
+            /** @description The account plays go to. */
             username?: string;
             /** @description The last problem sending a play. */
             error?: string;
@@ -2822,6 +2861,8 @@ export interface components {
             /** @description Seerr's address, e.g. http://10.1.1.10:5055. Empty turns requests off. */
             seerrUrl?: string;
             readonly seerrApiKeySet?: boolean;
+            /** @description Last.fm's API key and shared secret are set, so people can connect Last.fm (MUSIC-12). */
+            readonly lastFmConfigured?: boolean;
             /** @description Minutes recordings start early. */
             dvrPaddingBefore?: number;
             /** @description Minutes recordings run late. */
@@ -2832,6 +2873,10 @@ export interface components {
             seerrUrl?: string;
             /** @description Write-only. */
             seerrApiKey?: string;
+            /** @description Last.fm API key. Write-only; empty turns Last.fm off. */
+            lastFmApiKey?: string;
+            /** @description Last.fm shared secret. Write-only. */
+            lastFmSecret?: string;
             dvrPaddingBefore?: number;
             dvrPaddingAfter?: number;
             /** @description Replaces the whole list when sent. */
@@ -3883,6 +3928,27 @@ export interface operations {
             };
         };
     };
+    getMetrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Prometheus text exposition format. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            403: components["responses"]["Forbidden"];
+        };
+    };
     getHealth: {
         parameters: {
             query?: never;
@@ -4163,6 +4229,106 @@ export interface operations {
         };
     };
     disconnectListenBrainz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disconnected. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    lastFmStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScrobbleStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    connectLastFm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    token: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Connected. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScrobbleStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    lastFmAuthUrl: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    callbackUrl?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Where to go. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        url: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    disconnectLastFm: {
         parameters: {
             query?: never;
             header?: never;

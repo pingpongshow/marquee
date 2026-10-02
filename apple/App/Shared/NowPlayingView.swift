@@ -1,3 +1,4 @@
+import AVKit
 import MarqueeKit
 import SwiftUI
 
@@ -178,6 +179,9 @@ struct NowPlayingView: View {
                 DJMenu()
                 LevellingMenu()
                 CrossfadeMenu()
+                #if os(iOS)
+                AirPlayButton().frame(width: 30, height: 30)
+                #endif
             }
             .font(.title3)
             .foregroundStyle(.secondary)
@@ -242,3 +246,19 @@ struct NowPlayingView: View {
         .buttonStyle(.plain)
     }
 }
+
+#if os(iOS)
+/// The system AirPlay picker: AirPlay 2 speakers (HomePod, Sonos…), Apple TV and Bluetooth.
+struct AirPlayButton: UIViewRepresentable {
+    func makeUIView(context: Context) -> AVRoutePickerView {
+        let v = AVRoutePickerView()
+        v.tintColor = .secondaryLabel
+        v.activeTintColor = UIColor(Color.marqueeGold)
+        v.prioritizesVideoDevices = false
+        v.accessibilityLabel = "AirPlay"
+        return v
+    }
+
+    func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
+}
+#endif

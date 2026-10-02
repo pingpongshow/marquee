@@ -37,6 +37,9 @@ type Integrations struct {
 	// Seerr takes requests for titles that aren't in the library (REQ-1).
 	SeerrURL    string `json:"seerrUrl"`
 	SeerrAPIKey string `json:"seerrApiKey"`
+	// Last.fm scrobbling (MUSIC-12): the owner's API account (www.last.fm/api/account/create).
+	LastFMAPIKey string `json:"lastFmApiKey"`
+	LastFMSecret string `json:"lastFmSecret"`
 	// LiveTVSources feed Live TV (LIVE-1).
 	LiveTVSources []LiveTVSource `json:"liveTvSources"`
 	// DVR padding in minutes (LIVE-5).
