@@ -1,5 +1,7 @@
 package app.marquee.ui
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import app.marquee.api.models.RadioRequest
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.filled.Radio
@@ -90,6 +92,10 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 .onFailure { Toast.makeText(context, it.message ?: "Couldn't start a radio", Toast.LENGTH_LONG).show() }
         }
     }) { Icon(Icons.Filled.Radio, null); Text("Radio") }
+    @Composable fun Download() {
+        if (!marquee.isTv && d.type in listOf(ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO, ItemType.TRACK, ItemType.ALBUM, ItemType.ARTIST, ItemType.SEASON, ItemType.SHOW))
+            DownloadButton(d.summary())
+    }
     @Composable fun Actions() {
             when (d.type) {
                 ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO -> {
@@ -118,6 +124,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 }
                 else -> {}
             }
+        Download()
     }
     LazyColumn(contentPadding = PaddingValues(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
         item {
@@ -135,7 +142,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
             }
         }
         if (!marquee.isTv) {
-            item { Row(Modifier.padding(horizontal = sidePadding), horizontalArrangement = Arrangement.spacedBy(12.dp)) { Actions() } }
+            item { Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = sidePadding), horizontalArrangement = Arrangement.spacedBy(10.dp)) { Actions() } }
             d.summary?.takeIf { it.isNotBlank() }?.let { s -> item { Text(s, Modifier.padding(horizontal = sidePadding), maxLines = 8, overflow = TextOverflow.Ellipsis) } }
         }
         if (pg.children.isNotEmpty()) item {

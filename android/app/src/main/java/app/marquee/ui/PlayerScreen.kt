@@ -1,6 +1,7 @@
 package app.marquee.ui
 
 import android.app.Activity
+import android.net.Uri
 import android.content.pm.ActivityInfo
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -63,6 +64,15 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?) {
     var error by remember { mutableStateOf<String?>(null) }
     var position by remember { mutableLongStateOf(0L) }
     var playing by remember { mutableStateOf(false) }
+    // Downloaded: play the file on the device, even when the server is reachable (D64).
+    val downloads = LocalDownloads.current
+    val local = remember(itemId) { downloads.localFile(itemId) }
+    fun recordLocal(ended: Boolean = false) {
+        val dur = player.duration
+        val pos = player.currentPosition
+        if (local == null || pos <= 0) return
+        downloads.recordProgress(itemId, pos, watched = ended || (dur > 0 && pos >= dur * 0.9))
+    }
 
     fun report(state: PlaybackProgress.State) {
         val s = session ?: return
@@ -72,7 +82,13 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?) {
 
     // ExoPlayer is main-thread only; don't rely on the effect's dispatcher for that.
     LaunchedEffect(itemId) {
-        withContext(Dispatchers.Main) { runCatching {
+        if (local != null) withContext(Dispatchers.Main) {
+            player.setMediaItem(MediaItem.fromUri(Uri.fromFile(local)))
+            player.prepare()
+            val start = startMs ?: downloads.resumePosition(itemId)
+            if (start > 0) player.seekTo(start)
+            player.playWhenReady = true
+        } else withContext(Dispatchers.Main) { runCatching {
             withContext(Dispatchers.IO) { marquee.playback.startPlayback(PlaybackRequest(itemId, AndroidProfile.profile, startMs = startMs)) }
         }.onSuccess { s ->
             session = s
@@ -103,10 +119,12 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 playing = isPlaying
+                if (!isPlaying) recordLocal()
                 report(if (isPlaying) PlaybackProgress.State.PLAYING else PlaybackProgress.State.PAUSED)
             }
             override fun onPlaybackStateChanged(state: Int) {
                 if (state != Player.STATE_ENDED) return
+                if (local != null) { recordLocal(ended = true); nav.popBackStack(); return }
                 report(PlaybackProgress.State.PAUSED)
                 // Up next: the following episode (or nothing).
                 marquee.scope.launch(Dispatchers.Main) {
@@ -128,6 +146,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?) {
             }
             val s = session
             val pos = player.currentPosition
+            recordLocal()
             player.removeListener(listener)
             player.release()
             if (s != null) marquee.scope.launch {

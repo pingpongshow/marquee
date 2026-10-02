@@ -20,6 +20,6 @@ class MainActivity : ComponentActivity() {
             app.music.stop()
             marquee.reset()
         }
-        setContent { MarqueeTheme { MarqueeRoot(marquee, app.music) } }
+        setContent { MarqueeTheme { MarqueeRoot(marquee, app.music, app.downloads) } }
     }
 }
