@@ -138,6 +138,76 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
 
+  /auth/quickconnect:
+    post:
+      tags: [auth]
+      operationId: startQuickConnect
+      summary: A TV or other device asks to sign in with a code (Quick Connect). It shows the code and polls until someone approves it.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device]
+              properties:
+                device: { $ref: "#/components/schemas/DeviceInfo" }
+      responses:
+        "200":
+          description: Show the code; poll with the secret.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuickConnectStart" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /auth/quickconnect/{secret}:
+    get:
+      tags: [auth]
+      operationId: pollQuickConnect
+      summary: Whether the code has been approved. Once it has, the response carries the sign-in token (only once).
+      security: []
+      parameters:
+        - name: secret
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Current state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuickConnectState" }
+
+  /auth/quickconnect/authorize:
+    post:
+      tags: [auth]
+      operationId: authorizeQuickConnect
+      summary: Approve a device's Quick Connect code; it signs in as you.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        "200":
+          description: Approved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deviceName]
+                properties:
+                  deviceName: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
   /auth/logout:
     post:
       tags: [auth]
@@ -1491,6 +1561,8 @@ components:
         setupRequired: { type: boolean }
         networkClass: { $ref: "#/components/schemas/NetworkClass" }
         pinSignIn: { type: boolean, description: The sign-in screen should offer the profile picker with PINs from this network. }
+        lanUrl: { type: string, description: "The server's home-network address (Settings → Network), so apps reached over Tailscale learn it." }
+        remoteUrl: { type: string, description: "The Tailscale address (Settings → Remote Access), so apps on the LAN learn where to go when away." }
 
     Health:
       type: object
@@ -2047,6 +2119,7 @@ components:
         hlsAudioCodecs: { type: array, items: { type: string } }
         textSubtitles: { type: boolean, description: Can show WebVTT sidecar subtitles. }
         assSubtitles: { type: boolean, description: "Can render styled ASS/SSA subtitles itself (e.g. JASSUB); they're then sent as .ass with the file's fonts." }
+        hlsSubtitles: { type: boolean, description: "Text subtitles must come inside the HLS stream (AVPlayer). Every text track is listed as a WebVTT rendition, and a file with a subtitle selected is repackaged rather than played directly." }
 
     PlaybackRequest:
       type: object
@@ -2246,6 +2319,22 @@ components:
         item: { $ref: "#/components/schemas/ItemSummary" }
         role: { type: string }
         character: { type: string }
+
+    QuickConnectStart:
+      type: object
+      required: [code, secret, expiresAt, pollIntervalMs]
+      properties:
+        code: { type: string, description: Six characters to show on screen. }
+        secret: { type: string, description: Kept by the device to poll for the result. }
+        expiresAt: { type: string, format: date-time }
+        pollIntervalMs: { type: integer }
+
+    QuickConnectState:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [pending, approved, expired] }
+        auth: { $ref: "#/components/schemas/AuthResult" }
 
     PlaylistKind:
       type: string

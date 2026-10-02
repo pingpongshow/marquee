@@ -29,6 +29,8 @@ type DeviceProfile struct {
 	TextSubtitles bool
 	// ASSSubtitles: the client renders styled ASS/SSA itself.
 	ASSSubtitles bool
+	// HLSSubtitles: text subtitles must be WebVTT renditions inside HLS (AVPlayer).
+	HLSSubtitles bool
 }
 
 type Method string
@@ -89,6 +91,8 @@ type Limits struct {
 	MaxHeight  int // 0 = no limit
 	Remote     bool
 	PreferHEVC bool
+	// NoVideoCopy rules out direct stream: the file has no usable keyframe index (D48).
+	NoVideoCopy bool
 }
 
 // Decision is the plan for a session.
@@ -104,6 +108,7 @@ type Decision struct {
 	BurnSubtitle  bool // burn the selected (image) subtitle into the video
 	SubtitleVTT   bool // deliver the selected text subtitle as a WebVTT sidecar
 	SubtitleASS   bool // deliver it as the original ASS (client renders styling and fonts)
+	SubtitleHLS   bool // deliver it as a WebVTT rendition in the HLS master playlist
 	ToneMap       bool
 	Reasons       []string
 	retag         bool // video is fine apart from its codec tag; direct stream fixes it
@@ -192,6 +197,8 @@ func Decide(m Media, p DeviceProfile, l Limits) Decision {
 			reason("image subtitles (%s) must be burned in", s.Codec)
 		} else if (s.Codec == "ass" || s.Codec == "ssa") && p.ASSSubtitles {
 			d.SubtitleASS = true
+		} else if p.HLSSubtitles && p.HLS {
+			d.SubtitleHLS = true
 		} else if p.TextSubtitles {
 			d.SubtitleVTT = true
 		} else {
@@ -200,14 +207,20 @@ func Decide(m Media, p DeviceProfile, l Limits) Decision {
 		}
 	}
 
-	if videoOK && audioOK && containerOK && bitrateOK && !d.BurnSubtitle {
+	if d.SubtitleHLS && videoOK && audioOK && containerOK && bitrateOK {
+		reason("subtitles are delivered inside HLS")
+	}
+	if videoOK && audioOK && containerOK && bitrateOK && !d.BurnSubtitle && !d.SubtitleHLS {
 		d.Method = DirectPlay
 		d.VideoCopy, d.AudioCopy = true, true
 		return d
 	}
 
 	// Keep the original video, repackaged as HLS (audio converted if needed).
-	if (videoOK || d.retag) && bitrateOK && !d.BurnSubtitle && p.HLS && has(p.HLSVideoCodecs, v.Codec) {
+	if (videoOK || d.retag) && bitrateOK && !d.BurnSubtitle && p.HLS && has(p.HLSVideoCodecs, v.Codec) && l.NoVideoCopy {
+		reason("no keyframe index, so the video can't be repackaged")
+	}
+	if (videoOK || d.retag) && bitrateOK && !d.BurnSubtitle && p.HLS && has(p.HLSVideoCodecs, v.Codec) && !l.NoVideoCopy {
 		d.Method = DirectStream
 		d.VideoCopy = true
 		d.AudioCopy = a == nil || (has(p.HLSAudioCodecs, a.Codec) && (p.MaxAudioChannels == 0 || a.Channels <= p.MaxAudioChannels))

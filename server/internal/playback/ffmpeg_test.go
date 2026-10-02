@@ -9,8 +9,8 @@ func TestJobArgs(t *testing.T) {
 	d := Decide(archer(), chrome, Limits{})
 	j := Job{Input: "/m/a.mkv", Decision: d, VideoIndex: 0, AudioIndex: 4, SubIndex: -1, StartSegment: 10, Dir: "/t/s", Encoder: "nvenc", Preset: "balanced"}
 	cmd := strings.Join(j.Args(), " ")
-	for _, want := range []string{"-hwaccel cuda", "-ss 60.000", "-copyts", "scale_cuda=w=-2:h=1080:format=nv12", "h264_nvenc", "-start_number 10",
-		"expr:gte(t,n_forced*6)", "-c:a aac -ac 2", "-map 0:4"} {
+	for _, want := range []string{"-hwaccel cuda", "-ss 60.000", "-copyts", "scale_cuda=w=-2:h=1080:format=nv12", "h264_nvenc", "-no-scenecut 1",
+		"gte(t,prev_forced_t+6-0.001)", "+frag_discont pipe:1", "-c:a aac -ac 2", "-map 0:4"} {
 		if !strings.Contains(cmd, want) {
 			t.Errorf("missing %q in\n%s", want, cmd)
 		}
@@ -29,5 +29,10 @@ func TestJobArgs(t *testing.T) {
 	cmd = strings.Join(j.Args(), " ")
 	if !strings.Contains(cmd, "-c:v copy") || strings.Contains(cmd, "filter_complex") || strings.Contains(cmd, "-ss ") {
 		t.Errorf("direct stream:\n%s", cmd)
+	}
+	// A copy restart seeks just past the planned keyframe.
+	j.Plan, j.StartSegment = []float64{0, 5.005, 11.2}, 2
+	if cmd = strings.Join(j.Args(), " "); !strings.Contains(cmd, "-ss 11.250") || strings.Contains(cmd, "force_key_frames") {
+		t.Errorf("copy restart:\n%s", cmd)
 	}
 }

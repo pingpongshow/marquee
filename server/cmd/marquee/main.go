@@ -10,6 +10,8 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -18,6 +20,7 @@ import (
 	"marquee/internal/avatars"
 	"marquee/internal/config"
 	"marquee/internal/db"
+	"marquee/internal/discovery"
 	"marquee/internal/images"
 	"marquee/internal/items"
 	"marquee/internal/library"
@@ -196,6 +199,16 @@ func run() error {
 			return "Done", nil
 		}})
 	go scheduler.Run(ctx)
+
+	// Bonjour, so LAN apps find the server (D49).
+	port, _ := strconv.Atoi(strings.TrimPrefix(cfg.ListenAddr, ":"))
+	bonjour := &discovery.Advertiser{}
+	advertise := func(s settings.Settings) {
+		bonjour.Apply(s.Network.BonjourEnabled, discovery.Info{ServerID: store.ServerID(), Name: s.General.ServerName, Version: config.Version, Port: port}, s.Network.LANSubnets)
+	}
+	advertise(cur)
+	store.Subscribe(advertise)
+	defer bonjour.Stop()
 
 	handler := server.New(server.Deps{
 		Handlers: &api.Handlers{
