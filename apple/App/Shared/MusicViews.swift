@@ -9,6 +9,7 @@ struct MusicDiscoverView: View {
     @State private var status: MusicStatus?
     @State private var mixes: [Station] = []
     @State private var decades: [String] = []
+    @State private var styles: [String] = []
     @State private var prompt = ""
     @State private var busy = false
     @State private var error: String?
@@ -27,6 +28,7 @@ struct MusicDiscoverView: View {
                 if let error { ErrorBanner(message: error).padding(.horizontal, sidePadding) }
                 muse
                 stations
+                MoodsAndStyles(libraryID: libraryID, styles: styles)
                 if !mixes.isEmpty {
                     ShelfRow(title: "Mixes for you") {
                         ForEach(mixes, id: \.title) { m in MixCard(station: m) { music.playStation(m) } }
@@ -43,7 +45,9 @@ struct MusicDiscoverView: View {
         status = try? await app.musicStatus()
         guard status?.enabled == true else { return }
         mixes = (try? await app.mixes(library: libraryID)) ?? []
-        decades = ((try? await app.filters(library: libraryID, type: .album))?.decades.map(\.value) ?? []).prefix(6).map { $0 }
+        let f = try? await app.filters(library: libraryID, type: .album)
+        decades = (f?.decades.map(\.value) ?? []).prefix(6).map { $0 }
+        styles = (f?.genres.sorted { $0.count > $1.count }.map(\.value) ?? []).prefix(18).map { $0 }
     }
 
     private var muse: some View {
@@ -370,5 +374,165 @@ struct DJMenu: View {
                 .labelStyle(.iconOnly)
         }
         .accessibilityLabel(music.dj.map { "Guest DJ: \($0.label)" } ?? "Guest DJ: off")
+    }
+}
+
+/// Moods and styles as tiles (MUSIC-18); each opens its page.
+struct MoodsAndStyles: View {
+    let libraryID: Int64
+    let styles: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            section("Moods", musicMoods, kind: .mood)
+            if !styles.isEmpty { section("Styles", styles, kind: .style) }
+        }
+    }
+
+    private func section(_ title: String, _ names: [String], kind: MoodStyleView.Kind) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title).font(.title3.bold()).padding(.horizontal, sidePadding)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: tileSpacing) {
+                    ForEach(names, id: \.self) { n in
+                        NavigationLink { MoodStyleView(libraryID: libraryID, kind: kind, name: n) } label: {
+                            Text(n).font(.subheadline.weight(.semibold)).foregroundStyle(.white)
+                                .frame(width: tileWidth, height: tileWidth * 0.55, alignment: .bottomLeading)
+                                .padding(10)
+                                .background(LinearGradient(colors: [tint(n), tint(n).opacity(0.4)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                                            in: RoundedRectangle(cornerRadius: 10))
+                        }
+                        #if os(tvOS)
+                        .buttonStyle(.card)
+                        #else
+                        .buttonStyle(.plain)
+                        #endif
+                        .accessibilityLabel("\(n) \(kind == .mood ? "mood" : "style")")
+                    }
+                }
+                .padding(.horizontal, sidePadding)
+                #if os(tvOS)
+                .padding(.vertical, 20)
+                #endif
+            }
+            #if os(tvOS)
+            .scrollClipDisabled()
+            #endif
+        }
+    }
+
+    private func tint(_ s: String) -> Color {
+        let h = Double(s.unicodeScalars.reduce(7) { ($0 * 37 + Int($1.value)) % 360 }) / 360
+        return Color(hue: h, saturation: 0.6, brightness: 0.55)
+    }
+
+    #if os(tvOS)
+    private let tileWidth: CGFloat = 220
+    private let tileSpacing: CGFloat = 30
+    #else
+    private let tileWidth: CGFloat = 120
+    private let tileSpacing: CGFloat = 10
+    #endif
+}
+
+/// A mood or style page: its radio, albums and a track sampler (MUSIC-18).
+struct MoodStyleView: View {
+    enum Kind { case mood, style }
+    @Environment(AppSession.self) private var app
+    @Environment(MusicPlayer.self) private var music
+    let libraryID: Int64
+    let kind: Kind
+    let name: String
+    @State private var tracks: [Item] = []
+    @State private var albums: [Item] = []
+    @State private var error: String?
+    @State private var loaded = false
+
+    private var request: RadioRequest {
+        kind == .mood ? .init(seed: .mood, value: name.lowercased(), libraryId: libraryID, limit: 30)
+            : .init(seed: .genre, value: name, libraryId: libraryID, limit: 30)
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text(kind == .mood ? "MOOD" : "STYLE").font(.caption.weight(.semibold)).foregroundStyle(Color.marqueeGold)
+                    .padding(.horizontal, sidePadding)
+                Button { startRadio() } label: { Label("Play \(name) Radio", systemImage: "dot.radiowaves.left.and.right") }
+                    .buttonStyle(.borderedProminent)
+                    .padding(.horizontal, sidePadding)
+                if let error { Text(error).foregroundStyle(.red).padding(.horizontal, sidePadding) }
+                if !albums.isEmpty {
+                    ShelfRow(title: kind == .mood ? "Albums with This Feel" : "Albums") {
+                        ForEach(albums, id: \.id) { a in
+                            NavigationLink(value: Route.item(a.id)) { PosterCard(item: a) }.buttonStyle(.plain)
+                        }
+                    }
+                }
+                if !tracks.isEmpty {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("Tracks").font(.title3.bold()).padding(.bottom, 8)
+                        ForEach(Array(tracks.enumerated()), id: \.element.id) { i, t in
+                            Button { music.play(tracks, start: i, source: name) } label: {
+                                HStack {
+                                    Text("\(i + 1)").font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 24, alignment: .trailing)
+                                    VStack(alignment: .leading) {
+                                        Text(t.title).lineLimit(1)
+                                        Text([t.artistCredit ?? t.grandparentTitle, t.parentTitle].compactMap { $0 }.joined(separator: " · "))
+                                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                    }
+                                    Spacer()
+                                }
+                                .padding(.vertical, 6)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, sidePadding)
+                } else if !loaded {
+                    ProgressView().padding()
+                }
+            }
+            .padding(.vertical)
+        }
+        .navigationTitle(name)
+        .task { await load() }
+    }
+
+    private func startRadio() {
+        Task {
+            do {
+                var r = request
+                r.limit = 50
+                music.playStation(try await app.radio(r), radio: r)
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
+    }
+
+    private func load() async {
+        defer { loaded = true }
+        do {
+            tracks = try await app.radio(request).items
+            if kind == .style {
+                albums = try await app.items(library: libraryID, sort: ._hyphen_rating, limit: 40, genre: name, type: .album).items
+            } else {
+                // The station's albums, in order of appearance.
+                var seen = Set<Int64>()
+                albums = tracks.compactMap { t in
+                    guard let p = t.parentId, seen.insert(p).inserted else { return nil }
+                    var album = t
+                    album.id = p
+                    album._type = .album
+                    album.title = t.parentTitle ?? t.title
+                    album.parentTitle = t.artistCredit ?? t.grandparentTitle
+                    return album
+                }
+            }
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 }
