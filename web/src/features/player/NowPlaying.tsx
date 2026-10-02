@@ -1,10 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import { clsx } from "clsx";
-import { ChevronDown, GripVertical, ListMusic, Maximize2, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume2, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronDown, GripVertical, ListMusic, Maximize2, MicVocal, Moon, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume2, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { imageUrl } from "@/api/client";
+import { api, imageUrl, unwrap } from "@/api/client";
+import { Menu, MenuItem } from "@/components/Menu";
+import { Rating } from "../music/Rating";
 import type { ItemSummary } from "@/api/types";
-import { useMusic } from "./MusicPlayer";
+import { useMusic, type Levelling } from "./MusicPlayer";
 import type { Entry } from "./queue";
 
 export function fmtTime(s: number) {
@@ -235,7 +238,7 @@ export function NowPlaying() {
   const m = useMusic();
   const t = m.current!.item;
   const color = useArtworkColor(t.images?.poster);
-  const [showQueue, setShowQueue] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
+  const [panel, setPanel] = useState<"queue" | "lyrics" | null>(() => (window.matchMedia("(min-width: 1024px)").matches ? "queue" : null));
   const d = isFinite(m.duration) && m.duration > 0 ? m.duration : (t.durationMs ?? 0) / 1000;
 
   useEffect(() => {
@@ -263,13 +266,30 @@ export function NowPlaying() {
         <button onClick={() => m.setExpanded(false)} className="rounded-full p-2 hover:bg-white/10" aria-label="Close Now Playing">
           <ChevronDown className="size-6" />
         </button>
-        <div className="flex-1 text-center text-xs font-semibold tracking-wider text-white/70 uppercase">Now Playing</div>
-        <button onClick={() => setShowQueue((v) => !v)} className={clsx("rounded-full p-2 hover:bg-white/10", showQueue && "text-accent")} aria-label="Queue" aria-expanded={showQueue}>
+        <div className="flex-1 text-center">
+          <div className="text-xs font-semibold tracking-wider text-white/70 uppercase">{m.source ? "Playing from" : "Now Playing"}</div>
+          {m.source && <div className="truncate text-sm font-medium">{m.source.title}</div>}
+        </div>
+        <SleepMenu />
+        <button
+          onClick={() => setPanel((p) => (p === "lyrics" ? null : "lyrics"))}
+          className={clsx("rounded-full p-2 hover:bg-white/10", panel === "lyrics" && "text-accent")}
+          aria-label="Lyrics"
+          aria-pressed={panel === "lyrics"}
+        >
+          <MicVocal className="size-5" />
+        </button>
+        <button
+          onClick={() => setPanel((p) => (p === "queue" ? null : "queue"))}
+          className={clsx("rounded-full p-2 hover:bg-white/10", panel === "queue" && "text-accent")}
+          aria-label="Queue"
+          aria-pressed={panel === "queue"}
+        >
           <ListMusic className="size-5" />
         </button>
       </header>
       <div className="flex min-h-0 flex-1 gap-8 px-6 pb-8 lg:px-12">
-        <div className={clsx("flex min-w-0 flex-1 flex-col items-center justify-center gap-6", showQueue && "max-lg:hidden")}>
+        <div className={clsx("flex min-w-0 flex-1 flex-col items-center justify-center gap-6", panel && "max-lg:hidden")}>
           <Art item={t} size={640} className="aspect-square w-full max-w-[min(32rem,55vh)] shadow-2xl" />
           <div className="w-full max-w-[32rem] text-center">
             <div className="truncate text-2xl font-bold">{t.title}</div>
@@ -299,14 +319,97 @@ export function NowPlaying() {
             </div>
           </div>
           <Controls large />
-          <Volume className="flex" />
+          <div className="flex flex-wrap items-center justify-center gap-6">
+            <Rating key={t.id} itemId={t.id} value={t.userRating} />
+            <Volume className="flex" />
+            <LevellingSelect />
+          </div>
         </div>
-        {showQueue && (
-          <aside className="flex w-full flex-col overflow-hidden rounded-xl bg-black/30 lg:w-96">
-            <QueueList dark />
+        {panel && (
+          <aside className="flex w-full flex-col overflow-hidden rounded-xl bg-black/30 lg:w-[28rem]">
+            {panel === "queue" ? <QueueList dark /> : <LyricsPanel item={t} />}
           </aside>
         )}
       </div>
     </div>
+  );
+}
+
+/** Synced lyrics follow the music (the current line is highlighted and kept in view); plain lyrics just scroll. */
+function LyricsPanel({ item }: { item: ItemSummary }) {
+  const m = useMusic();
+  const lyrics = useQuery({
+    queryKey: ["lyrics", item.id],
+    queryFn: () => unwrap(api.GET("/items/{itemId}/lyrics", { params: { path: { itemId: item.id } } })),
+    retry: false,
+    staleTime: Infinity,
+  });
+  const ms = m.time * 1000;
+  const lines = lyrics.data?.lines ?? [];
+  let current = -1;
+  if (lyrics.data?.synced) {
+    for (let i = 0; i < lines.length; i++) if ((lines[i]!.timeMs ?? 0) <= ms + 250) current = i;
+  }
+  useEffect(() => {
+    if (current >= 0) document.getElementById(`lyric-${current}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [current]);
+  if (lyrics.isPending) return <p className="p-6 text-white/60">Looking for lyrics…</p>;
+  if (lyrics.isError || !lines.length) return <p className="p-6 text-white/60">No lyrics for this track.</p>;
+  return (
+    <div className="flex-1 overflow-y-auto px-6 py-10">
+      {lines.map((l, i) => (
+        <p
+          key={i}
+          id={`lyric-${i}`}
+          onClick={() => l.timeMs !== undefined && m.seek(l.timeMs / 1000)}
+          className={clsx(
+            "py-1.5 text-xl leading-snug font-bold transition-colors",
+            lyrics.data!.synced ? (i === current ? "text-white" : "cursor-pointer text-white/35 hover:text-white/60") : "text-white/85",
+            !l.text && "h-4",
+          )}
+        >
+          {l.text}
+        </p>
+      ))}
+      <p className="mt-6 text-xs text-white/40">Lyrics: {lyrics.data!.source === "lrclib" ? "LRCLIB" : lyrics.data!.source === "sidecar" ? ".lrc file" : "embedded in the file"}</p>
+    </div>
+  );
+}
+
+const sleepOptions = [15, 30, 45, 60, 90];
+
+function SleepMenu() {
+  const m = useMusic();
+  const active = m.sleep !== null;
+  return (
+    <Menu label="Sleep timer" trigger={<Moon className={clsx("size-5", active ? "text-accent" : "text-white")} />}>
+      {active && <MenuItem onClick={() => m.setSleep(null)}>Cancel sleep timer ({m.sleep === "track" ? "end of track" : "on"})</MenuItem>}
+      <MenuItem onClick={() => m.setSleep("track")}>At the end of this track</MenuItem>
+      {sleepOptions.map((n) => (
+        <MenuItem key={n} onClick={() => m.setSleep(Date.now() + n * 60_000)}>
+          In {n} minutes
+        </MenuItem>
+      ))}
+    </Menu>
+  );
+}
+
+const levellingLabels: Record<Levelling, string> = { auto: "Volume levelling: auto", track: "Level each track", album: "Level by album", off: "No levelling" };
+
+function LevellingSelect() {
+  const m = useMusic();
+  return (
+    <select
+      value={m.levelling}
+      onChange={(e) => m.setLevelling(e.target.value as Levelling)}
+      aria-label="Volume levelling"
+      className="rounded-md border border-white/20 bg-black/30 px-2 py-1 text-xs text-white/80"
+    >
+      {(Object.keys(levellingLabels) as Levelling[]).map((k) => (
+        <option key={k} value={k}>
+          {levellingLabels[k]}
+        </option>
+      ))}
+    </select>
   );
 }

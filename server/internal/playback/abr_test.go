@@ -2,8 +2,8 @@ package playback
 
 import (
 	"context"
-	"os"
 	"net/http/httptest"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"

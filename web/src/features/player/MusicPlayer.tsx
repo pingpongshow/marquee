@@ -1,11 +1,22 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, imageUrl, session as authSession, unwrap } from "@/api/client";
-import type { ItemSummary } from "@/api/types";
+import type { ItemSummary, RadioRequest } from "@/api/types";
 import { deviceProfile } from "./deviceProfile";
 import { MiniPlayer, NowPlaying } from "./NowPlaying";
 import * as Q from "./queue";
 
+export type Levelling = "off" | "track" | "album" | "auto";
+export type Source = { title: string; radio?: RadioRequest };
+
 type Ctx = {
+  source?: Source;
+  /** Plays a generated station; radios top themselves up as they play. */
+  playStation: (station: { title: string; items: ItemSummary[] }, radio?: RadioRequest) => void;
+  levelling: Levelling;
+  setLevelling: (l: Levelling) => void;
+  /** Sleep timer: an epoch time to pause at, "track" (end of this track), or null. */
+  sleep: number | "track" | null;
+  setSleep: (s: number | "track" | null) => void;
   queue: Q.Queue;
   current?: Q.Entry;
   playing: boolean;
@@ -38,8 +49,27 @@ export function useMusic() {
   return ctx;
 }
 
-/** A playback session bound to one of the two audio elements. */
-type Loaded = { key: number; sessionId: string; ready: boolean };
+/** A playback session bound to one of the two audio elements, with its levelling gains. */
+type Loaded = { key: number; sessionId: string; ready: boolean; trackGain?: number; albumGain?: number; peak?: number };
+
+function storedLevelling(): Levelling {
+  try {
+    const v = localStorage.getItem("marquee.levelling");
+    return v === "off" || v === "track" || v === "album" ? v : "auto";
+  } catch {
+    return "auto";
+  }
+}
+
+/** Linear gain for a track: ReplayGain dB, limited so the peak doesn't clip. */
+function levelGain(l: Loaded | null, mode: Levelling, albumRun: boolean): number {
+  if (!l || mode === "off") return 1;
+  const db = mode === "album" || (mode === "auto" && albumRun) ? (l.albumGain ?? l.trackGain) : l.trackGain;
+  if (db === undefined) return 1;
+  let g = Math.pow(10, db / 20);
+  if (l.peak && l.peak > 0) g = Math.min(g, 1 / l.peak);
+  return Math.min(g, 4);
+}
 
 const PRELOAD_SECONDS = 15;
 
@@ -88,7 +118,58 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(storedVolume);
   const [expanded, setExpanded] = useState(false);
+  const [source, setSource] = useState<Source | undefined>();
+  const [levelling, setLevellingState] = useState<Levelling>(storedLevelling);
+  const [sleep, setSleep] = useState<number | "track" | null>(null);
   const cur = Q.current(queue);
+
+  // Web Audio graph for levelling: element → per-element gain → master (volume) → speakers.
+  // Created on the first play (browsers require a user gesture).
+  const graph = useRef<{ ctx: AudioContext; master: GainNode; gains: GainNode[] } | null>(null);
+  const ensureGraph = useCallback(() => {
+    if (graph.current || typeof AudioContext === "undefined") return graph.current;
+    try {
+      const ctx = new AudioContext();
+      const master = ctx.createGain();
+      master.connect(ctx.destination);
+      const gains = audios.current.map((a) => {
+        const g = ctx.createGain();
+        if (a) {
+          ctx.createMediaElementSource(a).connect(g);
+          a.volume = 1;
+        }
+        g.connect(master);
+        return g;
+      });
+      graph.current = { ctx, master, gains };
+    } catch {
+      graph.current = null;
+    }
+    return graph.current;
+  }, []);
+  const levellingRef = useRef(levelling);
+  const volumeRef = useRef(volume);
+  useEffect(() => {
+    levellingRef.current = levelling;
+    volumeRef.current = volume;
+  });
+  /** Applies volume and levelling to element i (album gain when the previous track was from the same album). */
+  const applyGain = useCallback((i: number) => {
+    const g = graph.current;
+    const a = audios.current[i];
+    const q = queueRef.current;
+    const curEntry = q.entries[q.index];
+    const prevEntry = q.entries[q.index - 1];
+    const albumRun = !!curEntry && !!prevEntry && curEntry.item.parentId === prevEntry.item.parentId;
+    const gain = levelGain(loaded.current[i] ?? null, levellingRef.current, albumRun);
+    if (g) {
+      g.master.gain.value = volumeRef.current;
+      g.gains[i]!.gain.value = gain;
+      if (g.ctx.state === "suspended") g.ctx.resume().catch(() => {});
+    } else if (a) {
+      a.volume = Math.min(1, volumeRef.current * gain);
+    }
+  }, []);
 
   useEffect(() => {
     queueRef.current = queue;
@@ -120,7 +201,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const loadInto = useCallback(async (i: number, entry: Q.Entry, preload = false) => {
     const s = await openSession(entry.item, preload);
     if (loaded.current[i]) stopSession(loaded.current[i]!.sessionId);
-    loaded.current[i] = { key: entry.key, sessionId: s.id, ready: false };
+    loaded.current[i] = { key: entry.key, sessionId: s.id, ready: false, trackGain: s.trackGainDb, albumGain: s.albumGainDb, peak: s.peak };
     const a = audios.current[i]!;
     a.src = s.url;
     a.preload = "auto";
@@ -153,7 +234,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       }
       if (cancelled) return;
       const a = activeEl()!;
-      a.volume = volume;
+      ensureGraph();
+      applyGain(active.current);
       if (isFinite(a.duration)) setDuration(a.duration);
       a.play().catch(() => setPlaying(false));
     })();
@@ -161,8 +243,30 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
     // Volume is applied separately; only a track change restarts playback.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [curKey, loadInto, unload, activeEl]);
+  }, [curKey, loadInto, unload, activeEl, ensureGraph, applyGain]);
+
+  // Stations keep going: fetch more when the end of the queue gets close.
+  const refilling = useRef(false);
+  useEffect(() => {
+    const radio = source?.radio;
+    if (!radio || refilling.current || queue.entries.length - queue.index > 5) return;
+    refilling.current = true;
+    const exclude = queue.entries.map((e) => e.item.id);
+    unwrap(api.POST("/music/radio", { body: { ...radio, exclude, limit: 25 } }))
+      .then((st) => setQueue((q) => Q.append(q, st.items.filter((t) => !exclude.includes(t.id)))))
+      .catch(() => {})
+      .finally(() => (refilling.current = false));
+  }, [queue, source]);
+
+  // Sleep timer.
+  useEffect(() => {
+    if (typeof sleep !== "number") return;
+    const t = window.setTimeout(() => {
+      activeEl()?.pause();
+      setSleep(null);
+    }, Math.max(0, sleep - Date.now()));
+    return () => window.clearTimeout(t);
+  }, [sleep, activeEl]);
 
   // Lock-screen / OS media metadata.
   useEffect(() => {
@@ -208,6 +312,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     unload(0);
     unload(1);
     setQueue(Q.emptyQueue);
+    setSource(undefined);
+    setSleep(null);
     setExpanded(false);
     setPlaying(false);
   }, [report, unload]);
@@ -238,6 +344,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const onEnded = (i: number) => {
     if (i !== active.current) return;
     report("paused");
+    if (sleep === "track") {
+      setSleep(null);
+      setPlaying(false);
+      return;
+    }
     const q = queueRef.current;
     const fi = Q.followingIndex(q);
     if (fi < 0) {
@@ -256,18 +367,21 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       // Gapless switch: start the preloaded element now, then let state catch up.
       active.current = idle;
       const b = el(idle);
-      b.volume = volume;
       b.play().catch(() => {});
       setDuration(b.duration);
       setTime(0);
       unload(i);
     }
     setQueue({ ...q, index: fi });
+    // Levelling for the new track (album gain if it continues the album).
+    queueRef.current = { ...q, index: fi };
+    applyGain(active.current);
   };
 
   const setVolume = (v: number) => {
     setVolumeState(v);
-    audios.current.forEach((a) => a && (a.volume = v));
+    volumeRef.current = v;
+    applyGain(active.current);
     try {
       localStorage.setItem("marquee.volume", String(v));
     } catch {
@@ -276,6 +390,25 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   };
 
   const ctx: Ctx = {
+    source,
+    playStation: (station, radio) => {
+      unload(1 - active.current);
+      setSource({ title: station.title, radio });
+      setQueue((q) => Q.load(q, station.items, 0));
+    },
+    levelling,
+    setLevelling: (l) => {
+      setLevellingState(l);
+      levellingRef.current = l;
+      applyGain(active.current);
+      try {
+        localStorage.setItem("marquee.levelling", l);
+      } catch {
+        /* storage unavailable */
+      }
+    },
+    sleep,
+    setSleep,
     queue,
     current: cur,
     playing,
@@ -285,6 +418,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     expanded,
     play: (tracks, start = 0, opts) => {
       unload(1 - active.current);
+      setSource(undefined);
       setQueue((q) => Q.load(q, tracks, start, opts?.shuffle));
     },
     playNext: (tracks) => {
@@ -327,6 +461,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       {[0, 1].map((i) => (
         <audio
           key={i}
+          crossOrigin="anonymous"
           ref={(a) => {
             audios.current[i] = a;
           }}

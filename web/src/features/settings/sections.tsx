@@ -1,6 +1,7 @@
-import { Activity, CalendarClock, Cpu, Database, Download, Globe, Library, MonitorSmartphone, Network, ScrollText, Server, Users } from "lucide-react";
+import { Activity, AudioLines, CalendarClock, Cpu, Database, Download, Globe, Library, MonitorSmartphone, Network, ScrollText, Server, Users } from "lucide-react";
 import type { ComponentType } from "react";
 import { DashboardSettings } from "./DashboardSettings";
+import { MusicSettings } from "./MusicSettings";
 import { LibrariesSettings } from "./LibrariesSettings";
 import { LogsSettings } from "./LogsSettings";
 import { PlexImportSettings } from "./PlexImportSettings";
@@ -33,6 +34,7 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] = 
       { id: "remote-access", label: "Remote Access", icon: Globe, component: RemoteAccessSettings, keywords: "tailscale remote wan upload speed bandwidth limit internet", description: "Streaming to devices away from home over Tailscale, and how bandwidth is shared." },
       { id: "transcoder", label: "Transcoder", icon: Cpu, component: TranscoderSettings, keywords: "nvenc qsv quick sync gpu hardware encoder hevc tone mapping quality ladder preset max transcodes throttle", description: "Hardware encoders, quality and the automatic remote quality ladder." },
       { id: "metadata", label: "Metadata", icon: Database, component: MetadataSettings, keywords: "tmdb omdb api key ratings imdb rotten tomatoes artwork posters deezer", description: "Online metadata providers and their API keys." },
+      { id: "music", label: "Music", icon: AudioLines, component: MusicSettings, keywords: "sonic analysis radio sage mixes lyrics lrclib loudness replaygain volume levelling gpu", description: "Sonic analysis, lyrics and volume levelling." },
       { id: "scheduled-tasks", label: "Scheduled Tasks", icon: CalendarClock, component: ScheduledTasksSettings, keywords: "maintenance window backup restore database optimize tasks run now retention", description: "Maintenance window, background tasks and database backups." },
       { id: "plex-import", label: "Plex Import", icon: Download, component: PlexImportSettings, keywords: "plex import watch history migrate accounts path mapping", description: "Bring over watch history, playlists and customisations from Plex." },
     ],

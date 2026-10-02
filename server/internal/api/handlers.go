@@ -13,11 +13,13 @@ import (
 	"marquee/internal/items"
 	"marquee/internal/library"
 	"marquee/internal/logbuf"
+	"marquee/internal/lyrics"
 	"marquee/internal/metadata"
 	"marquee/internal/netclass"
 	"marquee/internal/playback"
 	"marquee/internal/plex"
 	"marquee/internal/settings"
+	"marquee/internal/sonic"
 	"marquee/internal/tasks"
 )
 
@@ -39,6 +41,8 @@ type Handlers struct {
 	Scans            *tasks.Scans
 	Tasks            *tasks.Scheduler
 	QuickConnect     auth.QuickConnect
+	Sonic            *sonic.Service
+	Lyrics           *lyrics.Service
 	Backups          *tasks.Backups
 	// Restart stops the server gracefully; Docker starts it again.
 	Restart func()

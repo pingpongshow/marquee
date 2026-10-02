@@ -8,6 +8,7 @@ import { Alert, Spinner } from "@/components/ui";
 import { useMusic } from "../player/MusicPlayer";
 import { ItemActions } from "./ItemActions";
 import { ItemMenu } from "./ItemMenu";
+import { Rating } from "../music/Rating";
 import { PlayButtons } from "./PlayButtons";
 import { Poster } from "./Poster";
 import { formatBytes, formatDuration, formatTrackTime, languageName, subtitleFor } from "./format";
@@ -200,16 +201,20 @@ function Children({ item }: { item: ItemDetail }) {
 }
 
 function Related({ item }: { item: ItemDetail }) {
+  const music = item.type === "artist" || item.type === "album" || item.type === "track";
   const related = useQuery({
     queryKey: ["items", item.id, "related"],
-    queryFn: () => unwrap(api.GET("/items/{itemId}/related", { params: { path: { itemId: item.id } } })),
-    enabled: ["movie", "show", "artist", "album"].includes(item.type),
+    queryFn: () =>
+      music
+        ? unwrap(api.GET("/items/{itemId}/sonic-similar", { params: { path: { itemId: item.id } } })).catch(() => [])
+        : unwrap(api.GET("/items/{itemId}/related", { params: { path: { itemId: item.id } } })),
+    enabled: ["movie", "show", "artist", "album", "track"].includes(item.type),
   });
   if (!related.data?.length) return null;
-  const square = item.type === "artist" || item.type === "album";
+  const square = music;
   return (
     <section className="mt-10">
-      <h2 className="mb-4 text-lg font-semibold">{square ? "Similar in your library" : "More like this"}</h2>
+      <h2 className="mb-4 text-lg font-semibold">{square ? (item.type === "track" ? "Sonically similar tracks" : "Sounds like") : "More like this"}</h2>
       <ul className="flex gap-4 overflow-x-auto pb-2">
         {related.data.map((r) => (
           <li key={r.id} className="w-36 shrink-0">
@@ -263,6 +268,9 @@ export function ItemPage() {
           <div className="mt-2 text-sm text-muted">{meta.join(" · ")}</div>
           {d.genres.length > 0 && <div className="mt-1 text-sm text-faint">{d.genres.join(", ")}</div>}
           <RatingBadges item={d} />
+          <div className="mt-2">
+            <Rating key={d.id} itemId={d.id} value={d.userRating} />
+          </div>
           <PlayButtons item={d} />
           <div className="mt-4 flex items-center gap-3">
             <ItemMenu item={d} />

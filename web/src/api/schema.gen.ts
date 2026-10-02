@@ -1056,6 +1056,148 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/music/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sonic analysis progress and whether the analysis service is running. */
+        get: operations["musicStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/sonic-similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        /** Tracks, albums or artists (matching the item's type) that sound like it (MUSIC-2). */
+        get: operations["sonicSimilar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/music/radio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A station (MUSIC-3) from a track, album or artist, a genre, a decade, a mood, your favourites or the whole library. Ask again with exclude to continue it. */
+        post: operations["musicRadio"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/music/sage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A playlist from a description, e.g. "rainy Sunday jazz with a late-night feel" (MUSIC-5). */
+        post: operations["musicSage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/music/adventure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sonic Adventure (MUSIC-4) — a path from one track to another through tracks that sound in between. */
+        post: operations["musicAdventure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/music/mixes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your daily mixes (MUSIC-7), built from your listening; they change once a day. */
+        get: operations["musicMixes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/rating": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Your rating (MUSIC-11), 0–10 (half stars; 10 = loved), or null to clear it. */
+        put: operations["rateItem"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/lyrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        /** A track's lyrics (MUSIC-10), timed when available, from the file, a .lrc sidecar or LRCLIB. */
+        get: operations["getLyrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/filesystem/browse": {
         parameters: {
             query?: never;
@@ -1266,6 +1408,7 @@ export interface components {
             library: components["schemas"]["LibraryGlobalSettings"];
             metadata: components["schemas"]["MetadataSettings"];
             tasks: components["schemas"]["TaskSettings"];
+            music?: components["schemas"]["MusicSettings"];
         };
         ServerSettingsUpdate: {
             security?: components["schemas"]["SecuritySettings"];
@@ -1276,6 +1419,15 @@ export interface components {
             library?: components["schemas"]["LibraryGlobalSettings"];
             metadata?: components["schemas"]["MetadataSettingsUpdate"];
             tasks?: components["schemas"]["TaskSettings"];
+            music?: components["schemas"]["MusicSettings"];
+        };
+        MusicSettings: {
+            /** @description Analyse how tracks sound (on this server's GPU) for radios */
+            sonicAnalysis?: boolean;
+            /** @description Look up lyrics on LRCLIB when a track has none (sends artist and title). */
+            onlineLyrics?: boolean;
+            /** @description Measure loudness of tracks without ReplayGain tags so volume levelling works for everything. */
+            loudnessAnalysis?: boolean;
         };
         SecuritySettings: {
             /**
@@ -1680,6 +1832,12 @@ export interface components {
             /** @description With ASS subtitles: JSON list of fonts embedded in the file ({name, url}[]). */
             fontsUrl?: string;
             markers: components["schemas"]["Marker"][];
+            /** @description Music: gain to apply for volume levelling (ReplayGain track gain). */
+            trackGainDb?: number;
+            /** @description Music: album gain, for playing whole albums. */
+            albumGainDb?: number;
+            /** @description Music: peak sample level (1.0 = full scale), to avoid clipping when boosting. */
+            peak?: number;
         };
         PlaybackProgress: {
             /** Format: int64 */
@@ -1830,11 +1988,13 @@ export interface components {
             imageIds: number[];
             /** Format: date-time */
             updatedAt: string;
+            rules?: components["schemas"]["SmartRules"];
         };
         PlaylistCreate: {
             title: string;
             kind: components["schemas"]["PlaylistKind"];
             itemIds?: number[];
+            rules?: components["schemas"]["SmartRules"];
         };
         PlaylistItemPage: {
             items: components["schemas"]["PlaylistEntry"][];
@@ -1881,6 +2041,71 @@ export interface components {
             streams: number;
             transcodes: number;
         };
+        MusicStatus: {
+            enabled: boolean;
+            /** @description The analysis service is running. */
+            available: boolean;
+            running: boolean;
+            model?: string;
+            device?: string;
+            analyzed: number;
+            total: number;
+            failed?: number;
+            progress?: number;
+            runTotal?: number;
+        };
+        RadioRequest: {
+            /** @enum {string} */
+            seed: "item" | "genre" | "decade" | "mood" | "favourites" | "library";
+            /**
+             * Format: int64
+             * @description With seed item: a track, album or artist.
+             */
+            itemId?: number;
+            /** @description With genre: the genre; decade: e.g. 1990; mood: a word or phrase. */
+            value?: string;
+            /** Format: int64 */
+            libraryId?: number;
+            /** @default 50 */
+            limit: number;
+            /** @description Tracks already queued (to continue a station). */
+            exclude?: number[];
+        };
+        Station: {
+            id?: string;
+            title: string;
+            description?: string;
+            items: components["schemas"]["ItemSummary"][];
+        };
+        Lyrics: {
+            synced: boolean;
+            /** @enum {string} */
+            source: "embedded" | "sidecar" | "lrclib";
+            lines: components["schemas"]["LyricLine"][];
+        };
+        LyricLine: {
+            /**
+             * Format: int64
+             * @description When the line is sung (synced lyrics only).
+             */
+            timeMs?: number;
+            text: string;
+        };
+        /** @description A smart playlist's rules (MUSIC-8); its contents are worked out each time it's opened. */
+        SmartRules: {
+            /** @enum {string} */
+            match: "all" | "any";
+            conditions: {
+                /** @enum {string} */
+                field: "genre" | "artist" | "album" | "title" | "year" | "rating" | "playCount" | "lastPlayedDays" | "addedDays" | "bpm" | "energy" | "key" | "durationSeconds";
+                /** @enum {string} */
+                op: "is" | "isNot" | "contains" | "notContains" | "gt" | "lt";
+                value: string;
+            }[];
+            /** @enum {string} */
+            sort?: "random" | "title" | "artist" | "year" | "-year" | "added" | "-added" | "rating" | "-rating" | "playCount" | "-playCount" | "lastPlayed" | "-lastPlayed";
+            limit?: number;
+        };
         ItemSummary: {
             /** Format: int64 */
             id: number;
@@ -1926,6 +2151,8 @@ export interface components {
             lastViewedAt?: string;
             /** @description Shows, seasons, artists, albums: how many episodes/tracks the user has watched. */
             watchedLeafCount?: number;
+            /** @description The user's rating, 0–10 (10 = loved). */
+            userRating?: number;
         };
         /** @description Artwork ids for /images/{artworkId}. Seasons and episodes fall back to the show's art, tracks to the album's. */
         ItemImages: {
@@ -2132,6 +2359,15 @@ export interface components {
         };
         /** @description Rate limited. */
         TooManyRequests: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description A helper service isn't running. */
+        ServiceUnavailable: {
             headers: {
                 [name: string]: unknown;
             };
@@ -3873,6 +4109,7 @@ export interface operations {
             content: {
                 "application/json": {
                     title?: string;
+                    rules?: components["schemas"]["SmartRules"];
                 };
             };
         };
@@ -4182,6 +4419,225 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    musicStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MusicStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    sonicSimilar: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemSummary"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    musicRadio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RadioRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Station"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    musicSage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    prompt: string;
+                    /** @default 30 */
+                    limit?: number;
+                    /** Format: int64 */
+                    libraryId?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Station"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    musicAdventure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: int64 */
+                    fromId: number;
+                    /** Format: int64 */
+                    toId: number;
+                    /** @default 15 */
+                    length?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Station"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    musicMixes: {
+        parameters: {
+            query?: {
+                libraryId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Station"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    rateItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    rating?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getLyrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Lyrics"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     browseFilesystem: {

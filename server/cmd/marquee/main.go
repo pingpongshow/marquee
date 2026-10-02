@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -25,6 +26,8 @@ import (
 	"marquee/internal/items"
 	"marquee/internal/library"
 	"marquee/internal/logbuf"
+	"marquee/internal/loudness"
+	"marquee/internal/lyrics"
 	"marquee/internal/metadata"
 	"marquee/internal/netclass"
 	"marquee/internal/playback"
@@ -33,6 +36,7 @@ import (
 	"marquee/internal/scanner"
 	"marquee/internal/server"
 	"marquee/internal/settings"
+	"marquee/internal/sonic"
 	"marquee/internal/tasks"
 	"marquee/internal/watcher"
 )
@@ -121,15 +125,20 @@ func run() error {
 		},
 	}
 	meta := &metadata.Service{DB: database, Settings: store}
+	var afterMusicScan atomic.Pointer[func()] // set once the scheduler exists
 	scans.AfterScan = func(ctx context.Context, lib library.Library, report func(scanner.Progress)) error {
 		lang := ""
 		if lib.Options.Language != nil {
 			lang = *lib.Options.Language
 		}
 		if lib.Type == library.Music {
-			return meta.MusicArtwork(ctx, lib.ID, func(p metadata.Progress) {
+			err := meta.MusicArtwork(ctx, lib.ID, func(p metadata.Progress) {
 				report(scanner.Progress{Phase: "metadata", Done: p.Done, Total: p.Total})
 			})
+			if f := afterMusicScan.Load(); f != nil {
+				(*f)() // analyse new tracks now rather than at the next hourly run
+			}
+			return err
 		}
 		if err := meta.MatchLibrary(ctx, lib.ID, string(lib.Type), lang, func(p metadata.Progress) {
 			report(scanner.Progress{Phase: "metadata", Done: p.Done, Total: p.Total})
@@ -198,6 +207,22 @@ func run() error {
 			refreshAllRatings(ctx, meta, libraries)
 			return "Done", nil
 		}})
+	// Music intelligence (M6.5): the sonic sidecar embeds tracks; the index serves radios etc.
+	sonicSvc := &sonic.Service{DB: database, Client: &sonic.Client{BaseURL: envOr("MARQUEE_SONIC_URL", "http://127.0.0.1:32501")},
+		Index: sonic.NewIndex(), Enabled: func() bool { return store.Get().Music.SonicAnalysis }}
+	if err := sonicSvc.Index.Load(ctx, database); err != nil {
+		slog.Warn("sonic index", "err", err)
+	}
+	scheduler.Register(tasks.Task{ID: "sonic", Name: "Analyse music", Every: time.Hour,
+		Description: "Listens to new tracks on the GPU so radios, similar music, mixes and Sonic Sage include them.",
+		Run:         sonicSvc.Analyze})
+	runSonic := func() { scheduler.RunNow(ctx, "sonic") }
+	afterMusicScan.Store(&runSonic)
+	loud := &loudness.Service{DB: database, FFmpeg: cfg.FFmpegPath, Workers: 4, Analyse: func() bool { return store.Get().Music.LoudnessAnalysis }}
+	scheduler.Register(tasks.Task{ID: "loudness", Name: "Measure music loudness", Window: true,
+		Description: "Reads ReplayGain tags and measures loudness of tracks without them, so volume levelling works for everything.",
+		Run:         loud.Run})
+	lyricsSvc := &lyrics.Service{DB: database, Online: func() bool { return store.Get().Music.OnlineLyrics }}
 	go scheduler.Run(ctx)
 
 	// Bonjour, so LAN apps find the server (D49).
@@ -214,7 +239,7 @@ func run() error {
 		Handlers: &api.Handlers{
 			DB: database, Auth: authSvc, Settings: store, Libraries: libraries,
 			Items: items.NewStore(database), Scans: scans, Version: config.Version,
-			Tasks: scheduler, Backups: backups, Restart: stop,
+			Tasks: scheduler, Backups: backups, Restart: stop, Sonic: sonicSvc, Lyrics: lyricsSvc,
 			Avatars:  &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
 			Images:   images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
 			Logs:     logs,
@@ -272,4 +297,11 @@ func refreshAllRatings(ctx context.Context, meta *metadata.Service, libs *librar
 			return
 		}
 	}
+}
+
+func envOr(k, def string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
+	return def
 }
