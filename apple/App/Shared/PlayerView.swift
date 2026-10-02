@@ -13,12 +13,14 @@ struct PlayerView: View {
     let request: VideoRequest
     @State private var playback: VideoPlayback?
     @State private var countdown: Int?
+    @State private var together: WatchTogether?
+    @State private var showGroup = false
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             if let p = playback {
-                PlayerController(playback: p, onNext: playNext)
+                PlayerController(playback: p, together: together, onNext: playNext)
                     .ignoresSafeArea()
                 overlays(p)
             } else {
@@ -28,6 +30,8 @@ struct PlayerView: View {
         .task {
             let p = VideoPlayback(app: app, playlistID: request.playlistID)
             playback = p
+            let t = WatchTogether(app: app, player: p.player, itemID: request.itemID)
+            together = t
             let tracks = PendingTracks.shared.take(request.itemID)
             #if os(iOS)
             // Downloaded: play from the device (works offline, saves bandwidth).
@@ -37,8 +41,12 @@ struct PlayerView: View {
             }
             #endif
             await p.start(itemID: request.itemID, startMs: request.startMs, audio: tracks.audio, subtitle: tracks.subtitle, fileID: tracks.file)
+            if let g = request.groupID { await t.join(g) }
         }
-        .onDisappear { Task { await playback?.stop() } }
+        .onDisappear {
+            together?.leave()
+            Task { await playback?.stop() }
+        }
         .onChange(of: playback?.finished) { _, done in
             guard done == true else { return }
             if playback?.nextUp != nil { startCountdown() } else { close() }
@@ -57,9 +65,11 @@ struct PlayerView: View {
                 }
                 .accessibilityLabel("Close player")
                 Spacer()
+                if let t = together { togetherButton(t) }
             }
             .padding()
             #endif
+            if let t = together, let e = t.error { Text(e).font(.footnote).foregroundStyle(.red).padding(.horizontal) }
             if let message = p.errorMessage {
                 ErrorBanner(message: message).padding().frame(maxWidth: 600)
             }
@@ -82,6 +92,30 @@ struct PlayerView: View {
             }
         }
     }
+
+    #if os(iOS)
+    /// Watch together: start a group, or see who's in it and leave.
+    @ViewBuilder private func togetherButton(_ t: WatchTogether) -> some View {
+        if let g = t.group {
+            Menu {
+                Section("Watching together") {
+                    ForEach(g.members, id: \.userId) { m in Label(m.name + (m.buffering ? " (loading)" : ""), systemImage: "person") }
+                }
+                if let by = g.lastBy, let what = g.lastAction { Text("\(by): \(what)") }
+                Button("Leave the Group", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) { t.leave() }
+            } label: {
+                Label("\(g.members.count)", systemImage: "person.2.fill").font(.headline).padding(12)
+                    .foregroundStyle(Color.marqueeGold).background(.ultraThinMaterial, in: Capsule())
+            }
+            .accessibilityLabel("Watching together")
+        } else {
+            Button { Task { await t.start() } } label: {
+                Image(systemName: "person.2").font(.headline).padding(12).background(.ultraThinMaterial, in: Circle())
+            }
+            .accessibilityLabel("Watch together")
+        }
+    }
+    #endif
 
     private func startCountdown() {
         countdown = 10
@@ -133,6 +167,7 @@ private struct UpNextCard: View {
 /// AVPlayerViewController: native controls, PiP, AirPlay, subtitle menu and Now Playing.
 struct PlayerController: UIViewControllerRepresentable {
     let playback: VideoPlayback
+    var together: WatchTogether?
     let onNext: () -> Void
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
@@ -161,11 +196,22 @@ struct PlayerController: UIViewControllerRepresentable {
             actions.append(UIAction(title: "Next Episode", image: UIImage(systemName: "forward.end.fill")) { _ in onNext() })
         }
         if vc.contextualActions.map(\.title) != actions.map(\.title) { vc.contextualActions = actions }
-        vc.transportBarCustomMenuItems = audioMenu()
+        vc.transportBarCustomMenuItems = audioMenu() + togetherMenu()
         #endif
     }
 
     #if os(tvOS)
+    /// Watch together from the Siri Remote's transport bar.
+    private func togetherMenu() -> [UIMenuElement] {
+        guard let t = together else { return [] }
+        if let g = t.group {
+            let people = g.members.map { UIAction(title: $0.name, attributes: .disabled) { _ in } }
+            return [UIMenu(title: "Watching Together (\(g.members.count))", image: UIImage(systemName: "person.2.fill"),
+                           children: people + [UIAction(title: "Leave the Group", attributes: .destructive) { _ in t.leave() }])]
+        }
+        return [UIAction(title: "Watch Together", image: UIImage(systemName: "person.2")) { _ in Task { await t.start() } }]
+    }
+
     /// Audio tracks (switching restarts the stream at the same position).
     private func audioMenu() -> [UIMenuElement] {
         let streams = playback.item?.info.versions.first?.files.first?.streams.filter { $0.kind == .audio } ?? []

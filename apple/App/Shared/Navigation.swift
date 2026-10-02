@@ -30,14 +30,16 @@ struct VideoRequest: Identifiable, Hashable {
     let itemID: Int64
     var startMs: Int64?
     var playlistID: Int64?
-    var id: String { "\(itemID)-\(startMs ?? -1)-\(playlistID ?? 0)" }
+    /// A watch-together group to join.
+    var groupID: String?
+    var id: String { "\(itemID)-\(startMs ?? -1)-\(playlistID ?? 0)-\(groupID ?? "")" }
 }
 
 /// Lets any view start a video; MainView presents the player.
 @MainActor @Observable
 final class VideoPresenter {
     var request: VideoRequest?
-    func play(_ itemID: Int64, startMs: Int64? = nil, playlistID: Int64? = nil) {
-        request = VideoRequest(itemID: itemID, startMs: startMs, playlistID: playlistID)
+    func play(_ itemID: Int64, startMs: Int64? = nil, playlistID: Int64? = nil, group: String? = nil) {
+        request = VideoRequest(itemID: itemID, startMs: startMs, playlistID: playlistID, groupID: group)
     }
 }

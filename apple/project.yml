@@ -133,6 +133,8 @@ schemes:
         MarqueeUITests: [test]
     test:
       targets: [MarqueeUITests]
+      environmentVariables:
+        MARQUEE_TEST_ADMIN_TOKEN: $(MARQUEE_TEST_ADMIN_TOKEN)
   MarqueeTV:
     build:
       targets:

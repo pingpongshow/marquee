@@ -11,10 +11,30 @@ struct HomeView: View {
     @State private var loaded = false
     @State private var error: String?
 
+    @State private var groups: [WatchGroup] = []
+
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: rowSpacing) {
                 if let error { ErrorBanner(message: error).padding(.horizontal, sidePadding) }
+                ForEach(groups, id: \.id) { g in
+                    Button { video.play(g.itemId, group: g.id) } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "person.2.fill").foregroundStyle(Color.marqueeGold)
+                            VStack(alignment: .leading) {
+                                Text(g.title).font(.headline).lineLimit(1)
+                                Text("\(g.members.map(\.name).formatted()) \(g.members.count == 1 ? "is" : "are") watching together").font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text("Join").font(.headline).foregroundStyle(Color.marqueeGold)
+                        }
+                        .padding()
+                        .background(Color.marqueeGold.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, sidePadding)
+                    .accessibilityLabel("Join \(g.title)")
+                }
                 if loaded && hubs.isEmpty {
                     ContentUnavailableView("Nothing here yet", systemImage: "film.stack", description: Text("Libraries are still being scanned, or none have been added."))
                 }
@@ -35,6 +55,14 @@ struct HomeView: View {
         }
         .navigationTitle("Home")
         .refreshable { await load() }
+        .task {
+            // Watch-together groups to join, refreshed while Home is open.
+            while !Task.isCancelled {
+                let me = app.me?.id
+                groups = ((try? await app.watchGroups()) ?? []).filter { !$0.members.contains { $0.userId == me } }
+                try? await Task.sleep(for: .seconds(15))
+            }
+        }
         .task { await load() }
         .onChange(of: video.request) { if video.request == nil { Task { await load() } } }
     }

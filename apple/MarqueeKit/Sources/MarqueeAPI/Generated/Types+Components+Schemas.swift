@@ -1461,6 +1461,142 @@ extension Components {
                 case trickplay
             }
         }
+        /// - Remark: Generated from `#/components/schemas/WatchGroup`.
+        public struct WatchGroup: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/WatchGroup/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/WatchGroup/itemId`.
+            public var itemId: Swift.Int64
+            /// What's playing.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchGroup/title`.
+            public var title: Swift.String
+            /// Who started the group.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchGroup/hostId`.
+            public var hostId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/WatchGroup/MembersPayload`.
+            public struct MembersPayloadPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/WatchGroup/MembersPayload/userId`.
+                public var userId: Swift.Int64
+                /// - Remark: Generated from `#/components/schemas/WatchGroup/MembersPayload/name`.
+                public var name: Swift.String
+                /// - Remark: Generated from `#/components/schemas/WatchGroup/MembersPayload/avatarUrl`.
+                public var avatarUrl: Swift.String?
+                /// - Remark: Generated from `#/components/schemas/WatchGroup/MembersPayload/buffering`.
+                public var buffering: Swift.Bool
+                /// Creates a new `MembersPayloadPayload`.
+                ///
+                /// - Parameters:
+                ///   - userId:
+                ///   - name:
+                ///   - avatarUrl:
+                ///   - buffering:
+                public init(
+                    userId: Swift.Int64,
+                    name: Swift.String,
+                    avatarUrl: Swift.String? = nil,
+                    buffering: Swift.Bool
+                ) {
+                    self.userId = userId
+                    self.name = name
+                    self.avatarUrl = avatarUrl
+                    self.buffering = buffering
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case userId
+                    case name
+                    case avatarUrl
+                    case buffering
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/WatchGroup/members`.
+            public typealias MembersPayload = [Components.Schemas.WatchGroup.MembersPayloadPayload]
+            /// - Remark: Generated from `#/components/schemas/WatchGroup/members`.
+            public var members: Components.Schemas.WatchGroup.MembersPayload
+            /// Bumped on every change.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchGroup/version`.
+            public var version: Swift.Int64
+            /// False while paused, or while a member is still loading.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchGroup/playing`.
+            public var playing: Swift.Bool
+            /// Position at `at`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchGroup/positionMs`.
+            public var positionMs: Swift.Int64
+            /// When positionMs was true. While playing, now = positionMs + (serverTime - at).
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchGroup/at`.
+            public var at: Foundation.Date
+            /// The server's clock, to correct for the client's.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchGroup/serverTime`.
+            public var serverTime: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/WatchGroup/lastAction`.
+            public var lastAction: Swift.String?
+            /// Who did the last thing.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchGroup/lastBy`.
+            public var lastBy: Swift.String?
+            /// Creates a new `WatchGroup`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - itemId:
+            ///   - title: What's playing.
+            ///   - hostId: Who started the group.
+            ///   - members:
+            ///   - version: Bumped on every change.
+            ///   - playing: False while paused, or while a member is still loading.
+            ///   - positionMs: Position at `at`.
+            ///   - at: When positionMs was true. While playing, now = positionMs + (serverTime - at).
+            ///   - serverTime: The server's clock, to correct for the client's.
+            ///   - lastAction:
+            ///   - lastBy: Who did the last thing.
+            public init(
+                id: Swift.String,
+                itemId: Swift.Int64,
+                title: Swift.String,
+                hostId: Swift.Int64,
+                members: Components.Schemas.WatchGroup.MembersPayload,
+                version: Swift.Int64,
+                playing: Swift.Bool,
+                positionMs: Swift.Int64,
+                at: Foundation.Date,
+                serverTime: Foundation.Date,
+                lastAction: Swift.String? = nil,
+                lastBy: Swift.String? = nil
+            ) {
+                self.id = id
+                self.itemId = itemId
+                self.title = title
+                self.hostId = hostId
+                self.members = members
+                self.version = version
+                self.playing = playing
+                self.positionMs = positionMs
+                self.at = at
+                self.serverTime = serverTime
+                self.lastAction = lastAction
+                self.lastBy = lastBy
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case itemId
+                case title
+                case hostId
+                case members
+                case version
+                case playing
+                case positionMs
+                case at
+                case serverTime
+                case lastAction
+                case lastBy
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/LiveTvStatus`.
         public struct LiveTvStatus: Codable, Hashable, Sendable {
             /// At least one source is set up.

@@ -259,6 +259,56 @@ final class MarqueeUITests: XCTestCase {
         close.tap()
     }
 
+    private var adminToken: String? { ProcessInfo.processInfo.environment["MARQUEE_TEST_ADMIN_TOKEN"].flatMap { $0.isEmpty ? nil : $0 } }
+
+    /// Calls the server as the test admin (the other viewer in watch-together tests).
+    @discardableResult
+    private func adminAPI(_ method: String, _ path: String, _ body: [String: Any]? = nil) throws -> [String: Any] {
+        guard let token = adminToken else { throw XCTSkip("MARQUEE_TEST_ADMIN_TOKEN not set") }
+        var req = URLRequest(url: URL(string: "http://\(server)/api/v1\(path)")!)
+        req.httpMethod = method
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if let body {
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+        let done = expectation(description: path)
+        var out: [String: Any] = [:]
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            out = (data.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 30)
+        return out
+    }
+
+    /// Watch together (SYNC-1): the admin starts a group over the API; this device joins from
+    /// Home, then follows the admin's pause.
+    func testWatchTogether() throws {
+        let g = try adminAPI("POST", "/syncplay/groups", ["itemId": 359, "positionMs": 30000])
+        let id = try XCTUnwrap(g["id"] as? String)
+        defer { _ = try? adminAPI("POST", "/syncplay/groups/\(id)/leave") }
+        connectAndSignIn()
+        let join = app.buttons["Join 00 Preview Test"]
+        XCTAssertTrue(join.waitForExistence(timeout: 30), "Home offers the group")
+        shot("w1-home-join")
+        join.tap()
+        XCTAssertTrue(app.buttons["Watching together"].waitForExistence(timeout: 20))
+        sleep(4)
+        var state = try adminAPI("GET", "/syncplay/groups/\(id)")
+        XCTAssertEqual((state["members"] as? [[String: Any]])?.count, 2)
+        shot("w2-joined")
+        try adminAPI("POST", "/syncplay/groups/\(id)/command", ["action": "pause", "positionMs": 60000])
+        sleep(4)
+        // The player followed: shows Play, and the group is still paused at the admin's spot.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(app.buttons["Play"].waitForExistence(timeout: 5), "the player paused with the group")
+        state = try adminAPI("GET", "/syncplay/groups/\(id)")
+        XCTAssertEqual(state["playing"] as? Bool, false)
+        shot("w3-paused-by-admin")
+        app.buttons["Close player"].tap()
+    }
+
     func testStatsAndAdventure() {
         connectAndSignIn()
         app.buttons["Settings"].firstMatch.tap()
