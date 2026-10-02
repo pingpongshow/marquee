@@ -20337,7 +20337,7 @@ public enum Operations {
             }
         }
     }
-    /// Trending, popular and upcoming titles from Seerr (REQ-2).
+    /// Trending, popular and upcoming titles from Seerr (REQ-2), optionally by network, studio or genre, in an order. A network means shows; a studio means films.
     ///
     /// - Remark: HTTP `GET /requests/discover`.
     /// - Remark: Generated from `#/paths//requests/discover/get(discoverRequestable)`.
@@ -20352,22 +20352,58 @@ public enum Operations {
                     case movies = "movies"
                     case tv = "tv"
                     case upcoming = "upcoming"
+                    case upcomingTv = "upcoming_tv"
                 }
                 /// - Remark: Generated from `#/paths/requests/discover/GET/query/category`.
                 public var category: Operations.DiscoverRequestable.Input.Query.CategoryPayload?
                 /// - Remark: Generated from `#/paths/requests/discover/GET/query/page`.
                 public var page: Swift.Int?
+                /// A TV network (from /requests/discover/filters).
+                ///
+                /// - Remark: Generated from `#/paths/requests/discover/GET/query/network`.
+                public var network: Swift.Int64?
+                /// A film studio.
+                ///
+                /// - Remark: Generated from `#/paths/requests/discover/GET/query/studio`.
+                public var studio: Swift.Int64?
+                /// A movie or TV genre (matching the category).
+                ///
+                /// - Remark: Generated from `#/paths/requests/discover/GET/query/genre`.
+                public var genre: Swift.Int64?
+                /// - Remark: Generated from `#/paths/requests/discover/GET/query/sort`.
+                @frozen public enum SortPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case popular = "popular"
+                    case rating = "rating"
+                    case newest = "newest"
+                    case title = "title"
+                }
+                /// For movies and tv.
+                ///
+                /// - Remark: Generated from `#/paths/requests/discover/GET/query/sort`.
+                public var sort: Operations.DiscoverRequestable.Input.Query.SortPayload?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
                 ///   - category:
                 ///   - page:
+                ///   - network: A TV network (from /requests/discover/filters).
+                ///   - studio: A film studio.
+                ///   - genre: A movie or TV genre (matching the category).
+                ///   - sort: For movies and tv.
                 public init(
                     category: Operations.DiscoverRequestable.Input.Query.CategoryPayload? = nil,
-                    page: Swift.Int? = nil
+                    page: Swift.Int? = nil,
+                    network: Swift.Int64? = nil,
+                    studio: Swift.Int64? = nil,
+                    genre: Swift.Int64? = nil,
+                    sort: Operations.DiscoverRequestable.Input.Query.SortPayload? = nil
                 ) {
                     self.category = category
                     self.page = page
+                    self.network = network
+                    self.studio = studio
+                    self.genre = genre
+                    self.sort = sort
                 }
             }
             public var query: Operations.DiscoverRequestable.Input.Query
@@ -20520,6 +20556,220 @@ public enum Operations {
             /// A helper service isn't running.
             ///
             /// - Remark: Generated from `#/paths//requests/discover/get(discoverRequestable)/responses/503`.
+            ///
+            /// HTTP response code: `503 serviceUnavailable`.
+            case serviceUnavailable(Components.Responses.ServiceUnavailable)
+            /// The associated value of the enum case if `self` is `.serviceUnavailable`.
+            ///
+            /// - Throws: An error if `self` is not `.serviceUnavailable`.
+            /// - SeeAlso: `.serviceUnavailable`.
+            public var serviceUnavailable: Components.Responses.ServiceUnavailable {
+                get throws {
+                    switch self {
+                    case let .serviceUnavailable(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "serviceUnavailable",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Discover's filters: TV networks, film studios and movie and TV genres.
+    ///
+    /// - Remark: HTTP `GET /requests/discover/filters`.
+    /// - Remark: Generated from `#/paths//requests/discover/filters/get(discoverFilters)`.
+    public enum DiscoverFilters {
+        public static let id: Swift.String = "discoverFilters"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/requests/discover/filters/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DiscoverFilters.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DiscoverFilters.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.DiscoverFilters.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.DiscoverFilters.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/requests/discover/filters/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/requests/discover/filters/GET/responses/200/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/requests/discover/filters/GET/responses/200/content/json/networks`.
+                        public var networks: [Components.Schemas.NamedId]
+                        /// - Remark: Generated from `#/paths/requests/discover/filters/GET/responses/200/content/json/studios`.
+                        public var studios: [Components.Schemas.NamedId]
+                        /// - Remark: Generated from `#/paths/requests/discover/filters/GET/responses/200/content/json/movieGenres`.
+                        public var movieGenres: [Components.Schemas.NamedId]
+                        /// - Remark: Generated from `#/paths/requests/discover/filters/GET/responses/200/content/json/tvGenres`.
+                        public var tvGenres: [Components.Schemas.NamedId]
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - networks:
+                        ///   - studios:
+                        ///   - movieGenres:
+                        ///   - tvGenres:
+                        public init(
+                            networks: [Components.Schemas.NamedId],
+                            studios: [Components.Schemas.NamedId],
+                            movieGenres: [Components.Schemas.NamedId],
+                            tvGenres: [Components.Schemas.NamedId]
+                        ) {
+                            self.networks = networks
+                            self.studios = studios
+                            self.movieGenres = movieGenres
+                            self.tvGenres = tvGenres
+                        }
+                        public enum CodingKeys: String, CodingKey {
+                            case networks
+                            case studios
+                            case movieGenres
+                            case tvGenres
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/requests/discover/filters/GET/responses/200/content/application\/json`.
+                    case json(Operations.DiscoverFilters.Output.Ok.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.DiscoverFilters.Output.Ok.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.DiscoverFilters.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.DiscoverFilters.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Filters.
+            ///
+            /// - Remark: Generated from `#/paths//requests/discover/filters/get(discoverFilters)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.DiscoverFilters.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.DiscoverFilters.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//requests/discover/filters/get(discoverFilters)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// An outside service (e.g. OpenSubtitles) failed or refused the request.
+            ///
+            /// - Remark: Generated from `#/paths//requests/discover/filters/get(discoverFilters)/responses/502`.
+            ///
+            /// HTTP response code: `502 badGateway`.
+            case badGateway(Components.Responses.BadGateway)
+            /// The associated value of the enum case if `self` is `.badGateway`.
+            ///
+            /// - Throws: An error if `self` is not `.badGateway`.
+            /// - SeeAlso: `.badGateway`.
+            public var badGateway: Components.Responses.BadGateway {
+                get throws {
+                    switch self {
+                    case let .badGateway(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badGateway",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// A helper service isn't running.
+            ///
+            /// - Remark: Generated from `#/paths//requests/discover/filters/get(discoverFilters)/responses/503`.
             ///
             /// HTTP response code: `503 serviceUnavailable`.
             case serviceUnavailable(Components.Responses.ServiceUnavailable)

@@ -105,7 +105,20 @@ func (h *Handlers) DiscoverRequestable(ctx context.Context, req DiscoverRequesta
 	if req.Params.Category != nil {
 		cat = string(*req.Params.Category)
 	}
-	items, p, total, err := h.Requests.Discover(ctx, s.User.ID, cat, page)
+	var b requests.Browse
+	if v := req.Params.Network; v != nil {
+		b.Network = *v
+	}
+	if v := req.Params.Studio; v != nil {
+		b.Studio = *v
+	}
+	if v := req.Params.Genre; v != nil {
+		b.Genre = *v
+	}
+	if v := req.Params.Sort; v != nil {
+		b.Sort = string(*v)
+	}
+	items, p, total, err := h.Requests.Discover(ctx, s.User.ID, cat, b, page)
 	if err != nil {
 		if na, e := seerrErr(err); na {
 			return DiscoverRequestable503JSONResponse{ServiceUnavailableJSONResponse(e)}, nil
@@ -343,4 +356,28 @@ func (h *Handlers) TitleRatings(ctx context.Context, req TitleRatingsRequestObje
 		}{&v, nz(im.URL)}
 	}
 	return TitleRatings200JSONResponse(out), nil
+}
+
+func toNamed(list []requests.Genre) []NamedId {
+	out := make([]NamedId, len(list))
+	for i, g := range list {
+		out[i] = NamedId{Id: g.ID, Name: g.Name}
+	}
+	return out
+}
+
+func (h *Handlers) DiscoverFilters(ctx context.Context, _ DiscoverFiltersRequestObject) (DiscoverFiltersResponseObject, error) {
+	if _, ok := session(ctx); !ok {
+		return DiscoverFilters401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	movie, tv, err := h.Requests.Filters(ctx)
+	if err != nil {
+		if na, e := seerrErr(err); na {
+			return DiscoverFilters503JSONResponse{ServiceUnavailableJSONResponse(e)}, nil
+		} else {
+			return DiscoverFilters502JSONResponse{BadGatewayJSONResponse(e)}, nil
+		}
+	}
+	return DiscoverFilters200JSONResponse{Networks: toNamed(requests.Networks), Studios: toNamed(requests.Studios),
+		MovieGenres: toNamed(movie), TvGenres: toNamed(tv)}, nil
 }

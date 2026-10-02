@@ -2408,6 +2408,29 @@ extension Components {
                 case error
             }
         }
+        /// - Remark: Generated from `#/components/schemas/NamedId`.
+        public struct NamedId: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/NamedId/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/NamedId/name`.
+            public var name: Swift.String
+            /// Creates a new `NamedId`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - name:
+            public init(
+                id: Swift.Int64,
+                name: Swift.String
+            ) {
+                self.id = id
+                self.name = name
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case name
+            }
+        }
         /// Public ratings of a title, through Seerr. Each part is absent when unknown.
         ///
         /// - Remark: Generated from `#/components/schemas/TitleRatings`.

@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -174,17 +175,68 @@ func (s *Seerr) Search(ctx context.Context, q string, page int) (Page, error) {
 }
 
 // Discover lists trending, popular movies or shows, or upcoming movies.
-func (s *Seerr) Discover(ctx context.Context, category string, page int) (Page, error) {
-	path := map[string]string{"trending": "/discover/trending", "movies": "/discover/movies", "tv": "/discover/tv", "upcoming": "/discover/movies/upcoming"}[category]
+// Browse narrows a Discover list (REQ-2): a TV network or film studio, a genre and an order.
+type Browse struct {
+	Network, Studio, Genre int64
+	Sort                   string // popular (default), rating, newest, title
+}
+
+// Discover lists titles: trending, movies, tv, upcoming (films) or upcoming_tv, narrowed by b.
+// A network means shows and a studio means films.
+func (s *Seerr) Discover(ctx context.Context, category string, b Browse, page int) (Page, error) {
+	switch {
+	case b.Network > 0:
+		category = "tv"
+	case b.Studio > 0:
+		category = "movies"
+	case (b.Genre > 0 || (b.Sort != "" && b.Sort != "popular")) && category != "tv":
+		category = "movies"
+	}
+	path := map[string]string{"trending": "/discover/trending", "movies": "/discover/movies", "tv": "/discover/tv",
+		"upcoming": "/discover/movies/upcoming", "upcoming_tv": "/discover/tv/upcoming"}[category]
 	if path == "" {
-		path = "/discover/trending"
+		path, category = "/discover/trending", "trending"
+	}
+	q := url.Values{"page": {strconv.Itoa(page)}}
+	if category == "movies" || category == "tv" {
+		tv := category == "tv"
+		if b.Network > 0 && tv {
+			q.Set("network", strconv.FormatInt(b.Network, 10))
+		}
+		if b.Studio > 0 && !tv {
+			q.Set("studio", strconv.FormatInt(b.Studio, 10))
+		}
+		if b.Genre > 0 {
+			q.Set("genre", strconv.FormatInt(b.Genre, 10))
+		}
+		today := time.Now().Format("2006-01-02")
+		switch b.Sort {
+		case "rating":
+			q.Set("sortBy", "vote_average.desc")
+			q.Set("voteCountGte", "200") // not titles with a handful of votes
+		case "newest":
+			if tv {
+				q.Set("sortBy", "first_air_date.desc")
+				q.Set("firstAirDateLte", today)
+			} else {
+				q.Set("sortBy", "primary_release_date.desc")
+				q.Set("primaryReleaseDateLte", today)
+			}
+		case "title":
+			if tv {
+				q.Set("sortBy", "original_name.asc")
+			} else {
+				q.Set("sortBy", "original_title.asc")
+			}
+			q.Set("voteCountGte", "50")
+		}
 	}
 	var p Page
-	err := s.do(ctx, http.MethodGet, fmt.Sprintf("%s?page=%d", path, page), nil, &p)
+	err := s.do(ctx, http.MethodGet, path+"?"+strings.ReplaceAll(q.Encode(), "+", "%20"), nil, &p)
 	for i := range p.Results {
 		// Discover pages for one type leave mediaType out.
 		if p.Results[i].MediaType == "" {
-			if category == "tv" {
+			if category == "tv" || category == "upcoming_tv" {
 				p.Results[i].MediaType = "tv"
 			} else {
 				p.Results[i].MediaType = "movie"
@@ -192,6 +244,23 @@ func (s *Seerr) Discover(ctx context.Context, category string, page int) (Page, 
 		}
 	}
 	return p, err
+}
+
+// Genre is a TMDB genre.
+type Genre struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+// Genres lists movie or TV genres.
+func (s *Seerr) Genres(ctx context.Context, tv bool) ([]Genre, error) {
+	path := "/genres/movie"
+	if tv {
+		path = "/genres/tv"
+	}
+	var out []Genre
+	err := s.do(ctx, http.MethodGet, path, nil, &out)
+	return out, err
 }
 
 // Movie and TV fetch one title's details.
