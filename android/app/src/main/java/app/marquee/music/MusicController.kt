@@ -3,9 +3,7 @@ package app.marquee.music
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
-import android.os.Bundle
 import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -143,19 +141,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
         }
     }
 
-    private fun mediaItem(t: ItemSummary, dj: String? = null): MediaItem = MediaItem.Builder()
-        .setMediaId(t.id.toString())
-        .setUri("marquee://track/${t.id}")
-        .setMediaMetadata(
-            MediaMetadata.Builder()
-                .setTitle(t.title)
-                .setArtist(t.artistCredit ?: t.grandparentTitle)
-                .setAlbumTitle(t.parentTitle)
-                .setArtworkUri(marquee.imageUrl(t.images?.poster, 512)?.let(Uri::parse))
-                .setExtras(Bundle().apply { if (dj != null) putString("dj", dj) })
-                .build(),
-        )
-        .build()
+    private fun mediaItem(t: ItemSummary, dj: String? = null): MediaItem = trackItem(marquee, t, dj)
 
     /** Plays tracks from start; source names what's playing (an album or playlist). */
     fun play(tracks: List<ItemSummary>, start: Int, source: String? = null) = start(tracks, start, source, null)
@@ -219,6 +205,25 @@ class MusicController(private val context: Context, private val marquee: Marquee
             c.addMediaItem(c.currentMediaItemIndex + 1, mediaItem(pick, dj.label))
             djCount = 0
         }
+    }
+
+    /** Connects to the music service so stations and the DJ work even when playback starts elsewhere (Android Auto). */
+    fun attach() { scope.launch { connect() } }
+
+    /** Takes over a queue started outside the app: its name and, for a station, how to continue it. */
+    fun adopt(source: String?, radio: RadioRequest?) = scope.launch {
+        _source.value = source
+        this@MusicController.radio = radio
+        djCount = 0
+    }
+
+    private val _levelling = MutableStateFlow(levellingPref())
+    /** Volume levelling (MUSIC-10); MusicService applies it. */
+    val levelling: StateFlow<Levelling> = _levelling
+    private fun levellingPref() = prefs.getString("levelling", null)?.let { n -> Levelling.entries.firstOrNull { it.name == n } } ?: Levelling.Auto
+    fun setLevelling(l: Levelling) {
+        _levelling.value = l
+        prefs.edit().putString("levelling", l.name).apply()
     }
 
     fun setDJ(dj: DJ?) {
