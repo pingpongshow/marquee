@@ -14,6 +14,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
@@ -51,6 +52,9 @@ class MusicService : MediaLibraryService() {
     private val levellingChanged = SharedPreferences.OnSharedPreferenceChangeListener { _, key -> if (key == "levelling") mediaSession?.player?.let(::level) }
     private var ticker: Job? = null
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val app get() = application as MarqueeApplication
+    /** Tracks playing from downloaded files. */
+    private val local = ConcurrentHashMap.newKeySet<Long>()
 
     override fun onCreate() {
         super.onCreate()
@@ -58,6 +62,8 @@ class MusicService : MediaLibraryService() {
             val uri = spec.uri
             if (uri.scheme != "marquee") return@Resolver spec
             val id = uri.lastPathSegment!!.toLong()
+            // Downloaded tracks play from the device (and count when the server is back).
+            app.downloads.localFile(id)?.let { f -> local.add(id); return@Resolver spec.withUri(Uri.fromFile(f)) }
             val (_, url) = resolved.getOrPut(id) {
                 // Preloaded sessions take over the device's playback when they first report "playing".
                 val s = marquee.playback.startPlayback(PlaybackRequest(id, AndroidProfile.profile, startMs = 0, preload = true))
@@ -67,7 +73,7 @@ class MusicService : MediaLibraryService() {
             }
             spec.withUri(Uri.parse(url))
         }
-        val http = DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true)
+        val http = DefaultDataSource.Factory(this, DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true))
         // Our own audio session, so the loudness effect can attach before playback starts.
         val audioSession = (getSystemService(AUDIO_SERVICE) as AudioManager).generateAudioSessionId()
         val player = ExoPlayer.Builder(this)
@@ -88,7 +94,13 @@ class MusicService : MediaLibraryService() {
             }
             override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
                 // The previous track finished or was skipped: record where it ended and close its session.
-                current?.let { prev -> finish(prev, if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) lastDuration else lastPosition) }
+                current?.let { prev ->
+                    val end = if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) lastDuration else lastPosition
+                    if (prev in local) {
+                        // A play counts once half the track has played, as on the server.
+                        if (lastDuration > 0 && end >= lastDuration / 2) app.downloads.recordProgress(prev, end, watched = true)
+                    } else finish(prev, end)
+                }
                 current = item?.mediaId?.toLongOrNull()
                 lastDuration = 0
                 level(player)
@@ -121,7 +133,6 @@ class MusicService : MediaLibraryService() {
                 launch(kotlinx.coroutines.Dispatchers.Main) { if (player.isPlaying) report(player, PlaybackProgress.State.PLAYING) }
             }
         }
-        val app = application as MarqueeApplication
         mediaSession = MediaLibrarySession.Builder(this, player, MusicLibrary(marquee) { app.music }).build()
         // Stations and the Guest DJ live in the app's controller; make sure it's listening.
         app.music.attach()

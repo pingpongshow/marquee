@@ -135,3 +135,14 @@ fun formatTime(ms: Long): String {
     val s = ms / 1000
     return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, (s % 3600) / 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
 }
+
+/** The summary form of a detail (what lists, queues and downloads keep). */
+fun app.marquee.api.models.ItemDetail.summary() = ItemSummary(
+    id = id, libraryId = libraryId, type = type, title = title, childCount = childCount, leafCount = leafCount, available = available,
+    matchState = ItemSummary.MatchState.entries.firstOrNull { it.value == matchState.value } ?: ItemSummary.MatchState.entries.first(),
+    addedAt = addedAt, originalTitle = originalTitle, year = year, index = index, absoluteIndex = absoluteIndex, disc = disc,
+    parentId = parentId, grandparentId = grandparentId, parentTitle = parentTitle, grandparentTitle = grandparentTitle,
+    artistCredit = artistCredit, durationMs = durationMs, originallyAvailableAt = originallyAvailableAt, images = images,
+    viewOffsetMs = viewOffsetMs, viewCount = viewCount, lastViewedAt = lastViewedAt, watchedLeafCount = watchedLeafCount,
+    userRating = userRating, watchlisted = watchlisted,
+)
