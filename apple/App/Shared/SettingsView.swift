@@ -20,6 +20,7 @@ struct SettingsView: View {
                         Text("@\(app.me?.username ?? "")").font(.caption).foregroundStyle(.secondary)
                     }
                 }
+                NavigationLink("Your Stats") { StatsView() }
                 Button("Switch Profile") { switching = true }
                 Button("Sign Out", role: .destructive) { Task { await app.signOut() } }
             }
