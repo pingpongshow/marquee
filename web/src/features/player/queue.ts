@@ -1,7 +1,8 @@
 import type { ItemSummary } from "@/api/types";
 
 /** One queue slot. The key keeps duplicates of the same track distinct. */
-export type Entry = { key: number; item: ItemSummary };
+/** dj marks a track the Guest DJ wove in (MUSIC-6). */
+export type Entry = { key: number; item: ItemSummary; dj?: string };
 export type Repeat = "off" | "all" | "one";
 
 /**
@@ -13,7 +14,7 @@ export type Queue = { entries: Entry[]; index: number; shuffled: boolean; origin
 export const emptyQueue: Queue = { entries: [], index: -1, shuffled: false, original: null, repeat: "off" };
 
 let nextKey = 1;
-const wrap = (items: ItemSummary[]): Entry[] => items.map((item) => ({ key: nextKey++, item }));
+const wrap = (items: ItemSummary[], dj?: string): Entry[] => items.map((item) => ({ key: nextKey++, item, ...(dj ? { dj } : {}) }));
 
 function shuffled<T>(list: T[], random = Math.random): T[] {
   const out = [...list];
@@ -52,9 +53,9 @@ export function toggleShuffle(q: Queue, random = Math.random): Queue {
 export const cycleRepeat = (q: Queue): Queue => ({ ...q, repeat: q.repeat === "off" ? "all" : q.repeat === "all" ? "one" : "off" });
 
 /** Inserts items right after the current track. */
-export function playNext(q: Queue, items: ItemSummary[]): Queue {
+export function playNext(q: Queue, items: ItemSummary[], dj?: string): Queue {
   if (q.index < 0) return load(q, items);
-  const add = wrap(items);
+  const add = wrap(items, dj);
   const at = q.index + 1;
   const entries = [...q.entries.slice(0, at), ...add, ...q.entries.slice(at)];
   let original = q.original;

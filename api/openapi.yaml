@@ -1887,6 +1887,35 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /music/dj:
+    post:
+      tags: [music]
+      operationId: musicDJ
+      summary: Guest DJ (MUSIC-6) — one track to weave in after the one playing.
+      description: "stretch: sounds like it, by another artist. groupie: the artist's other albums. deep_cuts: the artist's least-played tracks. contempo: a similar sound from the same era."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [trackId, mode]
+              properties:
+                trackId: { type: integer, format: int64 }
+                mode: { type: string, enum: [stretch, groupie, deep_cuts, contempo] }
+                exclude:
+                  type: array
+                  description: Tracks already queued.
+                  items: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /music/mixes:
     get:
       tags: [music]
