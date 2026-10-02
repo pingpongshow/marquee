@@ -531,4 +531,19 @@ class MarqueeUiTest {
             adminApi("POST", "/syncplay/groups/$id/leave")
         }
     }
+
+    /** Moods and styles (MUSIC-18): the Chill mood lists tracks and starts its radio. */
+    @Test fun moodsAndStyles() {
+        connectAndSignIn()
+        openLibrary("Music")
+        rule.waitUntil(20_000) { scrollTo(hasContentDescription("Chill mood")) }
+        shot("ms1-tiles")
+        rule.onNode(hasContentDescription("Chill mood")).performClick()
+        rule.waitText("Play Chill Radio")
+        rule.waitText("Tracks", 20_000)
+        shot("ms2-mood")
+        tap("Play Chill Radio")
+        if (isTv) rule.waitText("Playing", 15_000)
+        else rule.waitUntilAtLeastOneExists(hasContentDescription("Open Now Playing"), 15_000)
+    }
 }

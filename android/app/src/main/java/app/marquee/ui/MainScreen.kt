@@ -141,6 +141,9 @@ private fun Routes(nav: NavHostController) {
         composable("downloads") { DownloadsScreen(nav) }
         composable("discover") { DiscoverScreen(nav) }
         composable("livetv") { LiveTvScreen(nav) }
+        composable("browse/{lib}/{kind}/{name}", listOf(navArgument("lib") { type = NavType.LongType })) {
+            app.marquee.music.MoodStyleScreen(nav, it.arguments!!.getLong("lib"), it.arguments!!.getString("kind")!!, it.arguments!!.getString("name")!!)
+        }
         composable("live/{id}", listOf(navArgument("id") { type = NavType.LongType })) { LiveWatchScreen(nav, it.arguments!!.getLong("id")) }
         composable("approvals") { ApprovalsScreen() }
         composable("nowplaying") { NowPlayingScreen(onClose = { nav.popBackStack() }) }
