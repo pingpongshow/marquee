@@ -12,7 +12,10 @@ export function useRadio() {
   return useMutation({
     mutationFn: (input: RadioInput) => {
       const req: RadioRequest = { limit: 50, ...input };
-      return unwrap(api.POST("/music/radio", { body: req })).then((st) => ({ st, req }));
+      return unwrap(api.POST("/music/radio", { body: req })).then((st) => ({
+        st,
+        req,
+      }));
     },
     onSuccess: ({ st, req }) => {
       if (st.items.length) music.playStation(st, req);
@@ -24,7 +27,8 @@ export function useRadio() {
 export function useMuse() {
   const music = useMusic();
   return useMutation({
-    mutationFn: (body: { prompt: string; libraryId?: number }) => unwrap(api.POST("/music/muse", { body: { ...body, limit: 40 } })),
+    mutationFn: (body: { prompt: string; libraryId?: number }) =>
+      unwrap(api.POST("/music/muse", { body: { ...body, limit: 40 } })),
     onSuccess: (st) => {
       if (st.items.length) music.playStation(st);
     },
