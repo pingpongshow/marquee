@@ -37,6 +37,8 @@ import kotlinx.serialization.Contextual
  * @param remoteQualityKbps Cap for remote streams. 0 = server default.
  * @param canRequest May request titles through Seerr (REQ-1). Default false; admins always may.
  * @param canRecord May schedule Live TV recordings (LIVE-5). Default false; admins always may.
+ * @param liveTv May watch Live TV (LIVE-4). Default true.
+ * @param liveTvGroups Channel groups this user may watch. Null or absent = all.
  * @param seerrUserId The Seerr user requests are made as. Null = Seerr's API key owner.
  */
 @Serializable
@@ -66,6 +68,14 @@ data class UserRestrictions (
     /* May schedule Live TV recordings (LIVE-5). Default false; admins always may. */
     @SerialName(value = "canRecord")
     val canRecord: kotlin.Boolean? = null,
+
+    /* May watch Live TV (LIVE-4). Default true. */
+    @SerialName(value = "liveTv")
+    val liveTv: kotlin.Boolean? = null,
+
+    /* Channel groups this user may watch. Null or absent = all. */
+    @SerialName(value = "liveTvGroups")
+    val liveTvGroups: kotlin.collections.List<kotlin.String>? = null,
 
     /* The Seerr user requests are made as. Null = Seerr's API key owner. */
     @SerialName(value = "seerrUserId")

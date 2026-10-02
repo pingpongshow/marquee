@@ -38,6 +38,7 @@ import kotlinx.serialization.Contextual
  * @param number The channel number as the source gives it (e.g. 4 or 4.1).
  * @param group 
  * @param logoUrl Server-relative; no token needed.
+ * @param hidden The caller hid it (listed only with hidden=true).
  * @param now 
  * @param next 
  */
@@ -64,6 +65,10 @@ data class LiveChannel (
     /* Server-relative; no token needed. */
     @SerialName(value = "logoUrl")
     val logoUrl: kotlin.String? = null,
+
+    /* The caller hid it (listed only with hidden=true). */
+    @SerialName(value = "hidden")
+    val hidden: kotlin.Boolean? = null,
 
     @SerialName(value = "now")
     val now: LiveProgramme? = null,

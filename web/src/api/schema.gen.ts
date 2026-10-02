@@ -1331,6 +1331,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/livetv/channels/{channelId}/hidden": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Hide a channel from the caller's guide (LIVE-4). */
+        put: operations["hideLiveChannel"];
+        post?: never;
+        /** Show a hidden channel again. */
+        delete: operations["unhideLiveChannel"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/livetv/channels/{channelId}/favorite": {
         parameters: {
             query?: never;
@@ -2213,6 +2233,10 @@ export interface components {
             canRequest?: boolean;
             /** @description May schedule Live TV recordings (LIVE-5). Default false; admins always may. */
             canRecord?: boolean;
+            /** @description May watch Live TV (LIVE-4). Default true. */
+            liveTv?: boolean;
+            /** @description Channel groups this user may watch. Null or absent = all. */
+            liveTvGroups?: string[] | null;
             /**
              * Format: int64
              * @description The Seerr user requests are made as. Null = Seerr's API key owner.
@@ -2568,6 +2592,8 @@ export interface components {
             /** @description Server-relative; no token needed. */
             logoUrl?: string;
             favorite: boolean;
+            /** @description The caller hid it (listed only with hidden=true). */
+            hidden?: boolean;
             now?: components["schemas"]["LiveProgramme"];
             next?: components["schemas"]["LiveProgramme"];
         };
@@ -6116,6 +6142,10 @@ export interface operations {
                 group?: string;
                 /** @description Only the caller's favourites. */
                 favorites?: boolean;
+                /** @description The channels the caller watched last, newest first (LIVE-4). */
+                recent?: boolean;
+                /** @description Only the channels the caller hid (otherwise they're left out). */
+                hidden?: boolean;
             };
             header?: never;
             path?: never;
@@ -6166,6 +6196,7 @@ export interface operations {
                 end: string;
                 group?: string;
                 favorites?: boolean;
+                recent?: boolean;
             };
             header?: never;
             path?: never;
@@ -6188,6 +6219,50 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    hideLiveChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hidden. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    unhideLiveChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Shown. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     favoriteLiveChannel: {

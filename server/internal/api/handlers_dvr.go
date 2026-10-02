@@ -55,6 +55,9 @@ func (h *Handlers) ScheduleRecording(ctx context.Context, req ScheduleRecordingR
 		return ScheduleRecording503JSONResponse{ServiceUnavailableJSONResponse(apiErr("dvr_unavailable", livetv.ErrDVRUnavailable.Error()))}, nil
 	}
 	b := req.Body
+	if c, err := h.LiveTV.Channel(ctx, b.ChannelId); err == nil && !liveAllowed(s, c.Group) {
+		return ScheduleRecording403JSONResponse{ForbiddenJSONResponse(apiErr("not_allowed", "This channel isn't available for this profile."))}, nil
+	}
 	rec, rule, err := h.DVR.Schedule(ctx, s.User.ID, b.ChannelId, b.Start, b.Series != nil && *b.Series, b.AnyChannel != nil && *b.AnyChannel)
 	if errors.Is(err, livetv.ErrProgrammeNotFound) {
 		return ScheduleRecording404JSONResponse{NotFoundJSONResponse(apiErr("not_found", err.Error()))}, nil
