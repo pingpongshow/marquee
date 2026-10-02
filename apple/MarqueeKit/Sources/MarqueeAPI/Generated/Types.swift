@@ -373,6 +373,26 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /webhooks/test`.
     /// - Remark: Generated from `#/paths//webhooks/test/post(testWebhook)`.
     func testWebhook(_ input: Operations.TestWebhook.Input) async throws -> Operations.TestWebhook.Output
+    /// Whether the caller's account has two-factor sign-in.
+    ///
+    /// - Remark: HTTP `GET /auth/totp`.
+    /// - Remark: Generated from `#/paths//auth/totp/get(totpStatus)`.
+    func totpStatus(_ input: Operations.TotpStatus.Input) async throws -> Operations.TotpStatus.Output
+    /// Start turning on two-factor sign-in - a new secret for the authenticator app.
+    ///
+    /// - Remark: HTTP `POST /auth/totp/setup`.
+    /// - Remark: Generated from `#/paths//auth/totp/setup/post(setupTotp)`.
+    func setupTotp(_ input: Operations.SetupTotp.Input) async throws -> Operations.SetupTotp.Output
+    /// Finish turning on two-factor sign-in with a code from the app; returns one-time recovery codes.
+    ///
+    /// - Remark: HTTP `POST /auth/totp/enable`.
+    /// - Remark: Generated from `#/paths//auth/totp/enable/post(enableTotp)`.
+    func enableTotp(_ input: Operations.EnableTotp.Input) async throws -> Operations.EnableTotp.Output
+    /// Turn off two-factor sign-in (needs a current code or a recovery code). Admins can turn it off for another user.
+    ///
+    /// - Remark: HTTP `POST /auth/totp/disable`.
+    /// - Remark: Generated from `#/paths//auth/totp/disable/post(disableTotp)`.
+    func disableTotp(_ input: Operations.DisableTotp.Input) async throws -> Operations.DisableTotp.Output
     /// Watch-together groups the caller can join (members can see any group on the server).
     ///
     /// - Remark: HTTP `GET /syncplay/groups`.
@@ -1559,6 +1579,46 @@ extension APIProtocol {
         body: Operations.TestWebhook.Input.Body
     ) async throws -> Operations.TestWebhook.Output {
         try await testWebhook(Operations.TestWebhook.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Whether the caller's account has two-factor sign-in.
+    ///
+    /// - Remark: HTTP `GET /auth/totp`.
+    /// - Remark: Generated from `#/paths//auth/totp/get(totpStatus)`.
+    public func totpStatus(headers: Operations.TotpStatus.Input.Headers = .init()) async throws -> Operations.TotpStatus.Output {
+        try await totpStatus(Operations.TotpStatus.Input(headers: headers))
+    }
+    /// Start turning on two-factor sign-in - a new secret for the authenticator app.
+    ///
+    /// - Remark: HTTP `POST /auth/totp/setup`.
+    /// - Remark: Generated from `#/paths//auth/totp/setup/post(setupTotp)`.
+    public func setupTotp(headers: Operations.SetupTotp.Input.Headers = .init()) async throws -> Operations.SetupTotp.Output {
+        try await setupTotp(Operations.SetupTotp.Input(headers: headers))
+    }
+    /// Finish turning on two-factor sign-in with a code from the app; returns one-time recovery codes.
+    ///
+    /// - Remark: HTTP `POST /auth/totp/enable`.
+    /// - Remark: Generated from `#/paths//auth/totp/enable/post(enableTotp)`.
+    public func enableTotp(
+        headers: Operations.EnableTotp.Input.Headers = .init(),
+        body: Operations.EnableTotp.Input.Body
+    ) async throws -> Operations.EnableTotp.Output {
+        try await enableTotp(Operations.EnableTotp.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Turn off two-factor sign-in (needs a current code or a recovery code). Admins can turn it off for another user.
+    ///
+    /// - Remark: HTTP `POST /auth/totp/disable`.
+    /// - Remark: Generated from `#/paths//auth/totp/disable/post(disableTotp)`.
+    public func disableTotp(
+        headers: Operations.DisableTotp.Input.Headers = .init(),
+        body: Operations.DisableTotp.Input.Body
+    ) async throws -> Operations.DisableTotp.Output {
+        try await disableTotp(Operations.DisableTotp.Input(
             headers: headers,
             body: body
         ))

@@ -164,12 +164,12 @@ class Marquee(context: Context) {
             }
     }
 
-    suspend fun signIn(username: String, password: String) = finish(withContext(Dispatchers.IO) {
-        auth.login(LoginRequest(username, password, device))
+    suspend fun signIn(username: String, password: String, totpCode: String? = null) = finish(withContext(Dispatchers.IO) {
+        auth.login(LoginRequest(username, password, device, totpCode = totpCode))
     })
 
-    suspend fun signInProfile(userId: Long, pin: String?, password: String?) = finish(withContext(Dispatchers.IO) {
-        auth.pinLogin(PinLoginRequest(userId, device, pin = pin, password = password))
+    suspend fun signInProfile(userId: Long, pin: String?, password: String?, totpCode: String? = null) = finish(withContext(Dispatchers.IO) {
+        auth.pinLogin(PinLoginRequest(userId, device, pin = pin, password = password, totpCode = totpCode))
     })
 
     suspend fun finish(result: AuthResult) {

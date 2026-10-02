@@ -18,7 +18,12 @@ export function ProfileSwitcher({ onClose }: { onClose: () => void }) {
   const [password, setPassword] = useState("");
   const sw = useMutation({
     mutationFn: (p: { id: number; pin?: string; password?: string }) =>
-      unwrap(api.POST("/profiles/{userId}/switch", { params: { path: { userId: p.id } }, body: { pin: p.pin, password: p.password, device: deviceInfo() } })),
+      unwrap(
+        api.POST("/profiles/{userId}/switch", {
+          params: { path: { userId: p.id } },
+          body: { pin: p.pin, password: p.password, device: deviceInfo() },
+        }),
+      ),
     onSuccess: (res) => {
       signIn(res.token);
       onClose();
@@ -26,7 +31,8 @@ export function ProfileSwitcher({ onClose }: { onClose: () => void }) {
   });
 
   // Admins open managed profiles directly.
-  const needs = (p: Profile) => (me.data?.isAdmin && p.isManaged ? "none" : p.requires);
+  const needs = (p: Profile) =>
+    me.data?.isAdmin && p.isManaged ? "none" : p.requires;
   const choose = (p: Profile) => {
     if (p.id === me.data?.id) return onClose();
     if (needs(p) === "none") return sw.mutate({ id: p.id });
@@ -34,7 +40,15 @@ export function ProfileSwitcher({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Dialog open onClose={onClose} title={target ? `Enter ${target.displayName}'s ${needs(target) === "pin" ? "PIN" : "password"}` : "Switch profile"}>
+    <Dialog
+      open
+      onClose={onClose}
+      title={
+        target
+          ? `Enter ${target.displayName}'s ${needs(target) === "pin" ? "PIN" : "password"}`
+          : "Switch profile"
+      }
+    >
       {sw.isError && (
         <div className="mb-4">
           <Alert tone="error">{sw.error.message}</Alert>
@@ -47,12 +61,29 @@ export function ProfileSwitcher({ onClose }: { onClose: () => void }) {
           <ul className="grid grid-cols-3 gap-4">
             {profiles.data?.map((p) => (
               <li key={p.id}>
-                <button onClick={() => choose(p)} className="group flex w-full flex-col items-center gap-2 rounded-lg p-2 hover:bg-surface-2" disabled={sw.isPending}>
-                  <Avatar name={p.displayName} url={p.avatarUrl} className="size-16 text-2xl group-hover:ring-2 group-hover:ring-accent">
-                    {needs(p) !== "none" && <Lock className="absolute -right-0.5 -bottom-0.5 size-5 rounded-full bg-surface p-1 text-muted" aria-label="Locked" />}
+                <button
+                  onClick={() => choose(p)}
+                  className="group flex w-full flex-col items-center gap-2 rounded-lg p-2 hover:bg-surface-2"
+                  disabled={sw.isPending}
+                >
+                  <Avatar
+                    name={p.displayName}
+                    url={p.avatarUrl}
+                    className="size-16 text-2xl group-hover:ring-2 group-hover:ring-accent"
+                  >
+                    {needs(p) !== "none" && (
+                      <Lock
+                        className="absolute -right-0.5 -bottom-0.5 size-5 rounded-full bg-surface p-1 text-muted"
+                        aria-label="Locked"
+                      />
+                    )}
                   </Avatar>
-                  <span className="max-w-full truncate text-sm">{p.displayName}</span>
-                  {p.id === me.data?.id && <span className="text-[11px] text-accent">Current</span>}
+                  <span className="max-w-full truncate text-sm">
+                    {p.displayName}
+                  </span>
+                  {p.id === me.data?.id && (
+                    <span className="text-[11px] text-accent">Current</span>
+                  )}
                 </button>
               </li>
             ))}
@@ -60,7 +91,11 @@ export function ProfileSwitcher({ onClose }: { onClose: () => void }) {
         )
       ) : needs(target) === "pin" ? (
         <div className="flex flex-col items-center gap-5">
-          <PinPad disabled={sw.isPending} resetKey={sw.failureCount} onComplete={(pin) => sw.mutate({ id: target.id, pin })} />
+          <PinPad
+            disabled={sw.isPending}
+            resetKey={sw.failureCount}
+            onComplete={(pin) => sw.mutate({ id: target.id, pin })}
+          />
           <Button variant="ghost" size="sm" onClick={() => setTarget(null)}>
             Back
           </Button>
@@ -73,9 +108,20 @@ export function ProfileSwitcher({ onClose }: { onClose: () => void }) {
             sw.mutate({ id: target.id, password });
           }}
         >
-          <Input type="password" autoFocus autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} aria-label="Password" />
+          <Input
+            type="password"
+            autoFocus
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            aria-label="Password"
+          />
           <div className="flex justify-between">
-            <Button type="button" variant="ghost" onClick={() => setTarget(null)}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setTarget(null)}
+            >
               Back
             </Button>
             <Button type="submit" variant="primary" loading={sw.isPending}>
