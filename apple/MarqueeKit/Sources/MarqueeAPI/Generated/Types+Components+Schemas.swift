@@ -451,7 +451,7 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/UserPreferences`.
         public struct UserPreferences: Codable, Hashable, Sendable {
-            /// ISO 639-2
+            /// ISO 639-2, e.g. eng, jpn
             ///
             /// - Remark: Generated from `#/components/schemas/UserPreferences/audioLanguage`.
             public var audioLanguage: Swift.String?
@@ -477,7 +477,7 @@ extension Components {
             /// Creates a new `UserPreferences`.
             ///
             /// - Parameters:
-            ///   - audioLanguage: ISO 639-2
+            ///   - audioLanguage: ISO 639-2, e.g. eng, jpn
             ///   - subtitleLanguage:
             ///   - subtitleMode:
             ///   - localQualityKbps: 0 = original
@@ -1100,7 +1100,7 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/MusicSettings`.
         public struct MusicSettings: Codable, Hashable, Sendable {
-            /// Analyse how tracks sound (on this server's GPU) for radios
+            /// Analyse how tracks sound (on this server's GPU) for radios, similar music and Sonic Sage.
             ///
             /// - Remark: Generated from `#/components/schemas/MusicSettings/sonicAnalysis`.
             public var sonicAnalysis: Swift.Bool?
@@ -1115,7 +1115,7 @@ extension Components {
             /// Creates a new `MusicSettings`.
             ///
             /// - Parameters:
-            ///   - sonicAnalysis: Analyse how tracks sound (on this server's GPU) for radios
+            ///   - sonicAnalysis: Analyse how tracks sound (on this server's GPU) for radios, similar music and Sonic Sage.
             ///   - onlineLyrics: Look up lyrics on LRCLIB when a track has none (sends artist and title).
             ///   - loudnessAnalysis: Measure loudness of tracks without ReplayGain tags so volume levelling works for everything.
             public init(
@@ -2593,7 +2593,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/DeviceProfile`.
         public struct DeviceProfile: Codable, Hashable, Sendable {
-            /// Containers playable from a file URL (mp4
+            /// Containers playable from a file URL (mp4, webm, mkv…).
             ///
             /// - Remark: Generated from `#/components/schemas/DeviceProfile/containers`.
             public var containers: [Swift.String]
@@ -2639,7 +2639,7 @@ extension Components {
             /// Creates a new `DeviceProfile`.
             ///
             /// - Parameters:
-            ///   - containers: Containers playable from a file URL (mp4
+            ///   - containers: Containers playable from a file URL (mp4, webm, mkv…).
             ///   - videoCodecs:
             ///   - audioCodecs:
             ///   - maxAudioChannels:
@@ -3137,7 +3137,7 @@ extension Components {
             public var bitrateKbps: Swift.Int
             /// - Remark: Generated from `#/components/schemas/PlaybackSessionInfo/startedAt`.
             public var startedAt: Foundation.Date
-            /// Artwork id for a thumbnail (episode still
+            /// Artwork id for a thumbnail (episode still, backdrop or poster).
             ///
             /// - Remark: Generated from `#/components/schemas/PlaybackSessionInfo/imageId`.
             public var imageId: Swift.Int64?
@@ -3166,7 +3166,7 @@ extension Components {
             ///   - state:
             ///   - bitrateKbps:
             ///   - startedAt:
-            ///   - imageId: Artwork id for a thumbnail (episode still
+            ///   - imageId: Artwork id for a thumbnail (episode still, backdrop or poster).
             ///   - subtitle: Episode or album line, e.g. S2 · E5 · Title
             public init(
                 id: Swift.String,
@@ -4230,11 +4230,11 @@ extension Components {
             }
             /// - Remark: Generated from `#/components/schemas/Download/status`.
             public var status: Components.Schemas.Download.StatusPayload
-            /// Conversion progress
+            /// Conversion progress, 0–1.
             ///
             /// - Remark: Generated from `#/components/schemas/Download/progress`.
             public var progress: Swift.Double
-            /// Bytes
+            /// Bytes, once ready.
             ///
             /// - Remark: Generated from `#/components/schemas/Download/size`.
             public var size: Swift.Int64?
@@ -4255,8 +4255,8 @@ extension Components {
             ///   - itemId:
             ///   - quality:
             ///   - status:
-            ///   - progress: Conversion progress
-            ///   - size: Bytes
+            ///   - progress: Conversion progress, 0–1.
+            ///   - size: Bytes, once ready.
             ///   - url: Where to fetch the file once ready (supports HTTP ranges; send the token as for streams).
             ///   - fileName:
             ///   - error:
@@ -4301,7 +4301,7 @@ extension Components {
         public struct SubtitleResult: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/SubtitleResult/fileId`.
             public var fileId: Swift.Int64
-            /// ISO 639-1 (e.g. en
+            /// ISO 639-1 (e.g. en, pt-BR).
             ///
             /// - Remark: Generated from `#/components/schemas/SubtitleResult/language`.
             public var language: Swift.String
@@ -4327,7 +4327,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - fileId:
-            ///   - language: ISO 639-1 (e.g. en
+            ///   - language: ISO 639-1 (e.g. en, pt-BR).
             ///   - release:
             ///   - fileName:
             ///   - downloads:
@@ -4551,7 +4551,7 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/StatsCount`.
         public struct StatsCount: Codable, Hashable, Sendable {
-            /// The item or user
+            /// The item or user, when there is one.
             ///
             /// - Remark: Generated from `#/components/schemas/StatsCount/id`.
             public var id: Swift.Int64?
@@ -4566,7 +4566,7 @@ extension Components {
             /// Creates a new `StatsCount`.
             ///
             /// - Parameters:
-            ///   - id: The item or user
+            ///   - id: The item or user, when there is one.
             ///   - title:
             ///   - subtitle:
             ///   - plays:
@@ -4843,7 +4843,7 @@ extension Components {
             public var originalTitle: Swift.String?
             /// - Remark: Generated from `#/components/schemas/ItemSummary/year`.
             public var year: Swift.Int?
-            /// Season
+            /// Season, episode or track number.
             ///
             /// - Remark: Generated from `#/components/schemas/ItemSummary/index`.
             public var index: Swift.Int?
@@ -4936,7 +4936,7 @@ extension Components {
             ///   - title:
             ///   - originalTitle:
             ///   - year:
-            ///   - index: Season
+            ///   - index: Season, episode or track number.
             ///   - absoluteIndex: Absolute episode number (anime).
             ///   - disc:
             ///   - parentId:
