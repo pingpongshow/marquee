@@ -330,6 +330,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /activity/history`.
     /// - Remark: Generated from `#/paths//activity/history/get(playHistory)`.
     func playHistory(_ input: Operations.PlayHistory.Input) async throws -> Operations.PlayHistory.Output
+    /// Send a test event to a webhook URL now (admin only).
+    ///
+    /// - Remark: HTTP `POST /webhooks/test`.
+    /// - Remark: Generated from `#/paths//webhooks/test/post(testWebhook)`.
+    func testWebhook(_ input: Operations.TestWebhook.Input) async throws -> Operations.TestWebhook.Output
     /// Playback statistics (ADM-4). Administrators can see everyone or one user; others see their own (their "year in music").
     ///
     /// - Remark: HTTP `GET /stats`.
@@ -1261,6 +1266,19 @@ extension APIProtocol {
         try await playHistory(Operations.PlayHistory.Input(
             query: query,
             headers: headers
+        ))
+    }
+    /// Send a test event to a webhook URL now (admin only).
+    ///
+    /// - Remark: HTTP `POST /webhooks/test`.
+    /// - Remark: Generated from `#/paths//webhooks/test/post(testWebhook)`.
+    public func testWebhook(
+        headers: Operations.TestWebhook.Input.Headers = .init(),
+        body: Operations.TestWebhook.Input.Body
+    ) async throws -> Operations.TestWebhook.Output {
+        try await testWebhook(Operations.TestWebhook.Input(
+            headers: headers,
+            body: body
         ))
     }
     /// Playback statistics (ADM-4). Administrators can see everyone or one user; others see their own (their "year in music").

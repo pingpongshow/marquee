@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -41,6 +42,7 @@ import (
 	"marquee/internal/tasks"
 	"marquee/internal/trickplay"
 	"marquee/internal/watcher"
+	"marquee/internal/webhooks"
 )
 
 func main() {
@@ -81,6 +83,7 @@ func healthcheck() int {
 }
 
 func run() error {
+	startedAt := time.Now()
 	cfg, err := config.Load()
 	if err != nil {
 		return err
@@ -115,6 +118,31 @@ func run() error {
 	player := &playback.Manager{DB: database, Settings: store, FFmpeg: cfg.FFmpegPath, TranscodeDir: cfg.TranscodeDir,
 		Encoders: playback.DetectEncoders(ctx, cfg.FFmpegPath)}
 	go player.Run(ctx)
+	// Webhooks (ADM-5).
+	hooks := &webhooks.Dispatcher{DB: database, Settings: store, Server: func() webhooks.Server {
+		return webhooks.Server{ID: store.ServerID(), Name: store.Get().General.ServerName, Version: config.Version}
+	}}
+	go hooks.Run(ctx)
+	player.Events = func(kind string, s *playback.Session, pos int64) {
+		go func() {
+			hooks.Publish(webhooks.Event{Event: kind, User: &webhooks.User{ID: s.UserID, Name: s.UserName},
+				Device:   &webhooks.Device{Name: s.DeviceName, Platform: hooks.DevicePlatform(ctx, s.DeviceID)},
+				Item:     hooks.LookupItem(ctx, s.ItemID),
+				Playback: &webhooks.Playback{SessionID: s.ID, PositionMS: pos, Method: string(s.Decision.Method), Remote: s.Remote}})
+		}()
+	}
+	var announceMu sync.Mutex
+	announced := map[int64]time.Time{} // per library: titles added after this have been announced
+	announce := func(ctx context.Context, libID int64) {
+		announceMu.Lock()
+		since, ok := announced[libID]
+		if !ok {
+			since = startedAt
+		}
+		announced[libID] = time.Now()
+		announceMu.Unlock()
+		hooks.AnnounceAdded(ctx, libID, since)
+	}
 	libraries := library.NewStore(database)
 	scans := &tasks.Scans{
 		DB:        database,
@@ -140,6 +168,7 @@ func run() error {
 			if f := afterMusicScan.Load(); f != nil {
 				(*f)() // analyse new tracks now rather than at the next hourly run
 			}
+			announce(ctx, lib.ID)
 			return err
 		}
 		if err := meta.MatchLibrary(ctx, lib.ID, string(lib.Type), lang, func(p metadata.Progress) {
@@ -147,6 +176,7 @@ func run() error {
 		}); err != nil {
 			return err
 		}
+		announce(ctx, lib.ID) // after matching, so payloads carry proper titles
 		return meta.RefreshRatings(ctx, lib.ID)
 	}
 	// Adding a TMDB key starts matching everything that was scanned without one.
@@ -254,7 +284,7 @@ func run() error {
 		Handlers: &api.Handlers{
 			DB: database, Auth: authSvc, Settings: store, Libraries: libraries,
 			Items: items.NewStore(database), Scans: scans, Version: config.Version,
-			Tasks: scheduler, Trickplay: trick, Backups: backups, Restart: stop, Sonic: sonicSvc, Lyrics: lyricsSvc,
+			Tasks: scheduler, Trickplay: trick, Webhooks: hooks, Backups: backups, Restart: stop, Sonic: sonicSvc, Lyrics: lyricsSvc,
 			Avatars:  &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
 			Images:   images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
 			Logs:     logs,

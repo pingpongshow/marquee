@@ -1194,6 +1194,37 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /webhooks/test:
+    post:
+      tags: [system]
+      operationId: testWebhook
+      summary: Send a test event to a webhook URL now (admin only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, format: uri }
+                secret: { type: string }
+      responses:
+        "200":
+          description: Delivered or not.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+                  status: { type: integer, description: The receiver's HTTP status. }
+                  error: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /stats:
     get:
       tags: [activity]
@@ -2114,6 +2145,10 @@ components:
         metadata: { $ref: "#/components/schemas/MetadataSettings" }
         tasks: { $ref: "#/components/schemas/TaskSettings" }
         music: { $ref: "#/components/schemas/MusicSettings" }
+        webhooks:
+          type: array
+          description: Replaces the whole list when sent.
+          items: { $ref: "#/components/schemas/Webhook" }
 
     ServerSettingsUpdate:
       type: object
@@ -2127,6 +2162,23 @@ components:
         metadata: { $ref: "#/components/schemas/MetadataSettingsUpdate" }
         tasks: { $ref: "#/components/schemas/TaskSettings" }
         music: { $ref: "#/components/schemas/MusicSettings" }
+        webhooks:
+          type: array
+          description: Replaces the whole list when sent.
+          items: { $ref: "#/components/schemas/Webhook" }
+
+    Webhook:
+      type: object
+      required: [name, url, events, enabled]
+      properties:
+        id: { type: string, description: Assigned by the server. }
+        name: { type: string, maxLength: 100 }
+        url: { type: string, format: uri, description: "http(s) URL that receives a JSON POST per event." }
+        secret: { type: string, description: "When set, payloads are signed: X-Marquee-Signature: sha256=<HMAC-SHA256 of the body>." }
+        events:
+          type: array
+          items: { type: string, enum: [playback.started, playback.paused, playback.resumed, playback.stopped, playback.watched, library.added] }
+        enabled: { type: boolean }
 
     MusicSettings:
       type: object

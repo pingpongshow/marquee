@@ -2,7 +2,10 @@ package api
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"strings"
 
 	"marquee/internal/library"
 	"marquee/internal/settings"
@@ -72,7 +75,20 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			OnlineLyrics:     ptr(s.Music.OnlineLyrics),
 			LoudnessAnalysis: ptr(s.Music.LoudnessAnalysis),
 		},
+		Webhooks: ptr(toAPIWebhooks(s.Webhooks)),
 	}
+}
+
+func toAPIWebhooks(ws []settings.Webhook) []Webhook {
+	out := make([]Webhook, len(ws))
+	for i, w := range ws {
+		ev := make([]WebhookEvents, len(w.Events))
+		for j, e := range w.Events {
+			ev[j] = WebhookEvents(e)
+		}
+		out[i] = Webhook{Id: ptr(w.ID), Name: w.Name, Url: w.URL, Secret: nz(w.Secret), Events: ev, Enabled: w.Enabled}
+	}
+	return out
 }
 
 func set[T any](dst *T, src *T) {
@@ -154,6 +170,32 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		set(&s.Music.OnlineLyrics, m.OnlineLyrics)
 		set(&s.Music.LoudnessAnalysis, m.LoudnessAnalysis)
 	}
+	if u.Webhooks != nil {
+		s.Webhooks = make([]settings.Webhook, len(*u.Webhooks))
+		for i, w := range *u.Webhooks {
+			id := ""
+			if w.Id != nil {
+				id = *w.Id
+			}
+			if id == "" {
+				id = newWebhookID()
+			}
+			ev := make([]string, len(w.Events))
+			for j, e := range w.Events {
+				ev[j] = string(e)
+			}
+			s.Webhooks[i] = settings.Webhook{ID: id, Name: strings.TrimSpace(w.Name), URL: strings.TrimSpace(w.Url), Events: ev, Enabled: w.Enabled}
+			if w.Secret != nil {
+				s.Webhooks[i].Secret = *w.Secret
+			}
+		}
+	}
+}
+
+func newWebhookID() string {
+	b := make([]byte, 6)
+	rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 func (h *Handlers) GetSettings(ctx context.Context, _ GetSettingsRequestObject) (GetSettingsResponseObject, error) {

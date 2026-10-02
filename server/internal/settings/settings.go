@@ -28,6 +28,17 @@ type Settings struct {
 	Metadata     Metadata     `json:"metadata"`
 	Tasks        Tasks        `json:"tasks"`
 	Music        Music        `json:"music"`
+	Webhooks     []Webhook    `json:"webhooks"`
+}
+
+// Webhook is a URL told about events (ADM-5).
+type Webhook struct {
+	ID      string   `json:"id"`
+	Name    string   `json:"name"`
+	URL     string   `json:"url"`
+	Secret  string   `json:"secret"` // signs payloads (HMAC-SHA256) when set
+	Events  []string `json:"events"`
+	Enabled bool     `json:"enabled"`
 }
 
 // Music configures the M6.5 music features.
