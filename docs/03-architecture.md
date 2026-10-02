@@ -109,15 +109,21 @@ The session id is a random 128-bit capability that stops working when the sessio
 
 ## Background tasks
 
-| Task | Default schedule |
-|---|---|
-| Library scan | fs watcher (real time) + nightly full scan |
-| Metadata refresh | weekly for recently added items, monthly for everything else |
-| DB backup | daily, keep 7 |
-| DB optimize (`VACUUM`/`ANALYZE`) | weekly |
-| Trickplay generation | nightly, low priority (P1) |
-| Intro/credits detection | nightly, low priority (audio fingerprint per season) (P1) |
-| Transcode dir cleanup | hourly + on startup |
+A scheduler (`internal/tasks/scheduler.go`) runs registered tasks and records each run in `task_runs`. "Window" tasks run once a day inside the maintenance window (and catch up if the server was off for a whole window); interval tasks run every N hours. Settings → Scheduled Tasks lists them with their last result and a Run now button.
+
+| Task | Schedule | Status |
+|---|---|---|
+| Library scan | fs watcher (real time) + per-library interval; "Scan all libraries" on demand | Implemented |
+| DB backup (+ prune to retention) | daily in window | Implemented (M4) |
+| DB optimize (`PRAGMA optimize`, WAL checkpoint) | daily in window | Implemented (M4) |
+| Ratings refresh (OMDb) | every 6 h | Implemented |
+| Metadata refresh | weekly for recently added items, monthly for everything else | M7 |
+| Trickplay generation | nightly, low priority | M7 |
+| Intro/credits detection | nightly, low priority (audio fingerprint per season) | M7 |
+| Sonic analysis | continuous, low priority, GPU | M6.5 |
+| Transcode dir cleanup | on startup (sessions clean up their own directories) | Implemented |
+
+**Restore:** restoring copies the chosen backup to `<config>/restore-pending.db` and restarts. On start, before the database is opened, the current database moves to `backups/pre-restore-*.db` and the pending file takes its place.
 
 ## Upgrade & compatibility strategy
 

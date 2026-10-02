@@ -3,6 +3,7 @@ import { useState } from "react";
 import { systemInfoQuery } from "@/api/queries";
 import { Alert, Button, Card, Field, Input, Select, Spinner, StringListEditor, Toggle } from "@/components/ui";
 import { SaveBar } from "./SaveBar";
+import { RestartServer } from "./TasksSettings";
 import { useSectionDraft } from "./useSectionDraft";
 
 export const languages = [
@@ -59,6 +60,9 @@ export function GeneralSettings() {
           )}
         </Field>
       </Card>
+      <div className="mt-6">
+        <RestartServer />
+      </div>
       <SaveBar dirty={s.dirty} saving={s.saving} error={s.error} savedAt={s.savedAt} onSave={s.save} onReset={s.reset} />
     </>
   );
@@ -213,25 +217,3 @@ export function MetadataSettings() {
   );
 }
 
-export function TaskSettings() {
-  const s = useSectionDraft("tasks");
-  if (!s.draft) return <Spinner />;
-  return (
-    <>
-      <Card title="Maintenance" description="Heavy jobs (metadata refresh, thumbnail and intro detection, backups) run inside this window.">
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Window starts at">
-            {(id) => <Input id={id} type="time" value={s.draft!.maintenanceWindowStart ?? "03:00"} onChange={(e) => s.update({ maintenanceWindowStart: e.target.value })} />}
-          </Field>
-          <Field label="Window length (hours)">
-            {(id) => <Input id={id} type="number" min={1} max={12} value={s.draft!.maintenanceWindowHours ?? 4} onChange={(e) => s.update({ maintenanceWindowHours: Number(e.target.value) })} />}
-          </Field>
-        </div>
-        <Field label="Database backups to keep" help="A backup is taken daily and before every upgrade.">
-          {(id) => <Input id={id} type="number" min={1} max={60} value={s.draft!.backupRetention ?? 7} onChange={(e) => s.update({ backupRetention: Number(e.target.value) })} />}
-        </Field>
-      </Card>
-      <SaveBar dirty={s.dirty} saving={s.saving} error={s.error} savedAt={s.savedAt} onSave={s.save} onReset={s.reset} />
-    </>
-  );
-}

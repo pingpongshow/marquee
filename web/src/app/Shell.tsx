@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Clapperboard, Film, Home, Image, LogOut, Menu, Music, Settings, Sparkles, Tv, UserRound, Users, Video } from "lucide-react";
+import { clsx } from "clsx";
+import { Search as SearchIcon } from "lucide-react";
+import { Clapperboard, Film, Home, Image, ListMusic, LogOut, Menu, Music, Settings, Sparkles, Tv, UserRound, Users, Video } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { librariesQuery, meQuery, systemInfoQuery } from "@/api/queries";
 import type { LibraryType } from "@/api/types";
@@ -75,6 +77,21 @@ export function Shell({ children }: { children: ReactNode }) {
   const [switching, setSwitching] = useState(false);
   const music = useMusic();
 
+  // "/" jumps to search from anywhere (as in Plex), unless you're typing in a field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || t.closest("input, textarea, select, [contenteditable=true]")) return;
+      const box = document.querySelector<HTMLInputElement>('header input[aria-label="Search"]');
+      if (box) {
+        e.preventDefault();
+        box.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const sidebar = (
     <nav aria-label="Libraries" className="flex h-full flex-col gap-1 p-3">
       <Link to="/" className={navItem} activeProps={navActive} activeOptions={{ exact: true }} onClick={() => setNavOpen(false)}>
@@ -98,6 +115,9 @@ export function Shell({ children }: { children: ReactNode }) {
         );
       })}
       {libraries.data?.length === 0 && <p className="px-3 text-sm text-faint">No libraries yet</p>}
+      <Link to="/playlists" className={clsx(navItem, "mt-4")} activeProps={navActive} onClick={() => setNavOpen(false)}>
+        <ListMusic className="size-5" aria-hidden /> Playlists
+      </Link>
       <div className="mt-auto" />
       {me.data?.isAdmin && (
         <Link to="/settings" className={navItem} activeProps={navActive} onClick={() => setNavOpen(false)}>
@@ -117,6 +137,9 @@ export function Shell({ children }: { children: ReactNode }) {
         <Logo />
         <SearchBox />
         <div className="ml-auto flex items-center gap-3">
+          <Link to="/search" search={{ q: "" }} className="rounded p-1 text-muted hover:text-text md:hidden" aria-label="Search">
+            <SearchIcon className="size-5" />
+          </Link>
           {me.data?.isAdmin && <ActivityIndicator />}
           <UserMenu name={me.data?.displayName ?? ""} avatarUrl={me.data?.avatarUrl} onSwitch={() => setSwitching(true)} onSignOut={() => void signOut()} />
         </div>
@@ -131,7 +154,7 @@ export function Shell({ children }: { children: ReactNode }) {
         )}
         <main className="min-w-0 flex-1 overflow-y-auto">
           {children}
-          {music.index >= 0 && <div className="h-20" aria-hidden />}
+          {music.current && <div className="h-20" aria-hidden />}
         </main>
       </div>
       {switching && <ProfileSwitcher onClose={() => setSwitching(false)} />}

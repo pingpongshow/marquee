@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -82,6 +83,9 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	if err := db.ApplyPendingRestore(cfg.DBPath(), cfg.ConfigDir, cfg.BackupDir()); err != nil {
+		return fmt.Errorf("restore backup: %w", err)
+	}
 	database, err := db.Open(ctx, cfg.DBPath(), cfg.BackupDir())
 	if err != nil {
 		return err
@@ -166,23 +170,38 @@ func run() error {
 			}
 		}
 	}()
-	go func() {
-		t := time.NewTicker(6 * time.Hour)
-		defer t.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-t.C:
-				refreshAllRatings(ctx, meta, libraries)
+	backups := &tasks.Backups{DB: database, Dir: cfg.BackupDir(), ConfigDir: cfg.ConfigDir,
+		Retention: func() int { return store.Get().Tasks.BackupRetention }}
+	scheduler := &tasks.Scheduler{DB: database, Settings: store}
+	scheduler.Register(backups.Task())
+	scheduler.Register(tasks.Task{ID: "optimize", Name: "Optimize database", Window: true,
+		Description: "Updates query statistics and compacts the write-ahead log.",
+		Run: func(ctx context.Context) (string, error) {
+			if _, err := database.ExecContext(ctx, `PRAGMA optimize`); err != nil {
+				return "", err
 			}
-		}
-	}()
+			_, err := database.ExecContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`)
+			return "Done", err
+		}})
+	scheduler.Register(tasks.Task{ID: "scan-all", Name: "Scan all libraries",
+		Description: "Looks for new, changed and removed files in every library now. Libraries also rescan on their own schedule, and the file watcher catches most changes as they happen.",
+		Run: func(ctx context.Context) (string, error) {
+			scans.QueueAll(ctx)
+			return "Queued", nil
+		}})
+	scheduler.Register(tasks.Task{ID: "ratings", Name: "Refresh ratings", Every: 6 * time.Hour,
+		Description: "Fetches IMDb, Rotten Tomatoes and Metacritic ratings from OMDb within the daily request budget.",
+		Run: func(ctx context.Context) (string, error) {
+			refreshAllRatings(ctx, meta, libraries)
+			return "Done", nil
+		}})
+	go scheduler.Run(ctx)
 
 	handler := server.New(server.Deps{
 		Handlers: &api.Handlers{
 			DB: database, Auth: authSvc, Settings: store, Libraries: libraries,
 			Items: items.NewStore(database), Scans: scans, Version: config.Version,
+			Tasks: scheduler, Backups: backups, Restart: stop,
 			Avatars:  &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
 			Images:   images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
 			Logs:     logs,

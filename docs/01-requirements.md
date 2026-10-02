@@ -84,6 +84,28 @@ Priority key:
 
 **Transparency:** every session shows the decision and its reason in the dashboard and the player's info panel (e.g. "Transcode 4.1 Mbps HEVC: remote, measured 6 Mbps").
 
+## 3b. Music (Plexamp-class)
+
+The owner wants the best music experience possible: everything Plexamp and Plex's Sonic features do, on web, Apple and Android. Analysis runs on the server (the RTX 5090 is available), so no audio leaves the house.
+
+| ID | Requirement | Pri |
+|---|---|---|
+| MUSIC-1 | **Sonic analysis:** every track gets an audio embedding plus features (BPM, key, energy, danceability, mood, loudness), computed in the background on the server with GPU acceleration. New tracks are analysed as they are added. | P1 |
+| MUSIC-2 | **Sonically similar:** similar tracks, albums and artists by sound (not just tags), shown on track, album and artist pages. | P1 |
+| MUSIC-3 | **Radios:** track, album, artist, genre, mood, decade ("Time Travel") and library radio. Endless, and steered by sonic similarity, ratings, skips and play history. | P1 |
+| MUSIC-4 | **Sonic Adventure:** a playlist that travels smoothly from one track to another through sonically adjacent tracks. | P1 |
+| MUSIC-5 | **Sonic Sage (natural-language playlists):** "rainy Sunday jazz with a late-night feel" builds a playlist from your library. Text-to-audio embeddings run locally; an optional LLM (admin-supplied API key) interprets longer prompts. | P1 |
+| MUSIC-6 | **Guest DJ / smart play:** optional modes that weave related tracks, deeper cuts or the artist's other albums into whatever is playing. | P1 |
+| MUSIC-7 | **Mixes for you:** daily mixes per user (by taste clusters), "Rediscover" (loved but not played lately), "Deep cuts", "Recently added mix", mood mixes and anniversary albums on Home. | P1 |
+| MUSIC-8 | **Smart playlists:** rule-based (genre, artist, year, rating, play count, last played, added date, mood, BPM, key…) with limits and sort, kept up to date automatically. | P1 |
+| MUSIC-9 | **Playback quality:** gapless playback, loudness levelling (ReplayGain tags or EBU R128 analysis, track/album mode), optional crossfade and "sweet fades" that respect gapless albums, and a 10-band EQ on clients that support it. | P1 |
+| MUSIC-10 | **Lyrics:** embedded, `.lrc` sidecars and LRCLIB, with synced, scrolling lyrics in the player (also META-9). | P1 |
+| MUSIC-11 | **Ratings and taste:** 1–5 star / love ratings on tracks, albums and artists. Skips and plays feed recommendations. Per-user listening stats ("Year in music"). | P1 |
+| MUSIC-12 | **Scrobbling:** optional Last.fm and ListenBrainz scrobbling per user. | P2 |
+| MUSIC-13 | **Plexamp-style player:** full-screen now playing with artwork-coloured backgrounds, queue editing (drag to reorder, play next, add to queue), shuffle/repeat, sleep timer, waveform or visualizer, and a mini-player. | P1 |
+| MUSIC-14 | **Apple and Android:** offline downloads with smart sync (e.g. "keep my top 500 and today's mix"), CarPlay / Android Auto, lock-screen and widget controls, and Siri / Assistant "play … on Marquee" where the platforms allow. | P1 |
+| MUSIC-15 | **Discovery:** artist bios and photos, similar artists in your library, popular tracks (via Last.fm/ListenBrainz data) for an artist, and "Recently played" / "Most played" hubs. | P1 |
+
 ## 4. Users, auth & state
 
 | ID | Requirement | Pri |
@@ -96,7 +118,7 @@ Priority key:
 | USER-4 | TV-friendly login: Apple TV shows a code and you approve it from your phone or web ("Quick Connect"). | P1 |
 | USER-5 | Per-user watch state: resume offset, played/unplayed, play count, last watched, and ratings. | P0 |
 | USER-6 | Continue Watching / On Deck, Recently Added and Up Next (next episode). | P0 |
-| USER-7 | Playlists for video and music, plus smart playlists. | P1 |
+| USER-7 | Playlists for video and music, plus smart playlists (smart playlists: MUSIC-8, M6.5). | P1 |
 | USER-8 | Watchlist. | P1 |
 | USER-9 | TOTP two-factor auth for admin/WAN logins. | P2 |
 

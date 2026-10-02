@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { AlertTriangle, ChevronRight } from "lucide-react";
-import { imageUrl, personPhotoUrl } from "@/api/client";
+import { api, imageUrl, personPhotoUrl, unwrap } from "@/api/client";
 import { itemChildrenQuery, itemQuery, meQuery } from "@/api/queries";
 import type { Credit, ItemDetail, ItemSummary, MediaStream } from "@/api/types";
 import { Alert, Spinner } from "@/components/ui";
 import { useMusic } from "../player/MusicPlayer";
 import { ItemActions } from "./ItemActions";
+import { ItemMenu } from "./ItemMenu";
 import { PlayButtons } from "./PlayButtons";
 import { Poster } from "./Poster";
 import { formatBytes, formatDuration, formatTrackTime, languageName, subtitleFor } from "./format";
@@ -101,11 +102,18 @@ function Cast({ credits }: { credits: Credit[] }) {
       {crew.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-x-8 gap-y-1 text-sm">
           {(["director", "creator", "writer"] as const).map((role) => {
-            const names = crew.filter((c) => c.role === role).map((c) => c.name);
-            return names.length ? (
+            const people = crew.filter((c) => c.role === role).slice(0, 4);
+            return people.length ? (
               <div key={role}>
-                <span className="text-faint capitalize">{role === "writer" ? "Writers" : role + (names.length > 1 ? "s" : "")}</span>{" "}
-                <span className="text-text">{names.slice(0, 4).join(", ")}</span>
+                <span className="text-faint capitalize">{role === "writer" ? "Writers" : role + (people.length > 1 ? "s" : "")}</span>{" "}
+                {people.map((c, i) => (
+                  <span key={c.personId}>
+                    {i > 0 && ", "}
+                    <Link to="/person/$personId" params={{ personId: String(c.personId) }} className="text-text hover:underline">
+                      {c.name}
+                    </Link>
+                  </span>
+                ))}
               </div>
             ) : null;
           })}
@@ -117,13 +125,15 @@ function Cast({ credits }: { credits: Credit[] }) {
           <ul className="flex gap-4 overflow-x-auto pb-2">
             {people.map((c) => (
               <li key={c.personId} className="w-24 shrink-0 text-center">
-                <div className="mx-auto mb-2 size-24 overflow-hidden rounded-full bg-surface-3">
-                  {c.hasPhoto && <img src={personPhotoUrl(c.personId, 96)} alt="" loading="lazy" className="size-full object-cover" />}
-                </div>
-                <div className="truncate text-sm font-medium" title={c.name}>
-                  {c.name}
-                </div>
-                {c.character && <div className="truncate text-xs text-muted" title={c.character}>{c.character}</div>}
+                <Link to="/person/$personId" params={{ personId: String(c.personId) }} className="group block">
+                  <div className="mx-auto mb-2 size-24 overflow-hidden rounded-full bg-surface-3 group-hover:ring-2 group-hover:ring-accent">
+                    {c.hasPhoto && <img src={personPhotoUrl(c.personId, 96)} alt="" loading="lazy" className="size-full object-cover" />}
+                  </div>
+                  <div className="truncate text-sm font-medium group-hover:underline" title={c.name}>
+                    {c.name}
+                  </div>
+                  {c.character && <div className="truncate text-xs text-muted" title={c.character}>{c.character}</div>}
+                </Link>
               </li>
             ))}
           </ul>
@@ -147,7 +157,7 @@ function Children({ item }: { item: ItemDetail }) {
       <h2 className="mb-4 text-lg font-semibold">{heading}</h2>
       {rows ? (
         <ol className="divide-y divide-border rounded-lg border border-border bg-surface">
-          {list.map((c: ItemSummary, i) => (
+          {list.map((c: ItemSummary) => (
             <li key={c.id}>
               <Link
                 to="/item/$itemId"
@@ -158,7 +168,7 @@ function Children({ item }: { item: ItemDetail }) {
                     music.play(list.filter((t) => t.type === "track"), list.filter((t) => t.type === "track").indexOf(c));
                   }
                 }}
-                className={i === music.index && music.queue[music.index]?.id === c.id ? "flex items-center gap-4 px-4 py-3 text-accent hover:bg-surface-2" : "flex items-center gap-4 px-4 py-3 hover:bg-surface-2"}
+                className={music.current?.item.id === c.id ? "flex items-center gap-4 px-4 py-3 text-accent hover:bg-surface-2" : "flex items-center gap-4 px-4 py-3 hover:bg-surface-2"}
               >
                 <span className="w-8 shrink-0 text-right text-sm text-faint tabular-nums">{c.index ?? ""}</span>
                 {c.type === "episode" && c.images?.thumb && <img src={imageUrl(c.images.thumb, 160)} alt="" loading="lazy" className="aspect-video w-32 shrink-0 rounded object-cover" />}
@@ -167,6 +177,7 @@ function Children({ item }: { item: ItemDetail }) {
                   {c.type === "track" && c.artistCredit && c.artistCredit !== item.artistCredit && <span className="block truncate text-xs text-muted">{c.artistCredit}</span>}
                 </span>
                 <span className="shrink-0 text-sm text-muted tabular-nums">{c.type === "track" ? formatTrackTime(c.durationMs) : formatDuration(c.durationMs)}</span>
+                {c.type === "track" && <ItemMenu item={c} className="-my-1" />}
               </Link>
             </li>
           ))}
@@ -184,6 +195,32 @@ function Children({ item }: { item: ItemDetail }) {
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+function Related({ item }: { item: ItemDetail }) {
+  const related = useQuery({
+    queryKey: ["items", item.id, "related"],
+    queryFn: () => unwrap(api.GET("/items/{itemId}/related", { params: { path: { itemId: item.id } } })),
+    enabled: ["movie", "show", "artist", "album"].includes(item.type),
+  });
+  if (!related.data?.length) return null;
+  const square = item.type === "artist" || item.type === "album";
+  return (
+    <section className="mt-10">
+      <h2 className="mb-4 text-lg font-semibold">{square ? "Similar in your library" : "More like this"}</h2>
+      <ul className="flex gap-4 overflow-x-auto pb-2">
+        {related.data.map((r) => (
+          <li key={r.id} className="w-36 shrink-0">
+            <Link to="/item/$itemId" params={{ itemId: String(r.id) }} className="group block">
+              <Poster item={r} shape={square ? "square" : "poster"} width={180} className="group-hover:ring-2 group-hover:ring-accent" />
+              <div className="mt-2 truncate text-sm font-medium">{r.title}</div>
+              <div className="truncate text-xs text-muted">{subtitleFor(r)}</div>
+            </Link>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -227,11 +264,10 @@ export function ItemPage() {
           {d.genres.length > 0 && <div className="mt-1 text-sm text-faint">{d.genres.join(", ")}</div>}
           <RatingBadges item={d} />
           <PlayButtons item={d} />
-          {me.data?.isAdmin && (
-            <div className="mt-4 flex items-center gap-3">
-              <ItemActions item={d} />
-            </div>
-          )}
+          <div className="mt-4 flex items-center gap-3">
+            <ItemMenu item={d} />
+            {me.data?.isAdmin && <ItemActions item={d} />}
+          </div>
           {d.tagline && <p className="mt-4 text-lg text-muted italic">{d.tagline}</p>}
           {!d.available && (
             <div className="mt-4 flex items-center gap-2 text-sm text-danger">
@@ -252,6 +288,7 @@ export function ItemPage() {
       </div>
       <Children item={d} />
       <Cast credits={d.credits} />
+      <Related item={d} />
       <MediaInfo item={d} isAdmin={!!me.data?.isAdmin} />
     </div>
     </div>

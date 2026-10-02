@@ -174,3 +174,26 @@ export function useRevokeDevice() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["devices"] }),
   });
 }
+
+export const playlistsQuery = (kind?: "video" | "audio") =>
+  queryOptions({
+    queryKey: ["playlists", "list", kind ?? "all"],
+    queryFn: () => unwrap(api.GET("/playlists", { params: { query: kind ? { kind } : {} } })),
+  });
+
+export const playlistQuery = (id: number) =>
+  queryOptions({
+    queryKey: ["playlists", id],
+    queryFn: () => unwrap(api.GET("/playlists/{playlistId}", { params: { path: { playlistId: id } } })),
+  });
+
+export const playlistItemsQuery = (id: number) =>
+  queryOptions({
+    queryKey: ["playlists", id, "items"],
+    queryFn: () => unwrap(api.GET("/playlists/{playlistId}/items", { params: { path: { playlistId: id }, query: { limit: 2000 } } })),
+  });
+
+/** Playable items under any item (itself for a movie, episode or track). */
+export function fetchLeaves(itemId: number, opts?: { shuffle?: boolean; unwatched?: boolean }) {
+  return unwrap(api.GET("/items/{itemId}/leaves", { params: { path: { itemId }, query: opts ?? {} } }));
+}

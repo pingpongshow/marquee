@@ -29,6 +29,7 @@ tags:
   - name: plex
   - name: playback
   - name: hubs
+  - name: playlists
 
 paths:
   /system/info:
@@ -548,6 +549,29 @@ paths:
         - $ref: "#/components/parameters/Sort"
         - $ref: "#/components/parameters/Offset"
         - $ref: "#/components/parameters/Limit"
+        - name: watch
+          in: query
+          schema: { type: string, enum: [unwatched, watched, in_progress] }
+        - name: genre
+          in: query
+          schema: { type: string }
+        - name: decade
+          in: query
+          description: First year of a decade, e.g. 1990.
+          schema: { type: integer }
+        - name: contentRating
+          in: query
+          schema: { type: string }
+        - name: resolution
+          in: query
+          schema: { type: string, enum: ["4k", "1080", "720", sd] }
+        - name: hdr
+          in: query
+          schema: { type: boolean }
+        - name: letter
+          in: query
+          description: Only titles starting with this letter ("#" for anything else).
+          schema: { type: string }
       responses:
         "200":
           description: OK
@@ -988,6 +1012,353 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /libraries/{libraryId}/filters:
+    parameters:
+      - $ref: "#/components/parameters/LibraryId"
+    get:
+      tags: [items]
+      operationId: libraryFilters
+      summary: Values for the library filter bar, and where each letter starts for the A–Z jump bar (title sort).
+      parameters:
+        - name: type
+          in: query
+          schema: { $ref: "#/components/schemas/ItemType" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LibraryFilters" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /people/{personId}:
+    get:
+      tags: [items]
+      operationId: getPerson
+      summary: A person and the items in your libraries they appear in.
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PersonDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/related:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [items]
+      operationId: relatedItems
+      summary: Similar items from the same library ("More like this"), by shared genres and people.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ItemSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/leaves:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [items]
+      operationId: itemLeaves
+      summary: Playable items under a show, season, artist, album or collection, in play order (for Play all / Shuffle). At most 2,000.
+      parameters:
+        - name: shuffle
+          in: query
+          schema: { type: boolean }
+        - name: unwatched
+          in: query
+          description: Start from the first unwatched episode (shows and seasons).
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ItemSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /playlists:
+    get:
+      tags: [playlists]
+      operationId: listPlaylists
+      summary: Your playlists.
+      parameters:
+        - name: kind
+          in: query
+          schema: { $ref: "#/components/schemas/PlaylistKind" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Playlist" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [playlists]
+      operationId: createPlaylist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlaylistCreate" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /playlists/{playlistId}:
+    parameters:
+      - $ref: "#/components/parameters/PlaylistId"
+    get:
+      tags: [playlists]
+      operationId: getPlaylist
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [playlists]
+      operationId: updatePlaylist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, minLength: 1, maxLength: 200 }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [playlists]
+      operationId: deletePlaylist
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /playlists/{playlistId}/items:
+    parameters:
+      - $ref: "#/components/parameters/PlaylistId"
+    get:
+      tags: [playlists]
+      operationId: listPlaylistItems
+      parameters:
+        - $ref: "#/components/parameters/Offset"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 2000, default: 500 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlaylistItemPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [playlists]
+      operationId: addPlaylistItems
+      summary: Append items. Shows, seasons, artists and albums add their episodes or tracks.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [itemIds]
+              properties:
+                itemIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Added.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Playlist" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /playlists/{playlistId}/items/{entryId}:
+    parameters:
+      - $ref: "#/components/parameters/PlaylistId"
+      - name: entryId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    delete:
+      tags: [playlists]
+      operationId: removePlaylistItem
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [playlists]
+      operationId: movePlaylistItem
+      summary: Move an entry to just after another one (or to the top when afterEntryId is absent).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                afterEntryId: { type: integer, format: int64 }
+      responses:
+        "204": { description: Moved. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /tasks:
+    get:
+      tags: [system]
+      operationId: listTasks
+      summary: Scheduled maintenance tasks and their last run (admin only).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TaskInfo" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /tasks/{taskId}/run:
+    post:
+      tags: [system]
+      operationId: runTask
+      summary: Run a task now (admin only).
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "202": { description: Started. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /backups:
+    get:
+      tags: [system]
+      operationId: listBackups
+      summary: Database backups, newest first (admin only).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Backup" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [system]
+      operationId: createBackup
+      summary: Back up the database now (admin only).
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Backup" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /backups/{name}:
+    parameters:
+      - $ref: "#/components/parameters/BackupName"
+    get:
+      tags: [system]
+      operationId: downloadBackup
+      summary: Download a backup file (admin only).
+      responses:
+        "200":
+          description: SQLite database file.
+          headers:
+            Content-Disposition: { schema: { type: string } }
+          content:
+            application/octet-stream: { schema: { type: string, format: binary } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [system]
+      operationId: deleteBackup
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /backups/{name}/restore:
+    parameters:
+      - $ref: "#/components/parameters/BackupName"
+    post:
+      tags: [system]
+      operationId: restoreBackup
+      summary: Restore a backup (admin only). The server restarts to apply it; the current database is kept as a "pre-restore" backup.
+      responses:
+        "202": { description: Restoring; the server is restarting. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /system/restart:
+    post:
+      tags: [system]
+      operationId: restartServer
+      summary: Restart the server (admin only). Docker brings it back up.
+      responses:
+        "202": { description: Restarting. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /filesystem/browse:
     get:
       tags: [filesystem]
@@ -1038,7 +1409,7 @@ components:
       description: Sort order. Prefix with "-" for descending.
       schema:
         type: string
-        enum: [title, -title, added, -added, year, -year, released, -released]
+        enum: [title, -title, added, -added, year, -year, released, -released, rating, -rating, duration, -duration, -viewed, random]
         default: title
     Offset:
       name: offset
@@ -1048,6 +1419,16 @@ components:
       name: limit
       in: query
       schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+    PlaylistId:
+      name: playlistId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    BackupName:
+      name: name
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[A-Za-z0-9._-]+\\.db$" }
     LibraryId:
       name: libraryId
       in: path
@@ -1678,6 +2059,9 @@ components:
         startMs: { type: integer, format: int64, description: Omit to resume where the user left off. }
         maxBitrateKbps: { type: integer, description: "The app's quality setting; 0/omitted = original (home) or automatic (remote)." }
         measuredKbps: { type: integer, description: Measured download speed from /playback/bandwidth-test. }
+        preload:
+          type: boolean
+          description: Prepare the next item (gapless music) without ending this device's current session. It takes over when it first reports "playing".
         profile: { $ref: "#/components/schemas/DeviceProfile" }
 
     PlaybackDecision:
@@ -1794,6 +2178,10 @@ components:
         localKbps: { type: integer }
         remoteKbps: { type: integer }
         uploadSpeedKbps: { type: integer }
+        bandwidthHistory:
+          type: array
+          description: The last hour, one sample a minute, oldest first.
+          items: { $ref: "#/components/schemas/BandwidthSample" }
         libraries:
           type: array
           items:
@@ -1818,6 +2206,130 @@ components:
     ItemType:
       type: string
       enum: [movie, show, season, episode, artist, album, track, video]
+
+    LibraryFilters:
+      type: object
+      required: [genres, decades, contentRatings, letters]
+      properties:
+        genres: { type: array, items: { $ref: "#/components/schemas/Facet" } }
+        decades: { type: array, items: { $ref: "#/components/schemas/Facet" } }
+        contentRatings: { type: array, items: { $ref: "#/components/schemas/Facet" } }
+        letters: { type: array, items: { $ref: "#/components/schemas/LetterOffset" } }
+
+    LetterOffset:
+      type: object
+      required: [letter, offset]
+      properties:
+        letter: { type: string }
+        offset: { type: integer, description: Position of the first item with this letter in the title-sorted listing. }
+
+    Facet:
+      type: object
+      required: [value, count]
+      properties:
+        value: { type: string }
+        count: { type: integer }
+
+    PersonDetail:
+      type: object
+      required: [id, name, hasPhoto, credits]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        hasPhoto: { type: boolean }
+        credits: { type: array, items: { $ref: "#/components/schemas/PersonCredit" } }
+
+    PersonCredit:
+      type: object
+      required: [item, role]
+      properties:
+        item: { $ref: "#/components/schemas/ItemSummary" }
+        role: { type: string }
+        character: { type: string }
+
+    PlaylistKind:
+      type: string
+      enum: [video, audio]
+
+    Playlist:
+      type: object
+      required: [id, title, kind, itemCount, durationMs, imageIds, updatedAt]
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        kind: { $ref: "#/components/schemas/PlaylistKind" }
+        itemCount: { type: integer }
+        durationMs: { type: integer, format: int64 }
+        imageIds:
+          type: array
+          description: Posters/covers of up to four items, for the playlist's mosaic.
+          items: { type: integer, format: int64 }
+        updatedAt: { type: string, format: date-time }
+
+    PlaylistCreate:
+      type: object
+      required: [title, kind]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        kind: { $ref: "#/components/schemas/PlaylistKind" }
+        itemIds:
+          type: array
+          maxItems: 500
+          items: { type: integer, format: int64 }
+
+    PlaylistItemPage:
+      type: object
+      required: [items, total, offset]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/PlaylistEntry" } }
+        total: { type: integer }
+        offset: { type: integer }
+
+    PlaylistEntry:
+      type: object
+      required: [entryId, item]
+      properties:
+        entryId: { type: integer, format: int64 }
+        item: { $ref: "#/components/schemas/ItemSummary" }
+
+    TaskInfo:
+      type: object
+      required: [id, name, description, schedule, running]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        schedule: { type: string, description: "Human-readable, e.g. \"Daily in the maintenance window\"." }
+        running: { type: boolean }
+        lastRun: { $ref: "#/components/schemas/TaskRun" }
+
+    TaskRun:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [running, succeeded, failed] }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time }
+        message: { type: string }
+
+    Backup:
+      type: object
+      required: [name, size, createdAt, kind]
+      properties:
+        name: { type: string }
+        size: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+        kind: { type: string, enum: [scheduled, manual, pre-migration, pre-restore] }
+
+    BandwidthSample:
+      type: object
+      required: [at, localKbps, remoteKbps, streams, transcodes]
+      properties:
+        at: { type: string, format: date-time }
+        localKbps: { type: integer }
+        remoteKbps: { type: integer }
+        streams: { type: integer }
+        transcodes: { type: integer }
 
     ItemSummary:
       type: object

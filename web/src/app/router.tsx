@@ -5,10 +5,13 @@ import { Alert, Spinner } from "@/components/ui";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { SetupPage } from "@/features/auth/SetupPage";
 import { ItemPage } from "@/features/browse/ItemPage";
-import { LibraryPage } from "@/features/browse/LibraryPage";
+import { LibraryPage, validateLibrarySearch } from "@/features/browse/LibraryPage";
+import { PersonPage } from "@/features/browse/PersonPage";
 import { HomePage } from "@/features/home/HomePage";
 import { MusicProvider } from "@/features/player/MusicPlayer";
 import { PlayerPage } from "@/features/player/PlayerPage";
+import { PlaylistPage } from "@/features/playlists/PlaylistPage";
+import { PlaylistsPage } from "@/features/playlists/PlaylistsPage";
 import { SearchPage } from "@/features/search/SearchPage";
 import { AccountPage } from "@/features/users/AccountPage";
 import { SettingsLayout } from "@/features/settings/SettingsLayout";
@@ -42,7 +45,7 @@ const rootRoute = createRootRoute({ component: Gate });
 
 const homeRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: HomePage });
 
-const libraryRoute = createRoute({ getParentRoute: () => rootRoute, path: "/library/$libraryId", component: LibraryPage });
+const libraryRoute = createRoute({ getParentRoute: () => rootRoute, path: "/library/$libraryId", validateSearch: validateLibrarySearch, component: LibraryPage });
 const itemRoute = createRoute({ getParentRoute: () => rootRoute, path: "/item/$itemId", component: ItemPage });
 
 const searchRoute = createRoute({
@@ -54,9 +57,12 @@ const searchRoute = createRoute({
 const playRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/play/$itemId",
-  validateSearch: (s: Record<string, unknown>) => ({ t: typeof s.t === "number" ? s.t : undefined }),
+  validateSearch: (s: Record<string, unknown>): { t?: number; pl?: number } => ({ t: typeof s.t === "number" ? s.t : undefined, pl: typeof s.pl === "number" ? s.pl : undefined }),
   component: PlayerPage,
 });
+const personRoute = createRoute({ getParentRoute: () => rootRoute, path: "/person/$personId", component: PersonPage });
+const playlistsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/playlists", component: PlaylistsPage });
+const playlistRoute = createRoute({ getParentRoute: () => rootRoute, path: "/playlist/$playlistId", component: PlaylistPage });
 const accountRoute = createRoute({ getParentRoute: () => rootRoute, path: "/account", component: AccountPage });
 
 const settingsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/settings", component: SettingsLayout });
@@ -71,7 +77,7 @@ export const settingsSectionRoute = createRoute({
   component: SettingsSectionPage,
 });
 
-const routeTree = rootRoute.addChildren([homeRoute, playRoute, libraryRoute, itemRoute, searchRoute, accountRoute, settingsRoute.addChildren([settingsIndexRoute, settingsSectionRoute])]);
+const routeTree = rootRoute.addChildren([homeRoute, playRoute, libraryRoute, itemRoute, searchRoute, accountRoute, playlistsRoute, playlistRoute, personRoute, settingsRoute.addChildren([settingsIndexRoute, settingsSectionRoute])]);
 
 export const router = createRouter({
   routeTree,

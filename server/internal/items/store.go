@@ -111,6 +111,12 @@ var sorts = map[string]string{
 	"-year":     "i.year DESC, i.sort_title COLLATE NOCASE",
 	"released":  "COALESCE(i.originally_available_at, i.year), i.sort_title",
 	"-released": "COALESCE(i.originally_available_at, i.year) DESC, i.sort_title",
+	"rating":    "COALESCE(i.audience_rating, i.critic_rating, 0), i.sort_title COLLATE NOCASE",
+	"-rating":   "COALESCE(i.audience_rating, i.critic_rating, 0) DESC, i.sort_title COLLATE NOCASE",
+	"duration":  "COALESCE(i.duration_ms, 0), i.sort_title COLLATE NOCASE",
+	"-duration": "COALESCE(i.duration_ms, 0) DESC, i.sort_title COLLATE NOCASE",
+	"-viewed":   "(SELECT MAX(x.last_viewed_at) FROM user_item_state x JOIN items l ON l.id = x.item_id WHERE x.user_id = %UID% AND (l.id = i.id OR l.parent_id = i.id OR l.grandparent_id = i.id)) DESC NULLS LAST, i.sort_title COLLATE NOCASE",
+	"random":    "random()",
 }
 
 var baseCols = `i.id, i.library_id, i.type, i.title, COALESCE(i.original_title, ''), COALESCE(i.year, 0),
@@ -148,32 +154,33 @@ func art(kind string, aliases ...string) string {
 
 const summaryFrom = ` FROM items i LEFT JOIN items p ON p.id = i.parent_id LEFT JOIN items g ON g.id = i.grandparent_id`
 
-func scanSummary(row interface{ Scan(...any) error }) (Summary, error) {
+func scanSummary(row interface{ Scan(...any) error }, extra ...any) (Summary, error) {
 	var s Summary
 	var added string
-	err := row.Scan(&s.ID, &s.LibraryID, &s.Type, &s.Title, &s.OriginalTitle, &s.Year, &s.Index, &s.AbsIndex, &s.Disc,
+	err := row.Scan(append([]any{&s.ID, &s.LibraryID, &s.Type, &s.Title, &s.OriginalTitle, &s.Year, &s.Index, &s.AbsIndex, &s.Disc,
 		&s.ParentID, &s.GrandparentID, &s.ParentTitle, &s.GrandparentTitle, &s.ArtistCredit, &s.ChildCount, &s.LeafCount,
 		&s.DurationMS, &s.ReleaseDate, &s.Available, &s.MatchState, &added, &s.Poster, &s.Backdrop, &s.Thumb, &s.Logo,
-		&s.ViewOffsetMS, &s.ViewCount, &s.LastViewedAt, &s.WatchedLeaves)
+		&s.ViewOffsetMS, &s.ViewCount, &s.LastViewedAt, &s.WatchedLeaves}, extra...)...)
 	s.AddedAt, _ = time.Parse(time.RFC3339Nano, added)
 	return s, err
 }
 
 // List returns items of one type in a library.
-func (s *Store) List(ctx context.Context, acc Access, libID int64, typ, sort string, offset, limit int) ([]Summary, int, error) {
+func (s *Store) List(ctx context.Context, acc Access, libID int64, typ, sort string, f Filter, offset, limit int) ([]Summary, int, error) {
 	order, ok := sorts[sort]
 	if !ok {
 		order = sorts["title"]
 	}
+	order = strings.ReplaceAll(order, "%UID%", strconv.FormatInt(acc.UserID, 10))
 	var total int
 	ac, aargs := acc.clause()
-	args := append([]any{libID, typ}, aargs...)
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*)`+summaryFrom+` WHERE i.library_id = ? AND i.type = ? AND i.extra_type IS NULL AND `+ac,
-		args...).Scan(&total); err != nil {
+	fc, fargs := f.clause(acc.UserID)
+	args := append(append([]any{libID, typ}, aargs...), fargs...)
+	where := ` WHERE i.library_id = ? AND i.type = ? AND i.extra_type IS NULL AND ` + ac + ` AND ` + fc
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*)`+summaryFrom+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT `+cols(acc.UserID)+summaryFrom+`
-		WHERE i.library_id = ? AND i.type = ? AND i.extra_type IS NULL AND `+ac+` ORDER BY `+order+` LIMIT ? OFFSET ?`,
+	rows, err := s.db.QueryContext(ctx, `SELECT `+cols(acc.UserID)+summaryFrom+where+` ORDER BY `+order+` LIMIT ? OFFSET ?`,
 		append(args, limit, offset)...)
 	if err != nil {
 		return nil, 0, err

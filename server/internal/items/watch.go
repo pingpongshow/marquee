@@ -213,3 +213,18 @@ func intersect(allowed, ids []int64) []int64 {
 	}
 	return out
 }
+
+// RecentlyPlayedAlbums returns the albums the user played tracks from most recently.
+func (s *Store) RecentlyPlayedAlbums(ctx context.Context, acc Access, libID int64, limit int) ([]Summary, error) {
+	acc.LibraryIDs = intersect(acc.LibraryIDs, []int64{libID})
+	ac, aargs := acc.clause()
+	rows, err := s.db.QueryContext(ctx, `SELECT `+cols(acc.UserID)+summaryFrom+`
+		JOIN (SELECT t.parent_id AS album, MAX(us.last_viewed_at) AS played FROM user_item_state us
+		      JOIN items t ON t.id = us.item_id AND t.type = 'track' AND t.library_id = ?
+		      WHERE us.user_id = ? AND us.last_viewed_at IS NOT NULL GROUP BY t.parent_id) r ON r.album = i.id
+		WHERE `+ac+` ORDER BY r.played DESC LIMIT ?`, append(append([]any{libID, acc.UserID}, aargs...), limit)...)
+	if err != nil {
+		return nil, err
+	}
+	return collect(rows)
+}

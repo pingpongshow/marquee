@@ -111,6 +111,21 @@ export function Card({ title, description, children, actions }: { title?: string
   );
 }
 
+export function Badge({ children, tone = "muted" }: { children: ReactNode; tone?: "accent" | "muted" | "danger" }) {
+  return (
+    <span
+      className={clsx(
+        "rounded px-1.5 py-0.5 text-[11px]",
+        tone === "accent" && "bg-accent/15 font-medium text-accent",
+        tone === "muted" && "bg-surface-3 text-muted",
+        tone === "danger" && "bg-danger/15 font-medium text-danger",
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
 export function Alert({ tone = "info", children }: { tone?: "info" | "error" | "success"; children: ReactNode }) {
   return (
     <div

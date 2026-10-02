@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Lock, MoreHorizontal, Pencil, RefreshCw, Search, Unlock } from "lucide-react";
+import { Check, Lock, Pencil, RefreshCw, Search, Unlock } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, unwrap } from "@/api/client";
 import type { components } from "@/api/schema.gen";
@@ -209,8 +209,8 @@ export function ItemActions({ item }: { item: ItemDetail }) {
   return (
     <>
       <div className="relative" ref={ref}>
-        <Button variant="secondary" size="sm" onClick={() => setOpen((v) => !v)} aria-label="More actions" aria-expanded={open} loading={refresh.isPending}>
-          <MoreHorizontal className="size-4" />
+        <Button variant="secondary" size="sm" onClick={() => setOpen((v) => !v)} aria-label="Edit, fix match or refresh" title="Edit, fix match or refresh" aria-expanded={open} loading={refresh.isPending}>
+          <Pencil className="size-4" />
         </Button>
         {open && (
           <div className="absolute left-0 z-30 mt-2 w-52 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-2xl" onClick={() => setOpen(false)}>

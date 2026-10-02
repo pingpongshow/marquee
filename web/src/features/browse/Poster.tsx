@@ -21,11 +21,14 @@ export function Poster({
   shape = "poster",
   width = 240,
   className,
+  compact,
 }: {
   item: Pick<ItemSummary, "title" | "type" | "available" | "images"> & Partial<Pick<ItemSummary, "viewOffsetMs" | "durationMs" | "viewCount" | "leafCount" | "watchedLeafCount">>;
   shape?: Shape;
   width?: number;
   className?: string;
+  /** Thumbnail size: no placeholder text or badges. */
+  compact?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   const Icon = icons[item.type] ?? Film;
@@ -43,10 +46,10 @@ export function Poster({
       )}
       style={artId && !failed ? undefined : { background: `linear-gradient(160deg, hsl(${h} 35% 28%), hsl(${(h + 40) % 360} 30% 12%))` }}
     >
-      <WatchBadges item={item} />
+      {!compact && <WatchBadges item={item} />}
       {artId && !failed ? (
         <img src={imageUrl(artId, width)} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} className="absolute inset-0 size-full object-cover" />
-      ) : (
+      ) : compact ? null : (
         <>
           <Icon className="absolute top-3 left-3 size-5 text-white/30" aria-hidden />
           <span className="line-clamp-3 p-3 text-sm leading-tight font-semibold text-white/90">{item.title}</span>

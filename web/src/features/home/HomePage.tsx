@@ -7,6 +7,7 @@ import type { ItemSummary } from "@/api/types";
 import { Button, Spinner } from "@/components/ui";
 import { Poster } from "../browse/Poster";
 import { subtitleFor } from "../browse/format";
+import { GettingStarted } from "./GettingStarted";
 
 function HubItem({ it, wide }: { it: ItemSummary; wide: boolean }) {
   // Continue Watching episodes open the player directly, like Plex.
@@ -58,6 +59,7 @@ export function HomePage() {
 
   return (
     <div className="space-y-10 py-6 lg:py-8">
+      {me.data?.isAdmin && <GettingStarted />}
       {hubs.data?.map((hub) => {
         const wide = hub.id === "continue-watching";
         return (
