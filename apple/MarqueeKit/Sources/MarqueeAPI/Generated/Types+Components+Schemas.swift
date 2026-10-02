@@ -424,6 +424,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/remoteQualityKbps`.
             public var remoteQualityKbps: Swift.Int?
+            /// May request titles through Seerr (REQ-1). Default false; admins always may.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserRestrictions/canRequest`.
+            public var canRequest: Swift.Bool?
+            /// The Seerr user requests are made as. Null = Seerr's API key owner.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserRestrictions/seerrUserId`.
+            public var seerrUserId: Swift.Int64?
             /// Creates a new `UserRestrictions`.
             ///
             /// - Parameters:
@@ -431,22 +439,30 @@ extension Components {
             ///   - maxContentRating: Highest allowed rating, e.g. PG-13 or TV-14. Unrated items are hidden when set.
             ///   - allowRemote: May stream from outside the home network. Default true.
             ///   - remoteQualityKbps: Cap for remote streams. 0 = server default.
+            ///   - canRequest: May request titles through Seerr (REQ-1). Default false; admins always may.
+            ///   - seerrUserId: The Seerr user requests are made as. Null = Seerr's API key owner.
             public init(
                 libraryIds: [Swift.Int64]? = nil,
                 maxContentRating: Components.Schemas.UserRestrictions.MaxContentRatingPayload? = nil,
                 allowRemote: Swift.Bool? = nil,
-                remoteQualityKbps: Swift.Int? = nil
+                remoteQualityKbps: Swift.Int? = nil,
+                canRequest: Swift.Bool? = nil,
+                seerrUserId: Swift.Int64? = nil
             ) {
                 self.libraryIds = libraryIds
                 self.maxContentRating = maxContentRating
                 self.allowRemote = allowRemote
                 self.remoteQualityKbps = remoteQualityKbps
+                self.canRequest = canRequest
+                self.seerrUserId = seerrUserId
             }
             public enum CodingKeys: String, CodingKey {
                 case libraryIds
                 case maxContentRating
                 case allowRemote
                 case remoteQualityKbps
+                case canRequest
+                case seerrUserId
             }
         }
         /// - Remark: Generated from `#/components/schemas/UserPreferences`.
@@ -908,6 +924,8 @@ extension Components {
             public var tasks: Components.Schemas.TaskSettings
             /// - Remark: Generated from `#/components/schemas/ServerSettings/music`.
             public var music: Components.Schemas.MusicSettings?
+            /// - Remark: Generated from `#/components/schemas/ServerSettings/integrations`.
+            public var integrations: Components.Schemas.IntegrationSettings?
             /// Replaces the whole list when sent.
             ///
             /// - Remark: Generated from `#/components/schemas/ServerSettings/webhooks`.
@@ -924,6 +942,7 @@ extension Components {
             ///   - metadata:
             ///   - tasks:
             ///   - music:
+            ///   - integrations:
             ///   - webhooks: Replaces the whole list when sent.
             public init(
                 security: Components.Schemas.SecuritySettings,
@@ -935,6 +954,7 @@ extension Components {
                 metadata: Components.Schemas.MetadataSettings,
                 tasks: Components.Schemas.TaskSettings,
                 music: Components.Schemas.MusicSettings? = nil,
+                integrations: Components.Schemas.IntegrationSettings? = nil,
                 webhooks: [Components.Schemas.Webhook]? = nil
             ) {
                 self.security = security
@@ -946,6 +966,7 @@ extension Components {
                 self.metadata = metadata
                 self.tasks = tasks
                 self.music = music
+                self.integrations = integrations
                 self.webhooks = webhooks
             }
             public enum CodingKeys: String, CodingKey {
@@ -958,6 +979,7 @@ extension Components {
                 case metadata
                 case tasks
                 case music
+                case integrations
                 case webhooks
             }
         }
@@ -981,6 +1003,8 @@ extension Components {
             public var tasks: Components.Schemas.TaskSettings?
             /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/music`.
             public var music: Components.Schemas.MusicSettings?
+            /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/integrations`.
+            public var integrations: Components.Schemas.IntegrationSettingsUpdate?
             /// Replaces the whole list when sent.
             ///
             /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/webhooks`.
@@ -997,6 +1021,7 @@ extension Components {
             ///   - metadata:
             ///   - tasks:
             ///   - music:
+            ///   - integrations:
             ///   - webhooks: Replaces the whole list when sent.
             public init(
                 security: Components.Schemas.SecuritySettings? = nil,
@@ -1008,6 +1033,7 @@ extension Components {
                 metadata: Components.Schemas.MetadataSettingsUpdate? = nil,
                 tasks: Components.Schemas.TaskSettings? = nil,
                 music: Components.Schemas.MusicSettings? = nil,
+                integrations: Components.Schemas.IntegrationSettingsUpdate? = nil,
                 webhooks: [Components.Schemas.Webhook]? = nil
             ) {
                 self.security = security
@@ -1019,6 +1045,7 @@ extension Components {
                 self.metadata = metadata
                 self.tasks = tasks
                 self.music = music
+                self.integrations = integrations
                 self.webhooks = webhooks
             }
             public enum CodingKeys: String, CodingKey {
@@ -1031,6 +1058,7 @@ extension Components {
                 case metadata
                 case tasks
                 case music
+                case integrations
                 case webhooks
             }
         }
@@ -1431,6 +1459,429 @@ extension Components {
                 case watchedThresholdPercent
                 case detectIntros
                 case trickplay
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RequestsStatus`.
+        public struct RequestsStatus: Codable, Hashable, Sendable {
+            /// Seerr is configured.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RequestsStatus/enabled`.
+            public var enabled: Swift.Bool
+            /// The caller may make requests (admins always; others when granted).
+            ///
+            /// - Remark: Generated from `#/components/schemas/RequestsStatus/canRequest`.
+            public var canRequest: Swift.Bool
+            /// Requests waiting for approval (admins; 0 for others).
+            ///
+            /// - Remark: Generated from `#/components/schemas/RequestsStatus/pendingApprovals`.
+            public var pendingApprovals: Swift.Int
+            /// Creates a new `RequestsStatus`.
+            ///
+            /// - Parameters:
+            ///   - enabled: Seerr is configured.
+            ///   - canRequest: The caller may make requests (admins always; others when granted).
+            ///   - pendingApprovals: Requests waiting for approval (admins; 0 for others).
+            public init(
+                enabled: Swift.Bool,
+                canRequest: Swift.Bool,
+                pendingApprovals: Swift.Int
+            ) {
+                self.enabled = enabled
+                self.canRequest = canRequest
+                self.pendingApprovals = pendingApprovals
+            }
+            public enum CodingKeys: String, CodingKey {
+                case enabled
+                case canRequest
+                case pendingApprovals
+            }
+        }
+        /// Where a title stands. available/partial come from the library or Seerr; requested = sent to Seerr; pending = waiting for an admin in Marquee.
+        ///
+        /// - Remark: Generated from `#/components/schemas/Availability`.
+        @frozen public enum Availability: String, Codable, Hashable, Sendable, CaseIterable {
+            case none = "none"
+            case pending = "pending"
+            case requested = "requested"
+            case processing = "processing"
+            case partial = "partial"
+            case available = "available"
+        }
+        /// - Remark: Generated from `#/components/schemas/DiscoverItem`.
+        public struct DiscoverItem: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/DiscoverItem/tmdbId`.
+            public var tmdbId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/DiscoverItem/mediaType`.
+            @frozen public enum MediaTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case movie = "movie"
+                case tv = "tv"
+            }
+            /// - Remark: Generated from `#/components/schemas/DiscoverItem/mediaType`.
+            public var mediaType: Components.Schemas.DiscoverItem.MediaTypePayload
+            /// - Remark: Generated from `#/components/schemas/DiscoverItem/title`.
+            public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/DiscoverItem/year`.
+            public var year: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/DiscoverItem/overview`.
+            public var overview: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/DiscoverItem/posterUrl`.
+            public var posterUrl: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/DiscoverItem/backdropUrl`.
+            public var backdropUrl: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/DiscoverItem/availability`.
+            public var availability: Components.Schemas.Availability
+            /// The title in this library, when it's here.
+            ///
+            /// - Remark: Generated from `#/components/schemas/DiscoverItem/itemId`.
+            public var itemId: Swift.Int64?
+            /// The caller's open Marquee request for it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/DiscoverItem/requestId`.
+            public var requestId: Swift.Int64?
+            /// Creates a new `DiscoverItem`.
+            ///
+            /// - Parameters:
+            ///   - tmdbId:
+            ///   - mediaType:
+            ///   - title:
+            ///   - year:
+            ///   - overview:
+            ///   - posterUrl:
+            ///   - backdropUrl:
+            ///   - availability:
+            ///   - itemId: The title in this library, when it's here.
+            ///   - requestId: The caller's open Marquee request for it.
+            public init(
+                tmdbId: Swift.Int64,
+                mediaType: Components.Schemas.DiscoverItem.MediaTypePayload,
+                title: Swift.String,
+                year: Swift.Int? = nil,
+                overview: Swift.String? = nil,
+                posterUrl: Swift.String? = nil,
+                backdropUrl: Swift.String? = nil,
+                availability: Components.Schemas.Availability,
+                itemId: Swift.Int64? = nil,
+                requestId: Swift.Int64? = nil
+            ) {
+                self.tmdbId = tmdbId
+                self.mediaType = mediaType
+                self.title = title
+                self.year = year
+                self.overview = overview
+                self.posterUrl = posterUrl
+                self.backdropUrl = backdropUrl
+                self.availability = availability
+                self.itemId = itemId
+                self.requestId = requestId
+            }
+            public enum CodingKeys: String, CodingKey {
+                case tmdbId
+                case mediaType
+                case title
+                case year
+                case overview
+                case posterUrl
+                case backdropUrl
+                case availability
+                case itemId
+                case requestId
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/DiscoverPage`.
+        public struct DiscoverPage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/DiscoverPage/results`.
+            public var results: [Components.Schemas.DiscoverItem]
+            /// - Remark: Generated from `#/components/schemas/DiscoverPage/page`.
+            public var page: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/DiscoverPage/totalPages`.
+            public var totalPages: Swift.Int
+            /// Creates a new `DiscoverPage`.
+            ///
+            /// - Parameters:
+            ///   - results:
+            ///   - page:
+            ///   - totalPages:
+            public init(
+                results: [Components.Schemas.DiscoverItem],
+                page: Swift.Int,
+                totalPages: Swift.Int
+            ) {
+                self.results = results
+                self.page = page
+                self.totalPages = totalPages
+            }
+            public enum CodingKeys: String, CodingKey {
+                case results
+                case page
+                case totalPages
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RequestableShow`.
+        public struct RequestableShow: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/RequestableShow/tmdbId`.
+            public var tmdbId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/RequestableShow/title`.
+            public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/RequestableShow/SeasonsPayload`.
+            public struct SeasonsPayloadPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/RequestableShow/SeasonsPayload/number`.
+                public var number: Swift.Int
+                /// - Remark: Generated from `#/components/schemas/RequestableShow/SeasonsPayload/name`.
+                public var name: Swift.String?
+                /// - Remark: Generated from `#/components/schemas/RequestableShow/SeasonsPayload/episodeCount`.
+                public var episodeCount: Swift.Int?
+                /// - Remark: Generated from `#/components/schemas/RequestableShow/SeasonsPayload/availability`.
+                public var availability: Components.Schemas.Availability
+                /// Creates a new `SeasonsPayloadPayload`.
+                ///
+                /// - Parameters:
+                ///   - number:
+                ///   - name:
+                ///   - episodeCount:
+                ///   - availability:
+                public init(
+                    number: Swift.Int,
+                    name: Swift.String? = nil,
+                    episodeCount: Swift.Int? = nil,
+                    availability: Components.Schemas.Availability
+                ) {
+                    self.number = number
+                    self.name = name
+                    self.episodeCount = episodeCount
+                    self.availability = availability
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case number
+                    case name
+                    case episodeCount
+                    case availability
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/RequestableShow/seasons`.
+            public typealias SeasonsPayload = [Components.Schemas.RequestableShow.SeasonsPayloadPayload]
+            /// - Remark: Generated from `#/components/schemas/RequestableShow/seasons`.
+            public var seasons: Components.Schemas.RequestableShow.SeasonsPayload
+            /// Creates a new `RequestableShow`.
+            ///
+            /// - Parameters:
+            ///   - tmdbId:
+            ///   - title:
+            ///   - seasons:
+            public init(
+                tmdbId: Swift.Int64,
+                title: Swift.String,
+                seasons: Components.Schemas.RequestableShow.SeasonsPayload
+            ) {
+                self.tmdbId = tmdbId
+                self.title = title
+                self.seasons = seasons
+            }
+            public enum CodingKeys: String, CodingKey {
+                case tmdbId
+                case title
+                case seasons
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RequestState`.
+        @frozen public enum RequestState: String, Codable, Hashable, Sendable, CaseIterable {
+            case pending = "pending"
+            case approved = "approved"
+            case declined = "declined"
+            case failed = "failed"
+            case available = "available"
+        }
+        /// - Remark: Generated from `#/components/schemas/MediaRequestCreate`.
+        public struct MediaRequestCreate: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/MediaRequestCreate/tmdbId`.
+            public var tmdbId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/MediaRequestCreate/mediaType`.
+            @frozen public enum MediaTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case movie = "movie"
+                case tv = "tv"
+            }
+            /// - Remark: Generated from `#/components/schemas/MediaRequestCreate/mediaType`.
+            public var mediaType: Components.Schemas.MediaRequestCreate.MediaTypePayload
+            /// Shows only; absent or empty = every season not already here.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MediaRequestCreate/seasons`.
+            public var seasons: [Swift.Int]?
+            /// Creates a new `MediaRequestCreate`.
+            ///
+            /// - Parameters:
+            ///   - tmdbId:
+            ///   - mediaType:
+            ///   - seasons: Shows only; absent or empty = every season not already here.
+            public init(
+                tmdbId: Swift.Int64,
+                mediaType: Components.Schemas.MediaRequestCreate.MediaTypePayload,
+                seasons: [Swift.Int]? = nil
+            ) {
+                self.tmdbId = tmdbId
+                self.mediaType = mediaType
+                self.seasons = seasons
+            }
+            public enum CodingKeys: String, CodingKey {
+                case tmdbId
+                case mediaType
+                case seasons
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/MediaRequest`.
+        public struct MediaRequest: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/MediaRequest/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/MediaRequest/tmdbId`.
+            public var tmdbId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/MediaRequest/mediaType`.
+            @frozen public enum MediaTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case movie = "movie"
+                case tv = "tv"
+            }
+            /// - Remark: Generated from `#/components/schemas/MediaRequest/mediaType`.
+            public var mediaType: Components.Schemas.MediaRequest.MediaTypePayload
+            /// - Remark: Generated from `#/components/schemas/MediaRequest/title`.
+            public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/MediaRequest/year`.
+            public var year: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/MediaRequest/posterUrl`.
+            public var posterUrl: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/MediaRequest/seasons`.
+            public var seasons: [Swift.Int]
+            /// - Remark: Generated from `#/components/schemas/MediaRequest/status`.
+            public var status: Components.Schemas.RequestState
+            /// Why it was declined or failed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MediaRequest/reason`.
+            public var reason: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/MediaRequest/userId`.
+            public var userId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/MediaRequest/userName`.
+            public var userName: Swift.String
+            /// - Remark: Generated from `#/components/schemas/MediaRequest/createdAt`.
+            public var createdAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/MediaRequest/decidedAt`.
+            public var decidedAt: Foundation.Date?
+            /// - Remark: Generated from `#/components/schemas/MediaRequest/decidedBy`.
+            public var decidedBy: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/MediaRequest/seerrRequestId`.
+            public var seerrRequestId: Swift.Int64?
+            /// Creates a new `MediaRequest`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - tmdbId:
+            ///   - mediaType:
+            ///   - title:
+            ///   - year:
+            ///   - posterUrl:
+            ///   - seasons:
+            ///   - status:
+            ///   - reason: Why it was declined or failed.
+            ///   - userId:
+            ///   - userName:
+            ///   - createdAt:
+            ///   - decidedAt:
+            ///   - decidedBy:
+            ///   - seerrRequestId:
+            public init(
+                id: Swift.Int64,
+                tmdbId: Swift.Int64,
+                mediaType: Components.Schemas.MediaRequest.MediaTypePayload,
+                title: Swift.String,
+                year: Swift.Int? = nil,
+                posterUrl: Swift.String? = nil,
+                seasons: [Swift.Int],
+                status: Components.Schemas.RequestState,
+                reason: Swift.String? = nil,
+                userId: Swift.Int64,
+                userName: Swift.String,
+                createdAt: Foundation.Date,
+                decidedAt: Foundation.Date? = nil,
+                decidedBy: Swift.String? = nil,
+                seerrRequestId: Swift.Int64? = nil
+            ) {
+                self.id = id
+                self.tmdbId = tmdbId
+                self.mediaType = mediaType
+                self.title = title
+                self.year = year
+                self.posterUrl = posterUrl
+                self.seasons = seasons
+                self.status = status
+                self.reason = reason
+                self.userId = userId
+                self.userName = userName
+                self.createdAt = createdAt
+                self.decidedAt = decidedAt
+                self.decidedBy = decidedBy
+                self.seerrRequestId = seerrRequestId
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case tmdbId
+                case mediaType
+                case title
+                case year
+                case posterUrl
+                case seasons
+                case status
+                case reason
+                case userId
+                case userName
+                case createdAt
+                case decidedAt
+                case decidedBy
+                case seerrRequestId
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/IntegrationSettings`.
+        public struct IntegrationSettings: Codable, Hashable, Sendable {
+            /// Seerr's address, e.g. http://10.1.1.10:5055. Empty turns requests off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/seerrUrl`.
+            public var seerrUrl: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/seerrApiKeySet`.
+            public var seerrApiKeySet: Swift.Bool?
+            /// Creates a new `IntegrationSettings`.
+            ///
+            /// - Parameters:
+            ///   - seerrUrl: Seerr's address, e.g. http://10.1.1.10:5055. Empty turns requests off.
+            ///   - seerrApiKeySet:
+            public init(
+                seerrUrl: Swift.String? = nil,
+                seerrApiKeySet: Swift.Bool? = nil
+            ) {
+                self.seerrUrl = seerrUrl
+                self.seerrApiKeySet = seerrApiKeySet
+            }
+            public enum CodingKeys: String, CodingKey {
+                case seerrUrl
+                case seerrApiKeySet
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate`.
+        public struct IntegrationSettingsUpdate: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/seerrUrl`.
+            public var seerrUrl: Swift.String?
+            /// Write-only.
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/seerrApiKey`.
+            public var seerrApiKey: Swift.String?
+            /// Creates a new `IntegrationSettingsUpdate`.
+            ///
+            /// - Parameters:
+            ///   - seerrUrl:
+            ///   - seerrApiKey: Write-only.
+            public init(
+                seerrUrl: Swift.String? = nil,
+                seerrApiKey: Swift.String? = nil
+            ) {
+                self.seerrUrl = seerrUrl
+                self.seerrApiKey = seerrApiKey
+            }
+            public enum CodingKeys: String, CodingKey {
+                case seerrUrl
+                case seerrApiKey
             }
         }
         /// - Remark: Generated from `#/components/schemas/MetadataSettings`.

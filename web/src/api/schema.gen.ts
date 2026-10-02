@@ -1028,6 +1028,185 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/requests/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether requests are set up and whether the caller may make them. */
+        get: operations["requestsStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search movies and shows on Seerr, marked with what's in the library or already requested. */
+        get: operations["searchRequestable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trending, popular and upcoming titles from Seerr (REQ-2). */
+        get: operations["discoverRequestable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests/tv/{tmdbId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tmdbId: number;
+            };
+            cookie?: never;
+        };
+        /** A show's seasons and which are available or requested, for choosing what to request. */
+        get: operations["requestableShow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Requests, newest first. Users see their own; admins can ask for everyone's. */
+        get: operations["listRequests"];
+        put?: never;
+        /** Ask for a movie or show. It waits for an admin's approval, then goes to Seerr. */
+        post: operations["createRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests/{requestId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Withdraw a pending request (its owner or an admin). */
+        delete: operations["cancelRequest"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests/{requestId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve a pending request and send it to Seerr (admin only). */
+        post: operations["approveRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests/{requestId}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline a pending request (admin only). */
+        post: operations["declineRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests/seerr/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Seerr's users, for linking Marquee users to them (admin only). */
+        get: operations["listSeerrUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests/seerr/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check a Seerr URL and API key (admin only). Without an apiKey, the saved key is used. */
+        post: operations["testSeerr"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/stats": {
         parameters: {
             query?: never;
@@ -1629,6 +1808,13 @@ export interface components {
             allowRemote?: boolean;
             /** @description Cap for remote streams. 0 = server default. */
             remoteQualityKbps?: number;
+            /** @description May request titles through Seerr (REQ-1). Default false; admins always may. */
+            canRequest?: boolean;
+            /**
+             * Format: int64
+             * @description The Seerr user requests are made as. Null = Seerr's API key owner.
+             */
+            seerrUserId?: number | null;
         };
         UserPreferences: {
             /** @description ISO 639-2, e.g. eng, jpn */
@@ -1729,6 +1915,7 @@ export interface components {
             metadata: components["schemas"]["MetadataSettings"];
             tasks: components["schemas"]["TaskSettings"];
             music?: components["schemas"]["MusicSettings"];
+            integrations?: components["schemas"]["IntegrationSettings"];
             /** @description Replaces the whole list when sent. */
             webhooks?: components["schemas"]["Webhook"][];
         };
@@ -1742,6 +1929,7 @@ export interface components {
             metadata?: components["schemas"]["MetadataSettingsUpdate"];
             tasks?: components["schemas"]["TaskSettings"];
             music?: components["schemas"]["MusicSettings"];
+            integrations?: components["schemas"]["IntegrationSettingsUpdate"];
             /** @description Replaces the whole list when sent. */
             webhooks?: components["schemas"]["Webhook"][];
         };
@@ -1838,6 +2026,102 @@ export interface components {
             detectIntros?: boolean;
             /** @description Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie. */
             trickplay?: boolean;
+        };
+        RequestsStatus: {
+            /** @description Seerr is configured. */
+            enabled: boolean;
+            /** @description The caller may make requests (admins always; others when granted). */
+            canRequest: boolean;
+            /** @description Requests waiting for approval (admins; 0 for others). */
+            pendingApprovals: number;
+        };
+        /**
+         * @description Where a title stands. available/partial come from the library or Seerr; requested = sent to Seerr; pending = waiting for an admin in Marquee.
+         * @enum {string}
+         */
+        Availability: "none" | "pending" | "requested" | "processing" | "partial" | "available";
+        DiscoverItem: {
+            /** Format: int64 */
+            tmdbId: number;
+            /** @enum {string} */
+            mediaType: "movie" | "tv";
+            title: string;
+            year?: number;
+            overview?: string;
+            posterUrl?: string;
+            backdropUrl?: string;
+            availability: components["schemas"]["Availability"];
+            /**
+             * Format: int64
+             * @description The title in this library, when it's here.
+             */
+            itemId?: number;
+            /**
+             * Format: int64
+             * @description The caller's open Marquee request for it.
+             */
+            requestId?: number;
+        };
+        DiscoverPage: {
+            results: components["schemas"]["DiscoverItem"][];
+            page: number;
+            totalPages: number;
+        };
+        RequestableShow: {
+            /** Format: int64 */
+            tmdbId: number;
+            title: string;
+            seasons: {
+                number: number;
+                name?: string;
+                episodeCount?: number;
+                availability: components["schemas"]["Availability"];
+            }[];
+        };
+        /** @enum {string} */
+        RequestState: "pending" | "approved" | "declined" | "failed" | "available";
+        MediaRequestCreate: {
+            /** Format: int64 */
+            tmdbId: number;
+            /** @enum {string} */
+            mediaType: "movie" | "tv";
+            /** @description Shows only; absent or empty = every season not already here. */
+            seasons?: number[];
+        };
+        MediaRequest: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            tmdbId: number;
+            /** @enum {string} */
+            mediaType: "movie" | "tv";
+            title: string;
+            year?: number;
+            posterUrl?: string;
+            seasons: number[];
+            status: components["schemas"]["RequestState"];
+            /** @description Why it was declined or failed. */
+            reason?: string;
+            /** Format: int64 */
+            userId: number;
+            userName: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            decidedBy?: string;
+            /** Format: int64 */
+            seerrRequestId?: number;
+        };
+        IntegrationSettings: {
+            /** @description Seerr's address, e.g. http://10.1.1.10:5055. Empty turns requests off. */
+            seerrUrl?: string;
+            readonly seerrApiKeySet?: boolean;
+        };
+        IntegrationSettingsUpdate: {
+            seerrUrl?: string;
+            /** @description Write-only. */
+            seerrApiKey?: string;
         };
         MetadataSettings: {
             readonly tmdbApiKeySet?: boolean;
@@ -4786,6 +5070,304 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    requestsStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestsStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    searchRequestable: {
+        parameters: {
+            query: {
+                q: string;
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Results. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoverPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    discoverRequestable: {
+        parameters: {
+            query?: {
+                category?: "trending" | "movies" | "tv" | "upcoming";
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Results. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoverPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    requestableShow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tmdbId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The show. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestableShow"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listRequests: {
+        parameters: {
+            query?: {
+                scope?: "mine" | "all";
+                status?: components["schemas"]["RequestState"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Requests. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaRequest"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MediaRequestCreate"];
+            };
+        };
+        responses: {
+            /** @description Requested (pending approval). */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaRequest"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    cancelRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Withdrawn. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    approveRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Approved and sent, or failed (status says which). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    declineRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Declined. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listSeerrUsers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Users. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: int64 */
+                        id: number;
+                        displayName: string;
+                    }[];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    testSeerr: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    url: string;
+                    apiKey?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Reachable or not. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ok: boolean;
+                        version?: string;
+                        error?: string;
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };

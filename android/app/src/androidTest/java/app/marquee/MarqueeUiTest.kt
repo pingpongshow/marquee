@@ -434,9 +434,38 @@ class MarqueeUiTest {
         got((node.config[SemanticsProperties.ProgressBarRangeInfo].current * 1000).toLong())
     }
 
+    /** Scrolls whichever scrollable container holds a matching node there; false when none does. */
+    private fun scrollTo(m: SemanticsMatcher): Boolean {
+        val n = rule.onAllNodes(hasScrollToNodeAction()).fetchSemanticsNodes().size
+        return (0 until n).any { i -> runCatching { rule.onAllNodes(hasScrollToNodeAction())[i].performScrollToNode(m) }.isSuccess }
+    }
+
     private fun showControls() {
         if (rule.onAllNodes(hasContentDescription("Playback settings")).fetchSemanticsNodes().isEmpty())
             rule.onNode(hasContentDescription("Video player")).performClick()
         rule.waitUntilAtLeastOneExists(hasContentDescription("Playback settings"), 5_000)
+    }
+
+    /** Discover (REQ-1): request a title from Seerr's trending list, see it, withdraw it. Needs Seerr connected. */
+    @Test fun discoverAndRequest() {
+        connectAndSignIn()
+        tap("Libraries")
+        rule.waitText("Discover", 15_000)
+        tap("Discover")
+        val requestable = hasContentDescription("Request ", substring = true)
+        rule.waitUntilAtLeastOneExists(requestable, 20_000)
+        Thread.sleep(1500)
+        shot("r1-discover")
+        rule.onAllNodes(requestable).onFirst().performClick()
+        rule.waitUntilAtLeastOneExists(hasText("An admin approves", substring = true), 10_000)
+        val confirm = hasText("Request") and hasClickAction()
+        rule.waitUntil(15_000) { rule.onAllNodes(confirm).fetchSemanticsNodes().any { n -> !n.config.contains(SemanticsProperties.Disabled) } }
+        shot("r2-request")
+        rule.onAllNodes(confirm).onFirst().performClick()
+        // My Requests is at the end of the grid: scroll there once the list has reloaded.
+        rule.waitUntil(15_000) { scrollTo(hasText("Withdraw")) }
+        shot("r3-my-requests")
+        rule.onAllNodes(hasText("Withdraw")).onFirst().performClick()
+        rule.waitUntil(10_000) { !scrollTo(hasText("Withdraw")) }
     }
 }

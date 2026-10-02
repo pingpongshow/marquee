@@ -21,6 +21,9 @@ struct SettingsView: View {
                     }
                 }
                 NavigationLink("Your Stats") { StatsView() }
+                if app.me?.isAdmin == true {
+                    NavigationLink("Requests") { RequestApprovalsView() }
+                }
                 Button("Switch Profile") { switching = true }
                 Button("Sign Out", role: .destructive) { Task { await app.signOut() } }
             }

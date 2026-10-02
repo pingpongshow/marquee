@@ -373,6 +373,61 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /webhooks/test`.
     /// - Remark: Generated from `#/paths//webhooks/test/post(testWebhook)`.
     func testWebhook(_ input: Operations.TestWebhook.Input) async throws -> Operations.TestWebhook.Output
+    /// Whether requests are set up and whether the caller may make them.
+    ///
+    /// - Remark: HTTP `GET /requests/status`.
+    /// - Remark: Generated from `#/paths//requests/status/get(requestsStatus)`.
+    func requestsStatus(_ input: Operations.RequestsStatus.Input) async throws -> Operations.RequestsStatus.Output
+    /// Search movies and shows on Seerr, marked with what's in the library or already requested.
+    ///
+    /// - Remark: HTTP `GET /requests/search`.
+    /// - Remark: Generated from `#/paths//requests/search/get(searchRequestable)`.
+    func searchRequestable(_ input: Operations.SearchRequestable.Input) async throws -> Operations.SearchRequestable.Output
+    /// Trending, popular and upcoming titles from Seerr (REQ-2).
+    ///
+    /// - Remark: HTTP `GET /requests/discover`.
+    /// - Remark: Generated from `#/paths//requests/discover/get(discoverRequestable)`.
+    func discoverRequestable(_ input: Operations.DiscoverRequestable.Input) async throws -> Operations.DiscoverRequestable.Output
+    /// A show's seasons and which are available or requested, for choosing what to request.
+    ///
+    /// - Remark: HTTP `GET /requests/tv/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//requests/tv/{tmdbId}/get(requestableShow)`.
+    func requestableShow(_ input: Operations.RequestableShow.Input) async throws -> Operations.RequestableShow.Output
+    /// Requests, newest first. Users see their own; admins can ask for everyone's.
+    ///
+    /// - Remark: HTTP `GET /requests`.
+    /// - Remark: Generated from `#/paths//requests/get(listRequests)`.
+    func listRequests(_ input: Operations.ListRequests.Input) async throws -> Operations.ListRequests.Output
+    /// Ask for a movie or show. It waits for an admin's approval, then goes to Seerr.
+    ///
+    /// - Remark: HTTP `POST /requests`.
+    /// - Remark: Generated from `#/paths//requests/post(createRequest)`.
+    func createRequest(_ input: Operations.CreateRequest.Input) async throws -> Operations.CreateRequest.Output
+    /// Withdraw a pending request (its owner or an admin).
+    ///
+    /// - Remark: HTTP `DELETE /requests/{requestId}`.
+    /// - Remark: Generated from `#/paths//requests/{requestId}/delete(cancelRequest)`.
+    func cancelRequest(_ input: Operations.CancelRequest.Input) async throws -> Operations.CancelRequest.Output
+    /// Approve a pending request and send it to Seerr (admin only).
+    ///
+    /// - Remark: HTTP `POST /requests/{requestId}/approve`.
+    /// - Remark: Generated from `#/paths//requests/{requestId}/approve/post(approveRequest)`.
+    func approveRequest(_ input: Operations.ApproveRequest.Input) async throws -> Operations.ApproveRequest.Output
+    /// Decline a pending request (admin only).
+    ///
+    /// - Remark: HTTP `POST /requests/{requestId}/decline`.
+    /// - Remark: Generated from `#/paths//requests/{requestId}/decline/post(declineRequest)`.
+    func declineRequest(_ input: Operations.DeclineRequest.Input) async throws -> Operations.DeclineRequest.Output
+    /// Seerr's users, for linking Marquee users to them (admin only).
+    ///
+    /// - Remark: HTTP `GET /requests/seerr/users`.
+    /// - Remark: Generated from `#/paths//requests/seerr/users/get(listSeerrUsers)`.
+    func listSeerrUsers(_ input: Operations.ListSeerrUsers.Input) async throws -> Operations.ListSeerrUsers.Output
+    /// Check a Seerr URL and API key (admin only). Without an apiKey, the saved key is used.
+    ///
+    /// - Remark: HTTP `POST /requests/seerr/test`.
+    /// - Remark: Generated from `#/paths//requests/seerr/test/post(testSeerr)`.
+    func testSeerr(_ input: Operations.TestSeerr.Input) async throws -> Operations.TestSeerr.Output
     /// Playback statistics (ADM-4). Administrators can see everyone or one user; others see their own (their "year in music").
     ///
     /// - Remark: HTTP `GET /stats`.
@@ -1424,6 +1479,139 @@ extension APIProtocol {
         body: Operations.TestWebhook.Input.Body
     ) async throws -> Operations.TestWebhook.Output {
         try await testWebhook(Operations.TestWebhook.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Whether requests are set up and whether the caller may make them.
+    ///
+    /// - Remark: HTTP `GET /requests/status`.
+    /// - Remark: Generated from `#/paths//requests/status/get(requestsStatus)`.
+    public func requestsStatus(headers: Operations.RequestsStatus.Input.Headers = .init()) async throws -> Operations.RequestsStatus.Output {
+        try await requestsStatus(Operations.RequestsStatus.Input(headers: headers))
+    }
+    /// Search movies and shows on Seerr, marked with what's in the library or already requested.
+    ///
+    /// - Remark: HTTP `GET /requests/search`.
+    /// - Remark: Generated from `#/paths//requests/search/get(searchRequestable)`.
+    public func searchRequestable(
+        query: Operations.SearchRequestable.Input.Query,
+        headers: Operations.SearchRequestable.Input.Headers = .init()
+    ) async throws -> Operations.SearchRequestable.Output {
+        try await searchRequestable(Operations.SearchRequestable.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Trending, popular and upcoming titles from Seerr (REQ-2).
+    ///
+    /// - Remark: HTTP `GET /requests/discover`.
+    /// - Remark: Generated from `#/paths//requests/discover/get(discoverRequestable)`.
+    public func discoverRequestable(
+        query: Operations.DiscoverRequestable.Input.Query = .init(),
+        headers: Operations.DiscoverRequestable.Input.Headers = .init()
+    ) async throws -> Operations.DiscoverRequestable.Output {
+        try await discoverRequestable(Operations.DiscoverRequestable.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// A show's seasons and which are available or requested, for choosing what to request.
+    ///
+    /// - Remark: HTTP `GET /requests/tv/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//requests/tv/{tmdbId}/get(requestableShow)`.
+    public func requestableShow(
+        path: Operations.RequestableShow.Input.Path,
+        headers: Operations.RequestableShow.Input.Headers = .init()
+    ) async throws -> Operations.RequestableShow.Output {
+        try await requestableShow(Operations.RequestableShow.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Requests, newest first. Users see their own; admins can ask for everyone's.
+    ///
+    /// - Remark: HTTP `GET /requests`.
+    /// - Remark: Generated from `#/paths//requests/get(listRequests)`.
+    public func listRequests(
+        query: Operations.ListRequests.Input.Query = .init(),
+        headers: Operations.ListRequests.Input.Headers = .init()
+    ) async throws -> Operations.ListRequests.Output {
+        try await listRequests(Operations.ListRequests.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Ask for a movie or show. It waits for an admin's approval, then goes to Seerr.
+    ///
+    /// - Remark: HTTP `POST /requests`.
+    /// - Remark: Generated from `#/paths//requests/post(createRequest)`.
+    public func createRequest(
+        headers: Operations.CreateRequest.Input.Headers = .init(),
+        body: Operations.CreateRequest.Input.Body
+    ) async throws -> Operations.CreateRequest.Output {
+        try await createRequest(Operations.CreateRequest.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Withdraw a pending request (its owner or an admin).
+    ///
+    /// - Remark: HTTP `DELETE /requests/{requestId}`.
+    /// - Remark: Generated from `#/paths//requests/{requestId}/delete(cancelRequest)`.
+    public func cancelRequest(
+        path: Operations.CancelRequest.Input.Path,
+        headers: Operations.CancelRequest.Input.Headers = .init()
+    ) async throws -> Operations.CancelRequest.Output {
+        try await cancelRequest(Operations.CancelRequest.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Approve a pending request and send it to Seerr (admin only).
+    ///
+    /// - Remark: HTTP `POST /requests/{requestId}/approve`.
+    /// - Remark: Generated from `#/paths//requests/{requestId}/approve/post(approveRequest)`.
+    public func approveRequest(
+        path: Operations.ApproveRequest.Input.Path,
+        headers: Operations.ApproveRequest.Input.Headers = .init()
+    ) async throws -> Operations.ApproveRequest.Output {
+        try await approveRequest(Operations.ApproveRequest.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Decline a pending request (admin only).
+    ///
+    /// - Remark: HTTP `POST /requests/{requestId}/decline`.
+    /// - Remark: Generated from `#/paths//requests/{requestId}/decline/post(declineRequest)`.
+    public func declineRequest(
+        path: Operations.DeclineRequest.Input.Path,
+        headers: Operations.DeclineRequest.Input.Headers = .init(),
+        body: Operations.DeclineRequest.Input.Body? = nil
+    ) async throws -> Operations.DeclineRequest.Output {
+        try await declineRequest(Operations.DeclineRequest.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Seerr's users, for linking Marquee users to them (admin only).
+    ///
+    /// - Remark: HTTP `GET /requests/seerr/users`.
+    /// - Remark: Generated from `#/paths//requests/seerr/users/get(listSeerrUsers)`.
+    public func listSeerrUsers(headers: Operations.ListSeerrUsers.Input.Headers = .init()) async throws -> Operations.ListSeerrUsers.Output {
+        try await listSeerrUsers(Operations.ListSeerrUsers.Input(headers: headers))
+    }
+    /// Check a Seerr URL and API key (admin only). Without an apiKey, the saved key is used.
+    ///
+    /// - Remark: HTTP `POST /requests/seerr/test`.
+    /// - Remark: Generated from `#/paths//requests/seerr/test/post(testSeerr)`.
+    public func testSeerr(
+        headers: Operations.TestSeerr.Input.Headers = .init(),
+        body: Operations.TestSeerr.Input.Body
+    ) async throws -> Operations.TestSeerr.Output {
+        try await testSeerr(Operations.TestSeerr.Input(
             headers: headers,
             body: body
         ))

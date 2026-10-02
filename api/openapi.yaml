@@ -31,6 +31,8 @@ tags:
   - name: hubs
   - name: playlists
   - name: music
+  - name: requests
+    description: Seerr search and requests (REQ-1, REQ-2), approved by admins in Marquee.
 
 paths:
   /system/info:
@@ -1391,6 +1393,230 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /requests/status:
+    get:
+      tags: [requests]
+      operationId: requestsStatus
+      summary: Whether requests are set up and whether the caller may make them.
+      responses:
+        "200":
+          description: Status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RequestsStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /requests/search:
+    get:
+      tags: [requests]
+      operationId: searchRequestable
+      summary: Search movies and shows on Seerr, marked with what's in the library or already requested.
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 1 } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+      responses:
+        "200":
+          description: Results.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DiscoverPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /requests/discover:
+    get:
+      tags: [requests]
+      operationId: discoverRequestable
+      summary: Trending, popular and upcoming titles from Seerr (REQ-2).
+      parameters:
+        - name: category
+          in: query
+          schema: { type: string, enum: [trending, movies, tv, upcoming], default: trending }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+      responses:
+        "200":
+          description: Results.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DiscoverPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /requests/tv/{tmdbId}:
+    parameters:
+      - { name: tmdbId, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      tags: [requests]
+      operationId: requestableShow
+      summary: A show's seasons and which are available or requested, for choosing what to request.
+      responses:
+        "200":
+          description: The show.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RequestableShow" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /requests:
+    get:
+      tags: [requests]
+      operationId: listRequests
+      summary: Requests, newest first. Users see their own; admins can ask for everyone's.
+      parameters:
+        - name: scope
+          in: query
+          schema: { type: string, enum: [mine, all], default: mine }
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/RequestState" }
+      responses:
+        "200":
+          description: Requests.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MediaRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [requests]
+      operationId: createRequest
+      summary: Ask for a movie or show. It waits for an admin's approval, then goes to Seerr.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MediaRequestCreate" }
+      responses:
+        "201":
+          description: Requested (pending approval).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MediaRequest" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /requests/{requestId}:
+    parameters:
+      - { name: requestId, in: path, required: true, schema: { type: integer, format: int64 } }
+    delete:
+      tags: [requests]
+      operationId: cancelRequest
+      summary: Withdraw a pending request (its owner or an admin).
+      responses:
+        "204": { description: Withdrawn. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /requests/{requestId}/approve:
+    parameters:
+      - { name: requestId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [requests]
+      operationId: approveRequest
+      summary: Approve a pending request and send it to Seerr (admin only).
+      responses:
+        "200":
+          description: Approved and sent, or failed (status says which).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MediaRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /requests/{requestId}/decline:
+    parameters:
+      - { name: requestId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [requests]
+      operationId: declineRequest
+      summary: Decline a pending request (admin only).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: Declined.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MediaRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /requests/seerr/users:
+    get:
+      tags: [requests]
+      operationId: listSeerrUsers
+      summary: Seerr's users, for linking Marquee users to them (admin only).
+      responses:
+        "200":
+          description: Users.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [id, displayName]
+                  properties:
+                    id: { type: integer, format: int64 }
+                    displayName: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /requests/seerr/test:
+    post:
+      tags: [requests]
+      operationId: testSeerr
+      summary: Check a Seerr URL and API key (admin only). Without an apiKey, the saved key is used.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string }
+                apiKey: { type: string }
+      responses:
+        "200":
+          description: Reachable or not.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+                  version: { type: string }
+                  error: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /stats:
     get:
       tags: [activity]
@@ -2229,6 +2455,8 @@ components:
           enum: [G, PG, PG-13, R, NC-17, TV-Y, TV-Y7, TV-G, TV-PG, TV-14, TV-MA, null]
         allowRemote: { type: boolean, description: May stream from outside the home network. Default true. }
         remoteQualityKbps: { type: integer, minimum: 0, description: Cap for remote streams. 0 = server default. }
+        canRequest: { type: boolean, description: "May request titles through Seerr (REQ-1). Default false; admins always may." }
+        seerrUserId: { type: integer, format: int64, nullable: true, description: The Seerr user requests are made as. Null = Seerr's API key owner. }
 
     UserPreferences:
       type: object
@@ -2345,6 +2573,7 @@ components:
         metadata: { $ref: "#/components/schemas/MetadataSettings" }
         tasks: { $ref: "#/components/schemas/TaskSettings" }
         music: { $ref: "#/components/schemas/MusicSettings" }
+        integrations: { $ref: "#/components/schemas/IntegrationSettings" }
         webhooks:
           type: array
           description: Replaces the whole list when sent.
@@ -2362,6 +2591,7 @@ components:
         metadata: { $ref: "#/components/schemas/MetadataSettingsUpdate" }
         tasks: { $ref: "#/components/schemas/TaskSettings" }
         music: { $ref: "#/components/schemas/MusicSettings" }
+        integrations: { $ref: "#/components/schemas/IntegrationSettingsUpdate" }
         webhooks:
           type: array
           description: Replaces the whole list when sent.
@@ -2473,6 +2703,110 @@ components:
         watchedThresholdPercent: { type: integer, minimum: 50, maximum: 100 }
         detectIntros: { type: boolean, description: "Find intros and end credits in TV episodes by comparing their audio, for Skip Intro and Skip Credits (PLAY-12). Markers from Plex or the files take precedence." }
         trickplay: { type: boolean, description: "Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie." }
+
+    RequestsStatus:
+      type: object
+      required: [enabled, canRequest, pendingApprovals]
+      properties:
+        enabled: { type: boolean, description: Seerr is configured. }
+        canRequest: { type: boolean, description: The caller may make requests (admins always; others when granted). }
+        pendingApprovals: { type: integer, description: Requests waiting for approval (admins; 0 for others). }
+
+    Availability:
+      type: string
+      description: Where a title stands. available/partial come from the library or Seerr; requested = sent to Seerr; pending = waiting for an admin in Marquee.
+      enum: [none, pending, requested, processing, partial, available]
+
+    DiscoverItem:
+      type: object
+      required: [tmdbId, mediaType, title, availability]
+      properties:
+        tmdbId: { type: integer, format: int64 }
+        mediaType: { type: string, enum: [movie, tv] }
+        title: { type: string }
+        year: { type: integer }
+        overview: { type: string }
+        posterUrl: { type: string }
+        backdropUrl: { type: string }
+        availability: { $ref: "#/components/schemas/Availability" }
+        itemId: { type: integer, format: int64, description: "The title in this library, when it's here." }
+        requestId: { type: integer, format: int64, description: The caller's open Marquee request for it. }
+
+    DiscoverPage:
+      type: object
+      required: [results, page, totalPages]
+      properties:
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/DiscoverItem" }
+        page: { type: integer }
+        totalPages: { type: integer }
+
+    RequestableShow:
+      type: object
+      required: [tmdbId, title, seasons]
+      properties:
+        tmdbId: { type: integer, format: int64 }
+        title: { type: string }
+        seasons:
+          type: array
+          items:
+            type: object
+            required: [number, availability]
+            properties:
+              number: { type: integer }
+              name: { type: string }
+              episodeCount: { type: integer }
+              availability: { $ref: "#/components/schemas/Availability" }
+
+    RequestState:
+      type: string
+      enum: [pending, approved, declined, failed, available]
+
+    MediaRequestCreate:
+      type: object
+      required: [tmdbId, mediaType]
+      properties:
+        tmdbId: { type: integer, format: int64 }
+        mediaType: { type: string, enum: [movie, tv] }
+        seasons:
+          type: array
+          description: Shows only; absent or empty = every season not already here.
+          items: { type: integer }
+
+    MediaRequest:
+      type: object
+      required: [id, tmdbId, mediaType, title, status, userId, userName, createdAt, seasons]
+      properties:
+        id: { type: integer, format: int64 }
+        tmdbId: { type: integer, format: int64 }
+        mediaType: { type: string, enum: [movie, tv] }
+        title: { type: string }
+        year: { type: integer }
+        posterUrl: { type: string }
+        seasons:
+          type: array
+          items: { type: integer }
+        status: { $ref: "#/components/schemas/RequestState" }
+        reason: { type: string, description: Why it was declined or failed. }
+        userId: { type: integer, format: int64 }
+        userName: { type: string }
+        createdAt: { type: string, format: date-time }
+        decidedAt: { type: string, format: date-time }
+        decidedBy: { type: string }
+        seerrRequestId: { type: integer, format: int64 }
+
+    IntegrationSettings:
+      type: object
+      properties:
+        seerrUrl: { type: string, description: "Seerr's address, e.g. http://10.1.1.10:5055. Empty turns requests off." }
+        seerrApiKeySet: { type: boolean, readOnly: true }
+
+    IntegrationSettingsUpdate:
+      type: object
+      properties:
+        seerrUrl: { type: string }
+        seerrApiKey: { type: string, description: Write-only. }
 
     MetadataSettings:
       type: object
