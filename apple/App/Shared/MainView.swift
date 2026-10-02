@@ -158,15 +158,16 @@ struct LibrariesList: View {
             }
             #if os(iOS)
             Section {
-                NavigationLink { PlaylistsView() } label: {
+                // Value links only: mixing them with view links in one stack re-pushes screens.
+                NavigationLink(value: Route.playlists) {
                     Label("Playlists", systemImage: "music.note.list").foregroundStyle(.primary)
                 }
-                NavigationLink { DownloadsView() } label: {
+                NavigationLink(value: Route.downloads) {
                     Label("Downloads", systemImage: "arrow.down.circle").foregroundStyle(.primary)
                 }
                 // iPhone: Discover lives here (a sixth tab would spill into "More").
                 if canDiscover {
-                    NavigationLink { DiscoverView() } label: {
+                    NavigationLink(value: Route.discover) {
                         Label("Discover", systemImage: "safari").foregroundStyle(.primary)
                     }
                 }

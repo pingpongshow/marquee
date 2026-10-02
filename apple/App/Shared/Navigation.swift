@@ -8,6 +8,9 @@ enum Route: Hashable {
     case person(Int64)
     case playlist(Int64)
     case playlists
+    case downloads
+    case discover
+    case moodStyle(library: Int64, mood: Bool, name: String)
 }
 
 extension View {
@@ -20,6 +23,13 @@ extension View {
             case .person(let id): PersonView(id: id)
             case .playlist(let id): PlaylistView(id: id)
             case .playlists: PlaylistsView()
+            #if os(iOS)
+            case .downloads: DownloadsView()
+            #else
+            case .downloads: EmptyView()
+            #endif
+            case .discover: DiscoverView()
+            case let .moodStyle(library, mood, name): MoodStyleView(libraryID: library, kind: mood ? .mood : .style, name: name)
             }
         }
     }

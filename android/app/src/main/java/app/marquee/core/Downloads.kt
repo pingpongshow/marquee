@@ -20,6 +20,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import okhttp3.Request
 import java.io.File
 import java.time.OffsetDateTime
@@ -55,6 +56,8 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
         val transfer: Long? = null, // DownloadManager id
         val addedMs: Long = System.currentTimeMillis(),
         val resumeMs: Long? = null,
+        /** Downloaded because a synced playlist has it (removed when no synced playlist does). */
+        val viaPlaylist: Boolean = false,
     )
 
     @Serializable
@@ -63,6 +66,7 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
     private val dir = File(context.getExternalFilesDir(null) ?: context.filesDir, "downloads").apply { mkdirs() }
     private val indexFile = File(context.filesDir, "downloads.json")
     private val pendingFile = File(context.filesDir, "downloads-pending.json")
+    private val playlistsFile = File(context.filesDir, "downloads-playlists.json")
     private val json = Serializer.kotlinxSerializationJson
     private val dm = context.getSystemService(DownloadManager::class.java)
     private val lock = Mutex()
@@ -73,6 +77,12 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
     val entries: StateFlow<Map<Long, Entry>> = _entries
     private var pending: List<Pending> = runCatching { json.decodeFromString(ListSerializer(Pending.serializer()), pendingFile.readText()) }.getOrDefault(emptyList())
     private var watcher: Job? = null
+
+    /** Playlists kept on the device (MUSIC-19): playlist id -> its items when last synced. */
+    private val _playlists = MutableStateFlow<Map<Long, Set<Long>>>(
+        runCatching { json.decodeFromString(kotlinx.serialization.builtins.MapSerializer(Long.serializer(), kotlinx.serialization.builtins.SetSerializer(Long.serializer())), playlistsFile.readText()) }.getOrDefault(emptyMap()),
+    )
+    val playlists: StateFlow<Map<Long, Set<Long>>> = _playlists
 
     private fun load(): Map<Long, Entry> = runCatching {
         json.decodeFromString(ListSerializer(Entry.serializer()), indexFile.readText()).associateBy { it.item.id }
@@ -90,7 +100,47 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
     /** After signing in: resumes conversions and transfers, and sends offline plays. */
     fun attach() {
         watch()
-        marquee.scope.launch { flushProgress() }
+        marquee.scope.launch {
+            flushProgress()
+            // Playlists kept on the device follow their changes.
+            _playlists.value.keys.forEach { runCatching { syncPlaylist(it) } }
+        }
+    }
+
+    // Playlists
+
+    /** Keeps a playlist on the device: downloads what's new and drops what left it (tracks downloaded on their own stay). */
+    suspend fun syncPlaylist(id: Long) {
+        if (marquee.baseUrl == null) return
+        val items = kotlinx.coroutines.withContext(Dispatchers.IO) { marquee.playlists.listPlaylistItems(id, limit = 2000).items.map { it.item } }
+            .filter { it.type in listOf(ItemType.TRACK, ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO) }
+        val now = items.map { it.id }.toSet()
+        val before = _playlists.value[id].orEmpty()
+        _playlists.update { it + (id to now) }
+        savePlaylists()
+        for (it in items) if (_entries.value[it.id] == null) {
+            runCatching { download(it, if (it.type == ItemType.TRACK) Quality.Original else Quality.Medium) }
+            set(it.id) { e -> e.copy(viaPlaylist = true) }
+        }
+        dropOrphans(before - now)
+    }
+
+    fun unsyncPlaylist(id: Long) {
+        val ids = _playlists.value[id] ?: return
+        _playlists.update { it - id }
+        savePlaylists()
+        dropOrphans(ids)
+    }
+
+    private fun dropOrphans(ids: Set<Long>) {
+        val kept = _playlists.value.values.flatten().toSet()
+        ids.filter { it !in kept && _entries.value[it]?.viaPlaylist == true }.forEach(::remove)
+    }
+
+    private fun savePlaylists() {
+        runCatching {
+            playlistsFile.writeText(json.encodeToString(kotlinx.serialization.builtins.MapSerializer(Long.serializer(), kotlinx.serialization.builtins.SetSerializer(Long.serializer())), _playlists.value))
+        }
     }
 
     // Starting and removing
