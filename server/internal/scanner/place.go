@@ -29,26 +29,72 @@ type itemFields struct {
 	MatchState        string
 }
 
-// Folder names that hold extras rather than main content. Extras are indexed in a later
-// milestone (LIB-8); for now they are skipped so they don't pollute the library.
-var extrasDirs = set("extras", "featurettes", "behind the scenes", "deleted scenes", "interviews", "scenes",
-	"shorts", "trailers", "other", "samples", "sample", "subs", "subtitles", "bonus", "bonus features")
+// Folders and filename suffixes (Plex/Jellyfin conventions) that hold extras rather than
+// main content (LIB-8). "skip" marks samples and subtitle folders, which aren't extras.
+var extrasDirs = map[string]string{"extras": "other", "featurettes": "featurette", "behind the scenes": "behind_the_scenes",
+	"deleted scenes": "deleted_scene", "interviews": "interview", "scenes": "scene", "shorts": "short", "trailers": "trailer",
+	"other": "other", "bonus": "other", "bonus features": "other", "samples": "skip", "sample": "skip", "subs": "skip", "subtitles": "skip"}
 
-var extrasSuffixes = []string{"-trailer", "-featurette", "-behindthescenes", "-deleted", "-interview", "-scene", "-short", "-other", "-sample"}
+var extrasSuffixes = [][2]string{{"-trailer", "trailer"}, {"-featurette", "featurette"}, {"-behindthescenes", "behind_the_scenes"},
+	{"-deleted", "deleted_scene"}, {"-interview", "interview"}, {"-scene", "scene"}, {"-short", "short"}, {"-other", "other"}, {"-sample", "skip"}}
 
-func isExtra(parts []string, base string) bool {
+// extraKind returns the kind of extra a file is ("" for main content).
+func extraKind(parts []string, base string) string {
 	for _, p := range parts[:len(parts)-1] {
-		if extrasDirs[strings.ToLower(p)] {
-			return true
+		if k := extrasDirs[strings.ToLower(p)]; k != "" {
+			return k
 		}
 	}
 	lower := strings.ToLower(base)
 	for _, s := range extrasSuffixes {
-		if strings.HasSuffix(lower, s) {
-			return true
+		if strings.HasSuffix(lower, s[0]) {
+			return s[1]
 		}
 	}
-	return false
+	return ""
+}
+
+var extraLabels = map[string]string{"trailer": "Trailer", "featurette": "Featurette", "behind_the_scenes": "Behind the Scenes",
+	"deleted_scene": "Deleted Scene", "interview": "Interview", "scene": "Scene", "short": "Short", "other": "Extra"}
+
+// extraTitle makes a readable title from an extra's file name.
+func extraTitle(base string) string {
+	lower := strings.ToLower(base)
+	for _, s := range extrasSuffixes {
+		if strings.HasSuffix(lower, s[0]) {
+			base = base[:len(base)-len(s[0])]
+			break
+		}
+	}
+	t := strings.TrimSpace(strings.NewReplacer(".", " ", "_", " ").Replace(base))
+	if t == "" {
+		return "Extra"
+	}
+	return t
+}
+
+// placeExtra indexes a trailer, featurette or other extra. Extras are hidden from library
+// lists; linkExtras attaches them to their movie or show after the scan.
+func (w *writer) placeExtra(ctx context.Context, c candidate, kind, base string, parts []string) (placement, error) {
+	if kind == "skip" {
+		return placement{}, errSkip
+	}
+	title := extraTitle(base)
+	// "Movie (2010)-trailer.mkv" just repeats the folder: call it what it is instead.
+	if len(parts) >= 2 && strings.EqualFold(title, strings.TrimSpace(parts[0])) {
+		title = extraLabels[kind]
+	}
+	id, created, err := w.item(ctx, "video", "x:"+c.Rel, 0, 0, itemFields{Title: title, MatchState: "local"})
+	if err != nil {
+		return placement{}, err
+	}
+	if created {
+		if _, err := w.tx.ExecContext(ctx, `UPDATE items SET extra_type = ? WHERE id = ?`, kind, id); err != nil {
+			return placement{}, err
+		}
+		w.artwork(ctx, id, "thumb", "frame", c.Path)
+	}
+	return placement{ItemID: id}, nil
 }
 
 func (w *writer) place(ctx context.Context, c candidate, res *probe.Result) (placement, error) {
@@ -69,8 +115,8 @@ func (w *writer) place(ctx context.Context, c candidate, res *probe.Result) (pla
 }
 
 func (w *writer) placeMovie(ctx context.Context, c candidate, parts []string, file, base string) (placement, error) {
-	if isExtra(parts, base) {
-		return placement{}, errSkip
+	if kind := extraKind(parts, base); kind != "" {
+		return w.placeExtra(ctx, c, kind, base, parts)
 	}
 	folder := ""
 	if len(parts) >= 2 {
@@ -105,8 +151,10 @@ func (w *writer) placeEpisode(ctx context.Context, c candidate, parts []string, 
 	if len(parts) >= 3 {
 		seasonFolder = parts[1]
 	}
-	if _, isSeason := naming.ParseSeasonFolder(seasonFolder); !isSeason && isExtra(parts, base) {
-		return placement{}, errSkip
+	if _, isSeason := naming.ParseSeasonFolder(seasonFolder); !isSeason {
+		if kind := extraKind(parts, base); kind != "" {
+			return w.placeExtra(ctx, c, kind, base, parts)
+		}
 	}
 	ep, ok := naming.ParseEpisode(file)
 	if !ok {

@@ -3117,6 +3117,10 @@ components:
         watchedLeafCount: { type: integer, description: "Shows, seasons, artists, albums: how many episodes/tracks the user has watched." }
         userRating: { type: number, description: "The user's rating, 0–10 (10 = loved)." }
         watchlisted: { type: boolean, description: On the user's watchlist (USER-8). }
+        extraType:
+          type: string
+          description: Set for extras (LIB-8).
+          enum: [trailer, featurette, behind_the_scenes, deleted_scene, interview, scene, short, other]
 
     ItemImages:
       type: object
@@ -3206,6 +3210,10 @@ components:
             collections:
               type: array
               description: Collections the item belongs to (META-7).
+              items: { $ref: "#/components/schemas/ItemSummary" }
+            extras:
+              type: array
+              description: Trailers, featurettes and other extras (LIB-8), trailers first.
               items: { $ref: "#/components/schemas/ItemSummary" }
             summary: { type: string }
             audienceRating: { type: number, description: "TMDB user score, 0–10" }

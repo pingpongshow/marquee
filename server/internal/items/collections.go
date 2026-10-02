@@ -124,3 +124,15 @@ func RecountCollection(ctx context.Context, db execer, id int64) error {
 		leaf_count = (SELECT COUNT(*) FROM collection_items WHERE collection_id = ?) WHERE id = ?`, id, id, id)
 	return err
 }
+
+// Extras lists an item's trailers, featurettes and other extras (LIB-8), trailers first.
+func (s *Store) Extras(ctx context.Context, acc Access, itemID int64) ([]Summary, error) {
+	ac, aargs := acc.clause()
+	rows, err := s.db.QueryContext(ctx, `SELECT `+cols(acc.UserID)+summaryFrom+`
+		WHERE i.parent_id = ? AND i.extra_type IS NOT NULL AND `+ac+`
+		ORDER BY i.extra_type != 'trailer', i.extra_type, i.sort_title`, append([]any{itemID}, aargs...)...)
+	if err != nil {
+		return nil, err
+	}
+	return collect(rows)
+}

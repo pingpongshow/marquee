@@ -236,6 +236,11 @@ func (s *Scanner) Scan(ctx context.Context, lib library.Library, ignore []string
 	if err := w.finish(ctx); err != nil {
 		return st, err
 	}
+	if lib.Type == library.Movies || lib.Type == library.Shows || lib.Type == library.Anime {
+		if err := s.linkExtras(ctx, lib.ID); err != nil {
+			slog.Warn("scan: link extras", "err", err)
+		}
+	}
 	st.Duration = time.Since(start)
 	return st, nil
 }

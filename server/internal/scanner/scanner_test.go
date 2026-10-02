@@ -99,8 +99,13 @@ func TestScanShows(t *testing.T) {
 	l := e.lib("TV", library.Shows, "tv")
 
 	st := e.scan(l)
-	if st.Added != 7 || st.Skipped != 1 || st.Failed != 0 {
+	if st.Added != 8 || st.Skipped != 0 || st.Failed != 0 {
 		t.Fatalf("stats: %s", st)
+	}
+	// The featurette is an extra of its show (LIB-8), not an episode.
+	if n := e.count(`SELECT COUNT(*) FROM items x JOIN items s ON s.id = x.parent_id
+		WHERE x.extra_type = 'featurette' AND x.title = 'Making Of' AND s.type = 'show' AND s.title = 'Show'`); n != 1 {
+		t.Errorf("featurette linked to its show = %d", n)
 	}
 	if n := e.count(`SELECT COUNT(*) FROM items WHERE type = 'show'`); n != 4 {
 		t.Errorf("shows = %d", n)
@@ -121,12 +126,12 @@ func TestScanShows(t *testing.T) {
 	if n := e.count(`SELECT COUNT(*) FROM artwork WHERE kind = 'poster' AND source = 'local' AND selected = 1`); n != 1 {
 		t.Errorf("posters = %d", n)
 	}
-	if n := e.count(`SELECT COUNT(*) FROM markers WHERE kind = 'chapter'`); n != 7*5 {
+	if n := e.count(`SELECT COUNT(*) FROM markers WHERE kind = 'chapter'`); n != 8*5 {
 		t.Errorf("chapters = %d", n)
 	}
 
 	// Rescan with no changes does nothing.
-	if st := e.scan(l); st.Unchanged != 7 || st.Added+st.Updated != 0 {
+	if st := e.scan(l); st.Unchanged != 8 || st.Added+st.Updated != 0 {
 		t.Fatalf("rescan: %s", st)
 	}
 
@@ -178,8 +183,12 @@ func TestScanMoviesAndOfflineRoot(t *testing.T) {
 	l := e.lib("Movies", library.Movies, "movies")
 
 	st := e.scan(l)
-	if st.Added != 7 || st.Skipped != 1 {
+	if st.Added != 8 || st.Skipped != 0 {
 		t.Fatalf("stats: %s", st)
+	}
+	if n := e.count(`SELECT COUNT(*) FROM items x JOIN items m ON m.id = x.parent_id
+		WHERE x.extra_type = 'featurette' AND m.title = 'The Matrix'`); n != 1 {
+		t.Errorf("featurette linked to The Matrix = %d", n)
 	}
 	if n := e.count(`SELECT COUNT(*) FROM items WHERE type = 'movie'`); n != 5 {
 		t.Errorf("movies = %d", n)

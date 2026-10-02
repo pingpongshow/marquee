@@ -7,7 +7,7 @@ import { fetchLeaves } from "@/api/queries";
 import type { ItemDetail } from "@/api/types";
 import { Button } from "@/components/ui";
 import { useMusic } from "../player/MusicPlayer";
-import { formatDuration } from "./format";
+import { formatTrackTime } from "./format";
 
 export function PlayButtons({ item }: { item: ItemDetail }) {
   const navigate = useNavigate();
@@ -47,7 +47,7 @@ export function PlayButtons({ item }: { item: ItemDetail }) {
       {playable && (
         <>
           <Button variant="primary" onClick={() => playVideo(item.id)} disabled={!item.available}>
-            <Play className="size-4 fill-current" /> {resume ? `Resume from ${formatDuration(item.viewOffsetMs)}` : "Play"}
+            <Play className="size-4 fill-current" /> {resume ? `Resume from ${formatTrackTime(item.viewOffsetMs)}` : "Play"}
           </Button>
           {resume && (
             <Button onClick={() => playVideo(item.id, 0)}>

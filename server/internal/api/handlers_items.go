@@ -88,6 +88,9 @@ func toAPISummary(s items.Summary) ItemSummary {
 		out.UserRating = ptr(float32(s.UserRating))
 	}
 	out.Watchlisted = nz(s.Watchlisted)
+	if s.ExtraType != "" {
+		out.ExtraType = ptr(ItemSummaryExtraType(s.ExtraType))
+	}
 	if t, err := time.Parse(time.RFC3339Nano, s.LastViewedAt); err == nil {
 		out.LastViewedAt = &t
 	}
@@ -206,11 +209,18 @@ func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 		OriginallyAvailableAt: sum.OriginallyAvailableAt, Available: sum.Available,
 		MatchState: ItemDetailMatchState(sum.MatchState), AddedAt: sum.AddedAt, Images: sum.Images,
 		ViewOffsetMs: sum.ViewOffsetMs, ViewCount: sum.ViewCount, WatchedLeafCount: sum.WatchedLeafCount, LastViewedAt: sum.LastViewedAt,
-		UserRating: sum.UserRating, Watchlisted: sum.Watchlisted,
+		UserRating: sum.UserRating, Watchlisted: sum.Watchlisted, ExtraType: (*ItemDetailExtraType)(sum.ExtraType),
 		AudienceRating: nz(float32(d.AudienceRating)), Credits: make([]Credit, len(d.Credits)),
 		Summary: nz(d.Plot), Tagline: nz(d.Tagline), ContentRating: nz(d.ContentRating), Studio: nz(d.Studio),
 		Genres: d.Genres, ExternalIds: d.ExternalIDs, LockedFields: d.LockedFields,
 		Versions: make([]MediaVersion, len(d.Versions)), Chapters: make([]Chapter, len(d.Chapters)),
+	}
+	if xs, err := h.Items.Extras(ctx, access(ctx), id); err == nil && len(xs) > 0 {
+		list := make([]ItemSummary, len(xs))
+		for i, x := range xs {
+			list[i] = toAPISummary(x)
+		}
+		out.Extras = &list
 	}
 	if cs, err := h.Items.CollectionsOf(ctx, access(ctx), id); err == nil && len(cs) > 0 {
 		list := make([]ItemSummary, len(cs))

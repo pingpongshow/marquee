@@ -2501,6 +2501,11 @@ export interface components {
             userRating?: number;
             /** @description On the user's watchlist (USER-8). */
             watchlisted?: boolean;
+            /**
+             * @description Set for extras (LIB-8).
+             * @enum {string}
+             */
+            extraType?: "trailer" | "featurette" | "behind_the_scenes" | "deleted_scene" | "interview" | "scene" | "short" | "other";
         };
         /** @description Artwork ids for /images/{artworkId}. Seasons and episodes fall back to the show's art, tracks to the album's. */
         ItemImages: {
@@ -2574,6 +2579,8 @@ export interface components {
             lockedFields: string[];
             /** @description Collections the item belongs to (META-7). */
             collections?: components["schemas"]["ItemSummary"][];
+            /** @description Trailers, featurettes and other extras (LIB-8), trailers first. */
+            extras?: components["schemas"]["ItemSummary"][];
             summary?: string;
             /** @description TMDB user score, 0–10 */
             audienceRating?: number;

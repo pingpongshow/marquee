@@ -236,14 +236,14 @@ func (w *writer) finish(ctx context.Context) error {
 		`DELETE FROM items WHERE library_id = ?1 AND type IN ('season','album')
 			AND NOT EXISTS (SELECT 1 FROM items c WHERE c.parent_id = items.id)`,
 		`DELETE FROM items WHERE library_id = ?1 AND type IN ('show','artist')
-			AND NOT EXISTS (SELECT 1 FROM items c WHERE c.parent_id = items.id)`,
+			AND NOT EXISTS (SELECT 1 FROM items c WHERE c.parent_id = items.id AND c.extra_type IS NULL)`,
 		// Availability bubbles up from files.
 		`UPDATE items SET available = EXISTS (SELECT 1 FROM media_versions v JOIN media_files f ON f.version_id = v.id
 			WHERE v.item_id = items.id AND f.available = 1)
 			WHERE library_id = ?1 AND type IN ('movie','episode','track','video')`,
 		`UPDATE items SET available = EXISTS (SELECT 1 FROM items c WHERE c.parent_id = items.id AND c.available = 1)
 			WHERE library_id = ?1 AND type IN ('season','album')`,
-		`UPDATE items SET available = EXISTS (SELECT 1 FROM items c WHERE c.parent_id = items.id AND c.available = 1)
+		`UPDATE items SET available = EXISTS (SELECT 1 FROM items c WHERE c.parent_id = items.id AND c.available = 1 AND c.extra_type IS NULL)
 			WHERE library_id = ?1 AND type IN ('show','artist')`,
 		// Counts.
 		`UPDATE items SET
@@ -252,7 +252,7 @@ func (w *writer) finish(ctx context.Context) error {
 			duration_ms = (SELECT SUM(duration_ms) FROM items c WHERE c.parent_id = items.id)
 			WHERE library_id = ?1 AND type IN ('season','album')`,
 		`UPDATE items SET
-			child_count = (SELECT COUNT(*) FROM items c WHERE c.parent_id = items.id),
+			child_count = (SELECT COUNT(*) FROM items c WHERE c.parent_id = items.id AND c.extra_type IS NULL),
 			leaf_count  = (SELECT COUNT(*) FROM items c WHERE c.grandparent_id = items.id)
 			WHERE library_id = ?1 AND type = 'show'`,
 		`UPDATE items SET

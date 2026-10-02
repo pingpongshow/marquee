@@ -101,7 +101,7 @@ func (s *Store) ContinueWatching(ctx context.Context, acc Access, libIDs []int64
 	uid := strconv.FormatInt(acc.UserID, 10)
 	rows, err := s.db.QueryContext(ctx, `SELECT `+cols(acc.UserID)+summaryFrom+`
 		JOIN user_item_state us ON us.item_id = i.id AND us.user_id = `+uid+`
-		WHERE us.view_offset_ms > 0 AND i.type IN ('movie', 'episode', 'video') AND i.available = 1 AND `+ac+`
+		WHERE us.view_offset_ms > 0 AND i.type IN ('movie', 'episode', 'video') AND i.extra_type IS NULL AND i.available = 1 AND `+ac+`
 		ORDER BY us.last_viewed_at DESC LIMIT ?`, append(aargs, limit)...)
 	if err != nil {
 		return nil, err
