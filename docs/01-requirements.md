@@ -125,7 +125,7 @@ Plex-style Live TV on every client (see the owner's reference screenshot: Guide 
 | LIVE-1 | **Sources:** M3U playlists with XMLTV guides (admin-added), free ad-supported channels (Pluto TV and similar, where their terms allow), and an optional **Dispatcharr** integration (its channels, groups, logos and EPG) when the admin sets it up. | P1 |
 | LIVE-2 | **Guide:** a grid of channels × time with now/next, a "now" line, day picker, jump back/forward, categories and favourites; plus a "What's On" view of what's airing now. | P1 |
 | LIVE-3 | **Watching:** tune a channel with a muted live preview in the guide, full screen, channel up/down, and the server remuxing or transcoding streams for each client like any other playback (LAN and Tailscale). | P1 |
-| LIVE-4 | **Per-user:** favourite channels, hidden channels, recently watched, and access rules (e.g. kids' profiles). | P1 |
+| LIVE-4 | **Per-user:** favourite channels, hidden channels, recently watched, and access rules (e.g. kids' profiles). ✅ D78. | P1 |
 | LIVE-5 | **DVR:** record programmes and series to a library. ✅ D76. | P2 |
 
 ## 3d. Requests (Seerr)

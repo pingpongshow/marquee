@@ -22,17 +22,27 @@ public extension AppSession {
         try await liveAPI.liveTvStatus().ok.body.json
     }
 
-    /// Channels with now and next; group nil = all, favorites = only the caller's.
-    func liveChannels(group: String? = nil, favorites: Bool = false) async throws -> [LiveChannel] {
-        try await liveAPI.listLiveChannels(query: .init(group: group, favorites: favorites ? true : nil)).ok.body.json
+    /// Channels with now and next; group nil = all, favorites = only the caller's, recent =
+    /// recently watched (newest first), hidden = only the channels the caller hid.
+    func liveChannels(group: String? = nil, favorites: Bool = false, recent: Bool = false, hidden: Bool = false) async throws -> [LiveChannel] {
+        try await liveAPI.listLiveChannels(query: .init(group: group, favorites: favorites ? true : nil, recent: recent ? true : nil, hidden: hidden ? true : nil)).ok.body.json
+    }
+
+    /// Hides a channel from the caller's guide, or shows it again (LIVE-4).
+    func setHidden(_ channel: Int64, _ hidden: Bool) async throws {
+        if hidden {
+            _ = try await liveAPI.hideLiveChannel(path: .init(channelId: channel)).noContent
+        } else {
+            _ = try await liveAPI.unhideLiveChannel(path: .init(channelId: channel)).noContent
+        }
     }
 
     func liveGroups() async throws -> [String] {
         try await liveAPI.listLiveGroups().ok.body.json.map(\.name)
     }
 
-    func liveGuide(from: Date, to: Date, group: String? = nil, favorites: Bool = false) async throws -> [Int64: [LiveProgramme]] {
-        let rows = try await liveAPI.liveGuide(query: .init(start: from, end: to, group: group, favorites: favorites ? true : nil)).ok.body.json
+    func liveGuide(from: Date, to: Date, group: String? = nil, favorites: Bool = false, recent: Bool = false) async throws -> [Int64: [LiveProgramme]] {
+        let rows = try await liveAPI.liveGuide(query: .init(start: from, end: to, group: group, favorites: favorites ? true : nil, recent: recent ? true : nil)).ok.body.json
         return Dictionary(uniqueKeysWithValues: rows.map { ($0.channelId, $0.programmes) })
     }
 

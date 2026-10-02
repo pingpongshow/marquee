@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 	"strconv"
 	"time"
 
+	"marquee/internal/auth"
 	"marquee/internal/livetv"
 	"marquee/internal/netclass"
 )
@@ -25,15 +27,34 @@ func toAPIProg(p *livetv.Prog) *LiveProgramme {
 	return out
 }
 
-func liveFilter(group *string, fav *bool) livetv.Filter {
-	f := livetv.Filter{}
+// liveFilter builds a channel filter, limited to what the user may watch (LIVE-4).
+func liveFilter(s auth.Session, group *string, fav, recent, hidden *bool) livetv.Filter {
+	f := livetv.Filter{Groups: liveGroups(s)}
 	if group != nil {
 		f.Group = *group
 	}
-	if fav != nil {
-		f.Favorites = *fav
-	}
+	f.Favorites = fav != nil && *fav
+	f.Recent = recent != nil && *recent
+	f.Hidden = hidden != nil && *hidden
 	return f
+}
+
+// liveGroups is the channel groups a user is limited to (nil = all; empty = no Live TV).
+func liveGroups(s auth.Session) *[]string {
+	r := s.User.Restrictions
+	switch {
+	case s.User.IsAdmin:
+		return nil
+	case !r.LiveTVAllowed():
+		return &[]string{}
+	}
+	return r.LiveTVGroups
+}
+
+// liveAllowed reports whether the user may watch a channel in this group.
+func liveAllowed(s auth.Session, group string) bool {
+	g := liveGroups(s)
+	return g == nil || slices.Contains(*g, group)
 }
 
 func (h *Handlers) LiveTvStatus(ctx context.Context, _ LiveTvStatusRequestObject) (LiveTvStatusResponseObject, error) {
@@ -46,6 +67,11 @@ func (h *Handlers) LiveTvStatus(ctx context.Context, _ LiveTvStatusRequestObject
 func (h *Handlers) liveStatus(ctx context.Context) LiveTvStatus {
 	n, until, sources := h.LiveTV.Status(ctx)
 	out := LiveTvStatus{Enabled: h.LiveTV.Enabled(), Channels: n, GuideUntil: until}
+	if s, ok := session(ctx); ok {
+		if g := liveGroups(s); g != nil && len(*g) == 0 {
+			out.Enabled = false // this profile may not watch Live TV
+		}
+	}
 	if h.DVR != nil {
 		out.DvrAvailable = ptr(h.DVR.Available())
 		out.RecordingsActive = ptr(h.DVR.Active())
@@ -73,13 +99,14 @@ func (h *Handlers) ListLiveChannels(ctx context.Context, req ListLiveChannelsReq
 	if !ok {
 		return ListLiveChannels401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	list, err := h.LiveTV.Channels(ctx, s.User.ID, liveFilter(req.Params.Group, req.Params.Favorites))
+	list, err := h.LiveTV.Channels(ctx, s.User.ID, liveFilter(s, req.Params.Group, req.Params.Favorites, req.Params.Recent, req.Params.Hidden))
 	if err != nil {
 		return nil, internal(ctx, "liveChannels", err)
 	}
 	out := make(ListLiveChannels200JSONResponse, len(list))
 	for i, c := range list {
-		out[i] = LiveChannel{Id: c.ID, Number: nz(c.Number), Name: c.Name, Group: nz(c.Group), Favorite: c.Favorite, Now: toAPIProg(c.Now), Next: toAPIProg(c.Next)}
+		out[i] = LiveChannel{Id: c.ID, Number: nz(c.Number), Name: c.Name, Group: nz(c.Group), Favorite: c.Favorite, Hidden: nz(c.Hidden),
+			Now: toAPIProg(c.Now), Next: toAPIProg(c.Next)}
 		if c.HasLogo {
 			out[i].LogoUrl = ptr(logoURL(c.ID))
 		}
@@ -92,16 +119,22 @@ func logoURL(id int64) string {
 }
 
 func (h *Handlers) ListLiveGroups(ctx context.Context, _ ListLiveGroupsRequestObject) (ListLiveGroupsResponseObject, error) {
-	if _, ok := session(ctx); !ok {
+	s, ok := session(ctx)
+	if !ok {
 		return ListLiveGroups401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	counts, order, err := h.LiveTV.Groups(ctx)
 	if err != nil {
 		return nil, internal(ctx, "liveGroups", err)
 	}
-	out := make(ListLiveGroups200JSONResponse, len(order))
-	for i, g := range order {
-		out[i].Name, out[i].Channels = g, counts[g]
+	out := ListLiveGroups200JSONResponse{}
+	for _, g := range order {
+		if liveAllowed(s, g) {
+			out = append(out, struct {
+				Channels int    `json:"channels"`
+				Name     string `json:"name"`
+			}{counts[g], g})
+		}
 	}
 	return out, nil
 }
@@ -115,7 +148,7 @@ func (h *Handlers) LiveGuide(ctx context.Context, req LiveGuideRequestObject) (L
 	if !to.After(from) || to.Sub(from) > 24*time.Hour {
 		return LiveGuide400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "end must be after start and at most 24 hours later"))}, nil
 	}
-	rows, err := h.LiveTV.Guide(ctx, s.User.ID, liveFilter(req.Params.Group, req.Params.Favorites), from, to)
+	rows, err := h.LiveTV.Guide(ctx, s.User.ID, liveFilter(s, req.Params.Group, req.Params.Favorites, req.Params.Recent, nil), from, to)
 	if err != nil {
 		return nil, internal(ctx, "liveGuide", err)
 	}
@@ -154,6 +187,34 @@ func (h *Handlers) UnfavoriteLiveChannel(ctx context.Context, req UnfavoriteLive
 	return UnfavoriteLiveChannel204Response{}, nil
 }
 
+func (h *Handlers) HideLiveChannel(ctx context.Context, req HideLiveChannelRequestObject) (HideLiveChannelResponseObject, error) {
+	s, ok := session(ctx)
+	if !ok {
+		return HideLiveChannel401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	err := h.LiveTV.SetHidden(ctx, s.User.ID, req.ChannelId, true)
+	if errors.Is(err, livetv.ErrNotFound) {
+		return HideLiveChannel404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "channel not found"))}, nil
+	} else if err != nil {
+		return nil, internal(ctx, "hideChannel", err)
+	}
+	return HideLiveChannel204Response{}, nil
+}
+
+func (h *Handlers) UnhideLiveChannel(ctx context.Context, req UnhideLiveChannelRequestObject) (UnhideLiveChannelResponseObject, error) {
+	s, ok := session(ctx)
+	if !ok {
+		return UnhideLiveChannel401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	err := h.LiveTV.SetHidden(ctx, s.User.ID, req.ChannelId, false)
+	if errors.Is(err, livetv.ErrNotFound) {
+		return UnhideLiveChannel404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "channel not found"))}, nil
+	} else if err != nil {
+		return nil, internal(ctx, "unhideChannel", err)
+	}
+	return UnhideLiveChannel204Response{}, nil
+}
+
 func (h *Handlers) LiveChannelLogo(ctx context.Context, req LiveChannelLogoRequestObject) (LiveChannelLogoResponseObject, error) {
 	b, ct, err := h.LiveTV.Logo(ctx, req.ChannelId)
 	if err != nil {
@@ -179,6 +240,9 @@ func (h *Handlers) PlayLiveChannel(ctx context.Context, req PlayLiveChannelReque
 	} else if err != nil {
 		return nil, internal(ctx, "playLive", err)
 	}
+	if !liveAllowed(s, c.Group) {
+		return PlayLiveChannel403JSONResponse{ForbiddenJSONResponse(apiErr("not_allowed", "This channel isn't available for this profile."))}, nil
+	}
 	o := livetv.Options{VideoCodecs: req.Body.Profile.HlsVideoCodecs, AudioCodecs: req.Body.Profile.HlsAudioCodecs, Remote: remote, UserAgent: h.LiveTV.UserAgent(c.SourceID)}
 	if req.Body.MaxBitrateKbps != nil {
 		o.MaxKbps = *req.Body.MaxBitrateKbps
@@ -193,6 +257,7 @@ func (h *Handlers) PlayLiveChannel(ctx context.Context, req PlayLiveChannelReque
 		}
 		return nil, internal(ctx, "playLive", err)
 	}
+	h.LiveTV.Watched(ctx, u.ID, c.ID)
 	return PlayLiveChannel200JSONResponse(LiveSession{Id: ls.ID, Url: "/api/v1/live/" + ls.ID + "/index.m3u8", ChannelId: c.ID,
 		Method: LiveSessionMethod(ls.Method), VideoCodec: nz(ls.VideoCodec), AudioCodec: nz(ls.AudioCodec)}), nil
 }

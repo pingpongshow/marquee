@@ -16662,17 +16662,31 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/livetv/channels/GET/query/favorites`.
                 public var favorites: Swift.Bool?
+                /// The channels the caller watched last, newest first (LIVE-4).
+                ///
+                /// - Remark: Generated from `#/paths/livetv/channels/GET/query/recent`.
+                public var recent: Swift.Bool?
+                /// Only the channels the caller hid (otherwise they're left out).
+                ///
+                /// - Remark: Generated from `#/paths/livetv/channels/GET/query/hidden`.
+                public var hidden: Swift.Bool?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
                 ///   - group: Only this group (category).
                 ///   - favorites: Only the caller's favourites.
+                ///   - recent: The channels the caller watched last, newest first (LIVE-4).
+                ///   - hidden: Only the channels the caller hid (otherwise they're left out).
                 public init(
                     group: Swift.String? = nil,
-                    favorites: Swift.Bool? = nil
+                    favorites: Swift.Bool? = nil,
+                    recent: Swift.Bool? = nil,
+                    hidden: Swift.Bool? = nil
                 ) {
                     self.group = group
                     self.favorites = favorites
+                    self.recent = recent
+                    self.hidden = hidden
                 }
             }
             public var query: Operations.ListLiveChannels.Input.Query
@@ -16982,6 +16996,8 @@ public enum Operations {
                 public var group: Swift.String?
                 /// - Remark: Generated from `#/paths/livetv/guide/GET/query/favorites`.
                 public var favorites: Swift.Bool?
+                /// - Remark: Generated from `#/paths/livetv/guide/GET/query/recent`.
+                public var recent: Swift.Bool?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
@@ -16989,16 +17005,19 @@ public enum Operations {
                 ///   - end:
                 ///   - group:
                 ///   - favorites:
+                ///   - recent:
                 public init(
                     start: Foundation.Date,
                     end: Foundation.Date,
                     group: Swift.String? = nil,
-                    favorites: Swift.Bool? = nil
+                    favorites: Swift.Bool? = nil,
+                    recent: Swift.Bool? = nil
                 ) {
                     self.start = start
                     self.end = end
                     self.group = group
                     self.favorites = favorites
+                    self.recent = recent
                 }
             }
             public var query: Operations.LiveGuide.Input.Query
@@ -17145,6 +17164,322 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Hide a channel from the caller's guide (LIVE-4).
+    ///
+    /// - Remark: HTTP `PUT /livetv/channels/{channelId}/hidden`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/hidden/put(hideLiveChannel)`.
+    public enum HideLiveChannel {
+        public static let id: Swift.String = "hideLiveChannel"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/hidden/PUT/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/hidden/PUT/path/channelId`.
+                public var channelId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - channelId:
+                public init(channelId: Swift.Int64) {
+                    self.channelId = channelId
+                }
+            }
+            public var path: Operations.HideLiveChannel.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/hidden/PUT/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.HideLiveChannel.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.HideLiveChannel.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.HideLiveChannel.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.HideLiveChannel.Input.Path,
+                headers: Operations.HideLiveChannel.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Hidden.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/hidden/put(hideLiveChannel)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.HideLiveChannel.Output.NoContent)
+            /// Hidden.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/hidden/put(hideLiveChannel)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.HideLiveChannel.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/hidden/put(hideLiveChannel)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/hidden/put(hideLiveChannel)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Show a hidden channel again.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/channels/{channelId}/hidden`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/hidden/delete(unhideLiveChannel)`.
+    public enum UnhideLiveChannel {
+        public static let id: Swift.String = "unhideLiveChannel"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/hidden/DELETE/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/hidden/DELETE/path/channelId`.
+                public var channelId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - channelId:
+                public init(channelId: Swift.Int64) {
+                    self.channelId = channelId
+                }
+            }
+            public var path: Operations.UnhideLiveChannel.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/hidden/DELETE/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UnhideLiveChannel.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UnhideLiveChannel.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.UnhideLiveChannel.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.UnhideLiveChannel.Input.Path,
+                headers: Operations.UnhideLiveChannel.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Shown.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/hidden/delete(unhideLiveChannel)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.UnhideLiveChannel.Output.NoContent)
+            /// Shown.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/hidden/delete(unhideLiveChannel)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.UnhideLiveChannel.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/hidden/delete(unhideLiveChannel)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/hidden/delete(unhideLiveChannel)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
                             response: self
                         )
                     }

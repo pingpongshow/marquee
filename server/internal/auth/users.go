@@ -26,9 +26,16 @@ type Restrictions struct {
 	// CanRequest lets the user ask for titles through Seerr (REQ-1); admins always may.
 	CanRequest bool `json:"canRequest,omitempty"`
 	// CanRecord lets the user schedule Live TV recordings (LIVE-5); admins always may.
-	CanRecord   bool   `json:"canRecord,omitempty"`
-	SeerrUserID *int64 `json:"seerrUserId,omitempty"`
+	CanRecord bool `json:"canRecord,omitempty"`
+	// LiveTV: nil or true = may watch Live TV (LIVE-4); LiveTVGroups limits it to these
+	// channel groups (nil = all).
+	LiveTV       *bool     `json:"liveTv,omitempty"`
+	LiveTVGroups *[]string `json:"liveTvGroups,omitempty"`
+	SeerrUserID  *int64    `json:"seerrUserId,omitempty"`
 }
+
+// LiveTVAllowed reports whether the user may watch Live TV at all.
+func (r Restrictions) LiveTVAllowed() bool { return r.LiveTV == nil || *r.LiveTV }
 
 // RemoteAllowed reports whether the user may stream outside the LAN.
 func (r Restrictions) RemoteAllowed() bool { return r.AllowRemote == nil || *r.AllowRemote }

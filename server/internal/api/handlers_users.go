@@ -44,7 +44,8 @@ func canSeeLibrary(ctx context.Context, id int64) bool {
 
 func toAPIRestrictions(r auth.Restrictions) UserRestrictions {
 	out := UserRestrictions{LibraryIds: r.LibraryIDs, AllowRemote: ptr(r.RemoteAllowed()), RemoteQualityKbps: ptr(r.RemoteQualityKbps),
-		CanRequest: ptr(r.CanRequest), CanRecord: ptr(r.CanRecord), SeerrUserId: r.SeerrUserID}
+		CanRequest: ptr(r.CanRequest), CanRecord: ptr(r.CanRecord), SeerrUserId: r.SeerrUserID,
+		LiveTv: ptr(r.LiveTVAllowed()), LiveTvGroups: r.LiveTVGroups}
 	if r.MaxContentRating != nil {
 		out.MaxContentRating = ptr(UserRestrictionsMaxContentRating(*r.MaxContentRating))
 	}
@@ -77,6 +78,10 @@ func fromAPIRestrictions(r *UserRestrictions) (auth.Restrictions, error) {
 	if r.CanRecord != nil {
 		out.CanRecord = *r.CanRecord
 	}
+	if r.LiveTv != nil && !*r.LiveTv {
+		out.LiveTV = r.LiveTv // only "no" is stored; absent means allowed
+	}
+	out.LiveTVGroups = r.LiveTvGroups
 	out.SeerrUserID = r.SeerrUserId
 	return out, nil
 }

@@ -85,6 +85,22 @@ func TestDVRScheduling(t *testing.T) {
 		t.Errorf("after stopping the series: %+v", recs)
 	}
 
+	// Upcoming recordings follow the guide: a renamed one-off is updated; a series airing
+	// whose slot now holds another show is dropped.
+	r.Schedule(ctx, uid, news.ID, news.Now.Start, true, false)
+	s.DB.Exec(`UPDATE live_programmes SET title = 'Weather Extra', stop = ? WHERE channel_id = ? AND start = ?`,
+		weather.Stop.Add(15*time.Minute).UTC().Format(time.RFC3339), news.ID, weather.Start.UTC().Format(time.RFC3339))
+	s.DB.Exec(`UPDATE live_programmes SET title = 'Breaking News' WHERE channel_id = ? AND start = ?`, news.ID, news.Now.Start.UTC().Format(time.RFC3339))
+	r.followGuide(ctx)
+	if x, _ := r.Get(ctx, rec.ID); x.Title != "Weather Extra" || !x.Stop.Equal(weather.Stop.Add(15*time.Minute)) {
+		t.Errorf("one-off follows the guide: %+v", x)
+	}
+	for _, x := range must(r.List(ctx)) {
+		if x.RuleID != nil {
+			t.Errorf("series airing kept after the slot changed: %+v", x)
+		}
+	}
+
 	// Missed recordings fail rather than start late.
 	s.DB.Exec(`UPDATE dvr_recordings SET start = ?, stop = ? WHERE id = ?`,
 		now.Add(-2*time.Hour).UTC().Format(time.RFC3339), now.Add(-time.Hour).UTC().Format(time.RFC3339), rec.ID)
@@ -196,4 +212,11 @@ func TestDVRRecord(t *testing.T) {
 	if _, err := rec.Get(ctx, id); err != ErrRecordingNotFound {
 		t.Errorf("row kept: %v", err)
 	}
+}
+
+func must[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return v
 }

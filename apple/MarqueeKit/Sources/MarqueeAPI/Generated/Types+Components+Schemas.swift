@@ -448,6 +448,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/canRecord`.
             public var canRecord: Swift.Bool?
+            /// May watch Live TV (LIVE-4). Default true.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserRestrictions/liveTv`.
+            public var liveTv: Swift.Bool?
+            /// Channel groups this user may watch. Null or absent = all.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserRestrictions/liveTvGroups`.
+            public var liveTvGroups: [Swift.String]?
             /// The Seerr user requests are made as. Null = Seerr's API key owner.
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/seerrUserId`.
@@ -461,6 +469,8 @@ extension Components {
             ///   - remoteQualityKbps: Cap for remote streams. 0 = server default.
             ///   - canRequest: May request titles through Seerr (REQ-1). Default false; admins always may.
             ///   - canRecord: May schedule Live TV recordings (LIVE-5). Default false; admins always may.
+            ///   - liveTv: May watch Live TV (LIVE-4). Default true.
+            ///   - liveTvGroups: Channel groups this user may watch. Null or absent = all.
             ///   - seerrUserId: The Seerr user requests are made as. Null = Seerr's API key owner.
             public init(
                 libraryIds: [Swift.Int64]? = nil,
@@ -469,6 +479,8 @@ extension Components {
                 remoteQualityKbps: Swift.Int? = nil,
                 canRequest: Swift.Bool? = nil,
                 canRecord: Swift.Bool? = nil,
+                liveTv: Swift.Bool? = nil,
+                liveTvGroups: [Swift.String]? = nil,
                 seerrUserId: Swift.Int64? = nil
             ) {
                 self.libraryIds = libraryIds
@@ -477,6 +489,8 @@ extension Components {
                 self.remoteQualityKbps = remoteQualityKbps
                 self.canRequest = canRequest
                 self.canRecord = canRecord
+                self.liveTv = liveTv
+                self.liveTvGroups = liveTvGroups
                 self.seerrUserId = seerrUserId
             }
             public enum CodingKeys: String, CodingKey {
@@ -486,6 +500,8 @@ extension Components {
                 case remoteQualityKbps
                 case canRequest
                 case canRecord
+                case liveTv
+                case liveTvGroups
                 case seerrUserId
             }
         }
@@ -1952,6 +1968,10 @@ extension Components {
             public var logoUrl: Swift.String?
             /// - Remark: Generated from `#/components/schemas/LiveChannel/favorite`.
             public var favorite: Swift.Bool
+            /// The caller hid it (listed only with hidden=true).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveChannel/hidden`.
+            public var hidden: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/LiveChannel/now`.
             public var now: Components.Schemas.LiveProgramme?
             /// - Remark: Generated from `#/components/schemas/LiveChannel/next`.
@@ -1965,6 +1985,7 @@ extension Components {
             ///   - group:
             ///   - logoUrl: Server-relative; no token needed.
             ///   - favorite:
+            ///   - hidden: The caller hid it (listed only with hidden=true).
             ///   - now:
             ///   - next:
             public init(
@@ -1974,6 +1995,7 @@ extension Components {
                 group: Swift.String? = nil,
                 logoUrl: Swift.String? = nil,
                 favorite: Swift.Bool,
+                hidden: Swift.Bool? = nil,
                 now: Components.Schemas.LiveProgramme? = nil,
                 next: Components.Schemas.LiveProgramme? = nil
             ) {
@@ -1983,6 +2005,7 @@ extension Components {
                 self.group = group
                 self.logoUrl = logoUrl
                 self.favorite = favorite
+                self.hidden = hidden
                 self.now = now
                 self.next = next
             }
@@ -1993,6 +2016,7 @@ extension Components {
                 case group
                 case logoUrl
                 case favorite
+                case hidden
                 case now
                 case next
             }

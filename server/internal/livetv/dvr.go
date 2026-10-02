@@ -148,8 +148,12 @@ func (r *Recorder) Run(ctx context.Context) {
 	}
 }
 
-// Tick expands series rules, starts recordings that are due and marks missed ones.
+// Tick follows guide changes, expands series rules, starts recordings that are due and
+// marks missed ones.
 func (r *Recorder) Tick(ctx context.Context) {
+	if err := r.followGuide(ctx); err != nil {
+		slog.Warn("dvr: guide changes", "err", err)
+	}
 	if err := r.expandRules(ctx); err != nil {
 		slog.Warn("dvr: series rules", "err", err)
 	}
@@ -184,6 +188,23 @@ func (r *Recorder) Tick(ctx context.Context) {
 		}
 		r.start(ctx, d.id, end)
 	}
+}
+
+// followGuide keeps upcoming recordings in step with the guide: a programme that changed
+// name, details or end time is updated; a series airing whose slot now holds another title
+// is dropped (one-off recordings record whatever airs in their slot).
+func (r *Recorder) followGuide(ctx context.Context) error {
+	if _, err := r.Live.DB.ExecContext(ctx, `DELETE FROM dvr_recordings WHERE status = 'scheduled' AND rule_id IS NOT NULL
+		AND EXISTS (SELECT 1 FROM live_programmes p JOIN dvr_rules d ON d.id = dvr_recordings.rule_id
+			WHERE p.channel_id = dvr_recordings.channel_id AND p.start = dvr_recordings.start AND lower(p.title) <> lower(d.title))`); err != nil {
+		return err
+	}
+	_, err := r.Live.DB.ExecContext(ctx, `UPDATE dvr_recordings SET title = p.title, subtitle = p.subtitle, description = p.description,
+			category = p.category, episode = p.episode, image_url = p.image_url, stop = p.stop
+		FROM live_programmes p
+		WHERE dvr_recordings.status = 'scheduled' AND p.channel_id = dvr_recordings.channel_id AND p.start = dvr_recordings.start
+		  AND (p.title <> dvr_recordings.title OR p.stop <> dvr_recordings.stop OR p.subtitle <> dvr_recordings.subtitle OR p.episode <> dvr_recordings.episode)`)
+	return err
 }
 
 // expandRules schedules every guide airing that matches a series rule.
@@ -282,7 +303,10 @@ func (r *Recorder) Schedule(ctx context.Context, userID, channelID int64, start 
 	_, err = r.Live.DB.ExecContext(ctx, `INSERT INTO dvr_recordings (user_id, channel_id, channel_name, start, stop, title, subtitle, description, category, episode, image_url, created_at)
 		SELECT ?, p.channel_id, ?, p.start, p.stop, p.title, p.subtitle, p.description, p.category, p.episode, p.image_url, ?
 		FROM live_programmes p WHERE p.channel_id = ? AND p.start = ?
-		ON CONFLICT (channel_id, start) DO UPDATE SET status = 'scheduled', error = '' WHERE status IN ('cancelled', 'failed')`,
+		ON CONFLICT (channel_id, start) DO UPDATE SET status = 'scheduled', error = '', user_id = excluded.user_id, rule_id = NULL,
+			title = excluded.title, subtitle = excluded.subtitle, description = excluded.description, category = excluded.category,
+			episode = excluded.episode, image_url = excluded.image_url, stop = excluded.stop
+		WHERE status IN ('cancelled', 'failed')`,
 		userID, chName, now, channelID, start.UTC().Format(time.RFC3339))
 	if err != nil {
 		return nil, nil, err

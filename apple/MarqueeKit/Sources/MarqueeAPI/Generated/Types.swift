@@ -468,6 +468,16 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /livetv/guide`.
     /// - Remark: Generated from `#/paths//livetv/guide/get(liveGuide)`.
     func liveGuide(_ input: Operations.LiveGuide.Input) async throws -> Operations.LiveGuide.Output
+    /// Hide a channel from the caller's guide (LIVE-4).
+    ///
+    /// - Remark: HTTP `PUT /livetv/channels/{channelId}/hidden`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/hidden/put(hideLiveChannel)`.
+    func hideLiveChannel(_ input: Operations.HideLiveChannel.Input) async throws -> Operations.HideLiveChannel.Output
+    /// Show a hidden channel again.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/channels/{channelId}/hidden`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/hidden/delete(unhideLiveChannel)`.
+    func unhideLiveChannel(_ input: Operations.UnhideLiveChannel.Input) async throws -> Operations.UnhideLiveChannel.Output
     /// Add a channel to the caller's favourites.
     ///
     /// - Remark: HTTP `PUT /livetv/channels/{channelId}/favorite`.
@@ -1816,6 +1826,32 @@ extension APIProtocol {
     ) async throws -> Operations.LiveGuide.Output {
         try await liveGuide(Operations.LiveGuide.Input(
             query: query,
+            headers: headers
+        ))
+    }
+    /// Hide a channel from the caller's guide (LIVE-4).
+    ///
+    /// - Remark: HTTP `PUT /livetv/channels/{channelId}/hidden`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/hidden/put(hideLiveChannel)`.
+    public func hideLiveChannel(
+        path: Operations.HideLiveChannel.Input.Path,
+        headers: Operations.HideLiveChannel.Input.Headers = .init()
+    ) async throws -> Operations.HideLiveChannel.Output {
+        try await hideLiveChannel(Operations.HideLiveChannel.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Show a hidden channel again.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/channels/{channelId}/hidden`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/hidden/delete(unhideLiveChannel)`.
+    public func unhideLiveChannel(
+        path: Operations.UnhideLiveChannel.Input.Path,
+        headers: Operations.UnhideLiveChannel.Input.Headers = .init()
+    ) async throws -> Operations.UnhideLiveChannel.Output {
+        try await unhideLiveChannel(Operations.UnhideLiveChannel.Input(
+            path: path,
             headers: headers
         ))
     }

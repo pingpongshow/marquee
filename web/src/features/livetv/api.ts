@@ -21,11 +21,13 @@ export const liveGroupsQuery = queryOptions({
   staleTime: 5 * 60_000,
 });
 
-/** "all", "favorites" or a group name. */
+/** "all", "favorites", "recent", "hidden" or a group name. */
 export type LiveFilter = string;
 
 function filterParams(f: LiveFilter) {
   if (f === "favorites") return { favorites: true };
+  if (f === "recent") return { recent: true };
+  if (f === "hidden") return { hidden: true };
   if (f === "all") return {};
   return { group: f };
 }
@@ -48,7 +50,7 @@ export const liveGuideQuery = (f: LiveFilter, start: Date, end: Date) =>
         api.GET("/livetv/guide", {
           params: {
             query: {
-              ...filterParams(f),
+              ...(f === "hidden" ? {} : filterParams(f)),
               start: start.toISOString(),
               end: end.toISOString(),
             },
@@ -70,6 +72,26 @@ export function useFavorite() {
           )
         : unwrap(
             api.DELETE("/livetv/channels/{channelId}/favorite", {
+              params: { path: { channelId: id } },
+            }),
+          ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["livetv"] }),
+  });
+}
+
+/** Hide a channel from the guide, or show it again (LIVE-4). */
+export function useHideChannel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, hidden }: { id: number; hidden: boolean }) =>
+      hidden
+        ? unwrap(
+            api.PUT("/livetv/channels/{channelId}/hidden", {
+              params: { path: { channelId: id } },
+            }),
+          )
+        : unwrap(
+            api.DELETE("/livetv/channels/{channelId}/hidden", {
               params: { path: { channelId: id } },
             }),
           ),

@@ -4,6 +4,7 @@ import { clsx } from "clsx";
 import {
   ChevronLeft,
   ChevronRight,
+  Eye,
   Heart,
   Maximize2,
   Volume2,
@@ -22,6 +23,7 @@ import {
   minutesLeft,
   timeLabel,
   useFavorite,
+  useHideChannel,
   type Recording,
   recordingRulesQuery,
   recordingsQuery,
@@ -107,6 +109,8 @@ export function LiveTvPage() {
           >
             <option value="all">All channels</option>
             <option value="favorites">Favorites</option>
+            <option value="recent">Recently watched</option>
+            <option value="hidden">Hidden channels</option>
             {groups.data?.map((g) => (
               <option key={g.name} value={g.name}>
                 {g.name} ({g.channels})
@@ -169,7 +173,11 @@ export function LiveTvPage() {
         <p className="text-muted">
           {filter === "favorites"
             ? "No favourites yet. Tap the heart next to a channel."
-            : "No channels."}
+            : filter === "recent"
+              ? "Channels you watch will appear here."
+              : filter === "hidden"
+                ? "No hidden channels. Hide one from a programme's details in the guide."
+                : "No channels."}
         </p>
       ) : tab === "guide" ? (
         <Guide
@@ -275,6 +283,7 @@ function Guide({
   const guide = useQuery(liveGuideQuery(filter, start, end));
   const rows = new Map(guide.data?.map((r) => [r.channelId, r.programmes]));
   const fav = useFavorite();
+  const hide = useHideChannel();
   const [details, setDetails] = useState<{
     p: LiveProgramme;
     c: LiveChannel;
@@ -368,22 +377,32 @@ function Guide({
                   <ChannelLogo channel={c} className="h-9 w-14 shrink-0" />
                   <span className="text-xs text-faint">{c.number}</span>
                 </button>
-                <button
-                  onClick={() => fav.mutate({ id: c.id, on: !c.favorite })}
-                  aria-label={
-                    c.favorite
-                      ? `Remove ${c.name} from favourites`
-                      : `Add ${c.name} to favourites`
-                  }
-                  className="p-1"
-                >
-                  <Heart
-                    className={clsx(
-                      "size-4",
-                      c.favorite ? "fill-accent text-accent" : "text-faint",
-                    )}
-                  />
-                </button>
+                {c.hidden ? (
+                  <button
+                    onClick={() => hide.mutate({ id: c.id, hidden: false })}
+                    aria-label={`Show ${c.name} in the guide`}
+                    className="p-1"
+                  >
+                    <Eye className="size-4 text-faint" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => fav.mutate({ id: c.id, on: !c.favorite })}
+                    aria-label={
+                      c.favorite
+                        ? `Remove ${c.name} from favourites`
+                        : `Add ${c.name} to favourites`
+                    }
+                    className="p-1"
+                  >
+                    <Heart
+                      className={clsx(
+                        "size-4",
+                        c.favorite ? "fill-accent text-accent" : "text-faint",
+                      )}
+                    />
+                  </button>
+                )}
               </div>
               <div className="relative shrink-0" style={{ width }}>
                 {(rows.get(c.id) ?? []).map((p) => {
@@ -481,6 +500,19 @@ function Guide({
                 channel={details.c}
                 onDone={() => setDetails(null)}
               />
+            )}
+            {!details.c.hidden && (
+              <button
+                className="pt-2 text-sm text-muted hover:text-text"
+                onClick={() =>
+                  hide.mutate(
+                    { id: details.c.id, hidden: true },
+                    { onSuccess: () => setDetails(null) },
+                  )
+                }
+              >
+                Hide {details.c.name} from the guide
+              </button>
             )}
           </div>
         </div>

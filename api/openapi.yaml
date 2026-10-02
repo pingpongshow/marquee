@@ -1706,6 +1706,8 @@ paths:
       parameters:
         - { name: group, in: query, schema: { type: string }, description: Only this group (category). }
         - { name: favorites, in: query, schema: { type: boolean }, description: Only the caller's favourites. }
+        - { name: recent, in: query, schema: { type: boolean }, description: "The channels the caller watched last, newest first (LIVE-4)." }
+        - { name: hidden, in: query, schema: { type: boolean }, description: Only the channels the caller hid (otherwise they're left out). }
       responses:
         "200":
           description: Channels.
@@ -1746,6 +1748,7 @@ paths:
         - { name: end, in: query, required: true, schema: { type: string, format: date-time } }
         - { name: group, in: query, schema: { type: string } }
         - { name: favorites, in: query, schema: { type: boolean } }
+        - { name: recent, in: query, schema: { type: boolean } }
       responses:
         "200":
           description: Rows, one per channel.
@@ -1763,6 +1766,26 @@ paths:
                       items: { $ref: "#/components/schemas/LiveProgramme" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /livetv/channels/{channelId}/hidden:
+    parameters:
+      - { name: channelId, in: path, required: true, schema: { type: integer, format: int64 } }
+    put:
+      tags: [livetv]
+      operationId: hideLiveChannel
+      summary: Hide a channel from the caller's guide (LIVE-4).
+      responses:
+        "204": { description: Hidden. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [livetv]
+      operationId: unhideLiveChannel
+      summary: Show a hidden channel again.
+      responses:
+        "204": { description: Shown. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /livetv/channels/{channelId}/favorite:
     parameters:
@@ -2919,6 +2942,12 @@ components:
         remoteQualityKbps: { type: integer, minimum: 0, description: Cap for remote streams. 0 = server default. }
         canRequest: { type: boolean, description: "May request titles through Seerr (REQ-1). Default false; admins always may." }
         canRecord: { type: boolean, description: "May schedule Live TV recordings (LIVE-5). Default false; admins always may." }
+        liveTv: { type: boolean, description: "May watch Live TV (LIVE-4). Default true." }
+        liveTvGroups:
+          type: array
+          nullable: true
+          description: Channel groups this user may watch. Null or absent = all.
+          items: { type: string }
         seerrUserId: { type: integer, format: int64, nullable: true, description: The Seerr user requests are made as. Null = Seerr's API key owner. }
 
     UserPreferences:
@@ -3262,6 +3291,7 @@ components:
         group: { type: string }
         logoUrl: { type: string, description: Server-relative; no token needed. }
         favorite: { type: boolean }
+        hidden: { type: boolean, description: The caller hid it (listed only with hidden=true). }
         now: { $ref: "#/components/schemas/LiveProgramme" }
         next: { $ref: "#/components/schemas/LiveProgramme" }
 

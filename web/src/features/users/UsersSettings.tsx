@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { api, unwrap } from "@/api/client";
-import { liveStatusQuery } from "../livetv/api";
+import { liveGroupsQuery, liveStatusQuery } from "../livetv/api";
 import { requestsStatusQuery } from "../requests/api";
 import {
   librariesQuery,
@@ -50,6 +50,9 @@ function describe(r: UserRestrictions, libraryNames: Map<number, string>) {
   if (r.allowRemote === false) parts.push("Home network only");
   if (r.remoteQualityKbps)
     parts.push(`Remote ≤ ${(r.remoteQualityKbps / 1000).toFixed(0)} Mbps`);
+  if (r.liveTv === false) parts.push("No Live TV");
+  else if (r.liveTvGroups)
+    parts.push(`Live TV: ${r.liveTvGroups.join(", ") || "none"}`);
   return parts.join(" · ");
 }
 
@@ -99,6 +102,64 @@ function RequestPermission({
                 </option>
               ))}
             </Select>
+          )}
+        </Field>
+      )}
+    </div>
+  );
+}
+
+/** May this person watch Live TV, and which channel groups (LIVE-4). */
+function LiveTvPermission({
+  value,
+  onChange,
+}: {
+  value: UserRestrictions;
+  onChange: (r: UserRestrictions) => void;
+}) {
+  const status = useQuery(liveStatusQuery);
+  const groups = useQuery({
+    ...liveGroupsQuery,
+    enabled: !!status.data?.enabled,
+  });
+  if (!status.data?.enabled) return null;
+  const allowed = value.liveTv !== false;
+  const chosen = value.liveTvGroups ?? null;
+  const toggle = (g: string, on: boolean) => {
+    const all = groups.data?.map((x) => x.name) ?? [];
+    const next = new Set(chosen ?? all);
+    if (on) next.add(g);
+    else next.delete(g);
+    onChange({
+      ...value,
+      liveTvGroups: next.size === all.length ? null : [...next],
+    });
+  };
+  return (
+    <div className="space-y-3">
+      <Toggle
+        label="Can watch Live TV"
+        checked={allowed}
+        onChange={(v) => onChange({ ...value, liveTv: v })}
+      />
+      {allowed && !!groups.data?.length && (
+        <Field
+          label="Channel groups"
+          help="Only channels in the ticked groups appear for this person."
+        >
+          {() => (
+            <div className="flex flex-wrap gap-x-5 gap-y-2">
+              {groups.data.map((g) => (
+                <label key={g.name} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={chosen === null || chosen.includes(g.name)}
+                    onChange={(e) => toggle(g.name, e.target.checked)}
+                  />
+                  {g.name}
+                </label>
+              ))}
+            </div>
           )}
         </Field>
       )}
@@ -202,6 +263,7 @@ function RestrictionsEditor({
         )}
       </Field>
       <RequestPermission value={value} onChange={onChange} />
+      <LiveTvPermission value={value} onChange={onChange} />
       <RecordPermission value={value} onChange={onChange} />
       <Toggle
         label="Allow streaming away from home"

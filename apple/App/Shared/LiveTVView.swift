@@ -68,13 +68,16 @@ struct LiveTVView: View {
                 if tab == .recordings {
                     RecordingsList().padding(.horizontal, sidePadding)
                 } else if channels.isEmpty, enabled == true {
-                    Text(filter == "favorites" ? "No favourites yet. Add some with the heart next to a channel." : "No channels.")
+                    Text(filter == "favorites" ? "No favourites yet. Add some with the heart next to a channel."
+                        : filter == "recent" ? "Channels you watch will appear here."
+                        : filter == "hidden" ? "No hidden channels. Touch and hold a channel to hide it." : "No channels.")
                         .foregroundStyle(.secondary).padding(.horizontal, sidePadding)
                 } else if tab == .guide {
                     GuideGrid(channels: channels, guide: guide, start: start, selected: preview?.id,
                               onChannel: { c in pick(c) },
                               onProgramme: { p, c in programmeTapped(p, c) },
                               onFavorite: { c in toggleFavorite(c) },
+                              onHide: { c in toggleHidden(c) },
                               onRecord: canRecord ? { p, c, series in record(p, c, series: series) } : nil)
                 } else {
                     whatsOn
@@ -130,11 +133,14 @@ struct LiveTVView: View {
             Menu {
                 Button("All Channels") { filter = "all" }
                 Button("Favorites") { filter = "favorites" }
+                Button("Recently Watched") { filter = "recent" }
+                Button("Hidden Channels") { filter = "hidden" }
                 if !groups.isEmpty {
                     Section("Groups") { ForEach(groups, id: \.self) { g in Button(g) { filter = g } } }
                 }
             } label: {
-                Label(filter == "all" ? "All Channels" : filter == "favorites" ? "Favorites" : filter, systemImage: "line.3.horizontal.decrease.circle")
+                Label(["all": "All Channels", "favorites": "Favorites", "recent": "Recently Watched", "hidden": "Hidden Channels"][filter] ?? filter,
+                      systemImage: "line.3.horizontal.decrease.circle")
             }
             Spacer()
             if tab == .guide {
@@ -178,13 +184,21 @@ struct LiveTVView: View {
     }
 
     private func load() async {
-        let group = filter == "all" || filter == "favorites" ? nil : filter
+        let group = ["all", "favorites", "recent", "hidden"].contains(filter) ? nil : filter
         do {
-            channels = try await app.liveChannels(group: group, favorites: filter == "favorites")
-            guide = try await app.liveGuide(from: start, to: start.addingTimeInterval(GuideGrid.hours * 3600), group: group, favorites: filter == "favorites")
+            channels = try await app.liveChannels(group: group, favorites: filter == "favorites", recent: filter == "recent", hidden: filter == "hidden")
+            guide = filter == "hidden" ? [:] : try await app.liveGuide(from: start, to: start.addingTimeInterval(GuideGrid.hours * 3600), group: group,
+                                                                       favorites: filter == "favorites", recent: filter == "recent")
             error = nil
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+
+    private func toggleHidden(_ c: LiveChannel) {
+        Task {
+            try? await app.setHidden(c.id, c.hidden != true)
+            await load()
         }
     }
 
@@ -218,6 +232,7 @@ struct GuideGrid: View {
     let onChannel: (LiveChannel) -> Void
     let onProgramme: (LiveProgramme, LiveChannel) -> Void
     let onFavorite: (LiveChannel) -> Void
+    var onHide: ((LiveChannel) -> Void)?
     /// Record (series = every airing); nil when the viewer can't record.
     var onRecord: ((LiveProgramme, LiveChannel, Bool) -> Void)?
 
@@ -288,6 +303,11 @@ struct GuideGrid: View {
         }
         .padding(.horizontal, 4)
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(selected == c.id ? Color.marqueeGold : .clear))
+        .contextMenu {
+            if let onHide {
+                Button(c.hidden == true ? "Show in Guide" : "Hide Channel", systemImage: c.hidden == true ? "eye" : "eye.slash") { onHide(c) }
+            }
+        }
     }
 
     private func programmes(_ c: LiveChannel) -> some View {

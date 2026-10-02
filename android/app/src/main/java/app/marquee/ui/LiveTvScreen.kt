@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -132,11 +133,14 @@ fun LiveTvScreen(nav: NavHostController) {
     var reload by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(filter, start, reload) {
-        val group = filter.takeUnless { it == "all" || it == "favorites" }
+        val group = filter.takeUnless { it in setOf("all", "favorites", "recent", "hidden") }
         val fav = if (filter == "favorites") true else null
+        val recent = if (filter == "recent") true else null
+        val hidden = if (filter == "hidden") true else null
         withContext(Dispatchers.IO) {
-            channels = runCatching { marquee.livetv.listLiveChannels(group, fav) }.getOrDefault(emptyList())
-            guide = runCatching { marquee.livetv.liveGuide(start, start.plusHours(4), group, fav).associate { it.channelId to it.programmes } }.getOrDefault(emptyMap())
+            channels = runCatching { marquee.livetv.listLiveChannels(group, fav, recent, hidden) }.getOrDefault(emptyList())
+            guide = if (hidden == true) emptyMap()
+            else runCatching { marquee.livetv.liveGuide(start, start.plusHours(4), group, fav, recent).associate { it.channelId to it.programmes } }.getOrDefault(emptyMap())
         }
     }
     fun watch(id: Long) = nav.navigate("live/$id")
@@ -169,7 +173,7 @@ fun LiveTvScreen(nav: NavHostController) {
         }
         item {
             LazyRow(contentPadding = PaddingValues(horizontal = sidePadding), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val options = listOf("all" to "All Channels", "favorites" to "Favorites") + groups.map { it to it }
+                val options = listOf("all" to "All Channels", "favorites" to "Favorites", "recent" to "Recently watched", "hidden" to "Hidden") + groups.map { it to it }
                 items(options) { (v, label) -> FilterChip(filter == v, { filter = v }, { Text(label) }, Modifier.focusRing(RoundedCornerShape(8.dp))) }
             }
         }
@@ -178,7 +182,12 @@ fun LiveTvScreen(nav: NavHostController) {
         } }
         if (list == null) item { Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
         else if (list.isEmpty()) item {
-            Text(if (filter == "favorites") "No favourites yet. Add some with the heart next to a channel." else "No channels.",
+            Text(when (filter) {
+                "favorites" -> "No favourites yet. Add some with the heart next to a channel."
+                "recent" -> "Channels you watch will appear here."
+                "hidden" -> "No hidden channels. Hide one from a programme's details in the guide."
+                else -> "No channels."
+            },
                 Modifier.padding(horizontal = sidePadding), color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else if (tab == 0) {
             item {
@@ -200,7 +209,15 @@ fun LiveTvScreen(nav: NavHostController) {
                     },
                     onFavorite = { c ->
                         scope.launch {
-                            withContext(Dispatchers.IO) { runCatching { if (c.favorite) marquee.livetv.unfavoriteLiveChannel(c.id) else marquee.livetv.favoriteLiveChannel(c.id) } }
+                            withContext(Dispatchers.IO) {
+                                runCatching {
+                                    when {
+                                        c.hidden == true -> marquee.livetv.unhideLiveChannel(c.id) // the hidden view's button shows it again
+                                        c.favorite -> marquee.livetv.unfavoriteLiveChannel(c.id)
+                                        else -> marquee.livetv.favoriteLiveChannel(c.id)
+                                    }
+                                }
+                            }
                             reload++
                         }
                     })
@@ -219,6 +236,13 @@ fun LiveTvScreen(nav: NavHostController) {
                     listOfNotNull(p.episode, p.subtitle).takeIf { it.isNotEmpty() }?.let { Text(it.joinToString(" · ")) }
                     p.description?.let { Text(it) }
                     if (s.canRecord == true && p.end.isAfter(OffsetDateTime.now())) RecordActions(p, c) { details = null; reload++ }
+                    TextButton({
+                        scope.launch {
+                            withContext(Dispatchers.IO) { runCatching { marquee.livetv.hideLiveChannel(c.id) } }
+                            details = null
+                            reload++
+                        }
+                    }, Modifier.focusRing()) { Text("Hide ${c.name} from the guide", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
             },
             confirmButton = { TextButton({ details = null }, Modifier.focusRing()) { Text("Done") } },
@@ -258,7 +282,8 @@ private fun Guide(
                         c.number?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
                     IconButton({ onFavorite(c) }, Modifier.focusRing()) {
-                        Icon(if (c.favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                        if (c.hidden == true) Icon(Icons.Filled.Visibility, "Show ${c.name} in the guide", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        else Icon(if (c.favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                             if (c.favorite) "Remove ${c.name} from favourites" else "Add ${c.name} to favourites",
                             tint = if (c.favorite) Gold else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
