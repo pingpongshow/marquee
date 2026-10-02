@@ -411,10 +411,12 @@ func (s *Service) MeanOf(ids []int64) []float32 {
 	return Mean(ts)
 }
 
-// Mix is one of a listener's daily mixes.
+// Mix is one of a listener's mixes.
 type Mix struct {
 	Station
-	SeedIDs []int64 // tracks from the listener's taste that shaped it
+	SeedIDs     []int64 // tracks from the listener's taste that shaped it
+	ID          string  // stable for the day: daily-1, discovery, rediscover, new, decade
+	Description string  // what it is, when not just its artists
 }
 
 type mixCacheKey struct {
@@ -428,8 +430,8 @@ var (
 )
 
 // DailyMixes clusters the listener's taste into up to four groups and builds a 25-track
-// mix around each, mixing favourites with similar tracks they haven't played lately. Mixes
-// stay the same for the day.
+// mix around each, mixing favourites with similar tracks they haven't played lately, then
+// adds the history-based mixes (MUSIC-17). Mixes stay the same for the day.
 func (s *Service) DailyMixes(ctx context.Context, userID int64, keep Filter) []Mix {
 	key := mixCacheKey{userID, time.Now().Format("2006-01-02")}
 	mixMu.Lock()
@@ -460,10 +462,125 @@ func (s *Service) DailyMixes(ctx context.Context, userID int64, keep Filter) []M
 		for _, t := range ts {
 			used[t.ItemID] = true
 		}
-		mixes = append(mixes, Mix{Station: Station{Title: fmt.Sprintf("Daily Mix %d", i+1), IDs: TrackIDs(ts)}})
+		mixes = append(mixes, Mix{Station: Station{Title: fmt.Sprintf("Daily Mix %d", i+1), IDs: TrackIDs(ts)}, ID: fmt.Sprintf("daily-%d", i+1)})
 	}
+	mixes = append(mixes, s.historyMixes(ctx, userID, keep, keepLiked, avoid, r)...)
 	mixMu.Lock()
 	mixCache[key] = mixes
 	mixMu.Unlock()
 	return mixes
+}
+
+// historyMixes are Plexamp-style mixes from what someone has (and hasn't) played:
+// Discovery (never-played tracks close to their taste, favouring artists they rarely play),
+// Rediscover (favourites not played for six months), New Music (recent additions that fit
+// their taste) and their favourite decade.
+func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, liked []*Track, avoid map[int64]float64, r *rand.Rand) []Mix {
+	taste := Mean(liked)
+	if taste == nil {
+		return nil
+	}
+	played := map[int64]bool{}
+	artistPlays := map[int64]int{}
+	rows, err := s.DB.QueryContext(ctx, `SELECT s.item_id, s.play_count, COALESCE(i.grandparent_id, 0) FROM user_item_state s JOIN items i ON i.id = s.item_id
+		WHERE s.user_id = ? AND i.type = 'track' AND s.play_count > 0`, userID)
+	if err == nil {
+		for rows.Next() {
+			var id, artist int64
+			var n int
+			if rows.Scan(&id, &n, &artist) == nil {
+				played[id] = true
+				artistPlays[artist] += n
+			}
+		}
+		rows.Close()
+	}
+	allowed := func(t *Track) bool { return keep == nil || keep(t) }
+	var out []Mix
+
+	// Discovery: unplayed, near their taste; artists they've played a lot count against.
+	disc := Options{Keep: func(t *Track) bool { return allowed(t) && !played[t.ItemID] }, Avoid: map[int64]float64{}, Rand: r}
+	for _, t := range s.Index.Where(disc.Keep) {
+		if n := artistPlays[t.ArtistID]; n > 0 {
+			disc.Avoid[t.ItemID] = min(0.8, float64(n)/40)
+		}
+	}
+	if ts := s.Index.Pick(taste, 25, disc); len(ts) >= 10 {
+		out = append(out, Mix{Station: Station{Title: "Discovery Mix", IDs: TrackIDs(ts)}, ID: "discovery",
+			Description: "Tracks in your library you haven't played yet, close to what you love"})
+	}
+
+	// Rediscover: favourites (4+ stars, or played 3+ times) not played for six months.
+	var old []*Track
+	rows, err = s.DB.QueryContext(ctx, `SELECT item_id FROM user_item_state WHERE user_id = ? AND (rating >= 8 OR play_count >= 3)
+		AND (last_viewed_at IS NULL OR last_viewed_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-180 days'))`, userID)
+	if err == nil {
+		for rows.Next() {
+			var id int64
+			if rows.Scan(&id) == nil {
+				if t := s.Index.Get(id); t != nil && allowed(t) {
+					old = append(old, t)
+				}
+			}
+		}
+		rows.Close()
+	}
+	if len(old) >= 10 {
+		r.Shuffle(len(old), func(i, j int) { old[i], old[j] = old[j], old[i] })
+		old = old[:min(25, len(old))]
+		out = append(out, Mix{Station: Station{Title: "Rediscover", IDs: TrackIDs(order(old, Mean(old)))}, ID: "rediscover",
+			Description: "Favourites you haven't played in a while"})
+	}
+
+	// New Music: added in the last 60 days, near their taste.
+	fresh := map[int64]bool{}
+	rows, err = s.DB.QueryContext(ctx, `SELECT id FROM items WHERE type = 'track' AND added_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-60 days')`)
+	if err == nil {
+		for rows.Next() {
+			var id int64
+			if rows.Scan(&id) == nil {
+				fresh[id] = true
+			}
+		}
+		rows.Close()
+	}
+	if len(fresh) >= 10 {
+		o := Options{Keep: func(t *Track) bool { return allowed(t) && fresh[t.ItemID] }, Avoid: avoid, Rand: r}
+		if ts := s.Index.Pick(taste, 25, o); len(ts) >= 10 {
+			out = append(out, Mix{Station: Station{Title: "New Music Mix", IDs: TrackIDs(ts)}, ID: "new",
+				Description: "Recently added music that fits your taste"})
+		}
+	}
+
+	// Their favourite decade.
+	decades := map[int]int{}
+	for _, t := range liked {
+		if t.Year > 1900 {
+			decades[t.Year/10*10]++
+		}
+	}
+	best, n := 0, 0
+	for d, c := range decades {
+		if c > n || (c == n && d > best) {
+			best, n = d, c
+		}
+	}
+	if n >= 10 {
+		o := Options{Keep: func(t *Track) bool { return allowed(t) && t.Year/10*10 == best }, Avoid: avoid, Rand: r}
+		var inDecade []*Track
+		for _, t := range liked {
+			if t.Year/10*10 == best {
+				inDecade = append(inDecade, t)
+			}
+		}
+		if ts := s.Index.Pick(Mean(inDecade), 25, o); len(ts) >= 10 {
+			label := fmt.Sprintf("%ds", best%100)
+			if best < 1950 || best >= 2000 {
+				label = fmt.Sprintf("%ds", best)
+			}
+			out = append(out, Mix{Station: Station{Title: label + " Mix", IDs: TrackIDs(ts)}, ID: "decade",
+				Description: "Your favourite decade, with more like it"})
+		}
+	}
+	return out
 }

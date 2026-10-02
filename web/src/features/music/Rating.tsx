@@ -5,12 +5,26 @@ import { useState } from "react";
 import { api, unwrap } from "@/api/client";
 
 /** Five stars with halves (0–10 on the server, MUSIC-11). Clicking the current value clears it. */
-export function Rating({ itemId, value, size = "md" }: { itemId: number; value?: number; size?: "sm" | "md" }) {
+export function Rating({
+  itemId,
+  value,
+  size = "md",
+}: {
+  itemId: number;
+  value?: number;
+  size?: "sm" | "md";
+}) {
   const qc = useQueryClient();
   const [hover, setHover] = useState<number | null>(null);
   const [local, setLocal] = useState<number | undefined>(value);
   const rate = useMutation({
-    mutationFn: (rating: number | null) => unwrap(api.PUT("/items/{itemId}/rating", { params: { path: { itemId } }, body: { rating } })),
+    mutationFn: (rating: number | null) =>
+      unwrap(
+        api.PUT("/items/{itemId}/rating", {
+          params: { path: { itemId } },
+          body: { rating },
+        }),
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["items"] }),
   });
   const shown = hover ?? local ?? 0;
@@ -25,7 +39,10 @@ export function Rating({ itemId, value, size = "md" }: { itemId: number; value?:
         // Arrow keys move in half stars.
         if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
         e.preventDefault();
-        const next = Math.min(10, Math.max(0, (local ?? 0) + (e.key === "ArrowRight" ? 1 : -1)));
+        const next = Math.min(
+          10,
+          Math.max(0, (local ?? 0) + (e.key === "ArrowRight" ? 1 : -1)),
+        );
         setLocal(next || undefined);
         rate.mutate(next || null);
       }}
@@ -50,7 +67,12 @@ export function Rating({ itemId, value, size = "md" }: { itemId: number; value?:
               e.stopPropagation();
               // Where the click landed (works for taps too, which have no hover).
               const r = e.currentTarget.getBoundingClientRect();
-              const v = e.clientX > 0 ? (e.clientX - r.left < r.width / 2 ? n * 2 - 1 : n * 2) : (hover ?? n * 2);
+              const v =
+                e.clientX > 0
+                  ? e.clientX - r.left < r.width / 2
+                    ? n * 2 - 1
+                    : n * 2
+                  : (hover ?? n * 2);
               const next = v === local ? null : v;
               setLocal(next ?? undefined);
               rate.mutate(next);
@@ -58,8 +80,14 @@ export function Rating({ itemId, value, size = "md" }: { itemId: number; value?:
           >
             <Star className={clsx(px, "text-faint")} aria-hidden />
             {(full || half) && (
-              <span className="absolute inset-0.5 overflow-hidden" style={{ width: half ? "50%" : undefined }}>
-                <Star className={clsx(px, "fill-accent text-accent")} aria-hidden />
+              <span
+                className="absolute inset-0.5 overflow-hidden"
+                style={{ width: half ? "50%" : undefined }}
+              >
+                <Star
+                  className={clsx(px, "fill-accent text-accent")}
+                  aria-hidden
+                />
               </span>
             )}
           </button>
