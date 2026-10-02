@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.StarHalf
 import androidx.compose.material.icons.filled.Waves
@@ -314,6 +315,24 @@ fun DJButton() {
                     { Column { Text(d.label, fontWeight = if (d == dj) FontWeight.Bold else FontWeight.Normal); Text(d.blurb, style = MaterialTheme.typography.bodySmall) } },
                     { music.setDJ(d); open = false },
                 )
+            }
+        }
+    }
+}
+
+/** Volume levelling: Off, Track, Album or Smart (album gain while an album plays in order). */
+@Composable
+fun LevellingButton() {
+    val music = LocalMusic.current
+    val mode by music.levelling.collectAsState()
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton({ open = true }, Modifier.focusRing()) {
+            Icon(Icons.Filled.Tune, "Volume levelling: ${mode.label}", tint = if (mode == Levelling.Off) MaterialTheme.colorScheme.onSurfaceVariant else Gold)
+        }
+        DropdownMenu(open, { open = false }) {
+            Levelling.entries.forEach { l ->
+                DropdownMenuItem({ Text(l.label, fontWeight = if (l == mode) FontWeight.Bold else FontWeight.Normal) }, { music.setLevelling(l); open = false })
             }
         }
     }
