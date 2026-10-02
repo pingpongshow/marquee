@@ -79,6 +79,9 @@ type Job struct {
 	Encoder      string // nvenc, qsv, software
 	QSVDevice    string
 	Preset       string // speed, balanced, quality
+	// OutputFile, when set, writes one fast-start MP4 there (offline downloads) instead of
+	// streaming fragments to stdout; progress is reported on stdout.
+	OutputFile string
 }
 
 func presetFor(encoder, p string) string {
@@ -213,7 +216,11 @@ func (j Job) Args() []string {
 				// leaving some 6 s segments without a keyframe to start on.
 				a = append(a, "-c:v", codec, "-preset", preset, "-look_ahead", "0", "-forced_idr", "1")
 			default:
-				a = append(a, "-c:v", "libx264", "-preset", preset, "-sc_threshold", "0", "-profile:v", "high")
+				if d.VideoCodec == "hevc" {
+					a = append(a, "-c:v", "libx265", "-preset", preset, "-x265-params", "log-level=error:scenecut=0")
+				} else {
+					a = append(a, "-c:v", "libx264", "-preset", preset, "-sc_threshold", "0", "-profile:v", "high")
+				}
 			}
 			if d.VideoCodec == "hevc" {
 				a = append(a, "-tag:v", "hvc1") // Apple players need hvc1
@@ -221,7 +228,9 @@ func (j Job) Args() []string {
 			a = append(a, rate...)
 			// A keyframe on the first frame and every SegmentSeconds after it. Transcodes start
 			// exactly on a segment boundary, so these stay aligned with the plan after seeks.
-			a = append(a, "-force_key_frames", fmt.Sprintf("expr:if(isnan(prev_forced_t),1,gte(t,prev_forced_t+%d-0.001))", SegmentSeconds))
+			if j.OutputFile == "" {
+				a = append(a, "-force_key_frames", fmt.Sprintf("expr:if(isnan(prev_forced_t),1,gte(t,prev_forced_t+%d-0.001))", SegmentSeconds))
+			}
 		}
 	}
 
@@ -235,6 +244,10 @@ func (j Job) Args() []string {
 		}
 	}
 
+	if j.OutputFile != "" {
+		return append(a, "-sn", "-dn", "-map_metadata", "-1", "-max_muxing_queue_size", "4096",
+			"-progress", "pipe:1", "-nostats", "-f", "mp4", "-movflags", "+faststart", j.OutputFile)
+	}
 	// frag_discont keeps absolute timestamps in each fragment (tfdt), so segments made after
 	// a seek restart line up with the rest; without it they would restart at zero.
 	a = append(a, "-sn", "-dn", "-map_metadata", "-1", "-map_chapters", "-1",

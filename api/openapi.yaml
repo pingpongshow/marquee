@@ -1271,6 +1271,95 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /downloads:
+    get:
+      tags: [downloads]
+      operationId: listDownloads
+      summary: Your conversions for offline viewing, newest first.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Download" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [downloads]
+      operationId: createDownload
+      summary: Prepare an item to download for offline playback. "original" is ready at once; other qualities are converted on the server (one at a time) and become ready later.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [itemId, quality]
+              properties:
+                itemId: { type: integer, format: int64 }
+                fileId: { type: integer, format: int64, description: A specific version; default is the best. }
+                quality: { type: string, enum: [original, high, medium, low], description: "high 1080p, medium 720p, low 480p (HEVC MP4)." }
+      responses:
+        "200":
+          description: Ready or queued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Download" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /downloads/{downloadId}:
+    parameters:
+      - name: downloadId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [downloads]
+      operationId: getDownload
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Download" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [downloads]
+      operationId: deleteDownload
+      summary: Remove a conversion from the server (apps do this once they have the file).
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/progress:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    put:
+      tags: [playback]
+      operationId: syncProgress
+      summary: Record progress made while offline (a downloaded item played without a session).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [positionMs]
+              properties:
+                positionMs: { type: integer, format: int64 }
+                watched: { type: boolean, description: Played to the end (counts a play). }
+                playedAt: { type: string, format: date-time }
+      responses:
+        "204": { description: Recorded. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /webhooks/test:
     post:
       tags: [system]
@@ -2973,6 +3062,21 @@ components:
         items:
           type: array
           items: { $ref: "#/components/schemas/ItemSummary" }
+
+    Download:
+      type: object
+      required: [id, itemId, quality, status, progress]
+      properties:
+        id: { type: string, description: '"original-<item>" for originals.' }
+        itemId: { type: integer, format: int64 }
+        quality: { type: string, enum: [original, high, medium, low] }
+        status: { type: string, enum: [queued, converting, ready, failed] }
+        progress: { type: number, description: Conversion progress, 0–1. }
+        size: { type: integer, format: int64, description: Bytes, once ready. }
+        url: { type: string, description: "Where to fetch the file once ready (supports HTTP ranges; send the token as for streams)." }
+        fileName: { type: string }
+        error: { type: string }
+        createdAt: { type: string, format: date-time }
 
     SubtitleResult:
       type: object

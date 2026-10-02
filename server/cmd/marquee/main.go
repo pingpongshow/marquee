@@ -23,6 +23,7 @@ import (
 	"marquee/internal/config"
 	"marquee/internal/db"
 	"marquee/internal/discovery"
+	"marquee/internal/downloads"
 	"marquee/internal/images"
 	"marquee/internal/introdetect"
 	"marquee/internal/items"
@@ -273,6 +274,17 @@ func run() error {
 		return subtitles.Config{APIKey: m.OpenSubtitlesAPIKey, Username: m.OpenSubtitlesUser, Password: m.OpenSubtitlesPass,
 			UserAgent: "Marquee v" + config.Version, Base: os.Getenv("MARQUEE_OPENSUBTITLES_URL")}
 	}}
+	// Offline downloads (M7): conversions for phones and tablets.
+	dl := &downloads.Service{DB: database, Playback: player, Dir: filepath.Join(cfg.TranscodeDir, "downloads"),
+		Request: func(ctx context.Context, userID, itemID, fileID int64) (playback.Request, error) {
+			u, err := authSvc.GetUser(ctx, userID)
+			if err != nil {
+				return playback.Request{}, err
+			}
+			return playback.Request{UserID: userID, UserName: u.DisplayName, ItemID: itemID, FileID: fileID,
+				UserAudioLang: u.Preferences.AudioLanguage, UserSubLang: u.Preferences.SubtitleLanguage, UserSubMode: u.Preferences.SubtitleMode}, nil
+		}}
+	go dl.Run(ctx)
 	lyricsSvc := &lyrics.Service{DB: database, Online: func() bool { return store.Get().Music.OnlineLyrics }}
 	go scheduler.Run(ctx)
 
@@ -286,21 +298,23 @@ func run() error {
 	store.Subscribe(advertise)
 	defer bonjour.Stop()
 
+	apiHandlers := &api.Handlers{
+		DB: database, Auth: authSvc, Settings: store, Libraries: libraries,
+		Items: items.NewStore(database), Scans: scans, Version: config.Version,
+		Tasks: scheduler, Trickplay: trick, Webhooks: hooks, Subtitles: subs, Downloads: dl, Backups: backups, Restart: stop, Sonic: sonicSvc, Lyrics: lyricsSvc,
+		Avatars:  &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
+		Images:   images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
+		Logs:     logs,
+		Metadata: meta,
+		Playback: player,
+		Plex: &plex.Importer{DB: database, Auth: authSvc, Libraries: libraries, Matcher: meta,
+			PlexRoot: cfg.PlexDir, WorkDir: filepath.Join(cfg.ConfigDir, "plex-import"),
+			ArtDir: filepath.Join(cfg.ConfigDir, "cache", "plex-artwork")},
+		LibrariesChanged: func() { watch.Sync(ctx, store.Get().Library.WatchFilesystem) },
+	}
 	handler := server.New(server.Deps{
-		Handlers: &api.Handlers{
-			DB: database, Auth: authSvc, Settings: store, Libraries: libraries,
-			Items: items.NewStore(database), Scans: scans, Version: config.Version,
-			Tasks: scheduler, Trickplay: trick, Webhooks: hooks, Subtitles: subs, Backups: backups, Restart: stop, Sonic: sonicSvc, Lyrics: lyricsSvc,
-			Avatars:  &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
-			Images:   images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
-			Logs:     logs,
-			Metadata: meta,
-			Playback: player,
-			Plex: &plex.Importer{DB: database, Auth: authSvc, Libraries: libraries, Matcher: meta,
-				PlexRoot: cfg.PlexDir, WorkDir: filepath.Join(cfg.ConfigDir, "plex-import"),
-				ArtDir: filepath.Join(cfg.ConfigDir, "cache", "plex-artwork")},
-			LibrariesChanged: func() { watch.Sync(ctx, store.Get().Library.WatchFilesystem) },
-		},
+		Handlers:   apiHandlers,
+		Downloads:  apiHandlers.DownloadFiles(),
 		Stream:     player.StreamHandler(filepath.Join(cfg.ConfigDir, "cache", "subtitles")),
 		Auth:       authSvc,
 		Classifier: classifier,

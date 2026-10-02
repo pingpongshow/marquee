@@ -345,6 +345,29 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /activity/history`.
     /// - Remark: Generated from `#/paths//activity/history/get(playHistory)`.
     func playHistory(_ input: Operations.PlayHistory.Input) async throws -> Operations.PlayHistory.Output
+    /// Your conversions for offline viewing, newest first.
+    ///
+    /// - Remark: HTTP `GET /downloads`.
+    /// - Remark: Generated from `#/paths//downloads/get(listDownloads)`.
+    func listDownloads(_ input: Operations.ListDownloads.Input) async throws -> Operations.ListDownloads.Output
+    /// Prepare an item to download for offline playback. "original" is ready at once; other qualities are converted on the server (one at a time) and become ready later.
+    ///
+    /// - Remark: HTTP `POST /downloads`.
+    /// - Remark: Generated from `#/paths//downloads/post(createDownload)`.
+    func createDownload(_ input: Operations.CreateDownload.Input) async throws -> Operations.CreateDownload.Output
+    /// - Remark: HTTP `GET /downloads/{downloadId}`.
+    /// - Remark: Generated from `#/paths//downloads/{downloadId}/get(getDownload)`.
+    func getDownload(_ input: Operations.GetDownload.Input) async throws -> Operations.GetDownload.Output
+    /// Remove a conversion from the server (apps do this once they have the file).
+    ///
+    /// - Remark: HTTP `DELETE /downloads/{downloadId}`.
+    /// - Remark: Generated from `#/paths//downloads/{downloadId}/delete(deleteDownload)`.
+    func deleteDownload(_ input: Operations.DeleteDownload.Input) async throws -> Operations.DeleteDownload.Output
+    /// Record progress made while offline (a downloaded item played without a session).
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/progress`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/progress/put(syncProgress)`.
+    func syncProgress(_ input: Operations.SyncProgress.Input) async throws -> Operations.SyncProgress.Output
     /// Send a test event to a webhook URL now (admin only).
     ///
     /// - Remark: HTTP `POST /webhooks/test`.
@@ -1324,6 +1347,65 @@ extension APIProtocol {
         try await playHistory(Operations.PlayHistory.Input(
             query: query,
             headers: headers
+        ))
+    }
+    /// Your conversions for offline viewing, newest first.
+    ///
+    /// - Remark: HTTP `GET /downloads`.
+    /// - Remark: Generated from `#/paths//downloads/get(listDownloads)`.
+    public func listDownloads(headers: Operations.ListDownloads.Input.Headers = .init()) async throws -> Operations.ListDownloads.Output {
+        try await listDownloads(Operations.ListDownloads.Input(headers: headers))
+    }
+    /// Prepare an item to download for offline playback. "original" is ready at once; other qualities are converted on the server (one at a time) and become ready later.
+    ///
+    /// - Remark: HTTP `POST /downloads`.
+    /// - Remark: Generated from `#/paths//downloads/post(createDownload)`.
+    public func createDownload(
+        headers: Operations.CreateDownload.Input.Headers = .init(),
+        body: Operations.CreateDownload.Input.Body
+    ) async throws -> Operations.CreateDownload.Output {
+        try await createDownload(Operations.CreateDownload.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// - Remark: HTTP `GET /downloads/{downloadId}`.
+    /// - Remark: Generated from `#/paths//downloads/{downloadId}/get(getDownload)`.
+    public func getDownload(
+        path: Operations.GetDownload.Input.Path,
+        headers: Operations.GetDownload.Input.Headers = .init()
+    ) async throws -> Operations.GetDownload.Output {
+        try await getDownload(Operations.GetDownload.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Remove a conversion from the server (apps do this once they have the file).
+    ///
+    /// - Remark: HTTP `DELETE /downloads/{downloadId}`.
+    /// - Remark: Generated from `#/paths//downloads/{downloadId}/delete(deleteDownload)`.
+    public func deleteDownload(
+        path: Operations.DeleteDownload.Input.Path,
+        headers: Operations.DeleteDownload.Input.Headers = .init()
+    ) async throws -> Operations.DeleteDownload.Output {
+        try await deleteDownload(Operations.DeleteDownload.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Record progress made while offline (a downloaded item played without a session).
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/progress`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/progress/put(syncProgress)`.
+    public func syncProgress(
+        path: Operations.SyncProgress.Input.Path,
+        headers: Operations.SyncProgress.Input.Headers = .init(),
+        body: Operations.SyncProgress.Input.Body
+    ) async throws -> Operations.SyncProgress.Output {
+        try await syncProgress(Operations.SyncProgress.Input(
+            path: path,
+            headers: headers,
+            body: body
         ))
     }
     /// Send a test event to a webhook URL now (admin only).
