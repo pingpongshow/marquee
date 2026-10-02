@@ -14,6 +14,7 @@ import (
 	"marquee/internal/items"
 	"marquee/internal/library"
 	"marquee/internal/livetv"
+	"marquee/internal/scrobble"
 	"marquee/internal/logbuf"
 	"marquee/internal/lyrics"
 	"marquee/internal/metadata"
@@ -58,6 +59,7 @@ type Handlers struct {
 	Requests         *requests.Service
 	LiveTV           *livetv.Service
 	DVR              *livetv.Recorder
+	Scrobble         *scrobble.Service
 	SyncPlay         *syncplay.Service
 	// Restart stops the server gracefully; Docker starts it again.
 	Restart func()

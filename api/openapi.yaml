@@ -52,6 +52,20 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/SystemInfo" }
 
+  /system/metrics:
+    get:
+      tags: [system]
+      operationId: getMetrics
+      summary: "Prometheus metrics (ADM-7): playback, transcodes, Live TV, recordings, libraries and requests. Open to the home network; from elsewhere, admins only."
+      security: []
+      responses:
+        "200":
+          description: Prometheus text exposition format.
+          content:
+            text/plain:
+              schema: { type: string }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /system/health:
     get:
       tags: [system]
@@ -222,6 +236,48 @@ paths:
       summary: Revoke the current session token.
       responses:
         "204": { description: Logged out. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /me/scrobbling/listenbrainz:
+    get:
+      tags: [users]
+      operationId: listenBrainzStatus
+      summary: "Whether the caller's plays go to ListenBrainz (MUSIC-12)."
+      responses:
+        "200":
+          description: Status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScrobbleStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [users]
+      operationId: connectListenBrainz
+      summary: Send the caller's music plays to ListenBrainz with their user token (checked with ListenBrainz first).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, description: "From listenbrainz.org/settings. Write-only." }
+      responses:
+        "200":
+          description: Connected.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScrobbleStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+    delete:
+      tags: [users]
+      operationId: disconnectListenBrainz
+      summary: Stop sending plays to ListenBrainz.
+      responses:
+        "204": { description: Disconnected. }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   /me:
@@ -3398,6 +3454,14 @@ components:
         availability: { $ref: "#/components/schemas/Availability" }
         itemId: { type: integer, format: int64, description: "The title in this library, when it's here." }
         requestId: { type: integer, format: int64, description: The caller's open Marquee request for it. }
+
+    ScrobbleStatus:
+      type: object
+      required: [connected]
+      properties:
+        connected: { type: boolean }
+        username: { type: string, description: The ListenBrainz account. }
+        error: { type: string, description: The last problem sending a play. }
 
     TitleRatings:
       type: object

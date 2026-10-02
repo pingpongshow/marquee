@@ -173,6 +173,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/scrobbling/listenbrainz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether the caller's plays go to ListenBrainz (MUSIC-12). */
+        get: operations["listenBrainzStatus"];
+        /** Send the caller's music plays to ListenBrainz with their user token (checked with ListenBrainz first). */
+        put: operations["connectListenBrainz"];
+        post?: never;
+        /** Stop sending plays to ListenBrainz. */
+        delete: operations["disconnectListenBrainz"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me": {
         parameters: {
             query?: never;
@@ -2722,6 +2741,13 @@ export interface components {
              */
             requestId?: number;
         };
+        ScrobbleStatus: {
+            connected: boolean;
+            /** @description The ListenBrainz account. */
+            username?: string;
+            /** @description The last problem sending a play. */
+            error?: string;
+        };
         /** @description Public ratings of a title, through Seerr. Each part is absent when unknown. */
         TitleRatings: {
             rottenTomatoes?: {
@@ -4076,6 +4102,76 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Logged out. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listenBrainzStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScrobbleStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    connectListenBrainz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description From listenbrainz.org/settings. Write-only. */
+                    token: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Connected. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScrobbleStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            502: components["responses"]["BadGateway"];
+        };
+    };
+    disconnectListenBrainz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disconnected. */
             204: {
                 headers: {
                     [name: string]: unknown;
