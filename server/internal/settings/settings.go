@@ -29,6 +29,14 @@ type Settings struct {
 	Tasks        Tasks        `json:"tasks"`
 	Music        Music        `json:"music"`
 	Webhooks     []Webhook    `json:"webhooks"`
+	Integrations Integrations `json:"integrations"`
+}
+
+// Integrations are other services on the network Marquee talks to.
+type Integrations struct {
+	// Seerr takes requests for titles that aren't in the library (REQ-1).
+	SeerrURL    string `json:"seerrUrl"`
+	SeerrAPIKey string `json:"seerrApiKey"`
 }
 
 // Webhook is a URL told about events (ADM-5).

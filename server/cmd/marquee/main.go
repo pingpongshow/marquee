@@ -36,6 +36,7 @@ import (
 	"marquee/internal/playback"
 	"marquee/internal/plex"
 	"marquee/internal/probe"
+	"marquee/internal/requests"
 	"marquee/internal/scanner"
 	"marquee/internal/server"
 	"marquee/internal/settings"
@@ -313,6 +314,7 @@ func run() error {
 		DB: database, Auth: authSvc, Settings: store, Libraries: libraries,
 		Items: items.NewStore(database), Scans: scans, Version: config.Version,
 		Tasks: scheduler, Trickplay: trick, Webhooks: hooks, Subtitles: subs, Downloads: dl, Backups: backups, Restart: stop, Sonic: sonicSvc, Lyrics: lyricsSvc,
+		Requests: &requests.Service{DB: database, Settings: store},
 		Avatars:  &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
 		Images:   images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
 		Logs:     logs,

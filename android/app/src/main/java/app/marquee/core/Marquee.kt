@@ -13,6 +13,7 @@ import app.marquee.api.apis.PlaylistsApi
 import app.marquee.api.apis.SearchApi
 import app.marquee.api.apis.SystemApi
 import app.marquee.api.apis.DownloadsApi
+import app.marquee.api.apis.RequestsApi
 import app.marquee.api.apis.UsersApi
 import app.marquee.api.models.AuthResult
 import app.marquee.api.models.DeviceInfo
@@ -74,6 +75,7 @@ class Marquee(context: Context) {
     val playlists get() = PlaylistsApi(base, http)
     val users get() = UsersApi(base, http)
     val downloads get() = DownloadsApi(base, http)
+    val requests get() = RequestsApi(base, http)
 
     val isRemote: Boolean get() = info?.networkClass == NetworkClass.REMOTE
     /** Signed in but the server can't be reached. */

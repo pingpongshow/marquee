@@ -23,6 +23,9 @@ type Restrictions struct {
 	MaxContentRating  *string  `json:"maxContentRating,omitempty"`
 	AllowRemote       *bool    `json:"allowRemote,omitempty"` // nil = allowed
 	RemoteQualityKbps int      `json:"remoteQualityKbps,omitempty"`
+	// CanRequest lets the user ask for titles through Seerr (REQ-1); admins always may.
+	CanRequest  bool   `json:"canRequest,omitempty"`
+	SeerrUserID *int64 `json:"seerrUserId,omitempty"`
 }
 
 // RemoteAllowed reports whether the user may stream outside the LAN.

@@ -35,6 +35,8 @@ import kotlinx.serialization.Contextual
  * @param maxContentRating Highest allowed rating, e.g. PG-13 or TV-14. Unrated items are hidden when set.
  * @param allowRemote May stream from outside the home network. Default true.
  * @param remoteQualityKbps Cap for remote streams. 0 = server default.
+ * @param canRequest May request titles through Seerr (REQ-1). Default false; admins always may.
+ * @param seerrUserId The Seerr user requests are made as. Null = Seerr's API key owner.
  */
 @Serializable
 
@@ -54,7 +56,15 @@ data class UserRestrictions (
 
     /* Cap for remote streams. 0 = server default. */
     @SerialName(value = "remoteQualityKbps")
-    val remoteQualityKbps: kotlin.Int? = null
+    val remoteQualityKbps: kotlin.Int? = null,
+
+    /* May request titles through Seerr (REQ-1). Default false; admins always may. */
+    @SerialName(value = "canRequest")
+    val canRequest: kotlin.Boolean? = null,
+
+    /* The Seerr user requests are made as. Null = Seerr's API key owner. */
+    @SerialName(value = "seerrUserId")
+    val seerrUserId: kotlin.Long? = null
 
 ) {
 

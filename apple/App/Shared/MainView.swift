@@ -12,6 +12,7 @@ struct MainView: View {
     @State private var playlistPicker = PlaylistPicker.shared
     @State private var adventure = AdventurePicker.shared
     @State private var linkedItem: LinkedItem?
+    @State private var canDiscover = false
 
     var body: some View {
         TabView {
@@ -27,6 +28,9 @@ struct MainView: View {
                 }
             }
             Tab("Playlists", systemImage: "music.note.list") { stack { PlaylistsView() } }
+            if !compact && canDiscover {
+                Tab("Discover", systemImage: "safari") { stack { DiscoverView() } }
+            }
             #if os(iOS)
             if !compact {
                 // iPhone lists Downloads under Libraries (a sixth tab would spill into "More").
@@ -46,6 +50,10 @@ struct MainView: View {
         #endif
         .environment(video)
         .task { await loadLibraries() }
+        .task {
+            let s = try? await app.requestsStatus()
+            canDiscover = s?.enabled == true && s?.canRequest == true
+        }
         .sheet(item: $playlistPicker.item) { item in AddToPlaylistSheet(item: item) }
         .sheet(item: $adventure.from) { item in AdventureSheet(from: item) }
         // Links from the Top Shelf: marquee://play/<id> plays, marquee://item/<id> shows the page.
@@ -122,6 +130,8 @@ extension EnvironmentValues {
 }
 
 struct LibrariesList: View {
+    @Environment(AppSession.self) private var app
+    @State private var canDiscover = false
     let libraries: [Library]
     let icon: (Schemas.LibraryType) -> String
     var body: some View {
@@ -143,10 +153,20 @@ struct LibrariesList: View {
                 NavigationLink { DownloadsView() } label: {
                     Label("Downloads", systemImage: "arrow.down.circle").foregroundStyle(.primary)
                 }
+                // iPhone: Discover lives here (a sixth tab would spill into "More").
+                if canDiscover {
+                    NavigationLink { DiscoverView() } label: {
+                        Label("Discover", systemImage: "safari").foregroundStyle(.primary)
+                    }
+                }
             }
             #endif
         }
         .navigationTitle("Libraries")
+        .task {
+            let s = try? await app.requestsStatus()
+            canDiscover = s?.enabled == true && s?.canRequest == true
+        }
     }
 }
 

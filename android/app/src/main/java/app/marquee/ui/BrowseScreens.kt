@@ -1,5 +1,6 @@
 package app.marquee.ui
 
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -97,9 +98,24 @@ fun HomeScreen(nav: NavHostController) {
 @Composable
 fun LibrariesScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
+    val requests by produceState<app.marquee.api.models.RequestsStatus?>(null) {
+        value = withContext(Dispatchers.IO) { runCatching { marquee.requests.requestsStatus() }.getOrNull() }
+    }
     val libs by produceState<List<Library>?>(null) { value = withContext(Dispatchers.IO) { runCatching { marquee.libraries.listLibraries() }.getOrDefault(emptyList()) } }
     LazyColumn(contentPadding = PaddingValues(vertical = 16.dp)) {
         item { Text("Libraries", Modifier.padding(horizontal = sidePadding, vertical = 8.dp), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+        // Discover (REQ-1) when this person may request titles.
+        if (requests?.enabled == true && requests?.canRequest == true) item {
+            ListItem(
+                headlineContent = { Text("Discover") },
+                supportingContent = { Text("Find and request movies and shows") },
+                leadingContent = { Icon(Icons.Filled.Explore, null) },
+                trailingContent = { Icon(Icons.Filled.ChevronRight, null) },
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+                modifier = Modifier.focusCard({ nav.navigate("discover") }),
+            )
+            HorizontalDivider()
+        }
         // Phones and tablets keep downloads; TVs stream.
         if (!marquee.isTv) item {
             ListItem(
@@ -233,7 +249,7 @@ fun SearchScreen(nav: NavHostController) {
 }
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
     val me by marquee.me.collectAsState()
     val scope = rememberCoroutineScope()
@@ -249,6 +265,7 @@ fun SettingsScreen() {
         Text("Server: ${marquee.server?.name ?: ""} · ${if (marquee.isRemote) "Tailscale (away)" else "home network"}", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("Version ${marquee.info?.version ?: ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (me?.isAdmin == true) OutlinedButton(onClick = { nav.navigate("approvals") }) { Text("Requests") }
             OutlinedButton(onClick = { scope.launch { marquee.signOut() } }) { Text("Switch profile") }
             OutlinedButton(onClick = { marquee.forgetServer() }) { Text("Use a different server") }
         }

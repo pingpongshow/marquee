@@ -77,6 +77,10 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			OnlineLyrics:     ptr(s.Music.OnlineLyrics),
 			LoudnessAnalysis: ptr(s.Music.LoudnessAnalysis),
 		},
+		Integrations: &IntegrationSettings{
+			SeerrUrl:       ptr(s.Integrations.SeerrURL),
+			SeerrApiKeySet: ptr(s.Integrations.SeerrAPIKey != ""),
+		},
 		Webhooks: ptr(toAPIWebhooks(s.Webhooks)),
 	}
 }
@@ -173,6 +177,12 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		set(&s.Music.SonicAnalysis, m.SonicAnalysis)
 		set(&s.Music.OnlineLyrics, m.OnlineLyrics)
 		set(&s.Music.LoudnessAnalysis, m.LoudnessAnalysis)
+	}
+	if i := u.Integrations; i != nil {
+		if i.SeerrUrl != nil {
+			s.Integrations.SeerrURL = strings.TrimRight(strings.TrimSpace(*i.SeerrUrl), "/")
+		}
+		set(&s.Integrations.SeerrAPIKey, i.SeerrApiKey)
 	}
 	if u.Webhooks != nil {
 		s.Webhooks = make([]settings.Webhook, len(*u.Webhooks))
