@@ -1,63 +1,315 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "@tanstack/react-router";
-import { useState } from "react";
-import { libraryItemsQuery, librariesQuery, type ItemSort } from "@/api/queries";
+import { useQueries, useQuery } from "@tanstack/react-query";
+import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { clsx } from "clsx";
+import { Filter, LayoutGrid, List, X } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { api, unwrap } from "@/api/client";
+import { librariesQuery } from "@/api/queries";
+import type { ItemSummary } from "@/api/types";
+import type { operations } from "@/api/schema.gen";
 import { Alert, Button, Select, Spinner } from "@/components/ui";
+import { ItemMenu } from "./ItemMenu";
 import { Poster } from "./Poster";
-import { subtitleFor } from "./format";
+import { formatDuration, subtitleFor } from "./format";
 
-const PAGE = 120;
+type ListQuery = NonNullable<operations["listLibraryItems"]["parameters"]["query"]>;
+export type LibrarySearch = {
+  sort?: ListQuery["sort"];
+  watch?: ListQuery["watch"];
+  genre?: string;
+  decade?: number;
+  rating?: string;
+  res?: ListQuery["resolution"];
+  view?: "grid" | "list";
+};
+
+const PAGE = 100;
+const GAP = 16;
+
+const sortOptions: { value: NonNullable<ListQuery["sort"]>; label: string; video?: boolean }[] = [
+  { value: "title", label: "Title" },
+  { value: "-added", label: "Date added" },
+  { value: "-released", label: "Release date" },
+  { value: "-year", label: "Year (newest)" },
+  { value: "year", label: "Year (oldest)" },
+  { value: "-rating", label: "Rating" },
+  { value: "-viewed", label: "Last watched" },
+  { value: "-duration", label: "Duration", video: true },
+  { value: "random", label: "Random" },
+];
+
+export function validateLibrarySearch(s: Record<string, unknown>): LibrarySearch {
+  const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
+  return {
+    sort: str(s.sort) as LibrarySearch["sort"],
+    watch: str(s.watch) as LibrarySearch["watch"],
+    genre: str(s.genre),
+    decade: typeof s.decade === "number" ? s.decade : undefined,
+    rating: str(s.rating),
+    res: str(s.res) as LibrarySearch["res"],
+    view: s.view === "list" ? "list" : undefined,
+  };
+}
+
+/** Measures an element's width. */
+function useWidth<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => e && setWidth(e.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, width] as const;
+}
+
+function Chip({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <span className="flex items-center gap-1 rounded-full bg-accent/15 py-0.5 pr-1 pl-3 text-xs text-accent">
+      {label}
+      <button onClick={onClear} className="rounded-full p-0.5 hover:bg-accent/20" aria-label={`Remove filter ${label}`}>
+        <X className="size-3" />
+      </button>
+    </span>
+  );
+}
 
 export function LibraryPage() {
   const { libraryId } = useParams({ from: "/library/$libraryId" });
+  const search = useSearch({ from: "/library/$libraryId" });
+  const navigate = useNavigate({ from: "/library/$libraryId" });
   const id = Number(libraryId);
-  const [sort, setSort] = useState<ItemSort>("title");
-  const [limit, setLimit] = useState(PAGE);
   const lib = useQuery(librariesQuery).data?.find((l) => l.id === id);
-  const items = useQuery({ ...libraryItemsQuery(id, sort, 0, limit), placeholderData: (prev) => prev });
-  const shape = lib?.type === "music" ? "square" : lib?.type === "videos" ? "wide" : "poster";
+  const isMusic = lib?.type === "music";
+  const isVideo = !isMusic;
+  const shape = isMusic ? "square" : lib?.type === "videos" ? "wide" : "poster";
+  const sort = search.sort ?? "title";
+  const view = search.view ?? "grid";
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  // A random sort gets a fresh seed each time it's chosen, but stays stable while scrolling.
+  const [seed] = useState(() => Date.now());
+
+  const set = (patch: Partial<LibrarySearch>) => navigate({ search: (s: LibrarySearch) => ({ ...s, ...patch }), replace: true });
+  const query: ListQuery = { sort, watch: search.watch, genre: search.genre, decade: search.decade, contentRating: search.rating, resolution: search.res };
+  const filtered = !!(search.watch || search.genre || search.decade || search.rating || search.res);
+
+  const filters = useQuery({
+    queryKey: ["libraries", id, "filters"],
+    queryFn: () => unwrap(api.GET("/libraries/{libraryId}/filters", { params: { path: { libraryId: id } } })),
+  });
+
+  const fetchPage = (page: number) => unwrap(api.GET("/libraries/{libraryId}/items", { params: { path: { libraryId: id }, query: { ...query, offset: page * PAGE, limit: PAGE } } }));
+  const keyBase = ["libraries", id, "items", query, sort === "random" ? seed : 0] as const;
+  const first = useQuery({ queryKey: [...keyBase, 0], queryFn: () => fetchPage(0), placeholderData: (prev) => prev });
+  const total = first.data?.total ?? 0;
+
+  // Layout: columns from the container width; rows are virtualized inside <main>.
+  const [gridRef, width] = useWidth<HTMLDivElement>();
+  const minCol = shape === "wide" ? 240 : 150;
+  const cols = view === "list" ? 1 : Math.max(2, Math.floor((width + GAP) / (minCol + GAP)));
+  const colWidth = view === "list" ? width : (width - GAP * (cols - 1)) / cols;
+  const artHeight = shape === "poster" ? colWidth * 1.5 : shape === "square" ? colWidth : (colWidth * 9) / 16;
+  const rowHeight = view === "list" ? 64 : artHeight + 52 + 8;
+  const rows = Math.ceil(total / cols);
+  const [scrollEl, setScrollEl] = useState<HTMLElement | null>(null);
+  useEffect(() => setScrollEl(gridRef.current?.closest("main") ?? null), [gridRef]);
+  const [scrollMargin, setScrollMargin] = useState(0);
+  useLayoutEffect(() => {
+    if (gridRef.current && scrollEl) setScrollMargin(gridRef.current.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop);
+  }, [gridRef, scrollEl, filtersOpen, filtered, total]);
+  const virt = useVirtualizer({ count: rows, getScrollElement: () => scrollEl, estimateSize: () => rowHeight, overscan: 4, scrollMargin });
+  useEffect(() => virt.measure(), [rowHeight, virt]);
+  const visible = virt.getVirtualItems();
+
+  // Fetch the pages the visible rows need.
+  const pages = useMemo(() => {
+    const set = new Set<number>();
+    for (const r of visible) {
+      set.add(Math.floor((r.index * cols) / PAGE));
+      set.add(Math.floor(((r.index + 1) * cols - 1) / PAGE));
+    }
+    return [...set].filter((p) => p * PAGE < total);
+  }, [visible, cols, total]);
+  const pageResults = useQueries({
+    queries: pages.map((p) => ({ queryKey: [...keyBase, p], queryFn: () => fetchPage(p), staleTime: 30_000 })),
+  });
+  const itemAt = (i: number): ItemSummary | undefined => {
+    const p = Math.floor(i / PAGE);
+    const data = p === 0 ? first.data : pageResults[pages.indexOf(p)]?.data;
+    return data?.items[i - p * PAGE];
+  };
+
+  const jump = (offset: number) => virt.scrollToIndex(Math.floor(offset / cols), { align: "start" });
+  const showJumpBar = sort === "title" && !filtered && total > 40 && (filters.data?.letters.length ?? 0) > 1;
+  const genreValue = search.genre ?? "";
 
   return (
-    <div className="p-6 lg:p-8">
-      <div className="mb-6 flex flex-wrap items-center gap-4">
-        <h1 className="text-2xl font-bold">{lib?.name ?? "Library"}</h1>
-        {items.data && <span className="text-sm text-muted">{items.data.total.toLocaleString()} items</span>}
-        <div className="ml-auto w-48">
-          <Select aria-label="Sort by" value={sort} onChange={(e) => setSort(e.target.value as ItemSort)}>
-            <option value="title">Title</option>
-            <option value="-added">Recently added</option>
-            <option value="-year">Year (newest)</option>
-            <option value="year">Year (oldest)</option>
-          </Select>
+    <div className="flex">
+      <div className="min-w-0 flex-1 p-6 lg:p-8">
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-bold">{lib?.name ?? "Library"}</h1>
+          {first.data && <span className="text-sm text-muted">{total.toLocaleString()} {filtered ? "matching" : "items"}</span>}
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Button size="sm" variant={filtersOpen || filtered ? "primary" : "secondary"} onClick={() => setFiltersOpen((v) => !v)} aria-expanded={filtersOpen}>
+              <Filter className="size-4" /> Filter
+            </Button>
+            <div className="w-44">
+            <Select aria-label="Sort by" className="h-8" value={sort} onChange={(e) => set({ sort: e.target.value === "title" ? undefined : (e.target.value as LibrarySearch["sort"]) })}>
+              {sortOptions
+                .filter((o) => isVideo || !o.video)
+                .map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+            </Select>
+            </div>
+            <div className="flex rounded-md bg-surface-2 p-0.5" role="group" aria-label="View">
+              <button onClick={() => set({ view: undefined })} className={clsx("rounded p-1.5", view === "grid" ? "bg-surface-3 text-text" : "text-muted")} aria-label="Grid view" aria-pressed={view === "grid"}>
+                <LayoutGrid className="size-4" />
+              </button>
+              <button onClick={() => set({ view: "list" })} className={clsx("rounded p-1.5", view === "list" ? "bg-surface-3 text-text" : "text-muted")} aria-label="List view" aria-pressed={view === "list"}>
+                <List className="size-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {filtersOpen && (
+          <div className="mb-4 grid gap-3 rounded-lg border border-border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-5">
+            <Select aria-label="Watched state" value={search.watch ?? ""} onChange={(e) => set({ watch: (e.target.value || undefined) as LibrarySearch["watch"] })}>
+              <option value="">{isMusic ? "Any play state" : "Watched or not"}</option>
+              <option value="unwatched">{isMusic ? "Unplayed" : "Unwatched"}</option>
+              <option value="in_progress">In progress</option>
+              <option value="watched">{isMusic ? "Played" : "Watched"}</option>
+            </Select>
+            <Select aria-label="Genre" value={genreValue} onChange={(e) => set({ genre: e.target.value || undefined })}>
+              <option value="">All genres</option>
+              {filters.data?.genres.map((g) => (
+                <option key={g.value} value={g.value}>
+                  {g.value} ({g.count})
+                </option>
+              ))}
+            </Select>
+            <Select aria-label="Decade" value={search.decade ?? ""} onChange={(e) => set({ decade: e.target.value ? Number(e.target.value) : undefined })}>
+              <option value="">Any decade</option>
+              {filters.data?.decades.map((d) => (
+                <option key={d.value} value={d.value}>
+                  {d.value}s ({d.count})
+                </option>
+              ))}
+            </Select>
+            {isVideo && (
+              <Select aria-label="Content rating" value={search.rating ?? ""} onChange={(e) => set({ rating: e.target.value || undefined })}>
+                <option value="">Any rating</option>
+                {filters.data?.contentRatings.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.value} ({r.count})
+                  </option>
+                ))}
+              </Select>
+            )}
+            {isVideo && (
+              <Select aria-label="Resolution" value={search.res ?? ""} onChange={(e) => set({ res: (e.target.value || undefined) as LibrarySearch["res"] })}>
+                <option value="">Any resolution</option>
+                <option value="4k">4K</option>
+                <option value="1080">1080p</option>
+                <option value="720">720p</option>
+                <option value="sd">SD</option>
+              </Select>
+            )}
+          </div>
+        )}
+        {filtered && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            {search.watch && <Chip label={search.watch.replace("_", " ")} onClear={() => set({ watch: undefined })} />}
+            {search.genre && <Chip label={search.genre} onClear={() => set({ genre: undefined })} />}
+            {search.decade && <Chip label={`${search.decade}s`} onClear={() => set({ decade: undefined })} />}
+            {search.rating && <Chip label={search.rating} onClear={() => set({ rating: undefined })} />}
+            {search.res && <Chip label={search.res === "4k" ? "4K" : search.res === "sd" ? "SD" : `${search.res}p`} onClear={() => set({ res: undefined })} />}
+            <button onClick={() => set({ watch: undefined, genre: undefined, decade: undefined, rating: undefined, res: undefined })} className="text-xs text-muted hover:text-text">
+              Clear all
+            </button>
+          </div>
+        )}
+
+        {first.isPending && <Spinner />}
+        {first.isError && <Alert tone="error">{first.error.message}</Alert>}
+        {first.data?.total === 0 &&
+          (filtered ? (
+            <p className="text-muted">Nothing matches these filters.</p>
+          ) : (
+            <p className="text-muted">Nothing here yet. {lib?.scanStatus !== "idle" ? "A scan is in progress." : "Scan the library from Settings → Libraries."}</p>
+          ))}
+
+        <div ref={gridRef} className="relative" style={{ height: virt.getTotalSize() }}>
+          {width > 0 &&
+            visible.map((row) => (
+              <div
+                key={row.key}
+                className="absolute inset-x-0 top-0"
+                style={{ transform: `translateY(${row.start - scrollMargin}px)`, height: rowHeight, display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, columnGap: GAP }}
+              >
+                {Array.from({ length: cols }, (_, c) => {
+                  const i = row.index * cols + c;
+                  if (i >= total) return <div key={c} />;
+                  const it = itemAt(i);
+                  if (view === "list") return <ListRow key={c} item={it} shape={shape} />;
+                  return (
+                    <div key={c} className="min-w-0">
+                      {it ? (
+                        <Link to="/item/$itemId" params={{ itemId: String(it.id) }} className="group block">
+                          <Poster item={it} shape={shape} width={Math.round(colWidth)} className="transition-transform group-hover:scale-[1.03] group-hover:ring-2 group-hover:ring-accent" />
+                          <div className="mt-2 truncate text-sm font-medium" title={it.title}>
+                            {it.title}
+                          </div>
+                          <div className="truncate text-xs text-muted">{subtitleFor(it)}</div>
+                        </Link>
+                      ) : (
+                        <div className="animate-pulse rounded-md bg-surface-2" style={{ height: artHeight }} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
         </div>
       </div>
-      {items.isPending && <Spinner />}
-      {items.isError && <Alert tone="error">{items.error.message}</Alert>}
-      {items.data?.total === 0 && (
-        <p className="text-muted">
-          Nothing here yet. {lib?.scanStatus !== "idle" ? "A scan is in progress." : "Scan the library from Settings → Libraries."}
-        </p>
+
+      {showJumpBar && (
+        <nav aria-label="Jump to letter" className="sticky top-0 flex h-[calc(100vh-3.5rem)] w-7 shrink-0 flex-col items-center justify-center py-4 text-[11px] font-semibold text-muted">
+          {filters.data!.letters.map((l) => (
+            <button key={l.letter} onClick={() => jump(l.offset)} className="w-full py-px text-center hover:text-accent">
+              {l.letter}
+            </button>
+          ))}
+        </nav>
       )}
-      <ul className={shape === "wide" ? "grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-x-4 gap-y-6" : "grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-x-4 gap-y-6"}>
-        {items.data?.items.map((it) => (
-          <li key={it.id}>
-            <Link to="/item/$itemId" params={{ itemId: String(it.id) }} className="group block">
-              <Poster item={it} shape={shape} className="transition-transform group-hover:scale-[1.03] group-hover:ring-2 group-hover:ring-accent" />
-              <div className="mt-2 truncate text-sm font-medium" title={it.title}>
-                {it.title}
-              </div>
-              <div className="truncate text-xs text-muted">{subtitleFor(it)}</div>
-            </Link>
-          </li>
-        ))}
-      </ul>
-      {items.data && items.data.items.length < items.data.total && (
-        <div className="mt-8 flex justify-center">
-          <Button onClick={() => setLimit((l) => l + PAGE)} loading={items.isFetching}>
-            Show more
-          </Button>
+    </div>
+  );
+}
+
+function ListRow({ item, shape }: { item?: ItemSummary; shape: "poster" | "square" | "wide" }) {
+  if (!item) return <div className="h-14 animate-pulse rounded bg-surface-2" />;
+  const watched = item.type === "show" ? item.leafCount > 0 && item.watchedLeafCount === item.leafCount : (item.viewCount ?? 0) > 0;
+  return (
+    <div className="flex h-14 items-center gap-4 border-b border-border">
+      <Link to="/item/$itemId" params={{ itemId: String(item.id) }} className="flex min-w-0 flex-1 items-center gap-4 hover:text-accent">
+        <div className={clsx("shrink-0", shape === "wide" ? "w-20" : shape === "square" ? "w-12" : "w-9")}>
+          <Poster item={item} shape={shape} width={80} compact />
         </div>
-      )}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-medium">{item.title}</span>
+          <span className="block truncate text-xs text-muted">{subtitleFor(item)}</span>
+        </span>
+      </Link>
+      <span className="hidden w-16 text-sm text-muted sm:block">{item.year ?? ""}</span>
+      <span className="hidden w-20 text-right text-sm text-muted tabular-nums md:block">{item.type === "movie" || item.type === "video" ? formatDuration(item.durationMs) : item.type === "show" ? `${item.childCount} seasons` : ""}</span>
+      <span className={clsx("hidden w-20 text-right text-xs md:block", watched ? "text-success" : "text-faint")}>{item.type === "artist" ? "" : watched ? "Watched" : ""}</span>
+      <ItemMenu item={item} />
     </div>
   );
 }

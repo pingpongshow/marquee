@@ -8,3 +8,8 @@ deploy/.env
 *.db
 *.db-shm
 *.db-wal
+
+# The web client is TypeScript only. Compiled .js next to sources would shadow them
+# (Vite resolves .js before .tsx), so never commit any.
+web/src/**/*.js
+web/*.tsbuildinfo

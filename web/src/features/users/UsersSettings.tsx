@@ -3,15 +3,11 @@ import { KeyRound, Pencil, Plus, Shield, Trash2, UserRound, Users } from "lucide
 import { useState } from "react";
 import { librariesQuery, meQuery, useCreateUser, useDeleteUser, usersQuery, useUpdateUser } from "@/api/queries";
 import type { User, UserRestrictions } from "@/api/types";
-import { Alert, Button, Card, Dialog, Field, Input, Select, Spinner, Toggle } from "@/components/ui";
+import { Alert, Badge, Button, Card, Dialog, Field, Input, Select, Spinner, Toggle } from "@/components/ui";
 import { SaveBar } from "../settings/SaveBar";
 import { useSectionDraft } from "../settings/useSectionDraft";
 import { Avatar, AvatarPicker } from "./Avatar";
 import { ratingOptions, remoteQualityOptions } from "./constants";
-
-function Badge({ children, tone = "muted" }: { children: React.ReactNode; tone?: "accent" | "muted" }) {
-  return <span className={tone === "accent" ? "rounded bg-accent/15 px-1.5 py-0.5 text-[11px] font-medium text-accent" : "rounded bg-surface-3 px-1.5 py-0.5 text-[11px] text-muted"}>{children}</span>;
-}
 
 function describe(r: UserRestrictions, libraryNames: Map<number, string>) {
   const parts: string[] = [];

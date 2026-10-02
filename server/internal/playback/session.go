@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -33,6 +34,7 @@ type Request struct {
 	DeviceName       string
 	ItemID           int64
 	FileID           int64 // 0 = best file
+	Preload          bool  // gapless: don't end the device's current session yet
 	AudioStreamID    int64 // 0 = automatic
 	SubtitleStreamID int64 // 0 = automatic (forced/preferred), -1 = off
 	StartMS          int64 // -1 = resume position
@@ -75,6 +77,7 @@ type Session struct {
 	positionMS int64
 	state      string
 	watched    bool
+	preload    bool // prepared for gapless playback; not yet playing
 	historyID  int64
 	transcoder *Transcoder
 }
@@ -107,6 +110,13 @@ func (s *Session) touch() {
 // Transcoder returns the session's transcoder, or nil for direct play.
 func (s *Session) Transcoder() *Transcoder { return s.transcoder }
 
+// Preloading reports whether the session is a queued gapless track that hasn't started.
+func (s *Session) Preloading() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.preload
+}
+
 // BitrateKbps is what the stream uses (for bandwidth sharing).
 func (s *Session) BitrateKbps() int {
 	if s.Decision.Method == Transcode {
@@ -124,6 +134,51 @@ type Manager struct {
 
 	mu       sync.Mutex
 	sessions map[string]*Session
+	history  []Sample // last hour, one a minute
+}
+
+// Sample is one minute of the dashboard's bandwidth graph.
+type Sample struct {
+	At                    time.Time
+	LocalKbps, RemoteKbps int
+	Streams, Transcodes   int
+}
+
+// Usage sums the current streams.
+func (m *Manager) Usage() Sample {
+	u := Sample{At: time.Now()}
+	for _, s := range m.List() {
+		if s.Preloading() {
+			continue
+		}
+		u.Streams++
+		if s.Transcoder() != nil {
+			u.Transcodes++
+		}
+		if s.Remote {
+			u.RemoteKbps += s.BitrateKbps()
+		} else {
+			u.LocalKbps += s.BitrateKbps()
+		}
+	}
+	return u
+}
+
+// History returns the last hour of usage samples, oldest first.
+func (m *Manager) History() []Sample {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]Sample(nil), m.history...)
+}
+
+func (m *Manager) record() {
+	u := m.Usage()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.history = append(m.history, u)
+	if len(m.history) > 60 {
+		m.history = m.history[len(m.history)-60:]
+	}
 }
 
 func (m *Manager) init() {
@@ -200,10 +255,11 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 	}
 
 	// Stop this device's previous session (switching tracks or quality starts a new one).
-	for _, old := range m.List() {
-		if old.DeviceID == r.DeviceID && old.UserID == r.UserID {
-			m.Stop(ctx, old.ID)
-		}
+	// A preloaded session waits until it starts playing.
+	if r.Preload {
+		s.preload = true
+	} else {
+		m.stopOthers(ctx, s)
 	}
 
 	q := r.Quality
@@ -261,9 +317,10 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 	var title, typ string
 	var parent, grand sql.NullString
-	err := m.DB.QueryRowContext(ctx, `SELECT i.title, i.type, p.title, g.title FROM items i
+	var grandID sql.NullInt64
+	err := m.DB.QueryRowContext(ctx, `SELECT i.title, i.type, p.title, g.title, i.grandparent_id FROM items i
 		LEFT JOIN items p ON p.id = i.parent_id LEFT JOIN items g ON g.id = i.grandparent_id WHERE i.id = ?`, r.ItemID).
-		Scan(&title, &typ, &parent, &grand)
+		Scan(&title, &typ, &parent, &grand, &grandID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNoMedia
 	}
@@ -337,6 +394,28 @@ func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 	}
 	rows.Close()
 
+	// Track choices are remembered per show (or per movie) and reused when the client asks
+	// for automatic selection (PLAY-8).
+	memoryID := r.ItemID
+	if typ == "episode" && grandID.Valid {
+		memoryID = grandID.Int64
+	}
+	if typ != "track" && r.UserID > 0 {
+		var memAudio, memSub sql.NullString
+		m.DB.QueryRowContext(ctx, `SELECT audio_language, subtitle_language FROM user_item_state WHERE user_id = ? AND item_id = ?`,
+			r.UserID, memoryID).Scan(&memAudio, &memSub)
+		if r.AudioStreamID == 0 && memAudio.String != "" {
+			r.UserAudioLang = memAudio.String
+		}
+		if r.SubtitleStreamID == 0 && memSub.String != "" {
+			if memSub.String == "off" {
+				r.UserSubMode = "off"
+			} else {
+				r.UserSubMode, r.UserSubLang = "always", memSub.String
+			}
+		}
+	}
+
 	if len(vids) > 0 {
 		v := vids[0]
 		s.Media.Video = &VideoStream{Index: v.index, Codec: v.codec, Width: v.w, Height: v.h, BitDepth: v.depth, HDR: hdr,
@@ -384,6 +463,10 @@ func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 	if sub != nil {
 		s.Media.Subtitle = &SubtitleStream{ID: sub.id, Index: sub.index, Codec: sub.codec, External: sub.external}
 		s.SubtitleStreamID, s.SubtitleCodec = sub.id, sub.codec
+	}
+
+	if typ != "track" && r.UserID > 0 && (r.AudioStreamID != 0 || r.SubtitleStreamID != 0) {
+		rememberTracks(ctx, m, r, memoryID, audio, sub, func(st *stream) string { return st.lang })
 	}
 
 	s.StartMS = r.StartMS
@@ -446,6 +529,29 @@ func autoSubtitle[T any](subs []T, r Request, audio *T, info func(*T) (string, b
 	return nil
 }
 
+// rememberTracks stores the languages of explicitly chosen tracks on the show or movie.
+func rememberTracks[T any](ctx context.Context, m *Manager, r Request, itemID int64, audio, sub *T, lang func(*T) string) {
+	audioLang, subLang := "", ""
+	if r.AudioStreamID > 0 && audio != nil {
+		audioLang = lang(audio)
+	}
+	switch {
+	case r.SubtitleStreamID < 0:
+		subLang = "off"
+	case r.SubtitleStreamID > 0 && sub != nil:
+		subLang = lang(sub)
+	}
+	if audioLang == "" && subLang == "" {
+		return
+	}
+	_, err := m.DB.ExecContext(ctx, `INSERT INTO user_item_state (user_id, item_id, audio_language, subtitle_language) VALUES (?, ?, NULLIF(?, ''), NULLIF(?, ''))
+		ON CONFLICT (user_id, item_id) DO UPDATE SET audio_language = COALESCE(excluded.audio_language, audio_language),
+		subtitle_language = COALESCE(excluded.subtitle_language, subtitle_language)`, r.UserID, itemID, audioLang, subLang)
+	if err != nil {
+		slog.WarnContext(ctx, "remember tracks", "err", err)
+	}
+}
+
 func (m *Manager) subtitleRelIndex(ctx context.Context, fileID int64, index int) int {
 	var n int
 	m.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM streams WHERE file_id = ? AND kind = 'subtitle' AND stream_index IS NOT NULL AND stream_index < ?`,
@@ -455,13 +561,31 @@ func (m *Manager) subtitleRelIndex(ctx context.Context, fileID int64, index int)
 
 // Progress records the playback position. Past the watched threshold the item is marked
 // watched (once per session) and its resume point cleared.
+// stopOthers ends the device's other sessions.
+func (m *Manager) stopOthers(ctx context.Context, s *Session) {
+	for _, old := range m.List() {
+		if old.ID != s.ID && old.DeviceID == s.DeviceID && old.UserID == s.UserID {
+			m.Stop(ctx, old.ID)
+		}
+	}
+}
+
 func (m *Manager) Progress(ctx context.Context, id string, positionMS int64, state string) error {
 	s, ok := m.Get(id)
 	if !ok {
 		return ErrNoSession
 	}
 	s.mu.Lock()
+	takeOver := s.preload && state == "playing"
+	if takeOver {
+		s.preload = false
+	}
 	s.positionMS, s.state = positionMS, state
+	s.mu.Unlock()
+	if takeOver {
+		m.stopOthers(ctx, s)
+	}
+	s.mu.Lock()
 	alreadyWatched := s.watched
 	dur := s.Media.DurationMS
 	threshold := int64(m.Settings.Get().Library.WatchedThresholdPercent)
@@ -535,8 +659,17 @@ func (m *Manager) Reap(ctx context.Context, idle time.Duration) {
 
 // Run reaps idle sessions until ctx ends, then stops everything.
 func (m *Manager) Run(ctx context.Context) {
+	// No session survives a restart, so anything left in the transcode directory is stale.
+	if entries, err := os.ReadDir(m.TranscodeDir); err == nil {
+		for _, e := range entries {
+			os.RemoveAll(filepath.Join(m.TranscodeDir, e.Name()))
+		}
+	}
 	t := time.NewTicker(30 * time.Second)
 	defer t.Stop()
+	minute := time.NewTicker(time.Minute)
+	defer minute.Stop()
+	m.record()
 	for {
 		select {
 		case <-ctx.Done():
@@ -546,6 +679,8 @@ func (m *Manager) Run(ctx context.Context) {
 			return
 		case <-t.C:
 			m.Reap(ctx, 3*time.Minute)
+		case <-minute.C:
+			m.record()
 		}
 	}
 }
