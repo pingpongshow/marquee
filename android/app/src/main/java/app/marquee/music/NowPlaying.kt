@@ -145,6 +145,7 @@ fun NowPlayingScreen(onClose: () -> Unit) {
                 IconButton(::startRadio, Modifier.focusRing()) { Icon(Icons.Filled.Radio, "Start Radio", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 SleepButton()
                 DJButton()
+                LevellingButton()
             }
             radioError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         }

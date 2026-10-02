@@ -19,7 +19,14 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import android.content.ComponentName
 import android.view.KeyEvent
+import androidx.media3.common.MediaItem
+import androidx.media3.session.MediaBrowser
+import androidx.media3.session.SessionToken
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -210,5 +217,60 @@ class MarqueeUiTest {
         rule.waitForIdle()
         Thread.sleep(400)
         InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(code)
+    }
+
+    /** The browse tree Android Auto and Assistant use (MUSIC-14): browse, play a station, an album track and a search. */
+    @Test fun androidAutoBrowse() {
+        connectAndSignIn()
+        val token = SessionToken(context, ComponentName(context, app.marquee.music.MusicService::class.java))
+        fun onMain(block: () -> Unit) = InstrumentationRegistry.getInstrumentation().runOnMainSync(block)
+        // The browser lives on the main thread; calls go there and their futures are awaited here.
+        fun <T> call(block: () -> com.google.common.util.concurrent.ListenableFuture<T>): T {
+            var f: com.google.common.util.concurrent.ListenableFuture<T>? = null
+            onMain { f = block() }
+            return f!!.get(30, TimeUnit.SECONDS)
+        }
+        val browser = call { MediaBrowser.Builder(context, token).setApplicationLooper(android.os.Looper.getMainLooper()).buildAsync() }
+        fun children(id: String) = call { browser.getChildren(id, 0, 500, null) }.value!!
+        fun current(): MediaItem? { var m: MediaItem? = null; onMain { m = browser.currentMediaItem }; return m }
+        fun waitPlaying(what: String, check: (MediaItem) -> Boolean) {
+            val until = System.currentTimeMillis() + 20_000
+            while (System.currentTimeMillis() < until) {
+                var ok = false
+                onMain { ok = browser.isPlaying && browser.currentMediaItem?.let(check) == true }
+                if (ok) return
+                Thread.sleep(250)
+            }
+            throw AssertionError("$what didn't start; now ${current()?.mediaMetadata?.title}")
+        }
+        try {
+            val root = call { browser.getLibraryRoot(null) }.value!!
+            assertEquals(listOf("For You", "Playlists", "Artists", "Recently Added"), children(root.mediaId).map { it.mediaMetadata.title.toString() })
+            val forYou = children("foryou")
+            assertTrue(forYou.any { it.mediaMetadata.title.toString() == "Library Radio" })
+
+            // A station: plays real tracks.
+            onMain { browser.setMediaItem(MediaItem.Builder().setMediaId("radio:library").build()); browser.prepare(); browser.play() }
+            waitPlaying("Library Radio") { it.mediaId.toLongOrNull() != null }
+
+            // Artists → albums → a track: the whole album plays from that track.
+            val artist = children("artists").first { it.mediaMetadata.title.toString() == "Calm Pads" }
+            val album = children(artist.mediaId).first { it.mediaMetadata.title.toString() == "Floating" }
+            val tracks = children(album.mediaId)
+            val second = tracks.first { it.mediaMetadata.title.toString() == "Floating 2" }
+            onMain { browser.setMediaItem(second); browser.prepare(); browser.play() }
+            waitPlaying("Floating 2") { it.mediaMetadata.title.toString() == "Floating 2" }
+            var count = 0
+            onMain { count = browser.mediaItemCount }
+            assertEquals(tracks.size, count)
+
+            // "Play Hiss Theory on Marquee".
+            val voice = MediaItem.Builder().setMediaId("").setRequestMetadata(MediaItem.RequestMetadata.Builder().setSearchQuery("Hiss Theory").build()).build()
+            onMain { browser.setMediaItem(voice); browser.prepare(); browser.play() }
+            waitPlaying("search") { it.mediaMetadata.artist.toString() == "Hiss Theory" }
+            onMain { browser.stop() }
+        } finally {
+            onMain { browser.release() }
+        }
     }
 }
