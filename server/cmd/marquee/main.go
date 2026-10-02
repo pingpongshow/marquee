@@ -264,6 +264,14 @@ func run() error {
 		Run:         loud.Run})
 	trick := &trickplay.Service{DB: database, FFmpeg: cfg.FFmpegPath, Dir: filepath.Join(cfg.ConfigDir, "cache", "trickplay"), Workers: 2,
 		Enabled: func() bool { return store.Get().Library.Trickplay }, CUDA: player.Encoders.NVENC}
+	player.IFrames = func(fileID, durationMS int64) (string, []byte, bool) {
+		p, ok := trick.IFrames(fileID)
+		if !ok {
+			return "", nil, false
+		}
+		pl, err := trickplay.IFramePlaylist(p, durationMS)
+		return p, pl, err == nil
+	}
 	scheduler.Register(tasks.Task{ID: "trickplay", Name: "Make seek previews", Window: true, Bounded: true,
 		Description: "Makes the thumbnails shown while seeking through videos. A large library takes a few nights; it continues where it stopped.",
 		Run:         trick.Run, Progress: trick.Progress})

@@ -142,6 +142,9 @@ type Manager struct {
 	TranscodeDir string
 	Encoders     Encoders
 	FFprobe      string
+	// IFrames, when set, returns a file's scrubbing-thumbnail stream (an all-keyframe MP4
+	// and its HLS I-frame playlist) for Apple players.
+	IFrames func(fileID, durationMS int64) (file string, playlist []byte, ok bool)
 	// Events, when set, hears playback.started/paused/resumed/watched/stopped (webhooks).
 	Events func(kind string, s *Session, positionMS int64)
 

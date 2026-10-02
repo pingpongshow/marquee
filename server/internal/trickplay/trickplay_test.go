@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -48,5 +49,16 @@ func TestGenerate(t *testing.T) {
 	}
 	if _, err := os.Stat(s.SheetPath(7, 1)); err == nil {
 		t.Fatal("15 thumbnails should fit one sheet")
+	}
+	// The I-frame MP4: an init segment then one fragment per 10 s.
+	pl, err := IFramePlaylist(filepath.Join(s.Dir, "7", IFramesName), 150_000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(string(pl), "#EXT-X-BYTERANGE"); n != 15 {
+		t.Fatalf("%d I-frames in\n%s", n, pl)
+	}
+	if !strings.Contains(string(pl), "#EXT-X-I-FRAMES-ONLY") || !strings.Contains(string(pl), "#EXT-X-MAP:URI=") {
+		t.Fatalf("playlist:\n%s", pl)
 	}
 }
