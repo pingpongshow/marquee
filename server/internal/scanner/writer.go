@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"marquee/internal/library"
 	"marquee/internal/probe"
@@ -30,16 +31,30 @@ type writer struct {
 	existing map[string]existingFile
 	missing  map[string]existingFile // path → file not found on disk (yet)
 	pending  int
+	began    time.Time
 	keyCache map[string]int64 // type|scan_key → item id
 }
+
+// maxHold is how long a write transaction stays open: the database has one writer, and
+// playback progress, sign-ins and history wait for it.
+const maxHold = 500 * time.Millisecond
 
 func (w *writer) begin(ctx context.Context) error {
 	if w.keyCache == nil {
 		w.keyCache = map[string]int64{}
 	}
 	tx, err := w.db.BeginTx(ctx, nil)
-	w.tx = tx
+	w.tx, w.began = tx, time.Now()
 	return err
+}
+
+// ensure opens a transaction if none is open (they're opened only when there's writing to
+// do, never while waiting for files to be probed).
+func (w *writer) ensure(ctx context.Context) error {
+	if w.tx != nil {
+		return nil
+	}
+	return w.begin(ctx)
 }
 
 func (w *writer) rollback() {
@@ -48,16 +63,17 @@ func (w *writer) rollback() {
 	}
 }
 
+// maybeCommit commits every batchSize files or maxHold, whichever comes first; the next
+// write opens a new transaction.
 func (w *writer) maybeCommit(ctx context.Context) error {
 	w.pending++
-	if w.pending < batchSize {
+	if w.pending < batchSize && time.Since(w.began) < maxHold {
 		return nil
 	}
 	w.pending = 0
-	if err := w.tx.Commit(); err != nil {
-		return err
-	}
-	return w.begin(ctx)
+	err := w.tx.Commit()
+	w.tx = nil
+	return err
 }
 
 func (w *writer) restore(ctx context.Context, ids []int64) error {
@@ -220,6 +236,9 @@ func (w *writer) writeStreams(ctx context.Context, fileID int64, c candidate, re
 // finish marks missing files unavailable, removes items left without files, recomputes
 // availability and child counts, and commits.
 func (w *writer) finish(ctx context.Context) error {
+	if err := w.ensure(ctx); err != nil {
+		return err
+	}
 	for _, e := range w.missing {
 		if _, err := w.tx.ExecContext(ctx, `UPDATE media_files SET available = 0 WHERE id = ?`, e.ID); err != nil {
 			return err

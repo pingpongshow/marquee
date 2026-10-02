@@ -23,7 +23,14 @@ import { api, imageUrl, unwrap } from "@/api/client";
 import { Menu, MenuItem } from "@/components/Menu";
 import { Rating } from "../music/Rating";
 import type { ItemSummary } from "@/api/types";
-import { useMusic, type DJMode, type Levelling } from "./MusicPlayer";
+import { ignoreShortcut } from "@/lib/keys";
+import {
+  useMusic,
+  useMusicActions,
+  useMusicState,
+  type DJMode,
+  type Levelling,
+} from "./MusicPlayer";
 import type { Entry } from "./queue";
 
 export function fmtTime(s: number) {
@@ -99,7 +106,7 @@ function Scrubber({ className }: { className?: string }) {
 }
 
 function Controls({ large }: { large?: boolean }) {
-  const m = useMusic();
+  const m = useMusicState();
   const btn = large
     ? "rounded-full p-3 hover:bg-white/10"
     : "rounded-full p-2 hover:bg-surface-2";
@@ -150,7 +157,7 @@ function Controls({ large }: { large?: boolean }) {
 }
 
 function Volume({ className }: { className?: string }) {
-  const m = useMusic();
+  const m = useMusicState();
   return (
     <div className={clsx("items-center gap-2", className)}>
       <Volume2 className="size-4 opacity-70" aria-hidden />
@@ -276,7 +283,7 @@ export function MiniPlayer() {
 
 /** Up next, with drag to reorder, click to jump and remove. */
 export function QueueList({ dark }: { dark?: boolean }) {
-  const m = useMusic();
+  const m = useMusicState();
   const [dragKey, setDragKey] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const upcoming = m.queue.entries.slice(m.queue.index + 1);
@@ -395,20 +402,21 @@ export function NowPlaying() {
       ? m.duration
       : (t.durationMs ?? 0) / 1000;
 
+  // Actions are stable, so this subscribes once rather than on every playhead tick.
+  const { setExpanded, toggle, next, prev } = useMusicActions();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement && e.target.type !== "range")
-        return;
-      if (e.key === "Escape") m.setExpanded(false);
+      if (ignoreShortcut(e)) return;
+      if (e.key === "Escape") setExpanded(false);
       else if (e.key === " ") {
         e.preventDefault();
-        m.toggle();
-      } else if (e.key === "ArrowRight" && e.shiftKey) m.next();
-      else if (e.key === "ArrowLeft" && e.shiftKey) m.prev();
+        toggle();
+      } else if (e.key === "ArrowRight" && e.shiftKey) next();
+      else if (e.key === "ArrowLeft" && e.shiftKey) prev();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [m]);
+  }, [setExpanded, toggle, next, prev]);
 
   return (
     <div
@@ -427,7 +435,7 @@ export function NowPlaying() {
         >
           <ChevronDown className="size-6" />
         </button>
-        <div className="flex-1 text-center">
+        <div className="min-w-0 flex-1 text-center">
           <div className="text-xs font-semibold tracking-wider text-white/70 uppercase">
             {m.source ? "Playing from" : "Now Playing"}
           </div>
@@ -593,7 +601,7 @@ function LyricsPanel({ item }: { item: ItemSummary }) {
 const sleepOptions = [15, 30, 45, 60, 90];
 
 function SleepMenu() {
-  const m = useMusic();
+  const m = useMusicState();
   const active = m.sleep !== null;
   return (
     <Menu
@@ -632,7 +640,7 @@ const selectCls =
   "rounded-md border border-white/20 bg-black/30 px-2 py-1 text-xs text-white/80";
 
 function CrossfadeSelect() {
-  const m = useMusic();
+  const m = useMusicState();
   return (
     <select
       value={m.crossfade}
@@ -664,7 +672,7 @@ const djHelp: Record<DJMode, string> = {
 };
 
 function DJSelect() {
-  const m = useMusic();
+  const m = useMusicState();
   return (
     <select
       value={m.dj ?? ""}
@@ -684,7 +692,7 @@ function DJSelect() {
 }
 
 function LevellingSelect() {
-  const m = useMusic();
+  const m = useMusicState();
   return (
     <select
       value={m.levelling}

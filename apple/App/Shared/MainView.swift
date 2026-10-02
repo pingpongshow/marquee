@@ -11,6 +11,7 @@ struct MainView: View {
     @State private var showNowPlaying = false
     @State private var playlistPicker = PlaylistPicker.shared
     @State private var adventure = AdventurePicker.shared
+    @State private var actionError = ActionError.shared
     @State private var linkedItem: LinkedItem?
     @State private var canDiscover = false
     @State private var hasLiveTV = false
@@ -64,6 +65,11 @@ struct MainView: View {
         }
         .sheet(item: $playlistPicker.item) { item in AddToPlaylistSheet(item: item) }
         .sheet(item: $adventure.from) { item in AdventureSheet(from: item) }
+        .alert("Something went wrong", isPresented: Binding(get: { actionError.message != nil }, set: { if !$0 { actionError.message = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(actionError.message ?? "")
+        }
         // Links from the Top Shelf: marquee://play/<id> plays, marquee://item/<id> shows the page.
         .onOpenURL { url in
             guard url.scheme == "marquee", let id = Int64(url.lastPathComponent) else { return }
@@ -75,9 +81,16 @@ struct MainView: View {
                     .marqueeDestinations()
                     .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { linkedItem = nil } } }
             }
+            // One view can't present two covers at once: while a linked item is up, the
+            // player is presented from inside its cover.
+            .fullScreenCover(item: $video.request) { req in
+                PlayerView(request: req)
+                    .environment(video)
+            }
             .environment(video)
         }
-        .fullScreenCover(item: $video.request) { req in
+        .fullScreenCover(item: Binding(get: { linkedItem == nil ? video.request : nil },
+                                       set: { if linkedItem == nil { video.request = $0 } })) { req in
             PlayerView(request: req)
                 .environment(video)
         }

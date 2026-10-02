@@ -189,6 +189,16 @@ func (s *Service) refreshSource(ctx context.Context, src settings.LiveTVSource) 
 	defer body.Close()
 	now := time.Now().UTC()
 	from, until := now.Add(-3*time.Hour), now.Add(GuideDays*24*time.Hour)
+	// Read the whole guide first, so the database isn't held while it downloads.
+	var progs []Programme
+	guideChans, err := ParseXMLTV(body, from, until, func(p Programme) {
+		if len(byEPG[p.Channel]) > 0 {
+			progs = append(progs, p)
+		}
+	})
+	if err != nil {
+		return channels, 0, fmt.Errorf("guide: %w", err)
+	}
 	tx, err = s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return channels, 0, err
@@ -201,20 +211,13 @@ func (s *Service) refreshSource(ctx context.Context, src settings.LiveTVSource) 
 		return channels, 0, err
 	}
 	defer ins.Close()
-	var insErr error
-	guideChans, err := ParseXMLTV(body, from, until, func(p Programme) {
+	for _, p := range progs {
 		for _, id := range byEPG[p.Channel] {
-			if _, e := ins.ExecContext(ctx, id, p.Start.UTC().Format(time.RFC3339), p.Stop.UTC().Format(time.RFC3339), p.Title, p.Subtitle, p.Description, p.Category, p.Episode, p.Image); e != nil && insErr == nil {
-				insErr = e
+			if _, err := ins.ExecContext(ctx, id, p.Start.UTC().Format(time.RFC3339), p.Stop.UTC().Format(time.RFC3339), p.Title, p.Subtitle, p.Description, p.Category, p.Episode, p.Image); err != nil {
+				return channels, programmes, err
 			}
 			programmes++
 		}
-	})
-	if err != nil {
-		return channels, programmes, fmt.Errorf("guide: %w", err)
-	}
-	if insErr != nil {
-		return channels, programmes, insErr
 	}
 	// Logos from the guide fill in channels whose playlist entry had none.
 	for _, g := range guideChans {

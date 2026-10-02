@@ -70,6 +70,11 @@ public final class AppSession {
     public private(set) var me: User?
     public private(set) var lastError: String?
     public private(set) var client: Client?
+    /// True while the address is being re-checked in the background (the app stays usable).
+    public private(set) var isReconnecting = false
+    /// Called when the signed-in person goes away or changes (sign out, profile switch,
+    /// forgetting the server), so playback that belongs to them can stop.
+    @ObservationIgnored public var onUserChange: (() -> Void)?
 
     private let tokenBox = TokenBox()
     private var token: String? {
@@ -77,7 +82,10 @@ public final class AppSession {
         set { tokenBox.token = newValue }
     }
     private let pathMonitor = NWPathMonitor()
-    private var lastPath: NWPath.Status?
+    /// The last network seen: its status and the kinds of interface in use.
+    @ObservationIgnored private var lastPath: String?
+    @ObservationIgnored private var pathDebounce: Task<Void, Never>?
+    @ObservationIgnored private var reconnectTask: Task<Void, Never>?
 
     public init() {
         if let id = ServerStore.currentServerID, let s = ServerStore.servers.first(where: { $0.id == id }) {
@@ -87,14 +95,28 @@ public final class AppSession {
             Task { await reconnect() }
         }
         // Re-check the address when the network changes (Wi-Fi ↔ cellular, leaving home).
+        // Path updates come in bursts and often repeat the same network, so they're
+        // debounced and only a real change re-probes.
         pathMonitor.pathUpdateHandler = { [weak self] path in
-            Task { @MainActor in
-                guard let self else { return }
-                if self.lastPath != nil, self.server != nil { await self.reconnect() }
-                self.lastPath = path.status
-            }
+            let kinds: [NWInterface.InterfaceType] = [.wifi, .cellular, .wiredEthernet, .other, .loopback]
+            let signature = "\(path.status)|" + kinds.filter { path.usesInterfaceType($0) }.map { "\($0)" }.joined(separator: ",")
+                + "|" + path.availableInterfaces.map(\.name).joined(separator: ",")
+            Task { @MainActor in self?.pathChanged(signature) }
         }
         pathMonitor.start(queue: .global(qos: .utility))
+    }
+
+    private func pathChanged(_ signature: String) {
+        let first = lastPath == nil
+        guard signature != lastPath else { return }
+        lastPath = signature
+        guard !first, server != nil else { return }
+        pathDebounce?.cancel()
+        pathDebounce = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled, let self, self.server != nil else { return }
+            await self.reconnect()
+        }
     }
 
     // MARK: - Devices
@@ -153,6 +175,7 @@ public final class AppSession {
                 if let lanURL { record.lanURL = lanURL }
                 if let remoteURL { record.remoteURL = remoteURL }
                 if info.networkClass == .remote, record.remoteURL == nil { record.remoteURL = url }
+                if server?.id != record.id, me != nil { onUserChange?() }
                 use(record)
                 await reconnect()
                 return
@@ -173,17 +196,32 @@ public final class AppSession {
         token = ServerStore.token(for: record.id)
     }
 
-    /// Picks the best address for the current network and checks the session.
+    /// Picks the best address for the current network and checks the session. Calls while
+    /// one is already running wait for it rather than starting another.
     public func reconnect() async {
+        if let running = reconnectTask { await running.value; return }
+        let task = Task { await performReconnect() }
+        reconnectTask = task
+        await task.value
+        reconnectTask = nil
+    }
+
+    private func performReconnect() async {
         guard var record = server else { state = .noServer; return }
-        state = .connecting
+        // Only the first connection shows "Connecting…"; once there's a client the app stays
+        // up (a playing video, where you are) while the address is re-checked.
+        if client == nil { state = .connecting }
+        isReconnecting = true
+        defer { isReconnecting = false }
         var chosen: (URL, Schemas.SystemInfo)?
         for url in record.candidates {
             if let info = await Self.probe(url) { chosen = (url, info); break }
         }
-        guard let (url, info) = chosen else {
-            lastError = "Can't reach \(record.name). Check that you're on the home network or connected to Tailscale."
-            state = token == nil ? .signedOut : .signedIn
+        guard let (url, info) = chosen, server?.id == record.id else {
+            if server?.id == record.id {
+                lastError = "Can't reach \(record.name). Check that you're on the home network or connected to Tailscale."
+                state = token == nil ? .signedOut : .signedIn
+            }
             return
         }
         // Learn the remote address the server advertises (Settings → Remote Access).
@@ -208,10 +246,13 @@ public final class AppSession {
     // MARK: - Signing in
 
     private func signedIn(_ auth: Schemas.AuthResult) {
+        if let old = me?.id, old != auth.user.id { onUserChange?() }
         token = auth.token
         if let id = server?.id { ServerStore.setToken(auth.token, for: id) }
         me = auth.user
         state = .signedIn
+        // The image key only comes with /me.
+        Task { await refreshMe() }
     }
 
     public func signIn(username: String, password: String, totpCode: String? = nil) async throws {
@@ -284,6 +325,7 @@ public final class AppSession {
     }
 
     private func signOutLocally() {
+        onUserChange?()
         token = nil
         me = nil
         if let id = server?.id { ServerStore.setToken(nil, for: id) }
@@ -291,6 +333,7 @@ public final class AppSession {
     }
 
     public func forgetServer() {
+        onUserChange?()
         if let id = server?.id { ServerStore.forget(id) }
         server = nil
         client = nil
@@ -305,7 +348,14 @@ public final class AppSession {
 
     // MARK: - URLs
 
-    /// Artwork URL usable directly (images authenticate with the token parameter).
+    /// How image, person photo and avatar URLs authenticate: the image key from /me (D85),
+    /// which grants those images and nothing else, or the token until the key is known.
+    private var imageAuth: URLQueryItem {
+        if let key = me?.imageKey, !key.isEmpty { return .init(name: "key", value: key) }
+        return .init(name: "token", value: token)
+    }
+
+    /// Artwork URL usable directly (images authenticate with the image key).
     public func imageURL(_ artworkID: Int64?, width: Int) -> URL? {
         guard let artworkID, let baseURL else { return nil }
         #if canImport(UIKit)
@@ -314,14 +364,14 @@ public final class AppSession {
         let scale = 2
         #endif
         var c = URLComponents(url: baseURL.appending(path: "api/v1/images/\(artworkID)"), resolvingAgainstBaseURL: false)!
-        c.queryItems = [.init(name: "w", value: String(width * max(scale, 1))), .init(name: "token", value: token)]
+        c.queryItems = [.init(name: "w", value: String(width * max(scale, 1))), imageAuth]
         return c.url
     }
 
     public func personPhotoURL(_ personID: Int64, width: Int) -> URL? {
         guard let baseURL else { return nil }
         var c = URLComponents(url: baseURL.appending(path: "api/v1/people/\(personID)/photo"), resolvingAgainstBaseURL: false)!
-        c.queryItems = [.init(name: "w", value: String(width * 2)), .init(name: "token", value: token)]
+        c.queryItems = [.init(name: "w", value: String(width * 2)), imageAuth]
         return c.url
     }
 
@@ -333,7 +383,7 @@ public final class AppSession {
         let parts = path.split(separator: "?", maxSplits: 1)
         c.path = String(parts[0])
         var items = parts.count > 1 ? (URLComponents(string: "?" + parts[1])?.queryItems ?? []) : []
-        if path.hasPrefix("/api/v1/users/") { items.append(.init(name: "token", value: token)) }
+        if path.hasPrefix("/api/v1/users/") { items.append(imageAuth) } // avatars
         c.queryItems = items.isEmpty ? nil : items
         return c.url
     }

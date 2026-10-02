@@ -236,6 +236,9 @@ func (h *Handlers) Login(ctx context.Context, req LoginRequestObject) (LoginResp
 		if errors.Is(err, auth.ErrTOTPRequired) {
 			return Login401JSONResponse{UnauthorizedJSONResponse(apiErr("totp_required", err.Error()))}, nil
 		}
+		if errors.As(err, &rl) {
+			return Login429JSONResponse{TooManyRequestsJSONResponse(apiErr("rate_limited", rl.Error()))}, nil
+		}
 		slog.WarnContext(ctx, "wrong two-factor code", "username", b.Username, "ip", ip)
 		return Login401JSONResponse{UnauthorizedJSONResponse(apiErr("invalid_totp", err.Error()))}, nil
 	}
@@ -312,6 +315,8 @@ func (h *Handlers) PinLogin(ctx context.Context, req PinLoginRequestObject) (Pin
 	case errors.Is(err, auth.ErrWrongPIN):
 		slog.WarnContext(ctx, "wrong PIN", "user", b.UserId, "ip", ip)
 		return PinLogin401JSONResponse{UnauthorizedJSONResponse(apiErr("wrong_pin", "incorrect PIN"))}, nil
+	case err == nil && pinBlockedBy2FA(ctx, u):
+		return PinLogin401JSONResponse{UnauthorizedJSONResponse(apiErr("password_required", errPinNeeds2FA))}, nil
 	case errors.Is(err, auth.ErrPasswordRequired):
 		if b.Password == nil || *b.Password == "" {
 			return PinLogin401JSONResponse{UnauthorizedJSONResponse(apiErr("password_required", err.Error()))}, nil
@@ -345,6 +350,13 @@ func (h *Handlers) PinLogin(ctx context.Context, req PinLoginRequestObject) (Pin
 		return nil, internal(ctx, "pinLogin", err)
 	}
 	return PinLogin200JSONResponse{Token: token, User: toAPIUser(u)}, nil
+}
+
+const errPinNeeds2FA = "This account uses two-factor sign-in: away from home, sign in with its password and authenticator code."
+
+// pinBlockedBy2FA: a PIN alone mustn't open a two-factor account from outside the home (D75).
+func pinBlockedBy2FA(ctx context.Context, u auth.User) bool {
+	return u.HasTOTP && requestInfo(ctx).Class == netclass.Remote
 }
 
 // remoteURL is the Tailscale address apps use away from home, when remote access is on.

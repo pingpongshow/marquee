@@ -65,7 +65,7 @@ func (s *Scans) Run(ctx context.Context) {
 
 	// Runs left "running" by a restart are recorded as interrupted.
 	s.DB.ExecContext(ctx, `UPDATE task_runs SET status = 'failed', message = 'interrupted by server restart',
-		finished_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE status = 'running'`)
+		finished_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE status = 'running' AND task = 'scan'`)
 
 	if s.Settings.Get().Library.ScanOnStartup {
 		s.QueueAll(ctx)

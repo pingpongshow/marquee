@@ -14,9 +14,11 @@ import app.marquee.api.models.RadioRequest
 import app.marquee.api.models.RateItemRequest
 import app.marquee.api.models.Station
 import app.marquee.core.Marquee
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -83,11 +85,19 @@ class MusicController(private val context: Context, private val marquee: Marquee
     private var lastId: Long? = null
     private var ratingJob: Job? = null
 
+    /** The controller being built: every caller waits for the same one (main thread only). */
+    private var connecting: Deferred<MediaController>? = null
+
     private suspend fun connect(): MediaController {
         controller?.let { return it }
+        val pending = connecting ?: scope.async { build() }.also { connecting = it }
+        return try { pending.await() } finally { if (connecting === pending && pending.isCompleted) connecting = null }
+    }
+
+    private suspend fun build(): MediaController {
         val c = MediaController.Builder(context, SessionToken(context, ComponentName(context, MusicService::class.java))).buildAsync().await()
         c.addListener(object : Player.Listener {
-            override fun onEvents(player: Player, events: Player.Events) = sync(player)
+            override fun onEvents(player: Player, events: Player.Events) = sync(player, events.contains(Player.EVENT_TIMELINE_CHANGED))
             override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && _sleep.value == Sleep.EndOfTrack) {
                     c.pause()
@@ -97,16 +107,28 @@ class MusicController(private val context: Context, private val marquee: Marquee
         })
         controller = c
         watchCast()
-        scope.launch {
-            while (true) {
+        sync(c, queueChanged = true)
+        return c
+    }
+
+    private var ticker: Job? = null
+
+    /** Moves the position along and checks the sleep timer, only while something plays. */
+    private fun tick() {
+        if (ticker?.isActive == true || !(_playing.value || casting)) return
+        ticker = scope.launch {
+            while (_playing.value || casting) {
                 if (casting) _position.value = marquee.cast.position.value
                 else controller?.let { _position.value = it.currentPosition to it.duration.coerceAtLeast(0) }
-                (_sleep.value as? Sleep.At)?.let { if (System.currentTimeMillis() >= it.epochMs) { controller?.pause(); _sleep.value = null } }
+                (_sleep.value as? Sleep.At)?.let {
+                    if (System.currentTimeMillis() >= it.epochMs) {
+                        if (casting) marquee.cast.pause() else controller?.pause()
+                        _sleep.value = null
+                    }
+                }
                 delay(500)
             }
         }
-        sync(c)
-        return c
     }
 
     private fun meta(item: MediaItem): Now {
@@ -115,12 +137,17 @@ class MusicController(private val context: Context, private val marquee: Marquee
             m.extras?.getString("dj"))
     }
 
-    private fun sync(p: Player) {
+    private fun sync(p: Player, queueChanged: Boolean) {
         val cur = p.currentMediaItem?.let(::meta)
         _now.value = cur
-        if (!casting) _playing.value = p.isPlaying
+        if (!casting) {
+            _playing.value = p.isPlaying
+            _position.value = p.currentPosition to p.duration.coerceAtLeast(0)
+        }
+        tick()
         _index.value = p.currentMediaItemIndex
-        _queue.value = (0 until p.mediaItemCount).map { meta(p.getMediaItemAt(it)) }
+        // The queue list is only rebuilt when the queue itself changed.
+        if (queueChanged) _queue.value = (0 until p.mediaItemCount).map { meta(p.getMediaItemAt(it)) }
         _shuffle.value = p.shuffleModeEnabled
         _repeat.value = p.repeatMode
         if (cur?.id != lastId) {
@@ -159,10 +186,24 @@ class MusicController(private val context: Context, private val marquee: Marquee
         djCount = 0
         scope.launch(Dispatchers.Main) {
             val c = connect()
-            c.setMediaItems(tracks.map { mediaItem(it) }, start.coerceIn(0, tracks.size - 1), 0)
-            c.prepare()
-            c.play()
+            val index = start.coerceIn(0, tracks.size - 1)
+            c.setMediaItems(tracks.map { mediaItem(it) }, index, 0)
+            // While casting (or with a device connected and idle) the new queue plays there.
+            if (casting || beginCasting()) castTrack(index, 0)
+            else { c.prepare(); c.play() }
         }
+    }
+
+    /** Plays the best match for a spoken or typed search (MusicLibrary resolves it). */
+    fun playFromSearch(query: String) = with { c ->
+        _source.value = null
+        radio = null
+        djCount = 0
+        val item = MediaItem.Builder().setMediaId("search")
+            .setRequestMetadata(MediaItem.RequestMetadata.Builder().setSearchQuery(query).build()).build()
+        c.setMediaItems(listOf(item))
+        c.prepare()
+        c.play()
     }
 
     /** Starts a station from a seed (MUSIC-3). Throws when the server can't make one. */
@@ -259,7 +300,10 @@ class MusicController(private val context: Context, private val marquee: Marquee
     /** Adds tracks after the current one (Play Next) or at the end. */
     fun enqueue(tracks: List<ItemSummary>, next: Boolean) = with { c ->
         val items = tracks.map { mediaItem(it) }
-        if (c.mediaItemCount == 0) { c.setMediaItems(items); c.prepare(); c.play() }
+        if (c.mediaItemCount == 0) {
+            c.setMediaItems(items)
+            if (casting || beginCasting()) castTrack(0, 0) else { c.prepare(); c.play() }
+        }
         else if (next) c.addMediaItems(c.currentMediaItemIndex + 1, items) else c.addMediaItems(items)
     }
 
@@ -291,26 +335,49 @@ class MusicController(private val context: Context, private val marquee: Marquee
                 when {
                     // A video being cast owns the device; otherwise music goes there if any is queued.
                     device != null && !casting && !marquee.cast.videoActive && c.mediaItemCount > 0 && (c.isPlaying || _now.value != null) -> {
-                        casting = true
                         val at = c.currentPosition
-                        c.pause()
-                        marquee.cast.onFinished = { castNext() }
+                        beginCasting()
                         castTrack(c.currentMediaItemIndex, at)
                     }
                     device == null && casting -> {
                         casting = false
                         marquee.cast.onFinished = null
                         c.seekTo(c.currentMediaItemIndex, marquee.cast.position.value.first)
-                        c.play()
+                        // Carries on here only if it was playing there.
+                        c.prepare()
+                        if (marquee.cast.playingAtEnd) c.play()
+                        _playing.value = c.isPlaying
                     }
                 }
             }
         }
     }
 
+    /**
+     * Hands music to the connected Cast device, unless a video owns it: the phone pauses and
+     * keeps the queue. False when there's nothing to cast to.
+     */
+    private fun beginCasting(): Boolean {
+        val c = controller ?: return false
+        if (castWatch == null || marquee.cast.device.value == null || marquee.cast.videoActive) return false
+        casting = true
+        c.pause()
+        marquee.cast.onFinished = {
+            // The sleep timer's "end of track" stops the receiver here instead of moving on.
+            if (_sleep.value == Sleep.EndOfTrack) _sleep.value = null else castNext()
+        }
+        tick()
+        return true
+    }
+
     private fun castTrack(index: Int, at: Long) {
-        val t = _queue.value.getOrNull(index) ?: return
-        scope.launch { marquee.cast.load(t.id, at, t.title, t.artist.ifBlank { null }, t.artwork?.toString(), music = true) }
+        val c = controller ?: return
+        if (index !in 0 until c.mediaItemCount) return
+        val t = meta(c.getMediaItemAt(index))
+        scope.launch {
+            val error = marquee.cast.load(t.id, at, t.title, t.artist.ifBlank { null }, t.artwork?.toString(), music = true)
+            if (error != null) android.widget.Toast.makeText(context, "Couldn't play on the Cast device: $error", android.widget.Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun castNext() {

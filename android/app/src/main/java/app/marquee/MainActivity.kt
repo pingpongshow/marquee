@@ -1,5 +1,6 @@
 package app.marquee
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,5 +23,17 @@ class MainActivity : ComponentActivity() {
         }
         if (!marquee.isTv) marquee.cast.init() // Chromecast sessions (D82)
         setContent { MarqueeTheme { MarqueeRoot(marquee, app.music, app.downloads) } }
+        playFromSearch(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        playFromSearch(intent)
+    }
+
+    /** "Play … on Marquee" from Assistant: the music service finds and plays the best match. */
+    private fun playFromSearch(intent: Intent?) {
+        if (intent?.action != android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) return
+        (application as MarqueeApplication).music.playFromSearch(intent.getStringExtra(android.app.SearchManager.QUERY).orEmpty())
     }
 }

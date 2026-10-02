@@ -9,6 +9,7 @@ struct PlayerView: View {
     #endif
     @Environment(AppSession.self) private var app
     @Environment(VideoPresenter.self) private var presenter
+    @Environment(MusicPlayer.self) private var music
     @Environment(\.dismiss) private var dismiss
     let request: VideoRequest
     @State private var playback: VideoPlayback?
@@ -35,10 +36,12 @@ struct PlayerView: View {
             }
         }
         .task {
+            music.pause() // a video takes over from the music
             let p = VideoPlayback(app: app, playlistID: request.playlistID)
             playback = p
             let t = WatchTogether(app: app, player: p.player, itemID: request.itemID)
             together = t
+            p.onRestart = { [weak t] in t?.restarting() }
             let tracks = PendingTracks.shared.take(request.itemID)
             #if os(iOS)
             // Downloaded: play from the device (works offline, saves bandwidth).

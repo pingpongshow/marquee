@@ -2,12 +2,15 @@ package app.marquee.music
 
 import android.net.Uri
 import android.os.Bundle
+import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.util.UnstableApi
 import app.marquee.api.models.ItemSummary
 import app.marquee.core.Marquee
 
 /** A queue entry for a track: id = track id, URI resolved to a playback session by MusicService. */
+@OptIn(UnstableApi::class)
 fun trackItem(marquee: Marquee, t: ItemSummary, dj: String? = null): MediaItem = MediaItem.Builder()
     .setMediaId(t.id.toString())
     .setUri("marquee://track/${t.id}")

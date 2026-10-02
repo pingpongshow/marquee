@@ -16,9 +16,16 @@ enum Shared {
 /// CarPlay (MUSIC-14): mixes, stations and recently played albums, the music library and
 /// downloads, with the system Now Playing screen.
 @MainActor
-final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
+final class CarPlaySceneDelegate: UIResponder, @preconcurrency CPTemplateApplicationSceneDelegate {
     private var ui: CPInterfaceController?
     private var musicLibrary: Int64?
+    private var forYouTemplate: CPListTemplate?
+    private var downloadsTemplate: CPListTemplate?
+    /// Whether For You was last loaded with a connection, and which downloads were listed.
+    private var loadedConnected: Bool?
+    private var listedDownloads: [Int64]?
+    /// Bumped per connection, so an observation left from an earlier one stops.
+    private var watchGeneration = 0
 
     func templateApplicationScene(_ scene: CPTemplateApplicationScene, didConnect interfaceController: CPInterfaceController) {
         ui = interfaceController
@@ -30,14 +37,41 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         let downloads = CPListTemplate(title: "Downloads", sections: [])
         downloads.tabImage = UIImage(systemName: "arrow.down.circle")
         interfaceController.setRootTemplate(CPTabBarTemplate(templates: [forYou, library, downloads]), animated: false, completion: nil)
-        Task {
-            await loadForYou(forYou)
-            downloads.updateSections(downloadSections())
-        }
+        forYouTemplate = forYou
+        downloadsTemplate = downloads
+        loadedConnected = nil
+        listedDownloads = nil
+        watchGeneration += 1
+        refresh(watchGeneration)
     }
 
     func templateApplicationScene(_ scene: CPTemplateApplicationScene, didDisconnectInterfaceController interfaceController: CPInterfaceController) {
         ui = nil
+        forYouTemplate = nil
+        downloadsTemplate = nil
+    }
+
+    /// The car often connects before the app has reached the server: For You loads again once
+    /// it's connected (or lost), and Downloads follows what's on the device.
+    private func refresh(_ generation: Int) {
+        guard generation == watchGeneration, ui != nil, let forYou = forYouTemplate, let downloads = downloadsTemplate else { return }
+        let connected = app.client != nil && app.state == .signedIn
+        if connected != loadedConnected {
+            loadedConnected = connected
+            Task { await loadForYou(forYou) }
+        }
+        let done = downloadedTracks().map(\.id)
+        if done != listedDownloads {
+            listedDownloads = done
+            downloads.updateSections(downloadSections())
+        }
+        withObservationTracking {
+            _ = app.client
+            _ = app.state
+            _ = Shared.downloads?.entries
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.refresh(generation) }
+        }
     }
 
     private var app: AppSession { Shared.app }
@@ -196,10 +230,14 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
 
     // MARK: - Downloads
 
-    private func downloadSections() -> [CPListSection] {
+    private func downloadedTracks() -> [Item] {
         guard let dl = Shared.downloads else { return [] }
-        let tracks = dl.entries.values.filter { $0.state == .done && $0.item._type == .track }.map(\.item)
+        return dl.entries.values.filter { $0.state == .done && $0.item._type == .track }.map(\.item)
             .sorted { ($0.grandparentTitle ?? "", $0.parentTitle ?? "", $0.index ?? 0) < ($1.grandparentTitle ?? "", $1.parentTitle ?? "", $1.index ?? 0) }
+    }
+
+    private func downloadSections() -> [CPListSection] {
+        let tracks = downloadedTracks()
         guard !tracks.isEmpty else {
             return [CPListSection(items: [CPListItem(text: "No downloaded music", detailText: "Download albums in the app to play them offline")])]
         }

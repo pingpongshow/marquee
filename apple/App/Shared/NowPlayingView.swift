@@ -156,6 +156,10 @@ struct NowPlayingView: View {
             VStack(spacing: 4) {
                 Text(t.title).font(.title2.bold()).lineLimit(1).accessibilityIdentifier("nowPlayingTitle")
                 Text([t.artistCredit ?? t.grandparentTitle, t.parentTitle].compactMap { $0 }.joined(separator: " · ")).foregroundStyle(.secondary).lineLimit(1)
+                if let error = music.error {
+                    Label(error, systemImage: "exclamationmark.triangle.fill").font(.footnote).foregroundStyle(.red).lineLimit(2)
+                        .accessibilityIdentifier("musicError")
+                }
             }
             VStack(spacing: 4) {
                 #if os(tvOS)

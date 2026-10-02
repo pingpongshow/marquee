@@ -109,7 +109,12 @@ func (s *Service) pathFor(ctx context.Context, a artwork, width int) (string, st
 	if _, err := os.Stat(out); err == nil {
 		return out, ctype, nil
 	}
-	p, err := s.once(out, func() error { return s.render(ctx, a, key, width, out) })
+	p, err := s.once(out, func() error {
+		// Others may be waiting on this render: one client going away mustn't fail it.
+		rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
+		defer cancel()
+		return s.render(rctx, a, key, width, out)
+	})
 	return p, ctype, err
 }
 

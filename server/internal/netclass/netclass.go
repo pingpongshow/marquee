@@ -26,12 +26,12 @@ var tailscalePrefixes = []netip.Prefix{
 	netip.MustParsePrefix("fd7a:115c:a1e0::/48"),
 }
 
-// Proxies we accept X-Forwarded-For from (loopback and Docker bridge gateways).
-// `tailscale serve` on the host proxies through these.
+// Proxies we accept X-Forwarded-For from: loopback only. Marquee uses host networking, so
+// `tailscale serve` on the host comes in over loopback; Docker bridge addresses would be other
+// containers on the host, which mustn't be able to claim to be on the home network.
 var trustedProxyPrefixes = []netip.Prefix{
 	netip.MustParsePrefix("127.0.0.0/8"),
 	netip.MustParsePrefix("::1/128"),
-	netip.MustParsePrefix("172.16.0.0/12"),
 }
 
 type rules struct {

@@ -32,6 +32,8 @@ public final class WatchTogether {
     @ObservationIgnored private var statusObservation: NSKeyValueObservation?
     @ObservationIgnored private var jumpObserver: NSObjectProtocol?
     @ObservationIgnored private var buffering = false
+    /// Set while the player restarts its stream; cleared once it plays again.
+    @ObservationIgnored private var restartingUntil = Date.distantPast
 
     /// How far apart players may drift before being pulled back.
     static let drift: Double = 1.5
@@ -84,20 +86,47 @@ public final class WatchTogether {
         observe()
         polling?.cancel()
         polling = Task { [weak self] in
+            // A dropped connection or a reconnect retries with backoff; only the server saying
+            // the group is gone (404) ends it straight away.
+            var failures = 0
             while !Task.isCancelled {
                 guard let self, let g = self.group else { return }
                 do {
-                    let next = try await self.client.getWatchGroup(path: .init(groupId: g.id), query: .init(since: g.version)).ok.body.json
-                    if !Task.isCancelled, self.group != nil { self.apply(next) }
+                    switch try await self.client.getWatchGroup(path: .init(groupId: g.id), query: .init(since: g.version)) {
+                    case let .ok(ok):
+                        let next = try ok.body.json
+                        failures = 0
+                        if !Task.isCancelled, self.group != nil { self.apply(next) }
+                    case .notFound:
+                        self.ended("The group has ended.")
+                        return
+                    default:
+                        throw MarqueeError("Unexpected response")
+                    }
                 } catch {
                     if Task.isCancelled { return }
-                    self.error = "The group has ended."
-                    self.group = nil
-                    self.stopObserving()
-                    return
+                    failures += 1
+                    if failures >= 6 {
+                        self.leave() // giving up: tell the server, in case it can still hear us
+                        self.error = "Lost touch with the group."
+                        return
+                    }
+                    try? await Task.sleep(for: .seconds(min(16, 1 << (failures - 1))))
                 }
             }
         }
+    }
+
+    private func ended(_ message: String) {
+        error = message
+        group = nil
+        stopObserving()
+    }
+
+    /// The player is restarting its stream (an audio change, a fallback): the pause and seek
+    /// that come with it aren't the viewer's, so they aren't sent to the group.
+    public func restarting() {
+        restartingUntil = Date().addingTimeInterval(20)
     }
 
     private func apply(_ g: WatchGroup) {
@@ -120,7 +149,7 @@ public final class WatchTogether {
     }
 
     private func quiet() { quietUntil = Date().addingTimeInterval(1.2) }
-    private var mine: Bool { Date() > quietUntil }
+    private var mine: Bool { Date() > quietUntil && Date() > restartingUntil }
 
     private func observe() {
         guard statusObservation == nil else { return }
@@ -154,6 +183,7 @@ public final class WatchTogether {
                 Task { await send(.buffering) }
             }
         case .playing:
+            restartingUntil = .distantPast
             if buffering {
                 buffering = false
                 Task { await send(.ready) }

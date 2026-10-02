@@ -37,6 +37,7 @@ type Transcoder struct {
 	lastRequest int
 	paused      bool
 	stopped     bool
+	gen         int // bumped by each start, so one superseded while it waited backs off
 	stopOnce    sync.Once
 	quit        chan struct{}
 }
@@ -46,6 +47,12 @@ func (t *Transcoder) running() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.cmd != nil && !isClosed(t.exited)
+}
+
+func (t *Transcoder) isStopped() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.stopped
 }
 
 func (t *Transcoder) Encoder() string {
@@ -69,9 +76,22 @@ func exists(p string) bool {
 	return err == nil
 }
 
+var errStopped = errors.New("session stopped")
+
 // start launches FFmpeg at segment k. Caller holds t.mu.
 func (t *Transcoder) start(k int) error {
-	t.killLocked()
+	if t.stopped {
+		return errStopped
+	}
+	t.gen++
+	gen := t.gen
+	t.killLocked() // releases t.mu while the old run exits
+	switch {
+	case t.stopped:
+		return errStopped // stopped meanwhile: don't bring FFmpeg back
+	case t.gen != gen || t.cmd != nil:
+		return nil // another request started a run meanwhile; it serves this one too
+	}
 	if err := os.MkdirAll(t.Job.Dir, 0o755); err != nil {
 		return err
 	}
@@ -155,6 +175,10 @@ func (t *Transcoder) refreshProduced() {
 func (t *Transcoder) Init(ctx context.Context) (string, error) {
 	p := filepath.Join(t.Job.Dir, "init.mp4")
 	t.mu.Lock()
+	if t.stopped {
+		t.mu.Unlock()
+		return "", errStopped
+	}
 	if t.cmd == nil && !exists(p) {
 		if err := t.start(t.lastRequest); err != nil {
 			t.mu.Unlock()
@@ -179,7 +203,7 @@ func (t *Transcoder) Segment(ctx context.Context, k int) (string, error) {
 	t.mu.Lock()
 	if t.stopped {
 		t.mu.Unlock()
-		return "", errors.New("session stopped")
+		return "", errStopped
 	}
 	t.lastRequest = k
 	if t.paused && t.cmd != nil {

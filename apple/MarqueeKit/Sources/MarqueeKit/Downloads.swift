@@ -45,7 +45,7 @@ public final class Downloads {
     }
 
     /// A play made while offline, waiting to be sent.
-    struct PendingProgress: Codable {
+    struct PendingProgress: Codable, Equatable {
         let itemID: Int64
         let positionMs: Int64
         let watched: Bool
@@ -58,6 +58,13 @@ public final class Downloads {
     @ObservationIgnored private var session: URLSession!
     @ObservationIgnored private let bridge = SessionBridge()
     @ObservationIgnored private var polling: Task<Void, Never>?
+    /// Guards against overlapping work when attach runs again (every reconnect).
+    @ObservationIgnored private var resuming = false
+    @ObservationIgnored private var syncing = false
+    @ObservationIgnored private var flushing = false
+    @ObservationIgnored private var flushAgain = false
+    /// When each transfer last updated its progress (updates are throttled).
+    @ObservationIgnored private var lastProgress: [Int64: (at: Date, fraction: Double)] = [:]
 
     public static let directory: URL = {
         let d = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appending(path: "Downloads", directoryHint: .isDirectory)
@@ -94,19 +101,39 @@ public final class Downloads {
     }
 
     /// Connects to the signed-in server: resumes conversions and sends offline progress.
+    /// Safe to call again (it runs on every reconnect): only what isn't already under way starts.
     public func attach(_ app: AppSession) {
         self.app = app
-        // Anything interrupted mid-download restarts (the system may have finished it already).
-        for e in entries.values where !(e.state == .done) {
-            if case .failed = e.state { continue }
-            if e.jobID != nil, e.url == nil { continue }
-            if case .downloading = e.state, let path = e.url { fetch(itemID: e.id, path: path) }
-        }
+        resumeTransfers()
         pollConversions()
         Task {
             await flushProgress()
             // Playlists kept on the device follow their changes.
+            guard !syncing else { return }
+            syncing = true
+            defer { syncing = false }
             for id in syncedPlaylists.keys { await syncPlaylist(id) }
+        }
+    }
+
+    /// Restarts downloads interrupted mid-transfer, skipping any the background session is
+    /// still running (it carries on across launches by itself).
+    private func resumeTransfers() {
+        let wanted = entries.values.compactMap { e -> (Int64, String)? in
+            guard case .downloading = e.state, let path = e.url else { return nil }
+            return (e.id, path)
+        }
+        guard !resuming, !wanted.isEmpty else { return }
+        resuming = true
+        session.getAllTasks { tasks in
+            let live = Set(tasks.filter { $0.state == .running || $0.state == .suspended }.compactMap { $0.taskDescription.flatMap(Int64.init) })
+            Task { @MainActor in
+                self.resuming = false
+                for (id, path) in wanted where !live.contains(id) {
+                    guard case .downloading = self.entries[id]?.state else { continue }
+                    self.fetch(itemID: id, path: path)
+                }
+            }
         }
     }
 
@@ -227,19 +254,26 @@ public final class Downloads {
         Task { await flushProgress() }
     }
 
+    /// Sends offline plays. One flush at a time (a play sent twice counts twice); records
+    /// added meanwhile go in a follow-up, and only the ones the server took are removed.
     public func flushProgress() async {
-        guard let client = app?.client, !pending.isEmpty else { return }
-        var left: [PendingProgress] = []
-        for p in pending {
-            do {
-                _ = try await client.syncProgress(path: .init(itemId: p.itemID),
-                                                  body: .json(.init(positionMs: p.positionMs, watched: p.watched, playedAt: p.at))).noContent
-            } catch {
-                left.append(p)
+        guard !flushing else { flushAgain = true; return }
+        flushing = true
+        defer { flushing = false }
+        repeat {
+            flushAgain = false
+            guard let client = app?.client, !pending.isEmpty else { return }
+            var sent: [PendingProgress] = []
+            for p in pending {
+                do {
+                    _ = try await client.syncProgress(path: .init(itemId: p.itemID),
+                                                      body: .json(.init(positionMs: p.positionMs, watched: p.watched, playedAt: p.at))).noContent
+                    sent.append(p)
+                } catch {}
             }
-        }
-        pending = left
-        if let data = try? JSONEncoder().encode(pending) { try? data.write(to: Self.pendingURL, options: .atomic) }
+            pending.removeAll { sent.contains($0) }
+            if let data = try? JSONEncoder().encode(pending) { try? data.write(to: Self.pendingURL, options: .atomic) }
+        } while flushAgain
     }
 
     // MARK: - Conversions
@@ -286,12 +320,17 @@ public final class Downloads {
         task.resume()
     }
 
+    /// Progress comes many times a second; the list redraws about twice a second, or per 1%.
     fileprivate func progressed(itemID: Int64, fraction: Double) {
         guard entries[itemID] != nil else { return }
+        let now = Date()
+        if let last = lastProgress[itemID], now.timeIntervalSince(last.at) < 0.5, fraction - last.fraction < 0.01, fraction < 1 { return }
+        lastProgress[itemID] = (now, fraction)
         entries[itemID]?.state = .downloading(fraction)
     }
 
     fileprivate func finished(itemID: Int64, temp: URL, suggested: String?) {
+        lastProgress[itemID] = nil
         guard var e = entries[itemID] else { return }
         let ext = (suggested as NSString?)?.pathExtension.nilIfEmpty ?? (e.quality == .original ? "mkv" : "mp4")
         let name = "\(itemID).\(ext)"

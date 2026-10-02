@@ -6,13 +6,13 @@ import { api, unwrap } from "@/api/client";
 import { fetchLeaves } from "@/api/queries";
 import type { ItemDetail } from "@/api/types";
 import { Button, Select } from "@/components/ui";
-import { useMusic } from "../player/MusicPlayer";
+import { useMusicActions } from "../player/MusicPlayer";
 import { formatTrackTime, versionLabel } from "./format";
 
 export function PlayButtons({ item }: { item: ItemDetail }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const music = useMusic();
+  const music = useMusicActions();
   const [busy, setBusy] = useState(false);
   const watched = item.type === "show" || item.type === "season" ? item.leafCount > 0 && item.watchedLeafCount === item.leafCount : (item.viewCount ?? 0) > 0;
   const toggleWatched = useMutation({
@@ -20,16 +20,15 @@ export function PlayButtons({ item }: { item: ItemDetail }) {
       watched ? unwrap(api.DELETE("/items/{itemId}/watched", { params: { path: { itemId: item.id } } })) : unwrap(api.POST("/items/{itemId}/watched", { params: { path: { itemId: item.id } } })),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["items"] }),
   });
-  const [listed, setListed] = useState(!!item.watchlisted);
   const toggleWatchlist = useMutation({
     mutationFn: (on: boolean) =>
       on
         ? unwrap(api.PUT("/items/{itemId}/watchlist", { params: { path: { itemId: item.id } } }))
         : unwrap(api.DELETE("/items/{itemId}/watchlist", { params: { path: { itemId: item.id } } })),
-    onMutate: (on) => setListed(on),
-    onError: (_e, on) => setListed(!on),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["items"] }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["items"] }),
   });
+  // Optimistic while the request is in flight; otherwise whatever the server says.
+  const listed = toggleWatchlist.isPending ? !!toggleWatchlist.variables : !!item.watchlisted;
   // Several versions (4K and 1080p, a director's cut): choose one, or let the server pick the best (LIB-7).
   const [file, setFile] = useState<number | undefined>();
   const playVideo = (id: number, t?: number) => navigate({ to: "/play/$itemId", params: { itemId: String(id) }, search: { t, f: id === item.id ? file : undefined } });
