@@ -95,7 +95,7 @@ export function PlaylistPage() {
 
   const play = (start: number, shuffle = false) => {
     if (p.kind === "audio") {
-      music.play(items, start, { shuffle });
+      music.play(items, start, { shuffle, source: p.title });
       return;
     }
     const order = shuffle ? shuffled(items) : items.slice(start);
@@ -166,8 +166,12 @@ export function PlaylistPage() {
       </header>
       {(rename.isError || remove.isError || move.isError) && <Alert tone="error">{(rename.error ?? remove.error ?? move.error)?.message}</Alert>}
       {entries.isPending && <Spinner />}
-      {list.length === 0 && entries.isSuccess && <p className="text-muted">This playlist is empty. Use “Add to playlist” on tracks, albums, movies or episodes.</p>}
-      <ol className="divide-y divide-border rounded-lg border border-border bg-surface">
+      {list.length === 0 && entries.isSuccess && (
+        <p className="text-muted">
+          {p.rules ? "No tracks match these rules yet. Try loosening them with “Edit rules”." : "This playlist is empty. Use “Add to playlist” on tracks, albums, movies or episodes."}
+        </p>
+      )}
+      <ol className="empty:hidden divide-y divide-border rounded-lg border border-border bg-surface">
         {list.map((e, i) => {
           const it = e.item;
           const art = it.type === "episode" ? (it.images?.thumb ?? it.images?.poster) : it.images?.poster;

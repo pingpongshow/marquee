@@ -40,7 +40,7 @@ export function ItemMenu({ item, className }: { item: ItemSummary; className?: s
               </MenuItem>
             )}
             {item.type !== "track" && (
-              <MenuItem icon={<Shuffle />} onClick={async () => player.play(await fetchLeaves(item.id, { shuffle: true }))}>
+              <MenuItem icon={<Shuffle />} onClick={async () => player.play(await fetchLeaves(item.id, { shuffle: true }), 0, { source: item.title })}>
                 Shuffle play
               </MenuItem>
             )}
