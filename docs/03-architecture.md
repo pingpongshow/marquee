@@ -1,6 +1,6 @@
 # Architecture
 
-_Last updated: 2026-10-01. Status: **Draft**._
+_Last updated: 2026-10-02. Status: **Draft**._
 
 ## System overview
 
@@ -42,7 +42,7 @@ _Last updated: 2026-10-01. Status: **Draft**._
   /Packages/MediaKit       # shared Swift package: API client, models, player, view models
   /iOS                     # iPhone + iPad target
   /tvOS                    # Apple TV target
-/android                   # later
+/android                   # Android phone/TV app (Kotlin, Compose; D66)
 /deploy                    # Dockerfile, compose.yaml, reverse-proxy examples
 /docs                      # this documentation
 ```
