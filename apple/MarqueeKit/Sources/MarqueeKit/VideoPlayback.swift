@@ -42,6 +42,10 @@ public final class VideoPlayback {
     /// The version being played (nil = the server's best).
     @ObservationIgnored private var fileID: Int64?
     @ObservationIgnored private var selection: (audio: Int64?, subtitle: Int64?) = (nil, nil)
+    /// Set while playing a downloaded file (no server session; progress syncs later).
+    @ObservationIgnored private var offline: (itemID: Int64, downloads: Downloads)?
+    @ObservationIgnored private var offlineCounted = false
+    public private(set) var offlineTitle: String?
     @ObservationIgnored private static var measured: (kbps: Int, at: Date)?
 
     public init(app: AppSession, playlistID: Int64? = nil) {
@@ -125,6 +129,22 @@ public final class VideoPlayback {
         await start(itemID: id, startMs: pos, audio: audio ?? selection.audio, subtitle: subtitle ?? selection.subtitle)
     }
 
+    /// Plays a downloaded file. Works without the server; progress is kept on the device and
+    /// sent when the server is reachable.
+    public func startLocal(itemID: Int64, file: URL, downloads: Downloads) async {
+        errorMessage = nil
+        finished = false
+        offline = (itemID, downloads)
+        offlineTitle = downloads.entries[itemID]?.item.title
+        if app.client != nil { item = try? await app.item(itemID) }
+        let playerItem = AVPlayerItem(url: file)
+        observe(playerItem)
+        player.replaceCurrentItem(with: playerItem)
+        let resume = downloads.resumePosition(itemID)
+        if resume > 0 { await player.seek(to: CMTime(seconds: Double(resume) / 1000, preferredTimescale: 600)) }
+        player.play()
+    }
+
     public func stop() async {
         report(.paused, force: true)
         player.pause()
@@ -199,6 +219,19 @@ public final class VideoPlayback {
     }
 
     private func report(_ state: Schemas.PlaybackProgress.StatePayload, force: Bool = false) {
+        if let offline {
+            // Offline: remember the position; queue it for the server when paused or done.
+            let pos = Int64(max(0, player.currentTime().seconds) * 1000)
+            let dur = player.currentItem?.duration.seconds ?? 0
+            let watched = finished || (dur.isFinite && dur > 0 && Double(pos) / 1000 >= dur * 0.9)
+            if watched {
+                if !offlineCounted { offline.downloads.recordProgress(itemID: offline.itemID, positionMs: pos, watched: true) }
+                offlineCounted = true // one play per viewing
+            } else if state == .paused || force {
+                offline.downloads.recordProgress(itemID: offline.itemID, positionMs: pos, watched: false)
+            }
+            return
+        }
         guard let s = session, let client = app.client else { return }
         if !force, Date().timeIntervalSince(lastReport) < 1 { return }
         lastReport = Date()

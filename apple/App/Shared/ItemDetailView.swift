@@ -124,7 +124,15 @@ struct ItemDetailView: View {
                     ratings(d)
                 }
             }
+            #if os(iOS)
+            // Phones are too narrow for every action: the row scrolls, buttons keep their size.
+            ScrollView(.horizontal, showsIndicators: false) {
+                buttons(d).fixedSize().padding(.vertical, 2)
+            }
+            .scrollClipDisabled()
+            #else
             buttons(d)
+            #endif
             if let tagline = d.info.tagline, !tagline.isEmpty { Text(tagline).italic().foregroundStyle(.secondary) }
             if let summary = d.info.summary, !summary.isEmpty {
                 Text(summary).font(.body).foregroundStyle(.primary.opacity(0.9)).frame(maxWidth: 900, alignment: .leading)
@@ -188,6 +196,11 @@ struct ItemDetailView: View {
             case .collection:
                 EmptyView()
             }
+            #if os(iOS)
+            if [.movie, .episode, .video, .season, .show, .album, .artist, .track].contains(d.type) {
+                DownloadButton(item: d.base)
+            }
+            #endif
             if [.movie, .show, .episode, .video].contains(d.type) {
                 Button {
                     watchlisted.toggle()
