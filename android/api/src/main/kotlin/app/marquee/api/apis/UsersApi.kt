@@ -32,6 +32,9 @@ import app.marquee.api.models.ConnectLastFmRequest
 import app.marquee.api.models.ConnectListenBrainzRequest
 import app.marquee.api.models.Device
 import app.marquee.api.models.Error
+import app.marquee.api.models.Invite
+import app.marquee.api.models.InviteCreate
+import app.marquee.api.models.InviteCreated
 import app.marquee.api.models.LastFmAuthUrl200Response
 import app.marquee.api.models.LastFmAuthUrlRequest
 import app.marquee.api.models.Profile
@@ -216,6 +219,80 @@ open class UsersApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
+     * POST /invites
+     * Make a one-time invite link; whoever opens it picks a username and password and joins with these restrictions (admin only).
+     * 
+     * @param inviteCreate 
+     * @return InviteCreated
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun createInvite(inviteCreate: InviteCreate) : InviteCreated {
+        val localVarResponse = createInviteWithHttpInfo(inviteCreate = inviteCreate)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as InviteCreated
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /invites
+     * Make a one-time invite link; whoever opens it picks a username and password and joins with these restrictions (admin only).
+     * 
+     * @param inviteCreate 
+     * @return ApiResponse<InviteCreated?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun createInviteWithHttpInfo(inviteCreate: InviteCreate) : ApiResponse<InviteCreated?> {
+        val localVariableConfig = createInviteRequestConfig(inviteCreate = inviteCreate)
+
+        return request<InviteCreate, InviteCreated>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation createInvite
+     *
+     * @param inviteCreate 
+     * @return RequestConfig
+     */
+    fun createInviteRequestConfig(inviteCreate: InviteCreate) : RequestConfig<InviteCreate> {
+        val localVariableBody = inviteCreate
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/invites",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * POST /users
      * Create a user or managed profile (admin only).
      * 
@@ -355,6 +432,77 @@ open class UsersApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.DELETE,
             path = "/users/{userId}/avatar".replace("{"+"userId"+"}", encodeURIComponent(userId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /invites/{inviteId}
+     * Withdraw an invite (admin only). Someone who already joined keeps their account.
+     * 
+     * @param inviteId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun deleteInvite(inviteId: kotlin.Long) : Unit {
+        val localVarResponse = deleteInviteWithHttpInfo(inviteId = inviteId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /invites/{inviteId}
+     * Withdraw an invite (admin only). Someone who already joined keeps their account.
+     * 
+     * @param inviteId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun deleteInviteWithHttpInfo(inviteId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = deleteInviteRequestConfig(inviteId = inviteId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation deleteInvite
+     *
+     * @param inviteId 
+     * @return RequestConfig
+     */
+    fun deleteInviteRequestConfig(inviteId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/invites/{inviteId}".replace("{"+"inviteId"+"}", encodeURIComponent(inviteId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -857,6 +1005,76 @@ open class UsersApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/devices",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /invites
+     * Invites to share this server with friends (USER-13, admin only).
+     * 
+     * @return kotlin.collections.List<Invite>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listInvites() : kotlin.collections.List<Invite> {
+        val localVarResponse = listInvitesWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<Invite>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /invites
+     * Invites to share this server with friends (USER-13, admin only).
+     * 
+     * @return ApiResponse<kotlin.collections.List<Invite>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listInvitesWithHttpInfo() : ApiResponse<kotlin.collections.List<Invite>?> {
+        val localVariableConfig = listInvitesRequestConfig()
+
+        return request<Unit, kotlin.collections.List<Invite>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listInvites
+     *
+     * @return RequestConfig
+     */
+    fun listInvitesRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/invites",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

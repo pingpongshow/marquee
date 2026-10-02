@@ -311,6 +311,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Invites to share this server with friends (USER-13, admin only). */
+        get: operations["listInvites"];
+        put?: never;
+        /** Make a one-time invite link; whoever opens it picks a username and password and joins with these restrictions (admin only). */
+        post: operations["createInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/{inviteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                inviteId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Withdraw an invite (admin only). Someone who already joined keeps their account. */
+        delete: operations["deleteInvite"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        /** What an invite link is for, before accepting it. */
+        get: operations["getInvitation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{token}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Join with an invite link, creating your account and signing in. */
+        post: operations["acceptInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profiles": {
         parameters: {
             query?: never;
@@ -919,6 +994,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/libraries/{libraryId}/smart-collections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                libraryId: components["parameters"]["LibraryId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a smart collection from library filters (META-7, admin only). */
+        post: operations["createSmartCollection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/collections/{collectionId}/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Change a smart collection's rules (and optionally its name), or turn a manual collection's listing over to rules (admin only). */
+        put: operations["updateSmartCollection"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/collections/{collectionId}": {
         parameters: {
             query?: never;
@@ -988,6 +1101,43 @@ export interface paths {
         };
         /** The episode after this one (Up Next), if any. */
         get: operations["nextItem"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/home-layout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The person's Home rows, every available row included, in order (USER-12). */
+        get: operations["getHomeLayout"];
+        /** Reorder, hide, pin (add collection-<id> / playlist-<id>) or unpin Home rows. An empty list resets to the default. */
+        put: operations["setHomeLayout"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/prerolls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        /** What to play before a movie (PLAY-18): trailers of other movies, then the pre-roll video. Empty when off, for non-movies, or when the person opted out. Call it only when starting from the beginning. */
+        get: operations["listPrerolls"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2356,6 +2506,8 @@ export interface components {
              * @description The Seerr user requests are made as. Null = Seerr's API key owner.
              */
             seerrUserId?: number | null;
+            /** @description Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker. */
+            friend?: boolean;
         };
         UserPreferences: {
             /** @description ISO 639-2, e.g. eng, jpn */
@@ -2367,6 +2519,8 @@ export interface components {
             localQualityKbps?: number;
             /** @description 0 = automatic */
             remoteQualityKbps?: number;
+            /** @description Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true. */
+            cinemaTrailers?: boolean;
         };
         UserCreate: {
             username: string;
@@ -2459,6 +2613,7 @@ export interface components {
             tasks: components["schemas"]["TaskSettings"];
             music?: components["schemas"]["MusicSettings"];
             integrations?: components["schemas"]["IntegrationSettings"];
+            cinema?: components["schemas"]["CinemaSettings"];
             /** @description Replaces the whole list when sent. */
             webhooks?: components["schemas"]["Webhook"][];
         };
@@ -2473,6 +2628,7 @@ export interface components {
             tasks?: components["schemas"]["TaskSettings"];
             music?: components["schemas"]["MusicSettings"];
             integrations?: components["schemas"]["IntegrationSettingsUpdate"];
+            cinema?: components["schemas"]["CinemaSettings"];
             /** @description Replaces the whole list when sent. */
             webhooks?: components["schemas"]["Webhook"][];
         };
@@ -2489,6 +2645,16 @@ export interface components {
             secret?: string;
             events: ("playback.started" | "playback.paused" | "playback.resumed" | "playback.stopped" | "playback.watched" | "library.added")[];
             enabled: boolean;
+        };
+        /** @description Cinema trailers (PLAY-18) before movies that are started from the beginning. */
+        CinemaSettings: {
+            /** @description Trailers of other movies in the library to play first; 0 = off. */
+            trailers?: number;
+            /**
+             * Format: int64
+             * @description A video (e.g. a cinema intro) played after the trailers, before the movie.
+             */
+            prerollItemId?: number | null;
         };
         MusicSettings: {
             /** @description Analyse how tracks sound (on this server's GPU) for radios, similar music and Muse. */
@@ -3187,6 +3353,10 @@ export interface components {
             measuredKbps?: number;
             /** @description Prepare the next item (gapless music) without ending this device's current session. It takes over when it first reports "playing". */
             preload?: boolean;
+            /** @description Subtitle timing (PLAY-17), ms; positive shows subtitles later. Omit both offsets to use what this user last chose for this file; values sent are remembered. */
+            subtitleOffsetMs?: number;
+            /** @description Audio timing (PLAY-17), ms; positive plays the audio later. Nonzero repackages the stream (no direct play). */
+            audioOffsetMs?: number;
             profile: components["schemas"]["DeviceProfile"];
         };
         PlaybackDecision: {
@@ -3254,6 +3424,10 @@ export interface components {
             albumGainDb?: number;
             /** @description Music: peak sample level (1.0 = full scale), to avoid clipping when boosting. */
             peak?: number;
+            /** @description Subtitle offset applied (PLAY-17). subtitleUrl also takes ?offsetMs= to try another without restarting. */
+            subtitleOffsetMs?: number;
+            /** @description Audio offset applied (PLAY-17). */
+            audioOffsetMs?: number;
         };
         PlaybackProgress: {
             /** Format: int64 */
@@ -3338,6 +3512,94 @@ export interface components {
                 type: components["schemas"]["LibraryType"];
                 items: number;
             }[];
+        };
+        /** @description A smart collection's rules (META-7): its members are the library's movies or shows matching these, kept current. Only on collections that are smart. */
+        SmartCollectionRules: {
+            /** @enum {string} */
+            itemType: "movie" | "show";
+            /** @description A library sort (see the sort parameter). Default title. */
+            sort?: string;
+            /** @description At most this many; 0 = all. */
+            limit?: number;
+            /** @enum {string} */
+            watch?: "unwatched" | "watched" | "in_progress";
+            genre?: string;
+            decade?: number;
+            contentRating?: string;
+            /** @enum {string} */
+            resolution?: "4k" | "1080" | "720" | "sd";
+            hdr?: boolean;
+            yearFrom?: number;
+            yearTo?: number;
+            /** @description Added in the last this many days. */
+            addedDays?: number;
+            /** @description Studio or network. */
+            studio?: string;
+            /**
+             * Format: int64
+             * @description In the cast or crew.
+             */
+            personId?: number;
+            /** @description Audience, IMDb or critic rating of at least this (0–10). */
+            minRating?: number;
+        };
+        SmartCollectionSave: {
+            /** @description Required when creating. */
+            title?: string;
+            rules: components["schemas"]["SmartCollectionRules"];
+        };
+        /** @description The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones. */
+        HomeLayout: {
+            rows: components["schemas"]["HomeLayoutRow"][];
+        };
+        HomeLayoutRow: {
+            id: string;
+            /** @description Filled in by the server. */
+            readonly title?: string;
+            hidden?: boolean;
+            /** @description A pinned collection or playlist (remove it from the list to unpin). */
+            readonly pinned?: boolean;
+        };
+        Invite: {
+            /** Format: int64 */
+            id: number;
+            /** @description Who it's for, e.g. Mum. */
+            note?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            /** Format: date-time */
+            usedAt?: string;
+            /** @description The display name of who joined with it. */
+            usedBy?: string;
+            restrictions: components["schemas"]["UserRestrictions"];
+        };
+        InviteCreate: {
+            note?: string;
+            /** @description Default 7. */
+            expiresDays?: number;
+            restrictions?: components["schemas"]["UserRestrictions"];
+        };
+        InviteCreated: {
+            invite: components["schemas"]["Invite"];
+            /** @description Shown once. */
+            token: string;
+            /** @description The web page to send, relative to the server's address: /join/<token>. */
+            path: string;
+        };
+        InviteInfo: {
+            serverName: string;
+            invitedBy?: string;
+            note?: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        InviteAccept: {
+            username: string;
+            displayName?: string;
+            password: string;
+            device: components["schemas"]["DeviceInfo"];
         };
         Hub: {
             /** @example continue-watching */
@@ -3754,6 +4016,7 @@ export interface components {
             lockedFields: string[];
             /** @description Collections the item belongs to (META-7). */
             collections?: components["schemas"]["ItemSummary"][];
+            smartRules?: components["schemas"]["SmartCollectionRules"];
             /** @description Trailers, featurettes and other extras (LIB-8), trailers first. */
             extras?: components["schemas"]["ItemSummary"][];
             summary?: string;
@@ -4607,6 +4870,132 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    listInvites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invite"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteCreate"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteCreated"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    deleteInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                inviteId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteInfo"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    acceptInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteAccept"];
+            };
+        };
+        responses: {
+            /** @description Joined and signed in. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     listProfiles: {
@@ -5752,6 +6141,66 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    createSmartCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                libraryId: components["parameters"]["LibraryId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmartCollectionSave"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemSummary"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateSmartCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmartCollectionSave"];
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemSummary"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     deleteCollection: {
         parameters: {
             query?: never;
@@ -5854,6 +6303,77 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getHomeLayout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeLayout"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setHomeLayout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HomeLayout"];
+            };
+        };
+        responses: {
+            /** @description The saved layout. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeLayout"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listPrerolls: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description In play order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemSummary"][];
+                };
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];

@@ -11,6 +11,7 @@ import { formatDuration, formatTrackTime } from "../browse/format";
 import { ItemMenu } from "../browse/ItemMenu";
 import { useMusicState } from "../player/MusicPlayer";
 import { PlaylistMosaic } from "./PlaylistMosaic";
+import { PinToHomeButton } from "../home/EditHome";
 import { RulesEditor, rulesValid } from "./RulesEditor";
 import type { SmartRules } from "@/api/types";
 import { Sparkles } from "lucide-react";
@@ -158,6 +159,7 @@ export function PlaylistPage() {
                 <Sparkles className="size-4" /> Edit rules
               </Button>
             )}
+            <PinToHomeButton kind="playlist" id={id} />
             <Button variant="ghost" onClick={() => setConfirmDelete(true)}>
               <Trash2 className="size-4" /> Delete
             </Button>

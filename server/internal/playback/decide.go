@@ -93,6 +93,9 @@ type Limits struct {
 	PreferHEVC bool
 	// NoVideoCopy rules out direct stream: the file has no usable keyframe index (D48).
 	NoVideoCopy bool
+	// Resync rules out direct play: the audio is shifted (an audio sync offset, PLAY-17),
+	// which needs the file repackaged.
+	Resync bool
 }
 
 // Decision is the plan for a session.
@@ -210,7 +213,10 @@ func Decide(m Media, p DeviceProfile, l Limits) Decision {
 	if d.SubtitleHLS && videoOK && audioOK && containerOK && bitrateOK {
 		reason("subtitles are delivered inside HLS")
 	}
-	if videoOK && audioOK && containerOK && bitrateOK && !d.BurnSubtitle && !d.SubtitleHLS {
+	if l.Resync && p.HLS {
+		reason("audio sync offset needs repackaging")
+	}
+	if videoOK && audioOK && containerOK && bitrateOK && !d.BurnSubtitle && !d.SubtitleHLS && !(l.Resync && p.HLS) {
 		d.Method = DirectPlay
 		d.VideoCopy, d.AudioCopy = true, true
 		return d

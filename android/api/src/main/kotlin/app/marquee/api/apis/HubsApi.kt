@@ -28,6 +28,7 @@ import okhttp3.Call
 import okhttp3.HttpUrl
 
 import app.marquee.api.models.Error
+import app.marquee.api.models.HomeLayout
 import app.marquee.api.models.Hub
 
 import kotlinx.serialization.SerialName
@@ -54,6 +55,76 @@ open class HubsApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
         val defaultBasePath: String by lazy {
             System.getProperties().getProperty(ApiClient.BASE_URL_KEY, "/api/v1")
         }
+    }
+
+    /**
+     * GET /me/home-layout
+     * The person&#39;s Home rows, every available row included, in order (USER-12).
+     * 
+     * @return HomeLayout
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getHomeLayout() : HomeLayout {
+        val localVarResponse = getHomeLayoutWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as HomeLayout
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /me/home-layout
+     * The person&#39;s Home rows, every available row included, in order (USER-12).
+     * 
+     * @return ApiResponse<HomeLayout?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getHomeLayoutWithHttpInfo() : ApiResponse<HomeLayout?> {
+        val localVariableConfig = getHomeLayoutRequestConfig()
+
+        return request<Unit, HomeLayout>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getHomeLayout
+     *
+     * @return RequestConfig
+     */
+    fun getHomeLayoutRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/me/home-layout",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
     }
 
     /**
@@ -119,6 +190,80 @@ open class HubsApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/hubs/home",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /me/home-layout
+     * Reorder, hide, pin (add collection-&lt;id&gt; / playlist-&lt;id&gt;) or unpin Home rows. An empty list resets to the default.
+     * 
+     * @param homeLayout 
+     * @return HomeLayout
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun setHomeLayout(homeLayout: HomeLayout) : HomeLayout {
+        val localVarResponse = setHomeLayoutWithHttpInfo(homeLayout = homeLayout)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as HomeLayout
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /me/home-layout
+     * Reorder, hide, pin (add collection-&lt;id&gt; / playlist-&lt;id&gt;) or unpin Home rows. An empty list resets to the default.
+     * 
+     * @param homeLayout 
+     * @return ApiResponse<HomeLayout?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun setHomeLayoutWithHttpInfo(homeLayout: HomeLayout) : ApiResponse<HomeLayout?> {
+        val localVariableConfig = setHomeLayoutRequestConfig(homeLayout = homeLayout)
+
+        return request<HomeLayout, HomeLayout>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation setHomeLayout
+     *
+     * @param homeLayout 
+     * @return RequestConfig
+     */
+    fun setHomeLayoutRequestConfig(homeLayout: HomeLayout) : RequestConfig<HomeLayout> {
+        val localVariableBody = homeLayout
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/me/home-layout",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

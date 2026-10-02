@@ -203,6 +203,26 @@ func (s *Store) List(ctx context.Context, acc Access, libID int64, typ, sort str
 
 // Children returns an item's direct children in natural order (season/episode/disc/track number).
 func (s *Store) Children(ctx context.Context, acc Access, parentID int64, offset, limit int) ([]Summary, int, error) {
+	// A smart collection's members are whatever its saved filter matches now (META-7).
+	if sc, ok := s.Smart(ctx, parentID); ok {
+		if sc.Max > 0 {
+			if offset >= sc.Max {
+				return []Summary{}, sc.Max, nil
+			}
+			if offset+limit > sc.Max {
+				limit = sc.Max - offset
+			}
+		}
+		list, total, err := s.List(ctx, acc, sc.LibraryID, sc.ItemType, sc.Sort, sc.Filter, offset, limit)
+		if sc.Max > 0 && total > sc.Max {
+			total = sc.Max
+		}
+		if err == nil && acc.LibraryIDs == nil && acc.MaxRating == "" {
+			// Keep the count shown on the collection's card current.
+			s.db.ExecContext(ctx, `UPDATE items SET child_count = ?, leaf_count = ? WHERE id = ? AND child_count IS NOT ?`, total, total, parentID, total)
+		}
+		return list, total, err
+	}
 	var total int
 	ac, aargs := acc.clause()
 	args := append([]any{parentID}, aargs...)

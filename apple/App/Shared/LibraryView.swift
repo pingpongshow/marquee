@@ -38,6 +38,11 @@ struct LibraryView: View {
         }
         .navigationTitle(library?.name ?? "Library")
         .toolbar {
+            #if os(iOS)
+            if library?._type == .music {
+                ToolbarItem { CarModeButton(libraryID: libraryID) }
+            }
+            #endif
             ToolbarItem {
                 Menu {
                     if library?._type == .movies {

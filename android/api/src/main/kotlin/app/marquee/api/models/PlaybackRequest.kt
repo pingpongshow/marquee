@@ -41,6 +41,8 @@ import kotlinx.serialization.Contextual
  * @param maxBitrateKbps The app's quality setting; 0/omitted = original (home) or automatic (remote).
  * @param measuredKbps Measured download speed from /playback/bandwidth-test.
  * @param preload Prepare the next item (gapless music) without ending this device's current session. It takes over when it first reports \"playing\".
+ * @param subtitleOffsetMs Subtitle timing (PLAY-17), ms; positive shows subtitles later. Omit both offsets to use what this user last chose for this file; values sent are remembered.
+ * @param audioOffsetMs Audio timing (PLAY-17), ms; positive plays the audio later. Nonzero repackages the stream (no direct play).
  */
 @Serializable
 
@@ -77,7 +79,15 @@ data class PlaybackRequest (
 
     /* Prepare the next item (gapless music) without ending this device's current session. It takes over when it first reports \"playing\". */
     @SerialName(value = "preload")
-    val preload: kotlin.Boolean? = null
+    val preload: kotlin.Boolean? = null,
+
+    /* Subtitle timing (PLAY-17), ms; positive shows subtitles later. Omit both offsets to use what this user last chose for this file; values sent are remembered. */
+    @SerialName(value = "subtitleOffsetMs")
+    val subtitleOffsetMs: kotlin.Int? = null,
+
+    /* Audio timing (PLAY-17), ms; positive plays the audio later. Nonzero repackages the stream (no direct play). */
+    @SerialName(value = "audioOffsetMs")
+    val audioOffsetMs: kotlin.Int? = null
 
 ) {
 

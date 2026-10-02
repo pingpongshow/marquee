@@ -9,7 +9,9 @@ import {
   Info,
   Maximize,
   Minimize,
+  Minus,
   Pause,
+  Plus,
   Play,
   RotateCcw,
   RotateCw,
@@ -118,6 +120,32 @@ type Selection = {
   subtitle?: number;
   quality: number;
   file?: number;
+  /** Timing offsets (PLAY-17); unset lets the server use what this user last chose for the file. */
+  subOffset?: number;
+  audioOffset?: number;
+};
+
+/** Playback speeds (PLAY-19). Each new video starts at 1×. */
+export const speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+
+const MAX_OFFSET = 30_000;
+const clampOffset = (ms: number) =>
+  Math.min(MAX_OFFSET, Math.max(-MAX_OFFSET, Math.round(ms)));
+export function formatOffset(ms: number) {
+  return `${ms > 0 ? "+" : ms < 0 ? "−" : ""}${(Math.abs(ms) / 1000).toFixed(1)} s`;
+}
+/** A subtitle URL re-timed by the server without restarting the session. */
+function withOffset(url: string, ms: number) {
+  return `${url}${url.includes("?") ? "&" : "?"}offsetMs=${ms}`;
+}
+
+/** A cinema trailer or pre-roll played before a movie (PLAY-18). */
+export type Preroll = {
+  label: string;
+  /** The movie the trailers lead up to (where Back goes). */
+  movieId: number;
+  onDone: () => void;
+  onSkipAll: () => void;
 };
 
 /**
@@ -144,12 +172,14 @@ export function VideoPlayer({
   playlistId,
   fileId,
   groupId,
+  preroll,
 }: {
   itemId: number;
   startMs?: number;
   playlistId?: number;
   fileId?: number;
   groupId?: string;
+  preroll?: Preroll;
 }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -177,6 +207,17 @@ export function VideoPlayer({
     file: fileId,
   }));
   const [restartAt, setRestartAt] = useState<number | undefined>(startMs);
+  const [speed, setSpeed] = useState(1);
+  // A subtitle offset being tried on the current session (re-fetched, not restarted), and an
+  // audio offset waiting to restart the stream; each applies only to the session it was made on.
+  const [subTrial, setSubTrial] = useState<{ sid: string; ms: number } | null>(
+    null,
+  );
+  const [audioTrial, setAudioTrial] = useState<{
+    sid: string;
+    ms: number;
+  } | null>(null);
+  const audioTimer = useRef<number | undefined>(undefined);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
   const [buffering, setBuffering] = useState(true);
@@ -282,6 +323,8 @@ export function VideoPlayer({
               subtitleStreamId: sel.subtitle,
               maxBitrateKbps: quality || undefined,
               measuredKbps,
+              subtitleOffsetMs: sel.subOffset,
+              audioOffsetMs: sel.audioOffset,
             },
           }),
         );
@@ -349,11 +392,25 @@ export function VideoPlayer({
     return () => window.clearTimeout(t);
   }, [sess]);
 
+  // Subtitle timing being tried re-fetches the subtitles shifted, without a restart (PLAY-17).
+  const subOffset =
+    subTrial && subTrial.sid === sess?.id
+      ? subTrial.ms
+      : (sess?.subtitleOffsetMs ?? 0);
+  const audioOffset =
+    audioTrial && audioTrial.sid === sess?.id
+      ? audioTrial.ms
+      : (sess?.audioOffsetMs ?? 0);
+  const subUrl =
+    sess?.subtitleUrl &&
+    (subTrial && subTrial.sid === sess.id
+      ? withOffset(sess.subtitleUrl, subTrial.ms)
+      : sess.subtitleUrl);
+
   // Styled ASS subtitles: render with JASSUB, loading the fonts embedded in the file.
   useEffect(() => {
     const v = videoRef.current;
-    if (!v || !sess || sess.subtitleFormat !== "ass" || !sess.subtitleUrl)
-      return;
+    if (!v || !sess || sess.subtitleFormat !== "ass" || !subUrl) return;
     let instance: { destroy: () => void } | null = null;
     let cancelled = false;
     (async () => {
@@ -369,7 +426,7 @@ export function VideoPlayer({
         if (cancelled) return;
         instance = new JASSUB({
           video: v,
-          subUrl: new URL(sess.subtitleUrl!, location.href).href,
+          subUrl: new URL(subUrl, location.href).href,
           fonts: fonts.map((f) => new URL(f.url, location.href).href),
           queryFonts: false, // local font access needs a secure context
         });
@@ -381,7 +438,17 @@ export function VideoPlayer({
       cancelled = true;
       instance?.destroy();
     };
-  }, [sess]);
+  }, [sess, subUrl]);
+
+  // Speed (PLAY-19): 1× while watching together, since the group plays in step.
+  const syncing = !!together.group || !!groupId;
+  const rate = syncing ? 1 : speed;
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.defaultPlaybackRate = rate;
+    v.playbackRate = rate;
+  }, [rate, sess]);
 
   // Attach the stream to the <video>.
   useEffect(() => {
@@ -467,12 +534,36 @@ export function VideoPlayer({
   }, [item.data?.type, itemId, playlistId]);
 
   const [finding, setFinding] = useState(false);
-  const restart = (patch: Partial<Selection>) => {
+  const restart = (patch: Partial<Selection>, keepMenu = false) => {
     const v = videoRef.current;
     setRestartAt(v ? Math.round(v.currentTime * 1000) : 0);
-    setSel((s) => ({ ...s, ...patch }));
-    setMenu(null);
+    // Offsets are remembered per file: another version starts with its own. Otherwise a
+    // subtitle offset tried without a restart is sent now, which also remembers it.
+    const trial = subTrial && subTrial.sid === sess?.id ? subTrial.ms : undefined;
+    setSel((s) =>
+      patch.file !== undefined && patch.file !== s.file
+        ? { ...s, ...patch, subOffset: undefined, audioOffset: undefined }
+        : { ...s, subOffset: trial ?? s.subOffset, ...patch },
+    );
+    if (!keepMenu) setMenu(null);
   };
+  const changeSubOffset = (ms: number) => {
+    if (!sess) return;
+    // Sidecar subtitles shift in place; burned-in ones need the stream restarted.
+    if (sess.subtitleUrl) setSubTrial({ sid: sess.id, ms });
+    else restart({ subOffset: ms }, true);
+  };
+  const changeAudioOffset = (ms: number) => {
+    if (!sess) return;
+    setAudioTrial({ sid: sess.id, ms });
+    // Each change restarts the stream, so wait for a pause in the clicking.
+    window.clearTimeout(audioTimer.current);
+    audioTimer.current = window.setTimeout(
+      () => restart({ audioOffset: ms }, true),
+      700,
+    );
+  };
+  useEffect(() => () => window.clearTimeout(audioTimer.current), []);
 
   const toggle = useCallback(() => {
     const el = videoRef.current;
@@ -531,7 +622,7 @@ export function VideoPlayer({
           if (!document.fullscreenElement)
             navigate({
               to: "/item/$itemId",
-              params: { itemId: String(itemId) },
+              params: { itemId: String(preroll?.movieId ?? itemId) },
             });
       }
       poke();
@@ -552,7 +643,7 @@ export function VideoPlayer({
   const nearEnd =
     duration > 0 &&
     (duration - time < 30 || (marker?.kind === "credits" && !!next));
-  const showUpNext = !!next && nearEnd && !nextDismissed;
+  const showUpNext = !!next && nearEnd && !nextDismissed && !preroll;
 
   return (
     <div
@@ -606,15 +697,20 @@ export function VideoPlayer({
         }}
         onEnded={() => {
           report("paused");
-          if (next && !nextDismissed) playNext();
+          if (preroll) preroll.onDone();
+          else if (next && !nextDismissed) playNext();
         }}
       >
-        {sess?.subtitleUrl && sess.subtitleFormat !== "ass" && (
+        {subUrl && sess?.subtitleFormat !== "ass" && (
           <track
-            key={sess.subtitleUrl}
+            key={subUrl}
             kind="subtitles"
-            src={sess.subtitleUrl}
+            src={subUrl}
             default
+            // A swapped-in track isn't always shown on its own.
+            ref={(t) => {
+              if (t) t.track.mode = "showing";
+            }}
           />
         )}
       </video>
@@ -629,9 +725,9 @@ export function VideoPlayer({
           <p className="max-w-md text-white">{error}</p>
           <button
             className="rounded-md bg-accent px-4 py-2 font-medium text-black"
-            onClick={() => restart({})}
+            onClick={() => (preroll ? preroll.onDone() : restart({}))}
           >
-            Try again
+            {preroll ? "Skip" : "Try again"}
           </button>
         </div>
       )}
@@ -647,7 +743,7 @@ export function VideoPlayer({
           onClick={() =>
             navigate({
               to: "/item/$itemId",
-              params: { itemId: String(itemId) },
+              params: { itemId: String(preroll?.movieId ?? itemId) },
             })
           }
           className="rounded-full p-2 text-white hover:bg-white/10"
@@ -667,8 +763,29 @@ export function VideoPlayer({
         </div>
       </div>
 
+      {/* Cinema trailers: what's playing, and ways past it (PLAY-18) */}
+      {preroll && (
+        <div className="absolute right-8 bottom-28 flex items-center gap-2">
+          <span className="rounded-md bg-black/60 px-3 py-2 text-sm text-white/90 backdrop-blur">
+            {preroll.label}
+          </span>
+          <button
+            onClick={preroll.onDone}
+            className="rounded-md border border-white/40 bg-black/60 px-4 py-2 font-semibold text-white backdrop-blur hover:bg-white hover:text-black"
+          >
+            Skip
+          </button>
+          <button
+            onClick={preroll.onSkipAll}
+            className="rounded-md border border-white/40 bg-black/60 px-4 py-2 font-semibold text-white backdrop-blur hover:bg-white hover:text-black"
+          >
+            Skip all
+          </button>
+        </div>
+      )}
+
       {/* Skip intro / credits */}
-      {marker && !showUpNext && (
+      {marker && !showUpNext && !preroll && (
         <button
           onClick={() =>
             videoRef.current &&
@@ -795,10 +912,11 @@ export function VideoPlayer({
             <button
               onClick={() => setMenu(menu === "settings" ? null : "settings")}
               className="rounded-full p-2 hover:bg-white/10"
-              aria-label="Quality"
+              aria-label="Settings"
             >
               <Settings2 className="size-5" />
             </button>
+            {!preroll && (
             <button
               onClick={() =>
                 together.group
@@ -820,6 +938,7 @@ export function VideoPlayer({
                 </span>
               )}
             </button>
+            )}
             <button
               onClick={() => setMenu(menu === "info" ? null : "info")}
               className="rounded-full p-2 hover:bg-white/10"
@@ -898,6 +1017,13 @@ export function VideoPlayer({
                   {trackLabel(s)}
                 </MenuItem>
               ))}
+              {!syncing && sess && !!file?.videoCodec && (
+                <OffsetStepper
+                  label="Audio timing"
+                  value={audioOffset}
+                  onChange={changeAudioOffset}
+                />
+              )}
               <MenuHeading>Subtitles</MenuHeading>
               <MenuItem
                 active={!sess?.subtitleStreamId}
@@ -926,10 +1052,41 @@ export function VideoPlayer({
                   Find subtitles…
                 </MenuItem>
               )}
+              {!syncing && !!sess?.subtitleStreamId && (
+                <OffsetStepper
+                  label="Subtitle timing"
+                  value={subOffset}
+                  onChange={changeSubOffset}
+                />
+              )}
             </>
           )}
           {menu === "settings" && (
             <>
+              {!syncing && (
+                <>
+                  <MenuHeading>Speed</MenuHeading>
+                  <div
+                    className="flex flex-wrap gap-1 px-2 pb-1"
+                    role="group"
+                    aria-label="Playback speed"
+                  >
+                    {speeds.map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => setSpeed(r)}
+                        aria-pressed={speed === r}
+                        className={clsx(
+                          "rounded px-2 py-1 tabular-nums hover:bg-white/10",
+                          speed === r && "bg-white/15 text-accent",
+                        )}
+                      >
+                        {r}×
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
               {(item.data?.versions.length ?? 0) > 1 && (
                 <>
                   <MenuHeading>Version</MenuHeading>
@@ -1022,6 +1179,59 @@ function MenuHeading({ children }: { children: React.ReactNode }) {
   return (
     <div className="px-3 pt-2 pb-1 text-[11px] font-semibold tracking-wider text-white/50 uppercase">
       {children}
+    </div>
+  );
+}
+
+/** −/+ 100 ms steps for subtitle or audio timing, with the current value and Reset. */
+function OffsetStepper({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (ms: number) => void;
+}) {
+  const btn =
+    "rounded p-1.5 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent";
+  return (
+    <div className="px-3 py-2" role="group" aria-label={label}>
+      <div className="mb-1 text-[11px] font-semibold tracking-wider text-white/50 uppercase">
+        {label}
+      </div>
+      <div className="flex items-center gap-1">
+        <button
+          className={btn}
+          aria-label={`${label}: earlier`}
+          disabled={value <= -MAX_OFFSET}
+          onClick={() => onChange(clampOffset(value - 100))}
+        >
+          <Minus className="size-4" />
+        </button>
+        <span
+          className="w-20 text-center tabular-nums"
+          aria-live="polite"
+          data-testid={`${label}-value`}
+        >
+          {formatOffset(value)}
+        </span>
+        <button
+          className={btn}
+          aria-label={`${label}: later`}
+          disabled={value >= MAX_OFFSET}
+          onClick={() => onChange(clampOffset(value + 100))}
+        >
+          <Plus className="size-4" />
+        </button>
+        <button
+          className="ml-auto rounded px-2 py-1 text-white/80 hover:bg-white/10 disabled:opacity-40"
+          disabled={value === 0}
+          onClick={() => onChange(0)}
+        >
+          Reset
+        </button>
+      </div>
     </div>
   );
 }

@@ -154,6 +154,7 @@ export function Spinner({ label = "Loading" }: { label?: string }) {
 /** Modal dialog built on the native <dialog> element (focus trap and Esc handling for free). */
 export function Dialog({ open, onClose, title, children, footer, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
@@ -163,6 +164,7 @@ export function Dialog({ open, onClose, title, children, footer, wide }: { open:
   return (
     <dialog
       ref={ref}
+      aria-labelledby={titleId}
       onClose={onClose}
       onCancel={(e) => {
         e.preventDefault();
@@ -176,7 +178,9 @@ export function Dialog({ open, onClose, title, children, footer, wide }: { open:
       {open && (
         <div className="flex max-h-[85vh] flex-col">
           <header className="flex items-center justify-between border-b border-border px-5 py-4">
-            <h2 className="text-lg font-semibold">{title}</h2>
+            <h2 id={titleId} className="text-lg font-semibold">
+              {title}
+            </h2>
             <button type="button" onClick={onClose} className="rounded p-1 text-muted hover:bg-surface-2 hover:text-text" aria-label="Close">
               <X className="size-5" />
             </button>

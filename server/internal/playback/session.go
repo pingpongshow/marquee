@@ -47,6 +47,9 @@ type Request struct {
 	UserSubLang      string
 	UserSubMode      string // off, forced, foreign, always
 	RemoteAllowed    bool
+	// Timing offsets (PLAY-17), in ms: positive shows subtitles / plays audio later. Nil uses
+	// what this user last chose for the file; a value given is remembered for next time.
+	SubtitleOffsetMS, AudioOffsetMS *int
 }
 
 // Session is an active playback.
@@ -72,6 +75,8 @@ type Session struct {
 	AudioStreamID    int64
 	SubtitleStreamID int64
 	SubtitleCodec    string
+	SubtitleOffsetMS int // PLAY-17: applied to the subtitle sidecar, renditions and burn-in
+	AudioOffsetMS    int // PLAY-17: applied when repackaging or transcoding
 	Decision         Decision
 	LimitKbps        int
 	LimitReason      string
@@ -282,7 +287,9 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 	q.Remote = r.Remote
 	q.OtherRemoteKbps, q.OtherRemoteCount = m.remoteUsage("")
 	s.LimitKbps, s.LimitReason = MaxKbps(q, cfg.RemoteAccess)
-	limits := Limits{MaxKbps: s.LimitKbps, Remote: r.Remote, PreferHEVC: r.Remote && cfg.Transcoder.PreferHEVCRemote}
+	m.offsets(ctx, s, r)
+	limits := Limits{MaxKbps: s.LimitKbps, Remote: r.Remote, PreferHEVC: r.Remote && cfg.Transcoder.PreferHEVCRemote,
+		Resync: s.AudioOffsetMS != 0 && s.Media.Video != nil && s.Media.Audio != nil}
 	s.Decision = Decide(s.Media, r.Profile, limits)
 	// Copied video is cut on its own keyframes; without an index of them, transcode instead.
 	var plan []float64
@@ -310,7 +317,8 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 			return nil, ErrBusy
 		}
 		job := Job{Input: s.Path, Decision: s.Decision, VideoIndex: -1, AudioIndex: -1, SubIndex: -1, SubRelIndex: -1,
-			Dir: filepath.Join(m.TranscodeDir, s.ID), Preset: cfg.Transcoder.Preset, QSVDevice: m.Encoders.QSVDevice, Plan: plan}
+			Dir: filepath.Join(m.TranscodeDir, s.ID), Preset: cfg.Transcoder.Preset, QSVDevice: m.Encoders.QSVDevice, Plan: plan,
+			AudioOffsetMS: s.AudioOffsetMS, SubOffsetMS: s.SubtitleOffsetMS}
 		if v := s.Media.Video; v != nil {
 			job.VideoIndex, job.VideoCodec = v.Index, v.Codec
 		}
@@ -347,6 +355,39 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 	slog.Info("playback started", "user", s.UserName, "title", s.Title, "method", s.Decision.Method,
 		"remote", s.Remote, "limitKbps", s.LimitKbps, "reasons", strings.Join(s.Decision.Reasons, "; "))
 	return s, nil
+}
+
+// MaxOffsetMS bounds subtitle and audio offsets (PLAY-17).
+const MaxOffsetMS = 30000
+
+// offsets settles the session's timing offsets: the ones asked for (and remembers them for
+// this user and file), else the ones last used.
+func (m *Manager) offsets(ctx context.Context, s *Session, r Request) {
+	var sub, audio int
+	m.DB.QueryRowContext(ctx, `SELECT subtitle_ms, audio_ms FROM playback_offsets WHERE user_id = ? AND file_id = ?`,
+		s.UserID, s.FileID).Scan(&sub, &audio)
+	if r.SubtitleOffsetMS == nil && r.AudioOffsetMS == nil {
+		s.SubtitleOffsetMS, s.AudioOffsetMS = sub, audio
+		return
+	}
+	clamp := func(v int) int { return min(max(v, -MaxOffsetMS), MaxOffsetMS) }
+	if r.SubtitleOffsetMS != nil {
+		sub = clamp(*r.SubtitleOffsetMS)
+	}
+	if r.AudioOffsetMS != nil {
+		audio = clamp(*r.AudioOffsetMS)
+	}
+	s.SubtitleOffsetMS, s.AudioOffsetMS = sub, audio
+	if s.UserID == 0 {
+		return
+	}
+	if sub == 0 && audio == 0 {
+		m.DB.ExecContext(ctx, `DELETE FROM playback_offsets WHERE user_id = ? AND file_id = ?`, s.UserID, s.FileID)
+		return
+	}
+	m.DB.ExecContext(ctx, `INSERT INTO playback_offsets (user_id, file_id, subtitle_ms, audio_ms) VALUES (?, ?, ?, ?)
+		ON CONFLICT (user_id, file_id) DO UPDATE SET subtitle_ms = excluded.subtitle_ms, audio_ms = excluded.audio_ms`,
+		s.UserID, s.FileID, sub, audio)
 }
 
 // load fills the session's file, media and track choices from the database.

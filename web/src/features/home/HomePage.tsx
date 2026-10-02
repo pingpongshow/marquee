@@ -1,13 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ChevronRight, FolderPlus, UsersRound } from "lucide-react";
+import { ChevronRight, FolderPlus, LayoutList, UsersRound } from "lucide-react";
+import { useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { librariesQuery, meQuery } from "@/api/queries";
 import type { ItemSummary } from "@/api/types";
 import { Button, Spinner } from "@/components/ui";
 import { Poster } from "../browse/Poster";
 import { subtitleFor } from "../browse/format";
+import { EditHomeDialog } from "./EditHome";
 import { GettingStarted } from "./GettingStarted";
+import { pinnedTarget } from "./layout";
 
 function HubItem({ it, wide }: { it: ItemSummary; wide: boolean }) {
   // Continue Watching episodes open the player directly, like Plex.
@@ -68,6 +71,7 @@ export function HomePage() {
     queryKey: ["items", "hubs"],
     queryFn: () => unwrap(api.GET("/hubs/home")),
   });
+  const [editing, setEditing] = useState(false);
   if (libraries.isPending || hubs.isPending) return <Spinner />;
 
   if (!libraries.data?.length) {
@@ -96,11 +100,29 @@ export function HomePage() {
       <WatchTogetherBanner myId={me.data?.id} />
       {hubs.data?.map((hub) => {
         const wide = hub.id === "continue-watching";
+        // A pinned collection or playlist opens itself (USER-12).
+        const pinned = pinnedTarget(hub.id);
         return (
           <section key={hub.id}>
             <div className="mb-3 flex items-center gap-2 px-6 lg:px-8">
-              <h2 className="text-lg font-semibold">{hub.title}</h2>
-              {hub.libraryId && (
+              <h2 className="text-lg font-semibold">
+                {pinned ? (
+                  <Link {...pinned} className="hover:underline">
+                    {hub.title}
+                  </Link>
+                ) : (
+                  hub.title
+                )}
+              </h2>
+              {pinned ? (
+                <Link
+                  {...pinned}
+                  className="text-muted hover:text-text"
+                  aria-label={`Open ${hub.title}`}
+                >
+                  <ChevronRight className="size-5" />
+                </Link>
+              ) : hub.libraryId && (
                 <Link
                   to="/library/$libraryId"
                   params={{ libraryId: String(hub.libraryId) }}
@@ -124,6 +146,12 @@ export function HomePage() {
           Nothing here yet. Libraries are still being scanned.
         </p>
       )}
+      <div className="flex justify-center px-6 lg:px-8">
+        <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+          <LayoutList className="size-4" /> Edit Home
+        </Button>
+      </div>
+      {editing && <EditHomeDialog onClose={() => setEditing(false)} />}
     </div>
   );
 }

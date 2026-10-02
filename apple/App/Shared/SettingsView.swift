@@ -9,6 +9,7 @@ struct SettingsView: View {
     @State private var switching = false
     @State private var linkCode = ""
     @State private var linkResult: String?
+    @State private var trailersError: String?
 
     var body: some View {
         Form {
@@ -23,7 +24,10 @@ struct SettingsView: View {
                 NavigationLink("Your Stats") { StatsView() }
                 if app.me?.isAdmin == true {
                     NavigationLink("Requests") { RequestApprovalsView() }
+                    NavigationLink("Users and Friends") { UsersView() }
+                    NavigationLink("Cinema Trailers") { CinemaSettingsView() }
                 }
+                NavigationLink("Edit Home") { HomeEditView() }
                 Button("Switch Profile") { switching = true }
                 Button("Sign Out", role: .destructive) { Task { await app.signOut() } }
             }
@@ -51,6 +55,16 @@ struct SettingsView: View {
                 Text("Video quality")
             } footer: {
                 Text("Original plays files untouched when this device supports them. Automatic picks the best quality your connection allows.")
+            }
+            Section {
+                Toggle("Play trailers before movies", isOn: Binding(get: { app.cinemaTrailersPreference }, set: { on in
+                    Task {
+                        do { try await app.setCinemaTrailers(on); trailersError = nil } catch { trailersError = error.localizedDescription }
+                    }
+                }))
+                if let trailersError { Text(trailersError).font(.caption).foregroundStyle(.red) }
+            } footer: {
+                Text("When the server has cinema trailers on, they play before a movie you start from the beginning.")
             }
             Section {
                 @Bindable var music = music

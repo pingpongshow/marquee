@@ -33,6 +33,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Shuffle
@@ -155,6 +157,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                     Button(onClick = { leaves { music.play(it, 0) } }, modifier = Modifier.focusRing().initialFocus(marquee.isTv)) { Icon(Icons.Filled.PlayArrow, null); Text("Play") }
                     RadioButton()
                 }
+                ItemType.COLLECTION -> PinToHomeButton("collection-${d.id}")
                 else -> {}
             }
         StateButtons()
@@ -283,6 +286,11 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
 private fun Meta(d: ItemDetail) {
     if (d.type == ItemType.EPISODE) d.grandparentTitle?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     Text(d.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 3)
+    // Smart collections (META-7) fill themselves from their rules.
+    if (d.type == ItemType.COLLECTION && d.smartRules != null) Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Filled.AutoAwesome, null, Modifier.size(16.dp), tint = Gold)
+        Text("Smart collection", Modifier.padding(start = 6.dp), style = MaterialTheme.typography.labelLarge, color = Gold)
+    }
     if (d.type != ItemType.ARTIST) d.artistCredit?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     Text(listOfNotNull(d.year?.toString(), d.contentRating, d.durationMs?.takeIf { d.type in listOf(ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO) }?.let { formatTime(it) }).joinToString(" · "),
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

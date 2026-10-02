@@ -40,8 +40,9 @@ final class MarqueeTVUITests: XCTestCase {
         focus(element, direction: .right, tries: 6)
     }
 
-    private func approve(code: String) throws {
-        guard let token = adminToken else { throw XCTSkip("MARQUEE_TEST_ADMIN_TOKEN not set") }
+    private func approve(code: String, as userToken: String? = nil) throws {
+        guard let admin = adminToken else { throw XCTSkip("MARQUEE_TEST_ADMIN_TOKEN not set") }
+        let token = userToken ?? admin
         var req = URLRequest(url: URL(string: server + "/api/v1/auth/quickconnect/authorize")!)
         req.httpMethod = "POST"
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -58,7 +59,7 @@ final class MarqueeTVUITests: XCTestCase {
     }
 
     /// Connects with Bonjour and signs in with Quick Connect, ending on Home.
-    private func signIn() throws {
+    private func signIn(as userToken: String? = nil) throws {
         let found = app.buttons.matching(NSPredicate(format: "label CONTAINS 'E2E'")).firstMatch
         // A test server on this Mac shares the mDNS port with the system responder, so
         // Bonjour can miss it: fall back to typing its address.
@@ -86,7 +87,7 @@ final class MarqueeTVUITests: XCTestCase {
         remote.press(.select)
         let codeText = app.staticTexts.matching(NSPredicate(format: "label MATCHES '^([A-Z0-9] ){5}[A-Z0-9]$'")).firstMatch
         XCTAssertTrue(codeText.waitForExistence(timeout: 10))
-        try approve(code: codeText.label.replacingOccurrences(of: " ", with: ""))
+        try approve(code: codeText.label.replacingOccurrences(of: " ", with: ""), as: userToken)
         XCTAssertTrue(app.staticTexts["Continue Watching"].waitForExistence(timeout: 15) || app.staticTexts["Recently Added Movies"].waitForExistence(timeout: 5))
     }
 
@@ -159,18 +160,38 @@ final class MarqueeTVUITests: XCTestCase {
         sleep(2)
         shot("tv-04-home")
 
-        // Open the first poster (below the row title) and play it.
-        remote.press(.down)
+        // Open the first poster (below the row title) and play it. A Continue Watching tile
+        // plays at once; anything else opens its page first.
+        let before = try activeSessions()
+        let poster = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Preview Test' OR label CONTAINS[c] 'Long Test'")).firstMatch
+        if poster.waitForExistence(timeout: 5) { focus(poster) } else { remote.press(.down) }
         remote.press(.select)
         let play = app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume', 'Continue'}")).firstMatch
-        XCTAssertTrue(play.waitForExistence(timeout: 10))
-        sleep(1)
-        shot("tv-05-detail")
-        focus(play, direction: .down)
-        remote.press(.select)
+        if play.waitForExistence(timeout: 8) {
+            sleep(1)
+            shot("tv-05-detail")
+            focus(play, direction: .down)
+            remote.press(.select)
+        }
         sleep(6)
         shot("tv-06-playing")
+        XCTAssertGreaterThan(try activeSessions(), before, "nothing started playing")
         remote.press(.menu)
+    }
+
+    /// How many playback sessions the server has (admin view).
+    private func activeSessions() throws -> Int {
+        guard let admin = adminToken else { throw XCTSkip("MARQUEE_TEST_ADMIN_TOKEN not set") }
+        var req = URLRequest(url: URL(string: server + "/api/v1/playback/sessions")!)
+        req.setValue("Bearer \(admin)", forHTTPHeaderField: "Authorization")
+        let done = expectation(description: "sessions")
+        var count = 0
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            count = ((try? JSONSerialization.jsonObject(with: data ?? Data())) as? [Any])?.count ?? 0
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 10)
+        return count
     }
 
     /// Top Shelf links (marquee://item/<id>) open the item's page.
@@ -182,5 +203,135 @@ final class MarqueeTVUITests: XCTestCase {
         XCTAssertTrue(title.waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume'}")).firstMatch.waitForExistence(timeout: 5))
         shot("tv-topshelf-link")
+    }
+
+    // MARK: - Plex parity on the TV (USER-12, PLAY-17, PLAY-19)
+
+    /// Calls the server; returns the JSON object.
+    @discardableResult
+    private func api(_ method: String, _ path: String, _ body: [String: Any]? = nil, token: String? = nil) throws -> [String: Any] {
+        guard let admin = adminToken else { throw XCTSkip("MARQUEE_TEST_ADMIN_TOKEN not set") }
+        var req = URLRequest(url: URL(string: server + "/api/v1" + path)!)
+        req.httpMethod = method
+        req.setValue("Bearer \(token ?? admin)", forHTTPHeaderField: "Authorization")
+        if let body {
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+        let done = expectation(description: path)
+        var out: [String: Any] = [:]
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            out = (data.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 30)
+        return out
+    }
+
+    /// A temporary account (other clients' tests share the admin's Home layout and offsets),
+    /// signed in on the TV with Quick Connect and deleted when the test ends.
+    private func signInTemporaryUser() throws -> String {
+        let name = "uitv-\(Int.random(in: 1000...9999))"
+        let pass = "correct horse battery"
+        let user = try api("POST", "/users", ["username": name, "displayName": name, "password": pass])
+        let id = try XCTUnwrap(user["id"] as? Int)
+        let login = try api("POST", "/auth/login", ["username": name, "password": pass, "device": ["clientId": "uitest-\(name)", "name": "UI test", "platform": "tvos"]])
+        let url = server + "/api/v1/users/\(id)", admin = adminToken
+        addTeardownBlock { Self.send("DELETE", url, token: admin) }
+        let token = try XCTUnwrap(login["token"] as? String)
+        try signIn(as: token)
+        return token
+    }
+
+    /// Edit Home with the remote: hide a row with its button, then reset.
+    func testEditHome() throws {
+        let token = try signInTemporaryUser()
+        // At the bottom of Home (rows load as they come into view).
+        let edit = app.buttons["Edit Home"]
+        for _ in 0..<20 where !(edit.exists && edit.hasFocus) { remote.press(.down) }
+        XCTAssertTrue(edit.hasFocus)
+        remote.press(.select)
+        let hide = app.buttons["Hide Recently Added Movies"]
+        XCTAssertTrue(hide.waitForExistence(timeout: 10))
+        focus(hide)
+        sleep(1)
+        shot("tv-eh1-edit-home")
+        remote.press(.select)
+        XCTAssertTrue(app.buttons["Show Recently Added Movies"].waitForExistence(timeout: 5))
+        let layout = try api("GET", "/me/home-layout", token: token)["rows"] as? [[String: Any]] ?? []
+        XCTAssertEqual(layout.first { $0["id"] as? String == "recent-2" }?["hidden"] as? Bool, true)
+        // Move that row down with its button (two along from Hide).
+        let before = layout.firstIndex { $0["id"] as? String == "recent-2" } ?? -1
+        remote.press(.right)
+        remote.press(.right)
+        XCTAssertTrue(app.buttons["Move Recently Added Movies down"].hasFocus)
+        remote.press(.select)
+        sleep(2)
+        let moved = try api("GET", "/me/home-layout", token: token)["rows"] as? [[String: Any]] ?? []
+        XCTAssertEqual(moved.firstIndex { $0["id"] as? String == "recent-2" }, before + 1, "moved down one place")
+        shot("tv-eh2-changed")
+        let reset = app.buttons["Reset to Default"]
+        focus(reset)
+        remote.press(.select)
+        XCTAssertTrue(hide.waitForExistence(timeout: 5))
+    }
+
+    /// The player's transport bar: Speed and Subtitle/Audio Timing menus.
+    func testPlayerMenus() throws {
+        _ = try signInTemporaryUser()
+        let movie = app.buttons["00 Long Test"].firstMatch
+        XCTAssertTrue(movie.waitForExistence(timeout: 10))
+        for _ in 0..<4 where !movie.hasFocus && !app.buttons["00 Preview Test"].firstMatch.hasFocus { remote.press(.down) }
+        focus(movie, direction: .right, tries: 4)
+        remote.press(.select)
+        let play = app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume'}")).firstMatch
+        XCTAssertTrue(play.waitForExistence(timeout: 10))
+        focus(play, direction: .down)
+        remote.press(.select)
+        sleep(8)
+        // Up from the transport bar reaches the custom menu buttons.
+        remote.press(.select)
+        sleep(1)
+        // Up from the scrubber to the custom menus: Speed, Subtitle Timing, Audio Timing. The
+        // transport bar's buttons and menus aren't in the accessibility tree, so this is a smoke
+        // test: the remote opens each menu and the screenshots show them.
+        shot("tv-pm0-bar")
+        remote.press(.up)
+        sleep(1)
+        remote.press(.select)
+        sleep(1)
+        shot("tv-pm1-speed-menu")
+        remote.press(.menu)
+        sleep(1)
+        remote.press(.right)
+        remote.press(.select)
+        sleep(1)
+        shot("tv-pm2-subtitle-timing-menu")
+        remote.press(.menu)
+        sleep(1)
+        remote.press(.right)
+        remote.press(.select)
+        sleep(1)
+        shot("tv-pm3-audio-timing-menu")
+        remote.press(.menu)
+        XCTAssertEqual(app.state, .runningForeground)
+        remote.press(.menu)
+        remote.press(.menu)
+    }
+
+    /// A request that doesn't need an expectation, for teardown blocks (which run even when a
+    /// failure stops the test, unlike defer).
+    private static func send(_ method: String, _ url: String, token: String?, _ body: [String: Any]? = nil) {
+        guard let token, let u = URL(string: url) else { return }
+        var req = URLRequest(url: u)
+        req.httpMethod = method
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if let body {
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        }
+        let done = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: req) { _, _, _ in done.signal() }.resume()
+        _ = done.wait(timeout: .now() + 15)
     }
 }

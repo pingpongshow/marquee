@@ -2,10 +2,10 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { clsx } from "clsx";
-import { Filter, LayoutGrid, List, X } from "lucide-react";
+import { Filter, LayoutGrid, List, Sparkles, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, unwrap } from "@/api/client";
-import { librariesQuery } from "@/api/queries";
+import { librariesQuery, meQuery } from "@/api/queries";
 import type { ItemSummary } from "@/api/types";
 import type { operations } from "@/api/schema.gen";
 import { Alert, Button, Select, Spinner } from "@/components/ui";
@@ -13,6 +13,8 @@ import { ItemMenu } from "./ItemMenu";
 import { MusicDiscover } from "../music/Discover";
 import { Poster } from "./Poster";
 import { formatDuration, subtitleFor } from "./format";
+import { sortOptions } from "./sorts";
+import { SaveSmartCollectionDialog } from "./SmartCollection";
 
 type ListQuery = NonNullable<operations["listLibraryItems"]["parameters"]["query"]>;
 export type LibrarySearch = {
@@ -30,17 +32,6 @@ export type LibrarySearch = {
 const PAGE = 100;
 const GAP = 16;
 
-const sortOptions: { value: NonNullable<ListQuery["sort"]>; label: string; video?: boolean }[] = [
-  { value: "title", label: "Title" },
-  { value: "-added", label: "Date added" },
-  { value: "-released", label: "Release date" },
-  { value: "-year", label: "Year (newest)" },
-  { value: "year", label: "Year (oldest)" },
-  { value: "-rating", label: "Rating" },
-  { value: "-viewed", label: "Last watched" },
-  { value: "-duration", label: "Duration", video: true },
-  { value: "random", label: "Random" },
-];
 
 export function validateLibrarySearch(s: Record<string, unknown>): LibrarySearch {
   const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
@@ -93,6 +84,10 @@ export function LibraryPage() {
   const sort = search.sort ?? "title";
   const view = search.view ?? "grid";
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [savingSmart, setSavingSmart] = useState(false);
+  const isAdmin = !!useQuery(meQuery).data?.isAdmin;
+  // Movie and show libraries can save their filters as a smart collection (META-7).
+  const smartType = lib?.type === "movies" ? "movie" : lib?.type === "shows" || lib?.type === "anime" ? "show" : null;
   // A random sort gets a fresh seed each time it's chosen, but stays stable while scrolling.
   const [seed] = useState(() => Date.now());
 
@@ -215,7 +210,8 @@ export function LibraryPage() {
         </div>
 
         {filtersOpen && !collections && (
-          <div className="mb-4 grid gap-3 rounded-lg border border-border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="mb-4 rounded-lg border border-border bg-surface p-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <Select aria-label="Watched state" value={search.watch ?? ""} onChange={(e) => set({ watch: (e.target.value || undefined) as LibrarySearch["watch"] })}>
               <option value="">{isMusic ? "Any play state" : "Watched or not"}</option>
               <option value="unwatched">{isMusic ? "Unplayed" : "Unwatched"}</option>
@@ -258,6 +254,21 @@ export function LibraryPage() {
               </Select>
             )}
           </div>
+          {isAdmin && smartType && (
+            <div className="mt-3 flex justify-end">
+              <Button size="sm" variant="ghost" onClick={() => setSavingSmart(true)}>
+                <Sparkles className="size-4" /> Save as smart collection
+              </Button>
+            </div>
+          )}
+          </div>
+        )}
+        {savingSmart && smartType && (
+          <SaveSmartCollectionDialog
+            libraryId={id}
+            rules={{ itemType: smartType, sort, watch: search.watch, genre: search.genre, decade: search.decade, contentRating: search.rating, resolution: search.res }}
+            onClose={() => setSavingSmart(false)}
+          />
         )}
         {filtered && (
           <div className="mb-4 flex flex-wrap items-center gap-2">

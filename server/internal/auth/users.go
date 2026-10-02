@@ -32,6 +32,9 @@ type Restrictions struct {
 	LiveTV       *bool     `json:"liveTv,omitempty"`
 	LiveTVGroups *[]string `json:"liveTvGroups,omitempty"`
 	SeerrUserID  *int64    `json:"seerrUserId,omitempty"`
+	// Friend: joined through an invite (USER-13). Signs in with a password, isn't on the
+	// profile picker, and can't switch to household profiles.
+	Friend bool `json:"friend,omitempty"`
 }
 
 // LiveTVAllowed reports whether the user may watch Live TV at all.
@@ -47,6 +50,7 @@ type Preferences struct {
 	SubtitleMode      string `json:"subtitleMode,omitempty"`
 	LocalQualityKbps  int    `json:"localQualityKbps,omitempty"`
 	RemoteQualityKbps int    `json:"remoteQualityKbps,omitempty"`
+	CinemaTrailers    *bool  `json:"cinemaTrailers,omitempty"` // nil = on (PLAY-18)
 }
 
 type NewUser struct {

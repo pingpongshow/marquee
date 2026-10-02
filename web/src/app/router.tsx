@@ -6,9 +6,11 @@ import {
   createRoute,
   createRouter,
   lazyRouteComponent,
+  useRouterState,
 } from "@tanstack/react-router";
 import { systemInfoQuery } from "@/api/queries";
 import { Alert, Spinner } from "@/components/ui";
+import { JoinPage } from "@/features/auth/JoinPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { SetupPage } from "@/features/auth/SetupPage";
 import { ItemPage } from "@/features/browse/ItemPage";
@@ -58,6 +60,11 @@ const SettingsSectionPage = lazyRouteComponent(
 function Gate() {
   const { isAuthenticated } = useAuth();
   const info = useQuery(systemInfoQuery);
+  // Invite links are for people without an account yet (USER-13).
+  const joining = useRouterState({
+    select: (s) => s.location.pathname.startsWith("/join/"),
+  });
+  if (joining) return <Outlet />;
   if (info.isPending) return <Spinner label="Connecting to server" />;
   if (info.isError)
     return (
@@ -124,6 +131,11 @@ const playRoute = createRoute({
     g: typeof s.g === "string" ? s.g : undefined, // a watch-together group to join
   }),
   component: PlayerPage,
+});
+const joinRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/join/$token",
+  component: JoinPage,
 });
 const linkRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -207,6 +219,7 @@ const routeTree = rootRoute.addChildren([
   playlistRoute,
   personRoute,
   linkRoute,
+  joinRoute,
   settingsRoute.addChildren([settingsIndexRoute, settingsSectionRoute]),
 ]);
 

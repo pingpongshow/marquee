@@ -36,6 +36,7 @@ import kotlinx.serialization.Contextual
  * @param subtitleMode 
  * @param localQualityKbps 0 = original
  * @param remoteQualityKbps 0 = automatic
+ * @param cinemaTrailers Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true.
  */
 @Serializable
 
@@ -57,7 +58,11 @@ data class UserPreferences (
 
     /* 0 = automatic */
     @SerialName(value = "remoteQualityKbps")
-    val remoteQualityKbps: kotlin.Int? = null
+    val remoteQualityKbps: kotlin.Int? = null,
+
+    /* Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true. */
+    @SerialName(value = "cinemaTrailers")
+    val cinemaTrailers: kotlin.Boolean? = null
 
 ) {
 
