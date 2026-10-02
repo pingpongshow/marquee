@@ -38,6 +38,15 @@ func (m *Manager) StreamHandler(subtitleCache string) http.Handler {
 			return
 		}
 		w.Header().Set("Access-Control-Allow-Origin", "*")
+		// Lower ABR variants live under r<n>/ (PLAY-15).
+		rung := 0
+		if strings.HasPrefix(file, "r") {
+			if head, tail, ok := strings.Cut(file, "/"); ok {
+				if n, err := strconv.Atoi(head[1:]); err == nil && n > 0 {
+					rung, file = n, tail
+				}
+			}
+		}
 		switch {
 		case file == "file":
 			m.serveFile(w, r, s)
@@ -48,14 +57,14 @@ func (m *Manager) StreamHandler(subtitleCache string) http.Handler {
 			w.Header().Set("Cache-Control", "no-cache")
 			w.Write(PlanPlaylist(s.Plan, s.Media.DurationMS))
 		case file == "init.mp4":
-			m.serveFromTranscoder(w, r, s, -1)
+			m.serveFromTranscoder(w, r, s, rung, -1)
 		case strings.HasSuffix(file, ".m4s"):
 			k, err := strconv.Atoi(strings.TrimSuffix(file, ".m4s"))
 			if err != nil {
 				http.NotFound(w, r)
 				return
 			}
-			m.serveFromTranscoder(w, r, s, k)
+			m.serveFromTranscoder(w, r, s, rung, k)
 		case strings.HasPrefix(file, "subtitles/") && strings.HasSuffix(file, ".m3u8"):
 			sid, err := strconv.ParseInt(strings.TrimSuffix(strings.TrimPrefix(file, "subtitles/"), ".m3u8"), 10, 64)
 			if err != nil {
@@ -225,19 +234,34 @@ func (m *Manager) serveMaster(w http.ResponseWriter, s *Session) {
 		}
 	}
 	b.WriteString("\nindex.m3u8\n")
+	// Lower variants for adaptive bitrate (remote transcodes only).
+	for i, rg := range s.Rungs() {
+		bw := (rg.VideoKbps + audioKbps(d.AudioChannels)) * 1000
+		fmt.Fprintf(&b, "#EXT-X-STREAM-INF:BANDWIDTH=%d,CODECS=\"%s\"", bw, codecsString(s))
+		if v := s.Media.Video; v != nil && v.Height > 0 {
+			fmt.Fprintf(&b, ",RESOLUTION=%dx%d", (v.Width*rg.Height/v.Height+1)&^1, rg.Height)
+		}
+		if subs {
+			b.WriteString(",SUBTITLES=\"subs\"")
+		}
+		fmt.Fprintf(&b, "\nr%d/index.m3u8\n", i+1)
+	}
 	w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
 	w.Header().Set("Cache-Control", "no-cache")
 	io.WriteString(w, b.String())
 }
 
-func (m *Manager) serveFromTranscoder(w http.ResponseWriter, r *http.Request, s *Session, k int) {
-	t := s.Transcoder()
+func (m *Manager) serveFromTranscoder(w http.ResponseWriter, r *http.Request, s *Session, rung, k int) {
+	t, err := m.RungTranscoder(s, rung)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
 	if t == nil {
 		http.Error(w, "this session plays the file directly", http.StatusNotFound)
 		return
 	}
 	var p string
-	var err error
 	if k < 0 {
 		p, err = t.Init(r.Context())
 	} else {

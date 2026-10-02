@@ -86,6 +86,7 @@ type Session struct {
 	preload    bool // prepared for gapless playback; not yet playing
 	historyID  int64
 	transcoder *Transcoder
+	rungs      []Rung // lower ABR variants of a remote transcode
 }
 
 // Snapshot is a copy of a session's live state.
@@ -312,12 +313,15 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 			job.SubIndex, job.SubExternal, job.SubImage = sub.Index, sub.External, sub.IsImage()
 			job.SubRelIndex = m.subtitleRelIndex(ctx, s.FileID, sub.Index)
 		}
-		s.transcoder = &Transcoder{FFmpeg: m.FFmpeg, Job: job, Encoders: m.Encoders.Available(cfg.Transcoder.EncoderOrder),
+		s.transcoder = &Transcoder{FFmpeg: m.FFmpeg, Job: job, Encoders: m.encodersFor(cfg.Transcoder.EncoderOrder),
 			TotalSegments: len(plan), ThrottleAhead: cfg.Transcoder.ThrottleSegmentsAhead}
 		if s.Decision.VideoCopy {
 			s.transcoder.Encoders = []string{"software"} // copying video needs no encoder
 		}
 		s.transcoder.lastRequest = segmentFor(plan, float64(s.StartMS)/1000)
+		if s.Remote && s.Decision.Method == Transcode && s.Media.Video != nil {
+			s.rungs = ladderFor(s.Decision, s.Media.Video.Height, cfg.Transcoder.RemoteLadder)
+		}
 	}
 
 	res, err := m.DB.ExecContext(ctx, `INSERT INTO play_history(user_id, item_id, device_id, item_title, started_at, position_ms,
@@ -663,6 +667,7 @@ func (m *Manager) Stop(ctx context.Context, id string) error {
 			encoder = "copy"
 		}
 		s.transcoder.Stop()
+		s.stopRungs()
 	}
 	snap := s.Snapshot()
 	m.DB.ExecContext(ctx, `UPDATE play_history SET stopped_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), position_ms = ?, video_encoder = ?
@@ -710,6 +715,10 @@ func (m *Manager) Run(ctx context.Context) {
 			return
 		case <-t.C:
 			m.Reap(ctx, 3*time.Minute)
+			now := time.Now()
+			for _, s := range m.List() {
+				s.reapRungs(now)
+			}
 		case <-minute.C:
 			m.record()
 		}
