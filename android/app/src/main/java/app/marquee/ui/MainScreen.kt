@@ -113,7 +113,7 @@ private fun Routes(nav: NavHostController) {
         composable("libraries") { LibrariesScreen(nav) }
         composable("playlists") { PlaylistsScreen(nav) }
         composable("search") { SearchScreen(nav) }
-        composable("settings") { SettingsScreen() }
+        composable("settings") { SettingsScreen(nav) }
         composable("library/{id}", listOf(navArgument("id") { type = NavType.LongType })) { LibraryScreen(nav, it.arguments!!.getLong("id")) }
         composable("item/{id}", listOf(navArgument("id") { type = NavType.LongType })) { ItemScreen(nav, it.arguments!!.getLong("id")) }
         composable("playlist/{id}", listOf(navArgument("id") { type = NavType.LongType })) { PlaylistScreen(nav, it.arguments!!.getLong("id")) }
@@ -122,6 +122,8 @@ private fun Routes(nav: NavHostController) {
             listOf(navArgument("id") { type = NavType.LongType }, navArgument("start") { type = NavType.LongType; defaultValue = -1L }),
         ) { PlayerScreen(nav, it.arguments!!.getLong("id"), it.arguments!!.getLong("start").takeIf { s -> s >= 0 }) }
         composable("downloads") { DownloadsScreen(nav) }
+        composable("discover") { DiscoverScreen(nav) }
+        composable("approvals") { ApprovalsScreen() }
         composable("nowplaying") { NowPlayingScreen(onClose = { nav.popBackStack() }) }
     }
 }

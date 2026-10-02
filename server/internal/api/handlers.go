@@ -19,6 +19,7 @@ import (
 	"marquee/internal/netclass"
 	"marquee/internal/playback"
 	"marquee/internal/plex"
+	"marquee/internal/requests"
 	"marquee/internal/settings"
 	"marquee/internal/sonic"
 	"marquee/internal/subtitles"
@@ -52,6 +53,7 @@ type Handlers struct {
 	Sonic            *sonic.Service
 	Lyrics           *lyrics.Service
 	Backups          *tasks.Backups
+	Requests         *requests.Service
 	// Restart stops the server gracefully; Docker starts it again.
 	Restart func()
 	Version string

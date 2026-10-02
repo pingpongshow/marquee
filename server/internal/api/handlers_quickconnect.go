@@ -50,10 +50,10 @@ func (h *Handlers) StartQuickConnect(ctx context.Context, req StartQuickConnectR
 func (h *Handlers) PollQuickConnect(ctx context.Context, req PollQuickConnectRequestObject) (PollQuickConnectResponseObject, error) {
 	r, ok := h.QuickConnect.Poll(req.Secret)
 	if !ok {
-		return PollQuickConnect200JSONResponse{Status: Expired}, nil
+		return PollQuickConnect200JSONResponse{Status: QuickConnectStateStatusExpired}, nil
 	}
 	if !r.Approved {
-		return PollQuickConnect200JSONResponse{Status: Pending}, nil
+		return PollQuickConnect200JSONResponse{Status: QuickConnectStateStatusPending}, nil
 	}
 	u, err := h.Auth.GetUser(ctx, r.UserID)
 	if err != nil {
@@ -63,7 +63,7 @@ func (h *Handlers) PollQuickConnect(ctx context.Context, req PollQuickConnectReq
 	if err != nil {
 		return nil, internal(ctx, "quickConnect", err)
 	}
-	return PollQuickConnect200JSONResponse{Status: Approved, Auth: &AuthResult{Token: token, User: toAPIUser(u)}}, nil
+	return PollQuickConnect200JSONResponse{Status: QuickConnectStateStatusApproved, Auth: &AuthResult{Token: token, User: toAPIUser(u)}}, nil
 }
 
 func (h *Handlers) AuthorizeQuickConnect(ctx context.Context, req AuthorizeQuickConnectRequestObject) (AuthorizeQuickConnectResponseObject, error) {

@@ -199,6 +199,42 @@ final class MarqueeUITests: XCTestCase {
     }
 
     /// Your Stats (ADM-4) and Sonic Adventure from a track's menu (MUSIC-4).
+    /// Discover (REQ-1): browse Seerr, request a title, see it under My Requests, withdraw it.
+    /// Needs the server connected to Seerr and the test profile allowed to request.
+    func testDiscoverAndRequest() {
+        connectAndSignIn()
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            app.buttons["Libraries"].firstMatch.tap()
+            let back = app.navigationBars.buttons["Libraries"]
+            if back.waitForExistence(timeout: 2) { back.tap() }
+            let discover = app.buttons["Discover"].firstMatch
+            XCTAssertTrue(discover.waitForExistence(timeout: 10))
+            discover.tap()
+        } else {
+            app.buttons["Discover"].firstMatch.tap()
+        }
+        XCTAssertTrue(app.navigationBars["Discover"].waitForExistence(timeout: 10))
+        let request = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Request '")).firstMatch
+        XCTAssertTrue(request.waitForExistence(timeout: 20), "Discover lists requestable titles")
+        sleep(2)
+        shot("r1-discover")
+        request.tap()
+        let confirm = app.navigationBars["Request"].buttons["Request"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10))
+        // Shows load their seasons first.
+        let enabled = NSPredicate(format: "isEnabled == true")
+        expectation(for: enabled, evaluatedWith: confirm)
+        waitForExpectations(timeout: 10)
+        shot("r2-request-sheet")
+        confirm.tap()
+        let withdraw = app.buttons["Withdraw"].firstMatch
+        XCTAssertTrue(withdraw.waitForExistence(timeout: 15), "the request shows under My Requests")
+        for _ in 0..<8 where !withdraw.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        shot("r3-my-requests")
+        withdraw.tap()
+        XCTAssertTrue(withdraw.waitForNonExistence(timeout: 10))
+    }
+
     func testStatsAndAdventure() {
         connectAndSignIn()
         app.buttons["Settings"].firstMatch.tap()
