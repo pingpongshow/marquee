@@ -68,6 +68,9 @@ type Transcoder struct {
 	ToneMapping             bool          `json:"toneMapping"`
 	ThrottleSegmentsAhead   int           `json:"throttleSegmentsAhead"`
 	RemoteLadder            []QualityRung `json:"remoteLadder"`
+	// NVENCSessions is how many NVENC encodes may run at once before new jobs go to
+	// Quick Sync or the CPU (consumer NVIDIA drivers cap concurrent sessions). 0 = no cap.
+	NVENCSessions int `json:"nvencSessions"`
 }
 
 type Library struct {
@@ -114,6 +117,7 @@ func Defaults() Settings {
 			PreferHEVCRemote:        true,
 			ToneMapping:             true,
 			ThrottleSegmentsAhead:   10,
+			NVENCSessions:           8,
 			RemoteLadder: []QualityRung{
 				{Label: "1080p 12 Mbps", MaxHeight: 1080, VideoKbps: 12000},
 				{Label: "1080p 8 Mbps", MaxHeight: 1080, VideoKbps: 8000},

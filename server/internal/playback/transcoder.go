@@ -41,6 +41,13 @@ type Transcoder struct {
 	quit        chan struct{}
 }
 
+// running reports whether FFmpeg is currently running.
+func (t *Transcoder) running() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.cmd != nil && !isClosed(t.exited)
+}
+
 func (t *Transcoder) Encoder() string {
 	t.mu.Lock()
 	defer t.mu.Unlock()

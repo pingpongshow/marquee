@@ -2,11 +2,13 @@ module marquee
 
 go 1.26.0
 
+toolchain go1.26.8
+
 tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
 
 require (
 	github.com/fsnotify/fsnotify v1.10.1
-	github.com/getkin/kin-openapi v0.142.0
+	github.com/getkin/kin-openapi v0.144.0
 	github.com/grandcat/zeroconf v1.0.0
 	github.com/oapi-codegen/runtime v1.7.0
 	github.com/pressly/goose/v3 v3.28.0

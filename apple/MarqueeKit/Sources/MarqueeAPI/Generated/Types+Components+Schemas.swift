@@ -1200,6 +1200,10 @@ extension Components {
             public var toneMapping: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/TranscoderSettings/throttleSegmentsAhead`.
             public var throttleSegmentsAhead: Swift.Int?
+            /// Concurrent NVENC encodes before new jobs go to Quick Sync or the CPU (consumer NVIDIA drivers cap this). 0 = no cap.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TranscoderSettings/nvencSessions`.
+            public var nvencSessions: Swift.Int?
             /// - Remark: Generated from `#/components/schemas/TranscoderSettings/remoteLadder`.
             public var remoteLadder: [Components.Schemas.QualityRung]?
             /// Creates a new `TranscoderSettings`.
@@ -1211,6 +1215,7 @@ extension Components {
             ///   - preferHevcRemote:
             ///   - toneMapping:
             ///   - throttleSegmentsAhead:
+            ///   - nvencSessions: Concurrent NVENC encodes before new jobs go to Quick Sync or the CPU (consumer NVIDIA drivers cap this). 0 = no cap.
             ///   - remoteLadder:
             public init(
                 encoderOrder: [Components.Schemas.EncoderKind]? = nil,
@@ -1219,6 +1224,7 @@ extension Components {
                 preferHevcRemote: Swift.Bool? = nil,
                 toneMapping: Swift.Bool? = nil,
                 throttleSegmentsAhead: Swift.Int? = nil,
+                nvencSessions: Swift.Int? = nil,
                 remoteLadder: [Components.Schemas.QualityRung]? = nil
             ) {
                 self.encoderOrder = encoderOrder
@@ -1227,6 +1233,7 @@ extension Components {
                 self.preferHevcRemote = preferHevcRemote
                 self.toneMapping = toneMapping
                 self.throttleSegmentsAhead = throttleSegmentsAhead
+                self.nvencSessions = nvencSessions
                 self.remoteLadder = remoteLadder
             }
             public enum CodingKeys: String, CodingKey {
@@ -1236,6 +1243,7 @@ extension Components {
                 case preferHevcRemote
                 case toneMapping
                 case throttleSegmentsAhead
+                case nvencSessions
                 case remoteLadder
             }
         }

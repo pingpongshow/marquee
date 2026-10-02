@@ -1833,6 +1833,7 @@ components:
         preferHevcRemote: { type: boolean }
         toneMapping: { type: boolean }
         throttleSegmentsAhead: { type: integer, minimum: 2 }
+        nvencSessions: { type: integer, minimum: 0, maximum: 64, description: "Concurrent NVENC encodes before new jobs go to Quick Sync or the CPU (consumer NVIDIA drivers cap this). 0 = no cap." }
         remoteLadder:
           type: array
           items: { $ref: "#/components/schemas/QualityRung" }
