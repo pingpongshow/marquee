@@ -15,7 +15,13 @@ function dismissedBefore() {
   }
 }
 
-type Step = { done: boolean; title: string; detail: string; section: string; optional?: boolean };
+type Step = {
+  done: boolean;
+  title: string;
+  detail: string;
+  section: string;
+  optional?: boolean;
+};
 
 /** First-run checklist for administrators (ADM-1), shown on Home until done or dismissed. */
 export function GettingStarted() {
@@ -23,15 +29,47 @@ export function GettingStarted() {
   const libraries = useQuery(librariesQuery);
   const settings = useQuery(settingsQuery);
   const users = useQuery(usersQuery);
-  const plex = useQuery({ queryKey: ["plex-import"], queryFn: () => unwrap(api.GET("/plex-import")), enabled: !dismissed });
-  if (dismissed || !libraries.data || !settings.data || !users.data) return null;
+  const plex = useQuery({
+    queryKey: ["plex-import"],
+    queryFn: () => unwrap(api.GET("/plex-import")),
+    enabled: !dismissed,
+  });
+  if (dismissed || !libraries.data || !settings.data || !users.data)
+    return null;
 
   const steps: Step[] = [
-    { done: libraries.data.length > 0, title: "Add your libraries", detail: "Point Marquee at your movie, TV, anime and music folders.", section: "libraries" },
-    { done: !!settings.data.metadata?.tmdbApiKeySet, title: "Add a TMDB API key", detail: "Needed for posters, summaries, cast and ratings.", section: "metadata" },
-    { done: !!plex.data?.lastReport, title: "Import from Plex", detail: "Bring over watch history, playlists and fixed matches.", section: "plex-import", optional: !plex.data?.available },
-    { done: users.data.length > 1, title: "Add the people you share with", detail: "Accounts or managed profiles, each with their own watch history.", section: "users" },
-    { done: !!settings.data.remoteAccess?.remoteUrl, title: "Set up remote access", detail: "Your Tailscale address, so apps can stream away from home.", section: "remote-access" },
+    {
+      done: libraries.data.length > 0,
+      title: "Add your libraries",
+      detail: "Point Marquee at your movie, TV, anime and music folders.",
+      section: "libraries",
+    },
+    {
+      done: !!settings.data.metadata?.tmdbApiKeySet,
+      title: "Add a TMDB API key",
+      detail: "Needed for posters, summaries, cast and ratings.",
+      section: "metadata",
+    },
+    {
+      done: !!plex.data?.lastReport,
+      title: "Import from Plex",
+      detail: "Bring over watch history, playlists and fixed matches.",
+      section: "plex-import",
+      optional: !plex.data?.available,
+    },
+    {
+      done: users.data.length > 1,
+      title: "Add the people you share with",
+      detail:
+        "Accounts or managed profiles, each with their own watch history.",
+      section: "users",
+    },
+    {
+      done: !!settings.data.remoteAccess?.remoteUrl,
+      title: "Set up remote access",
+      detail: "Your Tailscale address, so apps can stream away from home.",
+      section: "remote-access",
+    },
   ];
   const remaining = steps.filter((s) => !s.done && !s.optional).length;
   if (remaining === 0) return null;
@@ -49,22 +87,51 @@ export function GettingStarted() {
         <div className="flex-1">
           <h2 className="text-lg font-semibold">Finish setting up Marquee</h2>
           <p className="text-sm text-muted">
-            {remaining} {remaining === 1 ? "step" : "steps"} left. Everything can be changed later in Settings.
+            {remaining} {remaining === 1 ? "step" : "steps"} left. Everything
+            can be changed later in Settings.
           </p>
         </div>
-        <button onClick={dismiss} className="rounded p-1 text-muted hover:bg-surface-2 hover:text-text" aria-label="Hide setup checklist">
+        <button
+          onClick={dismiss}
+          className="rounded p-1 text-muted hover:bg-surface-2 hover:text-text"
+          aria-label="Hide setup checklist"
+        >
           <X className="size-4" />
         </button>
       </div>
       <ol className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         {steps.map((s) => (
           <li key={s.section}>
-            <Link to="/settings/$section" params={{ section: s.section }} className="flex gap-3 rounded-lg p-3 hover:bg-surface-2">
-              {s.done ? <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-success" aria-label="Done" /> : <Circle className="mt-0.5 size-5 shrink-0 text-faint" aria-label="To do" />}
+            <Link
+              to="/settings/$section"
+              params={{ section: s.section }}
+              className="flex gap-3 rounded-lg p-3 hover:bg-surface-2"
+            >
+              {s.done ? (
+                <CheckCircle2
+                  className="mt-0.5 size-5 shrink-0 text-success"
+                  aria-label="Done"
+                />
+              ) : (
+                <Circle
+                  className="mt-0.5 size-5 shrink-0 text-faint"
+                  aria-label="To do"
+                />
+              )}
               <span>
-                <span className={s.done ? "block font-medium text-muted line-through" : "block font-medium"}>
+                <span
+                  className={
+                    s.done
+                      ? "block font-medium text-muted line-through"
+                      : "block font-medium"
+                  }
+                >
                   {s.title}
-                  {s.optional && !s.done ? <span className="ml-2 text-xs font-normal text-faint">no Plex database found</span> : null}
+                  {s.optional && !s.done ? (
+                    <span className="ml-2 text-xs font-normal text-faint">
+                      no Plex database found
+                    </span>
+                  ) : null}
                 </span>
                 <span className="block text-sm text-muted">{s.detail}</span>
               </span>

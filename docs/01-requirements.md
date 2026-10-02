@@ -110,6 +110,12 @@ The owner wants the best music experience possible: everything Plexamp and Plex'
 | MUSIC-18 | **Browse and play by mood and style:** Plexamp-style mood, style and genre pages with stations and playlists for each (moods from sonic analysis and tags, styles from tags/MusicBrainz), on every client. | P1 |
 | MUSIC-19 | **Playlist downloads:** download whole playlists (including smart playlists and mixes) for offline playback on Apple and Android, kept in sync as they change. | P1 |
 
+## 3b-2. Watch together
+
+| ID | Requirement | Pri |
+|---|---|---|
+| SYNC-1 | **Watch together (SyncPlay):** people on the server watch the same title in step on any client: shared play, pause and seek, everyone waits while someone loads, and others can join a group in progress. | P1 |
+
 ## 3c. Live TV
 
 Plex-style Live TV on every client (see the owner's reference screenshot: Guide / What's On tabs, a live preview with "Now On", a time-scrolling guide grid with channel logos, favourites and a now line).

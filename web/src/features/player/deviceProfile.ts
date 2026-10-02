@@ -9,9 +9,12 @@ export function deviceProfile(): DeviceProfile {
   if (cached) return cached;
   const v = document.createElement("video");
   const a = document.createElement("audio");
-  const MSE = (window as unknown as { ManagedMediaSource?: typeof MediaSource }).ManagedMediaSource ?? window.MediaSource;
+  const MSE =
+    (window as unknown as { ManagedMediaSource?: typeof MediaSource })
+      .ManagedMediaSource ?? window.MediaSource;
   const mse = (type: string) => !!MSE && MSE.isTypeSupported(type);
-  const can = (el: HTMLMediaElement, type: string) => el.canPlayType(type) !== "";
+  const can = (el: HTMLMediaElement, type: string) =>
+    el.canPlayType(type) !== "";
   const nativeHLS = can(v, "application/vnd.apple.mpegurl");
 
   const videoCodecs: string[] = [];
@@ -24,7 +27,8 @@ export function deviceProfile(): DeviceProfile {
   ];
   for (const [codec, type] of checks) {
     if (can(v, type) || mse(type)) videoCodecs.push(codec);
-    if (codec !== "vp9" && (mse(type) || (nativeHLS && can(v, type)))) hlsVideo.push(codec);
+    if (codec !== "vp9" && (mse(type) || (nativeHLS && can(v, type))))
+      hlsVideo.push(codec);
   }
   const audioCodecs: string[] = [];
   const hlsAudio: string[] = [];
@@ -40,14 +44,23 @@ export function deviceProfile(): DeviceProfile {
   ];
   for (const [codec, type] of audioChecks) {
     if (can(a, type) || mse(type)) audioCodecs.push(codec);
-    if (codec !== "vorbis" && codec !== "mp3" && (mse(type) || (nativeHLS && can(a, type)))) hlsAudio.push(codec);
+    if (
+      codec !== "vorbis" &&
+      codec !== "mp3" &&
+      (mse(type) || (nativeHLS && can(a, type)))
+    )
+      hlsAudio.push(codec);
   }
   const containers = ["mp4"];
   if (can(v, "video/webm")) containers.push("webm");
-  for (const c of ["mp3", "flac", "ogg"]) if (can(a, c === "mp3" ? "audio/mpeg" : `audio/${c}`)) containers.push(c);
+  for (const c of ["mp3", "flac", "ogg"])
+    if (can(a, c === "mp3" ? "audio/mpeg" : `audio/${c}`)) containers.push(c);
   if (can(a, "audio/mp4")) containers.push("m4a");
 
-  const hdr: ("hdr10" | "hlg")[] = window.matchMedia?.("(dynamic-range: high)").matches ? ["hdr10", "hlg"] : [];
+  const hdr: ("hdr10" | "hlg")[] = window.matchMedia?.("(dynamic-range: high)")
+    .matches
+    ? ["hdr10", "hlg"]
+    : [];
   cached = {
     containers,
     videoCodecs,
@@ -60,7 +73,10 @@ export function deviceProfile(): DeviceProfile {
     hlsAudioCodecs: hlsAudio,
     textSubtitles: true,
     // Styled anime subtitles are drawn by JASSUB (libass in WebAssembly).
-    assSubtitles: typeof WebAssembly === "object" && typeof Worker === "function" && typeof OffscreenCanvas === "function",
+    assSubtitles:
+      typeof WebAssembly === "object" &&
+      typeof Worker === "function" &&
+      typeof OffscreenCanvas === "function",
   };
   return cached;
 }

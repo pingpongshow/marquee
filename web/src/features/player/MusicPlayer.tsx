@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { api, imageUrl, session as authSession, unwrap } from "@/api/client";
 import type { ItemSummary, RadioRequest } from "@/api/types";
 import { deviceProfile } from "./deviceProfile";
@@ -12,7 +20,10 @@ export type Source = { title: string; radio?: RadioRequest };
 type Ctx = {
   source?: Source;
   /** Plays a generated station; radios top themselves up as they play. */
-  playStation: (station: { title: string; items: ItemSummary[] }, radio?: RadioRequest) => void;
+  playStation: (
+    station: { title: string; items: ItemSummary[] },
+    radio?: RadioRequest,
+  ) => void;
   levelling: Levelling;
   setLevelling: (l: Levelling) => void;
   /** Crossfade between tracks in seconds (0 = off); never within an album played in order. */
@@ -32,7 +43,11 @@ type Ctx = {
   volume: number;
   expanded: boolean;
   /** source names what's playing (an album or playlist) for the Now Playing header. */
-  play: (tracks: ItemSummary[], start?: number, opts?: { shuffle?: boolean; source?: string }) => void;
+  play: (
+    tracks: ItemSummary[],
+    start?: number,
+    opts?: { shuffle?: boolean; source?: string },
+  ) => void;
   playNext: (tracks: ItemSummary[]) => void;
   addToQueue: (tracks: ItemSummary[]) => void;
   remove: (key: number) => void;
@@ -58,7 +73,14 @@ export function useMusic() {
 }
 
 /** A playback session bound to one of the two audio elements, with its levelling gains. */
-type Loaded = { key: number; sessionId: string; ready: boolean; trackGain?: number; albumGain?: number; peak?: number };
+type Loaded = {
+  key: number;
+  sessionId: string;
+  ready: boolean;
+  trackGain?: number;
+  albumGain?: number;
+  peak?: number;
+};
 
 function storedLevelling(): Levelling {
   try {
@@ -70,9 +92,16 @@ function storedLevelling(): Levelling {
 }
 
 /** Linear gain for a track: ReplayGain dB, limited so the peak doesn't clip. */
-function levelGain(l: Loaded | null, mode: Levelling, albumRun: boolean): number {
+function levelGain(
+  l: Loaded | null,
+  mode: Levelling,
+  albumRun: boolean,
+): number {
   if (!l || mode === "off") return 1;
-  const db = mode === "album" || (mode === "auto" && albumRun) ? (l.albumGain ?? l.trackGain) : l.trackGain;
+  const db =
+    mode === "album" || (mode === "auto" && albumRun)
+      ? (l.albumGain ?? l.trackGain)
+      : l.trackGain;
   if (db === undefined) return 1;
   let g = Math.pow(10, db / 20);
   if (l.peak && l.peak > 0) g = Math.min(g, 1 / l.peak);
@@ -82,10 +111,15 @@ function levelGain(l: Loaded | null, mode: Levelling, albumRun: boolean): number
 const PRELOAD_SECONDS = 15;
 const DJ_EVERY = 3; // a DJ pick after this many of your own tracks
 
-function stored<T extends string | number>(key: string, fallback: T, valid: (v: string) => boolean): T {
+function stored<T extends string | number>(
+  key: string,
+  fallback: T,
+  valid: (v: string) => boolean,
+): T {
   try {
     const v = localStorage.getItem(key);
-    if (v !== null && valid(v)) return (typeof fallback === "number" ? Number(v) : v) as T;
+    if (v !== null && valid(v))
+      return (typeof fallback === "number" ? Number(v) : v) as T;
   } catch {
     /* storage unavailable */
   }
@@ -111,11 +145,20 @@ function storedVolume() {
 }
 
 function stopSession(id: string | undefined) {
-  if (id) fetch(`/api/v1/playback/sessions/${id}`, { method: "DELETE", keepalive: true, headers: { Authorization: `Bearer ${authSession.token}` } }).catch(() => {});
+  if (id)
+    fetch(`/api/v1/playback/sessions/${id}`, {
+      method: "DELETE",
+      keepalive: true,
+      headers: { Authorization: `Bearer ${authSession.token}` },
+    }).catch(() => {});
 }
 
 async function openSession(item: ItemSummary, preload: boolean) {
-  return unwrap(api.POST("/playback/sessions", { body: { itemId: item.id, profile: deviceProfile(), startMs: 0, preload } }));
+  return unwrap(
+    api.POST("/playback/sessions", {
+      body: { itemId: item.id, profile: deviceProfile(), startMs: 0, preload },
+    }),
+  );
 }
 
 /** Records the final position (so the play counts) and then ends the session. */
@@ -123,7 +166,10 @@ function finishSession(id: string, positionMs: number) {
   fetch(`/api/v1/playback/sessions/${id}`, {
     method: "PATCH",
     keepalive: true,
-    headers: { Authorization: `Bearer ${authSession.token}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${authSession.token}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({ positionMs, state: "paused" }),
   })
     .catch(() => {})
@@ -149,17 +195,33 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [source, setSource] = useState<Source | undefined>();
   const [levelling, setLevellingState] = useState<Levelling>(storedLevelling);
   const [sleep, setSleep] = useState<number | "track" | null>(null);
-  const [crossfade, setCrossfadeState] = useState<number>(() => stored<number>("marquee.crossfade", 0, (v) => Number(v) >= 0 && Number(v) <= 12));
-  const [dj, setDJState] = useState<DJMode | null>(() => stored<string>("marquee.dj", "", (v) => ["stretch", "groupie", "deep_cuts", "contempo"].includes(v)) as DJMode || null);
+  const [crossfade, setCrossfadeState] = useState<number>(() =>
+    stored<number>(
+      "marquee.crossfade",
+      0,
+      (v) => Number(v) >= 0 && Number(v) <= 12,
+    ),
+  );
+  const [dj, setDJState] = useState<DJMode | null>(
+    () =>
+      (stored<string>("marquee.dj", "", (v) =>
+        ["stretch", "groupie", "deep_cuts", "contempo"].includes(v),
+      ) as DJMode) || null,
+  );
   const crossfadeRef = useRef(crossfade);
   const fading = useRef(false);
   const cur = Q.current(queue);
 
   // Web Audio graph for levelling: element → per-element gain → master (volume) → speakers.
   // Created on the first play (browsers require a user gesture).
-  const graph = useRef<{ ctx: AudioContext; master: GainNode; gains: GainNode[] } | null>(null);
+  const graph = useRef<{
+    ctx: AudioContext;
+    master: GainNode;
+    gains: GainNode[];
+  } | null>(null);
   const ensureGraph = useCallback(() => {
-    if (graph.current || typeof AudioContext === "undefined") return graph.current;
+    if (graph.current || typeof AudioContext === "undefined")
+      return graph.current;
     try {
       const ctx = new AudioContext();
       const master = ctx.createGain();
@@ -193,8 +255,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     const q = queueRef.current;
     const curEntry = q.entries[q.index];
     const prevEntry = q.entries[q.index - 1];
-    const albumRun = !!curEntry && !!prevEntry && curEntry.item.parentId === prevEntry.item.parentId;
-    const gain = levelGain(loaded.current[i] ?? null, levellingRef.current, albumRun);
+    const albumRun =
+      !!curEntry &&
+      !!prevEntry &&
+      curEntry.item.parentId === prevEntry.item.parentId;
+    const gain = levelGain(
+      loaded.current[i] ?? null,
+      levellingRef.current,
+      albumRun,
+    );
     if (g) {
       g.master.gain.value = volumeRef.current;
       g.gains[i]!.gain.value = gain;
@@ -209,12 +278,21 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   }, [queue]);
 
   const el = (i: number) => audios.current[i]!;
-  const activeEl = useCallback(() => audios.current[active.current] ?? null, []);
+  const activeEl = useCallback(
+    () => audios.current[active.current] ?? null,
+    [],
+  );
 
   const report = useCallback((state: "playing" | "paused") => {
     const l = loaded.current[active.current];
     const a = audios.current[active.current];
-    if (l && a) api.PATCH("/playback/sessions/{sessionId}", { params: { path: { sessionId: l.sessionId } }, body: { positionMs: Math.round(a.currentTime * 1000), state } }).catch(() => {});
+    if (l && a)
+      api
+        .PATCH("/playback/sessions/{sessionId}", {
+          params: { path: { sessionId: l.sessionId } },
+          body: { positionMs: Math.round(a.currentTime * 1000), state },
+        })
+        .catch(() => {});
   }, []);
 
   const unload = useCallback((i: number) => {
@@ -231,16 +309,26 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /** Loads an entry into element i. */
-  const loadInto = useCallback(async (i: number, entry: Q.Entry, preload = false) => {
-    const s = await openSession(entry.item, preload);
-    if (loaded.current[i]) stopSession(loaded.current[i]!.sessionId);
-    loaded.current[i] = { key: entry.key, sessionId: s.id, ready: false, trackGain: s.trackGainDb, albumGain: s.albumGainDb, peak: s.peak };
-    const a = audios.current[i]!;
-    a.src = s.url;
-    a.preload = "auto";
-    a.load();
-    loaded.current[i]!.ready = true;
-  }, []);
+  const loadInto = useCallback(
+    async (i: number, entry: Q.Entry, preload = false) => {
+      const s = await openSession(entry.item, preload);
+      if (loaded.current[i]) stopSession(loaded.current[i]!.sessionId);
+      loaded.current[i] = {
+        key: entry.key,
+        sessionId: s.id,
+        ready: false,
+        trackGain: s.trackGainDb,
+        albumGain: s.albumGainDb,
+        peak: s.peak,
+      };
+      const a = audios.current[i]!;
+      a.src = s.url;
+      a.preload = "auto";
+      a.load();
+      loaded.current[i]!.ready = true;
+    },
+    [],
+  );
 
   // Start the current entry unless it's already loaded in the active element (after a
   // gapless switch) or waiting in the idle one (preloaded).
@@ -261,7 +349,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           await loadInto(active.current, entry);
         } catch {
           // Skip tracks that can't be played.
-          if (!cancelled) setQueue((q) => (Q.skipIndex(q) >= 0 && Q.skipIndex(q) !== q.index ? { ...q, index: Q.skipIndex(q) } : q));
+          if (!cancelled)
+            setQueue((q) =>
+              Q.skipIndex(q) >= 0 && Q.skipIndex(q) !== q.index
+                ? { ...q, index: Q.skipIndex(q) }
+                : q,
+            );
           return;
         }
       }
@@ -282,11 +375,19 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const refilling = useRef(false);
   useEffect(() => {
     const radio = source?.radio;
-    if (!radio || refilling.current || queue.entries.length - queue.index > 5) return;
+    if (!radio || refilling.current || queue.entries.length - queue.index > 5)
+      return;
     refilling.current = true;
     const exclude = queue.entries.map((e) => e.item.id);
     unwrap(api.POST("/music/radio", { body: { ...radio, exclude, limit: 25 } }))
-      .then((st) => setQueue((q) => Q.append(q, st.items.filter((t) => !exclude.includes(t.id)))))
+      .then((st) =>
+        setQueue((q) =>
+          Q.append(
+            q,
+            st.items.filter((t) => !exclude.includes(t.id)),
+          ),
+        ),
+      )
       .catch(() => {})
       .finally(() => (refilling.current = false));
   }, [queue, source]);
@@ -307,9 +408,14 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     if (djCount.current < DJ_EVERY || following?.dj) return;
     djBusy.current = true;
     const exclude = q.entries.map((e) => e.item.id);
-    unwrap(api.POST("/music/dj", { body: { trackId: entry.item.id, mode: dj, exclude } }))
+    unwrap(
+      api.POST("/music/dj", {
+        body: { trackId: entry.item.id, mode: dj, exclude },
+      }),
+    )
       .then((pick) => {
-        if (queueRef.current.entries[queueRef.current.index]?.key !== entry.key) return; // moved on
+        if (queueRef.current.entries[queueRef.current.index]?.key !== entry.key)
+          return; // moved on
         unload(1 - active.current); // the preloaded "next" track changes
         setQueue((cq) => Q.playNext(cq, [pick], dj));
         djCount.current = 0;
@@ -321,10 +427,13 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   // Sleep timer.
   useEffect(() => {
     if (typeof sleep !== "number") return;
-    const t = window.setTimeout(() => {
-      activeEl()?.pause();
-      setSleep(null);
-    }, Math.max(0, sleep - Date.now()));
+    const t = window.setTimeout(
+      () => {
+        activeEl()?.pause();
+        setSleep(null);
+      },
+      Math.max(0, sleep - Date.now()),
+    );
     return () => window.clearTimeout(t);
   }, [sleep, activeEl]);
 
@@ -336,16 +445,22 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       title: t.title,
       artist: t.artistCredit ?? t.grandparentTitle ?? "",
       album: t.parentTitle ?? "",
-      artwork: t.images?.poster ? [{ src: imageUrl(t.images.poster, 256), sizes: "512x512" }] : [],
+      artwork: t.images?.poster
+        ? [{ src: imageUrl(t.images.poster, 256), sizes: "512x512" }]
+        : [],
     });
   }, [cur]);
 
   useEffect(() => {
-    const t = window.setInterval(() => !activeEl()?.paused && report("playing"), 15_000);
+    const t = window.setInterval(
+      () => !activeEl()?.paused && report("playing"),
+      15_000,
+    );
     const onHide = () =>
       loaded.current.forEach((l, i) => {
         const a = audios.current[i];
-        if (l?.sessionId) finishSession(l.sessionId, a ? Math.round(a.currentTime * 1000) : 0);
+        if (l?.sessionId)
+          finishSession(l.sessionId, a ? Math.round(a.currentTime * 1000) : 0);
       });
     window.addEventListener("pagehide", onHide);
     return () => {
@@ -354,7 +469,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     };
   }, [report, activeEl]);
 
-  const goTo = useCallback((index: number) => setQueue((q) => (index < 0 ? q : { ...q, index })), []);
+  const goTo = useCallback(
+    (index: number) => setQueue((q) => (index < 0 ? q : { ...q, index })),
+    [],
+  );
   const next = useCallback(() => goTo(Q.skipIndex(queueRef.current)), [goTo]);
   const prev = useCallback(() => {
     const a = activeEl();
@@ -395,18 +513,46 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     const fi = Q.followingIndex(q);
     const idle = (1 - i) as 0 | 1;
     const following = q.entries[fi];
-    if (following && fi !== q.index && isFinite(a.duration) && a.duration - a.currentTime < PRELOAD_SECONDS && !loaded.current[idle]) {
-      loaded.current[idle] = { key: following.key, sessionId: "", ready: false }; // reserve
-      loadInto(idle, following, true).catch(() => (loaded.current[idle] = null));
+    if (
+      following &&
+      fi !== q.index &&
+      isFinite(a.duration) &&
+      a.duration - a.currentTime < PRELOAD_SECONDS &&
+      !loaded.current[idle]
+    ) {
+      loaded.current[idle] = {
+        key: following.key,
+        sessionId: "",
+        ready: false,
+      }; // reserve
+      loadInto(idle, following, true).catch(
+        () => (loaded.current[idle] = null),
+      );
     }
     // Crossfade into what follows, except within an album played in order (gapless albums
     // stay gapless, like Plexamp's sweet fades) and when the sleep timer ends this track.
     const cf = crossfadeRef.current;
     const g = graph.current;
     const pre = loaded.current[idle];
-    const sameAlbum = !!following && following.item.parentId === q.entries[q.index]?.item.parentId && (following.item.index ?? 0) === (q.entries[q.index]?.item.index ?? -1) + 1;
-    if (cf > 0 && g && following && fi !== q.index && !fading.current && pre?.ready && pre.key === following.key && !sameAlbum && sleep !== "track" &&
-      isFinite(a.duration) && a.duration - a.currentTime <= cf && a.duration > cf * 2) {
+    const sameAlbum =
+      !!following &&
+      following.item.parentId === q.entries[q.index]?.item.parentId &&
+      (following.item.index ?? 0) ===
+        (q.entries[q.index]?.item.index ?? -1) + 1;
+    if (
+      cf > 0 &&
+      g &&
+      following &&
+      fi !== q.index &&
+      !fading.current &&
+      pre?.ready &&
+      pre.key === following.key &&
+      !sameAlbum &&
+      sleep !== "track" &&
+      isFinite(a.duration) &&
+      a.duration - a.currentTime <= cf &&
+      a.duration > cf * 2
+    ) {
       fading.current = true;
       const now = g.ctx.currentTime;
       const left = Math.max(0.5, a.duration - a.currentTime);
@@ -426,10 +572,13 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       setDuration(b.duration);
       setTime(0);
       setQueue(nq);
-      window.setTimeout(() => {
-        unload(i);
-        fading.current = false;
-      }, left * 1000 + 250);
+      window.setTimeout(
+        () => {
+          unload(i);
+          fading.current = false;
+        },
+        left * 1000 + 250,
+      );
     }
   };
 
@@ -580,8 +729,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             report("paused");
           }}
           onTimeUpdate={() => onTimeUpdate(i)}
-          onDurationChange={(e) => i === active.current && setDuration(e.currentTarget.duration)}
-          onLoadedMetadata={(e) => i === active.current && setDuration(e.currentTarget.duration)}
+          onDurationChange={(e) =>
+            i === active.current && setDuration(e.currentTarget.duration)
+          }
+          onLoadedMetadata={(e) =>
+            i === active.current && setDuration(e.currentTarget.duration)
+          }
           onEnded={() => onEnded(i)}
         />
       ))}
