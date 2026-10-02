@@ -1,5 +1,9 @@
 package app.marquee.ui
 
+import app.marquee.api.models.RadioRequest
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.Radio
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Arrangement
@@ -49,7 +53,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private data class Page(val detail: ItemDetail, val children: List<ItemSummary>, val related: List<ItemSummary>)
+private data class Page(val detail: ItemDetail, val children: List<ItemSummary>, val related: List<ItemSummary>, val similar: List<ItemSummary>)
 
 /** Detail page for any item: header, play buttons, contents, cast and related titles. */
 @Composable
@@ -57,13 +61,16 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
     val marquee = LocalMarquee.current
     val music = LocalMusic.current
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val page by produceState<Result<Page>?>(null, itemId) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 val d = marquee.items.getItem(itemId)
                 val children = if (d.childCount > 0) marquee.items.listItemChildren(itemId, limit = 500).items else emptyList()
                 val related = if (d.type in listOf(ItemType.MOVIE, ItemType.SHOW, ItemType.ALBUM, ItemType.ARTIST)) runCatching { marquee.items.relatedItems(itemId) }.getOrDefault(emptyList()) else emptyList()
-                Page(d, children, related)
+                // Music: what sounds like it, from the sonic analysis (MUSIC-2).
+                val similar = if (d.type in listOf(ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK)) runCatching { marquee.music.sonicSimilar(itemId, 20) }.getOrDefault(emptyList()) else emptyList()
+                Page(d, children, related, similar)
             }
         }
     }
@@ -76,6 +83,13 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
         then(l)
     }
     val square = d.type in listOf(ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK)
+    /** A station seeded from this album, artist or track (MUSIC-3). */
+    @Composable fun RadioButton() = OutlinedButton(modifier = Modifier.focusRing(), onClick = {
+        scope.launch {
+            runCatching { music.startRadio(RadioRequest(RadioRequest.Seed.ITEM, itemId = d.id)) }
+                .onFailure { Toast.makeText(context, it.message ?: "Couldn't start a radio", Toast.LENGTH_LONG).show() }
+        }
+    }) { Icon(Icons.Filled.Radio, null); Text("Radio") }
     @Composable fun Actions() {
             when (d.type) {
                 ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO -> {
@@ -96,16 +110,22 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 ItemType.ALBUM, ItemType.ARTIST -> {
                     Button(onClick = { leaves { music.play(it, 0, source = d.title) } }, modifier = Modifier.focusRing().initialFocus(marquee.isTv)) { Icon(Icons.Filled.PlayArrow, null); Text("Play") }
                     OutlinedButton(modifier = Modifier.focusRing(), onClick = { leaves(shuffle = true) { music.play(it, 0, source = d.title) } }) { Icon(Icons.Filled.Shuffle, null); Text("Shuffle") }
+                    RadioButton()
                 }
-                ItemType.TRACK -> Button(onClick = { leaves { music.play(it, 0) } }, modifier = Modifier.focusRing().initialFocus(marquee.isTv)) { Icon(Icons.Filled.PlayArrow, null); Text("Play") }
+                ItemType.TRACK -> {
+                    Button(onClick = { leaves { music.play(it, 0) } }, modifier = Modifier.focusRing().initialFocus(marquee.isTv)) { Icon(Icons.Filled.PlayArrow, null); Text("Play") }
+                    RadioButton()
+                }
                 else -> {}
             }
     }
     LazyColumn(contentPadding = PaddingValues(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
         item {
             if (marquee.isTv) TvHeader(d, square) { Actions() } else {
-                Box(Modifier.fillMaxWidth().height(220.dp)) {
-                    marquee.imageUrl(d.images?.backdrop, 1280)?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize()) }
+                // A backdrop when there is one; otherwise just room under the status bar.
+                val backdrop = marquee.imageUrl(d.images?.backdrop, 1280)
+                Box(Modifier.fillMaxWidth().height(if (backdrop != null) 220.dp else 24.dp)) {
+                    backdrop?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize()) }
                     Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background))))
                 }
                 Row(Modifier.padding(horizontal = sidePadding), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -163,6 +183,11 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                         }
                     }
                 }
+            }
+        }
+        if (pg.similar.isNotEmpty()) item {
+            Shelf(if (d.type == ItemType.ARTIST) "Similar artists" else "Sounds similar", pg.similar, sidePadding) { _, it ->
+                PosterCard(it, marquee.imageUrl(it.images?.poster, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) })
             }
         }
         if (pg.related.isNotEmpty()) item {

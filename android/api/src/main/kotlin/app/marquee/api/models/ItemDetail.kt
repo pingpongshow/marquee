@@ -191,8 +191,8 @@ data class ItemDetail (
     val watchedLeafCount: kotlin.Int? = null,
 
     /* The user's rating, 0–10 (10 = loved). */
-    @Contextual @SerialName(value = "userRating")
-    val userRating: java.math.BigDecimal? = null,
+    @SerialName(value = "userRating")
+    val userRating: kotlin.Double? = null,
 
     /* On the user's watchlist (USER-8). */
     @SerialName(value = "watchlisted")
@@ -214,8 +214,8 @@ data class ItemDetail (
     val summary: kotlin.String? = null,
 
     /* TMDB user score, 0–10 */
-    @Contextual @SerialName(value = "audienceRating")
-    val audienceRating: java.math.BigDecimal? = null,
+    @SerialName(value = "audienceRating")
+    val audienceRating: kotlin.Double? = null,
 
     @SerialName(value = "ratings")
     val ratings: Ratings? = null,

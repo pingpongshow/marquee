@@ -1,5 +1,18 @@
 package app.marquee.music
 
+import kotlinx.coroutines.launch
+import app.marquee.ui.initialFocus
+import app.marquee.ui.focusRing
+import app.marquee.ui.LocalMarquee
+import app.marquee.api.models.RadioRequest
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.Lyrics
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,7 +34,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
@@ -82,75 +94,141 @@ fun MiniPlayer(onOpen: () -> Unit) {
     }
 }
 
-/** Full-screen Now Playing with the queue. */
+/** Full-screen Now Playing: artwork or lyrics or the queue, rating, radio, sleep timer and Guest DJ. */
 @Composable
 fun NowPlayingScreen(onClose: () -> Unit) {
     val music = LocalMusic.current
+    val marquee = LocalMarquee.current
     val now by music.now.collectAsState()
+    val source by music.source.collectAsState()
+    var panel by remember { mutableStateOf(Panel.Art) }
+    var radioError by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val n = now
+    fun startRadio() {
+        val id = n?.id ?: return
+        scope.launch {
+            radioError = runCatching { music.startRadio(RadioRequest(RadioRequest.Seed.ITEM, itemId = id)) }.exceptionOrNull()?.message
+        }
+    }
+
+    val header: @Composable () -> Unit = {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onClose, modifier = Modifier.focusRing()) { Icon(Icons.Filled.KeyboardArrowDown, "Close Now Playing") }
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(if (source == null) "NOW PLAYING" else "PLAYING FROM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                source?.let { Text(it, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            }
+            PanelButton(Icons.Filled.Lyrics, "Lyrics", panel == Panel.Lyrics) { panel = if (panel == Panel.Lyrics) Panel.Art else Panel.Lyrics }
+            PanelButton(Icons.AutoMirrored.Filled.QueueMusic, "Up Next", panel == Panel.Queue) { panel = if (panel == Panel.Queue) Panel.Art else Panel.Queue }
+        }
+    }
+    val panelContent: @Composable (Modifier) -> Unit = { m ->
+        when {
+            n == null -> Box(m, contentAlignment = Alignment.Center) { Text("Nothing playing", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            panel == Panel.Lyrics -> LyricsPanel(n.id, music.position.collectAsState().value.first, music::seek, m)
+            panel == Panel.Queue -> QueueList(m)
+            else -> Box(m, contentAlignment = Alignment.Center) {
+                AsyncImage(n.artwork, null, contentScale = ContentScale.Crop,
+                    modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(12.dp)).background(Surface2))
+            }
+        }
+    }
+    val details: @Composable () -> Unit = {
+        if (n != null) Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+            n.dj?.let { Text(it.uppercase(), style = MaterialTheme.typography.labelSmall, color = Gold) }
+            Text(n.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(listOf(n.artist, n.album).filter { it.isNotBlank() }.joinToString(" · "), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            Transport()
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                RatingStars(music.rating.collectAsState().value, music::rate, size = if (marquee.isTv) 22 else 24)
+                IconButton(::startRadio, Modifier.focusRing()) { Icon(Icons.Filled.Radio, "Start Radio", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                SleepButton()
+                DJButton()
+            }
+            radioError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        }
+    }
+
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        if (marquee.isTv) {
+            // TV: artwork, lyrics or the queue on the left, details and controls on the right.
+            Column(Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 24.dp)) {
+                header()
+                Row(Modifier.fillMaxSize().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(48.dp), verticalAlignment = Alignment.CenterVertically) {
+                    panelContent(Modifier.weight(1f).fillMaxHeight())
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { details() }
+                }
+            }
+        } else {
+            Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 24.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                header()
+                panelContent(Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp))
+                details()
+            }
+        }
+    }
+}
+
+private enum class Panel { Art, Lyrics, Queue }
+
+@Composable
+private fun PanelButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, on: Boolean, onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = Modifier.focusRing()) { Icon(icon, label, tint = if (on) Gold else MaterialTheme.colorScheme.onSurface) }
+}
+
+/** Scrubber, times and the play controls. */
+@Composable
+private fun Transport() {
+    val music = LocalMusic.current
     val playing by music.playing.collectAsState()
     val (pos, dur) = music.position.collectAsState().value
-    val source by music.source.collectAsState()
-    val queue by music.queue.collectAsState()
-    val index by music.index.collectAsState()
     val shuffle by music.shuffle.collectAsState()
     val repeat by music.repeat.collectAsState()
-    var showQueue by remember { mutableStateOf(false) }
     var scrub by remember { mutableStateOf<Float?>(null) }
-    val n = now
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onClose) { Icon(Icons.Filled.KeyboardArrowDown, "Close Now Playing") }
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(if (source == null) "NOW PLAYING" else "PLAYING FROM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    source?.let { Text(it, style = MaterialTheme.typography.labelLarge, maxLines = 1) }
+    Slider(
+        value = scrub ?: if (dur > 0) pos.toFloat() / dur else 0f,
+        onValueChange = { scrub = it },
+        onValueChangeFinished = { scrub?.let { music.seek((it * dur).toLong()) }; scrub = null },
+        modifier = Modifier.widthIn(max = 480.dp).padding(top = 8.dp).semantics { contentDescription = "Position" },
+    )
+    Row(Modifier.widthIn(max = 480.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(formatTime(pos), style = MaterialTheme.typography.labelSmall)
+        Text("-" + formatTime((dur - pos).coerceAtLeast(0)), style = MaterialTheme.typography.labelSmall)
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(vertical = 4.dp)) {
+        IconButton(onClick = music::toggleShuffle, modifier = Modifier.focusRing()) { Icon(Icons.Filled.Shuffle, "Shuffle", tint = if (shuffle) Gold else MaterialTheme.colorScheme.onSurfaceVariant) }
+        IconButton(onClick = music::previous, modifier = Modifier.focusRing()) { Icon(Icons.Filled.SkipPrevious, "Previous track", Modifier.size(36.dp)) }
+        IconButton(onClick = music::toggle, modifier = Modifier.focusRing().size(68.dp).clip(RoundedCornerShape(34.dp)).background(Gold).initialFocus(LocalMarquee.current.isTv)) {
+            Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "Pause" else "Play", Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onPrimary)
+        }
+        IconButton(onClick = music::next, modifier = Modifier.focusRing()) { Icon(Icons.Filled.SkipNext, "Next track", Modifier.size(36.dp)) }
+        IconButton(onClick = music::cycleRepeat, modifier = Modifier.focusRing()) {
+            Icon(if (repeat == Player.REPEAT_MODE_ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat, "Repeat",
+                tint = if (repeat == Player.REPEAT_MODE_OFF) MaterialTheme.colorScheme.onSurfaceVariant else Gold)
+        }
+    }
+}
+
+/** Up Next: tap to jump, with the Guest DJ's picks marked. */
+@Composable
+private fun QueueList(modifier: Modifier) {
+    val music = LocalMusic.current
+    val queue by music.queue.collectAsState()
+    val index by music.index.collectAsState()
+    val state = rememberLazyListState()
+    LaunchedEffect(Unit) { state.scrollToItem(index.coerceAtLeast(0)) }
+    LazyColumn(modifier, state = state) {
+        itemsIndexed(queue) { i, q ->
+            Row(Modifier.fillMaxWidth().focusCard({ music.jump(i) }).padding(vertical = 10.dp, horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AsyncImage(q.artwork, null, contentScale = ContentScale.Crop, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(4.dp)).background(Surface2))
+                Column(Modifier.weight(1f)) {
+                    Text(q.title, color = if (i == index) Gold else MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        fontWeight = if (i == index) FontWeight.Bold else FontWeight.Normal)
+                    Text(listOfNotNull(q.artist.ifBlank { null }, q.dj).joinToString(" · "), style = MaterialTheme.typography.bodySmall,
+                        color = if (q.dj != null) Gold else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
-                IconButton(onClick = { showQueue = !showQueue }) { Icon(Icons.Filled.QueueMusic, "Up Next", tint = if (showQueue) Gold else MaterialTheme.colorScheme.onSurface) }
-            }
-            if (showQueue) {
-                LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-                    itemsIndexed(queue) { i, q ->
-                        Row(Modifier.fillMaxWidth().focusCard({ music.jump(i) }).padding(vertical = 10.dp, horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Column {
-                                Text(q.title, color = if (i == index) Gold else MaterialTheme.colorScheme.onSurface, maxLines = 1)
-                                Text(q.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                            }
-                        }
-                    }
-                }
-            } else if (n != null) {
-                Spacer(Modifier.weight(0.3f))
-                AsyncImage(n.artwork, null, contentScale = ContentScale.Crop,
-                    modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(12.dp)).background(Surface2))
-                Text(n.title, Modifier.padding(top = 20.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(listOf(n.artist, n.album).filter { it.isNotBlank() }.joinToString(" · "), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                Slider(
-                    value = scrub ?: if (dur > 0) pos.toFloat() / dur else 0f,
-                    onValueChange = { scrub = it },
-                    onValueChangeFinished = { scrub?.let { music.seek((it * dur).toLong()) }; scrub = null },
-                    modifier = Modifier.widthIn(max = 480.dp).padding(top = 12.dp),
-                )
-                Row(Modifier.widthIn(max = 480.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(formatTime(pos), style = MaterialTheme.typography.labelSmall)
-                    Text("-" + formatTime((dur - pos).coerceAtLeast(0)), style = MaterialTheme.typography.labelSmall)
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp), modifier = Modifier.padding(top = 8.dp)) {
-                    IconButton(onClick = music::toggleShuffle) { Icon(Icons.Filled.Shuffle, "Shuffle", tint = if (shuffle) Gold else MaterialTheme.colorScheme.onSurfaceVariant) }
-                    IconButton(onClick = music::previous) { Icon(Icons.Filled.SkipPrevious, "Previous track", Modifier.size(36.dp)) }
-                    IconButton(onClick = music::toggle, modifier = Modifier.size(72.dp).clip(RoundedCornerShape(36.dp)).background(Gold)) {
-                        Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "Pause" else "Play", Modifier.size(40.dp), tint = MaterialTheme.colorScheme.onPrimary)
-                    }
-                    IconButton(onClick = music::next) { Icon(Icons.Filled.SkipNext, "Next track", Modifier.size(36.dp)) }
-                    IconButton(onClick = music::cycleRepeat) {
-                        Icon(if (repeat == Player.REPEAT_MODE_ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat, "Repeat",
-                            tint = if (repeat == Player.REPEAT_MODE_OFF) MaterialTheme.colorScheme.onSurfaceVariant else Gold)
-                    }
-                }
-                Spacer(Modifier.weight(0.5f))
-            } else {
-                Spacer(Modifier.weight(1f))
-                Text("Nothing playing", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.weight(1f))
             }
         }
     }

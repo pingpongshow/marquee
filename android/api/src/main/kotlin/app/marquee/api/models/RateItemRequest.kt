@@ -37,8 +37,8 @@ import kotlinx.serialization.Contextual
 
 data class RateItemRequest (
 
-    @Contextual @SerialName(value = "rating")
-    val rating: java.math.BigDecimal? = null
+    @SerialName(value = "rating")
+    val rating: kotlin.Double? = null
 
 ) {
 

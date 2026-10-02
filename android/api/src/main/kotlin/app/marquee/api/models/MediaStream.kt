@@ -104,8 +104,8 @@ data class MediaStream (
     @SerialName(value = "height")
     val height: kotlin.Int? = null,
 
-    @Contextual @SerialName(value = "frameRate")
-    val frameRate: java.math.BigDecimal? = null,
+    @SerialName(value = "frameRate")
+    val frameRate: kotlin.Double? = null,
 
     @SerialName(value = "bitDepth")
     val bitDepth: kotlin.Int? = null

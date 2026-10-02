@@ -101,7 +101,7 @@ fun Artwork(url: String?, title: String, shape: Shape, modifier: Modifier = Modi
 
 fun subtitleFor(item: ItemSummary): String = when (item.type) {
     ItemType.SHOW -> if (item.childCount == 1) "1 season" else "${item.childCount} seasons"
-    ItemType.SEASON -> "${item.leafCount} episodes"
+    ItemType.SEASON -> if (item.leafCount == 1) "1 episode" else "${item.leafCount} episodes"
     ItemType.ARTIST -> if (item.childCount == 1) "1 album" else "${item.childCount} albums"
     ItemType.EPISODE -> listOfNotNull(item.grandparentTitle, item.index?.let { "E$it" }).joinToString(" · ")
     ItemType.TRACK -> item.artistCredit ?: item.grandparentTitle ?: ""
