@@ -5,6 +5,8 @@ public typealias LiveChannel = Components.Schemas.LiveChannel
 public typealias LiveProgramme = Components.Schemas.LiveProgramme
 public typealias LiveTvStatus = Components.Schemas.LiveTvStatus
 public typealias LiveGuideRow = Operations.LiveGuide.Output.Ok.Body.JsonPayloadPayload
+public typealias Recording = Components.Schemas.Recording
+public typealias RecordingRule = Components.Schemas.RecordingRule
 
 /// Live TV (LIVE-1..4): channels, the guide, favourites and live streams.
 @MainActor
@@ -61,6 +63,40 @@ public extension AppSession {
 
     /// A channel's logo (served without a token).
     func logoURL(_ c: LiveChannel) -> URL? { absolute(c.logoUrl) }
+
+    // MARK: DVR (LIVE-5)
+
+    func recordings() async throws -> [Recording] {
+        try await liveAPI.listRecordings().ok.body.json
+    }
+
+    func recordingRules() async throws -> [RecordingRule] {
+        try await liveAPI.listRecordingRules().ok.body.json
+    }
+
+    /// Records a programme, or every airing of its title (on any channel) when `series` is set.
+    func record(_ p: LiveProgramme, on channel: Int64, series: Bool = false) async throws {
+        switch try await liveAPI.scheduleRecording(body: .json(.init(channelId: channel, start: p.start, series: series ? true : nil, anyChannel: series ? true : nil))) {
+        case .created: return
+        case let .serviceUnavailable(e): throw MarqueeError((try? e.body.json.message) ?? "Recording isn't available")
+        case let .notFound(e): throw MarqueeError((try? e.body.json.message) ?? "That programme isn't in the guide")
+        case .forbidden: throw MarqueeError("You can't record. An admin can allow it in Settings → Users.")
+        default: throw MarqueeError("Couldn't schedule the recording")
+        }
+    }
+
+    /// Cancels an upcoming recording, stops one in progress, or removes a finished one.
+    func cancelRecording(_ id: Int64, deleteFile: Bool = false) async throws {
+        switch try await liveAPI.cancelRecording(path: .init(recordingId: id), query: .init(deleteFile: deleteFile ? true : nil)) {
+        case .noContent: return
+        case let .forbidden(e): throw MarqueeError((try? e.body.json.message) ?? "Not allowed")
+        default: throw MarqueeError("Couldn't change the recording")
+        }
+    }
+
+    func stopSeries(_ id: Int64) async throws {
+        _ = try await liveAPI.deleteRecordingRule(path: .init(ruleId: id)).noContent
+    }
 }
 
 public extension LiveProgramme {

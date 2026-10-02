@@ -34,6 +34,8 @@ import kotlinx.serialization.Contextual
  *
  * @param seerrUrl Seerr's address, e.g. http://10.1.1.10:5055. Empty turns requests off.
  * @param seerrApiKeySet 
+ * @param dvrPaddingBefore Minutes recordings start early.
+ * @param dvrPaddingAfter Minutes recordings run late.
  * @param liveTvSources 
  */
 @Serializable
@@ -46,6 +48,14 @@ data class IntegrationSettings (
 
     @SerialName(value = "seerrApiKeySet")
     val seerrApiKeySet: kotlin.Boolean? = null,
+
+    /* Minutes recordings start early. */
+    @SerialName(value = "dvrPaddingBefore")
+    val dvrPaddingBefore: kotlin.Int? = null,
+
+    /* Minutes recordings run late. */
+    @SerialName(value = "dvrPaddingAfter")
+    val dvrPaddingAfter: kotlin.Int? = null,
 
     @SerialName(value = "liveTvSources")
     val liveTvSources: kotlin.collections.List<LiveTvSource>? = null

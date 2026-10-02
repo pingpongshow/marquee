@@ -670,4 +670,43 @@ class MarqueeUiTest {
             adminApi("DELETE", "/users/$id")
         }
     }
+
+    /** DVR (LIVE-5): record a programme from the guide, see it marked, cancel it from Recordings. */
+    @Test fun recording() {
+        // A clean DVR, and the profile allowed to record.
+        val rules = org.json.JSONArray(adminApi("GET", "/livetv/recording-rules"))
+        for (i in 0 until rules.length()) adminApi("DELETE", "/livetv/recording-rules/${rules.getJSONObject(i).getLong("id")}")
+        val recs = org.json.JSONArray(adminApi("GET", "/livetv/recordings"))
+        for (i in 0 until recs.length()) recs.getJSONObject(i).takeIf { it.getString("status") == "scheduled" }?.let { adminApi("DELETE", "/livetv/recordings/${it.getLong("id")}") }
+        val users = org.json.JSONArray(adminApi("GET", "/users"))
+        val kid = (0 until users.length()).map { users.getJSONObject(it) }.first { it.getString("displayName") == profile }
+        val restrictions = kid.optJSONObject("restrictions") ?: org.json.JSONObject()
+        restrictions.put("canRecord", true)
+        adminApi("PATCH", "/users/${kid.getLong("id")}", org.json.JSONObject().put("restrictions", restrictions).toString())
+
+        connectAndSignIn()
+        tap("Live TV")
+        rule.waitText("Recordings", 15_000)
+        // Move the guide on 90 minutes so the programmes shown haven't started.
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Later"), 10_000)
+        rule.onNode(hasContentDescription("Later")).performClick()
+        val programme = hasContentDescription(", Marquee News", substring = true) and hasClickAction()
+        rule.waitUntilAtLeastOneExists(programme, 10_000)
+        Thread.sleep(1500)
+        val node = rule.onAllNodes(programme).onFirst()
+        val title = node.fetchSemanticsNode().config[SemanticsProperties.ContentDescription].first().substringBefore(",")
+        node.performClick()
+        rule.waitText("Record series", 10_000)
+        shot("r1-programme")
+        tap("Record")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("$title, Marquee News, will record"), 10_000)
+        shot("r2-guide-marked")
+
+        tap("Recordings")
+        rule.waitText("Upcoming", 10_000)
+        rule.waitText(title)
+        shot("r3-recordings")
+        tap("Cancel")
+        rule.waitUntil(10_000) { rule.onAllNodesWithText("Upcoming").fetchSemanticsNodes().isEmpty() }
+    }
 }

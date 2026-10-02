@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -323,6 +324,39 @@ func run() error {
 	lastSources = string(raw)
 	go live.Run(ctx, liveWake)
 
+	// DVR (LIVE-5): recordings land in "Recorded TV" / "Recorded Movies", made on first use.
+	minutes := func(n int) time.Duration { return time.Duration(n) * time.Minute }
+	dvr := &livetv.Recorder{Live: live, FFmpeg: cfg.FFmpegPath, Dir: cfg.RecordingsDir,
+		Before: func() time.Duration { return minutes(store.Get().Integrations.DVRPaddingBefore) },
+		After:  func() time.Duration { return minutes(store.Get().Integrations.DVRPaddingAfter) },
+		Library: func(ctx context.Context, movies bool, dir string) (int64, error) {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				return 0, err
+			}
+			libs, err := libraries.List(ctx)
+			if err != nil {
+				return 0, err
+			}
+			for _, l := range libs {
+				if slices.Contains(l.Paths, dir) {
+					return l.ID, nil
+				}
+			}
+			name, t := "Recorded TV", library.Shows
+			if movies {
+				name, t = "Recorded Movies", library.Movies
+			}
+			l, err := libraries.Create(ctx, name, t, []string{dir}, library.Options{})
+			if err != nil {
+				return 0, err
+			}
+			slog.Info("dvr: created library", "name", name, "path", dir)
+			return l.ID, nil
+		},
+		Scan: scans.Queue,
+	}
+	go dvr.Run(ctx)
+
 	watchTogether := &syncplay.Service{}
 	go watchTogether.Run(ctx)
 	lyricsSvc := &lyrics.Service{DB: database, Online: func() bool { return store.Get().Music.OnlineLyrics }}
@@ -344,6 +378,7 @@ func run() error {
 		Tasks: scheduler, Trickplay: trick, Webhooks: hooks, Subtitles: subs, Downloads: dl, Backups: backups, Restart: stop, Sonic: sonicSvc, Lyrics: lyricsSvc,
 		Requests: &requests.Service{DB: database, Settings: store},
 		LiveTV:   live,
+		DVR:      dvr,
 		SyncPlay: watchTogether,
 		Avatars:  &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
 		Images:   images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),

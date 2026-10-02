@@ -24,7 +24,9 @@ type Restrictions struct {
 	AllowRemote       *bool    `json:"allowRemote,omitempty"` // nil = allowed
 	RemoteQualityKbps int      `json:"remoteQualityKbps,omitempty"`
 	// CanRequest lets the user ask for titles through Seerr (REQ-1); admins always may.
-	CanRequest  bool   `json:"canRequest,omitempty"`
+	CanRequest bool `json:"canRequest,omitempty"`
+	// CanRecord lets the user schedule Live TV recordings (LIVE-5); admins always may.
+	CanRecord   bool   `json:"canRecord,omitempty"`
 	SeerrUserID *int64 `json:"seerrUserId,omitempty"`
 }
 

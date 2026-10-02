@@ -26,6 +26,7 @@ _Last updated: 2026-10-02. Status: **Draft**._
                 │  SQLite (WAL)  /config/db    Image cache /config/cache           │
                 └──────────────────────────────────────────────────────────────────┘
                     │ /media (ro)        │ /transcode (tmpfs)      │ /plex (ro, import)
+                    │ /recordings (rw, Live TV recordings, D76)
 ```
 
 ## Repository layout (monorepo)

@@ -61,6 +61,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -153,13 +154,18 @@ fun LiveTvScreen(nav: NavHostController) {
     val list = channels
     LazyColumn(contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
+            Text("Live TV", Modifier.padding(horizontal = sidePadding), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        }
+        item {
             Row(Modifier.padding(horizontal = sidePadding), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Live TV", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.width(8.dp))
-                listOf("Guide", "What's On").forEachIndexed { i, t ->
+                (if (s.canRecord == true) listOf("Guide", "What's On", "Recordings") else listOf("Guide", "What's On")).forEachIndexed { i, t ->
                     FilterChip(tab == i, { tab = i }, { Text(t) }, Modifier.focusRing(RoundedCornerShape(8.dp)).initialFocus(marquee.isTv && i == 0))
                 }
             }
+        }
+        if (tab == 2) {
+            item { RecordingsList(nav) }
+            return@LazyColumn
         }
         item {
             LazyRow(contentPadding = PaddingValues(horizontal = sidePadding), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -186,7 +192,12 @@ fun LiveTvScreen(nav: NavHostController) {
             item {
                 Guide(list, guide, start, preview,
                     onChannel = ::pick,
-                    onProgramme = { p, c -> if (p.isOn()) pick(c) else details = p to c },
+                    onProgramme = { p, c ->
+                        // On now: preview (phone) or watch (TV); the previewed channel's programme
+                        // or a later one shows its details, with Record.
+                        val previewed = preview ?: list.firstOrNull()?.id
+                        if (p.isOn() && (marquee.isTv || previewed != c.id)) pick(c) else details = p to c
+                    },
                     onFavorite = { c ->
                         scope.launch {
                             withContext(Dispatchers.IO) { runCatching { if (c.favorite) marquee.livetv.unfavoriteLiveChannel(c.id) else marquee.livetv.favoriteLiveChannel(c.id) } }
@@ -207,6 +218,7 @@ fun LiveTvScreen(nav: NavHostController) {
                     Text("${c.name} · ${p.start.local().format(DateTimeFormatter.ofPattern("EEE h:mm a"))}–${p.end.local().format(clock)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     listOfNotNull(p.episode, p.subtitle).takeIf { it.isNotEmpty() }?.let { Text(it.joinToString(" · ")) }
                     p.description?.let { Text(it) }
+                    if (s.canRecord == true && p.end.isAfter(OffsetDateTime.now())) RecordActions(p, c) { details = null; reload++ }
                 }
             },
             confirmButton = { TextButton({ details = null }, Modifier.focusRing()) { Text("Done") } },
@@ -268,9 +280,12 @@ private fun Guide(
                                 Modifier.offset(x = left + 2.dp).padding(vertical = 4.dp).width(right - left - 4.dp).fillMaxHeight()
                                     .clip(RoundedCornerShape(6.dp)).background(if (p.isOn()) Color.White.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.07f))
                                     .focusCard({ onProgramme(p, c) }, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 6.dp)
-                                    .semantics { contentDescription = "${p.title}, ${c.name}" },
+                                    .semantics { contentDescription = "${p.title}, ${c.name}" + if (p.recording != null) ", will record" else "" },
                             ) {
-                                Text(p.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (p.recording != null) Box(Modifier.padding(end = 4.dp).size(7.dp).clip(CircleShape).background(Color(0xFFE53935)))
+                                    Text(p.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                }
                                 Text(if (p.isOn()) "${p.minutesLeft()}m left" else p.start.local().format(clock), style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }

@@ -488,4 +488,61 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
         shot("t2-signed-in")
     }
+
+    /// Calls the server as the test admin and returns a JSON array.
+    private func adminList(_ path: String) throws -> [[String: Any]] {
+        guard let token = adminToken else { throw XCTSkip("MARQUEE_TEST_ADMIN_TOKEN not set") }
+        var req = URLRequest(url: URL(string: "http://\(server)/api/v1\(path)")!)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let done = expectation(description: path)
+        var out: [[String: Any]] = []
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            out = (data.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [[String: Any]]) ?? []
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 30)
+        return out
+    }
+
+    /// DVR (LIVE-5): record an upcoming programme from the guide, see it marked, then cancel
+    /// it from Recordings.
+    func testRecording() throws {
+        // A clean DVR, and the profile allowed to record.
+        for r in try adminList("/livetv/recording-rules") { try adminAPI("DELETE", "/livetv/recording-rules/\(r["id"] as! Int)") }
+        for r in try adminList("/livetv/recordings") where r["status"] as? String == "scheduled" {
+            try adminAPI("DELETE", "/livetv/recordings/\(r["id"] as! Int)")
+        }
+        let kid = try XCTUnwrap(try adminList("/users").first { $0["displayName"] as? String == profile })
+        var restrictions = kid["restrictions"] as? [String: Any] ?? [:]
+        restrictions["canRecord"] = true
+        try adminAPI("PATCH", "/users/\(kid["id"] as! Int)", ["restrictions": restrictions])
+
+        connectAndSignIn()
+        app.buttons["Live TV"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Live TV"].waitForExistence(timeout: 10))
+        // Move the guide on 90 minutes, so what's on screen hasn't started, and pick one.
+        XCTAssertTrue(app.buttons["Later"].waitForExistence(timeout: 10))
+        app.buttons["Later"].tap()
+        sleep(2)
+        let later = app.buttons.matching(NSPredicate(format: "label MATCHES %@", ".*, [0-9]{1,2}:[0-9]{2}.(AM|PM), .*"))
+        XCTAssertTrue(later.firstMatch.waitForExistence(timeout: 15))
+        let screen = app.windows.firstMatch.frame
+        let upcoming = try XCTUnwrap(later.allElementsBoundByIndex.first { screen.contains($0.frame) })
+        let title = String(upcoming.label.split(separator: ",").first ?? "")
+        upcoming.tap()
+        let record = app.buttons["Record"]
+        XCTAssertTrue(record.waitForExistence(timeout: 10))
+        shot("r1-programme")
+        record.tap()
+        let marked = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ AND label ENDSWITH 'will record'", title + ",")).firstMatch
+        XCTAssertTrue(marked.waitForExistence(timeout: 10), "the guide marks it")
+        shot("r2-guide-marked")
+
+        app.buttons["Recordings"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Upcoming"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts[title].exists)
+        shot("r3-recordings")
+        app.buttons["Cancel"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Upcoming"].waitForNonExistence(timeout: 10))
+    }
 }

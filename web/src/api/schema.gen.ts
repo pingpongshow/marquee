@@ -1207,6 +1207,79 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/livetv/recordings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). */
+        get: operations["listRecordings"];
+        put?: never;
+        /** Record a programme from the guide, or every airing of its title (a series). */
+        post: operations["scheduleRecording"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/recordings/{recordingId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recordingId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list. */
+        delete: operations["cancelRecording"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/recording-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Series being recorded. */
+        get: operations["listRecordingRules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/recording-rules/{ruleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ruleId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Stop recording a series. Its upcoming airings are dropped; recordings already made stay. */
+        delete: operations["deleteRecordingRule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/livetv/channels": {
         parameters: {
             query?: never;
@@ -2138,6 +2211,8 @@ export interface components {
             remoteQualityKbps?: number;
             /** @description May request titles through Seerr (REQ-1). Default false; admins always may. */
             canRequest?: boolean;
+            /** @description May schedule Live TV recordings (LIVE-5). Default false; admins always may. */
+            canRecord?: boolean;
             /**
              * Format: int64
              * @description The Seerr user requests are made as. Null = Seerr's API key owner.
@@ -2405,6 +2480,12 @@ export interface components {
             /** @description At least one source is set up. */
             enabled: boolean;
             channels: number;
+            /** @description Recordings can be written (LIVE-5). */
+            dvrAvailable?: boolean;
+            /** @description The caller may schedule recordings. */
+            canRecord?: boolean;
+            /** @description Recordings in progress. */
+            recordingsActive?: number;
             /**
              * Format: date-time
              * @description The end of the loaded guide.
@@ -2419,6 +2500,63 @@ export interface components {
                 refreshedAt?: string;
                 error?: string;
             }[];
+        };
+        Recording: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            channelId?: number;
+            channelName: string;
+            /**
+             * Format: date-time
+             * @description The programme's start (recording begins a little earlier).
+             */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            title: string;
+            subtitle?: string;
+            description?: string;
+            episode?: string;
+            category?: string;
+            imageUrl?: string;
+            /** @enum {string} */
+            status: "scheduled" | "recording" | "completed" | "failed";
+            /** @description Scheduled by a series rule. */
+            series: boolean;
+            /** Format: int64 */
+            ruleId?: number;
+            /** @description Why it failed. */
+            error?: string;
+            /** Format: int64 */
+            sizeBytes?: number;
+            /**
+             * Format: int64
+             * @description The library item once the recording has been scanned.
+             */
+            itemId?: number;
+            /**
+             * Format: int64
+             * @description Who scheduled it.
+             */
+            userId?: number;
+        };
+        RecordingRule: {
+            /** Format: int64 */
+            id: number;
+            title: string;
+            /**
+             * Format: int64
+             * @description Absent = any channel.
+             */
+            channelId?: number;
+            channelName?: string;
+            /** @description Airings scheduled now. */
+            upcoming: number;
+            /** Format: int64 */
+            userId?: number;
+            /** Format: date-time */
+            createdAt: string;
         };
         LiveChannel: {
             /** Format: int64 */
@@ -2448,6 +2586,13 @@ export interface components {
             /** @description As the guide gives it, e.g. S2 E5. */
             episode?: string;
             imageUrl?: string;
+            /**
+             * @description The DVR will record or is recording it.
+             * @enum {string}
+             */
+            recording?: "scheduled" | "recording";
+            /** @description A series recording covers this title. */
+            series?: boolean;
         };
         LiveSession: {
             id: string;
@@ -2565,12 +2710,18 @@ export interface components {
             /** @description Seerr's address, e.g. http://10.1.1.10:5055. Empty turns requests off. */
             seerrUrl?: string;
             readonly seerrApiKeySet?: boolean;
+            /** @description Minutes recordings start early. */
+            dvrPaddingBefore?: number;
+            /** @description Minutes recordings run late. */
+            dvrPaddingAfter?: number;
             liveTvSources?: components["schemas"]["LiveTvSource"][];
         };
         IntegrationSettingsUpdate: {
             seerrUrl?: string;
             /** @description Write-only. */
             seerrApiKey?: string;
+            dvrPaddingBefore?: number;
+            dvrPaddingAfter?: number;
             /** @description Replaces the whole list when sent. */
             liveTvSources?: components["schemas"]["LiveTvSource"][];
         };
@@ -5814,6 +5965,143 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    listRecordings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recordings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recording"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    scheduleRecording: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: int64 */
+                    channelId: number;
+                    /**
+                     * Format: date-time
+                     * @description The programme's start time as the guide gives it.
+                     */
+                    start: string;
+                    /** @description Record every airing of this title. */
+                    series?: boolean;
+                    /** @description With series: on any channel, not only this one. */
+                    anyChannel?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Scheduled. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        recording?: components["schemas"]["Recording"];
+                        rule?: components["schemas"]["RecordingRule"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    cancelRecording: {
+        parameters: {
+            query?: {
+                /** @description Finished recordings: delete the file too (admins, or whoever scheduled it). */
+                deleteFile?: boolean;
+            };
+            header?: never;
+            path: {
+                recordingId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listRecordingRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordingRule"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    deleteRecordingRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ruleId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stopped. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listLiveChannels: {

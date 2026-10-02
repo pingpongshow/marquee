@@ -87,3 +87,63 @@ export function timeLabel(d: Date | string) {
     minute: "2-digit",
   });
 }
+
+// DVR (LIVE-5).
+export type Recording = components["schemas"]["Recording"];
+export type RecordingRule = components["schemas"]["RecordingRule"];
+
+export const recordingsQuery = queryOptions({
+  queryKey: ["livetv", "recordings"],
+  queryFn: () => unwrap(api.GET("/livetv/recordings")),
+  refetchInterval: 30_000,
+});
+
+export const recordingRulesQuery = queryOptions({
+  queryKey: ["livetv", "rules"],
+  queryFn: () => unwrap(api.GET("/livetv/recording-rules")),
+});
+
+export function useSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      channelId: number;
+      start: string;
+      series?: boolean;
+      anyChannel?: boolean;
+    }) => unwrap(api.POST("/livetv/recordings", { body })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["livetv"] }),
+  });
+}
+
+export function useCancelRecording() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, deleteFile }: { id: number; deleteFile?: boolean }) =>
+      unwrap(
+        api.DELETE("/livetv/recordings/{recordingId}", {
+          params: { path: { recordingId: id }, query: { deleteFile } },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["livetv"] }),
+  });
+}
+
+export function useDeleteRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      unwrap(
+        api.DELETE("/livetv/recording-rules/{ruleId}", {
+          params: { path: { ruleId: id } },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["livetv"] }),
+  });
+}
+
+export function formatSize(bytes?: number) {
+  if (!bytes) return "";
+  const gb = bytes / 1e9;
+  return gb >= 1 ? `${gb.toFixed(1)} GB` : `${Math.round(bytes / 1e6)} MB`;
+}

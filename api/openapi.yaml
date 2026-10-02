@@ -1607,6 +1607,97 @@ paths:
               schema: { $ref: "#/components/schemas/LiveTvStatus" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+  /livetv/recordings:
+    get:
+      tags: [livetv]
+      operationId: listRecordings
+      summary: "DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first)."
+      responses:
+        "200":
+          description: Recordings.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Recording" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [livetv]
+      operationId: scheduleRecording
+      summary: Record a programme from the guide, or every airing of its title (a series).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channelId, start]
+              properties:
+                channelId: { type: integer, format: int64 }
+                start: { type: string, format: date-time, description: The programme's start time as the guide gives it. }
+                series: { type: boolean, description: Record every airing of this title. }
+                anyChannel: { type: boolean, description: "With series: on any channel, not only this one." }
+      responses:
+        "201":
+          description: Scheduled.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recording: { $ref: "#/components/schemas/Recording" }
+                  rule: { $ref: "#/components/schemas/RecordingRule" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /livetv/recordings/{recordingId}:
+    parameters:
+      - { name: recordingId, in: path, required: true, schema: { type: integer, format: int64 } }
+    delete:
+      tags: [livetv]
+      operationId: cancelRecording
+      summary: Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list.
+      parameters:
+        - { name: deleteFile, in: query, schema: { type: boolean }, description: "Finished recordings: delete the file too (admins, or whoever scheduled it)." }
+      responses:
+        "204": { description: Done. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /livetv/recording-rules:
+    get:
+      tags: [livetv]
+      operationId: listRecordingRules
+      summary: Series being recorded.
+      responses:
+        "200":
+          description: Rules.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RecordingRule" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /livetv/recording-rules/{ruleId}:
+    parameters:
+      - { name: ruleId, in: path, required: true, schema: { type: integer, format: int64 } }
+    delete:
+      tags: [livetv]
+      operationId: deleteRecordingRule
+      summary: Stop recording a series. Its upcoming airings are dropped; recordings already made stay.
+      responses:
+        "204": { description: Stopped. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /livetv/channels:
     get:
       tags: [livetv]
@@ -2827,6 +2918,7 @@ components:
         allowRemote: { type: boolean, description: May stream from outside the home network. Default true. }
         remoteQualityKbps: { type: integer, minimum: 0, description: Cap for remote streams. 0 = server default. }
         canRequest: { type: boolean, description: "May request titles through Seerr (REQ-1). Default false; admins always may." }
+        canRecord: { type: boolean, description: "May schedule Live TV recordings (LIVE-5). Default false; admins always may." }
         seerrUserId: { type: integer, format: int64, nullable: true, description: The Seerr user requests are made as. Null = Seerr's API key owner. }
 
     UserPreferences:
@@ -3108,6 +3200,9 @@ components:
       properties:
         enabled: { type: boolean, description: At least one source is set up. }
         channels: { type: integer }
+        dvrAvailable: { type: boolean, description: "Recordings can be written (LIVE-5)." }
+        canRecord: { type: boolean, description: The caller may schedule recordings. }
+        recordingsActive: { type: integer, description: Recordings in progress. }
         guideUntil: { type: string, format: date-time, description: The end of the loaded guide. }
         sources:
           type: array
@@ -3121,6 +3216,41 @@ components:
               programmes: { type: integer }
               refreshedAt: { type: string, format: date-time }
               error: { type: string }
+
+    Recording:
+      type: object
+      required: [id, channelName, start, end, title, status, series]
+      properties:
+        id: { type: integer, format: int64 }
+        channelId: { type: integer, format: int64 }
+        channelName: { type: string }
+        start: { type: string, format: date-time, description: The programme's start (recording begins a little earlier). }
+        end: { type: string, format: date-time }
+        title: { type: string }
+        subtitle: { type: string }
+        description: { type: string }
+        episode: { type: string }
+        category: { type: string }
+        imageUrl: { type: string }
+        status: { type: string, enum: [scheduled, recording, completed, failed] }
+        series: { type: boolean, description: Scheduled by a series rule. }
+        ruleId: { type: integer, format: int64 }
+        error: { type: string, description: Why it failed. }
+        sizeBytes: { type: integer, format: int64 }
+        itemId: { type: integer, format: int64, description: The library item once the recording has been scanned. }
+        userId: { type: integer, format: int64, description: Who scheduled it. }
+
+    RecordingRule:
+      type: object
+      required: [id, title, upcoming, createdAt]
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        channelId: { type: integer, format: int64, description: Absent = any channel. }
+        channelName: { type: string }
+        upcoming: { type: integer, description: Airings scheduled now. }
+        userId: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
 
     LiveChannel:
       type: object
@@ -3148,6 +3278,8 @@ components:
         category: { type: string }
         episode: { type: string, description: "As the guide gives it, e.g. S2 E5." }
         imageUrl: { type: string }
+        recording: { type: string, enum: [scheduled, recording], description: The DVR will record or is recording it. }
+        series: { type: boolean, description: A series recording covers this title. }
 
     LiveSession:
       type: object
@@ -3272,6 +3404,8 @@ components:
       properties:
         seerrUrl: { type: string, description: "Seerr's address, e.g. http://10.1.1.10:5055. Empty turns requests off." }
         seerrApiKeySet: { type: boolean, readOnly: true }
+        dvrPaddingBefore: { type: integer, minimum: 0, maximum: 60, description: Minutes recordings start early. }
+        dvrPaddingAfter: { type: integer, minimum: 0, maximum: 120, description: Minutes recordings run late. }
         liveTvSources:
           type: array
           items: { $ref: "#/components/schemas/LiveTvSource" }
@@ -3281,6 +3415,8 @@ components:
       properties:
         seerrUrl: { type: string }
         seerrApiKey: { type: string, description: Write-only. }
+        dvrPaddingBefore: { type: integer, minimum: 0, maximum: 60 }
+        dvrPaddingAfter: { type: integer, minimum: 0, maximum: 120 }
         liveTvSources:
           type: array
           description: Replaces the whole list when sent.

@@ -444,6 +444,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/canRequest`.
             public var canRequest: Swift.Bool?
+            /// May schedule Live TV recordings (LIVE-5). Default false; admins always may.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserRestrictions/canRecord`.
+            public var canRecord: Swift.Bool?
             /// The Seerr user requests are made as. Null = Seerr's API key owner.
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/seerrUserId`.
@@ -456,6 +460,7 @@ extension Components {
             ///   - allowRemote: May stream from outside the home network. Default true.
             ///   - remoteQualityKbps: Cap for remote streams. 0 = server default.
             ///   - canRequest: May request titles through Seerr (REQ-1). Default false; admins always may.
+            ///   - canRecord: May schedule Live TV recordings (LIVE-5). Default false; admins always may.
             ///   - seerrUserId: The Seerr user requests are made as. Null = Seerr's API key owner.
             public init(
                 libraryIds: [Swift.Int64]? = nil,
@@ -463,6 +468,7 @@ extension Components {
                 allowRemote: Swift.Bool? = nil,
                 remoteQualityKbps: Swift.Int? = nil,
                 canRequest: Swift.Bool? = nil,
+                canRecord: Swift.Bool? = nil,
                 seerrUserId: Swift.Int64? = nil
             ) {
                 self.libraryIds = libraryIds
@@ -470,6 +476,7 @@ extension Components {
                 self.allowRemote = allowRemote
                 self.remoteQualityKbps = remoteQualityKbps
                 self.canRequest = canRequest
+                self.canRecord = canRecord
                 self.seerrUserId = seerrUserId
             }
             public enum CodingKeys: String, CodingKey {
@@ -478,6 +485,7 @@ extension Components {
                 case allowRemote
                 case remoteQualityKbps
                 case canRequest
+                case canRecord
                 case seerrUserId
             }
         }
@@ -1629,6 +1637,18 @@ extension Components {
             public var enabled: Swift.Bool
             /// - Remark: Generated from `#/components/schemas/LiveTvStatus/channels`.
             public var channels: Swift.Int
+            /// Recordings can be written (LIVE-5).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTvStatus/dvrAvailable`.
+            public var dvrAvailable: Swift.Bool?
+            /// The caller may schedule recordings.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTvStatus/canRecord`.
+            public var canRecord: Swift.Bool?
+            /// Recordings in progress.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTvStatus/recordingsActive`.
+            public var recordingsActive: Swift.Int?
             /// The end of the loaded guide.
             ///
             /// - Remark: Generated from `#/components/schemas/LiveTvStatus/guideUntil`.
@@ -1689,24 +1709,229 @@ extension Components {
             /// - Parameters:
             ///   - enabled: At least one source is set up.
             ///   - channels:
+            ///   - dvrAvailable: Recordings can be written (LIVE-5).
+            ///   - canRecord: The caller may schedule recordings.
+            ///   - recordingsActive: Recordings in progress.
             ///   - guideUntil: The end of the loaded guide.
             ///   - sources:
             public init(
                 enabled: Swift.Bool,
                 channels: Swift.Int,
+                dvrAvailable: Swift.Bool? = nil,
+                canRecord: Swift.Bool? = nil,
+                recordingsActive: Swift.Int? = nil,
                 guideUntil: Foundation.Date? = nil,
                 sources: Components.Schemas.LiveTvStatus.SourcesPayload
             ) {
                 self.enabled = enabled
                 self.channels = channels
+                self.dvrAvailable = dvrAvailable
+                self.canRecord = canRecord
+                self.recordingsActive = recordingsActive
                 self.guideUntil = guideUntil
                 self.sources = sources
             }
             public enum CodingKeys: String, CodingKey {
                 case enabled
                 case channels
+                case dvrAvailable
+                case canRecord
+                case recordingsActive
                 case guideUntil
                 case sources
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/Recording`.
+        public struct Recording: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/Recording/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/Recording/channelId`.
+            public var channelId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/Recording/channelName`.
+            public var channelName: Swift.String
+            /// The programme's start (recording begins a little earlier).
+            ///
+            /// - Remark: Generated from `#/components/schemas/Recording/start`.
+            public var start: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/Recording/end`.
+            public var end: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/Recording/title`.
+            public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/Recording/subtitle`.
+            public var subtitle: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Recording/description`.
+            public var description: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Recording/episode`.
+            public var episode: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Recording/category`.
+            public var category: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Recording/imageUrl`.
+            public var imageUrl: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Recording/status`.
+            @frozen public enum StatusPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case scheduled = "scheduled"
+                case recording = "recording"
+                case completed = "completed"
+                case failed = "failed"
+            }
+            /// - Remark: Generated from `#/components/schemas/Recording/status`.
+            public var status: Components.Schemas.Recording.StatusPayload
+            /// Scheduled by a series rule.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Recording/series`.
+            public var series: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/Recording/ruleId`.
+            public var ruleId: Swift.Int64?
+            /// Why it failed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Recording/error`.
+            public var error: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Recording/sizeBytes`.
+            public var sizeBytes: Swift.Int64?
+            /// The library item once the recording has been scanned.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Recording/itemId`.
+            public var itemId: Swift.Int64?
+            /// Who scheduled it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Recording/userId`.
+            public var userId: Swift.Int64?
+            /// Creates a new `Recording`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - channelId:
+            ///   - channelName:
+            ///   - start: The programme's start (recording begins a little earlier).
+            ///   - end:
+            ///   - title:
+            ///   - subtitle:
+            ///   - description:
+            ///   - episode:
+            ///   - category:
+            ///   - imageUrl:
+            ///   - status:
+            ///   - series: Scheduled by a series rule.
+            ///   - ruleId:
+            ///   - error: Why it failed.
+            ///   - sizeBytes:
+            ///   - itemId: The library item once the recording has been scanned.
+            ///   - userId: Who scheduled it.
+            public init(
+                id: Swift.Int64,
+                channelId: Swift.Int64? = nil,
+                channelName: Swift.String,
+                start: Foundation.Date,
+                end: Foundation.Date,
+                title: Swift.String,
+                subtitle: Swift.String? = nil,
+                description: Swift.String? = nil,
+                episode: Swift.String? = nil,
+                category: Swift.String? = nil,
+                imageUrl: Swift.String? = nil,
+                status: Components.Schemas.Recording.StatusPayload,
+                series: Swift.Bool,
+                ruleId: Swift.Int64? = nil,
+                error: Swift.String? = nil,
+                sizeBytes: Swift.Int64? = nil,
+                itemId: Swift.Int64? = nil,
+                userId: Swift.Int64? = nil
+            ) {
+                self.id = id
+                self.channelId = channelId
+                self.channelName = channelName
+                self.start = start
+                self.end = end
+                self.title = title
+                self.subtitle = subtitle
+                self.description = description
+                self.episode = episode
+                self.category = category
+                self.imageUrl = imageUrl
+                self.status = status
+                self.series = series
+                self.ruleId = ruleId
+                self.error = error
+                self.sizeBytes = sizeBytes
+                self.itemId = itemId
+                self.userId = userId
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case channelId
+                case channelName
+                case start
+                case end
+                case title
+                case subtitle
+                case description
+                case episode
+                case category
+                case imageUrl
+                case status
+                case series
+                case ruleId
+                case error
+                case sizeBytes
+                case itemId
+                case userId
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RecordingRule`.
+        public struct RecordingRule: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/RecordingRule/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/RecordingRule/title`.
+            public var title: Swift.String
+            /// Absent = any channel.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingRule/channelId`.
+            public var channelId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/RecordingRule/channelName`.
+            public var channelName: Swift.String?
+            /// Airings scheduled now.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingRule/upcoming`.
+            public var upcoming: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/RecordingRule/userId`.
+            public var userId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/RecordingRule/createdAt`.
+            public var createdAt: Foundation.Date
+            /// Creates a new `RecordingRule`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - title:
+            ///   - channelId: Absent = any channel.
+            ///   - channelName:
+            ///   - upcoming: Airings scheduled now.
+            ///   - userId:
+            ///   - createdAt:
+            public init(
+                id: Swift.Int64,
+                title: Swift.String,
+                channelId: Swift.Int64? = nil,
+                channelName: Swift.String? = nil,
+                upcoming: Swift.Int,
+                userId: Swift.Int64? = nil,
+                createdAt: Foundation.Date
+            ) {
+                self.id = id
+                self.title = title
+                self.channelId = channelId
+                self.channelName = channelName
+                self.upcoming = upcoming
+                self.userId = userId
+                self.createdAt = createdAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case title
+                case channelId
+                case channelName
+                case upcoming
+                case userId
+                case createdAt
             }
         }
         /// - Remark: Generated from `#/components/schemas/LiveChannel`.
@@ -1796,6 +2021,21 @@ extension Components {
             public var episode: Swift.String?
             /// - Remark: Generated from `#/components/schemas/LiveProgramme/imageUrl`.
             public var imageUrl: Swift.String?
+            /// The DVR will record or is recording it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveProgramme/recording`.
+            @frozen public enum RecordingPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case scheduled = "scheduled"
+                case recording = "recording"
+            }
+            /// The DVR will record or is recording it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveProgramme/recording`.
+            public var recording: Components.Schemas.LiveProgramme.RecordingPayload?
+            /// A series recording covers this title.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveProgramme/series`.
+            public var series: Swift.Bool?
             /// Creates a new `LiveProgramme`.
             ///
             /// - Parameters:
@@ -1808,6 +2048,8 @@ extension Components {
             ///   - category:
             ///   - episode: As the guide gives it, e.g. S2 E5.
             ///   - imageUrl:
+            ///   - recording: The DVR will record or is recording it.
+            ///   - series: A series recording covers this title.
             public init(
                 id: Swift.Int64,
                 start: Foundation.Date,
@@ -1817,7 +2059,9 @@ extension Components {
                 description: Swift.String? = nil,
                 category: Swift.String? = nil,
                 episode: Swift.String? = nil,
-                imageUrl: Swift.String? = nil
+                imageUrl: Swift.String? = nil,
+                recording: Components.Schemas.LiveProgramme.RecordingPayload? = nil,
+                series: Swift.Bool? = nil
             ) {
                 self.id = id
                 self.start = start
@@ -1828,6 +2072,8 @@ extension Components {
                 self.category = category
                 self.episode = episode
                 self.imageUrl = imageUrl
+                self.recording = recording
+                self.series = series
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -1839,6 +2085,8 @@ extension Components {
                 case category
                 case episode
                 case imageUrl
+                case recording
+                case series
             }
         }
         /// - Remark: Generated from `#/components/schemas/LiveSession`.
@@ -2342,6 +2590,14 @@ extension Components {
             public var seerrUrl: Swift.String?
             /// - Remark: Generated from `#/components/schemas/IntegrationSettings/seerrApiKeySet`.
             public var seerrApiKeySet: Swift.Bool?
+            /// Minutes recordings start early.
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/dvrPaddingBefore`.
+            public var dvrPaddingBefore: Swift.Int?
+            /// Minutes recordings run late.
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/dvrPaddingAfter`.
+            public var dvrPaddingAfter: Swift.Int?
             /// - Remark: Generated from `#/components/schemas/IntegrationSettings/liveTvSources`.
             public var liveTvSources: [Components.Schemas.LiveTvSource]?
             /// Creates a new `IntegrationSettings`.
@@ -2349,19 +2605,27 @@ extension Components {
             /// - Parameters:
             ///   - seerrUrl: Seerr's address, e.g. http://10.1.1.10:5055. Empty turns requests off.
             ///   - seerrApiKeySet:
+            ///   - dvrPaddingBefore: Minutes recordings start early.
+            ///   - dvrPaddingAfter: Minutes recordings run late.
             ///   - liveTvSources:
             public init(
                 seerrUrl: Swift.String? = nil,
                 seerrApiKeySet: Swift.Bool? = nil,
+                dvrPaddingBefore: Swift.Int? = nil,
+                dvrPaddingAfter: Swift.Int? = nil,
                 liveTvSources: [Components.Schemas.LiveTvSource]? = nil
             ) {
                 self.seerrUrl = seerrUrl
                 self.seerrApiKeySet = seerrApiKeySet
+                self.dvrPaddingBefore = dvrPaddingBefore
+                self.dvrPaddingAfter = dvrPaddingAfter
                 self.liveTvSources = liveTvSources
             }
             public enum CodingKeys: String, CodingKey {
                 case seerrUrl
                 case seerrApiKeySet
+                case dvrPaddingBefore
+                case dvrPaddingAfter
                 case liveTvSources
             }
         }
@@ -2373,6 +2637,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/seerrApiKey`.
             public var seerrApiKey: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/dvrPaddingBefore`.
+            public var dvrPaddingBefore: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/dvrPaddingAfter`.
+            public var dvrPaddingAfter: Swift.Int?
             /// Replaces the whole list when sent.
             ///
             /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/liveTvSources`.
@@ -2382,19 +2650,27 @@ extension Components {
             /// - Parameters:
             ///   - seerrUrl:
             ///   - seerrApiKey: Write-only.
+            ///   - dvrPaddingBefore:
+            ///   - dvrPaddingAfter:
             ///   - liveTvSources: Replaces the whole list when sent.
             public init(
                 seerrUrl: Swift.String? = nil,
                 seerrApiKey: Swift.String? = nil,
+                dvrPaddingBefore: Swift.Int? = nil,
+                dvrPaddingAfter: Swift.Int? = nil,
                 liveTvSources: [Components.Schemas.LiveTvSource]? = nil
             ) {
                 self.seerrUrl = seerrUrl
                 self.seerrApiKey = seerrApiKey
+                self.dvrPaddingBefore = dvrPaddingBefore
+                self.dvrPaddingAfter = dvrPaddingAfter
                 self.liveTvSources = liveTvSources
             }
             public enum CodingKeys: String, CodingKey {
                 case seerrUrl
                 case seerrApiKey
+                case dvrPaddingBefore
+                case dvrPaddingAfter
                 case liveTvSources
             }
         }

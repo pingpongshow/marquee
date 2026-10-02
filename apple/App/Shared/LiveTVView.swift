@@ -17,8 +17,10 @@ struct LiveTVView: View {
     @State private var details: (LiveProgramme, LiveChannel)?
     @State private var error: String?
     @State private var enabled: Bool?
+    @State private var canRecord = false
 
-    enum Tab: String, CaseIterable { case guide = "Guide", now = "What's On" }
+    enum Tab: String, CaseIterable { case guide = "Guide", now = "What's On", recordings = "Recordings" }
+    private var tabs: [Tab] { canRecord ? Tab.allCases : [.guide, .now] }
 
     static func defaultStart() -> Date {
         let cal = Calendar.current
@@ -37,7 +39,9 @@ struct LiveTVView: View {
         }
         .navigationTitle("Live TV")
         .task {
-            enabled = (try? await app.liveStatus())?.enabled ?? false
+            let status = try? await app.liveStatus()
+            enabled = status?.enabled ?? false
+            canRecord = status?.canRecord ?? false
             groups = (try? await app.liveGroups()) ?? []
         }
         .task(id: "\(filter)|\(start.timeIntervalSince1970)") { await load() }
@@ -47,7 +51,9 @@ struct LiveTVView: View {
         .fullScreenCover(item: $watching) { LiveWatchView(channels: channels, start: $0.id) }
         #endif
         .sheet(isPresented: Binding(get: { details != nil }, set: { if !$0 { details = nil } })) {
-            if let (p, c) = details { ProgrammeSheet(programme: p, channel: c) }
+            if let (p, c) = details {
+                ProgrammeSheet(programme: p, channel: c, canRecord: canRecord) { Task { await load() } }
+            }
         }
     }
 
@@ -56,22 +62,46 @@ struct LiveTVView: View {
             VStack(alignment: .leading, spacing: 16) {
                 controls
                 #if os(iOS)
-                if let c = preview ?? channels.first { LivePreview(channel: c) { watching = WatchTarget(id: c.id) } }
+                if tab != .recordings, let c = preview ?? channels.first { LivePreview(channel: c) { watching = WatchTarget(id: c.id) } }
                 #endif
                 if let error { Text(error).foregroundStyle(.red).padding(.horizontal, sidePadding) }
-                if channels.isEmpty, enabled == true {
+                if tab == .recordings {
+                    RecordingsList().padding(.horizontal, sidePadding)
+                } else if channels.isEmpty, enabled == true {
                     Text(filter == "favorites" ? "No favourites yet. Add some with the heart next to a channel." : "No channels.")
                         .foregroundStyle(.secondary).padding(.horizontal, sidePadding)
                 } else if tab == .guide {
                     GuideGrid(channels: channels, guide: guide, start: start, selected: preview?.id,
                               onChannel: { c in pick(c) },
-                              onProgramme: { p, c in if p.isOn { pick(c) } else { details = (p, c) } },
-                              onFavorite: { c in toggleFavorite(c) })
+                              onProgramme: { p, c in programmeTapped(p, c) },
+                              onFavorite: { c in toggleFavorite(c) },
+                              onRecord: canRecord ? { p, c, series in record(p, c, series: series) } : nil)
                 } else {
                     whatsOn
                 }
             }
             .padding(.vertical)
+        }
+    }
+
+    /// On now: preview it (iPhone/iPad) or watch it (Apple TV); a second tap on the channel
+    /// being previewed, or anything later, shows the programme's details.
+    private func programmeTapped(_ p: LiveProgramme, _ c: LiveChannel) {
+        #if os(tvOS)
+        if p.isOn { pick(c) } else { details = (p, c) }
+        #else
+        if p.isOn, (preview ?? channels.first)?.id != c.id { pick(c) } else { details = (p, c) }
+        #endif
+    }
+
+    private func record(_ p: LiveProgramme, _ c: LiveChannel, series: Bool) {
+        Task {
+            do {
+                try await app.record(p, on: c.id, series: series)
+                await load()
+            } catch {
+                self.error = error.localizedDescription
+            }
         }
     }
 
@@ -87,32 +117,36 @@ struct LiveTVView: View {
     private var controls: some View {
         VStack(alignment: .leading, spacing: 12) {
             Picker("View", selection: $tab) {
-                ForEach(Tab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                ForEach(tabs, id: \.self) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
-            HStack(spacing: 12) {
-                Menu {
-                    Button("All Channels") { filter = "all" }
-                    Button("Favorites") { filter = "favorites" }
-                    if !groups.isEmpty {
-                        Section("Groups") { ForEach(groups, id: \.self) { g in Button(g) { filter = g } } }
-                    }
-                } label: {
-                    Label(filter == "all" ? "All Channels" : filter == "favorites" ? "Favorites" : filter, systemImage: "line.3.horizontal.decrease.circle")
-                }
-                Spacer()
-                if tab == .guide {
-                    Button { start = start.addingTimeInterval(-90 * 60) } label: { Image(systemName: "chevron.left") }
-                        .accessibilityLabel("Earlier")
-                        .disabled(start < Date().addingTimeInterval(-3 * 3600))
-                    Text(start, format: .dateTime.weekday(.abbreviated).hour().minute()).font(.callout).monospacedDigit()
-                    Button { start = start.addingTimeInterval(90 * 60) } label: { Image(systemName: "chevron.right") }
-                        .accessibilityLabel("Later")
-                    Button("Now") { start = LiveTVView.defaultStart() }
-                }
-            }
+            if tab != .recordings { filterBar }
         }
         .padding(.horizontal, sidePadding)
+    }
+
+    private var filterBar: some View {
+        HStack(spacing: 12) {
+            Menu {
+                Button("All Channels") { filter = "all" }
+                Button("Favorites") { filter = "favorites" }
+                if !groups.isEmpty {
+                    Section("Groups") { ForEach(groups, id: \.self) { g in Button(g) { filter = g } } }
+                }
+            } label: {
+                Label(filter == "all" ? "All Channels" : filter == "favorites" ? "Favorites" : filter, systemImage: "line.3.horizontal.decrease.circle")
+            }
+            Spacer()
+            if tab == .guide {
+                Button { start = start.addingTimeInterval(-90 * 60) } label: { Image(systemName: "chevron.left") }
+                    .accessibilityLabel("Earlier")
+                    .disabled(start < Date().addingTimeInterval(-3 * 3600))
+                Text(start, format: .dateTime.weekday(.abbreviated).hour().minute()).font(.callout).monospacedDigit()
+                Button { start = start.addingTimeInterval(90 * 60) } label: { Image(systemName: "chevron.right") }
+                    .accessibilityLabel("Later")
+                Button("Now") { start = LiveTVView.defaultStart() }
+            }
+        }
     }
 
     private var whatsOn: some View {
@@ -184,6 +218,8 @@ struct GuideGrid: View {
     let onChannel: (LiveChannel) -> Void
     let onProgramme: (LiveProgramme, LiveChannel) -> Void
     let onFavorite: (LiveChannel) -> Void
+    /// Record (series = every airing); nil when the viewer can't record.
+    var onRecord: ((LiveProgramme, LiveChannel, Bool) -> Void)?
 
     #if os(tvOS)
     private let perMinute: CGFloat = 9
@@ -262,7 +298,13 @@ struct GuideGrid: View {
                 if right > left {
                     Button { onProgramme(p, c) } label: {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(p.title).font(.subheadline.weight(.medium)).lineLimit(1)
+                            HStack(spacing: 4) {
+                                if p.recording != nil {
+                                    Circle().fill(.red).frame(width: 7, height: 7)
+                                        .accessibilityLabel(p.recording == .recording ? "Recording" : "Will record")
+                                }
+                                Text(p.title).font(.subheadline.weight(.medium)).lineLimit(1)
+                            }
                             Text(p.isOn ? "\(p.minutesLeft)m left" : p.start.formatted(date: .omitted, time: .shortened))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
@@ -271,8 +313,14 @@ struct GuideGrid: View {
                         .background(p.isOn ? Color.secondary.opacity(0.3) : Color.secondary.opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(.plain)
+                    .contextMenu {
+                        if let onRecord, p.end > .now {
+                            if p.recording == nil { Button("Record", systemImage: "record.circle") { onRecord(p, c, false) } }
+                            if p.series != true { Button("Record Series", systemImage: "square.stack") { onRecord(p, c, true) } }
+                        }
+                    }
                     .offset(x: left + 2)
-                    .accessibilityLabel("\(p.title), \(p.isOn ? "\(p.minutesLeft) minutes left" : p.start.formatted(date: .omitted, time: .shortened)), \(c.name)")
+                    .accessibilityLabel("\(p.title), \(p.isOn ? "\(p.minutesLeft) minutes left" : p.start.formatted(date: .omitted, time: .shortened)), \(c.name)\(p.recording != nil ? ", will record" : "")")
                 }
             }
         }
@@ -455,7 +503,15 @@ struct LiveWatchView: View {
 struct ProgrammeSheet: View {
     let programme: LiveProgramme
     let channel: LiveChannel
+    var canRecord = false
+    var onChange: () -> Void = {}
+    @Environment(AppSession.self) private var app
     @Environment(\.dismiss) private var dismiss
+    @State private var recording: Recording?
+    @State private var loaded = false
+    @State private var busy = false
+    @State private var error: String?
+
     var body: some View {
         NavigationStack {
             List {
@@ -464,8 +520,154 @@ struct ProgrammeSheet: View {
                 Text("\(programme.start.formatted(.dateTime.weekday(.wide).hour().minute())) – \(programme.end.formatted(date: .omitted, time: .shortened))")
                 if let e = programme.episode { Text([e, programme.subtitle].compactMap { $0 }.joined(separator: " · ")).foregroundStyle(.secondary) }
                 if let d = programme.description { Text(d) }
+                if canRecord, programme.end > .now, loaded {
+                    Section {
+                        if programme.series == true { Text("A series recording covers this title.").font(.footnote).foregroundStyle(.secondary) }
+                        if let recording {
+                            Button(recording.status == .recording ? "Stop Recording" : "Don't Record", role: .destructive) {
+                                act { try await app.cancelRecording(recording.id) }
+                            }
+                        } else {
+                            Button("Record", systemImage: "record.circle") { act { try await app.record(programme, on: channel.id) } }
+                        }
+                        if programme.series != true {
+                            Button("Record Series", systemImage: "square.stack") { act { try await app.record(programme, on: channel.id, series: true) } }
+                        }
+                        if let error { Text(error).foregroundStyle(.red) }
+                    }
+                    .disabled(busy)
+                }
             }
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .task {
+                guard canRecord else { return }
+                recording = try? await app.recordings().first {
+                    $0.channelId == channel.id && $0.start == programme.start && ($0.status == .scheduled || $0.status == .recording)
+                }
+                loaded = true
+            }
+        }
+    }
+
+    private func act(_ f: @escaping () async throws -> Void) {
+        busy = true
+        Task {
+            do {
+                try await f()
+                onChange()
+                dismiss()
+            } catch {
+                self.error = error.localizedDescription
+            }
+            busy = false
+        }
+    }
+}
+
+/// The DVR (LIVE-5): recording now, upcoming, series and finished recordings.
+struct RecordingsList: View {
+    @Environment(AppSession.self) private var app
+    @State private var recordings: [Recording] = []
+    @State private var rules: [RecordingRule] = []
+    @State private var loaded = false
+    @State private var error: String?
+    @State private var deleting: Recording?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            if let error { Text(error).foregroundStyle(.red) }
+            if loaded && recordings.isEmpty && rules.isEmpty {
+                Text("Nothing recorded yet. Pick a programme in the guide and choose Record.").foregroundStyle(.secondary)
+            }
+            section("Recording Now", recordings.filter { $0.status == .recording }) { r in
+                Button("Stop") { act { try await app.cancelRecording(r.id) } }
+            }
+            section("Upcoming", recordings.filter { $0.status == .scheduled }) { r in
+                Button("Cancel") { act { try await app.cancelRecording(r.id) } }
+            }
+            if !rules.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Series").font(.headline)
+                    ForEach(rules, id: \.id) { s in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(s.title).font(.body.weight(.medium))
+                                Text("\(s.channelName ?? "Any channel") · \(s.upcoming) upcoming").font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button("Stop Series") { act { try await app.stopSeries(s.id) } }
+                        }
+                        .padding(12)
+                        .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                    }
+                }
+            }
+            section("Recorded", recordings.filter { $0.status == .completed || $0.status == .failed }) { r in
+                if r.status == .failed {
+                    Button("Dismiss") { act { try await app.cancelRecording(r.id) } }
+                } else {
+                    Button("Delete", role: .destructive) { deleting = r }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .task { await load() }
+        .refreshable { await load() }
+        .confirmationDialog("Delete this recording?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), presenting: deleting) { r in
+            Button("Delete \(r.title)", role: .destructive) { act { try await app.cancelRecording(r.id, deleteFile: true) } }
+        }
+    }
+
+    @ViewBuilder
+    private func section<A: View>(_ title: String, _ list: [Recording], @ViewBuilder action: @escaping (Recording) -> A) -> some View {
+        if !list.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(title).font(.headline)
+                ForEach(list, id: \.id) { r in
+                    HStack(spacing: 10) {
+                        if r.status == .recording { Circle().fill(.red).frame(width: 9, height: 9) }
+                        VStack(alignment: .leading, spacing: 2) {
+                            if let item = r.itemId {
+                                NavigationLink(value: Route.item(item)) { Text(r.title).font(.body.weight(.medium)) }
+                            } else {
+                                Text(r.title).font(.body.weight(.medium))
+                            }
+                            Text(detail(r)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                            if r.status == .failed { Text("Failed: \(r.error ?? "unknown error")").font(.caption).foregroundStyle(.red) }
+                        }
+                        Spacer()
+                        action(r)
+                    }
+                    .padding(12)
+                    .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                }
+            }
+        }
+    }
+
+    private func detail(_ r: Recording) -> String {
+        var parts = [r.episode, r.subtitle].compactMap { $0 }
+        parts.append(r.channelName)
+        parts.append("\(r.start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))–\(r.end.formatted(date: .omitted, time: .shortened))")
+        if let b = r.sizeBytes, b > 0 { parts.append(ByteCountFormatter.string(fromByteCount: b, countStyle: .file)) }
+        return parts.joined(separator: " · ")
+    }
+
+    private func load() async {
+        do {
+            recordings = try await app.recordings()
+            rules = try await app.recordingRules()
+            error = nil
+        } catch {
+            self.error = error.localizedDescription
+        }
+        loaded = true
+    }
+
+    private func act(_ f: @escaping () async throws -> Void) {
+        Task {
+            do { try await f() } catch { self.error = error.localizedDescription }
+            await load()
         }
     }
 }

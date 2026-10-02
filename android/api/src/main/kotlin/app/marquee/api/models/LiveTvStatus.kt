@@ -35,6 +35,9 @@ import kotlinx.serialization.Contextual
  * @param enabled At least one source is set up.
  * @param channels 
  * @param sources 
+ * @param dvrAvailable Recordings can be written (LIVE-5).
+ * @param canRecord The caller may schedule recordings.
+ * @param recordingsActive Recordings in progress.
  * @param guideUntil The end of the loaded guide.
  */
 @Serializable
@@ -50,6 +53,18 @@ data class LiveTvStatus (
 
     @SerialName(value = "sources")
     val sources: kotlin.collections.List<LiveTvStatusSourcesInner>,
+
+    /* Recordings can be written (LIVE-5). */
+    @SerialName(value = "dvrAvailable")
+    val dvrAvailable: kotlin.Boolean? = null,
+
+    /* The caller may schedule recordings. */
+    @SerialName(value = "canRecord")
+    val canRecord: kotlin.Boolean? = null,
+
+    /* Recordings in progress. */
+    @SerialName(value = "recordingsActive")
+    val recordingsActive: kotlin.Int? = null,
 
     /* The end of the loaded guide. */
     @Contextual @SerialName(value = "guideUntil")

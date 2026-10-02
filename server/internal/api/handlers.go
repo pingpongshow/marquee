@@ -57,6 +57,7 @@ type Handlers struct {
 	Backups          *tasks.Backups
 	Requests         *requests.Service
 	LiveTV           *livetv.Service
+	DVR              *livetv.Recorder
 	SyncPlay         *syncplay.Service
 	// Restart stops the server gracefully; Docker starts it again.
 	Restart func()

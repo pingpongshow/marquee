@@ -34,6 +34,10 @@ import app.marquee.api.models.LiveGuide200ResponseInner
 import app.marquee.api.models.LiveSession
 import app.marquee.api.models.LiveTvStatus
 import app.marquee.api.models.PlayLiveChannelRequest
+import app.marquee.api.models.Recording
+import app.marquee.api.models.RecordingRule
+import app.marquee.api.models.ScheduleRecording201Response
+import app.marquee.api.models.ScheduleRecordingRequest
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -59,6 +63,156 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         val defaultBasePath: String by lazy {
             System.getProperties().getProperty(ApiClient.BASE_URL_KEY, "/api/v1")
         }
+    }
+
+    /**
+     * DELETE /livetv/recordings/{recordingId}
+     * Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list.
+     * 
+     * @param recordingId 
+     * @param deleteFile Finished recordings: delete the file too (admins, or whoever scheduled it). (optional)
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun cancelRecording(recordingId: kotlin.Long, deleteFile: kotlin.Boolean? = null) : Unit {
+        val localVarResponse = cancelRecordingWithHttpInfo(recordingId = recordingId, deleteFile = deleteFile)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /livetv/recordings/{recordingId}
+     * Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list.
+     * 
+     * @param recordingId 
+     * @param deleteFile Finished recordings: delete the file too (admins, or whoever scheduled it). (optional)
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun cancelRecordingWithHttpInfo(recordingId: kotlin.Long, deleteFile: kotlin.Boolean?) : ApiResponse<Unit?> {
+        val localVariableConfig = cancelRecordingRequestConfig(recordingId = recordingId, deleteFile = deleteFile)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation cancelRecording
+     *
+     * @param recordingId 
+     * @param deleteFile Finished recordings: delete the file too (admins, or whoever scheduled it). (optional)
+     * @return RequestConfig
+     */
+    fun cancelRecordingRequestConfig(recordingId: kotlin.Long, deleteFile: kotlin.Boolean?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (deleteFile != null) {
+                    put("deleteFile", listOf(deleteFile.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/livetv/recordings/{recordingId}".replace("{"+"recordingId"+"}", encodeURIComponent(recordingId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /livetv/recording-rules/{ruleId}
+     * Stop recording a series. Its upcoming airings are dropped; recordings already made stay.
+     * 
+     * @param ruleId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun deleteRecordingRule(ruleId: kotlin.Long) : Unit {
+        val localVarResponse = deleteRecordingRuleWithHttpInfo(ruleId = ruleId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /livetv/recording-rules/{ruleId}
+     * Stop recording a series. Its upcoming airings are dropped; recordings already made stay.
+     * 
+     * @param ruleId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun deleteRecordingRuleWithHttpInfo(ruleId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = deleteRecordingRuleRequestConfig(ruleId = ruleId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation deleteRecordingRule
+     *
+     * @param ruleId 
+     * @return RequestConfig
+     */
+    fun deleteRecordingRuleRequestConfig(ruleId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/livetv/recording-rules/{ruleId}".replace("{"+"ruleId"+"}", encodeURIComponent(ruleId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
     }
 
     /**
@@ -279,6 +433,146 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/livetv/groups",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /livetv/recording-rules
+     * Series being recorded.
+     * 
+     * @return kotlin.collections.List<RecordingRule>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listRecordingRules() : kotlin.collections.List<RecordingRule> {
+        val localVarResponse = listRecordingRulesWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<RecordingRule>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /livetv/recording-rules
+     * Series being recorded.
+     * 
+     * @return ApiResponse<kotlin.collections.List<RecordingRule>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listRecordingRulesWithHttpInfo() : ApiResponse<kotlin.collections.List<RecordingRule>?> {
+        val localVariableConfig = listRecordingRulesRequestConfig()
+
+        return request<Unit, kotlin.collections.List<RecordingRule>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listRecordingRules
+     *
+     * @return RequestConfig
+     */
+    fun listRecordingRulesRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/livetv/recording-rules",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /livetv/recordings
+     * DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first).
+     * 
+     * @return kotlin.collections.List<Recording>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listRecordings() : kotlin.collections.List<Recording> {
+        val localVarResponse = listRecordingsWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<Recording>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /livetv/recordings
+     * DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first).
+     * 
+     * @return ApiResponse<kotlin.collections.List<Recording>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listRecordingsWithHttpInfo() : ApiResponse<kotlin.collections.List<Recording>?> {
+        val localVariableConfig = listRecordingsRequestConfig()
+
+        return request<Unit, kotlin.collections.List<Recording>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listRecordings
+     *
+     * @return RequestConfig
+     */
+    fun listRecordingsRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/livetv/recordings",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -661,6 +955,80 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/livetv/refresh",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /livetv/recordings
+     * Record a programme from the guide, or every airing of its title (a series).
+     * 
+     * @param scheduleRecordingRequest 
+     * @return ScheduleRecording201Response
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun scheduleRecording(scheduleRecordingRequest: ScheduleRecordingRequest) : ScheduleRecording201Response {
+        val localVarResponse = scheduleRecordingWithHttpInfo(scheduleRecordingRequest = scheduleRecordingRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ScheduleRecording201Response
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /livetv/recordings
+     * Record a programme from the guide, or every airing of its title (a series).
+     * 
+     * @param scheduleRecordingRequest 
+     * @return ApiResponse<ScheduleRecording201Response?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun scheduleRecordingWithHttpInfo(scheduleRecordingRequest: ScheduleRecordingRequest) : ApiResponse<ScheduleRecording201Response?> {
+        val localVariableConfig = scheduleRecordingRequestConfig(scheduleRecordingRequest = scheduleRecordingRequest)
+
+        return request<ScheduleRecordingRequest, ScheduleRecording201Response>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation scheduleRecording
+     *
+     * @param scheduleRecordingRequest 
+     * @return RequestConfig
+     */
+    fun scheduleRecordingRequestConfig(scheduleRecordingRequest: ScheduleRecordingRequest) : RequestConfig<ScheduleRecordingRequest> {
+        val localVariableBody = scheduleRecordingRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/livetv/recordings",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

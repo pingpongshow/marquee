@@ -1,6 +1,6 @@
 # Deployment Environment
 
-_Last updated: 2026-10-01. Facts gathered by read-only inspection of the production host._
+_Last updated: 2026-10-02. Facts gathered by read-only inspection of the production host._
 
 ## Production host: `root@10.1.1.10`
 
@@ -31,6 +31,7 @@ The RTX 5090 is also used by other GPU containers (`llama` llama.cpp-cuda, and C
 | `/mnt/data/Music` | ~16,100 tracks, 617 GB | `/music` | `/media/music` (ro) |
 | `/mnt/data/Photos/library` | Photos (Immich also runs on this host) | `/photos` | not mounted yet (photos are P2) |
 | `/mnt/docker/plex` | Plex config + DB (`com.plexapp.plugins.library.db`, 341 MB) | `/config` | `/plex` (**ro**, import only) |
+| `/mnt/docker/marquee/recordings` (or `RECORDINGS_DIR` in `.env`) | Live TV recordings (LIVE-5, D76) | — | `/recordings` (read-write; the only media mount Marquee writes) |
 
 `/mnt/data/Video` also contains two folders Plex does not mount (`Hentai`, `XXX`). They are excluded from planning unless the owner wants them added as restricted libraries.
 
