@@ -94,7 +94,7 @@ The owner wants the best music experience possible: everything Plexamp and Plex'
 | MUSIC-2 | **Sonically similar:** similar tracks, albums and artists by sound (not just tags), shown on track, album and artist pages. | P1 |
 | MUSIC-3 | **Radios:** track, album, artist, genre, mood, decade ("Time Travel") and library radio. Endless, and steered by sonic similarity, ratings, skips and play history. | P1 |
 | MUSIC-4 | **Sonic Adventure:** a playlist that travels smoothly from one track to another through sonically adjacent tracks. | P1 |
-| MUSIC-5 | **Sonic Sage (natural-language playlists):** "rainy Sunday jazz with a late-night feel" builds a playlist from your library. Text-to-audio embeddings run locally; an optional LLM (admin-supplied API key) interprets longer prompts. | P1 |
+| MUSIC-5 | **Muse (natural-language playlists):** "rainy Sunday jazz with a late-night feel" builds a playlist from your library. Text-to-audio embeddings run locally; an optional LLM (admin-supplied API key) interprets longer prompts. | P1 |
 | MUSIC-6 | **Guest DJ / smart play:** optional modes that weave related tracks, deeper cuts or the artist's other albums into whatever is playing. | P1 |
 | MUSIC-7 | **Mixes for you:** daily mixes per user (by taste clusters), "Rediscover" (loved but not played lately), "Deep cuts", "Recently added mix", mood mixes and anniversary albums on Home. | P1 |
 | MUSIC-8 | **Smart playlists:** rule-based (genre, artist, year, rating, play count, last played, added date, mood, BPM, key…) with limits and sort, kept up to date automatically. | P1 |
@@ -105,7 +105,7 @@ The owner wants the best music experience possible: everything Plexamp and Plex'
 | MUSIC-13 | **Plexamp-style player:** full-screen now playing with artwork-coloured backgrounds, queue editing (drag to reorder, play next, add to queue), shuffle/repeat, sleep timer, waveform or visualizer, and a mini-player. | P1 |
 | MUSIC-14 | **Apple and Android:** offline downloads with smart sync (e.g. "keep my top 500 and today's mix"), CarPlay / Android Auto, lock-screen and widget controls, and Siri / Assistant "play … on Marquee" where the platforms allow. | P1 |
 | MUSIC-15 | **Discovery:** artist bios and photos, similar artists in your library, popular tracks (via Last.fm/ListenBrainz data) for an artist, and "Recently played" / "Most played" hubs. | P1 |
-| MUSIC-16 | **A Marquee name for natural-language playlists:** "Sonic Sage" is Plex's name. Rename it across the server, API, web, Apple and Android apps and the docs (name to be chosen, see Q17). | P1 |
+| MUSIC-16 | **Muse (natural-language playlists) under Marquee's own name:** the feature Plex calls "Sonic Sage" is **Muse** across the server, API (`/music/muse`), web, Apple and Android apps and the docs (Q17). | P1 |
 | MUSIC-17 | **Mixes for you from listening history:** curated mixes like Plexamp's, from what each person plays, skips and rates (taste clusters, "discovery" of rarely played library tracks near their taste, rediscover, decade and mood mixes), refreshed daily. Builds on MUSIC-7. | P1 |
 | MUSIC-18 | **Browse and play by mood and style:** Plexamp-style mood, style and genre pages with stations and playlists for each (moods from sonic analysis and tags, styles from tags/MusicBrainz), on every client. | P1 |
 | MUSIC-19 | **Playlist downloads:** download whole playlists (including smart playlists and mixes) for offline playback on Apple and Android, kept in sync as they change. | P1 |

@@ -31,7 +31,7 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param sonicAnalysis Analyse how tracks sound (on this server's GPU) for radios, similar music and Sonic Sage.
+ * @param sonicAnalysis Analyse how tracks sound (on this server's GPU) for radios, similar music and Muse.
  * @param onlineLyrics Look up lyrics on LRCLIB when a track has none (sends artist and title).
  * @param loudnessAnalysis Measure loudness of tracks without ReplayGain tags so volume levelling works for everything.
  */
@@ -39,7 +39,7 @@ import kotlinx.serialization.Contextual
 
 data class MusicSettings (
 
-    /* Analyse how tracks sound (on this server's GPU) for radios, similar music and Sonic Sage. */
+    /* Analyse how tracks sound (on this server's GPU) for radios, similar music and Muse. */
     @SerialName(value = "sonicAnalysis")
     val sonicAnalysis: kotlin.Boolean? = null,
 

@@ -37,7 +37,7 @@ import kotlinx.serialization.Contextual
  */
 @Serializable
 
-data class MusicSageRequest (
+data class MusicMuseRequest (
 
     @SerialName(value = "prompt")
     val prompt: kotlin.String,

@@ -1100,7 +1100,7 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/MusicSettings`.
         public struct MusicSettings: Codable, Hashable, Sendable {
-            /// Analyse how tracks sound (on this server's GPU) for radios, similar music and Sonic Sage.
+            /// Analyse how tracks sound (on this server's GPU) for radios, similar music and Muse.
             ///
             /// - Remark: Generated from `#/components/schemas/MusicSettings/sonicAnalysis`.
             public var sonicAnalysis: Swift.Bool?
@@ -1115,7 +1115,7 @@ extension Components {
             /// Creates a new `MusicSettings`.
             ///
             /// - Parameters:
-            ///   - sonicAnalysis: Analyse how tracks sound (on this server's GPU) for radios, similar music and Sonic Sage.
+            ///   - sonicAnalysis: Analyse how tracks sound (on this server's GPU) for radios, similar music and Muse.
             ///   - onlineLyrics: Look up lyrics on LRCLIB when a track has none (sends artist and title).
             ///   - loudnessAnalysis: Measure loudness of tracks without ReplayGain tags so volume levelling works for everything.
             public init(

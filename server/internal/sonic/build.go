@@ -84,7 +84,7 @@ func (x *Index) Flow(anchor []float32, first *Track, o Options) []*Track {
 }
 
 // Pick chooses n diverse tracks close to v (maximal marginal relevance), then orders them
-// so each flows into the next. Used for Sonic Sage prompts and mixes.
+// so each flows into the next. Used for Muse prompts and mixes.
 func (x *Index) Pick(v []float32, n int, o Options) []*Track {
 	pool := x.Nearest(v, max(300, n*10), o.allowed)
 	// Drop the weakest part of the pool: in a small library (or for a prompt few tracks

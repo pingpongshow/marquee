@@ -6,7 +6,7 @@ public typealias RadioRequest = Components.Schemas.RadioRequest
 public typealias Lyrics = Components.Schemas.Lyrics
 public typealias MusicStatus = Components.Schemas.MusicStatus
 
-/// Music intelligence (M6.5): radios, Sonic Sage, mixes, similar, lyrics and ratings.
+/// Music intelligence (M6.5): radios, Muse, mixes, similar, lyrics and ratings.
 @MainActor
 public extension AppSession {
     private var musicAPI: Client {
@@ -23,9 +23,9 @@ public extension AppSession {
         try await musicAPI.musicRadio(body: .json(req)).ok.body.json
     }
 
-    /// A playlist from a description (Sonic Sage, MUSIC-5).
-    func sage(_ prompt: String, library: Int64? = nil, limit: Int = 40) async throws -> Station {
-        try await musicAPI.musicSage(body: .json(.init(prompt: prompt, limit: limit, libraryId: library))).ok.body.json
+    /// A playlist from a description (Muse, MUSIC-5).
+    func muse(_ prompt: String, library: Int64? = nil, limit: Int = 40) async throws -> Station {
+        try await musicAPI.musicMuse(body: .json(.init(prompt: prompt, limit: limit, libraryId: library))).ok.body.json
     }
 
     /// A path between two tracks (Sonic Adventure, MUSIC-4).
@@ -85,8 +85,8 @@ public extension AppSession {
 /// The moods offered as stations (same as the web client).
 public let musicMoods = ["Chill", "Energetic", "Focus", "Melancholy", "Party", "Romantic", "Dreamy", "Aggressive"]
 
-/// Example Sonic Sage prompts.
-public let sageSuggestions = ["Rainy Sunday jazz", "Late-night drive synthwave", "Upbeat 80s pop for cleaning the house", "Acoustic songs for a quiet evening"]
+/// Example Muse prompts.
+public let museSuggestions = ["Rainy Sunday jazz", "Late-night drive synthwave", "Upbeat 80s pop for cleaning the house", "Acoustic songs for a quiet evening"]
 
 /// One line of lyrics with its time in seconds (nil when unsynced).
 public struct LyricLineView: Identifiable, Sendable {

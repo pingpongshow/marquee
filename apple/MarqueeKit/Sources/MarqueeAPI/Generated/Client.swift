@@ -11368,15 +11368,15 @@ public struct Client: APIProtocol {
     }
     /// A playlist from a description, e.g. "rainy Sunday jazz with a late-night feel" (MUSIC-5).
     ///
-    /// - Remark: HTTP `POST /music/sage`.
-    /// - Remark: Generated from `#/paths//music/sage/post(musicSage)`.
-    public func musicSage(_ input: Operations.MusicSage.Input) async throws -> Operations.MusicSage.Output {
+    /// - Remark: HTTP `POST /music/muse`.
+    /// - Remark: Generated from `#/paths//music/muse/post(musicMuse)`.
+    public func musicMuse(_ input: Operations.MusicMuse.Input) async throws -> Operations.MusicMuse.Output {
         try await client.send(
             input: input,
-            forOperation: Operations.MusicSage.id,
+            forOperation: Operations.MusicMuse.id,
             serializer: { input in
                 let path = try converter.renderedPath(
-                    template: "/music/sage",
+                    template: "/music/muse",
                     parameters: []
                 )
                 var request: HTTPTypes.HTTPRequest = .init(
@@ -11403,7 +11403,7 @@ public struct Client: APIProtocol {
                 switch response.status.code {
                 case 200:
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
-                    let body: Operations.MusicSage.Output.Ok.Body
+                    let body: Operations.MusicMuse.Output.Ok.Body
                     let chosenContentType = try converter.bestContentType(
                         received: contentType,
                         options: [

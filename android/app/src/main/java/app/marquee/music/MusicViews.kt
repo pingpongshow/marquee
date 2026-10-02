@@ -1,5 +1,12 @@
 package app.marquee.music
 
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.focusable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -32,7 +39,7 @@ import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.StarHalf
+import androidx.compose.material.icons.automirrored.filled.StarHalf
 import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -69,7 +76,7 @@ import androidx.compose.ui.unit.dp
 import app.marquee.api.infrastructure.ClientException
 import app.marquee.api.models.ItemType
 import app.marquee.api.models.Lyrics
-import app.marquee.api.models.MusicSageRequest
+import app.marquee.api.models.MusicMuseRequest
 import app.marquee.api.models.MusicStatus
 import app.marquee.api.models.RadioRequest
 import app.marquee.api.models.Station
@@ -86,10 +93,10 @@ import kotlinx.coroutines.withContext
 /** The moods offered as stations (same as the web and Apple apps). */
 val musicMoods = listOf("Chill", "Energetic", "Focus", "Melancholy", "Party", "Romantic", "Dreamy", "Aggressive")
 
-/** Example Sonic Sage prompts. */
-val sageSuggestions = listOf("Rainy Sunday jazz", "Late-night drive synthwave", "Upbeat 80s pop for cleaning the house", "Acoustic songs for a quiet evening")
+/** Example Muse prompts. */
+val museSuggestions = listOf("Rainy Sunday jazz", "Late-night drive synthwave", "Upbeat 80s pop for cleaning the house", "Acoustic songs for a quiet evening")
 
-/** Sonic Sage, stations and daily mixes at the top of a music library (M6.5). */
+/** Muse, stations and daily mixes at the top of a music library (M6.5). */
 @Composable
 fun MusicDiscover(libraryId: Long) {
     val marquee = LocalMarquee.current
@@ -123,12 +130,12 @@ fun MusicDiscover(libraryId: Long) {
             busy = false
         }
     }
-    fun sage(text: String) {
+    fun muse(text: String) {
         val p = text.trim()
         if (p.length < 2) return
         run {
-            val station = withContext(Dispatchers.IO) { marquee.music.musicSage(MusicSageRequest(p, 40, libraryId)) }
-            if (station.items.isEmpty()) throw IllegalStateException("Sonic Sage found nothing for that.")
+            val station = withContext(Dispatchers.IO) { marquee.music.musicMuse(MusicMuseRequest(p, 40, libraryId)) }
+            if (station.items.isEmpty()) throw IllegalStateException("Muse found nothing for that.")
             music.playStation(station)
         }
     }
@@ -138,7 +145,7 @@ fun MusicDiscover(libraryId: Long) {
         if (st.analyzed < st.total) {
             Text(
                 if (st.available) "Listening to your music: ${st.analyzed} of ${st.total} tracks analysed. Radios and mixes improve as it goes."
-                else "The sonic analysis service isn't running, so radios and Sonic Sage are unavailable.",
+                else "The sonic analysis service isn't running, so radios and Muse are unavailable.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -147,20 +154,20 @@ fun MusicDiscover(libraryId: Long) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Filled.AutoAwesome, null, tint = Gold)
-                Text("Sonic Sage", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Muse", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     prompt, { prompt = it }, Modifier.weight(1f), singleLine = true,
                     placeholder = { Text("Describe what you want to hear…") },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-                    keyboardActions = KeyboardActions(onGo = { sage(prompt) }),
+                    keyboardActions = KeyboardActions(onGo = { muse(prompt) }),
                 )
-                Button({ sage(prompt) }, Modifier.focusRing(), enabled = prompt.trim().length >= 2 && !busy) {
+                Button({ muse(prompt) }, Modifier.focusRing(), enabled = prompt.trim().length >= 2 && !busy) {
                     if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("Play")
                 }
             }
-            ChipRow(sageSuggestions.map { s -> Chip(s, null) { prompt = s; sage(s) } })
+            ChipRow(museSuggestions.map { s -> Chip(s, null) { prompt = s; muse(s) } })
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -221,20 +228,41 @@ private fun MixCard(station: Station, index: Int, onPlay: () -> Unit) {
     }
 }
 
-/** Star rating, half stars; the last tap on the same value clears it (MUSIC-11). */
+/**
+ * Star rating in half stars (MUSIC-11): the left half of a star gives a half star; choosing
+ * the current value again clears it. With a D-pad, left/right on the stars move in halves.
+ */
 @Composable
 fun RatingStars(rating: Double?, onRate: (Double?) -> Unit, size: Int = 26) {
     val stars = (rating ?: 0.0) / 2
     val state = if (rating == null) "Not rated" else "${"%.1f".format(stars).removeSuffix(".0")} of 5 stars"
-    Row(Modifier.semantics { contentDescription = "Rating"; stateDescription = state }, verticalAlignment = Alignment.CenterVertically) {
+    fun pick(v: Double) = onRate(if (v == rating || v <= 0) null else v.coerceAtMost(10.0))
+    Row(
+        Modifier.semantics { contentDescription = "Rating"; stateDescription = state }
+            .focusRing(RoundedCornerShape(8.dp))
+            .onPreviewKeyEvent { e ->
+                if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                when (e.key) {
+                    Key.DirectionRight -> { pick((rating ?: 0.0) + 1); true }
+                    Key.DirectionLeft -> { if ((rating ?: 0.0) > 0) { pick((rating ?: 0.0) - 1); true } else false }
+                    else -> false
+                }
+            }
+            .focusable(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         for (star in 1..5) {
             val icon = when {
                 stars >= star -> Icons.Filled.Star
-                stars >= star - 0.5 -> Icons.Filled.StarHalf
+                stars >= star - 0.5 -> Icons.AutoMirrored.Filled.StarHalf
                 else -> Icons.Filled.StarBorder
             }
-            IconButton(onClick = { val v = star * 2.0; onRate(if (rating == v) null else v) }, modifier = Modifier.size((size + 14).dp)) {
-                Icon(icon, "$star star${if (star == 1) "" else "s"}", Modifier.size(size.dp), tint = if (stars >= star - 0.5) Gold else MaterialTheme.colorScheme.onSurfaceVariant)
+            Box(Modifier.size((size + 14).dp), contentAlignment = Alignment.Center) {
+                Icon(icon, null, Modifier.size(size.dp), tint = if (stars >= star - 0.5) Gold else MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(Modifier.matchParentSize()) {
+                    Box(Modifier.weight(1f).fillMaxHeight().semantics { contentDescription = "${star - 1}.5 stars" }.clickable { pick(star * 2.0 - 1) })
+                    Box(Modifier.weight(1f).fillMaxHeight().semantics { contentDescription = "$star star${if (star == 1) "" else "s"}" }.clickable { pick(star * 2.0) })
+                }
             }
         }
     }

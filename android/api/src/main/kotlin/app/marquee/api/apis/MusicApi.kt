@@ -32,7 +32,7 @@ import app.marquee.api.models.ItemSummary
 import app.marquee.api.models.Lyrics
 import app.marquee.api.models.MusicAdventureRequest
 import app.marquee.api.models.MusicDJRequest
-import app.marquee.api.models.MusicSageRequest
+import app.marquee.api.models.MusicMuseRequest
 import app.marquee.api.models.MusicStatus
 import app.marquee.api.models.RadioRequest
 import app.marquee.api.models.Station
@@ -363,6 +363,80 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
+     * POST /music/muse
+     * A playlist from a description, e.g. \&quot;rainy Sunday jazz with a late-night feel\&quot; (MUSIC-5).
+     * 
+     * @param musicMuseRequest 
+     * @return Station
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun musicMuse(musicMuseRequest: MusicMuseRequest) : Station {
+        val localVarResponse = musicMuseWithHttpInfo(musicMuseRequest = musicMuseRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as Station
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /music/muse
+     * A playlist from a description, e.g. \&quot;rainy Sunday jazz with a late-night feel\&quot; (MUSIC-5).
+     * 
+     * @param musicMuseRequest 
+     * @return ApiResponse<Station?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun musicMuseWithHttpInfo(musicMuseRequest: MusicMuseRequest) : ApiResponse<Station?> {
+        val localVariableConfig = musicMuseRequestConfig(musicMuseRequest = musicMuseRequest)
+
+        return request<MusicMuseRequest, Station>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation musicMuse
+     *
+     * @param musicMuseRequest 
+     * @return RequestConfig
+     */
+    fun musicMuseRequestConfig(musicMuseRequest: MusicMuseRequest) : RequestConfig<MusicMuseRequest> {
+        val localVariableBody = musicMuseRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/music/muse",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * POST /music/radio
      * A station (MUSIC-3) from a track, album or artist, a genre, a decade, a mood, your favourites or the whole library. Ask again with exclude to continue it.
      * 
@@ -429,80 +503,6 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/music/radio",
-            query = localVariableQuery,
-            headers = localVariableHeaders,
-            requiresAuthentication = true,
-            body = localVariableBody
-        )
-    }
-
-    /**
-     * POST /music/sage
-     * A playlist from a description, e.g. \&quot;rainy Sunday jazz with a late-night feel\&quot; (MUSIC-5).
-     * 
-     * @param musicSageRequest 
-     * @return Station
-     * @throws IllegalStateException If the request is not correctly configured
-     * @throws IOException Rethrows the OkHttp execute method exception
-     * @throws UnsupportedOperationException If the API returns an informational or redirection response
-     * @throws ClientException If the API returns a client error response
-     * @throws ServerException If the API returns a server error response
-     */
-    @Suppress("UNCHECKED_CAST")
-    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun musicSage(musicSageRequest: MusicSageRequest) : Station {
-        val localVarResponse = musicSageWithHttpInfo(musicSageRequest = musicSageRequest)
-
-        return when (localVarResponse.responseType) {
-            ResponseType.Success -> (localVarResponse as Success<*>).data as Station
-            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
-            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
-            ResponseType.ClientError -> {
-                val localVarError = localVarResponse as ClientError<*>
-                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
-            }
-            ResponseType.ServerError -> {
-                val localVarError = localVarResponse as ServerError<*>
-                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
-            }
-        }
-    }
-
-    /**
-     * POST /music/sage
-     * A playlist from a description, e.g. \&quot;rainy Sunday jazz with a late-night feel\&quot; (MUSIC-5).
-     * 
-     * @param musicSageRequest 
-     * @return ApiResponse<Station?>
-     * @throws IllegalStateException If the request is not correctly configured
-     * @throws IOException Rethrows the OkHttp execute method exception
-     */
-    @Suppress("UNCHECKED_CAST")
-    @Throws(IllegalStateException::class, IOException::class)
-    fun musicSageWithHttpInfo(musicSageRequest: MusicSageRequest) : ApiResponse<Station?> {
-        val localVariableConfig = musicSageRequestConfig(musicSageRequest = musicSageRequest)
-
-        return request<MusicSageRequest, Station>(
-            localVariableConfig
-        )
-    }
-
-    /**
-     * To obtain the request config of the operation musicSage
-     *
-     * @param musicSageRequest 
-     * @return RequestConfig
-     */
-    fun musicSageRequestConfig(musicSageRequest: MusicSageRequest) : RequestConfig<MusicSageRequest> {
-        val localVariableBody = musicSageRequest
-        val localVariableQuery: MultiValueMap = mutableMapOf()
-        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
-        localVariableHeaders["Content-Type"] = "application/json"
-        localVariableHeaders["Accept"] = "application/json"
-
-        return RequestConfig(
-            method = RequestMethod.POST,
-            path = "/music/sage",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

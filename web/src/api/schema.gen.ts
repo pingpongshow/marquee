@@ -1370,7 +1370,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/music/sage": {
+    "/music/muse": {
         parameters: {
             query?: never;
             header?: never;
@@ -1380,7 +1380,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** A playlist from a description, e.g. "rainy Sunday jazz with a late-night feel" (MUSIC-5). */
-        post: operations["musicSage"];
+        post: operations["musicMuse"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1760,7 +1760,7 @@ export interface components {
             enabled: boolean;
         };
         MusicSettings: {
-            /** @description Analyse how tracks sound (on this server's GPU) for radios, similar music and Sonic Sage. */
+            /** @description Analyse how tracks sound (on this server's GPU) for radios, similar music and Muse. */
             sonicAnalysis?: boolean;
             /** @description Look up lyrics on LRCLIB when a track has none (sends artist and title). */
             onlineLyrics?: boolean;
@@ -5437,7 +5437,7 @@ export interface operations {
             503: components["responses"]["ServiceUnavailable"];
         };
     };
-    musicSage: {
+    musicMuse: {
         parameters: {
             query?: never;
             header?: never;
