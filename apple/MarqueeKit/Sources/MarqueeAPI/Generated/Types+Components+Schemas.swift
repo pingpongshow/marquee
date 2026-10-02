@@ -906,6 +906,8 @@ extension Components {
             public var metadata: Components.Schemas.MetadataSettings
             /// - Remark: Generated from `#/components/schemas/ServerSettings/tasks`.
             public var tasks: Components.Schemas.TaskSettings
+            /// - Remark: Generated from `#/components/schemas/ServerSettings/music`.
+            public var music: Components.Schemas.MusicSettings?
             /// Creates a new `ServerSettings`.
             ///
             /// - Parameters:
@@ -917,6 +919,7 @@ extension Components {
             ///   - library:
             ///   - metadata:
             ///   - tasks:
+            ///   - music:
             public init(
                 security: Components.Schemas.SecuritySettings,
                 general: Components.Schemas.GeneralSettings,
@@ -925,7 +928,8 @@ extension Components {
                 transcoder: Components.Schemas.TranscoderSettings,
                 library: Components.Schemas.LibraryGlobalSettings,
                 metadata: Components.Schemas.MetadataSettings,
-                tasks: Components.Schemas.TaskSettings
+                tasks: Components.Schemas.TaskSettings,
+                music: Components.Schemas.MusicSettings? = nil
             ) {
                 self.security = security
                 self.general = general
@@ -935,6 +939,7 @@ extension Components {
                 self.library = library
                 self.metadata = metadata
                 self.tasks = tasks
+                self.music = music
             }
             public enum CodingKeys: String, CodingKey {
                 case security
@@ -945,6 +950,7 @@ extension Components {
                 case library
                 case metadata
                 case tasks
+                case music
             }
         }
         /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate`.
@@ -965,6 +971,8 @@ extension Components {
             public var metadata: Components.Schemas.MetadataSettingsUpdate?
             /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/tasks`.
             public var tasks: Components.Schemas.TaskSettings?
+            /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/music`.
+            public var music: Components.Schemas.MusicSettings?
             /// Creates a new `ServerSettingsUpdate`.
             ///
             /// - Parameters:
@@ -976,6 +984,7 @@ extension Components {
             ///   - library:
             ///   - metadata:
             ///   - tasks:
+            ///   - music:
             public init(
                 security: Components.Schemas.SecuritySettings? = nil,
                 general: Components.Schemas.GeneralSettings? = nil,
@@ -984,7 +993,8 @@ extension Components {
                 transcoder: Components.Schemas.TranscoderSettings? = nil,
                 library: Components.Schemas.LibraryGlobalSettings? = nil,
                 metadata: Components.Schemas.MetadataSettingsUpdate? = nil,
-                tasks: Components.Schemas.TaskSettings? = nil
+                tasks: Components.Schemas.TaskSettings? = nil,
+                music: Components.Schemas.MusicSettings? = nil
             ) {
                 self.security = security
                 self.general = general
@@ -994,6 +1004,7 @@ extension Components {
                 self.library = library
                 self.metadata = metadata
                 self.tasks = tasks
+                self.music = music
             }
             public enum CodingKeys: String, CodingKey {
                 case security
@@ -1004,6 +1015,42 @@ extension Components {
                 case library
                 case metadata
                 case tasks
+                case music
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/MusicSettings`.
+        public struct MusicSettings: Codable, Hashable, Sendable {
+            /// Analyse how tracks sound (on this server's GPU) for radios
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicSettings/sonicAnalysis`.
+            public var sonicAnalysis: Swift.Bool?
+            /// Look up lyrics on LRCLIB when a track has none (sends artist and title).
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicSettings/onlineLyrics`.
+            public var onlineLyrics: Swift.Bool?
+            /// Measure loudness of tracks without ReplayGain tags so volume levelling works for everything.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicSettings/loudnessAnalysis`.
+            public var loudnessAnalysis: Swift.Bool?
+            /// Creates a new `MusicSettings`.
+            ///
+            /// - Parameters:
+            ///   - sonicAnalysis: Analyse how tracks sound (on this server's GPU) for radios
+            ///   - onlineLyrics: Look up lyrics on LRCLIB when a track has none (sends artist and title).
+            ///   - loudnessAnalysis: Measure loudness of tracks without ReplayGain tags so volume levelling works for everything.
+            public init(
+                sonicAnalysis: Swift.Bool? = nil,
+                onlineLyrics: Swift.Bool? = nil,
+                loudnessAnalysis: Swift.Bool? = nil
+            ) {
+                self.sonicAnalysis = sonicAnalysis
+                self.onlineLyrics = onlineLyrics
+                self.loudnessAnalysis = loudnessAnalysis
+            }
+            public enum CodingKeys: String, CodingKey {
+                case sonicAnalysis
+                case onlineLyrics
+                case loudnessAnalysis
             }
         }
         /// - Remark: Generated from `#/components/schemas/SecuritySettings`.
@@ -2784,6 +2831,18 @@ extension Components {
             public var fontsUrl: Swift.String?
             /// - Remark: Generated from `#/components/schemas/PlaybackSession/markers`.
             public var markers: [Components.Schemas.Marker]
+            /// Music: gain to apply for volume levelling (ReplayGain track gain).
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaybackSession/trackGainDb`.
+            public var trackGainDb: Swift.Double?
+            /// Music: album gain, for playing whole albums.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaybackSession/albumGainDb`.
+            public var albumGainDb: Swift.Double?
+            /// Music: peak sample level (1.0 = full scale), to avoid clipping when boosting.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaybackSession/peak`.
+            public var peak: Swift.Double?
             /// Creates a new `PlaybackSession`.
             ///
             /// - Parameters:
@@ -2804,6 +2863,9 @@ extension Components {
             ///   - subtitleFormat:
             ///   - fontsUrl: With ASS subtitles: JSON list of fonts embedded in the file ({name, url}[]).
             ///   - markers:
+            ///   - trackGainDb: Music: gain to apply for volume levelling (ReplayGain track gain).
+            ///   - albumGainDb: Music: album gain, for playing whole albums.
+            ///   - peak: Music: peak sample level (1.0 = full scale), to avoid clipping when boosting.
             public init(
                 id: Swift.String,
                 itemId: Swift.Int64,
@@ -2821,7 +2883,10 @@ extension Components {
                 subtitleUrl: Swift.String? = nil,
                 subtitleFormat: Components.Schemas.PlaybackSession.SubtitleFormatPayload? = nil,
                 fontsUrl: Swift.String? = nil,
-                markers: [Components.Schemas.Marker]
+                markers: [Components.Schemas.Marker],
+                trackGainDb: Swift.Double? = nil,
+                albumGainDb: Swift.Double? = nil,
+                peak: Swift.Double? = nil
             ) {
                 self.id = id
                 self.itemId = itemId
@@ -2840,6 +2905,9 @@ extension Components {
                 self.subtitleFormat = subtitleFormat
                 self.fontsUrl = fontsUrl
                 self.markers = markers
+                self.trackGainDb = trackGainDb
+                self.albumGainDb = albumGainDb
+                self.peak = peak
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -2859,6 +2927,9 @@ extension Components {
                 case subtitleFormat
                 case fontsUrl
                 case markers
+                case trackGainDb
+                case albumGainDb
+                case peak
             }
         }
         /// - Remark: Generated from `#/components/schemas/PlaybackProgress`.
@@ -3536,6 +3607,8 @@ extension Components {
             public var imageIds: [Swift.Int64]
             /// - Remark: Generated from `#/components/schemas/Playlist/updatedAt`.
             public var updatedAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/Playlist/rules`.
+            public var rules: Components.Schemas.SmartRules?
             /// Creates a new `Playlist`.
             ///
             /// - Parameters:
@@ -3546,6 +3619,7 @@ extension Components {
             ///   - durationMs:
             ///   - imageIds: Posters/covers of up to four items, for the playlist's mosaic.
             ///   - updatedAt:
+            ///   - rules:
             public init(
                 id: Swift.Int64,
                 title: Swift.String,
@@ -3553,7 +3627,8 @@ extension Components {
                 itemCount: Swift.Int,
                 durationMs: Swift.Int64,
                 imageIds: [Swift.Int64],
-                updatedAt: Foundation.Date
+                updatedAt: Foundation.Date,
+                rules: Components.Schemas.SmartRules? = nil
             ) {
                 self.id = id
                 self.title = title
@@ -3562,6 +3637,7 @@ extension Components {
                 self.durationMs = durationMs
                 self.imageIds = imageIds
                 self.updatedAt = updatedAt
+                self.rules = rules
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -3571,6 +3647,7 @@ extension Components {
                 case durationMs
                 case imageIds
                 case updatedAt
+                case rules
             }
         }
         /// - Remark: Generated from `#/components/schemas/PlaylistCreate`.
@@ -3581,25 +3658,31 @@ extension Components {
             public var kind: Components.Schemas.PlaylistKind
             /// - Remark: Generated from `#/components/schemas/PlaylistCreate/itemIds`.
             public var itemIds: [Swift.Int64]?
+            /// - Remark: Generated from `#/components/schemas/PlaylistCreate/rules`.
+            public var rules: Components.Schemas.SmartRules?
             /// Creates a new `PlaylistCreate`.
             ///
             /// - Parameters:
             ///   - title:
             ///   - kind:
             ///   - itemIds:
+            ///   - rules:
             public init(
                 title: Swift.String,
                 kind: Components.Schemas.PlaylistKind,
-                itemIds: [Swift.Int64]? = nil
+                itemIds: [Swift.Int64]? = nil,
+                rules: Components.Schemas.SmartRules? = nil
             ) {
                 self.title = title
                 self.kind = kind
                 self.itemIds = itemIds
+                self.rules = rules
             }
             public enum CodingKeys: String, CodingKey {
                 case title
                 case kind
                 case itemIds
+                case rules
             }
         }
         /// - Remark: Generated from `#/components/schemas/PlaylistItemPage`.
@@ -3827,6 +3910,354 @@ extension Components {
                 case transcodes
             }
         }
+        /// - Remark: Generated from `#/components/schemas/MusicStatus`.
+        public struct MusicStatus: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/MusicStatus/enabled`.
+            public var enabled: Swift.Bool
+            /// The analysis service is running.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicStatus/available`.
+            public var available: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/MusicStatus/running`.
+            public var running: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/MusicStatus/model`.
+            public var model: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/MusicStatus/device`.
+            public var device: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/MusicStatus/analyzed`.
+            public var analyzed: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/MusicStatus/total`.
+            public var total: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/MusicStatus/failed`.
+            public var failed: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/MusicStatus/progress`.
+            public var progress: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/MusicStatus/runTotal`.
+            public var runTotal: Swift.Int?
+            /// Creates a new `MusicStatus`.
+            ///
+            /// - Parameters:
+            ///   - enabled:
+            ///   - available: The analysis service is running.
+            ///   - running:
+            ///   - model:
+            ///   - device:
+            ///   - analyzed:
+            ///   - total:
+            ///   - failed:
+            ///   - progress:
+            ///   - runTotal:
+            public init(
+                enabled: Swift.Bool,
+                available: Swift.Bool,
+                running: Swift.Bool,
+                model: Swift.String? = nil,
+                device: Swift.String? = nil,
+                analyzed: Swift.Int,
+                total: Swift.Int,
+                failed: Swift.Int? = nil,
+                progress: Swift.Int? = nil,
+                runTotal: Swift.Int? = nil
+            ) {
+                self.enabled = enabled
+                self.available = available
+                self.running = running
+                self.model = model
+                self.device = device
+                self.analyzed = analyzed
+                self.total = total
+                self.failed = failed
+                self.progress = progress
+                self.runTotal = runTotal
+            }
+            public enum CodingKeys: String, CodingKey {
+                case enabled
+                case available
+                case running
+                case model
+                case device
+                case analyzed
+                case total
+                case failed
+                case progress
+                case runTotal
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RadioRequest`.
+        public struct RadioRequest: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/RadioRequest/seed`.
+            @frozen public enum SeedPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case item = "item"
+                case genre = "genre"
+                case decade = "decade"
+                case mood = "mood"
+                case favourites = "favourites"
+                case library = "library"
+            }
+            /// - Remark: Generated from `#/components/schemas/RadioRequest/seed`.
+            public var seed: Components.Schemas.RadioRequest.SeedPayload
+            /// With seed item: a track, album or artist.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RadioRequest/itemId`.
+            public var itemId: Swift.Int64?
+            /// With genre: the genre; decade: e.g. 1990; mood: a word or phrase.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RadioRequest/value`.
+            public var value: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/RadioRequest/libraryId`.
+            public var libraryId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/RadioRequest/limit`.
+            public var limit: Swift.Int?
+            /// Tracks already queued (to continue a station).
+            ///
+            /// - Remark: Generated from `#/components/schemas/RadioRequest/exclude`.
+            public var exclude: [Swift.Int64]?
+            /// Creates a new `RadioRequest`.
+            ///
+            /// - Parameters:
+            ///   - seed:
+            ///   - itemId: With seed item: a track, album or artist.
+            ///   - value: With genre: the genre; decade: e.g. 1990; mood: a word or phrase.
+            ///   - libraryId:
+            ///   - limit:
+            ///   - exclude: Tracks already queued (to continue a station).
+            public init(
+                seed: Components.Schemas.RadioRequest.SeedPayload,
+                itemId: Swift.Int64? = nil,
+                value: Swift.String? = nil,
+                libraryId: Swift.Int64? = nil,
+                limit: Swift.Int? = nil,
+                exclude: [Swift.Int64]? = nil
+            ) {
+                self.seed = seed
+                self.itemId = itemId
+                self.value = value
+                self.libraryId = libraryId
+                self.limit = limit
+                self.exclude = exclude
+            }
+            public enum CodingKeys: String, CodingKey {
+                case seed
+                case itemId
+                case value
+                case libraryId
+                case limit
+                case exclude
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/Station`.
+        public struct Station: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/Station/id`.
+            public var id: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Station/title`.
+            public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/Station/description`.
+            public var description: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Station/items`.
+            public var items: [Components.Schemas.ItemSummary]
+            /// Creates a new `Station`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - title:
+            ///   - description:
+            ///   - items:
+            public init(
+                id: Swift.String? = nil,
+                title: Swift.String,
+                description: Swift.String? = nil,
+                items: [Components.Schemas.ItemSummary]
+            ) {
+                self.id = id
+                self.title = title
+                self.description = description
+                self.items = items
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case title
+                case description
+                case items
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/Lyrics`.
+        public struct Lyrics: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/Lyrics/synced`.
+            public var synced: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/Lyrics/source`.
+            @frozen public enum SourcePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case embedded = "embedded"
+                case sidecar = "sidecar"
+                case lrclib = "lrclib"
+            }
+            /// - Remark: Generated from `#/components/schemas/Lyrics/source`.
+            public var source: Components.Schemas.Lyrics.SourcePayload
+            /// - Remark: Generated from `#/components/schemas/Lyrics/lines`.
+            public var lines: [Components.Schemas.LyricLine]
+            /// Creates a new `Lyrics`.
+            ///
+            /// - Parameters:
+            ///   - synced:
+            ///   - source:
+            ///   - lines:
+            public init(
+                synced: Swift.Bool,
+                source: Components.Schemas.Lyrics.SourcePayload,
+                lines: [Components.Schemas.LyricLine]
+            ) {
+                self.synced = synced
+                self.source = source
+                self.lines = lines
+            }
+            public enum CodingKeys: String, CodingKey {
+                case synced
+                case source
+                case lines
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/LyricLine`.
+        public struct LyricLine: Codable, Hashable, Sendable {
+            /// When the line is sung (synced lyrics only).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LyricLine/timeMs`.
+            public var timeMs: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/LyricLine/text`.
+            public var text: Swift.String
+            /// Creates a new `LyricLine`.
+            ///
+            /// - Parameters:
+            ///   - timeMs: When the line is sung (synced lyrics only).
+            ///   - text:
+            public init(
+                timeMs: Swift.Int64? = nil,
+                text: Swift.String
+            ) {
+                self.timeMs = timeMs
+                self.text = text
+            }
+            public enum CodingKeys: String, CodingKey {
+                case timeMs
+                case text
+            }
+        }
+        /// A smart playlist's rules (MUSIC-8); its contents are worked out each time it's opened.
+        ///
+        /// - Remark: Generated from `#/components/schemas/SmartRules`.
+        public struct SmartRules: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/SmartRules/match`.
+            @frozen public enum MatchPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case all = "all"
+                case any = "any"
+            }
+            /// - Remark: Generated from `#/components/schemas/SmartRules/match`.
+            public var match: Components.Schemas.SmartRules.MatchPayload
+            /// - Remark: Generated from `#/components/schemas/SmartRules/ConditionsPayload`.
+            public struct ConditionsPayloadPayload: Codable, Hashable, Sendable {
+                /// energy is a percentile of the analysed library: 0 = the calmest tracks, 0.8 = more intense than 80% of them.
+                ///
+                /// - Remark: Generated from `#/components/schemas/SmartRules/ConditionsPayload/field`.
+                @frozen public enum FieldPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case genre = "genre"
+                    case artist = "artist"
+                    case album = "album"
+                    case title = "title"
+                    case year = "year"
+                    case rating = "rating"
+                    case playCount = "playCount"
+                    case lastPlayedDays = "lastPlayedDays"
+                    case addedDays = "addedDays"
+                    case bpm = "bpm"
+                    case energy = "energy"
+                    case key = "key"
+                    case durationSeconds = "durationSeconds"
+                }
+                /// energy is a percentile of the analysed library: 0 = the calmest tracks, 0.8 = more intense than 80% of them.
+                ///
+                /// - Remark: Generated from `#/components/schemas/SmartRules/ConditionsPayload/field`.
+                public var field: Components.Schemas.SmartRules.ConditionsPayloadPayload.FieldPayload
+                /// - Remark: Generated from `#/components/schemas/SmartRules/ConditionsPayload/op`.
+                @frozen public enum OpPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case _is = "is"
+                    case isNot = "isNot"
+                    case contains = "contains"
+                    case notContains = "notContains"
+                    case gt = "gt"
+                    case lt = "lt"
+                }
+                /// - Remark: Generated from `#/components/schemas/SmartRules/ConditionsPayload/op`.
+                public var op: Components.Schemas.SmartRules.ConditionsPayloadPayload.OpPayload
+                /// - Remark: Generated from `#/components/schemas/SmartRules/ConditionsPayload/value`.
+                public var value: Swift.String
+                /// Creates a new `ConditionsPayloadPayload`.
+                ///
+                /// - Parameters:
+                ///   - field: energy is a percentile of the analysed library: 0 = the calmest tracks, 0.8 = more intense than 80% of them.
+                ///   - op:
+                ///   - value:
+                public init(
+                    field: Components.Schemas.SmartRules.ConditionsPayloadPayload.FieldPayload,
+                    op: Components.Schemas.SmartRules.ConditionsPayloadPayload.OpPayload,
+                    value: Swift.String
+                ) {
+                    self.field = field
+                    self.op = op
+                    self.value = value
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case field
+                    case op
+                    case value
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/SmartRules/conditions`.
+            public typealias ConditionsPayload = [Components.Schemas.SmartRules.ConditionsPayloadPayload]
+            /// - Remark: Generated from `#/components/schemas/SmartRules/conditions`.
+            public var conditions: Components.Schemas.SmartRules.ConditionsPayload
+            /// - Remark: Generated from `#/components/schemas/SmartRules/sort`.
+            @frozen public enum SortPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case random = "random"
+                case title = "title"
+                case artist = "artist"
+                case year = "year"
+                case _hyphen_year = "-year"
+                case added = "added"
+                case _hyphen_added = "-added"
+                case rating = "rating"
+                case _hyphen_rating = "-rating"
+                case playCount = "playCount"
+                case _hyphen_playCount = "-playCount"
+                case lastPlayed = "lastPlayed"
+                case _hyphen_lastPlayed = "-lastPlayed"
+            }
+            /// - Remark: Generated from `#/components/schemas/SmartRules/sort`.
+            public var sort: Components.Schemas.SmartRules.SortPayload?
+            /// - Remark: Generated from `#/components/schemas/SmartRules/limit`.
+            public var limit: Swift.Int?
+            /// Creates a new `SmartRules`.
+            ///
+            /// - Parameters:
+            ///   - match:
+            ///   - conditions:
+            ///   - sort:
+            ///   - limit:
+            public init(
+                match: Components.Schemas.SmartRules.MatchPayload,
+                conditions: Components.Schemas.SmartRules.ConditionsPayload,
+                sort: Components.Schemas.SmartRules.SortPayload? = nil,
+                limit: Swift.Int? = nil
+            ) {
+                self.match = match
+                self.conditions = conditions
+                self.sort = sort
+                self.limit = limit
+            }
+            public enum CodingKeys: String, CodingKey {
+                case match
+                case conditions
+                case sort
+                case limit
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/ItemSummary`.
         public struct ItemSummary: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/ItemSummary/id`.
@@ -3900,6 +4331,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ItemSummary/watchedLeafCount`.
             public var watchedLeafCount: Swift.Int?
+            /// The user's rating, 0–10 (10 = loved).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemSummary/userRating`.
+            public var userRating: Swift.Double?
             /// Creates a new `ItemSummary`.
             ///
             /// - Parameters:
@@ -3929,6 +4364,7 @@ extension Components {
             ///   - viewCount:
             ///   - lastViewedAt:
             ///   - watchedLeafCount: Shows, seasons, artists, albums: how many episodes/tracks the user has watched.
+            ///   - userRating: The user's rating, 0–10 (10 = loved).
             public init(
                 id: Swift.Int64,
                 libraryId: Swift.Int64,
@@ -3955,7 +4391,8 @@ extension Components {
                 viewOffsetMs: Swift.Int64? = nil,
                 viewCount: Swift.Int? = nil,
                 lastViewedAt: Foundation.Date? = nil,
-                watchedLeafCount: Swift.Int? = nil
+                watchedLeafCount: Swift.Int? = nil,
+                userRating: Swift.Double? = nil
             ) {
                 self.id = id
                 self.libraryId = libraryId
@@ -3983,6 +4420,7 @@ extension Components {
                 self.viewCount = viewCount
                 self.lastViewedAt = lastViewedAt
                 self.watchedLeafCount = watchedLeafCount
+                self.userRating = userRating
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -4011,6 +4449,7 @@ extension Components {
                 case viewCount
                 case lastViewedAt
                 case watchedLeafCount
+                case userRating
             }
         }
         /// Artwork ids for /images/{artworkId}. Seasons and episodes fall back to the show's art, tracks to the album's.

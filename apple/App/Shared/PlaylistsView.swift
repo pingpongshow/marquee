@@ -120,7 +120,7 @@ struct PlaylistView: View {
         let items = entries.map(\.item)
         guard !items.isEmpty else { return }
         if playlist?.kind == .audio {
-            music.play(items, start: start, shuffle: shuffle)
+            music.play(items, start: start, shuffle: shuffle, source: playlist?.title)
         } else {
             let first = shuffle ? items.randomElement()! : items[start]
             video.play(first.id, startMs: 0, playlistID: id)

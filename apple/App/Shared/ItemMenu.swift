@@ -16,10 +16,13 @@ struct ItemMenuItems: View {
 
     var body: some View {
         if item.isMusic {
+            if [.track, .album, .artist].contains(item._type) {
+                Button { startRadio() } label: { Label("Start Radio", systemImage: "dot.radiowaves.left.and.right") }
+            }
             Button { Task { music.playNext(await leaves()) } } label: { Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") }
             Button { Task { music.addToQueue(await leaves()) } } label: { Label("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") }
             if item._type != .track {
-                Button { Task { music.play(await leaves(), shuffle: true) } } label: { Label("Shuffle", systemImage: "shuffle") }
+                Button { Task { music.play(await leaves(), shuffle: true, source: item.title) } } label: { Label("Shuffle", systemImage: "shuffle") }
             }
         }
         Button { PlaylistPicker.shared.item = item } label: { Label("Add to Playlist…", systemImage: "text.badge.plus") }
@@ -34,6 +37,11 @@ struct ItemMenuItems: View {
                 Label(item.watched ? "Mark Unwatched" : "Mark Watched", systemImage: item.watched ? "circle" : "checkmark.circle")
             }
         }
+    }
+
+    private func startRadio() {
+        let req = RadioRequest(seed: .item, itemId: item.id, limit: 50)
+        Task { if let st = try? await app.radio(req) { music.playStation(st, radio: req) } }
     }
 
     private func leaves() async -> [Item] {

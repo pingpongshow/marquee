@@ -2096,7 +2096,10 @@ export interface components {
             /** @enum {string} */
             match: "all" | "any";
             conditions: {
-                /** @enum {string} */
+                /**
+                 * @description energy is a percentile of the analysed library: 0 = the calmest tracks, 0.8 = more intense than 80% of them.
+                 * @enum {string}
+                 */
                 field: "genre" | "artist" | "album" | "title" | "year" | "rating" | "playCount" | "lastPlayedDays" | "addedDays" | "bpm" | "energy" | "key" | "durationSeconds";
                 /** @enum {string} */
                 op: "is" | "isNot" | "contains" | "notContains" | "gt" | "lt";
