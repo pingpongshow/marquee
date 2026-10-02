@@ -592,4 +592,33 @@ class MarqueeUiTest {
         shot("cf1-after-crossfade")
         InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.setCrossfade(0); app.music.stop() }
     }
+
+    /** M7 on Android: watchlist, extras, collections and your stats. */
+    @Test fun watchlistCollectionsStats() {
+        connectAndSignIn()
+        openLibrary("Movies")
+        rule.waitText("00 Preview Test")
+        tap("00 Preview Test")
+        rule.waitUntilAtLeastOneExists(hasText("Watchlist") or hasText("On Watchlist"), 10_000)
+        if (rule.onAllNodesWithText("On Watchlist").fetchSemanticsNodes().isNotEmpty()) tap("On Watchlist")
+        tap("Watchlist")
+        rule.waitText("On Watchlist")
+        rule.waitUntil(10_000) { scrollTo(hasText("Extras")) }
+        shot("m7a-item")
+        tap("On Watchlist") // back off the watchlist
+        back()
+        rule.waitText("Collections")
+        tap("Collections")
+        rule.waitText("Test Saga", 10_000)
+        shot("m7b-collections")
+        tap("Test Saga")
+        rule.waitText("In this collection", 10_000)
+        rule.waitText("15 Thunder")
+        tap("Settings")
+        tap("Your Stats")
+        rule.waitUntilAtLeastOneExists(hasText("Plays") or hasText("Nothing played in this period."), 15_000)
+        tap("All time")
+        rule.waitText("Plays", 15_000)
+        shot("m7c-stats")
+    }
 }

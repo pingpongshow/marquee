@@ -192,12 +192,14 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
     var total by remember { mutableIntStateOf(-1) }
     var loading by remember { mutableStateOf(false) }
     var library by remember { mutableStateOf<Library?>(null) }
+    // Movie libraries also browse by collection (META-7).
+    var collections by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     fun loadMore() {
         if (loading || (total >= 0 && items.size >= total)) return
         loading = true
         scope.launch {
-            withContext(Dispatchers.IO) { runCatching { marquee.items.listLibraryItems(libraryId, offset = items.size, limit = 120) } }
+            withContext(Dispatchers.IO) { runCatching { marquee.items.listLibraryItems(libraryId, if (collections) ItemType.COLLECTION else null, offset = items.size, limit = 120) } }
                 .onSuccess { page -> items.addAll(page.items.filter { n -> items.none { it.id == n.id } }); total = page.total }
             loading = false
         }
@@ -209,7 +211,14 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
     val min = if (marquee.isTv) 130.dp else 110.dp
     val isMusic = library?.type == LibraryType.MUSIC
     Column {
-        Text(library?.name ?: "", Modifier.padding(horizontal = sidePadding, vertical = 12.dp), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Row(Modifier.padding(horizontal = sidePadding, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(library?.name ?: "", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            if (library?.type == LibraryType.MOVIES) listOf(false to "All", true to "Collections").forEach { (c, label) ->
+                androidx.compose.material3.FilterChip(collections == c, {
+                    if (collections != c) { collections = c; items.clear(); total = -1; loadMore() }
+                }, { Text(label) }, Modifier.focusRing(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)))
+            }
+        }
         LazyVerticalGrid(GridCells.Adaptive(min), contentPadding = PaddingValues(sidePadding), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             // Music libraries open with Muse, stations and mixes above the artists.
             if (isMusic) item(span = { GridItemSpan(maxLineSpan) }) { app.marquee.music.MusicDiscover(libraryId) { kind, name -> nav.navigate("browse/$libraryId/$kind/${android.net.Uri.encode(name)}") } }
@@ -309,6 +318,7 @@ fun SettingsScreen(nav: NavHostController) {
         Text("Server: ${marquee.server?.name ?: ""} · ${if (marquee.isRemote) "Tailscale (away)" else "home network"}", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("Version ${marquee.info?.version ?: ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedButton(onClick = { nav.navigate("stats") }) { Text("Your Stats") }
             if (me?.isAdmin == true) OutlinedButton(onClick = { nav.navigate("approvals") }) { Text("Requests") }
             OutlinedButton(onClick = { scope.launch { marquee.signOut() } }) { Text("Switch profile") }
             OutlinedButton(onClick = { marquee.forgetServer() }) { Text("Use a different server") }
