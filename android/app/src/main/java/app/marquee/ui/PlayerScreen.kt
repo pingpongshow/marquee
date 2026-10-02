@@ -1,5 +1,8 @@
 package app.marquee.ui
 
+import app.marquee.core.WatchTogether
+import androidx.compose.runtime.collectAsState
+import androidx.compose.material.icons.filled.Groups
 import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.net.Uri
@@ -117,7 +120,7 @@ private val qualities = listOf<Pair<String, Int?>>(
  */
 @OptIn(UnstableApi::class)
 @Composable
-fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?) {
+fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: String? = null) {
     val marquee = LocalMarquee.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -135,6 +138,12 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?) {
     var settings by remember { mutableStateOf(false) }
     var lastTouch by remember { mutableIntStateOf(0) } // bumps keep the controls up
     var scrub by remember { mutableStateOf<Long?>(null) }
+    // Watch together (SYNC-1).
+    val together = remember { WatchTogether(marquee, player, itemId, scope) }
+    val group by together.group.collectAsState()
+    val groupError by together.error.collectAsState()
+    var groupPanel by remember { mutableStateOf(false) }
+    LaunchedEffect(groupId) { if (groupId != null) { delay(1500); together.join(groupId) } }
     // Downloaded: play the file on the device, even when the server is reachable (D64).
     val downloads = LocalDownloads.current
     val local = remember(itemId) { downloads.localFile(itemId) }
@@ -236,7 +245,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?) {
                 // Up next: the following episode (or nothing).
                 marquee.scope.launch(Dispatchers.Main) {
                     val next = withContext(Dispatchers.IO) { runCatching { marquee.items.nextItem(itemId) }.getOrNull() }
-                    if (next != null) nav.navigate("player/${next.id}?start=0") { popUpTo("player/{id}?start={start}") { inclusive = true } }
+                    if (next != null) nav.navigate("player/${next.id}?start=0") { popUpTo("player/{id}?start={start}&group={group}") { inclusive = true } }
                     else nav.popBackStack()
                 }
             }
@@ -254,6 +263,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?) {
             val s = session
             val pos = player.currentPosition
             recordLocal()
+            together.leave()
             player.removeListener(listener)
             player.release()
             closeSession(s, pos)
@@ -326,6 +336,14 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?) {
                         Text(d?.let { if (it.type == ItemType.EPISODE) listOfNotNull(it.parentTitle, it.index?.let { i -> "E$i" }, it.title).joinToString(" · ") else it.title } ?: "",
                             color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
+                    if (local == null) IconButton({ if (group == null) together.start() else groupPanel = true; poke() }, Modifier.focusRing()) {
+                        val g = group
+                        if (g == null) Icon(Icons.Filled.Groups, "Watch together", tint = Color.White)
+                        else Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.Groups, "Watching together", tint = Gold)
+                            Text("${g.members.size}", color = Gold, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
                     if (local == null) IconButton({ settings = true; poke() }, Modifier.focusRing()) { Icon(Icons.Filled.Settings, "Playback settings", tint = Color.White) }
                 }
                 // Middle: back 10, play/pause, forward 30.
@@ -349,6 +367,21 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?) {
             modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = if (controls) 96.dp else 32.dp, end = 32.dp).focusRing(),
         ) { Text(if (marker.kind == Marker.Kind.CREDITS) "Skip Credits" else "Skip Intro") }
 
+        groupError?.let { Text(it, Modifier.align(Alignment.TopCenter).padding(top = 72.dp), color = MaterialTheme.colorScheme.error) }
+        val g = group
+        if (groupPanel && g != null) androidx.compose.material3.AlertDialog(
+            onDismissRequest = { groupPanel = false },
+            title = { Text("Watching together") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Play, pause and seeking are shared. Others join from Home.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    g.members.forEach { m -> Text("• ${m.name}${if (m.buffering) " (loading)" else ""}") }
+                    if (g.lastBy != null && g.lastAction != null) Text("${g.lastBy}: ${g.lastAction}", style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = { TextButton({ together.leave(); groupPanel = false }, Modifier.focusRing()) { Text("Leave the group") } },
+            dismissButton = { TextButton({ groupPanel = false }, Modifier.focusRing()) { Text("Close") } },
+        )
         if (settings) PlayerSettings(
             detail, session, choice,
             onPick = { c ->

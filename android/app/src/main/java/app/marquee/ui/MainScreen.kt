@@ -131,9 +131,13 @@ private fun Routes(nav: NavHostController) {
         composable("item/{id}", listOf(navArgument("id") { type = NavType.LongType })) { ItemScreen(nav, it.arguments!!.getLong("id")) }
         composable("playlist/{id}", listOf(navArgument("id") { type = NavType.LongType })) { PlaylistScreen(nav, it.arguments!!.getLong("id")) }
         composable(
-            "player/{id}?start={start}",
-            listOf(navArgument("id") { type = NavType.LongType }, navArgument("start") { type = NavType.LongType; defaultValue = -1L }),
-        ) { PlayerScreen(nav, it.arguments!!.getLong("id"), it.arguments!!.getLong("start").takeIf { s -> s >= 0 }) }
+            "player/{id}?start={start}&group={group}",
+            listOf(
+                navArgument("id") { type = NavType.LongType },
+                navArgument("start") { type = NavType.LongType; defaultValue = -1L },
+                navArgument("group") { type = NavType.StringType; nullable = true; defaultValue = null },
+            ),
+        ) { PlayerScreen(nav, it.arguments!!.getLong("id"), it.arguments!!.getLong("start").takeIf { s -> s >= 0 }, it.arguments!!.getString("group")) }
         composable("downloads") { DownloadsScreen(nav) }
         composable("discover") { DiscoverScreen(nav) }
         composable("livetv") { LiveTvScreen(nav) }
