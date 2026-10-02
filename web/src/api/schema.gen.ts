@@ -1631,7 +1631,7 @@ export interface components {
             remoteQualityKbps?: number;
         };
         UserPreferences: {
-            /** @description ISO 639-2 */
+            /** @description ISO 639-2, e.g. eng, jpn */
             audioLanguage?: string;
             subtitleLanguage?: string;
             /** @enum {string} */
@@ -1760,7 +1760,7 @@ export interface components {
             enabled: boolean;
         };
         MusicSettings: {
-            /** @description Analyse how tracks sound (on this server's GPU) for radios */
+            /** @description Analyse how tracks sound (on this server's GPU) for radios, similar music and Sonic Sage. */
             sonicAnalysis?: boolean;
             /** @description Look up lyrics on LRCLIB when a track has none (sends artist and title). */
             onlineLyrics?: boolean;
@@ -2076,7 +2076,7 @@ export interface components {
         };
         /** @description What the client can play. Codec names follow ffprobe (h264, hevc, av1, vp9, aac, ac3, eac3, opus, flac, mp3…). */
         DeviceProfile: {
-            /** @description Containers playable from a file URL (mp4 */
+            /** @description Containers playable from a file URL (mp4, webm, mkv…). */
             containers: string[];
             videoCodecs: string[];
             audioCodecs: string[];
@@ -2221,7 +2221,7 @@ export interface components {
             startedAt: string;
             /**
              * Format: int64
-             * @description Artwork id for a thumbnail (episode still
+             * @description Artwork id for a thumbnail (episode still, backdrop or poster).
              */
             imageId?: number;
             /** @description Episode or album line, e.g. S2 · E5 · Title */
@@ -2433,11 +2433,11 @@ export interface components {
             quality: "original" | "high" | "medium" | "low";
             /** @enum {string} */
             status: "queued" | "converting" | "ready" | "failed";
-            /** @description Conversion progress */
+            /** @description Conversion progress, 0–1. */
             progress: number;
             /**
              * Format: int64
-             * @description Bytes
+             * @description Bytes, once ready.
              */
             size?: number;
             /** @description Where to fetch the file once ready (supports HTTP ranges; send the token as for streams). */
@@ -2450,7 +2450,7 @@ export interface components {
         SubtitleResult: {
             /** Format: int64 */
             fileId: number;
-            /** @description ISO 639-1 (e.g. en */
+            /** @description ISO 639-1 (e.g. en, pt-BR). */
             language: string;
             release: string;
             fileName?: string;
@@ -2496,7 +2496,7 @@ export interface components {
         StatsCount: {
             /**
              * Format: int64
-             * @description The item or user
+             * @description The item or user, when there is one.
              */
             id?: number;
             title: string;
@@ -2560,7 +2560,7 @@ export interface components {
             title: string;
             originalTitle?: string;
             year?: number;
-            /** @description Season */
+            /** @description Season, episode or track number. */
             index?: number;
             /** @description Absolute episode number (anime). */
             absoluteIndex?: number;

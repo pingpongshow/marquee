@@ -2233,7 +2233,7 @@ components:
     UserPreferences:
       type: object
       properties:
-        audioLanguage: { type: string, description: ISO 639-2, e.g. eng, jpn }
+        audioLanguage: { type: string, description: "ISO 639-2, e.g. eng, jpn" }
         subtitleLanguage: { type: string }
         subtitleMode: { type: string, enum: [off, forced, foreign, always] }
         localQualityKbps: { type: integer, minimum: 0, description: 0 = original }
@@ -2383,7 +2383,7 @@ components:
     MusicSettings:
       type: object
       properties:
-        sonicAnalysis: { type: boolean, description: Analyse how tracks sound (on this server's GPU) for radios, similar music and Sonic Sage. }
+        sonicAnalysis: { type: boolean, description: "Analyse how tracks sound (on this server's GPU) for radios, similar music and Sonic Sage." }
         onlineLyrics: { type: boolean, description: Look up lyrics on LRCLIB when a track has none (sends artist and title). }
         loudnessAnalysis: { type: boolean, description: Measure loudness of tracks without ReplayGain tags so volume levelling works for everything. }
 
@@ -2734,7 +2734,7 @@ components:
       description: What the client can play. Codec names follow ffprobe (h264, hevc, av1, vp9, aac, ac3, eac3, opus, flac, mp3…).
       required: [containers, videoCodecs, audioCodecs, hls, hlsVideoCodecs, hlsAudioCodecs]
       properties:
-        containers: { type: array, items: { type: string }, description: Containers playable from a file URL (mp4, webm, mkv…). }
+        containers: { type: array, items: { type: string }, description: "Containers playable from a file URL (mp4, webm, mkv…)." }
         videoCodecs: { type: array, items: { type: string } }
         audioCodecs: { type: array, items: { type: string } }
         maxAudioChannels: { type: integer }
@@ -2844,7 +2844,7 @@ components:
         state: { type: string }
         bitrateKbps: { type: integer }
         startedAt: { type: string, format: date-time }
-        imageId: { type: integer, format: int64, description: Artwork id for a thumbnail (episode still, backdrop or poster). }
+        imageId: { type: integer, format: int64, description: "Artwork id for a thumbnail (episode still, backdrop or poster)." }
         subtitle: { type: string, description: "Episode or album line, e.g. S2 · E5 · Title" }
 
     HistoryEntry:
@@ -3100,8 +3100,8 @@ components:
         itemId: { type: integer, format: int64 }
         quality: { type: string, enum: [original, high, medium, low] }
         status: { type: string, enum: [queued, converting, ready, failed] }
-        progress: { type: number, description: Conversion progress, 0–1. }
-        size: { type: integer, format: int64, description: Bytes, once ready. }
+        progress: { type: number, description: "Conversion progress, 0–1." }
+        size: { type: integer, format: int64, description: "Bytes, once ready." }
         url: { type: string, description: "Where to fetch the file once ready (supports HTTP ranges; send the token as for streams)." }
         fileName: { type: string }
         error: { type: string }
@@ -3112,7 +3112,7 @@ components:
       required: [fileId, language, release, downloads, hearingImpaired, hashMatch, aiTranslated]
       properties:
         fileId: { type: integer, format: int64 }
-        language: { type: string, description: ISO 639-1 (e.g. en, pt-BR). }
+        language: { type: string, description: "ISO 639-1 (e.g. en, pt-BR)." }
         release: { type: string }
         fileName: { type: string }
         downloads: { type: integer }
@@ -3162,7 +3162,7 @@ components:
       type: object
       required: [title, plays, hours]
       properties:
-        id: { type: integer, format: int64, description: The item or user, when there is one. }
+        id: { type: integer, format: int64, description: "The item or user, when there is one." }
         title: { type: string }
         subtitle: { type: string }
         plays: { type: integer }
@@ -3228,7 +3228,7 @@ components:
         title: { type: string }
         originalTitle: { type: string }
         year: { type: integer }
-        index: { type: integer, description: Season, episode or track number. }
+        index: { type: integer, description: "Season, episode or track number." }
         absoluteIndex: { type: integer, description: Absolute episode number (anime). }
         disc: { type: integer }
         parentId: { type: integer, format: int64 }
