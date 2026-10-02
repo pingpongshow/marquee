@@ -29,5 +29,8 @@ class MarqueeApplication : Application(), SingletonImageLoader.Factory {
     }
 
     override fun newImageLoader(context: coil3.PlatformContext): ImageLoader =
-        ImageLoader.Builder(context).components { add(OkHttpNetworkFetcherFactory(callFactory = { marquee.http })) }.build()
+        ImageLoader.Builder(context).components {
+            add(OkHttpNetworkFetcherFactory(callFactory = { marquee.http }))
+            add(coil3.svg.SvgDecoder.Factory()) // channel logos are often SVG
+        }.build()
 }

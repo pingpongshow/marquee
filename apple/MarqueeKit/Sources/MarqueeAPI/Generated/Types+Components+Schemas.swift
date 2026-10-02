@@ -1461,6 +1461,346 @@ extension Components {
                 case trickplay
             }
         }
+        /// - Remark: Generated from `#/components/schemas/LiveTvStatus`.
+        public struct LiveTvStatus: Codable, Hashable, Sendable {
+            /// At least one source is set up.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTvStatus/enabled`.
+            public var enabled: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/LiveTvStatus/channels`.
+            public var channels: Swift.Int
+            /// The end of the loaded guide.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTvStatus/guideUntil`.
+            public var guideUntil: Foundation.Date?
+            /// - Remark: Generated from `#/components/schemas/LiveTvStatus/SourcesPayload`.
+            public struct SourcesPayloadPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/LiveTvStatus/SourcesPayload/id`.
+                public var id: Swift.String
+                /// - Remark: Generated from `#/components/schemas/LiveTvStatus/SourcesPayload/name`.
+                public var name: Swift.String
+                /// - Remark: Generated from `#/components/schemas/LiveTvStatus/SourcesPayload/channels`.
+                public var channels: Swift.Int
+                /// - Remark: Generated from `#/components/schemas/LiveTvStatus/SourcesPayload/programmes`.
+                public var programmes: Swift.Int
+                /// - Remark: Generated from `#/components/schemas/LiveTvStatus/SourcesPayload/refreshedAt`.
+                public var refreshedAt: Foundation.Date?
+                /// - Remark: Generated from `#/components/schemas/LiveTvStatus/SourcesPayload/error`.
+                public var error: Swift.String?
+                /// Creates a new `SourcesPayloadPayload`.
+                ///
+                /// - Parameters:
+                ///   - id:
+                ///   - name:
+                ///   - channels:
+                ///   - programmes:
+                ///   - refreshedAt:
+                ///   - error:
+                public init(
+                    id: Swift.String,
+                    name: Swift.String,
+                    channels: Swift.Int,
+                    programmes: Swift.Int,
+                    refreshedAt: Foundation.Date? = nil,
+                    error: Swift.String? = nil
+                ) {
+                    self.id = id
+                    self.name = name
+                    self.channels = channels
+                    self.programmes = programmes
+                    self.refreshedAt = refreshedAt
+                    self.error = error
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case id
+                    case name
+                    case channels
+                    case programmes
+                    case refreshedAt
+                    case error
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/LiveTvStatus/sources`.
+            public typealias SourcesPayload = [Components.Schemas.LiveTvStatus.SourcesPayloadPayload]
+            /// - Remark: Generated from `#/components/schemas/LiveTvStatus/sources`.
+            public var sources: Components.Schemas.LiveTvStatus.SourcesPayload
+            /// Creates a new `LiveTvStatus`.
+            ///
+            /// - Parameters:
+            ///   - enabled: At least one source is set up.
+            ///   - channels:
+            ///   - guideUntil: The end of the loaded guide.
+            ///   - sources:
+            public init(
+                enabled: Swift.Bool,
+                channels: Swift.Int,
+                guideUntil: Foundation.Date? = nil,
+                sources: Components.Schemas.LiveTvStatus.SourcesPayload
+            ) {
+                self.enabled = enabled
+                self.channels = channels
+                self.guideUntil = guideUntil
+                self.sources = sources
+            }
+            public enum CodingKeys: String, CodingKey {
+                case enabled
+                case channels
+                case guideUntil
+                case sources
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/LiveChannel`.
+        public struct LiveChannel: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LiveChannel/id`.
+            public var id: Swift.Int64
+            /// The channel number as the source gives it (e.g. 4 or 4.1).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveChannel/number`.
+            public var number: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/LiveChannel/name`.
+            public var name: Swift.String
+            /// - Remark: Generated from `#/components/schemas/LiveChannel/group`.
+            public var group: Swift.String?
+            /// Server-relative; no token needed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveChannel/logoUrl`.
+            public var logoUrl: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/LiveChannel/favorite`.
+            public var favorite: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/LiveChannel/now`.
+            public var now: Components.Schemas.LiveProgramme?
+            /// - Remark: Generated from `#/components/schemas/LiveChannel/next`.
+            public var next: Components.Schemas.LiveProgramme?
+            /// Creates a new `LiveChannel`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - number: The channel number as the source gives it (e.g. 4 or 4.1).
+            ///   - name:
+            ///   - group:
+            ///   - logoUrl: Server-relative; no token needed.
+            ///   - favorite:
+            ///   - now:
+            ///   - next:
+            public init(
+                id: Swift.Int64,
+                number: Swift.String? = nil,
+                name: Swift.String,
+                group: Swift.String? = nil,
+                logoUrl: Swift.String? = nil,
+                favorite: Swift.Bool,
+                now: Components.Schemas.LiveProgramme? = nil,
+                next: Components.Schemas.LiveProgramme? = nil
+            ) {
+                self.id = id
+                self.number = number
+                self.name = name
+                self.group = group
+                self.logoUrl = logoUrl
+                self.favorite = favorite
+                self.now = now
+                self.next = next
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case number
+                case name
+                case group
+                case logoUrl
+                case favorite
+                case now
+                case next
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/LiveProgramme`.
+        public struct LiveProgramme: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LiveProgramme/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/LiveProgramme/start`.
+            public var start: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/LiveProgramme/end`.
+            public var end: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/LiveProgramme/title`.
+            public var title: Swift.String
+            /// The episode's name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveProgramme/subtitle`.
+            public var subtitle: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/LiveProgramme/description`.
+            public var description: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/LiveProgramme/category`.
+            public var category: Swift.String?
+            /// As the guide gives it, e.g. S2 E5.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveProgramme/episode`.
+            public var episode: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/LiveProgramme/imageUrl`.
+            public var imageUrl: Swift.String?
+            /// Creates a new `LiveProgramme`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - start:
+            ///   - end:
+            ///   - title:
+            ///   - subtitle: The episode's name.
+            ///   - description:
+            ///   - category:
+            ///   - episode: As the guide gives it, e.g. S2 E5.
+            ///   - imageUrl:
+            public init(
+                id: Swift.Int64,
+                start: Foundation.Date,
+                end: Foundation.Date,
+                title: Swift.String,
+                subtitle: Swift.String? = nil,
+                description: Swift.String? = nil,
+                category: Swift.String? = nil,
+                episode: Swift.String? = nil,
+                imageUrl: Swift.String? = nil
+            ) {
+                self.id = id
+                self.start = start
+                self.end = end
+                self.title = title
+                self.subtitle = subtitle
+                self.description = description
+                self.category = category
+                self.episode = episode
+                self.imageUrl = imageUrl
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case start
+                case end
+                case title
+                case subtitle
+                case description
+                case category
+                case episode
+                case imageUrl
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/LiveSession`.
+        public struct LiveSession: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LiveSession/id`.
+            public var id: Swift.String
+            /// The live HLS playlist (server-relative; the session id is its credential).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveSession/url`.
+            public var url: Swift.String
+            /// - Remark: Generated from `#/components/schemas/LiveSession/channelId`.
+            public var channelId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/LiveSession/method`.
+            @frozen public enum MethodPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case copy = "copy"
+                case transcode = "transcode"
+            }
+            /// - Remark: Generated from `#/components/schemas/LiveSession/method`.
+            public var method: Components.Schemas.LiveSession.MethodPayload
+            /// - Remark: Generated from `#/components/schemas/LiveSession/videoCodec`.
+            public var videoCodec: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/LiveSession/audioCodec`.
+            public var audioCodec: Swift.String?
+            /// Creates a new `LiveSession`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - url: The live HLS playlist (server-relative; the session id is its credential).
+            ///   - channelId:
+            ///   - method:
+            ///   - videoCodec:
+            ///   - audioCodec:
+            public init(
+                id: Swift.String,
+                url: Swift.String,
+                channelId: Swift.Int64,
+                method: Components.Schemas.LiveSession.MethodPayload,
+                videoCodec: Swift.String? = nil,
+                audioCodec: Swift.String? = nil
+            ) {
+                self.id = id
+                self.url = url
+                self.channelId = channelId
+                self.method = method
+                self.videoCodec = videoCodec
+                self.audioCodec = audioCodec
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case url
+                case channelId
+                case method
+                case videoCodec
+                case audioCodec
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/LiveTvSource`.
+        public struct LiveTvSource: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LiveTvSource/id`.
+            public var id: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/LiveTvSource/name`.
+            public var name: Swift.String
+            /// dispatcharr: url is Dispatcharr's address and its /output/m3u and /output/epg are used.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTvSource/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case m3u = "m3u"
+                case dispatcharr = "dispatcharr"
+            }
+            /// dispatcharr: url is Dispatcharr's address and its /output/m3u and /output/epg are used.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTvSource/kind`.
+            public var kind: Components.Schemas.LiveTvSource.KindPayload
+            /// The M3U playlist (m3u) or Dispatcharr's address.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTvSource/url`.
+            public var url: Swift.String
+            /// XMLTV guide (m3u sources; optional, else the playlist's url-tvg).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTvSource/epgUrl`.
+            public var epgUrl: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/LiveTvSource/userAgent`.
+            public var userAgent: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/LiveTvSource/enabled`.
+            public var enabled: Swift.Bool?
+            /// Creates a new `LiveTvSource`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - name:
+            ///   - kind: dispatcharr: url is Dispatcharr's address and its /output/m3u and /output/epg are used.
+            ///   - url: The M3U playlist (m3u) or Dispatcharr's address.
+            ///   - epgUrl: XMLTV guide (m3u sources; optional, else the playlist's url-tvg).
+            ///   - userAgent:
+            ///   - enabled:
+            public init(
+                id: Swift.String? = nil,
+                name: Swift.String,
+                kind: Components.Schemas.LiveTvSource.KindPayload,
+                url: Swift.String,
+                epgUrl: Swift.String? = nil,
+                userAgent: Swift.String? = nil,
+                enabled: Swift.Bool? = nil
+            ) {
+                self.id = id
+                self.name = name
+                self.kind = kind
+                self.url = url
+                self.epgUrl = epgUrl
+                self.userAgent = userAgent
+                self.enabled = enabled
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case name
+                case kind
+                case url
+                case epgUrl
+                case userAgent
+                case enabled
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/RequestsStatus`.
         public struct RequestsStatus: Codable, Hashable, Sendable {
             /// Seerr is configured.
@@ -1842,21 +2182,27 @@ extension Components {
             public var seerrUrl: Swift.String?
             /// - Remark: Generated from `#/components/schemas/IntegrationSettings/seerrApiKeySet`.
             public var seerrApiKeySet: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/liveTvSources`.
+            public var liveTvSources: [Components.Schemas.LiveTvSource]?
             /// Creates a new `IntegrationSettings`.
             ///
             /// - Parameters:
             ///   - seerrUrl: Seerr's address, e.g. http://10.1.1.10:5055. Empty turns requests off.
             ///   - seerrApiKeySet:
+            ///   - liveTvSources:
             public init(
                 seerrUrl: Swift.String? = nil,
-                seerrApiKeySet: Swift.Bool? = nil
+                seerrApiKeySet: Swift.Bool? = nil,
+                liveTvSources: [Components.Schemas.LiveTvSource]? = nil
             ) {
                 self.seerrUrl = seerrUrl
                 self.seerrApiKeySet = seerrApiKeySet
+                self.liveTvSources = liveTvSources
             }
             public enum CodingKeys: String, CodingKey {
                 case seerrUrl
                 case seerrApiKeySet
+                case liveTvSources
             }
         }
         /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate`.
@@ -1867,21 +2213,29 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/seerrApiKey`.
             public var seerrApiKey: Swift.String?
+            /// Replaces the whole list when sent.
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/liveTvSources`.
+            public var liveTvSources: [Components.Schemas.LiveTvSource]?
             /// Creates a new `IntegrationSettingsUpdate`.
             ///
             /// - Parameters:
             ///   - seerrUrl:
             ///   - seerrApiKey: Write-only.
+            ///   - liveTvSources: Replaces the whole list when sent.
             public init(
                 seerrUrl: Swift.String? = nil,
-                seerrApiKey: Swift.String? = nil
+                seerrApiKey: Swift.String? = nil,
+                liveTvSources: [Components.Schemas.LiveTvSource]? = nil
             ) {
                 self.seerrUrl = seerrUrl
                 self.seerrApiKey = seerrApiKey
+                self.liveTvSources = liveTvSources
             }
             public enum CodingKeys: String, CodingKey {
                 case seerrUrl
                 case seerrApiKey
+                case liveTvSources
             }
         }
         /// - Remark: Generated from `#/components/schemas/MetadataSettings`.

@@ -23,7 +23,7 @@
 
 package app.marquee.api.models
 
-import app.marquee.api.models.LiveTvSource
+import app.marquee.api.models.LiveTvStatusSourcesInner
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -32,24 +32,28 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param seerrUrl 
- * @param seerrApiKey Write-only.
- * @param liveTvSources Replaces the whole list when sent.
+ * @param enabled At least one source is set up.
+ * @param channels 
+ * @param sources 
+ * @param guideUntil The end of the loaded guide.
  */
 @Serializable
 
-data class IntegrationSettingsUpdate (
+data class LiveTvStatus (
 
-    @SerialName(value = "seerrUrl")
-    val seerrUrl: kotlin.String? = null,
+    /* At least one source is set up. */
+    @SerialName(value = "enabled")
+    val enabled: kotlin.Boolean,
 
-    /* Write-only. */
-    @SerialName(value = "seerrApiKey")
-    val seerrApiKey: kotlin.String? = null,
+    @SerialName(value = "channels")
+    val channels: kotlin.Int,
 
-    /* Replaces the whole list when sent. */
-    @SerialName(value = "liveTvSources")
-    val liveTvSources: kotlin.collections.List<LiveTvSource>? = null
+    @SerialName(value = "sources")
+    val sources: kotlin.collections.List<LiveTvStatusSourcesInner>,
+
+    /* The end of the loaded guide. */
+    @Contextual @SerialName(value = "guideUntil")
+    val guideUntil: java.time.OffsetDateTime? = null
 
 ) {
 

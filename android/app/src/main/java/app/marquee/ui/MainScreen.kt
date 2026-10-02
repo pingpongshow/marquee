@@ -1,5 +1,9 @@
 package app.marquee.ui
 
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import androidx.compose.runtime.produceState
+import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.onFocusChanged
@@ -56,7 +60,9 @@ import app.marquee.music.NowPlayingScreen
 
 private data class Dest(val route: String, val label: String, val icon: ImageVector)
 
-private val tabs = listOf(
+private val liveTab = Dest("livetv", "Live TV", Icons.Filled.LiveTv)
+
+private val allTabs = listOf(
     Dest("home", "Home", Icons.Filled.Home),
     Dest("libraries", "Libraries", Icons.Filled.VideoLibrary),
     Dest("playlists", "Playlists", Icons.Filled.LibraryMusic),
@@ -71,7 +77,14 @@ fun MainScreen() {
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route ?: "home"
-    val fullScreen = route.startsWith("player") || route == "nowplaying"
+    val fullScreen = route.startsWith("player") || route == "nowplaying" || route.startsWith("live/")
+    // Live TV gets a tab when it's set up; on phones Playlists then moves under Libraries.
+    val liveOn by produceState(false) { value = withContext(Dispatchers.IO) { runCatching { marquee.livetv.liveTvStatus().enabled }.getOrDefault(false) } }
+    val tabs = buildList {
+        add(allTabs[0])
+        if (liveOn) add(liveTab)
+        addAll(allTabs.drop(1).filter { !(liveOn && !marquee.isTv && it.route == "playlists") })
+    }
     // The tab whose section is showing; reselecting it goes back to its first screen.
     var tab by rememberSaveable { mutableStateOf("home") }
     LaunchedEffect(route) { if (tabs.any { it.route == route }) tab = route }
@@ -123,6 +136,8 @@ private fun Routes(nav: NavHostController) {
         ) { PlayerScreen(nav, it.arguments!!.getLong("id"), it.arguments!!.getLong("start").takeIf { s -> s >= 0 }) }
         composable("downloads") { DownloadsScreen(nav) }
         composable("discover") { DiscoverScreen(nav) }
+        composable("livetv") { LiveTvScreen(nav) }
+        composable("live/{id}", listOf(navArgument("id") { type = NavType.LongType })) { LiveWatchScreen(nav, it.arguments!!.getLong("id")) }
         composable("approvals") { ApprovalsScreen() }
         composable("nowplaying") { NowPlayingScreen(onClose = { nav.popBackStack() }) }
     }

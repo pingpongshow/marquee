@@ -23,7 +23,7 @@
 
 package app.marquee.api.models
 
-import app.marquee.api.models.LiveTvSource
+import app.marquee.api.models.DeviceProfile
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -32,24 +32,18 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param seerrUrl 
- * @param seerrApiKey Write-only.
- * @param liveTvSources Replaces the whole list when sent.
+ * @param profile 
+ * @param maxBitrateKbps 
  */
 @Serializable
 
-data class IntegrationSettingsUpdate (
+data class PlayLiveChannelRequest (
 
-    @SerialName(value = "seerrUrl")
-    val seerrUrl: kotlin.String? = null,
+    @SerialName(value = "profile")
+    val profile: DeviceProfile,
 
-    /* Write-only. */
-    @SerialName(value = "seerrApiKey")
-    val seerrApiKey: kotlin.String? = null,
-
-    /* Replaces the whole list when sent. */
-    @SerialName(value = "liveTvSources")
-    val liveTvSources: kotlin.collections.List<LiveTvSource>? = null
+    @SerialName(value = "maxBitrateKbps")
+    val maxBitrateKbps: kotlin.Int? = null
 
 ) {
 

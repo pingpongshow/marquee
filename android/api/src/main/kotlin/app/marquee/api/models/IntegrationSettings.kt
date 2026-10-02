@@ -23,6 +23,7 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.LiveTvSource
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -33,6 +34,7 @@ import kotlinx.serialization.Contextual
  *
  * @param seerrUrl Seerr's address, e.g. http://10.1.1.10:5055. Empty turns requests off.
  * @param seerrApiKeySet 
+ * @param liveTvSources 
  */
 @Serializable
 
@@ -43,7 +45,10 @@ data class IntegrationSettings (
     val seerrUrl: kotlin.String? = null,
 
     @SerialName(value = "seerrApiKeySet")
-    val seerrApiKeySet: kotlin.Boolean? = null
+    val seerrApiKeySet: kotlin.Boolean? = null,
+
+    @SerialName(value = "liveTvSources")
+    val liveTvSources: kotlin.collections.List<LiveTvSource>? = null
 
 ) {
 
