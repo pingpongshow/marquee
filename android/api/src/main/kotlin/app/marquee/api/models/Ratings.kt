@@ -41,8 +41,8 @@ import kotlinx.serialization.Contextual
 data class Ratings (
 
     /* 0–10 */
-    @Contextual @SerialName(value = "imdb")
-    val imdb: java.math.BigDecimal? = null,
+    @SerialName(value = "imdb")
+    val imdb: kotlin.Double? = null,
 
     @SerialName(value = "imdbVotes")
     val imdbVotes: kotlin.Int? = null,

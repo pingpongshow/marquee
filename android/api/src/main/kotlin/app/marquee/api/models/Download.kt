@@ -60,8 +60,8 @@ data class Download (
     val status: Download.Status,
 
     /* Conversion progress, 0–1. */
-    @Contextual @SerialName(value = "progress")
-    val progress: java.math.BigDecimal,
+    @SerialName(value = "progress")
+    val progress: kotlin.Double,
 
     /* Bytes, once ready. */
     @SerialName(value = "size")

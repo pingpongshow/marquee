@@ -116,16 +116,16 @@ data class PlaybackSession (
     val fontsUrl: kotlin.String? = null,
 
     /* Music: gain to apply for volume levelling (ReplayGain track gain). */
-    @Contextual @SerialName(value = "trackGainDb")
-    val trackGainDb: java.math.BigDecimal? = null,
+    @SerialName(value = "trackGainDb")
+    val trackGainDb: kotlin.Double? = null,
 
     /* Music: album gain, for playing whole albums. */
-    @Contextual @SerialName(value = "albumGainDb")
-    val albumGainDb: java.math.BigDecimal? = null,
+    @SerialName(value = "albumGainDb")
+    val albumGainDb: kotlin.Double? = null,
 
     /* Music: peak sample level (1.0 = full scale), to avoid clipping when boosting. */
-    @Contextual @SerialName(value = "peak")
-    val peak: java.math.BigDecimal? = null
+    @SerialName(value = "peak")
+    val peak: kotlin.Double? = null
 
 ) {
 
