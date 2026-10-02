@@ -395,7 +395,7 @@ struct MoodsAndStyles: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: tileSpacing) {
                     ForEach(names, id: \.self) { n in
-                        NavigationLink { MoodStyleView(libraryID: libraryID, kind: kind, name: n) } label: {
+                        NavigationLink(value: Route.moodStyle(library: libraryID, mood: kind == .mood, name: n)) {
                             Text(n).font(.subheadline.weight(.semibold)).foregroundStyle(.white)
                                 .frame(width: tileWidth, height: tileWidth * 0.55, alignment: .bottomLeading)
                                 .padding(10)

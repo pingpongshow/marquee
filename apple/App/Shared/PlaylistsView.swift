@@ -83,6 +83,9 @@ struct PlaylistView: View {
                         HStack {
                             Button { play(0) } label: { Label("Play", systemImage: "play.fill") }.buttonStyle(.borderedProminent)
                             Button { play(0, shuffle: true) } label: { Label("Shuffle", systemImage: "shuffle") }.buttonStyle(.bordered)
+                            #if os(iOS)
+                            PlaylistDownloadButton(id: id)
+                            #endif
                         }
                     }
                 }
@@ -127,3 +130,27 @@ struct PlaylistView: View {
         }
     }
 }
+
+#if os(iOS)
+/// Keep a playlist on the device, in sync with its changes (MUSIC-19).
+struct PlaylistDownloadButton: View {
+    @Environment(Downloads.self) private var downloads
+    let id: Int64
+
+    var body: some View {
+        if downloads.isSynced(id) {
+            let c = downloads.syncedCount(id)
+            Menu {
+                Text(c.done == c.total ? "All \(c.total) on this device; changes download automatically." : "\(c.done) of \(c.total) downloaded")
+                Button("Remove Download", systemImage: "trash", role: .destructive) { downloads.unsyncPlaylist(id) }
+            } label: {
+                Label(c.done == c.total ? "Downloaded" : "\(c.done)/\(c.total)", systemImage: c.done == c.total ? "arrow.down.circle.fill" : "arrow.down.circle.dotted")
+            }
+            .buttonStyle(.bordered)
+        } else {
+            Button { Task { await downloads.syncPlaylist(id) } } label: { Label("Download", systemImage: "arrow.down.circle") }
+                .buttonStyle(.bordered)
+        }
+    }
+}
+#endif

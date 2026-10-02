@@ -325,6 +325,34 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(app.buttons["miniPlayer"].waitForExistence(timeout: 15))
     }
 
+    /// Playlist downloads (MUSIC-19): keep the profile's "Road Trip" playlist on the device.
+    func testPlaylistDownload() {
+        connectAndSignIn()
+        app.buttons["Libraries"].firstMatch.tap()
+        let back = app.navigationBars.buttons["Libraries"]
+        if back.waitForExistence(timeout: 2) { back.tap() }
+        app.buttons["Playlists"].firstMatch.tap()
+        let trip = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Road Trip'")).firstMatch
+        XCTAssertTrue(trip.waitForExistence(timeout: 10))
+        trip.tap()
+        sleep(2)
+        shot("pd0-playlist")
+        let download = app.buttons["Download"]
+        if !download.waitForExistence(timeout: 5) {
+            // Left over from an earlier run.
+            app.buttons["Downloaded"].tap()
+            app.buttons["Remove Download"].tap()
+        }
+        XCTAssertTrue(download.waitForExistence(timeout: 5))
+        download.tap()
+        XCTAssertTrue(app.buttons["Downloaded"].waitForExistence(timeout: 60), "all of the playlist downloads")
+        shot("pd1-playlist-downloaded")
+        app.buttons["Downloaded"].tap()
+        shot("pd2-menu")
+        app.buttons["Remove Download"].tap()
+        XCTAssertTrue(download.waitForExistence(timeout: 5))
+    }
+
     func testStatsAndAdventure() {
         connectAndSignIn()
         app.buttons["Settings"].firstMatch.tap()
