@@ -4,6 +4,9 @@ import SwiftUI
 
 /// Full-screen video playback.
 struct PlayerView: View {
+    #if os(iOS)
+    @Environment(Downloads.self) private var downloads
+    #endif
     @Environment(AppSession.self) private var app
     @Environment(VideoPresenter.self) private var presenter
     @Environment(\.dismiss) private var dismiss
@@ -26,6 +29,13 @@ struct PlayerView: View {
             let p = VideoPlayback(app: app, playlistID: request.playlistID)
             playback = p
             let tracks = PendingTracks.shared.take(request.itemID)
+            #if os(iOS)
+            // Downloaded: play from the device (works offline, saves bandwidth).
+            if let file = downloads.localURL(request.itemID) {
+                await p.startLocal(itemID: request.itemID, file: file, downloads: downloads)
+                return
+            }
+            #endif
             await p.start(itemID: request.itemID, startMs: request.startMs, audio: tracks.audio, subtitle: tracks.subtitle, fileID: tracks.file)
         }
         .onDisappear { Task { await playback?.stop() } }
