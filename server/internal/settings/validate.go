@@ -29,6 +29,9 @@ func (s Settings) Validate() error {
 			return invalid("each Live TV source needs a name and an http(s) address")
 		}
 	}
+	if s.Integrations.DVRPaddingBefore < 0 || s.Integrations.DVRPaddingBefore > 60 || s.Integrations.DVRPaddingAfter < 0 || s.Integrations.DVRPaddingAfter > 120 {
+		return invalid("recording padding must be 0–60 minutes before and 0–120 after")
+	}
 	switch s.Security.PinSignIn {
 	case "off", "local", "everywhere":
 	default:

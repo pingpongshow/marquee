@@ -428,6 +428,31 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /livetv/status`.
     /// - Remark: Generated from `#/paths//livetv/status/get(liveTvStatus)`.
     func liveTvStatus(_ input: Operations.LiveTvStatus.Input) async throws -> Operations.LiveTvStatus.Output
+    /// DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first).
+    ///
+    /// - Remark: HTTP `GET /livetv/recordings`.
+    /// - Remark: Generated from `#/paths//livetv/recordings/get(listRecordings)`.
+    func listRecordings(_ input: Operations.ListRecordings.Input) async throws -> Operations.ListRecordings.Output
+    /// Record a programme from the guide, or every airing of its title (a series).
+    ///
+    /// - Remark: HTTP `POST /livetv/recordings`.
+    /// - Remark: Generated from `#/paths//livetv/recordings/post(scheduleRecording)`.
+    func scheduleRecording(_ input: Operations.ScheduleRecording.Input) async throws -> Operations.ScheduleRecording.Output
+    /// Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/recordings/{recordingId}`.
+    /// - Remark: Generated from `#/paths//livetv/recordings/{recordingId}/delete(cancelRecording)`.
+    func cancelRecording(_ input: Operations.CancelRecording.Input) async throws -> Operations.CancelRecording.Output
+    /// Series being recorded.
+    ///
+    /// - Remark: HTTP `GET /livetv/recording-rules`.
+    /// - Remark: Generated from `#/paths//livetv/recording-rules/get(listRecordingRules)`.
+    func listRecordingRules(_ input: Operations.ListRecordingRules.Input) async throws -> Operations.ListRecordingRules.Output
+    /// Stop recording a series. Its upcoming airings are dropped; recordings already made stay.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/recording-rules/{ruleId}`.
+    /// - Remark: Generated from `#/paths//livetv/recording-rules/{ruleId}/delete(deleteRecordingRule)`.
+    func deleteRecordingRule(_ input: Operations.DeleteRecordingRule.Input) async throws -> Operations.DeleteRecordingRule.Output
     /// Channels in number order, with what's on now and next.
     ///
     /// - Remark: HTTP `GET /livetv/channels`.
@@ -1705,6 +1730,61 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//livetv/status/get(liveTvStatus)`.
     public func liveTvStatus(headers: Operations.LiveTvStatus.Input.Headers = .init()) async throws -> Operations.LiveTvStatus.Output {
         try await liveTvStatus(Operations.LiveTvStatus.Input(headers: headers))
+    }
+    /// DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first).
+    ///
+    /// - Remark: HTTP `GET /livetv/recordings`.
+    /// - Remark: Generated from `#/paths//livetv/recordings/get(listRecordings)`.
+    public func listRecordings(headers: Operations.ListRecordings.Input.Headers = .init()) async throws -> Operations.ListRecordings.Output {
+        try await listRecordings(Operations.ListRecordings.Input(headers: headers))
+    }
+    /// Record a programme from the guide, or every airing of its title (a series).
+    ///
+    /// - Remark: HTTP `POST /livetv/recordings`.
+    /// - Remark: Generated from `#/paths//livetv/recordings/post(scheduleRecording)`.
+    public func scheduleRecording(
+        headers: Operations.ScheduleRecording.Input.Headers = .init(),
+        body: Operations.ScheduleRecording.Input.Body
+    ) async throws -> Operations.ScheduleRecording.Output {
+        try await scheduleRecording(Operations.ScheduleRecording.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/recordings/{recordingId}`.
+    /// - Remark: Generated from `#/paths//livetv/recordings/{recordingId}/delete(cancelRecording)`.
+    public func cancelRecording(
+        path: Operations.CancelRecording.Input.Path,
+        query: Operations.CancelRecording.Input.Query = .init(),
+        headers: Operations.CancelRecording.Input.Headers = .init()
+    ) async throws -> Operations.CancelRecording.Output {
+        try await cancelRecording(Operations.CancelRecording.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Series being recorded.
+    ///
+    /// - Remark: HTTP `GET /livetv/recording-rules`.
+    /// - Remark: Generated from `#/paths//livetv/recording-rules/get(listRecordingRules)`.
+    public func listRecordingRules(headers: Operations.ListRecordingRules.Input.Headers = .init()) async throws -> Operations.ListRecordingRules.Output {
+        try await listRecordingRules(Operations.ListRecordingRules.Input(headers: headers))
+    }
+    /// Stop recording a series. Its upcoming airings are dropped; recordings already made stay.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/recording-rules/{ruleId}`.
+    /// - Remark: Generated from `#/paths//livetv/recording-rules/{ruleId}/delete(deleteRecordingRule)`.
+    public func deleteRecordingRule(
+        path: Operations.DeleteRecordingRule.Input.Path,
+        headers: Operations.DeleteRecordingRule.Input.Headers = .init()
+    ) async throws -> Operations.DeleteRecordingRule.Output {
+        try await deleteRecordingRule(Operations.DeleteRecordingRule.Input(
+            path: path,
+            headers: headers
+        ))
     }
     /// Channels in number order, with what's on now and next.
     ///

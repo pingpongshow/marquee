@@ -36,6 +36,7 @@ import kotlinx.serialization.Contextual
  * @param allowRemote May stream from outside the home network. Default true.
  * @param remoteQualityKbps Cap for remote streams. 0 = server default.
  * @param canRequest May request titles through Seerr (REQ-1). Default false; admins always may.
+ * @param canRecord May schedule Live TV recordings (LIVE-5). Default false; admins always may.
  * @param seerrUserId The Seerr user requests are made as. Null = Seerr's API key owner.
  */
 @Serializable
@@ -61,6 +62,10 @@ data class UserRestrictions (
     /* May request titles through Seerr (REQ-1). Default false; admins always may. */
     @SerialName(value = "canRequest")
     val canRequest: kotlin.Boolean? = null,
+
+    /* May schedule Live TV recordings (LIVE-5). Default false; admins always may. */
+    @SerialName(value = "canRecord")
+    val canRecord: kotlin.Boolean? = null,
 
     /* The Seerr user requests are made as. Null = Seerr's API key owner. */
     @SerialName(value = "seerrUserId")

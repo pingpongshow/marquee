@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { api, unwrap } from "@/api/client";
+import { liveStatusQuery } from "../livetv/api";
 import { requestsStatusQuery } from "../requests/api";
 import {
   librariesQuery,
@@ -105,6 +106,26 @@ function RequestPermission({
   );
 }
 
+/** May this person schedule Live TV recordings (LIVE-5). */
+function RecordPermission({
+  value,
+  onChange,
+}: {
+  value: UserRestrictions;
+  onChange: (r: UserRestrictions) => void;
+}) {
+  const status = useQuery(liveStatusQuery);
+  if (!status.data?.enabled || !status.data.dvrAvailable) return null;
+  return (
+    <Toggle
+      label="Can record Live TV"
+      help="Schedule recordings and series, and cancel upcoming ones."
+      checked={!!value.canRecord}
+      onChange={(v) => onChange({ ...value, canRecord: v })}
+    />
+  );
+}
+
 /** Restrictions editor shared by the add and edit dialogs. */
 function RestrictionsEditor({
   value,
@@ -181,6 +202,7 @@ function RestrictionsEditor({
         )}
       </Field>
       <RequestPermission value={value} onChange={onChange} />
+      <RecordPermission value={value} onChange={onChange} />
       <Toggle
         label="Allow streaming away from home"
         help="Over Tailscale. Turn off to limit this person to the home network."

@@ -40,6 +40,8 @@ import kotlinx.serialization.Contextual
  * @param category 
  * @param episode As the guide gives it, e.g. S2 E5.
  * @param imageUrl 
+ * @param recording The DVR will record or is recording it.
+ * @param series A series recording covers this title.
  */
 @Serializable
 
@@ -72,10 +74,28 @@ data class LiveProgramme (
     val episode: kotlin.String? = null,
 
     @SerialName(value = "imageUrl")
-    val imageUrl: kotlin.String? = null
+    val imageUrl: kotlin.String? = null,
+
+    /* The DVR will record or is recording it. */
+    @SerialName(value = "recording")
+    val recording: LiveProgramme.Recording? = null,
+
+    /* A series recording covers this title. */
+    @SerialName(value = "series")
+    val series: kotlin.Boolean? = null
 
 ) {
 
+    /**
+     * The DVR will record or is recording it.
+     *
+     * Values: SCHEDULED,RECORDING
+     */
+    @Serializable
+    enum class Recording(val value: kotlin.String) {
+        @SerialName(value = "scheduled") SCHEDULED("scheduled"),
+        @SerialName(value = "recording") RECORDING("recording");
+    }
 
 }
 

@@ -39,6 +39,9 @@ type Integrations struct {
 	SeerrAPIKey string `json:"seerrApiKey"`
 	// LiveTVSources feed Live TV (LIVE-1).
 	LiveTVSources []LiveTVSource `json:"liveTvSources"`
+	// DVR padding in minutes (LIVE-5).
+	DVRPaddingBefore int `json:"dvrPaddingBefore"`
+	DVRPaddingAfter  int `json:"dvrPaddingAfter"`
 }
 
 // LiveTVSource is an M3U playlist with its XMLTV guide, or a Dispatcharr server.
@@ -179,9 +182,10 @@ func Defaults() Settings {
 			Trickplay:               true,
 			DetectIntros:            true,
 		},
-		Metadata: Metadata{AnimeEpisodeOrdering: "seasonal", OMDbDailyLimit: 950},
-		Tasks:    Tasks{MaintenanceWindowStart: "03:00", MaintenanceWindowHours: 4, BackupRetention: 7},
-		Music:    Music{SonicAnalysis: true, OnlineLyrics: false, LoudnessAnalysis: true},
+		Metadata:     Metadata{AnimeEpisodeOrdering: "seasonal", OMDbDailyLimit: 950},
+		Tasks:        Tasks{MaintenanceWindowStart: "03:00", MaintenanceWindowHours: 4, BackupRetention: 7},
+		Music:        Music{SonicAnalysis: true, OnlineLyrics: false, LoudnessAnalysis: true},
+		Integrations: Integrations{DVRPaddingBefore: 1, DVRPaddingAfter: 3},
 	}
 }
 

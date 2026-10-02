@@ -59,7 +59,7 @@ func (m *Manager) OfflineJob(ctx context.Context, r Request, quality, out string
 	job := Job{Input: s.Path, Decision: d, VideoIndex: v.Index, AudioIndex: -1, SubIndex: -1, SubRelIndex: -1, VideoCodec: v.Codec,
 		Preset: cfg.Transcoder.Preset, QSVDevice: m.Encoders.QSVDevice, OutputFile: out}
 	if a := s.Media.Audio; a != nil {
-		job.AudioIndex = a.Index
+		job.AudioIndex, job.AudioCodec = a.Index, a.Codec
 	}
 	if sub := s.Media.Subtitle; sub != nil && sub.IsImage() {
 		job.Decision.BurnSubtitle = true

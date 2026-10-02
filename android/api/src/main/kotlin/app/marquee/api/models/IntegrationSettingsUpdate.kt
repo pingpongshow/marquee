@@ -34,6 +34,8 @@ import kotlinx.serialization.Contextual
  *
  * @param seerrUrl 
  * @param seerrApiKey Write-only.
+ * @param dvrPaddingBefore 
+ * @param dvrPaddingAfter 
  * @param liveTvSources Replaces the whole list when sent.
  */
 @Serializable
@@ -46,6 +48,12 @@ data class IntegrationSettingsUpdate (
     /* Write-only. */
     @SerialName(value = "seerrApiKey")
     val seerrApiKey: kotlin.String? = null,
+
+    @SerialName(value = "dvrPaddingBefore")
+    val dvrPaddingBefore: kotlin.Int? = null,
+
+    @SerialName(value = "dvrPaddingAfter")
+    val dvrPaddingAfter: kotlin.Int? = null,
 
     /* Replaces the whole list when sent. */
     @SerialName(value = "liveTvSources")

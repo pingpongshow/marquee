@@ -203,7 +203,7 @@ func (s *Service) refreshSource(ctx context.Context, src settings.LiveTVSource) 
 	var insErr error
 	guideChans, err := ParseXMLTV(body, from, until, func(p Programme) {
 		for _, id := range byEPG[p.Channel] {
-			if _, e := ins.ExecContext(ctx, id, p.Start.Format(time.RFC3339), p.Stop.Format(time.RFC3339), p.Title, p.Subtitle, p.Description, p.Category, p.Episode, p.Image); e != nil && insErr == nil {
+			if _, e := ins.ExecContext(ctx, id, p.Start.UTC().Format(time.RFC3339), p.Stop.UTC().Format(time.RFC3339), p.Title, p.Subtitle, p.Description, p.Category, p.Episode, p.Image); e != nil && insErr == nil {
 				insErr = e
 			}
 			programmes++
@@ -263,6 +263,10 @@ type Prog struct {
 	ID                                                     int64
 	Start, Stop                                            time.Time
 	Title, Subtitle, Description, Category, Episode, Image string
+	// Recording is "scheduled" or "recording" when the DVR has it (LIVE-5); Series when a
+	// series rule covers it.
+	Recording string
+	Series    bool
 }
 
 // Filter narrows channel lists.
@@ -304,13 +308,19 @@ func scanProg(rows *sql.Rows) (int64, Prog, error) {
 	var ch int64
 	var p Prog
 	var start, stop string
-	err := rows.Scan(&ch, &p.ID, &start, &stop, &p.Title, &p.Subtitle, &p.Description, &p.Category, &p.Episode, &p.Image)
+	var rec sql.NullString
+	err := rows.Scan(&ch, &p.ID, &start, &stop, &p.Title, &p.Subtitle, &p.Description, &p.Category, &p.Episode, &p.Image, &rec, &p.Series)
+	p.Recording = rec.String
 	p.Start, _ = time.Parse(time.RFC3339, start)
 	p.Stop, _ = time.Parse(time.RFC3339, stop)
 	return ch, p, err
 }
 
-const progCols = `channel_id, id, start, stop, title, subtitle, description, category, episode, image_url`
+const progCols = `channel_id, id, start, stop, title, subtitle, description, category, episode, image_url,
+	(SELECT r.status FROM dvr_recordings r WHERE r.channel_id = live_programmes.channel_id AND r.start = live_programmes.start
+		AND r.status IN ('scheduled', 'recording')),
+	EXISTS (SELECT 1 FROM dvr_rules d WHERE lower(d.title) = lower(live_programmes.title)
+		AND (d.channel_id IS NULL OR d.channel_id = live_programmes.channel_id))`
 
 // Channels lists channels with what's on now and next.
 func (s *Service) Channels(ctx context.Context, userID int64, f Filter) ([]Channel, error) {

@@ -315,7 +315,7 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 			job.VideoIndex, job.VideoCodec = v.Index, v.Codec
 		}
 		if a := s.Media.Audio; a != nil {
-			job.AudioIndex = a.Index
+			job.AudioIndex, job.AudioCodec = a.Index, a.Codec
 		}
 		if sub := s.Media.Subtitle; sub != nil && s.Decision.BurnSubtitle {
 			job.SubIndex, job.SubExternal, job.SubImage = sub.Index, sub.External, sub.IsImage()

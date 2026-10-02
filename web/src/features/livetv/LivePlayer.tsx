@@ -45,7 +45,10 @@ export function LivePlayer({
           hls.loadSource(s.url);
           hls.attachMedia(v);
           // Start once the playlist is in (browsers allow muted autoplay).
-          hls.on(Hls.Events.MANIFEST_PARSED, () => void v.play().catch(() => {}));
+          hls.on(
+            Hls.Events.MANIFEST_PARSED,
+            () => void v.play().catch(() => {}),
+          );
           hls.on(Hls.Events.ERROR, (_, d) => {
             if (d.fatal) onError?.("The stream stopped.");
           });
