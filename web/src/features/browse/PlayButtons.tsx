@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Check, Play, RotateCcw, Shuffle } from "lucide-react";
+import { Bookmark, BookmarkCheck, Check, Play, RotateCcw, Shuffle } from "lucide-react";
 import { useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { fetchLeaves } from "@/api/queries";
@@ -18,6 +18,16 @@ export function PlayButtons({ item }: { item: ItemDetail }) {
   const toggleWatched = useMutation({
     mutationFn: () =>
       watched ? unwrap(api.DELETE("/items/{itemId}/watched", { params: { path: { itemId: item.id } } })) : unwrap(api.POST("/items/{itemId}/watched", { params: { path: { itemId: item.id } } })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["items"] }),
+  });
+  const [listed, setListed] = useState(!!item.watchlisted);
+  const toggleWatchlist = useMutation({
+    mutationFn: (on: boolean) =>
+      on
+        ? unwrap(api.PUT("/items/{itemId}/watchlist", { params: { path: { itemId: item.id } } }))
+        : unwrap(api.DELETE("/items/{itemId}/watchlist", { params: { path: { itemId: item.id } } })),
+    onMutate: (on) => setListed(on),
+    onError: (_e, on) => setListed(!on),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["items"] }),
   });
   const playVideo = (id: number, t?: number) => navigate({ to: "/play/$itemId", params: { itemId: String(id) }, search: { t } });
@@ -73,6 +83,11 @@ export function PlayButtons({ item }: { item: ItemDetail }) {
       {item.type === "track" && (
         <Button variant="primary" onClick={() => music.play([item])}>
           <Play className="size-4 fill-current" /> Play
+        </Button>
+      )}
+      {(item.type === "movie" || item.type === "show" || item.type === "episode" || item.type === "video") && (
+        <Button variant="ghost" onClick={() => toggleWatchlist.mutate(!listed)} aria-pressed={listed}>
+          {listed ? <BookmarkCheck className="size-4 text-accent" /> : <Bookmark className="size-4" />} {listed ? "On watchlist" : "Watchlist"}
         </Button>
       )}
       {(playable || item.type === "show" || item.type === "season") && (

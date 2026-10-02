@@ -34,6 +34,7 @@ type Summary struct {
 	LastViewedAt  string
 	WatchedLeaves int
 	UserRating    float64 // 0 = not rated
+	Watchlisted   bool
 }
 
 type Detail struct {
@@ -138,7 +139,8 @@ func cols(uid int64) string {
 	CASE WHEN i.type IN ('show', 'season', 'artist', 'album') THEN (SELECT COUNT(*) FROM items l
 		JOIN user_item_state x ON x.item_id = l.id AND x.user_id = ` + u + ` AND x.play_count > 0
 		WHERE (l.parent_id = i.id OR l.grandparent_id = i.id) AND l.type IN ('episode', 'track')) ELSE 0 END,
-	COALESCE((SELECT rating FROM user_item_state WHERE user_id = ` + u + ` AND item_id = i.id), 0)`
+	COALESCE((SELECT rating FROM user_item_state WHERE user_id = ` + u + ` AND item_id = i.id), 0),
+	COALESCE((SELECT watchlisted_at IS NOT NULL FROM user_item_state WHERE user_id = ` + u + ` AND item_id = i.id), 0)`
 }
 
 // art builds a COALESCE over the selected artwork of kind for each aliased item, so
@@ -162,7 +164,7 @@ func scanSummary(row interface{ Scan(...any) error }, extra ...any) (Summary, er
 	err := row.Scan(append([]any{&s.ID, &s.LibraryID, &s.Type, &s.Title, &s.OriginalTitle, &s.Year, &s.Index, &s.AbsIndex, &s.Disc,
 		&s.ParentID, &s.GrandparentID, &s.ParentTitle, &s.GrandparentTitle, &s.ArtistCredit, &s.ChildCount, &s.LeafCount,
 		&s.DurationMS, &s.ReleaseDate, &s.Available, &s.MatchState, &added, &s.Poster, &s.Backdrop, &s.Thumb, &s.Logo,
-		&s.ViewOffsetMS, &s.ViewCount, &s.LastViewedAt, &s.WatchedLeaves, &s.UserRating}, extra...)...)
+		&s.ViewOffsetMS, &s.ViewCount, &s.LastViewedAt, &s.WatchedLeaves, &s.UserRating, &s.Watchlisted}, extra...)...)
 	s.AddedAt, _ = time.Parse(time.RFC3339Nano, added)
 	return s, err
 }
@@ -179,6 +181,10 @@ func (s *Store) List(ctx context.Context, acc Access, libID int64, typ, sort str
 	fc, fargs := f.clause(acc.UserID)
 	args := append(append([]any{libID, typ}, aargs...), fargs...)
 	where := ` WHERE i.library_id = ? AND i.type = ? AND i.extra_type IS NULL AND ` + ac + ` AND ` + fc
+	if typ == "collection" {
+		// TMDB collections of which the library has a single film aren't worth showing.
+		where += ` AND (i.child_count >= 2 OR NOT EXISTS (SELECT 1 FROM external_ids x WHERE x.item_id = i.id AND x.provider = 'tmdb_collection'))`
+	}
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*)`+summaryFrom+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
@@ -196,12 +202,21 @@ func (s *Store) Children(ctx context.Context, acc Access, parentID int64, offset
 	var total int
 	ac, aargs := acc.clause()
 	args := append([]any{parentID}, aargs...)
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*)`+summaryFrom+` WHERE i.parent_id = ? AND i.extra_type IS NULL AND `+ac, args...).Scan(&total); err != nil {
+	// A collection's children are its members, oldest first; everything else uses parent_id.
+	where := `i.parent_id = ?`
+	order := `CASE WHEN i.type = 'album' THEN COALESCE(i.year, 9999) END DESC, COALESCE(i.disc, 0), COALESCE(i.idx, 0), i.sort_title COLLATE NOCASE`
+	var typ string
+	s.db.QueryRowContext(ctx, `SELECT type FROM items WHERE id = ?`, parentID).Scan(&typ)
+	if typ == "collection" {
+		where = `i.id IN (SELECT item_id FROM collection_items WHERE collection_id = ?)`
+		order = `COALESCE(i.year, 9999), i.sort_title COLLATE NOCASE`
+	}
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*)`+summaryFrom+` WHERE `+where+` AND i.extra_type IS NULL AND `+ac, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT `+cols(acc.UserID)+summaryFrom+`
-		WHERE i.parent_id = ? AND i.extra_type IS NULL AND `+ac+`
-		ORDER BY CASE WHEN i.type = 'album' THEN COALESCE(i.year, 9999) END DESC, COALESCE(i.disc, 0), COALESCE(i.idx, 0), i.sort_title COLLATE NOCASE
+		WHERE `+where+` AND i.extra_type IS NULL AND `+ac+`
+		ORDER BY `+order+`
 		LIMIT ? OFFSET ?`, append(args, limit, offset)...)
 	if err != nil {
 		return nil, 0, err

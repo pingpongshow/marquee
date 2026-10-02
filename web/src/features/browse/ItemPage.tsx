@@ -149,7 +149,7 @@ function Children({ item }: { item: ItemDetail }) {
   const children = useQuery({ ...itemChildrenQuery(item.id), enabled: item.childCount > 0 });
   if (!children.data?.items.length) return null;
   const list = children.data.items;
-  const heading = { show: "Seasons", season: "Episodes", artist: "Albums", album: "Tracks" }[item.type as string] ?? "Contents";
+  const heading = { show: "Seasons", season: "Episodes", artist: "Albums", album: "Tracks", collection: "In this collection" }[item.type as string] ?? "Contents";
 
   // Episodes and tracks are rows; seasons and albums are poster cards.
   const rows = item.type === "season" || item.type === "album";
@@ -196,6 +196,37 @@ function Children({ item }: { item: ItemDetail }) {
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+/** Other titles in the item's collections (film series). */
+function CollectionShelves({ item }: { item: ItemDetail }) {
+  return (item.collections ?? []).map((c) => <CollectionShelf key={c.id} collection={c} current={item.id} />);
+}
+
+function CollectionShelf({ collection, current }: { collection: ItemSummary; current: number }) {
+  const members = useQuery(itemChildrenQuery(collection.id));
+  const list = members.data?.items.filter((m) => m.id !== current) ?? [];
+  if (!list.length) return null;
+  return (
+    <section className="mt-10">
+      <h2 className="mb-4 text-lg font-semibold">
+        <Link to="/item/$itemId" params={{ itemId: String(collection.id) }} className="hover:underline">
+          {collection.title}
+        </Link>
+      </h2>
+      <ul className="flex gap-4 overflow-x-auto pb-2">
+        {list.map((r) => (
+          <li key={r.id} className="w-36 shrink-0">
+            <Link to="/item/$itemId" params={{ itemId: String(r.id) }} className="group block">
+              <Poster item={r} width={180} className="group-hover:ring-2 group-hover:ring-accent" />
+              <div className="mt-2 truncate text-sm font-medium">{r.title}</div>
+              <div className="truncate text-xs text-muted">{subtitleFor(r)}</div>
+            </Link>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -295,6 +326,7 @@ export function ItemPage() {
         </div>
       </div>
       <Children item={d} />
+      <CollectionShelves item={d} />
       <Cast credits={d.credits} />
       <Related item={d} />
       <MediaInfo item={d} isAdmin={!!me.data?.isAdmin} />

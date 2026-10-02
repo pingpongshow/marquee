@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Lock, Pencil, RefreshCw, Search, Unlock } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { Check, Lock, Pencil, RefreshCw, Search, Trash2, Unlock } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, unwrap } from "@/api/client";
 import type { components } from "@/api/schema.gen";
@@ -195,6 +196,11 @@ export function ItemActions({ item }: { item: ItemDetail }) {
   const [dialog, setDialog] = useState<"edit" | "match" | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const matchable = item.type === "movie" || item.type === "show";
+  const navigate = useNavigate();
+  const removeCollection = useMutation({
+    mutationFn: () => unwrap(api.DELETE("/collections/{collectionId}", { params: { path: { collectionId: item.id } } })),
+    onSuccess: () => navigate({ to: "/library/$libraryId", params: { libraryId: String(item.libraryId) }, search: { show: "collections" } }),
+  });
   const refresh = useMutation({
     mutationFn: () => unwrap(api.POST("/items/{itemId}/refresh", { params: { path: { itemId: item.id } } })),
     onSuccess: updated,
@@ -225,6 +231,14 @@ export function ItemActions({ item }: { item: ItemDetail }) {
             {matchable && item.matchState === "matched" && (
               <button className={itemCls} onClick={() => refresh.mutate()}>
                 <RefreshCw className="size-4" /> Refresh metadata
+              </button>
+            )}
+            {item.type === "collection" && (
+              <button
+                className={itemCls + " text-danger"}
+                onClick={() => window.confirm(`Delete the collection “${item.title}”? Its titles stay in the library.`) && removeCollection.mutate()}
+              >
+                <Trash2 className="size-4" /> Delete collection
               </button>
             )}
           </div>
