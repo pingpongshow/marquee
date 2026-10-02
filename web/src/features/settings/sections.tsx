@@ -1,4 +1,4 @@
-import { Activity, AudioLines, CalendarClock, Cpu, Database, Download, Globe, Library, MonitorSmartphone, Network, ScrollText, Server, Users } from "lucide-react";
+import { Activity, AudioLines, BarChart3, CalendarClock, Cpu, Database, Download, Globe, Library, MonitorSmartphone, Network, ScrollText, Server, Users } from "lucide-react";
 import type { ComponentType } from "react";
 import { DashboardSettings } from "./DashboardSettings";
 import { MusicSettings } from "./MusicSettings";
@@ -6,6 +6,7 @@ import { LibrariesSettings } from "./LibrariesSettings";
 import { LogsSettings } from "./LogsSettings";
 import { PlexImportSettings } from "./PlexImportSettings";
 import { GeneralSettings, MetadataSettings, NetworkSettings, RemoteAccessSettings } from "./ServerSections";
+import { StatsView } from "./StatsView";
 import { ScheduledTasksSettings } from "./TasksSettings";
 import { TranscoderSettings } from "./TranscoderSettings";
 import { DevicesSettings } from "../users/DevicesSettings";
@@ -50,10 +51,15 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] = 
     label: "Activity",
     sections: [
       { id: "dashboard", label: "Dashboard", icon: Activity, component: DashboardSettings, keywords: "now playing streams bandwidth graph history stop", description: "Now playing, bandwidth, transcodes and recent plays." },
+      { id: "statistics", label: "Statistics", icon: BarChart3, component: StatisticsSettings, keywords: "stats plays history most watched top movies shows artists users tautulli year in music", description: "What's been played, by whom, on which apps, and how it was delivered." },
       { id: "logs", label: "Logs", icon: ScrollText, component: LogsSettings, keywords: "errors troubleshooting debug", description: "What the server has been doing, for troubleshooting." },
     ],
   },
 ];
+
+function StatisticsSettings() {
+  return <StatsView admin />;
+}
 
 export function findSection(id: string) {
   for (const g of settingsGroups) {
