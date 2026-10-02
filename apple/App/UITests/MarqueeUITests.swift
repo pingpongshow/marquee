@@ -157,4 +157,44 @@ final class MarqueeUITests: XCTestCase {
         app.buttons["On Watchlist"].tap()
         XCTAssertTrue(app.buttons["Watchlist"].waitForExistence(timeout: 5))
     }
+
+    /// Offline downloads (M7): convert on the server, download, play from the device.
+    func testDownloadAndPlayOffline() {
+        connectAndSignIn()
+        openLibrary("Movies")
+        XCTAssertTrue(app.navigationBars["Movies"].waitForExistence(timeout: 10))
+        let movie = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '00 Preview Test'")).firstMatch
+        XCTAssertTrue(movie.waitForExistence(timeout: 10))
+        movie.tap()
+        // Left over from an earlier run: delete it first.
+        if app.buttons["Downloaded"].waitForExistence(timeout: 3) {
+            app.buttons["Downloaded"].tap()
+            app.buttons["Delete Download"].tap()
+        }
+        let download = app.buttons["Download"]
+        XCTAssertTrue(download.waitForExistence(timeout: 10))
+        download.tap()
+        app.buttons["Medium (720p)"].tap()
+        XCTAssertTrue(app.buttons["Downloaded"].waitForExistence(timeout: 120), "conversion and download finish")
+        shot("d1-downloaded")
+
+        // Libraries → Downloads → play it.
+        app.buttons["Libraries"].firstMatch.tap()
+        let back = app.navigationBars.buttons["Libraries"]
+        if back.waitForExistence(timeout: 2) { back.tap() }
+        app.staticTexts["Downloads"].firstMatch.tap()
+        let entry = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '00 Preview Test'")).firstMatch
+        XCTAssertTrue(entry.waitForExistence(timeout: 10))
+        shot("d2-downloads")
+        entry.tap()
+        XCTAssertTrue(app.buttons["Close player"].waitForExistence(timeout: 10))
+        sleep(4)
+        shot("d3-playing-offline")
+        app.buttons["Close player"].tap()
+
+        // Clean up so the test can run again.
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        entry.press(forDuration: 1.2)
+        app.buttons["Delete Download"].tap()
+    }
 }

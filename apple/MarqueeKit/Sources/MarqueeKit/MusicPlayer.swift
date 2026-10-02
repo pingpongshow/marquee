@@ -57,6 +57,8 @@ public final class MusicPlayer {
     public var current: PlayQueue.Entry? { queue.current }
 
     private let app: AppSession
+    /// Downloaded tracks play from the device, with or without the server (MUSIC-14).
+    @ObservationIgnored public var downloads: Downloads?
     @ObservationIgnored private let player = AVQueuePlayer()
     /// Server session (and loudness) per player item.
     private struct Loaded {
@@ -198,6 +200,11 @@ public final class MusicPlayer {
     // MARK: - Player items
 
     private func makeItem(_ entry: PlayQueue.Entry, preload: Bool) async -> AVPlayerItem? {
+        if let local = downloads?.localURL(entry.item.id) {
+            let item = AVPlayerItem(url: local)
+            sessions[ObjectIdentifier(item)] = Loaded(entry: entry.id, session: "", trackGain: nil, albumGain: nil, peak: nil)
+            return item
+        }
         guard let client = app.client else { return nil }
         guard let s = try? await client.startPlayback(body: .json(.init(itemId: entry.item.id, startMs: 0, preload: preload,
                                                                          profile: AppleDeviceProfile.current()))).ok.body.json,
@@ -209,7 +216,7 @@ public final class MusicPlayer {
     }
 
     private func endSession(for item: AVPlayerItem) {
-        guard let s = sessions.removeValue(forKey: ObjectIdentifier(item)) else { return }
+        guard let s = sessions.removeValue(forKey: ObjectIdentifier(item)), !s.session.isEmpty else { return }
         let pos = item === player.currentItem ? Int64(max(0, player.currentTime().seconds) * 1000) : 0
         let client = app.client
         Task {
@@ -264,7 +271,13 @@ public final class MusicPlayer {
             player.pause()
             sleep = nil
         }
-        if let previous, let s = sessions.removeValue(forKey: previous) {
+        if let previous, let s = sessions[previous], s.session.isEmpty {
+            // A downloaded track: count the play (if most of it played) for the next sync.
+            sessions.removeValue(forKey: previous)
+            if let e = queue.entries.first(where: { $0.id == s.entry }), duration > 0, time >= duration * 0.5 {
+                downloads?.recordProgress(itemID: e.item.id, positionMs: Int64(time * 1000), watched: true)
+            }
+        } else if let previous, let s = sessions.removeValue(forKey: previous) {
             let client = app.client
             let durMs = Int64(duration * 1000)
             Task {
@@ -346,7 +359,7 @@ public final class MusicPlayer {
     }
 
     private func report(_ state: String) {
-        guard let item = player.currentItem, let s = sessions[ObjectIdentifier(item)], let client = app.client else { return }
+        guard let item = player.currentItem, let s = sessions[ObjectIdentifier(item)], !s.session.isEmpty, let client = app.client else { return }
         lastReport = Date()
         let pos = Int64(max(0, player.currentTime().seconds) * 1000)
         let st: Schemas.PlaybackProgress.StatePayload = state == "playing" ? .playing : .paused

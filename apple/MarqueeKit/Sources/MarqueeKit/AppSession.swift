@@ -326,5 +326,13 @@ public final class AppSession {
         return c.url
     }
 
+    /// A server URL that authenticates with the token parameter (downloads, which run in
+    /// the background where the API middleware doesn't apply).
+    public func authorizedURL(_ path: String) -> URL? {
+        guard let u = absolute(path), var c = URLComponents(url: u, resolvingAgainstBaseURL: false) else { return nil }
+        c.queryItems = (c.queryItems ?? []) + [.init(name: "token", value: token)]
+        return c.url
+    }
+
     public var isRemote: Bool { info?.networkClass == .remote }
 }

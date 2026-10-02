@@ -25,6 +25,12 @@ struct MainView: View {
                 }
             }
             Tab("Playlists", systemImage: "music.note.list") { stack { PlaylistsView() } }
+            #if os(iOS)
+            if !compact {
+                // iPhone lists Downloads under Libraries (a sixth tab would spill into "More").
+                Tab("Downloads", systemImage: "arrow.down.circle") { stack { DownloadsView() } }
+            }
+            #endif
             #if os(tvOS)
             if music.current != nil {
                 Tab("Now Playing", systemImage: "waveform") { NowPlayingView() }
@@ -103,17 +109,26 @@ struct LibrariesList: View {
     let libraries: [Library]
     let icon: (Schemas.LibraryType) -> String
     var body: some View {
-        List(libraries, id: \.id) { lib in
-            NavigationLink(value: Route.library(lib.id)) {
-                Label {
-                    VStack(alignment: .leading) {
-                        Text(lib.name)
-                        Text("\(lib.itemCount) items").font(.caption).foregroundStyle(.secondary)
+        List {
+            ForEach(libraries, id: \.id) { lib in
+                NavigationLink(value: Route.library(lib.id)) {
+                    Label {
+                        VStack(alignment: .leading) {
+                            Text(lib.name)
+                            Text("\(lib.itemCount) items").font(.caption).foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: icon(lib._type)).foregroundStyle(Color.marqueeGold)
                     }
-                } icon: {
-                    Image(systemName: icon(lib._type)).foregroundStyle(Color.marqueeGold)
                 }
             }
+            #if os(iOS)
+            Section {
+                NavigationLink { DownloadsView() } label: {
+                    Label("Downloads", systemImage: "arrow.down.circle").foregroundStyle(.primary)
+                }
+            }
+            #endif
         }
         .navigationTitle("Libraries")
     }
