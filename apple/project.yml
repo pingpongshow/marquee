@@ -27,6 +27,9 @@ targets:
       - App/iOS
     dependencies:
       - package: MarqueeKit
+      # Chromecast (D82): Google's Cast SDK, fetched by scripts/fetch-cast-sdk.sh.
+      - framework: Vendor/GoogleCast.xcframework
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.marquee.Marquee
@@ -42,8 +45,8 @@ targets:
         UIBackgroundModes: [audio]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
-        NSLocalNetworkUsageDescription: Marquee looks for your Marquee server on your home network.
-        NSBonjourServices: [_marquee._tcp]
+        NSLocalNetworkUsageDescription: Marquee looks for your Marquee server, and TVs and speakers to cast to, on your home network.
+        NSBonjourServices: [_marquee._tcp, _googlecast._tcp, _CC1AD845._googlecast._tcp]
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true   # self-hosted server over plain HTTP on the LAN and Tailscale (WireGuard-encrypted)
         UIApplicationSceneManifest:

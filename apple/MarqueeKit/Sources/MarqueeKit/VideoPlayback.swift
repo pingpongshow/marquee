@@ -154,6 +154,15 @@ public final class VideoPlayback {
         timeObserver = nil
     }
 
+    /// Hands playback to another device (Chromecast): ends this stream but stays ready for
+    /// `start` to carry on here later.
+    public func handOff() async {
+        report(.paused, force: true)
+        player.pause()
+        player.replaceCurrentItem(with: nil)
+        await stopSession()
+    }
+
     public func skipMarker() {
         guard let m = activeMarker else { return }
         player.seek(to: CMTime(seconds: Double(m.endMs) / 1000 + 0.5, preferredTimescale: 600))

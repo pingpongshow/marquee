@@ -44,6 +44,7 @@ import kotlinx.serialization.Contextual
  * @param networkClass 
  * @param markers 
  * @param fileId 
+ * @param contentType The media type url is served with (e.g. video/mp4, audio/flac, application/vnd.apple.mpegurl), for players such as Chromecast that need it.
  * @param limitKbps Bitrate ceiling applied; absent = none.
  * @param limitReason 
  * @param audioStreamId 
@@ -90,6 +91,10 @@ data class PlaybackSession (
 
     @SerialName(value = "fileId")
     val fileId: kotlin.Long? = null,
+
+    /* The media type url is served with (e.g. video/mp4, audio/flac, application/vnd.apple.mpegurl), for players such as Chromecast that need it. */
+    @SerialName(value = "contentType")
+    val contentType: kotlin.String? = null,
 
     /* Bitrate ceiling applied; absent = none. */
     @SerialName(value = "limitKbps")

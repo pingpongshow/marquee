@@ -40,6 +40,7 @@ struct MarqueeApp: App {
         Shared.app = session
         Shared.music = player
         Shared.downloads = dl
+        CastController.setUp(app: session, music: player) // Chromecast (D82)
         #endif
     }
 
