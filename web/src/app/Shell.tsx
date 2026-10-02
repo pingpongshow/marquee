@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { liveStatusQuery } from "@/features/livetv/api";
 import { requestsStatusQuery } from "@/features/requests/api";
 import { clsx } from "clsx";
 import { Search as SearchIcon, Compass } from "lucide-react";
@@ -145,6 +146,7 @@ export function Shell({ children }: { children: ReactNode }) {
   }, []);
 
   const requests = useQuery(requestsStatusQuery);
+  const live = useQuery(liveStatusQuery);
   const sidebar = (
     <nav aria-label="Libraries" className="flex h-full flex-col gap-1 p-3">
       <Link
@@ -192,6 +194,16 @@ export function Shell({ children }: { children: ReactNode }) {
       >
         <ListMusic className="size-5" aria-hidden /> Playlists
       </Link>
+      {live.data?.enabled && (
+        <Link
+          to="/livetv"
+          className={navItem}
+          activeProps={navActive}
+          onClick={() => setNavOpen(false)}
+        >
+          <Tv className="size-5" aria-hidden /> Live TV
+        </Link>
+      )}
       {requests.data?.enabled && requests.data.canRequest && (
         <Link
           to="/discover"

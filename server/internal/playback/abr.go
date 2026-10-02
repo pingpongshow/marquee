@@ -151,6 +151,11 @@ func (m *Manager) nvencJobs() int {
 // encodersFor is the configured encoder order, skipping NVENC while its concurrent
 // session limit is reached (consumer NVIDIA drivers allow a fixed number of encodes);
 // new jobs then go to Quick Sync and finally the CPU instead of failing.
+// EncoderChoices is the encoders to try for a new transcode, best first.
+func (m *Manager) EncoderChoices() []string {
+	return m.encodersFor(m.Settings.Get().Transcoder.EncoderOrder)
+}
+
 func (m *Manager) encodersFor(order []string) []string {
 	avail := m.Encoders.Available(order)
 	limit := m.Settings.Get().Transcoder.NVENCSessions

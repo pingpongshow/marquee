@@ -25,6 +25,7 @@ Highlights:
 - **Libraries:** movies, shows, anime, music and personal videos. TMDB/OMDb metadata, collections, extras and versions. The Plex import brings over watch history, playlists, ratings and markers.
 - **Playback:** direct play, direct stream or transcode on NVENC, Quick Sync or the CPU, with HDR tone mapping, adaptive bitrate over Tailscale, styled subtitles, OpenSubtitles search, Skip Intro/Credits (imported or detected) and seek previews.
 - **Music:** GPU sonic analysis, similar music, radios, Muse (describe-it playlists), Sonic Adventure, daily mixes, Guest DJ, smart playlists, synced lyrics, loudness levelling, crossfade and gapless playback.
+- **Live TV and requests:** a Plex-style guide from Dispatcharr or any M3U/XMLTV source, and Seerr requests approved by admins.
 - **Apps:** web, iPhone/iPad (offline downloads, CarPlay) and Apple TV (Top Shelf), with profiles, PINs, Quick Connect, watchlist, statistics and webhooks.
 ## Repository layout
 

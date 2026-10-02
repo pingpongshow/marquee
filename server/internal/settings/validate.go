@@ -21,6 +21,14 @@ func invalid(format string, args ...any) error {
 var validEncoders = map[string]bool{"nvenc": true, "qsv": true, "vaapi": true, "software": true}
 
 func (s Settings) Validate() error {
+	for _, src := range s.Integrations.LiveTVSources {
+		if src.Kind != "m3u" && src.Kind != "dispatcharr" {
+			return invalid("a Live TV source must be an M3U playlist or Dispatcharr")
+		}
+		if src.Name == "" || !(strings.HasPrefix(src.URL, "http://") || strings.HasPrefix(src.URL, "https://")) {
+			return invalid("each Live TV source needs a name and an http(s) address")
+		}
+	}
 	switch s.Security.PinSignIn {
 	case "off", "local", "everywhere":
 	default:
