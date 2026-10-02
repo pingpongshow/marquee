@@ -468,4 +468,29 @@ class MarqueeUiTest {
         rule.onAllNodes(hasText("Withdraw")).onFirst().performClick()
         rule.waitUntil(10_000) { !scrollTo(hasText("Withdraw")) }
     }
+
+    /** Live TV (LIVE-2/3): guide with a playing preview (phones), What's On, full screen, channel down. Needs a source. */
+    @Test fun liveTv() {
+        connectAndSignIn()
+        tap("Live TV")
+        rule.waitText("What's On", 15_000)
+        val playing = { name: String -> hasContentDescription(name) and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Playing") }
+        if (!isTv) {
+            rule.waitUntilAtLeastOneExists(playing("Live preview"), 30_000)
+            Thread.sleep(2000)
+            shot("l1-guide")
+        }
+        tap("What's On")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Watch ", substring = true), 10_000)
+        shot("l2-whats-on")
+        rule.onAllNodes(hasContentDescription("Watch ", substring = true)).onFirst().performClick()
+        rule.waitUntilAtLeastOneExists(playing("Live TV"), 30_000)
+        Thread.sleep(3000)
+        shot("l3-watching")
+        if (isTv) key(KeyEvent.KEYCODE_DPAD_DOWN) else rule.onNode(hasContentDescription("Channel down")).performClick()
+        rule.waitUntilAtLeastOneExists(playing("Live TV"), 30_000)
+        Thread.sleep(3000)
+        shot("l4-next-channel")
+        back()
+    }
 }

@@ -373,6 +373,56 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /webhooks/test`.
     /// - Remark: Generated from `#/paths//webhooks/test/post(testWebhook)`.
     func testWebhook(_ input: Operations.TestWebhook.Input) async throws -> Operations.TestWebhook.Output
+    /// Whether Live TV is set up, and how many channels there are.
+    ///
+    /// - Remark: HTTP `GET /livetv/status`.
+    /// - Remark: Generated from `#/paths//livetv/status/get(liveTvStatus)`.
+    func liveTvStatus(_ input: Operations.LiveTvStatus.Input) async throws -> Operations.LiveTvStatus.Output
+    /// Channels in number order, with what's on now and next.
+    ///
+    /// - Remark: HTTP `GET /livetv/channels`.
+    /// - Remark: Generated from `#/paths//livetv/channels/get(listLiveChannels)`.
+    func listLiveChannels(_ input: Operations.ListLiveChannels.Input) async throws -> Operations.ListLiveChannels.Output
+    /// Channel groups (categories) with their channel counts.
+    ///
+    /// - Remark: HTTP `GET /livetv/groups`.
+    /// - Remark: Generated from `#/paths//livetv/groups/get(listLiveGroups)`.
+    func listLiveGroups(_ input: Operations.ListLiveGroups.Input) async throws -> Operations.ListLiveGroups.Output
+    /// The guide grid - programmes per channel between two times (at most 24 hours).
+    ///
+    /// - Remark: HTTP `GET /livetv/guide`.
+    /// - Remark: Generated from `#/paths//livetv/guide/get(liveGuide)`.
+    func liveGuide(_ input: Operations.LiveGuide.Input) async throws -> Operations.LiveGuide.Output
+    /// Add a channel to the caller's favourites.
+    ///
+    /// - Remark: HTTP `PUT /livetv/channels/{channelId}/favorite`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/favorite/put(favoriteLiveChannel)`.
+    func favoriteLiveChannel(_ input: Operations.FavoriteLiveChannel.Input) async throws -> Operations.FavoriteLiveChannel.Output
+    /// Remove a channel from the caller's favourites.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/channels/{channelId}/favorite`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/favorite/delete(unfavoriteLiveChannel)`.
+    func unfavoriteLiveChannel(_ input: Operations.UnfavoriteLiveChannel.Input) async throws -> Operations.UnfavoriteLiveChannel.Output
+    /// The channel's logo, fetched from its source and cached (no sign-in needed, like artwork).
+    ///
+    /// - Remark: HTTP `GET /livetv/channels/{channelId}/logo`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/logo/get(liveChannelLogo)`.
+    func liveChannelLogo(_ input: Operations.LiveChannelLogo.Input) async throws -> Operations.LiveChannelLogo.Output
+    /// Start watching a channel. Returns a live HLS session (copied or transcoded for the device).
+    ///
+    /// - Remark: HTTP `POST /livetv/channels/{channelId}/play`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/play/post(playLiveChannel)`.
+    func playLiveChannel(_ input: Operations.PlayLiveChannel.Input) async throws -> Operations.PlayLiveChannel.Output
+    /// Stop watching (the stream also stops by itself when nothing fetches it for a minute).
+    ///
+    /// - Remark: HTTP `DELETE /livetv/sessions/{sessionId}`.
+    /// - Remark: Generated from `#/paths//livetv/sessions/{sessionId}/delete(stopLiveSession)`.
+    func stopLiveSession(_ input: Operations.StopLiveSession.Input) async throws -> Operations.StopLiveSession.Output
+    /// Reload channels and the guide from every source now (admin only).
+    ///
+    /// - Remark: HTTP `POST /livetv/refresh`.
+    /// - Remark: Generated from `#/paths//livetv/refresh/post(refreshLiveTv)`.
+    func refreshLiveTv(_ input: Operations.RefreshLiveTv.Input) async throws -> Operations.RefreshLiveTv.Output
     /// Whether requests are set up and whether the caller may make them.
     ///
     /// - Remark: HTTP `GET /requests/status`.
@@ -1482,6 +1532,120 @@ extension APIProtocol {
             headers: headers,
             body: body
         ))
+    }
+    /// Whether Live TV is set up, and how many channels there are.
+    ///
+    /// - Remark: HTTP `GET /livetv/status`.
+    /// - Remark: Generated from `#/paths//livetv/status/get(liveTvStatus)`.
+    public func liveTvStatus(headers: Operations.LiveTvStatus.Input.Headers = .init()) async throws -> Operations.LiveTvStatus.Output {
+        try await liveTvStatus(Operations.LiveTvStatus.Input(headers: headers))
+    }
+    /// Channels in number order, with what's on now and next.
+    ///
+    /// - Remark: HTTP `GET /livetv/channels`.
+    /// - Remark: Generated from `#/paths//livetv/channels/get(listLiveChannels)`.
+    public func listLiveChannels(
+        query: Operations.ListLiveChannels.Input.Query = .init(),
+        headers: Operations.ListLiveChannels.Input.Headers = .init()
+    ) async throws -> Operations.ListLiveChannels.Output {
+        try await listLiveChannels(Operations.ListLiveChannels.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Channel groups (categories) with their channel counts.
+    ///
+    /// - Remark: HTTP `GET /livetv/groups`.
+    /// - Remark: Generated from `#/paths//livetv/groups/get(listLiveGroups)`.
+    public func listLiveGroups(headers: Operations.ListLiveGroups.Input.Headers = .init()) async throws -> Operations.ListLiveGroups.Output {
+        try await listLiveGroups(Operations.ListLiveGroups.Input(headers: headers))
+    }
+    /// The guide grid - programmes per channel between two times (at most 24 hours).
+    ///
+    /// - Remark: HTTP `GET /livetv/guide`.
+    /// - Remark: Generated from `#/paths//livetv/guide/get(liveGuide)`.
+    public func liveGuide(
+        query: Operations.LiveGuide.Input.Query,
+        headers: Operations.LiveGuide.Input.Headers = .init()
+    ) async throws -> Operations.LiveGuide.Output {
+        try await liveGuide(Operations.LiveGuide.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Add a channel to the caller's favourites.
+    ///
+    /// - Remark: HTTP `PUT /livetv/channels/{channelId}/favorite`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/favorite/put(favoriteLiveChannel)`.
+    public func favoriteLiveChannel(
+        path: Operations.FavoriteLiveChannel.Input.Path,
+        headers: Operations.FavoriteLiveChannel.Input.Headers = .init()
+    ) async throws -> Operations.FavoriteLiveChannel.Output {
+        try await favoriteLiveChannel(Operations.FavoriteLiveChannel.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Remove a channel from the caller's favourites.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/channels/{channelId}/favorite`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/favorite/delete(unfavoriteLiveChannel)`.
+    public func unfavoriteLiveChannel(
+        path: Operations.UnfavoriteLiveChannel.Input.Path,
+        headers: Operations.UnfavoriteLiveChannel.Input.Headers = .init()
+    ) async throws -> Operations.UnfavoriteLiveChannel.Output {
+        try await unfavoriteLiveChannel(Operations.UnfavoriteLiveChannel.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// The channel's logo, fetched from its source and cached (no sign-in needed, like artwork).
+    ///
+    /// - Remark: HTTP `GET /livetv/channels/{channelId}/logo`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/logo/get(liveChannelLogo)`.
+    public func liveChannelLogo(
+        path: Operations.LiveChannelLogo.Input.Path,
+        headers: Operations.LiveChannelLogo.Input.Headers = .init()
+    ) async throws -> Operations.LiveChannelLogo.Output {
+        try await liveChannelLogo(Operations.LiveChannelLogo.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Start watching a channel. Returns a live HLS session (copied or transcoded for the device).
+    ///
+    /// - Remark: HTTP `POST /livetv/channels/{channelId}/play`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/play/post(playLiveChannel)`.
+    public func playLiveChannel(
+        path: Operations.PlayLiveChannel.Input.Path,
+        headers: Operations.PlayLiveChannel.Input.Headers = .init(),
+        body: Operations.PlayLiveChannel.Input.Body
+    ) async throws -> Operations.PlayLiveChannel.Output {
+        try await playLiveChannel(Operations.PlayLiveChannel.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Stop watching (the stream also stops by itself when nothing fetches it for a minute).
+    ///
+    /// - Remark: HTTP `DELETE /livetv/sessions/{sessionId}`.
+    /// - Remark: Generated from `#/paths//livetv/sessions/{sessionId}/delete(stopLiveSession)`.
+    public func stopLiveSession(
+        path: Operations.StopLiveSession.Input.Path,
+        headers: Operations.StopLiveSession.Input.Headers = .init()
+    ) async throws -> Operations.StopLiveSession.Output {
+        try await stopLiveSession(Operations.StopLiveSession.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Reload channels and the guide from every source now (admin only).
+    ///
+    /// - Remark: HTTP `POST /livetv/refresh`.
+    /// - Remark: Generated from `#/paths//livetv/refresh/post(refreshLiveTv)`.
+    public func refreshLiveTv(headers: Operations.RefreshLiveTv.Input.Headers = .init()) async throws -> Operations.RefreshLiveTv.Output {
+        try await refreshLiveTv(Operations.RefreshLiveTv.Input(headers: headers))
     }
     /// Whether requests are set up and whether the caller may make them.
     ///

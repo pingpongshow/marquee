@@ -13,10 +13,14 @@ struct MainView: View {
     @State private var adventure = AdventurePicker.shared
     @State private var linkedItem: LinkedItem?
     @State private var canDiscover = false
+    @State private var hasLiveTV = false
 
     var body: some View {
         TabView {
             Tab("Home", systemImage: "house") { stack { HomeView() } }
+            if hasLiveTV {
+                Tab("Live TV", systemImage: "tv") { stack { LiveTVView() } }
+            }
             if compact {
                 // iPhone: one Libraries tab so the tab bar doesn't overflow into "More".
                 Tab("Libraries", systemImage: "square.stack") { stack { LibrariesList(libraries: libraries, icon: icon) } }
@@ -27,7 +31,10 @@ struct MainView: View {
                     }
                 }
             }
-            Tab("Playlists", systemImage: "music.note.list") { stack { PlaylistsView() } }
+            // iPhone with Live TV: Playlists moves under Libraries to keep five tabs.
+            if !(compact && hasLiveTV) {
+                Tab("Playlists", systemImage: "music.note.list") { stack { PlaylistsView() } }
+            }
             if !compact && canDiscover {
                 Tab("Discover", systemImage: "safari") { stack { DiscoverView() } }
             }
@@ -53,6 +60,7 @@ struct MainView: View {
         .task {
             let s = try? await app.requestsStatus()
             canDiscover = s?.enabled == true && s?.canRequest == true
+            hasLiveTV = (try? await app.liveStatus())?.enabled == true
         }
         .sheet(item: $playlistPicker.item) { item in AddToPlaylistSheet(item: item) }
         .sheet(item: $adventure.from) { item in AdventureSheet(from: item) }
@@ -150,6 +158,9 @@ struct LibrariesList: View {
             }
             #if os(iOS)
             Section {
+                NavigationLink { PlaylistsView() } label: {
+                    Label("Playlists", systemImage: "music.note.list").foregroundStyle(.primary)
+                }
                 NavigationLink { DownloadsView() } label: {
                     Label("Downloads", systemImage: "arrow.down.circle").foregroundStyle(.primary)
                 }

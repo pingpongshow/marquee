@@ -13684,6 +13684,1691 @@ public enum Operations {
             }
         }
     }
+    /// Whether Live TV is set up, and how many channels there are.
+    ///
+    /// - Remark: HTTP `GET /livetv/status`.
+    /// - Remark: Generated from `#/paths//livetv/status/get(liveTvStatus)`.
+    public enum LiveTvStatus {
+        public static let id: Swift.String = "liveTvStatus"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/status/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.LiveTvStatus.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.LiveTvStatus.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.LiveTvStatus.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.LiveTvStatus.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/status/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/status/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.LiveTvStatus)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.LiveTvStatus {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.LiveTvStatus.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.LiveTvStatus.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Status.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/status/get(liveTvStatus)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.LiveTvStatus.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.LiveTvStatus.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/status/get(liveTvStatus)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Channels in number order, with what's on now and next.
+    ///
+    /// - Remark: HTTP `GET /livetv/channels`.
+    /// - Remark: Generated from `#/paths//livetv/channels/get(listLiveChannels)`.
+    public enum ListLiveChannels {
+        public static let id: Swift.String = "listLiveChannels"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/channels/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// Only this group (category).
+                ///
+                /// - Remark: Generated from `#/paths/livetv/channels/GET/query/group`.
+                public var group: Swift.String?
+                /// Only the caller's favourites.
+                ///
+                /// - Remark: Generated from `#/paths/livetv/channels/GET/query/favorites`.
+                public var favorites: Swift.Bool?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - group: Only this group (category).
+                ///   - favorites: Only the caller's favourites.
+                public init(
+                    group: Swift.String? = nil,
+                    favorites: Swift.Bool? = nil
+                ) {
+                    self.group = group
+                    self.favorites = favorites
+                }
+            }
+            public var query: Operations.ListLiveChannels.Input.Query
+            /// - Remark: Generated from `#/paths/livetv/channels/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListLiveChannels.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListLiveChannels.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ListLiveChannels.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - query:
+            ///   - headers:
+            public init(
+                query: Operations.ListLiveChannels.Input.Query = .init(),
+                headers: Operations.ListLiveChannels.Input.Headers = .init()
+            ) {
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/channels/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/channels/GET/responses/200/content/application\/json`.
+                    case json([Components.Schemas.LiveChannel])
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: [Components.Schemas.LiveChannel] {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListLiveChannels.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ListLiveChannels.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Channels.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/get(listLiveChannels)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ListLiveChannels.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ListLiveChannels.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/get(listLiveChannels)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Channel groups (categories) with their channel counts.
+    ///
+    /// - Remark: HTTP `GET /livetv/groups`.
+    /// - Remark: Generated from `#/paths//livetv/groups/get(listLiveGroups)`.
+    public enum ListLiveGroups {
+        public static let id: Swift.String = "listLiveGroups"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/groups/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListLiveGroups.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListLiveGroups.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ListLiveGroups.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.ListLiveGroups.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/groups/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/groups/GET/responses/200/content/JsonPayload`.
+                    public struct JsonPayloadPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/livetv/groups/GET/responses/200/content/JsonPayload/name`.
+                        public var name: Swift.String
+                        /// - Remark: Generated from `#/paths/livetv/groups/GET/responses/200/content/JsonPayload/channels`.
+                        public var channels: Swift.Int
+                        /// Creates a new `JsonPayloadPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - name:
+                        ///   - channels:
+                        public init(
+                            name: Swift.String,
+                            channels: Swift.Int
+                        ) {
+                            self.name = name
+                            self.channels = channels
+                        }
+                        public enum CodingKeys: String, CodingKey {
+                            case name
+                            case channels
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/livetv/groups/GET/responses/200/content/json`.
+                    public typealias JsonPayload = [Operations.ListLiveGroups.Output.Ok.Body.JsonPayloadPayload]
+                    /// - Remark: Generated from `#/paths/livetv/groups/GET/responses/200/content/application\/json`.
+                    case json(Operations.ListLiveGroups.Output.Ok.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.ListLiveGroups.Output.Ok.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListLiveGroups.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ListLiveGroups.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Groups.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/groups/get(listLiveGroups)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ListLiveGroups.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ListLiveGroups.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/groups/get(listLiveGroups)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// The guide grid - programmes per channel between two times (at most 24 hours).
+    ///
+    /// - Remark: HTTP `GET /livetv/guide`.
+    /// - Remark: Generated from `#/paths//livetv/guide/get(liveGuide)`.
+    public enum LiveGuide {
+        public static let id: Swift.String = "liveGuide"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/guide/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/guide/GET/query/start`.
+                public var start: Foundation.Date
+                /// - Remark: Generated from `#/paths/livetv/guide/GET/query/end`.
+                public var end: Foundation.Date
+                /// - Remark: Generated from `#/paths/livetv/guide/GET/query/group`.
+                public var group: Swift.String?
+                /// - Remark: Generated from `#/paths/livetv/guide/GET/query/favorites`.
+                public var favorites: Swift.Bool?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - start:
+                ///   - end:
+                ///   - group:
+                ///   - favorites:
+                public init(
+                    start: Foundation.Date,
+                    end: Foundation.Date,
+                    group: Swift.String? = nil,
+                    favorites: Swift.Bool? = nil
+                ) {
+                    self.start = start
+                    self.end = end
+                    self.group = group
+                    self.favorites = favorites
+                }
+            }
+            public var query: Operations.LiveGuide.Input.Query
+            /// - Remark: Generated from `#/paths/livetv/guide/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.LiveGuide.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.LiveGuide.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.LiveGuide.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - query:
+            ///   - headers:
+            public init(
+                query: Operations.LiveGuide.Input.Query,
+                headers: Operations.LiveGuide.Input.Headers = .init()
+            ) {
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/guide/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/guide/GET/responses/200/content/JsonPayload`.
+                    public struct JsonPayloadPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/livetv/guide/GET/responses/200/content/JsonPayload/channelId`.
+                        public var channelId: Swift.Int64
+                        /// - Remark: Generated from `#/paths/livetv/guide/GET/responses/200/content/JsonPayload/programmes`.
+                        public var programmes: [Components.Schemas.LiveProgramme]
+                        /// Creates a new `JsonPayloadPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - channelId:
+                        ///   - programmes:
+                        public init(
+                            channelId: Swift.Int64,
+                            programmes: [Components.Schemas.LiveProgramme]
+                        ) {
+                            self.channelId = channelId
+                            self.programmes = programmes
+                        }
+                        public enum CodingKeys: String, CodingKey {
+                            case channelId
+                            case programmes
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/livetv/guide/GET/responses/200/content/json`.
+                    public typealias JsonPayload = [Operations.LiveGuide.Output.Ok.Body.JsonPayloadPayload]
+                    /// - Remark: Generated from `#/paths/livetv/guide/GET/responses/200/content/application\/json`.
+                    case json(Operations.LiveGuide.Output.Ok.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.LiveGuide.Output.Ok.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.LiveGuide.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.LiveGuide.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Rows, one per channel.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/guide/get(liveGuide)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.LiveGuide.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.LiveGuide.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/guide/get(liveGuide)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/guide/get(liveGuide)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Add a channel to the caller's favourites.
+    ///
+    /// - Remark: HTTP `PUT /livetv/channels/{channelId}/favorite`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/favorite/put(favoriteLiveChannel)`.
+    public enum FavoriteLiveChannel {
+        public static let id: Swift.String = "favoriteLiveChannel"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/favorite/PUT/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/favorite/PUT/path/channelId`.
+                public var channelId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - channelId:
+                public init(channelId: Swift.Int64) {
+                    self.channelId = channelId
+                }
+            }
+            public var path: Operations.FavoriteLiveChannel.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/favorite/PUT/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.FavoriteLiveChannel.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.FavoriteLiveChannel.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.FavoriteLiveChannel.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.FavoriteLiveChannel.Input.Path,
+                headers: Operations.FavoriteLiveChannel.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Added.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/favorite/put(favoriteLiveChannel)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.FavoriteLiveChannel.Output.NoContent)
+            /// Added.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/favorite/put(favoriteLiveChannel)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.FavoriteLiveChannel.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/favorite/put(favoriteLiveChannel)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/favorite/put(favoriteLiveChannel)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Remove a channel from the caller's favourites.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/channels/{channelId}/favorite`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/favorite/delete(unfavoriteLiveChannel)`.
+    public enum UnfavoriteLiveChannel {
+        public static let id: Swift.String = "unfavoriteLiveChannel"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/favorite/DELETE/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/favorite/DELETE/path/channelId`.
+                public var channelId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - channelId:
+                public init(channelId: Swift.Int64) {
+                    self.channelId = channelId
+                }
+            }
+            public var path: Operations.UnfavoriteLiveChannel.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/favorite/DELETE/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UnfavoriteLiveChannel.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UnfavoriteLiveChannel.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.UnfavoriteLiveChannel.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.UnfavoriteLiveChannel.Input.Path,
+                headers: Operations.UnfavoriteLiveChannel.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Removed.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/favorite/delete(unfavoriteLiveChannel)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.UnfavoriteLiveChannel.Output.NoContent)
+            /// Removed.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/favorite/delete(unfavoriteLiveChannel)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.UnfavoriteLiveChannel.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/favorite/delete(unfavoriteLiveChannel)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// The channel's logo, fetched from its source and cached (no sign-in needed, like artwork).
+    ///
+    /// - Remark: HTTP `GET /livetv/channels/{channelId}/logo`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/logo/get(liveChannelLogo)`.
+    public enum LiveChannelLogo {
+        public static let id: Swift.String = "liveChannelLogo"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/logo/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/logo/GET/path/channelId`.
+                public var channelId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - channelId:
+                public init(channelId: Swift.Int64) {
+                    self.channelId = channelId
+                }
+            }
+            public var path: Operations.LiveChannelLogo.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/logo/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.LiveChannelLogo.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.LiveChannelLogo.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.LiveChannelLogo.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.LiveChannelLogo.Input.Path,
+                headers: Operations.LiveChannelLogo.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/logo/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/logo/GET/responses/200/content/image\/*`.
+                    case image_Ast_(OpenAPIRuntime.HTTPBody)
+                    /// The associated value of the enum case if `self` is `.image_Ast_`.
+                    ///
+                    /// - Throws: An error if `self` is not `.image_Ast_`.
+                    /// - SeeAlso: `.image_Ast_`.
+                    public var image_Ast_: OpenAPIRuntime.HTTPBody {
+                        get throws {
+                            switch self {
+                            case let .image_Ast_(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.LiveChannelLogo.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.LiveChannelLogo.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// The image.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/logo/get(liveChannelLogo)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.LiveChannelLogo.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.LiveChannelLogo.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/logo/get(liveChannelLogo)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case image_Ast_
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "image/*":
+                    self = .image_Ast_
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .image_Ast_:
+                    return "image/*"
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .image_Ast_,
+                    .json
+                ]
+            }
+        }
+    }
+    /// Start watching a channel. Returns a live HLS session (copied or transcoded for the device).
+    ///
+    /// - Remark: HTTP `POST /livetv/channels/{channelId}/play`.
+    /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/play/post(playLiveChannel)`.
+    public enum PlayLiveChannel {
+        public static let id: Swift.String = "playLiveChannel"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/play/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/play/POST/path/channelId`.
+                public var channelId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - channelId:
+                public init(channelId: Swift.Int64) {
+                    self.channelId = channelId
+                }
+            }
+            public var path: Operations.PlayLiveChannel.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/play/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.PlayLiveChannel.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.PlayLiveChannel.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.PlayLiveChannel.Input.Headers
+            /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/play/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/play/POST/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/play/POST/requestBody/json/profile`.
+                    public var profile: Components.Schemas.DeviceProfile
+                    /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/play/POST/requestBody/json/maxBitrateKbps`.
+                    public var maxBitrateKbps: Swift.Int?
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - profile:
+                    ///   - maxBitrateKbps:
+                    public init(
+                        profile: Components.Schemas.DeviceProfile,
+                        maxBitrateKbps: Swift.Int? = nil
+                    ) {
+                        self.profile = profile
+                        self.maxBitrateKbps = maxBitrateKbps
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case profile
+                        case maxBitrateKbps
+                    }
+                }
+                /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/play/POST/requestBody/content/application\/json`.
+                case json(Operations.PlayLiveChannel.Input.Body.JsonPayload)
+            }
+            public var body: Operations.PlayLiveChannel.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.PlayLiveChannel.Input.Path,
+                headers: Operations.PlayLiveChannel.Input.Headers = .init(),
+                body: Operations.PlayLiveChannel.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/play/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/play/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.LiveSession)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.LiveSession {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.PlayLiveChannel.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.PlayLiveChannel.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// The session.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/play/post(playLiveChannel)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.PlayLiveChannel.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.PlayLiveChannel.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/play/post(playLiveChannel)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/play/post(playLiveChannel)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/play/post(playLiveChannel)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// An outside service (e.g. OpenSubtitles) failed or refused the request.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/play/post(playLiveChannel)/responses/502`.
+            ///
+            /// HTTP response code: `502 badGateway`.
+            case badGateway(Components.Responses.BadGateway)
+            /// The associated value of the enum case if `self` is `.badGateway`.
+            ///
+            /// - Throws: An error if `self` is not `.badGateway`.
+            /// - SeeAlso: `.badGateway`.
+            public var badGateway: Components.Responses.BadGateway {
+                get throws {
+                    switch self {
+                    case let .badGateway(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badGateway",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// A helper service isn't running.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/play/post(playLiveChannel)/responses/503`.
+            ///
+            /// HTTP response code: `503 serviceUnavailable`.
+            case serviceUnavailable(Components.Responses.ServiceUnavailable)
+            /// The associated value of the enum case if `self` is `.serviceUnavailable`.
+            ///
+            /// - Throws: An error if `self` is not `.serviceUnavailable`.
+            /// - SeeAlso: `.serviceUnavailable`.
+            public var serviceUnavailable: Components.Responses.ServiceUnavailable {
+                get throws {
+                    switch self {
+                    case let .serviceUnavailable(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "serviceUnavailable",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Stop watching (the stream also stops by itself when nothing fetches it for a minute).
+    ///
+    /// - Remark: HTTP `DELETE /livetv/sessions/{sessionId}`.
+    /// - Remark: Generated from `#/paths//livetv/sessions/{sessionId}/delete(stopLiveSession)`.
+    public enum StopLiveSession {
+        public static let id: Swift.String = "stopLiveSession"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/sessions/{sessionId}/DELETE/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/sessions/{sessionId}/DELETE/path/sessionId`.
+                public var sessionId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - sessionId:
+                public init(sessionId: Swift.String) {
+                    self.sessionId = sessionId
+                }
+            }
+            public var path: Operations.StopLiveSession.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/sessions/{sessionId}/DELETE/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.StopLiveSession.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.StopLiveSession.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.StopLiveSession.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.StopLiveSession.Input.Path,
+                headers: Operations.StopLiveSession.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Stopped.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/sessions/{sessionId}/delete(stopLiveSession)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.StopLiveSession.Output.NoContent)
+            /// Stopped.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/sessions/{sessionId}/delete(stopLiveSession)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.StopLiveSession.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/sessions/{sessionId}/delete(stopLiveSession)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Reload channels and the guide from every source now (admin only).
+    ///
+    /// - Remark: HTTP `POST /livetv/refresh`.
+    /// - Remark: Generated from `#/paths//livetv/refresh/post(refreshLiveTv)`.
+    public enum RefreshLiveTv {
+        public static let id: Swift.String = "refreshLiveTv"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/refresh/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RefreshLiveTv.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RefreshLiveTv.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.RefreshLiveTv.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.RefreshLiveTv.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/refresh/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/refresh/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.LiveTvStatus)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.LiveTvStatus {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RefreshLiveTv.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.RefreshLiveTv.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// What each source returned.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/refresh/post(refreshLiveTv)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.RefreshLiveTv.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.RefreshLiveTv.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/refresh/post(refreshLiveTv)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/refresh/post(refreshLiveTv)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
     /// Whether requests are set up and whether the caller may make them.
     ///
     /// - Remark: HTTP `GET /requests/status`.
