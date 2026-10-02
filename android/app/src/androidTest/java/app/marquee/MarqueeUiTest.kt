@@ -498,8 +498,8 @@ class MarqueeUiTest {
     private val adminToken = args.getString("admintoken")?.takeIf { it != "none" }
 
     /** Calls the server as the test admin (the other viewer in watch-together). */
-    private fun adminApi(method: String, path: String, body: String? = null): String {
-        val token = adminToken ?: throw org.junit.AssumptionViolatedException("no admin token")
+    private fun adminApi(method: String, path: String, body: String? = null, asToken: String? = null): String {
+        val token = asToken ?: adminToken ?: throw org.junit.AssumptionViolatedException("no admin token")
         val req = okhttp3.Request.Builder().url("http://$server/api/v1$path").header("Authorization", "Bearer $token")
             .method(method, body?.let { okhttp3.RequestBody.create("application/json".toMediaType(), it) } ?: if (method == "POST") okhttp3.RequestBody.create(null, ByteArray(0)) else null)
             .build()
@@ -620,5 +620,54 @@ class MarqueeUiTest {
         tap("All time")
         rule.waitText("Plays", 15_000)
         shot("m7c-stats")
+    }
+
+    /** RFC 6238 code for a base32 secret, [ahead] steps from now. */
+    private fun totp(secret: String, ahead: Int = 0): String {
+        val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+        var bits = 0; var value = 0
+        val key = java.io.ByteArrayOutputStream()
+        for (c in secret.uppercase()) {
+            val i = alphabet.indexOf(c).takeIf { it >= 0 } ?: continue
+            value = (value shl 5) or i; bits += 5
+            if (bits >= 8) { key.write((value shr (bits - 8)) and 0xFF); bits -= 8 }
+        }
+        val step = System.currentTimeMillis() / 30_000 + ahead
+        val mac = javax.crypto.Mac.getInstance("HmacSHA1").apply { init(javax.crypto.spec.SecretKeySpec(key.toByteArray(), "HmacSHA1")) }
+            .doFinal(java.nio.ByteBuffer.allocate(8).putLong(step).array())
+        val o = mac[19].toInt() and 15
+        val n = ((mac[o].toInt() and 0x7F) shl 24 or ((mac[o + 1].toInt() and 0xFF) shl 16) or ((mac[o + 2].toInt() and 0xFF) shl 8) or (mac[o + 3].toInt() and 0xFF)) % 1_000_000
+        return "%06d".format(n)
+    }
+
+    /** Two-factor sign-in (USER-9): a password account with an authenticator is asked for a code. */
+    @Test fun twoFactorSignIn() {
+        val name = "twofa-android-${(1000..9999).random()}"
+        val pass = "correct horse battery"
+        val id = org.json.JSONObject(adminApi("POST", "/users", """{"username":"$name","displayName":"$name","password":"$pass"}""")).getLong("id")
+        try {
+            val token = org.json.JSONObject(adminApi("POST", "/auth/login",
+                """{"username":"$name","password":"$pass","device":{"clientId":"uitest-$name","name":"UI test","platform":"android"}}""")).getString("token")
+            val secret = org.json.JSONObject(adminApi("POST", "/auth/totp/setup", "", token)).getString("secret")
+            adminApi("POST", "/auth/totp/enable", """{"code":"${totp(secret)}"}""", token)
+
+            rule.waitUntilAtLeastOneExists(hasSetTextAction(), 10_000)
+            rule.onNode(hasSetTextAction()).performTextInput(server)
+            rule.onNodeWithText("Connect").performClick()
+            rule.waitText("Who's watching?")
+            tap("Sign in with a username")
+            rule.waitText("Username")
+            rule.onNode(hasSetTextAction() and hasText("Username")).performTextInput(name)
+            rule.onNode(hasSetTextAction() and hasText("Password")).performTextInput(pass)
+            rule.onAllNodesWithText("Sign In").onFirst().performClick()
+            rule.waitUntilAtLeastOneExists(androidx.compose.ui.test.hasTestTag("totpCode"), 10_000)
+            shot("t1-code-asked")
+            rule.onNode(androidx.compose.ui.test.hasTestTag("totpCode")).performTextInput(totp(secret, 1)) // the enable code's step is used up
+            rule.onAllNodesWithText("Sign In").onFirst().performClick()
+            rule.waitText("Recently Added", 20_000, substring = true)
+            shot("t2-signed-in")
+        } finally {
+            adminApi("DELETE", "/users/$id")
+        }
     }
 }

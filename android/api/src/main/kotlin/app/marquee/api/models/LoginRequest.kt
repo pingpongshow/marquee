@@ -35,6 +35,7 @@ import kotlinx.serialization.Contextual
  * @param username 
  * @param password 
  * @param device 
+ * @param totpCode The authenticator code (or a recovery code) when the account has two-factor sign-in.
  */
 @Serializable
 
@@ -47,7 +48,11 @@ data class LoginRequest (
     val password: kotlin.String,
 
     @SerialName(value = "device")
-    val device: DeviceInfo
+    val device: DeviceInfo,
+
+    /* The authenticator code (or a recovery code) when the account has two-factor sign-in. */
+    @SerialName(value = "totpCode")
+    val totpCode: kotlin.String? = null
 
 ) {
 

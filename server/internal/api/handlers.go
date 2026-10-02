@@ -138,7 +138,7 @@ func (h *Handlers) GetHealth(ctx context.Context, _ GetHealthRequestObject) (Get
 func toAPIUser(u auth.User) User {
 	return User{
 		Id: u.ID, Username: u.Username, DisplayName: u.DisplayName,
-		IsAdmin: u.IsAdmin, IsManaged: u.IsManaged, HasPin: ptr(u.HasPIN), HasPassword: ptr(u.HasPassword), AvatarUrl: avatarURL(u),
+		IsAdmin: u.IsAdmin, IsManaged: u.IsManaged, HasPin: ptr(u.HasPIN), HasPassword: ptr(u.HasPassword), HasTwoFactor: ptr(u.HasTOTP), AvatarUrl: avatarURL(u),
 		CreatedAt: u.CreatedAt, LastSeenAt: u.LastSeenAt,
 		Restrictions: toAPIRestrictions(u.Restrictions), Preferences: toAPIPrefs(u.Preferences),
 	}
@@ -225,6 +225,16 @@ func (h *Handlers) Login(ctx context.Context, req LoginRequestObject) (LoginResp
 		return Login401JSONResponse{UnauthorizedJSONResponse(apiErr("invalid_credentials", err.Error()))}, nil
 	case err != nil:
 		return nil, internal(ctx, "login", err)
+	}
+	// Two-factor sign-in.
+	code := ""
+	set(&code, b.TotpCode)
+	if err := h.Auth.CheckTOTP(ctx, u.ID, code); err != nil {
+		if errors.Is(err, auth.ErrTOTPRequired) {
+			return Login401JSONResponse{UnauthorizedJSONResponse(apiErr("totp_required", err.Error()))}, nil
+		}
+		slog.WarnContext(ctx, "wrong two-factor code", "username", b.Username, "ip", ip)
+		return Login401JSONResponse{UnauthorizedJSONResponse(apiErr("invalid_totp", err.Error()))}, nil
 	}
 	token, err := h.Auth.IssueToken(ctx, h.DB, u.ID, toDevice(b.Device), ip)
 	if err != nil {
@@ -313,6 +323,14 @@ func (h *Handlers) PinLogin(ctx context.Context, req PinLoginRequestObject) (Pin
 			return PinLogin401JSONResponse{UnauthorizedJSONResponse(apiErr("invalid_credentials", "incorrect password"))}, nil
 		case err != nil:
 			return nil, internal(ctx, "pinLogin", err)
+		}
+		code := ""
+		set(&code, b.TotpCode)
+		if err := h.Auth.CheckTOTP(ctx, u.ID, code); err != nil {
+			if errors.Is(err, auth.ErrTOTPRequired) {
+				return PinLogin401JSONResponse{UnauthorizedJSONResponse(apiErr("totp_required", err.Error()))}, nil
+			}
+			return PinLogin401JSONResponse{UnauthorizedJSONResponse(apiErr("invalid_totp", err.Error()))}, nil
 		}
 	case err != nil:
 		return nil, internal(ctx, "pinLogin", err)

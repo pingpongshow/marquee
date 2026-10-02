@@ -8,7 +8,8 @@ import { Alert, Button, Card, Input } from "@/components/ui";
 export function LinkDeviceCard() {
   const [code, setCode] = useState("");
   const link = useMutation({
-    mutationFn: () => unwrap(api.POST("/auth/quickconnect/authorize", { body: { code } })),
+    mutationFn: () =>
+      unwrap(api.POST("/auth/quickconnect/authorize", { body: { code } })),
     onSuccess: () => setCode(""),
   });
   const submit = (e: FormEvent) => {
@@ -16,20 +17,37 @@ export function LinkDeviceCard() {
     if (code.replace(/\s/g, "").length === 6) link.mutate();
   };
   return (
-    <Card title="Link a device" description="Signing in on an Apple TV or another device? Choose Quick Connect there and enter the code it shows. The device signs in as you.">
-      {link.isSuccess && <Alert tone="success">{link.data.deviceName} is now signed in.</Alert>}
+    <Card
+      title="Link a device"
+      description="Signing in on an Apple TV or another device? Choose Quick Connect there and enter the code it shows. The device signs in as you."
+    >
+      {link.isSuccess && (
+        <Alert tone="success">{link.data.deviceName} is now signed in.</Alert>
+      )}
       {link.isError && <Alert tone="error">{link.error.message}</Alert>}
       <form onSubmit={submit} className="flex flex-wrap gap-2">
         <Input
           aria-label="Code"
           value={code}
-          onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9 ]/g, "").slice(0, 7))}
+          onChange={(e) =>
+            setCode(
+              e.target.value
+                .toUpperCase()
+                .replace(/[^A-Z0-9 ]/g, "")
+                .slice(0, 7),
+            )
+          }
           placeholder="ABC123"
           autoComplete="off"
           autoCapitalize="characters"
           className="w-40 font-mono text-lg tracking-[0.3em] uppercase"
         />
-        <Button type="submit" variant="primary" disabled={code.replace(/\s/g, "").length !== 6} loading={link.isPending}>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={code.replace(/\s/g, "").length !== 6}
+          loading={link.isPending}
+        >
           <MonitorSmartphone className="size-4" /> Link
         </Button>
       </form>
