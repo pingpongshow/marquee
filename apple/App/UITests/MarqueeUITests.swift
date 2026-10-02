@@ -36,11 +36,28 @@ final class MarqueeUITests: XCTestCase {
         shot("03-home")
     }
 
+    /// iPhone: Libraries tab → library. iPad: the library is its own tab / sidebar item.
+    private func openLibrary(_ name: String) {
+        let librariesTab = app.buttons["Libraries"].firstMatch
+        if UIDevice.current.userInterfaceIdiom == .phone, librariesTab.exists {
+            librariesTab.tap()
+            let back = app.navigationBars.buttons["Libraries"]
+            if back.waitForExistence(timeout: 2) { back.tap() }
+            app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch.tap()
+        } else {
+            // iPad: libraries are listed in the sidebar.
+            let item = app.cells[name].firstMatch
+            if !item.exists {
+                app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'sidebar'")).firstMatch.tap()
+            }
+            XCTAssertTrue(item.waitForExistence(timeout: 5))
+            item.tap()
+        }
+    }
+
     func testBrowseAndPlay() {
         connectAndSignIn()
-        // Movies library grid (iPhone: through the Libraries tab).
-        app.tabBars.buttons["Libraries"].firstMatch.tap()
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Movies'")).firstMatch.tap()
+        openLibrary("Movies")
         XCTAssertTrue(app.navigationBars["Movies"].waitForExistence(timeout: 10))
         shot("04-movies")
         let first = app.scrollViews.buttons.firstMatch
@@ -57,10 +74,7 @@ final class MarqueeUITests: XCTestCase {
         close.tap()
 
         // Music: play an artist and open Now Playing.
-        app.tabBars.buttons["Libraries"].firstMatch.tap()
-        let back = app.navigationBars.buttons["Libraries"]
-        if back.waitForExistence(timeout: 2) { back.tap() }
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Music'")).firstMatch.tap()
+        openLibrary("Music")
         XCTAssertTrue(app.navigationBars["Music"].waitForExistence(timeout: 10))
         app.scrollViews.buttons.firstMatch.tap()
         let playMusic = app.buttons["Play"].firstMatch
