@@ -1535,6 +1535,8 @@ export interface components {
             /** @description Directories the folder picker may browse. */
             browseRoots?: string[];
             watchedThresholdPercent?: number;
+            /** @description Find intros and end credits in TV episodes by comparing their audio, for Skip Intro and Skip Credits (PLAY-12). Markers from Plex or the files take precedence. */
+            detectIntros?: boolean;
             /** @description Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie. */
             trickplay?: boolean;
         };

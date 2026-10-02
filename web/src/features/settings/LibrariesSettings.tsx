@@ -127,6 +127,12 @@ export function LibrariesSettings() {
             <Toggle label="Scan automatically when files change" help="Watches library folders and picks up new, renamed and deleted files within seconds." checked={!!scanning.draft.watchFilesystem} onChange={(v) => scanning.update({ watchFilesystem: v })} />
             <Toggle label="Scan all libraries when the server starts" checked={!!scanning.draft.scanOnStartup} onChange={(v) => scanning.update({ scanOnStartup: v })} />
             <Toggle
+              label="Find intros and credits"
+              help="Compares the audio of episodes in each season, in the maintenance window, so Skip Intro and Skip Credits work on new episodes. Markers imported from Plex are kept."
+              checked={!!scanning.draft.detectIntros}
+              onChange={(v) => scanning.update({ detectIntros: v })}
+            />
+            <Toggle
               label="Make seek previews"
               help="Thumbnails shown while seeking through videos, made in the maintenance window. Uses roughly 3–7 MB per movie; a large library takes a few nights."
               checked={!!scanning.draft.trickplay}
