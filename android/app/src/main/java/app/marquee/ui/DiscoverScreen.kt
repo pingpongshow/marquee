@@ -149,7 +149,7 @@ fun DiscoverScreen(nav: NavHostController) {
                 DiscoverCard(it) {
                     when {
                         it.itemId != null -> nav.navigate("item/${it.itemId}")
-                        it.requestable() -> picked = it
+                        else -> picked = it // its details, with Request when it can be
                     }
                 }
             }
@@ -215,10 +215,11 @@ private fun RequestRow(r: MediaRequest, action: String?, secondary: String? = nu
     }
 }
 
-/** Ask for a movie, or chosen seasons of a show. */
+/** A title's details, and asking for a movie or chosen seasons of a show. */
 @Composable
 private fun RequestDialog(item: DiscoverItem, onDone: (Boolean) -> Unit) {
     val marquee = LocalMarquee.current
+    val can = item.requestable()
     val scope = rememberCoroutineScope()
     val isShow = item.mediaType == DiscoverItem.MediaType.TV
     val show by produceState<RequestableShow?>(null) { if (isShow) value = withContext(Dispatchers.IO) { runCatching { marquee.requests.requestableShow(item.tmdbId) }.getOrNull() } }
@@ -229,15 +230,19 @@ private fun RequestDialog(item: DiscoverItem, onDone: (Boolean) -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = { onDone(false) },
-        title = { Text("Request ${item.title}") },
+        title = { Text(if (can) "Request ${item.title}" else item.title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     AsyncImage(item.posterUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.width(80.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(6.dp)))
-                    Text(item.overview ?: "", maxLines = 7, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(listOfNotNull(item.year?.toString(), if (isShow) "Series" else "Movie", item.availability.label.takeIf { it.isNotBlank() }).joinToString(" · "),
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(item.overview ?: "No description available.", maxLines = 14, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
-                Text("An admin approves requests before they're downloaded.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (isShow) {
+                if (can) Text("An admin approves requests before they're downloaded.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (isShow && can) {
                     val sh = show
                     if (sh == null) CircularProgressIndicator(Modifier.size(24.dp))
                     else sh.seasons.forEach { s ->
@@ -255,7 +260,7 @@ private fun RequestDialog(item: DiscoverItem, onDone: (Boolean) -> Unit) {
             }
         },
         confirmButton = {
-            Button(
+            if (can) Button(
                 {
                     busy = true
                     scope.launch {
@@ -270,7 +275,7 @@ private fun RequestDialog(item: DiscoverItem, onDone: (Boolean) -> Unit) {
                 enabled = !busy && (!isShow || seasons.isNotEmpty()),
             ) { Text("Request") }
         },
-        dismissButton = { TextButton({ onDone(false) }, Modifier.focusRing()) { Text("Cancel") } },
+        dismissButton = { TextButton({ onDone(false) }, Modifier.focusRing()) { Text(if (can) "Cancel" else "Close") } },
     )
 }
 

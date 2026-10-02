@@ -1,5 +1,11 @@
 import { clsx } from "clsx";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 /** A dropdown menu anchored to its trigger button. Items close the menu when clicked. */
 export function Menu({
@@ -16,10 +22,22 @@ export function Menu({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [side, setSide] = useState(align);
   const ref = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  // Open on the other side when the preferred one would run off the screen.
+  useLayoutEffect(() => {
+    if (!open) return setSide(align);
+    const r = menu.current?.getBoundingClientRect();
+    if (!r) return;
+    if (r.left < 8 && side === "right") setSide("left");
+    else if (r.right > window.innerWidth - 8 && side === "left")
+      setSide("right");
+  }, [open, side, align]);
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const onDown = (e: MouseEvent) =>
+      !ref.current?.contains(e.target as Node) && setOpen(false);
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
@@ -47,7 +65,11 @@ export function Menu({
       {open && (
         <div
           role="menu"
-          className={clsx("absolute z-40 mt-1 w-56 overflow-hidden rounded-lg border border-border bg-surface py-1 text-text shadow-2xl", align === "right" ? "right-0" : "left-0")}
+          ref={menu}
+          className={clsx(
+            "absolute z-40 mt-1 w-56 max-w-[calc(100vw-16px)] overflow-hidden rounded-lg border border-border bg-surface py-1 text-text shadow-2xl",
+            side === "right" ? "right-0" : "left-0",
+          )}
           onClick={(e) => {
             e.stopPropagation();
             setOpen(false);
@@ -60,7 +82,17 @@ export function Menu({
   );
 }
 
-export function MenuItem({ icon, children, onClick, disabled }: { icon?: ReactNode; children: ReactNode; onClick: () => void; disabled?: boolean }) {
+export function MenuItem({
+  icon,
+  children,
+  onClick,
+  disabled,
+}: {
+  icon?: ReactNode;
+  children: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
