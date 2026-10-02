@@ -30,9 +30,11 @@
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_marquee._tcp</string>
+		<string>_googlecast._tcp</string>
+		<string>_CC1AD845._googlecast._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Marquee looks for your Marquee server on your home network.</string>
+	<string>Marquee looks for your Marquee server, and TVs and speakers to cast to, on your home network.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

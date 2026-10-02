@@ -54,6 +54,9 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-hls:1.5.1")
     implementation("androidx.media3:media3-ui:1.5.1")
     implementation("androidx.media3:media3-session:1.5.1")
+    // Chromecast (D82): the Cast framework and the system media router for picking devices.
+    implementation("com.google.android.gms:play-services-cast-framework:22.0.0")
+    implementation("androidx.mediarouter:mediarouter:1.7.0")
     implementation("io.coil-kt.coil3:coil-compose:3.0.4")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
     implementation("io.coil-kt.coil3:coil-svg:3.0.4")

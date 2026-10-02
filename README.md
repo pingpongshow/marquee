@@ -45,6 +45,7 @@ Highlights:
 ```bash
 cd server && go generate ./... && go test ./...      # regenerate API stubs, run tests
 cd web && npm run gen:api && npm run build             # regenerate TS types, build into server
+cd apple && scripts/fetch-cast-sdk.sh                  # once: Google's Cast SDK (Chromecast) into apple/Vendor
 cd apple && scripts/gen-api.sh && xcodegen generate    # regenerate the Swift client and Xcode project
 cd android && scripts/gen-api.sh && ./gradlew :app:assembleDebug   # regenerate the Kotlin client, build the APK
 cd android && scripts/ui-test.sh                       # UI tests on the running emulator against a dev server on :32597

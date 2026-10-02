@@ -34,6 +34,8 @@ import kotlinx.serialization.Contextual
  *
  * @param seerrUrl 
  * @param seerrApiKey Write-only.
+ * @param lastFmApiKey Last.fm API key. Write-only; empty turns Last.fm off.
+ * @param lastFmSecret Last.fm shared secret. Write-only.
  * @param dvrPaddingBefore 
  * @param dvrPaddingAfter 
  * @param liveTvSources Replaces the whole list when sent.
@@ -48,6 +50,14 @@ data class IntegrationSettingsUpdate (
     /* Write-only. */
     @SerialName(value = "seerrApiKey")
     val seerrApiKey: kotlin.String? = null,
+
+    /* Last.fm API key. Write-only; empty turns Last.fm off. */
+    @SerialName(value = "lastFmApiKey")
+    val lastFmApiKey: kotlin.String? = null,
+
+    /* Last.fm shared secret. Write-only. */
+    @SerialName(value = "lastFmSecret")
+    val lastFmSecret: kotlin.String? = null,
 
     @SerialName(value = "dvrPaddingBefore")
     val dvrPaddingBefore: kotlin.Int? = null,

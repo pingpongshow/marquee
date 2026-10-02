@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
 import androidx.media3.common.MediaItem
+import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -95,9 +96,11 @@ class MusicController(private val context: Context, private val marquee: Marquee
             }
         })
         controller = c
+        watchCast()
         scope.launch {
             while (true) {
-                controller?.let { _position.value = it.currentPosition to it.duration.coerceAtLeast(0) }
+                if (casting) _position.value = marquee.cast.position.value
+                else controller?.let { _position.value = it.currentPosition to it.duration.coerceAtLeast(0) }
                 (_sleep.value as? Sleep.At)?.let { if (System.currentTimeMillis() >= it.epochMs) { controller?.pause(); _sleep.value = null } }
                 delay(500)
             }
@@ -115,7 +118,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
     private fun sync(p: Player) {
         val cur = p.currentMediaItem?.let(::meta)
         _now.value = cur
-        _playing.value = p.isPlaying
+        if (!casting) _playing.value = p.isPlaying
         _index.value = p.currentMediaItemIndex
         _queue.value = (0 until p.mediaItemCount).map { meta(p.getMediaItemAt(it)) }
         _shuffle.value = p.shuffleModeEnabled
@@ -261,11 +264,62 @@ class MusicController(private val context: Context, private val marquee: Marquee
     }
 
     private fun with(block: (MediaController) -> Unit) { scope.launch { block(connect()) } }
-    fun toggle() = with { if (it.isPlaying) it.pause() else it.play() }
-    fun next() = with { it.seekToNextMediaItem() }
-    fun previous() = with { if (it.currentPosition > 3000) it.seekTo(0) else it.seekToPreviousMediaItem() }
-    fun seek(ms: Long) = with { it.seekTo(ms) }
-    fun jump(index: Int) = with { it.seekTo(index, 0) }
+    fun toggle() = with { if (casting) marquee.cast.toggle() else if (it.isPlaying) it.pause() else it.play() }
+    fun next() = with { if (casting) castNext() else it.seekToNextMediaItem() }
+    fun previous() = with {
+        when {
+            casting && marquee.cast.position.value.first > 3000 -> marquee.cast.seek(0)
+            casting -> it.previousMediaItemIndex.takeIf { i -> i != C.INDEX_UNSET }?.let { i -> it.seekTo(i, 0); castTrack(i, 0) }
+            it.currentPosition > 3000 -> it.seekTo(0)
+            else -> it.seekToPreviousMediaItem()
+        }
+    }
+    fun seek(ms: Long) = with { if (casting) marquee.cast.seek(ms) else it.seekTo(ms) }
+    fun jump(index: Int) = with { it.seekTo(index, 0); if (casting) castTrack(index, 0) }
+
+    // Chromecast (D82): when a Cast device connects while music is playing, the queue plays
+    // there track by track; the phone keeps the queue (paused) and carries on when casting stops.
+    private var casting = false
+    private var castWatch: Job? = null
+
+    private fun watchCast() {
+        if (castWatch != null || marquee.isTv || !marquee.cast.available) return
+        castWatch = scope.launch {
+            launch { marquee.cast.playing.collect { if (casting) _playing.value = it } }
+            marquee.cast.device.collect { device ->
+                val c = controller ?: return@collect
+                when {
+                    // A video being cast owns the device; otherwise music goes there if any is queued.
+                    device != null && !casting && !marquee.cast.videoActive && c.mediaItemCount > 0 && (c.isPlaying || _now.value != null) -> {
+                        casting = true
+                        val at = c.currentPosition
+                        c.pause()
+                        marquee.cast.onFinished = { castNext() }
+                        castTrack(c.currentMediaItemIndex, at)
+                    }
+                    device == null && casting -> {
+                        casting = false
+                        marquee.cast.onFinished = null
+                        c.seekTo(c.currentMediaItemIndex, marquee.cast.position.value.first)
+                        c.play()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun castTrack(index: Int, at: Long) {
+        val t = _queue.value.getOrNull(index) ?: return
+        scope.launch { marquee.cast.load(t.id, at, t.title, t.artist.ifBlank { null }, t.artwork?.toString(), music = true) }
+    }
+
+    private fun castNext() {
+        val c = controller ?: return
+        val n = c.nextMediaItemIndex
+        if (n == C.INDEX_UNSET) { marquee.cast.pause(); return }
+        c.seekTo(n, 0)
+        castTrack(n, 0)
+    }
     fun remove(index: Int) = with { if (index != it.currentMediaItemIndex) it.removeMediaItem(index) }
     fun toggleShuffle() = with { it.shuffleModeEnabled = !it.shuffleModeEnabled }
     fun cycleRepeat() = with {

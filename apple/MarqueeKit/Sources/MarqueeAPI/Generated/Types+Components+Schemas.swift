@@ -2367,6 +2367,47 @@ extension Components {
                 case requestId
             }
         }
+        /// - Remark: Generated from `#/components/schemas/ScrobbleStatus`.
+        public struct ScrobbleStatus: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ScrobbleStatus/connected`.
+            public var connected: Swift.Bool
+            /// Last.fm: the server has Last.fm's API keys, so people can connect.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ScrobbleStatus/available`.
+            public var available: Swift.Bool?
+            /// The account plays go to.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ScrobbleStatus/username`.
+            public var username: Swift.String?
+            /// The last problem sending a play.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ScrobbleStatus/error`.
+            public var error: Swift.String?
+            /// Creates a new `ScrobbleStatus`.
+            ///
+            /// - Parameters:
+            ///   - connected:
+            ///   - available: Last.fm: the server has Last.fm's API keys, so people can connect.
+            ///   - username: The account plays go to.
+            ///   - error: The last problem sending a play.
+            public init(
+                connected: Swift.Bool,
+                available: Swift.Bool? = nil,
+                username: Swift.String? = nil,
+                error: Swift.String? = nil
+            ) {
+                self.connected = connected
+                self.available = available
+                self.username = username
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case connected
+                case available
+                case username
+                case error
+            }
+        }
         /// Public ratings of a title, through Seerr. Each part is absent when unknown.
         ///
         /// - Remark: Generated from `#/components/schemas/TitleRatings`.
@@ -2721,6 +2762,10 @@ extension Components {
             public var seerrUrl: Swift.String?
             /// - Remark: Generated from `#/components/schemas/IntegrationSettings/seerrApiKeySet`.
             public var seerrApiKeySet: Swift.Bool?
+            /// Last.fm's API key and shared secret are set, so people can connect Last.fm (MUSIC-12).
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/lastFmConfigured`.
+            public var lastFmConfigured: Swift.Bool?
             /// Minutes recordings start early.
             ///
             /// - Remark: Generated from `#/components/schemas/IntegrationSettings/dvrPaddingBefore`.
@@ -2736,18 +2781,21 @@ extension Components {
             /// - Parameters:
             ///   - seerrUrl: Seerr's address, e.g. http://10.1.1.10:5055. Empty turns requests off.
             ///   - seerrApiKeySet:
+            ///   - lastFmConfigured: Last.fm's API key and shared secret are set, so people can connect Last.fm (MUSIC-12).
             ///   - dvrPaddingBefore: Minutes recordings start early.
             ///   - dvrPaddingAfter: Minutes recordings run late.
             ///   - liveTvSources:
             public init(
                 seerrUrl: Swift.String? = nil,
                 seerrApiKeySet: Swift.Bool? = nil,
+                lastFmConfigured: Swift.Bool? = nil,
                 dvrPaddingBefore: Swift.Int? = nil,
                 dvrPaddingAfter: Swift.Int? = nil,
                 liveTvSources: [Components.Schemas.LiveTvSource]? = nil
             ) {
                 self.seerrUrl = seerrUrl
                 self.seerrApiKeySet = seerrApiKeySet
+                self.lastFmConfigured = lastFmConfigured
                 self.dvrPaddingBefore = dvrPaddingBefore
                 self.dvrPaddingAfter = dvrPaddingAfter
                 self.liveTvSources = liveTvSources
@@ -2755,6 +2803,7 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case seerrUrl
                 case seerrApiKeySet
+                case lastFmConfigured
                 case dvrPaddingBefore
                 case dvrPaddingAfter
                 case liveTvSources
@@ -2768,6 +2817,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/seerrApiKey`.
             public var seerrApiKey: Swift.String?
+            /// Last.fm API key. Write-only; empty turns Last.fm off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/lastFmApiKey`.
+            public var lastFmApiKey: Swift.String?
+            /// Last.fm shared secret. Write-only.
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/lastFmSecret`.
+            public var lastFmSecret: Swift.String?
             /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/dvrPaddingBefore`.
             public var dvrPaddingBefore: Swift.Int?
             /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/dvrPaddingAfter`.
@@ -2781,18 +2838,24 @@ extension Components {
             /// - Parameters:
             ///   - seerrUrl:
             ///   - seerrApiKey: Write-only.
+            ///   - lastFmApiKey: Last.fm API key. Write-only; empty turns Last.fm off.
+            ///   - lastFmSecret: Last.fm shared secret. Write-only.
             ///   - dvrPaddingBefore:
             ///   - dvrPaddingAfter:
             ///   - liveTvSources: Replaces the whole list when sent.
             public init(
                 seerrUrl: Swift.String? = nil,
                 seerrApiKey: Swift.String? = nil,
+                lastFmApiKey: Swift.String? = nil,
+                lastFmSecret: Swift.String? = nil,
                 dvrPaddingBefore: Swift.Int? = nil,
                 dvrPaddingAfter: Swift.Int? = nil,
                 liveTvSources: [Components.Schemas.LiveTvSource]? = nil
             ) {
                 self.seerrUrl = seerrUrl
                 self.seerrApiKey = seerrApiKey
+                self.lastFmApiKey = lastFmApiKey
+                self.lastFmSecret = lastFmSecret
                 self.dvrPaddingBefore = dvrPaddingBefore
                 self.dvrPaddingAfter = dvrPaddingAfter
                 self.liveTvSources = liveTvSources
@@ -2800,6 +2863,8 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case seerrUrl
                 case seerrApiKey
+                case lastFmApiKey
+                case lastFmSecret
                 case dvrPaddingBefore
                 case dvrPaddingAfter
                 case liveTvSources
@@ -4289,6 +4354,10 @@ extension Components {
             }
             /// - Remark: Generated from `#/components/schemas/PlaybackSession/protocol`.
             public var _protocol: Components.Schemas.PlaybackSession._ProtocolPayload
+            /// The media type url is served with (e.g. video/mp4, audio/flac, application/vnd.apple.mpegurl), for players such as Chromecast that need it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaybackSession/contentType`.
+            public var contentType: Swift.String?
             /// Where to start (the resume position unless startMs was given).
             ///
             /// - Remark: Generated from `#/components/schemas/PlaybackSession/startMs`.
@@ -4346,6 +4415,7 @@ extension Components {
             ///   - fileId:
             ///   - url: Path to play: a file (direct play), progressive audio, or an HLS master playlist.
             ///   - _protocol:
+            ///   - contentType: The media type url is served with (e.g. video/mp4, audio/flac, application/vnd.apple.mpegurl), for players such as Chromecast that need it.
             ///   - startMs: Where to start (the resume position unless startMs was given).
             ///   - durationMs:
             ///   - decision:
@@ -4367,6 +4437,7 @@ extension Components {
                 fileId: Swift.Int64? = nil,
                 url: Swift.String,
                 _protocol: Components.Schemas.PlaybackSession._ProtocolPayload,
+                contentType: Swift.String? = nil,
                 startMs: Swift.Int64,
                 durationMs: Swift.Int64,
                 decision: Components.Schemas.PlaybackDecision,
@@ -4388,6 +4459,7 @@ extension Components {
                 self.fileId = fileId
                 self.url = url
                 self._protocol = _protocol
+                self.contentType = contentType
                 self.startMs = startMs
                 self.durationMs = durationMs
                 self.decision = decision
@@ -4410,6 +4482,7 @@ extension Components {
                 case fileId
                 case url
                 case _protocol = "protocol"
+                case contentType
                 case startMs
                 case durationMs
                 case decision

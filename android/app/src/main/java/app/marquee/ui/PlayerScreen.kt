@@ -34,6 +34,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Forward30
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.CastConnected
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Settings
@@ -272,6 +273,33 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     }
 
     fun poke() { controls = true; lastTouch++ }
+
+    // Chromecast (D82): when a Cast device connects, the video moves there at the current
+    // position; when casting stops, it carries on here from where the TV was.
+    val castDevice by marquee.cast.device.collectAsState()
+    var casting by remember { mutableStateOf(false) }
+    LaunchedEffect(castDevice) {
+        if (castDevice != null && local == null && !casting) {
+            casting = true
+            val at = player.currentPosition
+            player.pause()
+            closeSession(session, at)
+            session = null
+            val d = detail
+            val title = d?.let { if (it.type == ItemType.EPISODE) "${it.grandparentTitle ?: ""} · ${it.title}" else it.title } ?: ""
+            marquee.cast.onFinished = { nav.popBackStack() }
+            marquee.cast.load(itemId, at, title, d?.year?.toString(), marquee.imageUrl(d?.images?.backdrop ?: d?.images?.poster, 640), music = false,
+                fileId = choice.fileId, audioStreamId = choice.audio, subtitleStreamId = choice.subtitle)?.let { error = it }
+        } else if (castDevice == null && casting) {
+            casting = false
+            marquee.cast.onFinished = null
+            start(marquee.cast.position.value.first, choice)
+        }
+    }
+    DisposableEffect(Unit) {
+        marquee.cast.videoActive = true
+        onDispose { marquee.cast.videoActive = false; if (casting) marquee.cast.onFinished = null }
+    }
     fun seekBy(ms: Long) {
         val target = ((scrub ?: player.currentPosition) + ms).coerceIn(0, duration.coerceAtLeast(1))
         scrub = target
@@ -326,7 +354,8 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             ScrubBar(scrub!!, duration, thumbs, onChange = { scrub = it }, onDone = ::commitScrub)
         }
 
-        AnimatedVisibility(controls, Modifier.fillMaxSize(), enter = fadeIn(), exit = fadeOut()) {
+        if (casting) CastingPanel(castDevice ?: "", detail?.title ?: "", onClose = { nav.popBackStack() })
+        AnimatedVisibility(controls && !casting, Modifier.fillMaxSize(), enter = fadeIn(), exit = fadeOut()) {
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.7f), 0.3f to Color.Transparent, 0.65f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.8f)))) {
                 // Top: back, title, settings.
                 Row(Modifier.align(Alignment.TopStart).fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -345,6 +374,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                             Text("${g.members.size}", color = Gold, style = MaterialTheme.typography.labelSmall)
                         }
                     }
+                    if (local == null) CastButton()
                     if (local == null) IconButton({ settings = true; poke() }, Modifier.focusRing()) { Icon(Icons.Filled.Settings, "Playback settings", tint = Color.White) }
                 }
                 // Middle: back 10, play/pause, forward 30.
@@ -549,6 +579,45 @@ private fun FindSubtitles(itemId: Long, onClose: () -> Unit, onDownloaded: (Long
                 }
             }
             item { TextButton(onClose, Modifier.padding(horizontal = 8.dp).focusRing()) { Text("Close") } }
+        }
+    }
+}
+
+/** Shown over the video while it plays on a Cast device: what's casting and its controls. */
+@Composable
+private fun CastingPanel(device: String, title: String, onClose: () -> Unit) {
+    val cast = LocalMarquee.current.cast
+    val playing by cast.playing.collectAsState()
+    val pos by cast.position.collectAsState()
+    var drag by remember { mutableStateOf<Float?>(null) }
+    Box(Modifier.fillMaxSize().background(Color.Black).clickable(remember { MutableInteractionSource() }, indication = null) {}) {
+        Row(Modifier.align(Alignment.TopStart).fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClose, Modifier.focusRing()) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Close player", tint = Color.White) }
+            Spacer(Modifier.weight(1f))
+            CastButton()
+        }
+        Column(Modifier.align(Alignment.Center).fillMaxWidth().padding(horizontal = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Filled.CastConnected, null, Modifier.size(48.dp), tint = Gold)
+            Text("Playing on $device", Modifier.padding(top = 12.dp), color = Color.White.copy(alpha = 0.75f))
+            Text(title, Modifier.padding(top = 4.dp), color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
+            val (p, d) = pos
+            if (d > 0) {
+                Slider(drag ?: (p.toFloat() / d), { drag = it }, Modifier.padding(top = 24.dp).fillMaxWidth(),
+                    onValueChangeFinished = { drag?.let { cast.seek((it * d).toLong()) }; drag = null })
+                Row(Modifier.fillMaxWidth()) {
+                    Text(formatTime(p), color = Color.White.copy(alpha = 0.75f), style = MaterialTheme.typography.labelMedium)
+                    Spacer(Modifier.weight(1f))
+                    Text(formatTime(d), color = Color.White.copy(alpha = 0.75f), style = MaterialTheme.typography.labelMedium)
+                }
+            }
+            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton({ cast.seek((p - 10_000).coerceAtLeast(0)) }, Modifier.focusRing().size(56.dp)) { Icon(Icons.Filled.Replay10, "Back 10 seconds", Modifier.size(36.dp), tint = Color.White) }
+                IconButton({ cast.toggle() }, Modifier.focusRing().size(76.dp)) {
+                    Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "Pause" else "Play", Modifier.size(56.dp), tint = Color.White)
+                }
+                IconButton({ cast.seek(p + 30_000) }, Modifier.focusRing().size(56.dp)) { Icon(Icons.Filled.Forward30, "Forward 30 seconds", Modifier.size(36.dp), tint = Color.White) }
+            }
         }
     }
 }

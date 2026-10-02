@@ -34,6 +34,7 @@ import kotlinx.serialization.Contextual
  *
  * @param seerrUrl Seerr's address, e.g. http://10.1.1.10:5055. Empty turns requests off.
  * @param seerrApiKeySet 
+ * @param lastFmConfigured Last.fm's API key and shared secret are set, so people can connect Last.fm (MUSIC-12).
  * @param dvrPaddingBefore Minutes recordings start early.
  * @param dvrPaddingAfter Minutes recordings run late.
  * @param liveTvSources 
@@ -48,6 +49,10 @@ data class IntegrationSettings (
 
     @SerialName(value = "seerrApiKeySet")
     val seerrApiKeySet: kotlin.Boolean? = null,
+
+    /* Last.fm's API key and shared secret are set, so people can connect Last.fm (MUSIC-12). */
+    @SerialName(value = "lastFmConfigured")
+    val lastFmConfigured: kotlin.Boolean? = null,
 
     /* Minutes recordings start early. */
     @SerialName(value = "dvrPaddingBefore")

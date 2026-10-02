@@ -347,6 +347,76 @@ open class SystemApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     }
 
     /**
+     * GET /system/metrics
+     * Prometheus metrics (ADM-7): playback, transcodes, Live TV, recordings, libraries and requests. Open to the home network; from elsewhere, admins only.
+     * 
+     * @return kotlin.String
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getMetrics() : kotlin.String {
+        val localVarResponse = getMetricsWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.String
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /system/metrics
+     * Prometheus metrics (ADM-7): playback, transcodes, Live TV, recordings, libraries and requests. Open to the home network; from elsewhere, admins only.
+     * 
+     * @return ApiResponse<kotlin.String?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getMetricsWithHttpInfo() : ApiResponse<kotlin.String?> {
+        val localVariableConfig = getMetricsRequestConfig()
+
+        return request<Unit, kotlin.String>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getMetrics
+     *
+     * @return RequestConfig
+     */
+    fun getMetricsRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "text/plain, application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/system/metrics",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * GET /system/info
      * Public server identity and status (used for discovery and connection checks).
      * 

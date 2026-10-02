@@ -103,9 +103,33 @@ struct NowPlayingView: View {
     }
 
     @ViewBuilder private var sourceHeader: some View {
+        #if os(iOS)
+        // Where it plays: AirPlay (HomePod, Sonos…) and Chromecast, beside what's playing.
+        HStack(alignment: .center) {
+            Color.clear.frame(width: 72, height: 1)
+            Spacer(minLength: 0)
+            sourceTitle
+            Spacer(minLength: 0)
+            HStack(spacing: 6) {
+                AirPlayButton().frame(width: 32, height: 32)
+                CastButton(tint: .secondaryLabel).frame(width: 32, height: 32)
+            }
+            .frame(width: 72, alignment: .trailing)
+        }
+        #else
+        sourceTitle
+        #endif
+    }
+
+    @ViewBuilder private var sourceTitle: some View {
         VStack(spacing: 2) {
             Text(music.source == nil ? "NOW PLAYING" : "PLAYING FROM").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
             if let s = music.source { Text(s.title).font(.footnote.weight(.semibold)).lineLimit(1) }
+            #if os(iOS)
+            if music.remote != nil, let d = CastController.shared.device {
+                Text("Playing on \(d)").font(.caption.weight(.semibold)).foregroundStyle(Color.marqueeGold).lineLimit(1)
+            }
+            #endif
         }
     }
 
@@ -179,9 +203,6 @@ struct NowPlayingView: View {
                 DJMenu()
                 LevellingMenu()
                 CrossfadeMenu()
-                #if os(iOS)
-                AirPlayButton().frame(width: 30, height: 30)
-                #endif
             }
             .font(.title3)
             .foregroundStyle(.secondary)

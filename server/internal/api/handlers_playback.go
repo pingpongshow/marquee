@@ -98,11 +98,11 @@ func (h *Handlers) StartPlayback(ctx context.Context, req StartPlaybackRequestOb
 		Markers: []Marker{}}
 	switch {
 	case s.Decision.Method == playback.DirectPlay:
-		out.Url, out.Protocol = base+"file", File
+		out.Url, out.Protocol, out.ContentType = base+"file", File, ptr(playback.FileContentType(s))
 	case s.Media.Video == nil:
-		out.Url, out.Protocol = base+"audio", Progressive
+		out.Url, out.Protocol, out.ContentType = base+"audio", Progressive, ptr("audio/aac")
 	default:
-		out.Url, out.Protocol = base+"master.m3u8", Hls
+		out.Url, out.Protocol, out.ContentType = base+"master.m3u8", Hls, ptr("application/vnd.apple.mpegurl")
 	}
 	switch {
 	case s.Decision.SubtitleASS && s.SubtitleStreamID > 0:

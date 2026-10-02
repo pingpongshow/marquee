@@ -24,6 +24,14 @@ import (
 // unguessable capability that stops working when the session ends (WAN-5).
 const StreamPrefix = "/api/v1/stream/"
 
+// FileContentType is the media type a directly played file is served with.
+func FileContentType(s *Session) string {
+	if ct := mime.TypeByExtension(strings.ToLower(filepath.Ext(s.Path))); ct != "" {
+		return ct
+	}
+	return contentTypeFor(s.Media.Container, s.Media.Video == nil)
+}
+
 func (m *Manager) StreamHandler(subtitleCache string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rest := strings.TrimPrefix(r.URL.Path, StreamPrefix)
@@ -112,11 +120,7 @@ func (m *Manager) serveFile(w http.ResponseWriter, r *http.Request, s *Session) 
 		http.Error(w, "file unavailable", http.StatusNotFound)
 		return
 	}
-	if ct := mime.TypeByExtension(strings.ToLower(filepath.Ext(s.Path))); ct != "" {
-		w.Header().Set("Content-Type", ct)
-	} else {
-		w.Header().Set("Content-Type", contentTypeFor(s.Media.Container, s.Media.Video == nil))
-	}
+	w.Header().Set("Content-Type", FileContentType(s))
 	http.ServeContent(w, r, "", st.ModTime(), f)
 }
 

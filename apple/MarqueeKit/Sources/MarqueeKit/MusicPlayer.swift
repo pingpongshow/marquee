@@ -125,7 +125,7 @@ public final class MusicPlayer {
         observers.append(player.observe(\.timeControlStatus) { [weak self] p, _ in
             let isPlaying = p.timeControlStatus != .paused
             Task { @MainActor in
-                guard let self, self.playing != isPlaying else { return }
+                guard let self, self.remote == nil, self.playing != isPlaying else { return }
                 self.playing = isPlaying
                 self.report(isPlaying ? "playing" : "paused")
                 self.updateNowPlaying()
@@ -133,7 +133,7 @@ public final class MusicPlayer {
         })
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self] t in
             MainActor.assumeIsolated {
-                guard let self else { return }
+                guard let self, self.remote == nil else { return }
                 self.time = t.seconds.isFinite ? t.seconds : 0
                 if let d = self.player.currentItem?.duration.seconds, d.isFinite { self.duration = d }
                 if Date().timeIntervalSince(self.lastReport) > 15, self.playing { self.report("playing") }
@@ -201,14 +201,19 @@ public final class MusicPlayer {
         rebuild()
     }
 
-    public func toggle() { playing ? player.pause() : resume() }
+    public func toggle() {
+        if let remote { remote.toggle(); return }
+        playing ? player.pause() : resume()
+    }
 
     public func resume() {
+        if let remote { remote.resume(); return }
         activateAudioSession()
         player.play()
     }
 
     public func seek(_ seconds: Double) {
+        if let remote { remote.seek(seconds); time = seconds; return }
         player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
         time = seconds
         updateNowPlaying()
@@ -264,20 +269,60 @@ public final class MusicPlayer {
     }
 
     /// Replaces everything in the player with the current entry and what follows it.
-    private func rebuild() {
+    private func rebuild(at start: Double = 0) {
         report("paused")
         for item in player.items() { endSession(for: item) }
         player.removeAllItems()
-        time = 0
+        time = start
         duration = Double(queue.current?.item.durationMs ?? 0) / 1000
         guard let entry = queue.current else { playing = false; updateNowPlaying(); return }
         updateNowPlaying()
+        if let remote {
+            remote.play(entry.item, at: start)
+            return
+        }
         Task {
             guard let item = await makeItem(entry, preload: false), queue.current?.id == entry.id else { return }
             player.insert(item, after: nil)
+            if start > 0 { await player.seek(to: CMTime(seconds: start, preferredTimescale: 600)) }
             resume()
             refreshFollowing()
         }
+    }
+
+    // MARK: - Remote playback (Chromecast, D82)
+
+    /// Set while the queue plays on another device: tracks go there one by one and transport
+    /// commands are forwarded; this player keeps the queue. Cleared, playback carries on here.
+    public var remote: (any RemotePlayback)? {
+        didSet {
+            guard (remote == nil) != (oldValue == nil) else { return }
+            let at = time
+            if remote != nil {
+                player.pause()
+                rebuild(at: at)
+            } else if queue.current != nil {
+                rebuild(at: at)
+            }
+        }
+    }
+
+    /// The remote device's state.
+    public func remoteUpdate(playing: Bool, time: Double, duration: Double) {
+        guard remote != nil else { return }
+        self.playing = playing
+        self.time = time
+        if duration > 0 { self.duration = duration }
+        updateNowPlaying()
+    }
+
+    /// The remote device finished a track: on to what follows, as when a track ends here.
+    public func remoteFinished() {
+        guard remote != nil else { return }
+        let i = queue.followingIndex
+        guard i >= 0 else { playing = false; return }
+        queue.setIndex(i)
+        rebuild()
     }
 
     /// Makes sure the item after the current one is the entry that should follow.
@@ -559,4 +604,13 @@ public final class MusicPlayer {
             #endif
         }
     }
+}
+
+/// Another device playing the queue (Chromecast, D82), driven by MusicPlayer.
+@MainActor
+public protocol RemotePlayback: AnyObject {
+    func play(_ item: Item, at seconds: Double)
+    func toggle()
+    func resume()
+    func seek(_ seconds: Double)
 }

@@ -20,3 +20,4 @@ apple/**/.build/
 apple/**/.swiftpm/
 apple/**/xcuserdata/
 apple/build/
+apple/Vendor/

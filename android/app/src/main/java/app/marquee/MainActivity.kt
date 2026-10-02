@@ -20,6 +20,7 @@ class MainActivity : ComponentActivity() {
             app.music.stop()
             marquee.reset()
         }
+        if (!marquee.isTv) marquee.cast.init() // Chromecast sessions (D82)
         setContent { MarqueeTheme { MarqueeRoot(marquee, app.music, app.downloads) } }
     }
 }

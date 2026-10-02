@@ -424,6 +424,7 @@ class MarqueeUiTest {
             rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("4 Mbps 720p"))
             rule.onNode(hasText("4 Mbps 720p") and isSelected()).assertExists() // the stream restarted with the cap
             shot("p3-transcoding")
+            rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Close"))
             tap("Close")
         }
         back()
@@ -714,5 +715,25 @@ class MarqueeUiTest {
         shot("r3-recordings")
         tap("Cancel")
         rule.waitUntil(10_000) { rule.onAllNodesWithText("Upcoming").fetchSemanticsNodes().isEmpty() }
+    }
+
+    /** Chromecast (D82): the Cast button in the player opens a device picker that searches the network. */
+    @Test fun castPicker() {
+        assumeTrue("phones only", !isTv)
+        connectAndSignIn()
+        openLibrary("Movies")
+        rule.waitText("00 Preview Test")
+        tap("00 Preview Test")
+        rule.waitUntilAtLeastOneExists(hasText("Play") or hasText("Resume"), 10_000)
+        rule.onAllNodes(hasText("Play") or hasText("Resume")).onFirst().performClick()
+        val playing = hasContentDescription("Video player") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Playing")
+        rule.waitUntilAtLeastOneExists(playing, 30_000)
+        showControls()
+        rule.onNode(androidx.compose.ui.test.hasTestTag("castButton")).performClick()
+        rule.waitText("Cast to")
+        rule.waitUntilAtLeastOneExists(hasText("Looking for TVs and speakers", substring = true), 5_000)
+        shot("c1-cast-picker")
+        tap("Close")
+        rule.waitUntilAtLeastOneExists(playing, 10_000) // still playing here
     }
 }

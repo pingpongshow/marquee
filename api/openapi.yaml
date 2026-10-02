@@ -3963,6 +3963,7 @@ components:
         fileId: { type: integer, format: int64 }
         url: { type: string, description: "Path to play: a file (direct play), progressive audio, or an HLS master playlist." }
         protocol: { type: string, enum: [file, hls, progressive] }
+        contentType: { type: string, description: "The media type url is served with (e.g. video/mp4, audio/flac, application/vnd.apple.mpegurl), for players such as Chromecast that need it." }
         startMs: { type: integer, format: int64, description: Where to start (the resume position unless startMs was given). }
         durationMs: { type: integer, format: int64 }
         decision: { $ref: "#/components/schemas/PlaybackDecision" }

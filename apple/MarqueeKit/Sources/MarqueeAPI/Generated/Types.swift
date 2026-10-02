@@ -16,6 +16,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /system/info`.
     /// - Remark: Generated from `#/paths//system/info/get(getSystemInfo)`.
     func getSystemInfo(_ input: Operations.GetSystemInfo.Input) async throws -> Operations.GetSystemInfo.Output
+    /// Prometheus metrics (ADM-7): playback, transcodes, Live TV, recordings, libraries and requests. Open to the home network; from elsewhere, admins only.
+    ///
+    /// - Remark: HTTP `GET /system/metrics`.
+    /// - Remark: Generated from `#/paths//system/metrics/get(getMetrics)`.
+    func getMetrics(_ input: Operations.GetMetrics.Input) async throws -> Operations.GetMetrics.Output
     /// Liveness/readiness probe.
     ///
     /// - Remark: HTTP `GET /system/health`.
@@ -59,6 +64,41 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /auth/logout`.
     /// - Remark: Generated from `#/paths//auth/logout/post(logout)`.
     func logout(_ input: Operations.Logout.Input) async throws -> Operations.Logout.Output
+    /// Whether the caller's plays go to ListenBrainz (MUSIC-12).
+    ///
+    /// - Remark: HTTP `GET /me/scrobbling/listenbrainz`.
+    /// - Remark: Generated from `#/paths//me/scrobbling/listenbrainz/get(listenBrainzStatus)`.
+    func listenBrainzStatus(_ input: Operations.ListenBrainzStatus.Input) async throws -> Operations.ListenBrainzStatus.Output
+    /// Send the caller's music plays to ListenBrainz with their user token (checked with ListenBrainz first).
+    ///
+    /// - Remark: HTTP `PUT /me/scrobbling/listenbrainz`.
+    /// - Remark: Generated from `#/paths//me/scrobbling/listenbrainz/put(connectListenBrainz)`.
+    func connectListenBrainz(_ input: Operations.ConnectListenBrainz.Input) async throws -> Operations.ConnectListenBrainz.Output
+    /// Stop sending plays to ListenBrainz.
+    ///
+    /// - Remark: HTTP `DELETE /me/scrobbling/listenbrainz`.
+    /// - Remark: Generated from `#/paths//me/scrobbling/listenbrainz/delete(disconnectListenBrainz)`.
+    func disconnectListenBrainz(_ input: Operations.DisconnectListenBrainz.Input) async throws -> Operations.DisconnectListenBrainz.Output
+    /// Whether the caller's plays go to Last.fm, and whether Last.fm is set up on this server (MUSIC-12).
+    ///
+    /// - Remark: HTTP `GET /me/scrobbling/lastfm`.
+    /// - Remark: Generated from `#/paths//me/scrobbling/lastfm/get(lastFmStatus)`.
+    func lastFmStatus(_ input: Operations.LastFmStatus.Input) async throws -> Operations.LastFmStatus.Output
+    /// Start connecting Last.fm: the last.fm page where the person approves Marquee. Last.fm sends them back to callbackUrl with ?token=…
+    ///
+    /// - Remark: HTTP `POST /me/scrobbling/lastfm`.
+    /// - Remark: Generated from `#/paths//me/scrobbling/lastfm/post(lastFmAuthUrl)`.
+    func lastFmAuthUrl(_ input: Operations.LastFmAuthUrl.Input) async throws -> Operations.LastFmAuthUrl.Output
+    /// Finish connecting Last.fm with the token last.fm returned.
+    ///
+    /// - Remark: HTTP `PUT /me/scrobbling/lastfm`.
+    /// - Remark: Generated from `#/paths//me/scrobbling/lastfm/put(connectLastFm)`.
+    func connectLastFm(_ input: Operations.ConnectLastFm.Input) async throws -> Operations.ConnectLastFm.Output
+    /// Stop sending plays to Last.fm.
+    ///
+    /// - Remark: HTTP `DELETE /me/scrobbling/lastfm`.
+    /// - Remark: Generated from `#/paths//me/scrobbling/lastfm/delete(disconnectLastFm)`.
+    func disconnectLastFm(_ input: Operations.DisconnectLastFm.Input) async throws -> Operations.DisconnectLastFm.Output
     /// - Remark: HTTP `GET /me`.
     /// - Remark: Generated from `#/paths//me/get(getMe)`.
     func getMe(_ input: Operations.GetMe.Input) async throws -> Operations.GetMe.Output
@@ -747,6 +787,13 @@ extension APIProtocol {
     public func getSystemInfo(headers: Operations.GetSystemInfo.Input.Headers = .init()) async throws -> Operations.GetSystemInfo.Output {
         try await getSystemInfo(Operations.GetSystemInfo.Input(headers: headers))
     }
+    /// Prometheus metrics (ADM-7): playback, transcodes, Live TV, recordings, libraries and requests. Open to the home network; from elsewhere, admins only.
+    ///
+    /// - Remark: HTTP `GET /system/metrics`.
+    /// - Remark: Generated from `#/paths//system/metrics/get(getMetrics)`.
+    public func getMetrics(headers: Operations.GetMetrics.Input.Headers = .init()) async throws -> Operations.GetMetrics.Output {
+        try await getMetrics(Operations.GetMetrics.Input(headers: headers))
+    }
     /// Liveness/readiness probe.
     ///
     /// - Remark: HTTP `GET /system/health`.
@@ -843,6 +890,73 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//auth/logout/post(logout)`.
     public func logout(headers: Operations.Logout.Input.Headers = .init()) async throws -> Operations.Logout.Output {
         try await logout(Operations.Logout.Input(headers: headers))
+    }
+    /// Whether the caller's plays go to ListenBrainz (MUSIC-12).
+    ///
+    /// - Remark: HTTP `GET /me/scrobbling/listenbrainz`.
+    /// - Remark: Generated from `#/paths//me/scrobbling/listenbrainz/get(listenBrainzStatus)`.
+    public func listenBrainzStatus(headers: Operations.ListenBrainzStatus.Input.Headers = .init()) async throws -> Operations.ListenBrainzStatus.Output {
+        try await listenBrainzStatus(Operations.ListenBrainzStatus.Input(headers: headers))
+    }
+    /// Send the caller's music plays to ListenBrainz with their user token (checked with ListenBrainz first).
+    ///
+    /// - Remark: HTTP `PUT /me/scrobbling/listenbrainz`.
+    /// - Remark: Generated from `#/paths//me/scrobbling/listenbrainz/put(connectListenBrainz)`.
+    public func connectListenBrainz(
+        headers: Operations.ConnectListenBrainz.Input.Headers = .init(),
+        body: Operations.ConnectListenBrainz.Input.Body
+    ) async throws -> Operations.ConnectListenBrainz.Output {
+        try await connectListenBrainz(Operations.ConnectListenBrainz.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Stop sending plays to ListenBrainz.
+    ///
+    /// - Remark: HTTP `DELETE /me/scrobbling/listenbrainz`.
+    /// - Remark: Generated from `#/paths//me/scrobbling/listenbrainz/delete(disconnectListenBrainz)`.
+    public func disconnectListenBrainz(headers: Operations.DisconnectListenBrainz.Input.Headers = .init()) async throws -> Operations.DisconnectListenBrainz.Output {
+        try await disconnectListenBrainz(Operations.DisconnectListenBrainz.Input(headers: headers))
+    }
+    /// Whether the caller's plays go to Last.fm, and whether Last.fm is set up on this server (MUSIC-12).
+    ///
+    /// - Remark: HTTP `GET /me/scrobbling/lastfm`.
+    /// - Remark: Generated from `#/paths//me/scrobbling/lastfm/get(lastFmStatus)`.
+    public func lastFmStatus(headers: Operations.LastFmStatus.Input.Headers = .init()) async throws -> Operations.LastFmStatus.Output {
+        try await lastFmStatus(Operations.LastFmStatus.Input(headers: headers))
+    }
+    /// Start connecting Last.fm: the last.fm page where the person approves Marquee. Last.fm sends them back to callbackUrl with ?token=…
+    ///
+    /// - Remark: HTTP `POST /me/scrobbling/lastfm`.
+    /// - Remark: Generated from `#/paths//me/scrobbling/lastfm/post(lastFmAuthUrl)`.
+    public func lastFmAuthUrl(
+        headers: Operations.LastFmAuthUrl.Input.Headers = .init(),
+        body: Operations.LastFmAuthUrl.Input.Body
+    ) async throws -> Operations.LastFmAuthUrl.Output {
+        try await lastFmAuthUrl(Operations.LastFmAuthUrl.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Finish connecting Last.fm with the token last.fm returned.
+    ///
+    /// - Remark: HTTP `PUT /me/scrobbling/lastfm`.
+    /// - Remark: Generated from `#/paths//me/scrobbling/lastfm/put(connectLastFm)`.
+    public func connectLastFm(
+        headers: Operations.ConnectLastFm.Input.Headers = .init(),
+        body: Operations.ConnectLastFm.Input.Body
+    ) async throws -> Operations.ConnectLastFm.Output {
+        try await connectLastFm(Operations.ConnectLastFm.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Stop sending plays to Last.fm.
+    ///
+    /// - Remark: HTTP `DELETE /me/scrobbling/lastfm`.
+    /// - Remark: Generated from `#/paths//me/scrobbling/lastfm/delete(disconnectLastFm)`.
+    public func disconnectLastFm(headers: Operations.DisconnectLastFm.Input.Headers = .init()) async throws -> Operations.DisconnectLastFm.Output {
+        try await disconnectLastFm(Operations.DisconnectLastFm.Input(headers: headers))
     }
     /// - Remark: HTTP `GET /me`.
     /// - Remark: Generated from `#/paths//me/get(getMe)`.
