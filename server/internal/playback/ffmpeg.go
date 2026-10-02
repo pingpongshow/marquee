@@ -74,6 +74,7 @@ type Job struct {
 	SubImage     bool   // the subtitle to burn is a bitmap format (overlay) rather than text (libass)
 	VideoCodec   string // source video codec (for stream-copy tagging)
 	StartSegment int
+	Plan         []float64 // segment start times (seconds); nil = every SegmentSeconds
 	Dir          string
 	Encoder      string // nvenc, qsv, software
 	QSVDevice    string
@@ -96,10 +97,24 @@ func escapeFilterPath(p string) string {
 	return "'" + r.Replace(p) + "'"
 }
 
-// Args builds the FFmpeg command line.
+// SegmentStart is where segment k begins, in seconds.
+func (j Job) SegmentStart(k int) float64 {
+	if k < len(j.Plan) {
+		return j.Plan[k]
+	}
+	return float64(k * SegmentSeconds)
+}
+
+// Args builds the FFmpeg command line. The output is one fragmented MP4 stream on stdout
+// (a fragment per keyframe, absolute timestamps); splitFragments cuts it into segments.
 func (j Job) Args() []string {
 	d := j.Decision
-	start := float64(j.StartSegment * SegmentSeconds)
+	start := j.SegmentStart(j.StartSegment)
+	if d.VideoCopy && start > 0 {
+		// Copying seeks to the keyframe at or before the time; aim just past the planned
+		// keyframe so rounding can't land on the one before. Earlier fragments are dropped.
+		start += 0.05
+	}
 	var a []string
 	a = append(a, "-hide_banner", "-v", "warning", "-nostdin", "-y")
 
@@ -188,13 +203,15 @@ func (j Job) Args() []string {
 				if d.VideoCodec == "hevc" {
 					codec = "hevc_nvenc"
 				}
-				a = append(a, "-c:v", codec, "-preset", preset, "-rc", "vbr", "-forced-idr", "1", "-spatial_aq", "1")
+				a = append(a, "-c:v", codec, "-preset", preset, "-rc", "vbr", "-forced-idr", "1", "-spatial_aq", "1", "-no-scenecut", "1")
 			case "qsv":
 				codec := "h264_qsv"
 				if d.VideoCodec == "hevc" {
 					codec = "hevc_qsv"
 				}
-				a = append(a, "-c:v", codec, "-preset", preset, "-look_ahead", "0")
+				// forced_idr: QSV otherwise ignores forced keyframes and keeps its own ~10 s GOP,
+				// leaving some 6 s segments without a keyframe to start on.
+				a = append(a, "-c:v", codec, "-preset", preset, "-look_ahead", "0", "-forced_idr", "1")
 			default:
 				a = append(a, "-c:v", "libx264", "-preset", preset, "-sc_threshold", "0", "-profile:v", "high")
 			}
@@ -202,7 +219,9 @@ func (j Job) Args() []string {
 				a = append(a, "-tag:v", "hvc1") // Apple players need hvc1
 			}
 			a = append(a, rate...)
-			a = append(a, "-force_key_frames", fmt.Sprintf("expr:gte(t,n_forced*%d)", SegmentSeconds))
+			// A keyframe on the first frame and every SegmentSeconds after it. Transcodes start
+			// exactly on a segment boundary, so these stay aligned with the plan after seeks.
+			a = append(a, "-force_key_frames", fmt.Sprintf("expr:if(isnan(prev_forced_t),1,gte(t,prev_forced_t+%d-0.001))", SegmentSeconds))
 		}
 	}
 
@@ -216,14 +235,11 @@ func (j Job) Args() []string {
 		}
 	}
 
+	// frag_discont keeps absolute timestamps in each fragment (tfdt), so segments made after
+	// a seek restart line up with the rest; without it they would restart at zero.
 	a = append(a, "-sn", "-dn", "-map_metadata", "-1", "-map_chapters", "-1",
 		"-avoid_negative_ts", "disabled", "-max_muxing_queue_size", "4096",
-		"-f", "hls", "-hls_time", strconv.Itoa(SegmentSeconds), "-hls_segment_type", "fmp4",
-		"-hls_fmp4_init_filename", "init.mp4",
-		"-hls_segment_filename", filepath.Join(j.Dir, "%d.m4s"),
-		"-start_number", strconv.Itoa(j.StartSegment),
-		"-hls_list_size", "0", "-hls_playlist_type", "event", "-hls_flags", "temp_file",
-		filepath.Join(j.Dir, "ffmpeg.m3u8"))
+		"-f", "mp4", "-movflags", "+frag_keyframe+empty_moov+default_base_moof+frag_discont", "pipe:1")
 	return a
 }
 

@@ -13,3 +13,10 @@ deploy/.env
 # (Vite resolves .js before .tsx), so never commit any.
 web/src/**/*.js
 web/*.tsbuildinfo
+
+# Apple: the Xcode project is generated from apple/project.yml (xcodegen)
+apple/Marquee.xcodeproj/
+apple/**/.build/
+apple/**/.swiftpm/
+apple/**/xcuserdata/
+apple/build/

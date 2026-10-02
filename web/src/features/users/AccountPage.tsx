@@ -4,6 +4,7 @@ import { meQuery, useUpdateMe } from "@/api/queries";
 import type { UserPreferences } from "@/api/types";
 import { Alert, Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
 import { AvatarPicker } from "./Avatar";
+import { LinkDeviceCard } from "./LinkDevice";
 import { languageOptions, localQualityOptions, remoteQualityOptions } from "./constants";
 
 /** Per-user account and playback preferences (any user). */
@@ -41,6 +42,8 @@ export function AccountPage() {
           </Button>
         </div>
       </Card>
+
+      <LinkDeviceCard />
 
       {!u.isManaged && (
         <Card title="Password" description={u.hasPassword ? undefined : "You don't have a password. Add one to sign in from outside the home network or on devices without PIN sign-in."}>

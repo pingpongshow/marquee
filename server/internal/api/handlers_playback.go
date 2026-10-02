@@ -23,6 +23,7 @@ func toProfile(p DeviceProfile) playback.DeviceProfile {
 	set(&out.TenBit, p.TenBit)
 	set(&out.TextSubtitles, p.TextSubtitles)
 	set(&out.ASSSubtitles, p.AssSubtitles)
+	set(&out.HLSSubtitles, p.HlsSubtitles)
 	if p.Hdr != nil {
 		for _, h := range *p.Hdr {
 			out.HDR = append(out.HDR, string(h))

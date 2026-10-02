@@ -154,11 +154,21 @@ func devTranscode(args []string) int {
 	}
 	d := playback.Decide(m, browser, playback.Limits{MaxKbps: *kbps})
 	fmt.Printf("decision: %s %v\n", d, d.Reasons)
+	plan := playback.FixedPlan(m.DurationMS)
+	if d.VideoCopy {
+		kf, err := playback.Keyframes(ctx, cfg.FFprobePath, *path, res.Container)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "keyframes:", err)
+			return 1
+		}
+		plan = playback.KeyframePlan(kf, float64(m.DurationMS)/1000, playback.SegmentSeconds)
+		fmt.Printf("keyframes: %d, segments: %d (first %v)\n", len(kf), len(plan), plan[:min(4, len(plan))])
+	}
 	dir, _ := os.MkdirTemp(cfg.TranscodeDir, "dev-")
-	tr := &playback.Transcoder{FFmpeg: cfg.FFmpegPath, TotalSegments: playback.SegmentCount(m.DurationMS), ThrottleAhead: 30,
+	tr := &playback.Transcoder{FFmpeg: cfg.FFmpegPath, TotalSegments: len(plan), ThrottleAhead: 30,
 		Encoders: []string{*encoder, "software"},
 		Job: playback.Job{Input: *path, Decision: d, VideoIndex: vi, VideoCodec: m.Video.Codec, AudioIndex: ai, SubIndex: *sub, SubImage: image, SubRelIndex: 0,
-			Dir: dir, Preset: "balanced", QSVDevice: "/dev/dri/renderD128"}}
+			Dir: dir, Preset: "balanced", QSVDevice: "/dev/dri/renderD128", Plan: plan}}
 	defer tr.Stop()
 	fmt.Println("ffmpeg", strings.Join(func() []string { j := tr.Job; j.Encoder = *encoder; j.StartSegment = *start; return j.Args() }(), " "))
 	t0 := time.Now()

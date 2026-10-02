@@ -556,3 +556,47 @@ func TestBrowseFiltersPlaylistsBackups(t *testing.T) {
 		t.Fatalf("tasks: %d", code)
 	}
 }
+
+func TestQuickConnect(t *testing.T) {
+	h := newHarness(t)
+	var res api.AuthResult
+	h.do("POST", "/setup", map[string]any{"serverName": "T", "username": "admin", "password": "correct horse", "device": device}, &res)
+	adminToken := res.Token
+
+	h.token = ""
+	tv := map[string]any{"clientId": "apple-tv-1", "name": "Living Room", "platform": "tvos"}
+	var start api.QuickConnectStart
+	if code := h.do("POST", "/auth/quickconnect", map[string]any{"device": tv}, &start); code != 200 || len(start.Code) != 6 {
+		t.Fatalf("start: %d %+v", code, start)
+	}
+	var st api.QuickConnectState
+	h.do("GET", "/auth/quickconnect/"+start.Secret, nil, &st)
+	if st.Status != "pending" || st.Auth != nil {
+		t.Fatalf("pending: %+v", st)
+	}
+	if code := h.do("POST", "/auth/quickconnect/authorize", map[string]any{"code": start.Code}, nil); code != 401 {
+		t.Fatalf("approving needs sign-in: %d", code)
+	}
+	h.token = adminToken
+	if code := h.do("POST", "/auth/quickconnect/authorize", map[string]any{"code": "ZZZZZZ"}, nil); code != 404 {
+		t.Fatalf("wrong code: %d", code)
+	}
+	var ok struct{ DeviceName string }
+	if code := h.do("POST", "/auth/quickconnect/authorize", map[string]any{"code": strings.ToLower(start.Code[:3]) + " " + start.Code[3:]}, &ok); code != 200 || ok.DeviceName != "Living Room" {
+		t.Fatalf("approve: %d %+v", code, ok)
+	}
+	h.token = ""
+	h.do("GET", "/auth/quickconnect/"+start.Secret, nil, &st)
+	if st.Status != "approved" || st.Auth == nil || st.Auth.User.Username != "admin" {
+		t.Fatalf("approved: %+v", st)
+	}
+	h.token = st.Auth.Token
+	if code := h.do("GET", "/me", nil, nil); code != 200 {
+		t.Fatalf("token from quick connect: %d", code)
+	}
+	h.token = ""
+	h.do("GET", "/auth/quickconnect/"+start.Secret, nil, &st)
+	if st.Status != "expired" {
+		t.Fatalf("token must be handed out once: %+v", st)
+	}
+}

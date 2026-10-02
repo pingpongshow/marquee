@@ -14,6 +14,7 @@ import { PlaylistPage } from "@/features/playlists/PlaylistPage";
 import { PlaylistsPage } from "@/features/playlists/PlaylistsPage";
 import { SearchPage } from "@/features/search/SearchPage";
 import { AccountPage } from "@/features/users/AccountPage";
+import { LinkPage } from "@/features/users/LinkDevice";
 import { SettingsLayout } from "@/features/settings/SettingsLayout";
 import { SettingsSectionPage } from "@/features/settings/SettingsSectionPage";
 import { useAuth } from "@/lib/auth";
@@ -60,6 +61,7 @@ const playRoute = createRoute({
   validateSearch: (s: Record<string, unknown>): { t?: number; pl?: number } => ({ t: typeof s.t === "number" ? s.t : undefined, pl: typeof s.pl === "number" ? s.pl : undefined }),
   component: PlayerPage,
 });
+const linkRoute = createRoute({ getParentRoute: () => rootRoute, path: "/link", component: LinkPage });
 const personRoute = createRoute({ getParentRoute: () => rootRoute, path: "/person/$personId", component: PersonPage });
 const playlistsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/playlists", component: PlaylistsPage });
 const playlistRoute = createRoute({ getParentRoute: () => rootRoute, path: "/playlist/$playlistId", component: PlaylistPage });
@@ -77,7 +79,7 @@ export const settingsSectionRoute = createRoute({
   component: SettingsSectionPage,
 });
 
-const routeTree = rootRoute.addChildren([homeRoute, playRoute, libraryRoute, itemRoute, searchRoute, accountRoute, playlistsRoute, playlistRoute, personRoute, settingsRoute.addChildren([settingsIndexRoute, settingsSectionRoute])]);
+const routeTree = rootRoute.addChildren([homeRoute, playRoute, libraryRoute, itemRoute, searchRoute, accountRoute, playlistsRoute, playlistRoute, personRoute, linkRoute, settingsRoute.addChildren([settingsIndexRoute, settingsSectionRoute])]);
 
 export const router = createRouter({
   routeTree,
