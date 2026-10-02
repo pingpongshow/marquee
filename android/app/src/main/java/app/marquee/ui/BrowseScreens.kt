@@ -1,5 +1,6 @@
 package app.marquee.ui
 
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.foundation.layout.Arrangement
@@ -98,6 +99,7 @@ fun HomeScreen(nav: NavHostController) {
 @Composable
 fun LibrariesScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
+    val liveOn by produceState(false) { value = withContext(Dispatchers.IO) { runCatching { marquee.livetv.liveTvStatus().enabled }.getOrDefault(false) } }
     val requests by produceState<app.marquee.api.models.RequestsStatus?>(null) {
         value = withContext(Dispatchers.IO) { runCatching { marquee.requests.requestsStatus() }.getOrNull() }
     }
@@ -113,6 +115,17 @@ fun LibrariesScreen(nav: NavHostController) {
                 trailingContent = { Icon(Icons.Filled.ChevronRight, null) },
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
                 modifier = Modifier.focusCard({ nav.navigate("discover") }),
+            )
+            HorizontalDivider()
+        }
+        // Phones with Live TV list Playlists here instead of in the tab bar.
+        if (!marquee.isTv && liveOn) item {
+            ListItem(
+                headlineContent = { Text("Playlists") },
+                leadingContent = { Icon(Icons.Filled.LibraryMusic, null) },
+                trailingContent = { Icon(Icons.Filled.ChevronRight, null) },
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+                modifier = Modifier.focusCard({ nav.navigate("playlists") }),
             )
             HorizontalDivider()
         }

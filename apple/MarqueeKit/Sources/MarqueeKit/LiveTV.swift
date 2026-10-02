@@ -1,0 +1,73 @@
+import Foundation
+import MarqueeAPI
+
+public typealias LiveChannel = Components.Schemas.LiveChannel
+public typealias LiveProgramme = Components.Schemas.LiveProgramme
+public typealias LiveTvStatus = Components.Schemas.LiveTvStatus
+public typealias LiveGuideRow = Operations.LiveGuide.Output.Ok.Body.JsonPayloadPayload
+
+/// Live TV (LIVE-1..4): channels, the guide, favourites and live streams.
+@MainActor
+public extension AppSession {
+    private var liveAPI: Client {
+        get throws {
+            guard let client else { throw MarqueeError("Not connected") }
+            return client
+        }
+    }
+
+    func liveStatus() async throws -> LiveTvStatus {
+        try await liveAPI.liveTvStatus().ok.body.json
+    }
+
+    /// Channels with now and next; group nil = all, favorites = only the caller's.
+    func liveChannels(group: String? = nil, favorites: Bool = false) async throws -> [LiveChannel] {
+        try await liveAPI.listLiveChannels(query: .init(group: group, favorites: favorites ? true : nil)).ok.body.json
+    }
+
+    func liveGroups() async throws -> [String] {
+        try await liveAPI.listLiveGroups().ok.body.json.map(\.name)
+    }
+
+    func liveGuide(from: Date, to: Date, group: String? = nil, favorites: Bool = false) async throws -> [Int64: [LiveProgramme]] {
+        let rows = try await liveAPI.liveGuide(query: .init(start: from, end: to, group: group, favorites: favorites ? true : nil)).ok.body.json
+        return Dictionary(uniqueKeysWithValues: rows.map { ($0.channelId, $0.programmes) })
+    }
+
+    func setFavorite(_ channel: Int64, _ on: Bool) async throws {
+        if on {
+            _ = try await liveAPI.favoriteLiveChannel(path: .init(channelId: channel)).noContent
+        } else {
+            _ = try await liveAPI.unfavoriteLiveChannel(path: .init(channelId: channel)).noContent
+        }
+    }
+
+    /// Starts a channel; returns the session id and the stream's URL.
+    func playLive(_ channel: Int64) async throws -> (id: String, url: URL) {
+        switch try await liveAPI.playLiveChannel(path: .init(channelId: channel), body: .json(.init(profile: AppleDeviceProfile.current()))) {
+        case let .ok(ok):
+            let s = try ok.body.json
+            guard let url = absolute(s.url) else { throw MarqueeError("Not connected") }
+            return (s.id, url)
+        case let .badGateway(e): throw MarqueeError((try? e.body.json.message) ?? "The channel isn't available right now")
+        case let .forbidden(e): throw MarqueeError((try? e.body.json.message) ?? "Live TV isn't available here")
+        default: throw MarqueeError("Couldn't tune the channel")
+        }
+    }
+
+    func stopLive(_ session: String) async {
+        _ = try? await liveAPI.stopLiveSession(path: .init(sessionId: session))
+    }
+
+    /// A channel's logo (served without a token).
+    func logoURL(_ c: LiveChannel) -> URL? { absolute(c.logoUrl) }
+}
+
+public extension LiveProgramme {
+    var minutesLeft: Int { max(0, Int(end.timeIntervalSinceNow / 60)) }
+    var isOn: Bool { start <= Date() && end > Date() }
+    var progress: Double {
+        let total = end.timeIntervalSince(start)
+        return total > 0 ? min(1, max(0, Date().timeIntervalSince(start) / total)) : 0
+    }
+}

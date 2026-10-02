@@ -235,6 +235,30 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(withdraw.waitForNonExistence(timeout: 10))
     }
 
+    /// Live TV (LIVE-2/3): guide with a live preview, What's On, full-screen watching and
+    /// channel up. Needs a Live TV source (scripts/fake-iptv.py in development).
+    func testLiveTV() {
+        connectAndSignIn()
+        app.buttons["Live TV"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Live TV"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Unmute"].waitForExistence(timeout: 20), "the preview tunes")
+        sleep(5)
+        shot("l1-guide")
+        app.buttons["What's On"].firstMatch.tap()
+        let watch = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Watch '")).firstMatch
+        XCTAssertTrue(watch.waitForExistence(timeout: 10))
+        shot("l2-whats-on")
+        watch.tap()
+        let close = app.buttons["Close Live TV"]
+        XCTAssertTrue(close.waitForExistence(timeout: 15))
+        sleep(6)
+        shot("l3-watching")
+        app.buttons["Channel up"].tap()
+        sleep(6)
+        shot("l4-channel-up")
+        close.tap()
+    }
+
     func testStatsAndAdventure() {
         connectAndSignIn()
         app.buttons["Settings"].firstMatch.tap()
