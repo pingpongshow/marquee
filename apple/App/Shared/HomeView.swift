@@ -1,5 +1,8 @@
 import MarqueeKit
 import SwiftUI
+#if os(tvOS)
+import TVServices
+#endif
 
 struct HomeView: View {
     @Environment(AppSession.self) private var app
@@ -46,11 +49,33 @@ struct HomeView: View {
         do {
             hubs = try await app.hubs()
             error = nil
+            #if os(tvOS)
+            saveTopShelf()
+            #endif
         } catch {
             self.error = error.localizedDescription
         }
         loaded = true
     }
+
+    #if os(tvOS)
+    /// Continue Watching and the newest titles for the Apple TV Top Shelf.
+    private func saveTopShelf() {
+        let wanted = hubs.filter { $0.id == "continue-watching" || ($0.id.hasPrefix("recent-") && $0.items.first?._type != .album) }.prefix(3)
+        let sections = wanted.map { hub in
+            TopShelfSnapshot.Section(title: hub.title, items: hub.items.prefix(12).map { it in
+                let wide = hub.id == "continue-watching"
+                let art = wide ? (it.images?.thumb ?? it.images?.backdrop) : it.images?.poster
+                return TopShelfSnapshot.Item(id: it.id, title: it.title,
+                                             subtitle: it._type == .episode ? it.grandparentTitle : it.year.map(String.init),
+                                             imageURL: app.imageURL(art, width: wide ? 640 : 300), wide: wide,
+                                             playable: [.movie, .episode, .video].contains(it._type))
+            })
+        }
+        TopShelfSnapshot(sections: Array(sections)).save()
+        TVTopShelfContentProvider.topShelfContentDidChange()
+    }
+    #endif
 }
 
 /// Continue Watching: wide art that plays straight away (Plex behaviour).
