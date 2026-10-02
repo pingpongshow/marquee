@@ -3,6 +3,7 @@ import { useState } from "react";
 import { meQuery, useUpdateMe } from "@/api/queries";
 import type { UserPreferences } from "@/api/types";
 import { Alert, Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
+import { StatsView } from "../settings/StatsView";
 import { AvatarPicker } from "./Avatar";
 import { LinkDeviceCard } from "./LinkDevice";
 import { languageOptions, localQualityOptions, remoteQualityOptions } from "./constants";
@@ -147,6 +148,9 @@ export function AccountPage() {
             Save preferences
           </Button>
         </div>
+      </Card>
+      <Card title="Your stats" description="What you've watched and listened to.">
+        <StatsView admin={false} />
       </Card>
     </div>
   );

@@ -1194,6 +1194,31 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /stats:
+    get:
+      tags: [activity]
+      operationId: getStats
+      summary: Playback statistics (ADM-4). Administrators can see everyone or one user; others see their own (their "year in music").
+      parameters:
+        - name: days
+          in: query
+          description: The last N days; 0 means all time.
+          schema: { type: integer, minimum: 0, maximum: 3650, default: 30 }
+        - name: userId
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: limit
+          in: query
+          description: Entries per top list.
+          schema: { type: integer, minimum: 1, maximum: 50, default: 10 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Stats" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
   /system/status:
     get:
       tags: [system]
@@ -2810,6 +2835,53 @@ components:
         items:
           type: array
           items: { $ref: "#/components/schemas/ItemSummary" }
+
+    Stats:
+      type: object
+      required: [plays, hours, videoHours, musicHours, users, days, movies, shows, artists, albums, tracks, people, platforms, methods, local, remote]
+      properties:
+        since: { type: string, format: date-time }
+        plays: { type: integer }
+        hours: { type: number }
+        videoHours: { type: number }
+        musicHours: { type: number }
+        users: { type: integer, description: People who played something. }
+        days:
+          type: array
+          items:
+            type: object
+            required: [date, video, music, hours]
+            properties:
+              date: { type: string, format: date }
+              video: { type: integer }
+              music: { type: integer }
+              hours: { type: number }
+        movies: { type: array, items: { $ref: "#/components/schemas/StatsCount" } }
+        shows: { type: array, items: { $ref: "#/components/schemas/StatsCount" } }
+        artists: { type: array, items: { $ref: "#/components/schemas/StatsCount" } }
+        albums: { type: array, items: { $ref: "#/components/schemas/StatsCount" } }
+        tracks: { type: array, items: { $ref: "#/components/schemas/StatsCount" } }
+        people: { type: array, items: { $ref: "#/components/schemas/StatsCount" } }
+        platforms: { type: array, items: { $ref: "#/components/schemas/StatsCount" } }
+        methods:
+          type: object
+          required: [directPlay, directStream, transcode]
+          properties:
+            directPlay: { type: integer }
+            directStream: { type: integer }
+            transcode: { type: integer }
+        local: { type: integer }
+        remote: { type: integer }
+
+    StatsCount:
+      type: object
+      required: [title, plays, hours]
+      properties:
+        id: { type: integer, format: int64, description: The item or user, when there is one. }
+        title: { type: string }
+        subtitle: { type: string }
+        plays: { type: integer }
+        hours: { type: number }
 
     Trickplay:
       type: object

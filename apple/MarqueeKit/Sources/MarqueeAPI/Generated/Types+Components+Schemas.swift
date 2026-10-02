@@ -4098,6 +4098,230 @@ extension Components {
                 case items
             }
         }
+        /// - Remark: Generated from `#/components/schemas/Stats`.
+        public struct Stats: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/Stats/since`.
+            public var since: Foundation.Date?
+            /// - Remark: Generated from `#/components/schemas/Stats/plays`.
+            public var plays: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/Stats/hours`.
+            public var hours: Swift.Double
+            /// - Remark: Generated from `#/components/schemas/Stats/videoHours`.
+            public var videoHours: Swift.Double
+            /// - Remark: Generated from `#/components/schemas/Stats/musicHours`.
+            public var musicHours: Swift.Double
+            /// People who played something.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Stats/users`.
+            public var users: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/Stats/DaysPayload`.
+            public struct DaysPayloadPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/Stats/DaysPayload/date`.
+                public var date: Swift.String
+                /// - Remark: Generated from `#/components/schemas/Stats/DaysPayload/video`.
+                public var video: Swift.Int
+                /// - Remark: Generated from `#/components/schemas/Stats/DaysPayload/music`.
+                public var music: Swift.Int
+                /// - Remark: Generated from `#/components/schemas/Stats/DaysPayload/hours`.
+                public var hours: Swift.Double
+                /// Creates a new `DaysPayloadPayload`.
+                ///
+                /// - Parameters:
+                ///   - date:
+                ///   - video:
+                ///   - music:
+                ///   - hours:
+                public init(
+                    date: Swift.String,
+                    video: Swift.Int,
+                    music: Swift.Int,
+                    hours: Swift.Double
+                ) {
+                    self.date = date
+                    self.video = video
+                    self.music = music
+                    self.hours = hours
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case date
+                    case video
+                    case music
+                    case hours
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/Stats/days`.
+            public typealias DaysPayload = [Components.Schemas.Stats.DaysPayloadPayload]
+            /// - Remark: Generated from `#/components/schemas/Stats/days`.
+            public var days: Components.Schemas.Stats.DaysPayload
+            /// - Remark: Generated from `#/components/schemas/Stats/movies`.
+            public var movies: [Components.Schemas.StatsCount]
+            /// - Remark: Generated from `#/components/schemas/Stats/shows`.
+            public var shows: [Components.Schemas.StatsCount]
+            /// - Remark: Generated from `#/components/schemas/Stats/artists`.
+            public var artists: [Components.Schemas.StatsCount]
+            /// - Remark: Generated from `#/components/schemas/Stats/albums`.
+            public var albums: [Components.Schemas.StatsCount]
+            /// - Remark: Generated from `#/components/schemas/Stats/tracks`.
+            public var tracks: [Components.Schemas.StatsCount]
+            /// - Remark: Generated from `#/components/schemas/Stats/people`.
+            public var people: [Components.Schemas.StatsCount]
+            /// - Remark: Generated from `#/components/schemas/Stats/platforms`.
+            public var platforms: [Components.Schemas.StatsCount]
+            /// - Remark: Generated from `#/components/schemas/Stats/methods`.
+            public struct MethodsPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/Stats/methods/directPlay`.
+                public var directPlay: Swift.Int
+                /// - Remark: Generated from `#/components/schemas/Stats/methods/directStream`.
+                public var directStream: Swift.Int
+                /// - Remark: Generated from `#/components/schemas/Stats/methods/transcode`.
+                public var transcode: Swift.Int
+                /// Creates a new `MethodsPayload`.
+                ///
+                /// - Parameters:
+                ///   - directPlay:
+                ///   - directStream:
+                ///   - transcode:
+                public init(
+                    directPlay: Swift.Int,
+                    directStream: Swift.Int,
+                    transcode: Swift.Int
+                ) {
+                    self.directPlay = directPlay
+                    self.directStream = directStream
+                    self.transcode = transcode
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case directPlay
+                    case directStream
+                    case transcode
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/Stats/methods`.
+            public var methods: Components.Schemas.Stats.MethodsPayload
+            /// - Remark: Generated from `#/components/schemas/Stats/local`.
+            public var local: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/Stats/remote`.
+            public var remote: Swift.Int
+            /// Creates a new `Stats`.
+            ///
+            /// - Parameters:
+            ///   - since:
+            ///   - plays:
+            ///   - hours:
+            ///   - videoHours:
+            ///   - musicHours:
+            ///   - users: People who played something.
+            ///   - days:
+            ///   - movies:
+            ///   - shows:
+            ///   - artists:
+            ///   - albums:
+            ///   - tracks:
+            ///   - people:
+            ///   - platforms:
+            ///   - methods:
+            ///   - local:
+            ///   - remote:
+            public init(
+                since: Foundation.Date? = nil,
+                plays: Swift.Int,
+                hours: Swift.Double,
+                videoHours: Swift.Double,
+                musicHours: Swift.Double,
+                users: Swift.Int,
+                days: Components.Schemas.Stats.DaysPayload,
+                movies: [Components.Schemas.StatsCount],
+                shows: [Components.Schemas.StatsCount],
+                artists: [Components.Schemas.StatsCount],
+                albums: [Components.Schemas.StatsCount],
+                tracks: [Components.Schemas.StatsCount],
+                people: [Components.Schemas.StatsCount],
+                platforms: [Components.Schemas.StatsCount],
+                methods: Components.Schemas.Stats.MethodsPayload,
+                local: Swift.Int,
+                remote: Swift.Int
+            ) {
+                self.since = since
+                self.plays = plays
+                self.hours = hours
+                self.videoHours = videoHours
+                self.musicHours = musicHours
+                self.users = users
+                self.days = days
+                self.movies = movies
+                self.shows = shows
+                self.artists = artists
+                self.albums = albums
+                self.tracks = tracks
+                self.people = people
+                self.platforms = platforms
+                self.methods = methods
+                self.local = local
+                self.remote = remote
+            }
+            public enum CodingKeys: String, CodingKey {
+                case since
+                case plays
+                case hours
+                case videoHours
+                case musicHours
+                case users
+                case days
+                case movies
+                case shows
+                case artists
+                case albums
+                case tracks
+                case people
+                case platforms
+                case methods
+                case local
+                case remote
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/StatsCount`.
+        public struct StatsCount: Codable, Hashable, Sendable {
+            /// The item or user
+            ///
+            /// - Remark: Generated from `#/components/schemas/StatsCount/id`.
+            public var id: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/StatsCount/title`.
+            public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StatsCount/subtitle`.
+            public var subtitle: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/StatsCount/plays`.
+            public var plays: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/StatsCount/hours`.
+            public var hours: Swift.Double
+            /// Creates a new `StatsCount`.
+            ///
+            /// - Parameters:
+            ///   - id: The item or user
+            ///   - title:
+            ///   - subtitle:
+            ///   - plays:
+            ///   - hours:
+            public init(
+                id: Swift.Int64? = nil,
+                title: Swift.String,
+                subtitle: Swift.String? = nil,
+                plays: Swift.Int,
+                hours: Swift.Double
+            ) {
+                self.id = id
+                self.title = title
+                self.subtitle = subtitle
+                self.plays = plays
+                self.hours = hours
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case title
+                case subtitle
+                case plays
+                case hours
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/Trickplay`.
         public struct Trickplay: Codable, Hashable, Sendable {
             /// Thumbnail n shows the video at n × intervalMs.
