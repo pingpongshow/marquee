@@ -68,6 +68,18 @@ function trackLabel(s: MediaStream) {
 
 type Selection = { audio?: number; subtitle?: number; quality: number };
 
+/**
+ * Fallback levels when the browser can't play what it claimed it could:
+ * 0 = everything the browser reports, 1 = no direct play, 2 = H.264 video only (full transcode).
+ */
+function profileFor(level: number) {
+  const base = deviceProfile();
+  if (level === 0) return base;
+  const noDirect = { ...base, containers: [] };
+  if (level === 1) return noDirect;
+  return { ...noDirect, videoCodecs: ["h264"], hlsVideoCodecs: ["h264"], tenBit: false, hdr: [] };
+}
+
 export function VideoPlayer({ itemId, startMs }: { itemId: number; startMs?: number }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -92,6 +104,9 @@ export function VideoPlayer({ itemId, startMs }: { itemId: number; startMs?: num
   const [next, setNext] = useState<ItemSummary | null>(null);
   const [nextDismissed, setNextDismissed] = useState(false);
   const hideTimer = useRef<number | undefined>(undefined);
+  const [fallback, setFallback] = useState(0);
+  const startedRef = useRef(false);
+  const failRef = useRef<(m: string) => void>(() => {});
   const [bufferedEnd, setBufferedEnd] = useState(0);
   const menuRef = useRef(menu);
   useEffect(() => {
@@ -143,7 +158,7 @@ export function VideoPlayer({ itemId, startMs }: { itemId: number; startMs?: num
           api.POST("/playback/sessions", {
             body: {
               itemId,
-              profile: deviceProfile(),
+              profile: profileFor(fallback),
               startMs: restartAt,
               audioStreamId: sel.audio,
               subtitleStreamId: sel.subtitle,
@@ -166,7 +181,67 @@ export function VideoPlayer({ itemId, startMs }: { itemId: number; startMs?: num
     return () => {
       cancelled = true;
     };
-  }, [item.data, info.data, itemId, restartAt, sel, remote, stopSession]);
+  }, [item.data, info.data, itemId, restartAt, sel, remote, stopSession, fallback]);
+
+  // When playback fails, report it and retry one step safer (see profileFor).
+  const fail = useCallback(
+    (message: string) => {
+      const s = sessionRef.current;
+      const v = videoRef.current;
+      if (s)
+        api.PATCH("/playback/sessions/{sessionId}", {
+          params: { path: { sessionId: s.id } },
+          body: { positionMs: Math.round((v?.currentTime ?? 0) * 1000), state: "error", error: `${s.decision.method}: ${message}` },
+        }).catch(() => {});
+      if (fallback < 2) {
+        setRestartAt(v && v.currentTime > 1 ? Math.round(v.currentTime * 1000) : restartAt);
+        setFallback((f) => f + 1);
+      } else {
+        setError(`This video can't be played in this browser (${message}).`);
+      }
+    },
+    [fallback, restartAt],
+  );
+  useEffect(() => {
+    failRef.current = fail;
+  }, [fail]);
+
+  // A stream that hasn't started after 20 s counts as failed.
+  useEffect(() => {
+    if (!sess) return;
+    startedRef.current = false;
+    const t = window.setTimeout(() => !startedRef.current && failRef.current("didn't start within 20 seconds"), 20_000);
+    return () => window.clearTimeout(t);
+  }, [sess]);
+
+  // Styled ASS subtitles: render with JASSUB, loading the fonts embedded in the file.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !sess || sess.subtitleFormat !== "ass" || !sess.subtitleUrl) return;
+    let instance: { destroy: () => void } | null = null;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [{ default: JASSUB }, fonts] = await Promise.all([
+          import("jassub"),
+          sess.fontsUrl ? fetch(sess.fontsUrl).then((r) => r.json() as Promise<{ name: string; url: string }[]>) : Promise.resolve([]),
+        ]);
+        if (cancelled) return;
+        instance = new JASSUB({
+          video: v,
+          subUrl: new URL(sess.subtitleUrl!, location.href).href,
+          fonts: fonts.map((f) => new URL(f.url, location.href).href),
+          queryFonts: false, // local font access needs a secure context
+        });
+      } catch (e) {
+        console.warn("styled subtitles unavailable", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      instance?.destroy();
+    };
+  }, [sess]);
 
   // Attach the stream to the <video>.
   useEffect(() => {
@@ -177,10 +252,13 @@ export function VideoPlayer({ itemId, startMs }: { itemId: number; startMs?: num
     hlsRef.current = null;
     if (sess.protocol === "hls" && Hls.isSupported()) {
       const hls = new Hls({ startPosition: start, maxBufferLength: 30, backBufferLength: 60 });
+      let mediaRecovered = false;
       hls.on(Hls.Events.ERROR, (_e, data) => {
         if (data.fatal) {
-          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
-          else setError(`Playback error: ${data.details}`);
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR && !mediaRecovered) {
+            mediaRecovered = true;
+            hls.recoverMediaError();
+          } else failRef.current(`${data.type}: ${data.details}`);
         }
       });
       hls.loadSource(sess.url);
@@ -320,7 +398,15 @@ export function VideoPlayer({ itemId, startMs }: { itemId: number; startMs?: num
         }}
         onProgress={(e) => updateBuffered(e.currentTarget)}
         onWaiting={() => setBuffering(true)}
-        onPlaying={() => setBuffering(false)}
+        onPlaying={() => {
+          startedRef.current = true;
+          setBuffering(false);
+        }}
+        onError={(e) => {
+          const err = e.currentTarget.error;
+          // hls.js reports its own errors; this covers direct play and native HLS.
+          if (err && sess && !hlsRef.current) fail(`media error ${err.code}${err.message ? `: ${err.message}` : ""}`);
+        }}
         onCanPlay={() => setBuffering(false)}
         onVolumeChange={(e) => {
           setMuted(e.currentTarget.muted);
@@ -331,7 +417,7 @@ export function VideoPlayer({ itemId, startMs }: { itemId: number; startMs?: num
           if (next && !nextDismissed) playNext();
         }}
       >
-        {sess?.subtitleUrl && <track key={sess.subtitleUrl} kind="subtitles" src={sess.subtitleUrl} default />}
+        {sess?.subtitleUrl && sess.subtitleFormat !== "ass" && <track key={sess.subtitleUrl} kind="subtitles" src={sess.subtitleUrl} default />}
       </video>
 
       {(buffering || !sess) && !error && (

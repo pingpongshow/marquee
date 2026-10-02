@@ -50,7 +50,7 @@ Priority key:
 | PLAY-4 | Transcode to HLS. Video: H.264/HEVC (AV1 later). Audio: AAC, AC3, EAC3 or Opus. Seeking restarts the encoder at the requested position. | P0 |
 | PLAY-5 | Hardware acceleration: NVIDIA NVENC/NVDEC first (production has an RTX 5090), then Intel QSV, then automatic software fallback. AMD VAAPI is P2. | P0 |
 | PLAY-6 | HDR→SDR tone mapping when transcoding for SDR clients. No 4K/HDR/DV in the library yet, but it must be supported later (schema and decision engine model HDR/DV from day one). | P1 |
-| PLAY-7 | Subtitles: pass through text subtitles as WebVTT. Burn in image subtitles (PGS/VobSub) and ASS when the client can't render them. | P0 |
+| PLAY-7 | Subtitles: pass through text subtitles as WebVTT. Deliver ASS/SSA styled (with embedded fonts) to clients that can render it. Burn in image subtitles (PGS/VobSub). | P0 |
 | PLAY-8 | Audio and subtitle track selection, with per-user language preferences and "remember per show". | P0 |
 | PLAY-9 | **Automatic quality selection.** The server picks the best bitrate per session from the network class (local or remote), measured client bandwidth, server settings, user limits and client settings. See §3a. | P0 |
 | PLAY-15 | Adaptive bitrate during playback: multi-rung HLS ladder for remote sessions. The player switches rungs as throughput changes, and the server re-evaluates the session ceiling when bandwidth or the number of concurrent remote streams changes. | P0 |

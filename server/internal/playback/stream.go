@@ -2,6 +2,7 @@ package playback
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -53,13 +54,24 @@ func (m *Manager) StreamHandler(subtitleCache string) http.Handler {
 				return
 			}
 			m.serveFromTranscoder(w, r, s, k)
-		case strings.HasPrefix(file, "subtitles/") && strings.HasSuffix(file, ".vtt"):
-			sid, err := strconv.ParseInt(strings.TrimSuffix(strings.TrimPrefix(file, "subtitles/"), ".vtt"), 10, 64)
+		case strings.HasPrefix(file, "subtitles/") && (strings.HasSuffix(file, ".vtt") || strings.HasSuffix(file, ".ass")):
+			name := strings.TrimPrefix(file, "subtitles/")
+			format := strings.TrimPrefix(filepath.Ext(name), ".")
+			sid, err := strconv.ParseInt(strings.TrimSuffix(name, "."+format), 10, 64)
 			if err != nil {
 				http.NotFound(w, r)
 				return
 			}
-			m.serveSubtitle(w, r, s, sid, subtitleCache)
+			m.serveSubtitle(w, r, s, sid, subtitleCache, format)
+		case file == "fonts.json":
+			m.serveFontList(w, r, s)
+		case strings.HasPrefix(file, "fonts/"):
+			idx, err := strconv.Atoi(strings.TrimPrefix(file, "fonts/"))
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			m.serveFont(w, r, s, idx, subtitleCache)
 		case file == "audio":
 			m.serveAudioTranscode(w, r, s)
 		default:
@@ -208,8 +220,9 @@ func (m *Manager) serveFromTranscoder(w http.ResponseWriter, r *http.Request, s 
 	http.ServeFile(w, r, p)
 }
 
-// serveSubtitle converts a subtitle track to WebVTT once per file and caches it.
-func (m *Manager) serveSubtitle(w http.ResponseWriter, r *http.Request, s *Session, streamID int64, cacheDir string) {
+// serveSubtitle converts a subtitle track to WebVTT (or extracts the original ASS) once per
+// file and caches it.
+func (m *Manager) serveSubtitle(w http.ResponseWriter, r *http.Request, s *Session, streamID int64, cacheDir, format string) {
 	var index int
 	var external string
 	err := m.DB.QueryRowContext(r.Context(), `SELECT COALESCE(stream_index, -1), COALESCE(external_path, '') FROM streams
@@ -218,7 +231,7 @@ func (m *Manager) serveSubtitle(w http.ResponseWriter, r *http.Request, s *Sessi
 		http.NotFound(w, r)
 		return
 	}
-	out := filepath.Join(cacheDir, fmt.Sprintf("%d-%d.vtt", s.FileID, streamID))
+	out := filepath.Join(cacheDir, fmt.Sprintf("%d-%d.%s", s.FileID, streamID, format))
 	if _, err := os.Stat(out); err != nil {
 		os.MkdirAll(cacheDir, 0o755)
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
@@ -230,7 +243,11 @@ func (m *Manager) serveSubtitle(w http.ResponseWriter, r *http.Request, s *Sessi
 			args = append(args, "-i", s.Path, "-map", fmt.Sprintf("0:%d", index))
 		}
 		tmp := out + ".tmp"
-		args = append(args, "-c:s", "webvtt", "-f", "webvtt", tmp)
+		if format == "ass" {
+			args = append(args, "-c:s", "ass", "-f", "ass", tmp)
+		} else {
+			args = append(args, "-c:s", "webvtt", "-f", "webvtt", tmp)
+		}
 		if msg, err := exec.CommandContext(ctx, m.FFmpeg, args...).CombinedOutput(); err != nil {
 			os.Remove(tmp)
 			slog.Warn("subtitle conversion failed", "file", s.Path, "stream", streamID, "err", err, "ffmpeg", strings.TrimSpace(string(msg)))
@@ -239,7 +256,84 @@ func (m *Manager) serveSubtitle(w http.ResponseWriter, r *http.Request, s *Sessi
 		}
 		os.Rename(tmp, out)
 	}
-	w.Header().Set("Content-Type", "text/vtt; charset=utf-8")
+	if format == "ass" {
+		w.Header().Set("Content-Type", "text/x-ssa; charset=utf-8")
+	} else {
+		w.Header().Set("Content-Type", "text/vtt; charset=utf-8")
+	}
+	http.ServeFile(w, r, out)
+}
+
+type fontAttachment struct {
+	Index int    `json:"-"`
+	Name  string `json:"name"`
+	URL   string `json:"url"`
+}
+
+// fonts lists font attachments embedded in the file (anime MKVs carry their subtitle fonts).
+func (m *Manager) fonts(r *http.Request, s *Session) []fontAttachment {
+	var raw string
+	if err := m.DB.QueryRowContext(r.Context(), `SELECT COALESCE(probe_json, '') FROM media_files WHERE id = ?`, s.FileID).Scan(&raw); err != nil {
+		return nil
+	}
+	var out struct {
+		Streams []struct {
+			Index     int               `json:"index"`
+			CodecType string            `json:"codec_type"`
+			Tags      map[string]string `json:"tags"`
+		} `json:"streams"`
+	}
+	if json.Unmarshal([]byte(raw), &out) != nil {
+		return nil
+	}
+	var list []fontAttachment
+	for _, st := range out.Streams {
+		mime := strings.ToLower(st.Tags["mimetype"])
+		name := st.Tags["filename"]
+		ext := strings.ToLower(filepath.Ext(name))
+		if st.CodecType != "attachment" || !(strings.Contains(mime, "font") || ext == ".ttf" || ext == ".otf" || ext == ".ttc" || ext == ".woff" || ext == ".woff2") {
+			continue
+		}
+		list = append(list, fontAttachment{Index: st.Index, Name: name, URL: StreamPrefix + s.ID + "/fonts/" + strconv.Itoa(st.Index)})
+	}
+	return list
+}
+
+func (m *Manager) serveFontList(w http.ResponseWriter, r *http.Request, s *Session) {
+	list := m.fonts(r, s)
+	if list == nil {
+		list = []fontAttachment{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(list)
+}
+
+// serveFont extracts one embedded font (cached per file).
+func (m *Manager) serveFont(w http.ResponseWriter, r *http.Request, s *Session, index int, cacheDir string) {
+	ok := false
+	for _, f := range m.fonts(r, s) {
+		ok = ok || f.Index == index
+	}
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	out := filepath.Join(cacheDir, fmt.Sprintf("%d-font-%d", s.FileID, index))
+	if _, err := os.Stat(out); err != nil {
+		os.MkdirAll(cacheDir, 0o755)
+		tmp := out + ".tmp"
+		ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
+		defer cancel()
+		// -dump_attachment writes the file and then complains there's no output; the file is what we want.
+		exec.CommandContext(ctx, m.FFmpeg, "-hide_banner", "-v", "error", "-y", fmt.Sprintf("-dump_attachment:%d", index), tmp, "-i", s.Path).Run()
+		if st, err := os.Stat(tmp); err != nil || st.Size() == 0 {
+			http.Error(w, "font extraction failed", http.StatusUnprocessableEntity)
+			return
+		}
+		os.Rename(tmp, out)
+	}
+	w.Header().Set("Content-Type", "font/ttf")
+	w.Header().Set("Cache-Control", "private, max-age=86400")
 	http.ServeFile(w, r, out)
 }
 

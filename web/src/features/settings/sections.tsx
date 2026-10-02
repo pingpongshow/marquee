@@ -1,5 +1,6 @@
 import { Activity, CalendarClock, Cpu, Database, Download, Globe, Library, MonitorSmartphone, Network, ScrollText, Server, Users } from "lucide-react";
 import type { ComponentType } from "react";
+import { DashboardSettings } from "./DashboardSettings";
 import { LibrariesSettings } from "./LibrariesSettings";
 import { LogsSettings } from "./LogsSettings";
 import { PlexImportSettings } from "./PlexImportSettings";
@@ -43,7 +44,7 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] = 
   {
     label: "Activity",
     sections: [
-      { id: "dashboard", label: "Dashboard", icon: Activity, milestone: "M3", description: "Now playing, bandwidth and active transcodes." },
+      { id: "dashboard", label: "Dashboard", icon: Activity, component: DashboardSettings, description: "Now playing, bandwidth, transcodes and recent plays." },
       { id: "logs", label: "Logs", icon: ScrollText, component: LogsSettings, description: "What the server has been doing, for troubleshooting." },
     ],
   },

@@ -3,6 +3,7 @@ import { clsx } from "clsx";
 import { Activity, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api, unwrap } from "@/api/client";
+import { Link } from "@tanstack/react-router";
 import { useCancelScan } from "@/api/queries";
 import type { components } from "@/api/schema.gen";
 
@@ -11,6 +12,10 @@ type Task = components["schemas"]["ActivityTask"];
 function taskDetail(t: Task) {
   const p = t.progress;
   if (t.state === "queued" || !p) return "Waiting…";
+  if (t.kind === "stream") {
+    const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+    return `${fmt(p.done)} / ${fmt(p.total)}`;
+  }
   if (p.phase === "walking") return "Finding files…";
   if (p.phase === "cleanup") return "Finishing up…";
   return `${p.done.toLocaleString()} of ${p.total.toLocaleString()}`;
@@ -91,12 +96,15 @@ export function ActivityIndicator() {
                       <div className="truncate text-sm font-medium">{t.title}</div>
                       <div className="text-xs text-muted">{taskDetail(t)}</div>
                     </div>
-                    {t.libraryId && (
+                    {(t.libraryId || t.kind === "stream") && (
                       <button
                         className="rounded p-1 text-muted hover:bg-surface-2 hover:text-text"
                         aria-label={`Stop: ${t.title}`}
                         title="Stop"
-                        onClick={() => t.libraryId && cancel.mutate(t.libraryId)}
+                        onClick={() => {
+                          if (t.kind === "stream") void api.DELETE("/playback/sessions/{sessionId}", { params: { path: { sessionId: t.id.replace("stream:", "") } } });
+                          else if (t.libraryId) cancel.mutate(t.libraryId);
+                        }}
                       >
                         <Square className="size-3.5" />
                       </button>
@@ -115,7 +123,9 @@ export function ActivityIndicator() {
               );
             })}
           </ul>
-          <div className="border-t border-border px-4 py-2 text-[11px] text-faint">Streams will appear here once playback is available.</div>
+          <Link to="/settings/$section" params={{ section: "dashboard" }} onClick={() => setOpen(false)} className="block border-t border-border px-4 py-2 text-xs text-muted hover:text-text">
+            Open dashboard
+          </Link>
         </div>
       )}
     </div>

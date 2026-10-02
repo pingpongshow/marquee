@@ -689,6 +689,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/activity/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent plays, newest first (admin only). */
+        get: operations["playHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Server health for the dashboard (admin only). */
+        get: operations["systemStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/filesystem/browse": {
         parameters: {
             query?: never;
@@ -1213,6 +1247,8 @@ export interface components {
             hlsAudioCodecs: string[];
             /** @description Can show WebVTT sidecar subtitles. */
             textSubtitles?: boolean;
+            /** @description Can render styled ASS/SSA subtitles itself (e.g. JASSUB); they're then sent as .ass with the file's fonts. */
+            assSubtitles?: boolean;
         };
         PlaybackRequest: {
             /** Format: int64 */
@@ -1290,8 +1326,12 @@ export interface components {
             audioStreamId?: number;
             /** Format: int64 */
             subtitleStreamId?: number;
-            /** @description WebVTT for the selected text subtitle (absent when burned in or off). */
+            /** @description The selected text subtitle as WebVTT or ASS (absent when burned in or off). */
             subtitleUrl?: string;
+            /** @enum {string} */
+            subtitleFormat?: "vtt" | "ass";
+            /** @description With ASS subtitles: JSON list of fonts embedded in the file ({name, url}[]). */
+            fontsUrl?: string;
             markers: components["schemas"]["Marker"][];
         };
         PlaybackProgress: {
@@ -1327,6 +1367,54 @@ export interface components {
             bitrateKbps: number;
             /** Format: date-time */
             startedAt: string;
+            /**
+             * Format: int64
+             * @description Artwork id for a thumbnail (episode still
+             */
+            imageId?: number;
+            /** @description Episode or album line, e.g. S2 · E5 · Title */
+            subtitle?: string;
+        };
+        HistoryEntry: {
+            /** Format: int64 */
+            id: number;
+            userName?: string;
+            deviceName?: string;
+            /** Format: int64 */
+            itemId?: number;
+            title: string;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            stoppedAt?: string;
+            /** Format: int64 */
+            positionMs?: number;
+            method?: string;
+            networkClass?: string;
+            encoder?: string;
+            bitrateKbps?: number;
+            /** @enum {string} */
+            source: "marquee" | "plex";
+        };
+        SystemStatus: {
+            version: string;
+            /** Format: date-time */
+            startedAt: string;
+            /** @description Encoders that work on this server, in the configured order. */
+            encoders: string[];
+            activeStreams: number;
+            activeTranscodes: number;
+            maxTranscodes: number;
+            localKbps: number;
+            remoteKbps: number;
+            uploadSpeedKbps?: number;
+            libraries: {
+                /** Format: int64 */
+                id: number;
+                name: string;
+                type: components["schemas"]["LibraryType"];
+                items: number;
+            }[];
         };
         Hub: {
             /** @example continue-watching */
@@ -2899,6 +2987,52 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    playHistory: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryEntry"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    systemStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     browseFilesystem: {
