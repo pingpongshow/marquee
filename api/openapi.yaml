@@ -31,6 +31,8 @@ tags:
   - name: hubs
   - name: playlists
   - name: music
+  - name: syncplay
+    description: Watch together (SyncPlay) - shared play, pause and seek for a video.
   - name: livetv
     description: Live TV channels and guide from M3U/XMLTV sources and Dispatcharr (LIVE-1..4).
   - name: requests
@@ -1394,6 +1396,117 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+
+  /syncplay/groups:
+    get:
+      tags: [syncplay]
+      operationId: listWatchGroups
+      summary: Watch-together groups the caller can join (members can see any group on the server).
+      responses:
+        "200":
+          description: Groups.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/WatchGroup" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [syncplay]
+      operationId: createWatchGroup
+      summary: Start watching something together; the caller is the first member.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [itemId]
+              properties:
+                itemId: { type: integer, format: int64 }
+                positionMs: { type: integer, format: int64, minimum: 0 }
+      responses:
+        "201":
+          description: The group.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WatchGroup" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /syncplay/groups/{groupId}:
+    parameters:
+      - { name: groupId, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [syncplay]
+      operationId: getWatchGroup
+      summary: The group's state. With since, waits (up to 25 s) for a newer version - long polling.
+      parameters:
+        - { name: since, in: query, schema: { type: integer, format: int64 } }
+      responses:
+        "200":
+          description: The group.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WatchGroup" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /syncplay/groups/{groupId}/join:
+    parameters:
+      - { name: groupId, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [syncplay]
+      operationId: joinWatchGroup
+      summary: Join a group.
+      responses:
+        "200":
+          description: The group.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WatchGroup" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /syncplay/groups/{groupId}/leave:
+    parameters:
+      - { name: groupId, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [syncplay]
+      operationId: leaveWatchGroup
+      summary: Leave a group; the last one out ends it.
+      responses:
+        "204": { description: Left. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /syncplay/groups/{groupId}/command:
+    parameters:
+      - { name: groupId, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [syncplay]
+      operationId: watchGroupCommand
+      summary: Play, pause or seek for everyone in the group (members only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, positionMs]
+              properties:
+                action: { type: string, enum: [play, pause, seek, buffering, ready] }
+                positionMs: { type: integer, format: int64, minimum: 0 }
+      responses:
+        "200":
+          description: The new state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WatchGroup" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /livetv/status:
     get:
@@ -2873,6 +2986,32 @@ components:
         watchedThresholdPercent: { type: integer, minimum: 50, maximum: 100 }
         detectIntros: { type: boolean, description: "Find intros and end credits in TV episodes by comparing their audio, for Skip Intro and Skip Credits (PLAY-12). Markers from Plex or the files take precedence." }
         trickplay: { type: boolean, description: "Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie." }
+
+    WatchGroup:
+      type: object
+      required: [id, itemId, title, hostId, members, version, playing, positionMs, at, serverTime]
+      properties:
+        id: { type: string }
+        itemId: { type: integer, format: int64 }
+        title: { type: string, description: What's playing. }
+        hostId: { type: integer, format: int64, description: Who started the group. }
+        members:
+          type: array
+          items:
+            type: object
+            required: [userId, name, buffering]
+            properties:
+              userId: { type: integer, format: int64 }
+              name: { type: string }
+              avatarUrl: { type: string }
+              buffering: { type: boolean }
+        version: { type: integer, format: int64, description: Bumped on every change. }
+        playing: { type: boolean, description: "False while paused, or while a member is still loading." }
+        positionMs: { type: integer, format: int64, description: Position at `at`. }
+        at: { type: string, format: date-time, description: "When positionMs was true. While playing, now = positionMs + (serverTime - at)." }
+        serverTime: { type: string, format: date-time, description: "The server's clock, to correct for the client's." }
+        lastAction: { type: string }
+        lastBy: { type: string, description: Who did the last thing. }
 
     LiveTvStatus:
       type: object

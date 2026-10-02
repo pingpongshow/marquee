@@ -94,10 +94,11 @@ const playRoute = createRoute({
   path: "/play/$itemId",
   validateSearch: (
     s: Record<string, unknown>,
-  ): { t?: number; pl?: number; f?: number } => ({
+  ): { t?: number; pl?: number; f?: number; g?: string } => ({
     t: typeof s.t === "number" ? s.t : undefined,
     pl: typeof s.pl === "number" ? s.pl : undefined,
     f: typeof s.f === "number" ? s.f : undefined, // a specific version's file (LIB-7)
+    g: typeof s.g === "string" ? s.g : undefined, // a watch-together group to join
   }),
   component: PlayerPage,
 });

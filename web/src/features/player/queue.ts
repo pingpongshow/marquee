@@ -9,12 +9,25 @@ export type Repeat = "off" | "all" | "one";
  * The play queue. `entries` is the play order; while shuffled, `original` keeps the
  * unshuffled order so turning shuffle off restores it (Plexamp behaviour).
  */
-export type Queue = { entries: Entry[]; index: number; shuffled: boolean; original: Entry[] | null; repeat: Repeat };
+export type Queue = {
+  entries: Entry[];
+  index: number;
+  shuffled: boolean;
+  original: Entry[] | null;
+  repeat: Repeat;
+};
 
-export const emptyQueue: Queue = { entries: [], index: -1, shuffled: false, original: null, repeat: "off" };
+export const emptyQueue: Queue = {
+  entries: [],
+  index: -1,
+  shuffled: false,
+  original: null,
+  repeat: "off",
+};
 
 let nextKey = 1;
-const wrap = (items: ItemSummary[], dj?: string): Entry[] => items.map((item) => ({ key: nextKey++, item, ...(dj ? { dj } : {}) }));
+const wrap = (items: ItemSummary[], dj?: string): Entry[] =>
+  items.map((item) => ({ key: nextKey++, item, ...(dj ? { dj } : {}) }));
 
 function shuffled<T>(list: T[], random = Math.random): T[] {
   const out = [...list];
@@ -28,29 +41,62 @@ function shuffled<T>(list: T[], random = Math.random): T[] {
 export const current = (q: Queue): Entry | undefined => q.entries[q.index];
 
 /** Replaces the queue and starts at `start`; with shuffle the started track plays first. */
-export function load(q: Queue, items: ItemSummary[], start = 0, shuffle = false, random = Math.random): Queue {
+export function load(
+  q: Queue,
+  items: ItemSummary[],
+  start = 0,
+  shuffle = false,
+  random = Math.random,
+): Queue {
   const entries = wrap(items);
   if (!entries.length) return { ...emptyQueue, repeat: q.repeat };
-  if (!shuffle) return { entries, index: Math.min(Math.max(start, 0), entries.length - 1), shuffled: false, original: null, repeat: q.repeat };
+  if (!shuffle)
+    return {
+      entries,
+      index: Math.min(Math.max(start, 0), entries.length - 1),
+      shuffled: false,
+      original: null,
+      repeat: q.repeat,
+    };
   const first = entries[Math.min(Math.max(start, 0), entries.length - 1)]!;
   const rest = shuffled(
     entries.filter((e) => e !== first),
     random,
   );
-  return { entries: [first, ...rest], index: 0, shuffled: true, original: entries, repeat: q.repeat };
+  return {
+    entries: [first, ...rest],
+    index: 0,
+    shuffled: true,
+    original: entries,
+    repeat: q.repeat,
+  };
 }
 
 export function toggleShuffle(q: Queue, random = Math.random): Queue {
   const cur = current(q);
   if (!cur) return { ...q, shuffled: !q.shuffled };
   if (q.shuffled && q.original) {
-    return { ...q, entries: q.original, index: Math.max(0, q.original.indexOf(cur)), shuffled: false, original: null };
+    return {
+      ...q,
+      entries: q.original,
+      index: Math.max(0, q.original.indexOf(cur)),
+      shuffled: false,
+      original: null,
+    };
   }
   const upcoming = shuffled(q.entries.slice(q.index + 1), random);
-  return { ...q, entries: [...q.entries.slice(0, q.index + 1), ...upcoming], shuffled: true, original: q.entries };
+  return {
+    ...q,
+    entries: [...q.entries.slice(0, q.index + 1), ...upcoming],
+    shuffled: true,
+    original: q.entries,
+  };
 }
 
-export const cycleRepeat = (q: Queue): Queue => ({ ...q, repeat: q.repeat === "off" ? "all" : q.repeat === "all" ? "one" : "off" });
+export const cycleRepeat = (q: Queue): Queue => ({
+  ...q,
+  repeat: q.repeat === "off" ? "all" : q.repeat === "all" ? "one" : "off",
+});
 
 /** Inserts items right after the current track. */
 export function playNext(q: Queue, items: ItemSummary[], dj?: string): Queue {
@@ -70,7 +116,11 @@ export function playNext(q: Queue, items: ItemSummary[], dj?: string): Queue {
 export function append(q: Queue, items: ItemSummary[]): Queue {
   if (q.index < 0) return load(q, items);
   const add = wrap(items);
-  return { ...q, entries: [...q.entries, ...add], original: q.original ? [...q.original, ...add] : null };
+  return {
+    ...q,
+    entries: [...q.entries, ...add],
+    original: q.original ? [...q.original, ...add] : null,
+  };
 }
 
 export function remove(q: Queue, key: number): Queue {
@@ -79,8 +129,14 @@ export function remove(q: Queue, key: number): Queue {
   const entries = q.entries.filter((e) => e.key !== key);
   if (!entries.length) return { ...emptyQueue, repeat: q.repeat };
   // Removing the current track moves on to the one that took its place.
-  const index = i < q.index ? q.index - 1 : Math.min(q.index, entries.length - 1);
-  return { ...q, entries, index, original: q.original?.filter((e) => e.key !== key) ?? null };
+  const index =
+    i < q.index ? q.index - 1 : Math.min(q.index, entries.length - 1);
+  return {
+    ...q,
+    entries,
+    index,
+    original: q.original?.filter((e) => e.key !== key) ?? null,
+  };
 }
 
 /** Moves an entry to position `to` in the play order. */
