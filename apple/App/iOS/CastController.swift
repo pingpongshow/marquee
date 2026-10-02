@@ -31,6 +31,8 @@ final class CastController: NSObject {
     @ObservationIgnored private var castingMusic = false
     @ObservationIgnored private var ticker: Timer?
     @ObservationIgnored private var lastReport = Date.distantPast
+    /// Bumped per load, so a slow load for an earlier track can't replace a newer one.
+    @ObservationIgnored private var loadGeneration = 0
 
     static func setUp(app: AppSession, music: MusicPlayer) {
         let options = GCKCastOptions(discoveryCriteria: GCKDiscoveryCriteria(applicationID: kGCKDefaultMediaReceiverApplicationID))
@@ -81,12 +83,23 @@ final class CastController: NSObject {
     @discardableResult
     func load(itemID: Int64, at seconds: Double, title: String, subtitle: String?, artwork: URL?, music: Bool,
               fileID: Int64? = nil, audio: Int64? = nil, subtitleStream: Int64? = nil) async -> String? {
-        guard let app, let remote else { return "Not connected to a Cast device" }
+        guard let app, remote != nil else { return "Not connected to a Cast device" }
+        loadGeneration += 1
+        let generation = loadGeneration
         let s: PlaybackSession
         do {
             s = try await app.castSession(itemID: itemID, startMs: Int64(seconds * 1000), fileID: fileID, audio: audio, subtitle: subtitleStream)
         } catch {
-            return error.localizedDescription
+            return generation == loadGeneration ? error.localizedDescription : nil
+        }
+        // Another load started meanwhile (a quick skip): this one's session isn't needed.
+        guard generation == loadGeneration else {
+            app.stopCastSession(s.id)
+            return nil
+        }
+        guard let remote else {
+            app.stopCastSession(s.id)
+            return "Not connected to a Cast device"
         }
         guard let url = app.castURL(s.url) else { return "No server address" }
         let meta = GCKMediaMetadata(metadataType: music ? .musicTrack : .movie)
@@ -116,11 +129,11 @@ final class CastController: NSObject {
         if !active.isEmpty { request.activeTrackIDs = active }
         closeSession()
         session = s
-        remote.loadMedia(with: request.build())
+        _ = remote.loadMedia(with: request.build())
         return nil
     }
 
-    func toggle() { playing ? remote?.pause() : remote?.play() }
+    func toggle() { _ = playing ? remote?.pause() : remote?.play() }
 
     func seekTo(_ seconds: Double) {
         let o = GCKMediaSeekOptions()
@@ -188,10 +201,18 @@ extension CastController: RemotePlayback {
     func play(_ item: Item, at seconds: Double) {
         let artist = item.artistCredit ?? item.grandparentTitle
         let art = app?.imageURL(item.images?.poster, width: 512)
-        Task { await load(itemID: item.id, at: seconds, title: item.title, subtitle: artist, artwork: art, music: true) }
+        Task {
+            guard let err = await load(itemID: item.id, at: seconds, title: item.title, subtitle: artist, artwork: art, music: true),
+                  castingMusic else { return }
+            // Couldn't cast: say why and carry on here.
+            castingMusic = false
+            music?.showError("Couldn't cast: \(err)")
+            music?.remote = nil
+        }
     }
 
-    func resume() { remote?.play() }
+    func resume() { _ = remote?.play() }
+    func pause() { _ = remote?.pause() }
     func seek(_ seconds: Double) { seekTo(seconds) }
 }
 

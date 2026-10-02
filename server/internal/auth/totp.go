@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -129,21 +130,42 @@ func (s *Service) CheckTOTP(ctx context.Context, userID int64, code string) erro
 	if code == "" {
 		return ErrTOTPRequired
 	}
+	// Wrong codes are limited per account, so knowing the password doesn't allow guessing.
+	key := "totp:" + strconv.FormatInt(userID, 10)
+	if wait := s.totp.blocked("", key); wait > 0 {
+		return &RateLimitedError{RetryAfter: wait}
+	}
+	// Each code and recovery code works once: the updates only succeed if nothing else used
+	// it first (two sign-ins racing with the same code).
 	if step := totpMatch(secret.String, code, time.Now()); step > last {
-		_, err := s.db.ExecContext(ctx, `UPDATE user_totp SET last_step = ? WHERE user_id = ?`, step, userID)
-		return err
+		res, err := s.db.ExecContext(ctx, `UPDATE user_totp SET last_step = ? WHERE user_id = ? AND last_step < ?`, step, userID, step)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 1 {
+			s.totp.success("", key)
+			return nil
+		}
 	}
 	var hashes []string
 	json.Unmarshal([]byte(rec), &hashes)
 	h := hashCode(code)
 	for i, x := range hashes {
 		if subtle.ConstantTimeCompare([]byte(x), []byte(h)) == 1 {
-			hashes = append(hashes[:i], hashes[i+1:]...)
-			raw, _ := json.Marshal(hashes)
-			_, err := s.db.ExecContext(ctx, `UPDATE user_totp SET recovery = ? WHERE user_id = ?`, string(raw), userID)
-			return err
+			left := append(append([]string{}, hashes[:i]...), hashes[i+1:]...)
+			raw, _ := json.Marshal(left)
+			res, err := s.db.ExecContext(ctx, `UPDATE user_totp SET recovery = ? WHERE user_id = ? AND recovery = ?`, string(raw), userID, rec)
+			if err != nil {
+				return err
+			}
+			if n, _ := res.RowsAffected(); n == 1 {
+				s.totp.success("", key)
+				return nil
+			}
+			break
 		}
 	}
+	s.totp.fail("", key)
 	return ErrTOTPInvalid
 }
 

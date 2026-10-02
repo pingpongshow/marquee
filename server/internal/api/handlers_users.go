@@ -340,6 +340,9 @@ func (h *Handlers) SwitchProfile(ctx context.Context, req SwitchProfileRequestOb
 	set(&pin, b.Pin)
 	set(&pw, b.Password)
 	ip := requestInfo(ctx).ClientIP
+	if pw == "" && pinBlockedBy2FA(ctx, target) {
+		return SwitchProfile401JSONResponse{UnauthorizedJSONResponse(apiErr("password_required", errPinNeeds2FA))}, nil
+	}
 	// Admins can switch into managed profiles without the PIN (like a Plex Home admin).
 	if !(s.User.IsAdmin && target.IsManaged) {
 		err = h.Auth.VerifySwitch(ctx, ip, target, pin, pw)

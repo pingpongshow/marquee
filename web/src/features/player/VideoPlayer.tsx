@@ -37,6 +37,7 @@ import type {
 } from "@/api/types";
 import { Spinner } from "@/components/ui";
 import { languageName, versionLabel } from "../browse/format";
+import { ignoreShortcut } from "@/lib/keys";
 import { deviceProfile } from "./deviceProfile";
 import { SubtitleSearchDialog } from "./SubtitleSearch";
 
@@ -218,24 +219,29 @@ export function VideoPlayer({
     setBufferedEnd(end);
   };
 
-  const file =
-    item.data?.versions[0]?.files.find((f) => f.id === sess?.fileId) ??
-    item.data?.versions[0]?.files[0];
+  const allFiles = item.data?.versions.flatMap((v) => v.files) ?? [];
+  const file = allFiles.find((f) => f.id === sess?.fileId) ?? allFiles[0];
   const audioTracks = file?.streams.filter((s) => s.kind === "audio") ?? [];
   const subTracks = file?.streams.filter((s) => s.kind === "subtitle") ?? [];
   const duration = (sess?.durationMs ?? item.data?.durationMs ?? 0) / 1000;
 
-  const report = useCallback((state: "playing" | "paused" | "buffering") => {
-    const s = sessionRef.current;
-    const v = videoRef.current;
-    if (!s || !v) return;
-    api
-      .PATCH("/playback/sessions/{sessionId}", {
-        params: { path: { sessionId: s.id } },
-        body: { positionMs: Math.round(v.currentTime * 1000), state },
-      })
-      .catch(() => {});
-  }, []);
+  const report = useCallback(
+    (
+      state: "playing" | "paused" | "buffering",
+      el?: HTMLVideoElement | null,
+    ) => {
+      const s = sessionRef.current;
+      const v = el ?? videoRef.current;
+      if (!s || !v) return;
+      api
+        .PATCH("/playback/sessions/{sessionId}", {
+          params: { path: { sessionId: s.id } },
+          body: { positionMs: Math.round(v.currentTime * 1000), state },
+        })
+        .catch(() => {});
+    },
+    [],
+  );
 
   const stopSession = useCallback(() => {
     const s = sessionRef.current;
@@ -249,9 +255,12 @@ export function VideoPlayer({
     }).catch(() => {});
   }, []);
 
-  // Start (or restart, after a track/quality change) the session.
+  // Start (or restart, after a track/quality change) the session. Depends only on primitives
+  // and the selection: refetches of the item or system info (progress reports, ratings,
+  // reconnects) hand back new objects and must not restart the stream mid-playback.
+  const ready = !!item.data && !!info.data;
   useEffect(() => {
-    if (!item.data || !info.data) return;
+    if (!ready) return;
     let cancelled = false;
     (async () => {
       setError(null);
@@ -294,16 +303,7 @@ export function VideoPlayer({
     return () => {
       cancelled = true;
     };
-  }, [
-    item.data,
-    info.data,
-    itemId,
-    restartAt,
-    sel,
-    remote,
-    stopSession,
-    fallback,
-  ]);
+  }, [ready, itemId, restartAt, sel, remote, stopSession, fallback]);
 
   // When playback fails, report it and retry one step safer (see profileFor).
   const fail = useCallback(
@@ -390,6 +390,7 @@ export function VideoPlayer({
     const start = sess.startMs / 1000;
     hlsRef.current?.destroy();
     hlsRef.current = null;
+    let removeSeek: (() => void) | undefined;
     if (sess.protocol === "hls" && Hls.isSupported()) {
       const hls = new Hls({
         startPosition: start,
@@ -415,16 +416,20 @@ export function VideoPlayer({
         v.removeEventListener("loadedmetadata", seek);
       };
       v.addEventListener("loadedmetadata", seek);
+      removeSeek = () => v.removeEventListener("loadedmetadata", seek);
     }
     v.play().catch(() => setPlaying(false));
     return () => {
+      removeSeek?.();
       hlsRef.current?.destroy();
       hlsRef.current = null;
     };
   }, [sess]);
 
-  // Periodic progress; stop the session when leaving.
+  // Periodic progress; stop the session when leaving. The ref is detached by the time the
+  // cleanup runs on unmount, so keep the element for the final report.
   useEffect(() => {
+    const el = videoRef.current;
     const t = window.setInterval(
       () => videoRef.current && !videoRef.current.paused && report("playing"),
       10_000,
@@ -434,7 +439,7 @@ export function VideoPlayer({
     return () => {
       window.clearInterval(t);
       window.removeEventListener("pagehide", onUnload);
-      report("paused");
+      report("paused", el);
       stopSession();
       qc.invalidateQueries({ queryKey: ["items"] });
     };
@@ -496,9 +501,14 @@ export function VideoPlayer({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.tagName === "INPUT") return;
+      if (ignoreShortcut(e)) return;
       const el = videoRef.current;
       if (!el) return;
+      // Escape closes an open player menu before it leaves the player.
+      if (e.key === "Escape" && menuRef.current) {
+        setMenu(null);
+        return;
+      }
       switch (e.key) {
         case " ":
         case "k":
@@ -694,7 +704,7 @@ export function VideoPlayer({
       {/* Bottom controls */}
       <div
         className={clsx(
-          "absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-6 pt-16 pb-5 transition-opacity",
+          "absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-3 pt-16 pb-5 transition-opacity sm:px-6",
           chrome ? "opacity-100" : "pointer-events-none opacity-0",
         )}
       >
@@ -706,7 +716,7 @@ export function VideoPlayer({
           preview={trickplay.data ? { ...trickplay.data, itemId } : undefined}
           onSeek={(t) => videoRef.current && (videoRef.current.currentTime = t)}
         />
-        <div className="mt-3 flex items-center gap-3 text-white">
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-white">
           <button
             onClick={toggle}
             className="rounded-full p-2 hover:bg-white/10"
@@ -741,15 +751,16 @@ export function VideoPlayer({
               <SkipForward className="size-5" />
             </button>
           )}
-          <span className="ml-2 text-sm tabular-nums">
+          <span className="text-sm tabular-nums sm:ml-2">
             {fmt(time)} / {fmt(duration)}
           </span>
           <div className="ml-auto flex items-center gap-1">
+            {/* Phones use their hardware volume buttons. */}
             <button
               onClick={() =>
                 videoRef.current && (videoRef.current.muted = !muted)
               }
-              className="rounded-full p-2 hover:bg-white/10"
+              className="hidden rounded-full p-2 hover:bg-white/10 sm:block"
               aria-label={muted ? "Unmute" : "Mute"}
             >
               {muted || volume === 0 ? (
@@ -765,7 +776,7 @@ export function VideoPlayer({
               step={0.05}
               value={muted ? 0 : volume}
               aria-label="Volume"
-              className="w-24 accent-[var(--color-accent)]"
+              className="hidden w-24 accent-[var(--color-accent)] sm:block"
               onChange={(e) => {
                 const el = videoRef.current;
                 if (el) {
@@ -832,7 +843,7 @@ export function VideoPlayer({
       </div>
 
       {menu && (
-        <div className="absolute right-6 bottom-24 max-h-[60vh] w-80 overflow-y-auto rounded-lg border border-white/15 bg-black/85 p-2 text-sm text-white shadow-2xl backdrop-blur">
+        <div className="absolute right-3 bottom-32 max-h-[60vh] w-80 max-w-[calc(100vw-1.5rem)] overflow-y-auto sm:right-6 sm:bottom-24 rounded-lg border border-white/15 bg-black/85 p-2 text-sm text-white shadow-2xl backdrop-blur">
           {menu === "together" && (
             <div className="space-y-2 p-2">
               <MenuHeading>Watching together</MenuHeading>

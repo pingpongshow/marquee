@@ -22,6 +22,8 @@ function storageSet(key: string, value: string | null) {
 }
 
 let token: string | null = storageGet(TOKEN_KEY);
+/** Image-only key from /me (D85); image URLs fall back to the token until it is known. */
+let imageKey: string | null = null;
 const unauthorizedListeners = new Set<() => void>();
 
 export const session = {
@@ -30,7 +32,11 @@ export const session = {
   },
   set(t: string | null) {
     token = t;
+    imageKey = null;
     storageSet(TOKEN_KEY, t);
+  },
+  setImageKey(k: string | null | undefined) {
+    imageKey = k || null;
   },
   onUnauthorized(fn: () => void) {
     unauthorizedListeners.add(fn);
@@ -89,18 +95,24 @@ const authMiddleware: Middleware = {
 export const api = createClient<paths>({ baseUrl: "/api/v1" });
 api.use(authMiddleware);
 
+/** Query parameter authenticating an <img>: the image key once /me has loaded, else the token. */
+function imageAuth(): string {
+  if (imageKey) return `key=${encodeURIComponent(imageKey)}`;
+  return `token=${encodeURIComponent(token ?? "")}`;
+}
+
 /**
- * URL for an artwork image at a display width. The token rides in the query string because
+ * URL for an artwork image at a display width. The image key rides in the query string because
  * <img> can't send headers. Width is doubled for high-DPI screens and snapped server-side.
  */
 export function imageUrl(artworkId: number, width: number) {
   const w = Math.round(width * Math.min(window.devicePixelRatio || 1, 2));
-  return `/api/v1/images/${artworkId}?w=${w}&token=${encodeURIComponent(token ?? "")}`;
+  return `/api/v1/images/${artworkId}?w=${w}&${imageAuth()}`;
 }
 
 export function personPhotoUrl(personId: number, width: number) {
   const w = Math.round(width * Math.min(window.devicePixelRatio || 1, 2));
-  return `/api/v1/people/${personId}/photo?w=${w}&token=${encodeURIComponent(token ?? "")}`;
+  return `/api/v1/people/${personId}/photo?w=${w}&${imageAuth()}`;
 }
 
 /** A seek-preview sprite sheet (PLAY-13). */
@@ -108,9 +120,9 @@ export function trickplaySheetUrl(itemId: number, sheet: number) {
   return `/api/v1/items/${itemId}/trickplay/${sheet}?token=${encodeURIComponent(token ?? "")}`;
 }
 
-/** Profile picture URL usable in <img> (signed-in viewers authenticate with the token parameter). */
+/** Profile picture URL usable in <img> (signed-in viewers authenticate with the image key or token). */
 export function avatarSrc(avatarUrl: string) {
-  return token ? `${avatarUrl}&token=${encodeURIComponent(token)}` : avatarUrl;
+  return imageKey || token ? `${avatarUrl}&${imageAuth()}` : avatarUrl;
 }
 
 export class ApiError extends Error {

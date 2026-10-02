@@ -51,7 +51,7 @@ func TestHistoryMixes(t *testing.T) {
 		d.Exec(`INSERT INTO user_item_state (user_id, item_id, play_count, rating, last_viewed_at) VALUES (1, ?, 4, 10, `+last+`)`, i)
 	}
 	s := &Service{DB: d, Index: ix}
-	mixes := s.DailyMixes(ctx, 1, nil)
+	mixes := s.DailyMixes(ctx, 1, "", nil)
 	byID := map[string]Mix{}
 	for _, m := range mixes {
 		byID[m.ID] = m

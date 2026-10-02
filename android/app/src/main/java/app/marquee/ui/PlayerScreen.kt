@@ -82,6 +82,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -99,7 +100,10 @@ import app.marquee.api.models.PlaybackProgress
 import app.marquee.api.models.PlaybackRequest
 import app.marquee.api.models.PlaybackSession
 import app.marquee.core.AndroidProfile
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -125,7 +129,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     val marquee = LocalMarquee.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val player = remember { ExoPlayer.Builder(context).setSeekBackIncrementMs(10_000).setSeekForwardIncrementMs(30_000).build() }
+    val player = remember { videoPlayer(context, seekIncrements = true) }
     var session by remember { mutableStateOf<PlaybackSession?>(null) }
     var detail by remember { mutableStateOf<ItemDetail?>(null) }
     var thumbs by remember { mutableStateOf<TrickplayThumbs?>(null) }
@@ -139,6 +143,13 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     var settings by remember { mutableStateOf(false) }
     var lastTouch by remember { mutableIntStateOf(0) } // bumps keep the controls up
     var scrub by remember { mutableStateOf<Long?>(null) }
+    // Set while the video plays on a Cast device (D82); the local player stays idle then.
+    var casting by remember { mutableStateOf(false) }
+    // The item's details, once loaded (or null if they couldn't be): the Cast hand-off waits for them.
+    val detailReady = remember { CompletableDeferred<ItemDetail?>() }
+    // This player's own place in navigation: it only moves on (or back) while it's still showing.
+    val ownEntry = remember { nav.currentBackStackEntry }
+    fun stillShowing() = ownEntry != null && nav.currentBackStackEntry === ownEntry
     // Watch together (SYNC-1).
     val together = remember { WatchTogether(marquee, player, itemId, scope) }
     val group by together.group.collectAsState()
@@ -174,7 +185,18 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
         val old = session
         val req = PlaybackRequest(itemId, AndroidProfile.profile, fileId = c.fileId, audioStreamId = c.audio, subtitleStreamId = c.subtitle,
             startMs = at, maxBitrateKbps = c.maxKbps)
-        runCatching { withContext(Dispatchers.IO) { marquee.playback.startPlayback(req) } }
+        // Started on the session's own scope: if the screen goes away while the server is
+        // starting it, the session is stopped as soon as it arrives rather than left running.
+        val pending = marquee.scope.async { runCatching { marquee.playback.startPlayback(req) } }
+        val result = try {
+            pending.await()
+        } catch (e: CancellationException) {
+            marquee.scope.launch { pending.await().getOrNull()?.let { closeSession(it, at ?: 0) } }
+            throw e
+        }
+        // Casting began meanwhile: the video plays there, not here.
+        if (casting) { result.getOrNull()?.let { closeSession(it, at ?: 0) }; return@withContext }
+        result
             .onSuccess { s ->
                 if (old != null) closeSession(old, player.currentPosition)
                 session = s
@@ -197,8 +219,13 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
 
     // ExoPlayer is main-thread only; don't rely on the effect's dispatcher for that.
     LaunchedEffect(itemId) {
-        launch(Dispatchers.IO) { detail = runCatching { marquee.items.getItem(itemId) }.getOrNull() }
+        launch {
+            detail = withContext(Dispatchers.IO) { runCatching { marquee.items.getItem(itemId) }.getOrNull() }
+            detailReady.complete(detail)
+        }
         launch { thumbs = TrickplayThumbs.load(marquee, itemId) }
+        // Already casting: the Cast hand-off below plays it there instead.
+        if (local == null && marquee.cast.device.value != null) return@LaunchedEffect
         if (local != null) withContext(Dispatchers.Main) {
             player.setMediaItem(MediaItem.fromUri(Uri.fromFile(local)))
             player.prepare()
@@ -222,17 +249,8 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     LaunchedEffect(controls, lastTouch, playing, settings, scrub) {
         if (controls && playing && !settings && scrub == null) { delay(4000); controls = false }
     }
+    VideoWindow()
     DisposableEffect(Unit) {
-        val activity = context as? Activity
-        val window = activity?.window
-        window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        // Phones: full screen in landscape, like any video app.
-        val bars = window?.let { WindowCompat.getInsetsController(it, it.decorView) }
-        if (!marquee.isTv) {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-            bars?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            bars?.hide(WindowInsetsCompat.Type.systemBars())
-        }
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 playing = isPlaying
@@ -242,11 +260,12 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             override fun onPlaybackStateChanged(state: Int) {
                 buffering = state == Player.STATE_BUFFERING || state == Player.STATE_IDLE
                 if (state != Player.STATE_ENDED) return
-                if (local != null) { recordLocal(ended = true); nav.popBackStack(); return }
+                if (local != null) { recordLocal(ended = true); if (stillShowing()) nav.popBackStack(); return }
                 report(PlaybackProgress.State.PAUSED)
-                // Up next: the following episode (or nothing).
+                // Up next: the following episode (or nothing), unless the viewer has already left.
                 marquee.scope.launch(Dispatchers.Main) {
                     val next = withContext(Dispatchers.IO) { runCatching { marquee.items.nextItem(itemId) }.getOrNull() }
+                    if (!stillShowing()) return@launch
                     if (next != null) nav.navigate("player/${next.id}?start=0") { popUpTo("player/{id}?start={start}&group={group}") { inclusive = true } }
                     else nav.popBackStack()
                 }
@@ -257,11 +276,6 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
         }
         player.addListener(listener)
         onDispose {
-            window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            if (!marquee.isTv) {
-                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                bars?.show(WindowInsetsCompat.Type.systemBars())
-            }
             val s = session
             val pos = player.currentPosition
             recordLocal()
@@ -277,28 +291,34 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     // Chromecast (D82): when a Cast device connects, the video moves there at the current
     // position; when casting stops, it carries on here from where the TV was.
     val castDevice by marquee.cast.device.collectAsState()
-    var casting by remember { mutableStateOf(false) }
+    var castError by remember { mutableStateOf<String?>(null) }
+    val onCastFinished = remember { { if (stillShowing()) nav.popBackStack() } }
     LaunchedEffect(castDevice) {
         if (castDevice != null && local == null && !casting) {
             casting = true
-            val at = player.currentPosition
+            castError = null
+            val here = session
             player.pause()
-            closeSession(session, at)
+            closeSession(here, player.currentPosition)
             session = null
-            val d = detail
+            // The title, artwork and resume point come from the details, so wait for them.
+            val d = detailReady.await()
+            // Opened while already casting nothing played here: start where asked, or resume.
+            val at = if (here == null) startMs ?: d?.viewOffsetMs ?: 0 else player.currentPosition
             val title = d?.let { if (it.type == ItemType.EPISODE) "${it.grandparentTitle ?: ""} · ${it.title}" else it.title } ?: ""
-            marquee.cast.onFinished = { nav.popBackStack() }
-            marquee.cast.load(itemId, at, title, d?.year?.toString(), marquee.imageUrl(d?.images?.backdrop ?: d?.images?.poster, 640), music = false,
-                fileId = choice.fileId, audioStreamId = choice.audio, subtitleStreamId = choice.subtitle)?.let { error = it }
+            marquee.cast.onFinished = onCastFinished
+            castError = marquee.cast.load(itemId, at, title, d?.year?.toString(), marquee.imageUrl(d?.images?.backdrop ?: d?.images?.poster, 640), music = false,
+                fileId = choice.fileId, audioStreamId = choice.audio, subtitleStreamId = choice.subtitle)
         } else if (castDevice == null && casting) {
             casting = false
-            marquee.cast.onFinished = null
+            castError = null
+            if (marquee.cast.onFinished === onCastFinished) marquee.cast.onFinished = null
             start(marquee.cast.position.value.first, choice)
         }
     }
     DisposableEffect(Unit) {
-        marquee.cast.videoActive = true
-        onDispose { marquee.cast.videoActive = false; if (casting) marquee.cast.onFinished = null }
+        // Only clears its own hand-off: the next episode's player may have set one already.
+        onDispose { if (marquee.cast.onFinished === onCastFinished) marquee.cast.onFinished = null }
     }
     fun seekBy(ms: Long) {
         val target = ((scrub ?: player.currentPosition) + ms).coerceIn(0, duration.coerceAtLeast(1))
@@ -354,7 +374,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             ScrubBar(scrub!!, duration, thumbs, onChange = { scrub = it }, onDone = ::commitScrub)
         }
 
-        if (casting) CastingPanel(castDevice ?: "", detail?.title ?: "", onClose = { nav.popBackStack() })
+        if (casting) CastingPanel(castDevice ?: "", detail?.title ?: "", castError, onClose = { nav.popBackStack() })
         AnimatedVisibility(controls && !casting, Modifier.fillMaxSize(), enter = fadeIn(), exit = fadeOut()) {
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.7f), 0.3f to Color.Transparent, 0.65f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.8f)))) {
                 // Top: back, title, settings.
@@ -585,7 +605,7 @@ private fun FindSubtitles(itemId: Long, onClose: () -> Unit, onDownloaded: (Long
 
 /** Shown over the video while it plays on a Cast device: what's casting and its controls. */
 @Composable
-private fun CastingPanel(device: String, title: String, onClose: () -> Unit) {
+private fun CastingPanel(device: String, title: String, error: String?, onClose: () -> Unit) {
     val cast = LocalMarquee.current.cast
     val playing by cast.playing.collectAsState()
     val pos by cast.position.collectAsState()
@@ -601,6 +621,7 @@ private fun CastingPanel(device: String, title: String, onClose: () -> Unit) {
             Text("Playing on $device", Modifier.padding(top = 12.dp), color = Color.White.copy(alpha = 0.75f))
             Text(title, Modifier.padding(top = 4.dp), color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
+            error?.let { Text("Couldn't play it there: $it", Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.error) }
             val (p, d) = pos
             if (d > 0) {
                 Slider(drag ?: (p.toFloat() / d), { drag = it }, Modifier.padding(top = 24.dp).fillMaxWidth(),
@@ -617,6 +638,56 @@ private fun CastingPanel(device: String, title: String, onClose: () -> Unit) {
                     Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "Pause" else "Play", Modifier.size(56.dp), tint = Color.White)
                 }
                 IconButton({ cast.seek(p + 30_000) }, Modifier.focusRing().size(56.dp)) { Icon(Icons.Filled.Forward30, "Forward 30 seconds", Modifier.size(36.dp), tint = Color.White) }
+            }
+        }
+    }
+}
+
+/**
+ * An ExoPlayer for video: it takes audio focus (so music pauses) and pauses when headphones
+ * are unplugged.
+ */
+@OptIn(UnstableApi::class)
+internal fun videoPlayer(context: android.content.Context, seekIncrements: Boolean = false, audioFocus: Boolean = true): ExoPlayer =
+    ExoPlayer.Builder(context)
+        .apply { if (seekIncrements) setSeekBackIncrementMs(10_000).setSeekForwardIncrementMs(30_000) }
+        .setAudioAttributes(videoAudio, audioFocus)
+        .setHandleAudioBecomingNoisy(true)
+        .build()
+
+internal val videoAudio: AudioAttributes = AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build()
+
+/**
+ * While a video screen is up: keeps the screen on and, on phones, goes full screen in
+ * landscape; a Cast device connected meanwhile is for the video, not music. Counted on
+ * Marquee, because when the next episode replaces a player the outgoing screen closes after
+ * the new one opened, and mustn't undo it.
+ */
+@Composable
+internal fun VideoWindow() {
+    val marquee = LocalMarquee.current
+    val context = LocalContext.current
+    DisposableEffect(Unit) {
+        val activity = context as? Activity
+        val window = activity?.window
+        val bars = window?.let { WindowCompat.getInsetsController(it, it.decorView) }
+        marquee.videoScreens++
+        marquee.cast.videoActive = true
+        window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Phones: full screen in landscape, like any video app.
+        if (!marquee.isTv) {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            bars?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            bars?.hide(WindowInsetsCompat.Type.systemBars())
+        }
+        onDispose {
+            marquee.videoScreens = (marquee.videoScreens - 1).coerceAtLeast(0)
+            if (marquee.videoScreens > 0) return@onDispose
+            marquee.cast.videoActive = false
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            if (!marquee.isTv) {
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                bars?.show(WindowInsetsCompat.Type.systemBars())
             }
         }
     }

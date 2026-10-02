@@ -86,9 +86,6 @@ class MusicService : MediaLibraryService() {
         enhancer = runCatching { LoudnessEnhancer(audioSession).apply { enabled = true } }.getOrNull()
         prefs.registerOnSharedPreferenceChangeListener(levellingChanged)
         player.addListener(object : Player.Listener {
-            private var current: Long? = null
-            private var lastPosition = 0L
-            private var lastDuration = 0L
             override fun onEvents(p: Player, events: Player.Events) {
                 if (p.duration > 0) lastDuration = p.duration
                 lastPosition = p.currentPosition
@@ -110,6 +107,7 @@ class MusicService : MediaLibraryService() {
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 report(player, if (isPlaying) PlaybackProgress.State.PLAYING else PlaybackProgress.State.PAUSED)
+                if (isPlaying) watch(player) else { watcher?.cancel(); watcher = null }
                 // Paused mid-crossfade: the tail stops too.
                 if (!isPlaying && player.playbackState == Player.STATE_READY && fadeJob?.isActive == true) {
                     fadeJob?.cancel()
@@ -117,11 +115,13 @@ class MusicService : MediaLibraryService() {
                 }
             }
 
-            // A new queue: close sessions for tracks that were loaded ahead but left it.
+            // A new queue: close sessions for tracks that were loaded ahead but left it. The
+            // interrupted track and one fading out are closed at their real positions by the
+            // item transition and the end of the fade, which come after this.
             override fun onTimelineChanged(timeline: Timeline, reason: Int) {
                 if (reason != Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) return
                 val queued = (0 until player.mediaItemCount).mapNotNull { player.getMediaItemAt(it).mediaId.toLongOrNull() }.toSet()
-                resolved.keys.filter { it !in queued }.forEach { finish(it, 0) }
+                resolved.keys.filter { it !in queued && it != current && it != fadingFrom }.forEach { finish(it, 0) }
             }
 
             // The server ended a session we still had cached (it was idle too long): start a fresh one, once.
@@ -136,23 +136,37 @@ class MusicService : MediaLibraryService() {
                 player.play()
             }
         })
-        // Watch for track ends to crossfade.
-        marquee.scope.launch(kotlinx.coroutines.Dispatchers.Main) {
-            while (true) {
-                delay(200)
-                val p = mediaSession?.player ?: break
-                maybeCrossfade(p)
-            }
-        }
         ticker = marquee.scope.launch {
             while (true) {
                 delay(15_000)
                 launch(kotlinx.coroutines.Dispatchers.Main) { if (player.isPlaying) report(player, PlaybackProgress.State.PLAYING) }
             }
         }
-        mediaSession = MediaLibrarySession.Builder(this, player, MusicLibrary(marquee) { app.music }).build()
+        mediaSession = MediaLibrarySession.Builder(this, player, MusicLibrary(marquee, packageName) { app.music }).build()
         // Stations and the Guest DJ live in the app's controller; make sure it's listening.
         app.music.attach()
+    }
+
+    private var current: Long? = null
+    private var lastPosition = 0L
+    private var lastDuration = 0L
+    private var watcher: Job? = null
+
+    /**
+     * While playing: keeps the position fresh (so a skipped track closes where it was left)
+     * and, with crossfade on, watches for the track's end a few times a second.
+     */
+    private fun watch(p: Player) {
+        if (watcher?.isActive == true) return
+        watcher = marquee.scope.launch(kotlinx.coroutines.Dispatchers.Main) {
+            while (p.isPlaying) {
+                val crossfade = crossfadeSeconds() > 0
+                delay(if (crossfade) 200 else 1000)
+                if (mediaSession == null) break
+                lastPosition = p.currentPosition
+                if (crossfade) maybeCrossfade(p)
+            }
+        }
     }
 
     /**
@@ -227,7 +241,7 @@ class MusicService : MediaLibraryService() {
         }
     }
 
-    private fun endFade(p: Player, endMs: Long = 0) {
+    private fun endFade(p: Player, endMs: Long = fader?.currentPosition ?: 0) {
         fader?.let { it.stop(); it.clearMediaItems() }
         ramp = 1f
         applyVolume(p)
@@ -289,6 +303,7 @@ class MusicService : MediaLibraryService() {
 
     override fun onDestroy() {
         ticker?.cancel()
+        watcher?.cancel()
         prefs.unregisterOnSharedPreferenceChangeListener(levellingChanged)
         enhancer?.release()
         fadeJob?.cancel()

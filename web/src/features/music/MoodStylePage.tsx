@@ -4,7 +4,7 @@ import { Loader2, Play, Radio } from "lucide-react";
 import { api, unwrap } from "@/api/client";
 import { Alert, Spinner } from "@/components/ui";
 import { Poster } from "../browse/Poster";
-import { useMusic } from "../player/MusicPlayer";
+import { useMusicActions } from "../player/MusicPlayer";
 import { formatTrackTime } from "../browse/format";
 import { useRadio } from "./useRadio";
 
@@ -20,7 +20,7 @@ export function MoodStylePage() {
     ? ({ seed: "mood", value: value.toLowerCase(), libraryId: lib } as const)
     : ({ seed: "genre", value, libraryId: lib } as const);
   const radio = useRadio();
-  const music = useMusic();
+  const music = useMusicActions();
   // A taste of the station: its first tracks, shown as a list (and their albums for moods).
   const sampler = useQuery({
     queryKey: ["music", "sampler", kind, value, lib],

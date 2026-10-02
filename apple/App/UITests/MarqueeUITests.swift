@@ -116,6 +116,8 @@ final class MarqueeUITests: XCTestCase {
         // An album with an .lrc sidecar: synced lyrics.
         let artist = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calm Pads'")).firstMatch
         XCTAssertTrue(artist.waitForExistence(timeout: 10))
+        // The Music page has grown (mixes, moods, styles): bring the card clear of the tab bar.
+        for _ in 0..<4 where artist.frame.maxY > app.tabBars.firstMatch.frame.minY - 10 { app.swipeUp() }
         artist.tap()
         let album = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Floating'")).firstMatch
         XCTAssertTrue(album.waitForExistence(timeout: 10))

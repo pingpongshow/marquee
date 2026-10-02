@@ -28,7 +28,7 @@ import { UpdateBanner } from "@/features/activity/UpdateBanner";
 import { SearchBox } from "@/features/search/SearchBox";
 import { Avatar } from "@/features/users/Avatar";
 import { ProfileSwitcher } from "@/features/users/ProfileSwitcher";
-import { useMusic } from "@/features/player/MusicPlayer";
+import { useMusicState } from "@/features/player/MusicPlayer";
 import { useAuth } from "@/lib/auth";
 
 export const libraryIcons: Record<LibraryType, typeof Film> = {
@@ -120,7 +120,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const libraries = useQuery(librariesQuery);
   const [navOpen, setNavOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
-  const music = useMusic();
+  const music = useMusicState();
 
   // "/" jumps to search from anywhere (as in Plex), unless you're typing in a field.
   useEffect(() => {

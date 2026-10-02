@@ -8,6 +8,20 @@ final class PlaylistPicker {
     var item: Item?
 }
 
+/// A menu action that failed; MainView shows it as an alert (menus close before they could).
+@MainActor @Observable
+final class ActionError {
+    static let shared = ActionError()
+    var message: String?
+
+    /// Runs an action, keeping what went wrong to show.
+    static func run(_ work: @escaping @MainActor () async throws -> Void) {
+        Task {
+            do { try await work() } catch is CancellationError {} catch { shared.message = error.localizedDescription }
+        }
+    }
+}
+
 /// Queue and playlist actions for any item (context menus and "…" buttons).
 struct ItemMenuItems: View {
     @Environment(AppSession.self) private var app
@@ -22,10 +36,10 @@ struct ItemMenuItems: View {
             if item._type == .track {
                 Button { AdventurePicker.shared.from = item } label: { Label("Sonic Adventure…", systemImage: "point.topleft.down.to.point.bottomright.curvepath") }
             }
-            Button { Task { music.playNext(await leaves()) } } label: { Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") }
-            Button { Task { music.addToQueue(await leaves()) } } label: { Label("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") }
+            Button { ActionError.run { music.playNext(try await leaves()) } } label: { Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") }
+            Button { ActionError.run { music.addToQueue(try await leaves()) } } label: { Label("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") }
             if item._type != .track {
-                Button { Task { music.play(await leaves(), shuffle: true, source: item.title) } } label: { Label("Shuffle", systemImage: "shuffle") }
+                Button { ActionError.run { music.play(try await leaves(), shuffle: true, source: item.title) } } label: { Label("Shuffle", systemImage: "shuffle") }
             }
         }
         Button { PlaylistPicker.shared.item = item } label: { Label("Add to Playlist…", systemImage: "text.badge.plus") }
@@ -37,12 +51,12 @@ struct ItemMenuItems: View {
         }
         if [.movie, .show, .episode, .video].contains(item._type) {
             let listed = item.watchlisted ?? false
-            Button { Task { try? await app.setWatchlist(item.id, !listed) } } label: {
+            Button { ActionError.run { try await app.setWatchlist(item.id, !listed) } } label: {
                 Label(listed ? "Remove from Watchlist" : "Add to Watchlist", systemImage: listed ? "bookmark.slash" : "bookmark")
             }
         }
         if item.isPlayableVideo || item._type == .show || item._type == .season {
-            Button { Task { try? await app.setWatched(item.id, !item.watched) } } label: {
+            Button { ActionError.run { try await app.setWatched(item.id, !item.watched) } } label: {
                 Label(item.watched ? "Mark Unwatched" : "Mark Watched", systemImage: item.watched ? "circle" : "checkmark.circle")
             }
         }
@@ -50,11 +64,15 @@ struct ItemMenuItems: View {
 
     private func startRadio() {
         let req = RadioRequest(seed: .item, itemId: item.id, limit: 50)
-        Task { if let st = try? await app.radio(req) { music.playStation(st, radio: req) } }
+        ActionError.run {
+            let st = try await app.radio(req)
+            guard !st.items.isEmpty else { throw MarqueeError("Couldn't find anything to play for this station.") }
+            music.playStation(st, radio: req)
+        }
     }
 
-    private func leaves() async -> [Item] {
-        item._type == .track ? [item] : ((try? await app.leaves(item.id)) ?? [])
+    private func leaves() async throws -> [Item] {
+        item._type == .track ? [item] : try await app.leaves(item.id)
     }
 }
 

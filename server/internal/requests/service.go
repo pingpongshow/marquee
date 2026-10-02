@@ -29,6 +29,7 @@ type Service struct {
 	DB       *sql.DB
 	Settings *settings.Store
 
+	approveMu sync.Mutex
 	ratingsMu sync.Mutex
 	ratings   map[string]cachedRatings
 	genres    [][]Genre
@@ -65,6 +66,13 @@ func (s *Service) Ratings(ctx context.Context, mediaType string, tmdbID int64) (
 	s.ratingsMu.Lock()
 	if s.ratings == nil {
 		s.ratings = map[string]cachedRatings{}
+	}
+	if len(s.ratings) > 2000 {
+		for k, c := range s.ratings {
+			if time.Since(c.at) > c.ttl {
+				delete(s.ratings, k)
+			}
+		}
 	}
 	s.ratings[key] = cachedRatings{r, time.Now(), ttl}
 	s.ratingsMu.Unlock()
@@ -378,7 +386,7 @@ func (s *Service) refresh(ctx context.Context) {
 	if !s.Enabled() {
 		return
 	}
-	rows, err := s.DB.QueryContext(ctx, `SELECT id, seerr_request_id FROM media_requests WHERE status = 'approved' AND seerr_request_id IS NOT NULL LIMIT 50`)
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, seerr_request_id FROM media_requests WHERE status = 'approved' AND seerr_request_id IS NOT NULL ORDER BY random() LIMIT 50`)
 	if err != nil {
 		return
 	}
@@ -478,6 +486,9 @@ func nullInt(v int) any {
 
 // Approve sends a pending request to Seerr, as the requester's linked Seerr user.
 func (s *Service) Approve(ctx context.Context, id, adminID int64, seerrUser func(userID int64) *int64) (Request, error) {
+	// One approval at a time, so a double click or two admins can't send it to Seerr twice.
+	s.approveMu.Lock()
+	defer s.approveMu.Unlock()
 	r, err := s.Get(ctx, id)
 	if err != nil {
 		return r, err
@@ -492,8 +503,10 @@ func (s *Service) Approve(ctx context.Context, id, adminID int64, seerrUser func
 		slog.Warn("request to Seerr failed", "title", r.Title, "err", err)
 		return s.Get(ctx, id)
 	}
-	s.DB.ExecContext(ctx, `UPDATE media_requests SET status = 'approved', seerr_request_id = ?, decided_by = ?, decided_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`,
-		sid, adminID, id)
+	if _, err := s.DB.ExecContext(ctx, `UPDATE media_requests SET status = 'approved', seerr_request_id = ?, decided_by = ?, decided_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`,
+		sid, adminID, id); err != nil {
+		return r, err
+	}
 	slog.Info("request approved", "title", r.Title, "seerr", sid)
 	return s.Get(ctx, id)
 }

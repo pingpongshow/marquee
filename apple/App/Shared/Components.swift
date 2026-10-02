@@ -31,7 +31,7 @@ struct ArtworkView: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             placeholder
-            AsyncImage(url: app.imageURL(artID, width: Int(width))) { phase in
+            CachedImage(url: app.imageURL(artID, width: Int(width))) { phase in
                 if let image = phase.image { image.resizable().scaledToFill() }
             }
         }
@@ -53,7 +53,9 @@ struct ArtworkView: View {
     }
 
     private var placeholder: some View {
-        let hue = Double(abs(item.title.hashValue) % 360) / 360
+        // A stable hash (String.hashValue changes every launch), so a title keeps its colour.
+        let hash = item.title.unicodeScalars.reduce(UInt32(5381)) { ($0 &<< 5) &+ $0 &+ $1.value }
+        let hue = Double(hash % 360) / 360
         return LinearGradient(colors: [Color(hue: hue, saturation: 0.35, brightness: 0.3), Color(hue: hue, saturation: 0.3, brightness: 0.12)],
                               startPoint: .topLeading, endPoint: .bottomTrailing)
             .overlay(alignment: .bottomLeading) {
@@ -67,6 +69,63 @@ struct ArtworkView: View {
                 .background(Color.marqueeGold, in: RoundedRectangle(cornerRadius: 4)).foregroundStyle(.black).padding(6)
         } else if item.isPlayableVideo, item.watched, item.progress == nil {
             Image(systemName: "checkmark.circle.fill").symbolRenderingMode(.palette).foregroundStyle(.black, Color.marqueeGold).padding(6)
+        }
+    }
+}
+
+/// Decoded artwork kept in memory, so scrolling back to a poster shows it at once instead of
+/// decoding it again (and flashing the placeholder). The bytes also stay in URLCache.
+@MainActor
+enum ImageMemory {
+    static let cache: NSCache<NSURL, UIImage> = {
+        let c = NSCache<NSURL, UIImage>()
+        c.totalCostLimit = 96 << 20
+        return c
+    }()
+
+    static func cost(_ image: UIImage) -> Int {
+        Int(image.size.width * image.scale * image.size.height * image.scale * 4)
+    }
+}
+
+/// AsyncImage with the in-memory cache above. Loading stops when the view goes away or the
+/// URL changes.
+struct CachedImage<Content: View>: View {
+    let url: URL?
+    @ViewBuilder let content: (AsyncImagePhase) -> Content
+    @State private var loaded: UIImage?
+    @State private var loadedURL: URL?
+    @State private var failedURL: URL?
+
+    var body: some View {
+        content(phase)
+            .task(id: url) { await load() }
+    }
+
+    private var phase: AsyncImagePhase {
+        guard let url else { return .empty }
+        if let image = ImageMemory.cache.object(forKey: url as NSURL) { return .success(Image(uiImage: image)) }
+        if loadedURL == url, let loaded { return .success(Image(uiImage: loaded)) }
+        if failedURL == url { return .failure(URLError(.cannotDecodeContentData)) }
+        return .empty
+    }
+
+    private func load() async {
+        guard let url, ImageMemory.cache.object(forKey: url as NSURL) == nil else { return }
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            try Task.checkCancellation()
+            guard (response as? HTTPURLResponse)?.statusCode ?? 200 == 200 else { throw URLError(.badServerResponse) }
+            // Decoded off the main thread, ready to draw.
+            guard let image = await Task.detached(priority: .userInitiated, operation: { UIImage(data: data)?.preparingForDisplay() }).value else {
+                throw URLError(.cannotDecodeContentData)
+            }
+            try Task.checkCancellation()
+            ImageMemory.cache.setObject(image, forKey: url as NSURL, cost: ImageMemory.cost(image))
+            loaded = image
+            loadedURL = url
+        } catch {
+            if !Task.isCancelled { failedURL = url }
         }
     }
 }
@@ -129,7 +188,7 @@ struct AvatarView: View {
             Circle().fill(Color.gray.opacity(0.35))
             Text(name.prefix(1).uppercased()).font(.system(size: size * 0.42, weight: .bold))
             if let u = app.absolute(url) {
-                AsyncImage(url: u) { phase in
+                CachedImage(url: u) { phase in
                     if let image = phase.image { image.resizable().scaledToFill() }
                 }
             }

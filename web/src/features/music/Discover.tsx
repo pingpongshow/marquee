@@ -14,7 +14,7 @@ import { useState, type FormEvent } from "react";
 import { api, imageUrl, unwrap } from "@/api/client";
 import type { Station } from "@/api/types";
 import { Alert } from "@/components/ui";
-import { useMusic } from "../player/MusicPlayer";
+import { useMusicActions } from "../player/MusicPlayer";
 import { useRadio, useMuse } from "./useRadio";
 
 const moods = [
@@ -76,7 +76,7 @@ function MixArt({
 
 /** The top of a music library: Muse, stations and daily mixes (M6.5). */
 export function MusicDiscover({ libraryId }: { libraryId: number }) {
-  const music = useMusic();
+  const music = useMusicActions();
   const radio = useRadio();
   const muse = useMuse();
   const [prompt, setPrompt] = useState("");

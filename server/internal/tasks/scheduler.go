@@ -245,7 +245,7 @@ func (s *Scheduler) due(ctx context.Context, t Task, now time.Time) bool {
 // Run checks every minute for due tasks until ctx is cancelled.
 func (s *Scheduler) Run(ctx context.Context) {
 	s.DB.ExecContext(ctx, `UPDATE task_runs SET status = 'failed', message = '`+interrupted+`',
-		finished_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE status = 'running'`)
+		finished_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE status = 'running' AND task != 'scan'`)
 	tick := time.NewTicker(time.Minute)
 	defer tick.Stop()
 	for {
