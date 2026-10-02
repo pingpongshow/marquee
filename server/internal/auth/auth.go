@@ -217,6 +217,11 @@ func BearerToken(r *http.Request) string {
 	if h := r.Header.Get("Authorization"); len(h) > 7 && strings.EqualFold(h[:7], "bearer ") {
 		return strings.TrimSpace(h[7:])
 	}
+	// Only API URLs take a token in the query. Web-app pages don't: other services send
+	// people back to them with their own ?token= (Last.fm's sign-in, D81).
+	if !strings.HasPrefix(r.URL.Path, "/api/") {
+		return ""
+	}
 	return r.URL.Query().Get("token")
 }
 
