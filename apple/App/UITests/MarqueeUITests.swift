@@ -76,7 +76,9 @@ final class MarqueeUITests: XCTestCase {
         // Music: play an artist and open Now Playing.
         openLibrary("Music")
         XCTAssertTrue(app.navigationBars["Music"].waitForExistence(timeout: 10))
-        app.scrollViews.buttons.firstMatch.tap()
+        let artist = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calm Pads'")).firstMatch
+        XCTAssertTrue(artist.waitForExistence(timeout: 10))
+        artist.tap()
         let playMusic = app.buttons["Play"].firstMatch
         XCTAssertTrue(playMusic.waitForExistence(timeout: 10))
         shot("07-artist")
@@ -85,5 +87,50 @@ final class MarqueeUITests: XCTestCase {
         shot("08-mini-player")
         app.buttons["Pause"].firstMatch.tap()
         shot("09-paused")
+    }
+
+    /// Sonic Sage, Now Playing's source and lyrics (M6.5). Needs the test music library and
+    /// the sonic analysis sidecar.
+    func testMusicFeatures() {
+        connectAndSignIn()
+        openLibrary("Music")
+        XCTAssertTrue(app.staticTexts["Sonic Sage"].waitForExistence(timeout: 10))
+        shot("m1-discover")
+
+        let prompt = app.textFields["Describe what you want to hear…"]
+        prompt.tap()
+        prompt.typeText("white noise and static hiss\n")
+        let mini = app.buttons["miniPlayer"]
+        XCTAssertTrue(mini.waitForExistence(timeout: 20), "Sage should start a noise track")
+        XCTAssertTrue(mini.label.contains("Hiss Theory") || mini.label.contains("Static Kids"), mini.label)
+        mini.tap()
+        XCTAssertTrue(app.staticTexts["PLAYING FROM"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["white noise and static hiss"].exists)
+        shot("m2-now-playing-sage")
+        app.buttons["Up Next"].tap()
+        shot("m3-up-next")
+        app.buttons["Now Playing"].firstMatch.tap()
+        app.swipeDown(velocity: .fast)
+
+        // An album with an .lrc sidecar: synced lyrics.
+        let artist = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calm Pads'")).firstMatch
+        XCTAssertTrue(artist.waitForExistence(timeout: 10))
+        artist.tap()
+        let album = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Floating'")).firstMatch
+        XCTAssertTrue(album.waitForExistence(timeout: 10))
+        album.tap()
+        XCTAssertTrue(app.buttons["Radio"].waitForExistence(timeout: 10))
+        app.buttons["Play"].firstMatch.tap()
+        sleep(2)
+        XCTAssertTrue(mini.label.contains("Floating 1"), mini.label)
+        mini.tap()
+        XCTAssertTrue(app.staticTexts["PLAYING FROM"].waitForExistence(timeout: 5))
+        app.buttons["Lyrics"].tap()
+        XCTAssertTrue(app.staticTexts["Floating on a quiet sea"].waitForExistence(timeout: 10))
+        sleep(4)
+        shot("m4-lyrics")
+        app.buttons["Now Playing"].firstMatch.tap()
+        app.buttons["3 stars"].tap()
+        shot("m5-rated")
     }
 }

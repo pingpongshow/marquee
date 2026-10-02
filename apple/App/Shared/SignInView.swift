@@ -108,7 +108,6 @@ struct SignInView: View {
     }
 }
 
-extension Schemas.Profile: @retroactive Identifiable {}
 
 private struct PinEntry: View {
     let profile: Schemas.Profile

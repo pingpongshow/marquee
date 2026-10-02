@@ -180,5 +180,33 @@ extension Components {
                 self.body = body
             }
         }
+        public struct ServiceUnavailable: Sendable, Hashable {
+            /// - Remark: Generated from `#/components/responses/ServiceUnavailable/content`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/components/responses/ServiceUnavailable/content/application\/json`.
+                case json(Components.Schemas._Error)
+                /// The associated value of the enum case if `self` is `.json`.
+                ///
+                /// - Throws: An error if `self` is not `.json`.
+                /// - SeeAlso: `.json`.
+                public var json: Components.Schemas._Error {
+                    get throws {
+                        switch self {
+                        case let .json(body):
+                            return body
+                        }
+                    }
+                }
+            }
+            /// Received HTTP response body
+            public var body: Components.Responses.ServiceUnavailable.Body
+            /// Creates a new `ServiceUnavailable`.
+            ///
+            /// - Parameters:
+            ///   - body: Received HTTP response body
+            public init(body: Components.Responses.ServiceUnavailable.Body) {
+                self.body = body
+            }
+        }
     }
 }

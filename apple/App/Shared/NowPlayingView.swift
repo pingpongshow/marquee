@@ -22,6 +22,7 @@ struct MiniPlayerBar: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("miniPlayer")
                 Button { music.toggle() } label: { Image(systemName: music.playing ? "pause.fill" : "play.fill").font(.title3).frame(width: 36, height: 36) }
                     .buttonStyle(.plain)
                     .accessibilityLabel(music.playing ? "Pause" : "Play")
@@ -49,8 +50,12 @@ struct MiniPlayerBar: View {
 struct NowPlayingView: View {
     @Environment(MusicPlayer.self) private var music
     @Environment(AppSession.self) private var app
-    @State private var showQueue = false
+    @State private var panel: Panel = .player
     @State private var scrub: Double?
+
+    enum Panel: String, CaseIterable {
+        case player = "Now Playing", lyrics = "Lyrics", queue = "Up Next"
+    }
 
     var body: some View {
         if let t = music.current?.item {
@@ -58,17 +63,34 @@ struct NowPlayingView: View {
                 backdrop(t)
                 #if os(tvOS)
                 HStack(spacing: 80) {
-                    player(t).frame(maxWidth: 700)
-                    queueList.frame(width: 700)
-                }
-                .padding(80)
-                #else
-                VStack(spacing: 22) {
-                    Capsule().fill(.secondary).frame(width: 40, height: 5).padding(.top, 8)
-                    if showQueue { queueList } else { player(t) }
-                    Button { withAnimation { showQueue.toggle() } } label: {
-                        Label(showQueue ? "Now Playing" : "Up Next", systemImage: showQueue ? "music.note" : "list.bullet")
+                    VStack(spacing: 30) {
+                        sourceHeader
+                        player(t)
                     }
+                    .frame(maxWidth: 700)
+                    VStack(alignment: .leading, spacing: 20) {
+                        Text(panel == .lyrics ? "Lyrics" : "Up Next").font(.title3.bold())
+                        if panel == .lyrics { LyricsView(itemID: t.id).frame(maxHeight: .infinity) } else { queueList }
+                    }
+                    .frame(width: 700)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                }
+                .padding(.horizontal, 80)
+                .padding(.vertical, 30)
+                .onAppear { if panel == .player { panel = .queue } }
+                #else
+                VStack(spacing: 16) {
+                    Capsule().fill(.secondary).frame(width: 40, height: 5).padding(.top, 8)
+                    sourceHeader
+                    switch panel {
+                    case .player: player(t)
+                    case .lyrics: LyricsView(itemID: t.id).padding(.horizontal, 8)
+                    case .queue: queueList
+                    }
+                    Picker("Show", selection: $panel.animation()) {
+                        ForEach(Panel.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
                     .padding(.bottom)
                 }
                 .padding(.horizontal, 24)
@@ -76,6 +98,13 @@ struct NowPlayingView: View {
             }
         } else {
             ContentUnavailableView("Nothing playing", systemImage: "music.note")
+        }
+    }
+
+    @ViewBuilder private var sourceHeader: some View {
+        VStack(spacing: 2) {
+            Text(music.source == nil ? "NOW PLAYING" : "PLAYING FROM").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+            if let s = music.source { Text(s.title).font(.footnote.weight(.semibold)).lineLimit(1) }
         }
     }
 
@@ -89,10 +118,15 @@ struct NowPlayingView: View {
     }
 
     private func player(_ t: Item) -> some View {
-        VStack(spacing: 22) {
+        VStack(spacing: stackSpacing) {
             Spacer(minLength: 0)
             ArtworkView(item: t, shape: .square, width: 600)
+                #if os(tvOS)
+                .frame(width: artSize, height: artSize)
+                .layoutPriority(1)
+                #else
                 .frame(maxWidth: artSize)
+                #endif
                 .shadow(color: .black.opacity(0.5), radius: 30, y: 10)
             VStack(spacing: 4) {
                 Text(t.title).font(.title2.bold()).lineLimit(1)
@@ -124,14 +158,41 @@ struct NowPlayingView: View {
                 }
             }
             .buttonStyle(.plain)
+            #if os(tvOS)
+            .frame(maxWidth: .infinity) // full width, so up/down from any button reaches the row
+            .focusSection()
+            #endif
+            HStack(spacing: 24) {
+                #if os(iOS)
+                RatingStars(itemID: t.id, rating: t.userRating).id(t.id)
+                Spacer()
+                #endif
+                #if os(tvOS)
+                Button { panel = panel == .lyrics ? .queue : .lyrics } label: {
+                    Label(panel == .lyrics ? "Show Up Next" : "Lyrics", systemImage: panel == .lyrics ? "list.bullet" : "quote.bubble")
+                        .labelStyle(.iconOnly)
+                }
+                .accessibilityLabel(panel == .lyrics ? "Show Up Next" : "Lyrics")
+                #endif
+                SleepMenu().labelStyle(.iconOnly)
+                LevellingMenu()
+            }
+            .font(.title3)
+            .foregroundStyle(.secondary)
+            #if os(tvOS)
+            .frame(maxWidth: .infinity) // full width, so up/down from any button reaches the row
+            .focusSection()
+            #endif
             Spacer(minLength: 0)
         }
     }
 
     #if os(tvOS)
-    private let artSize: CGFloat = 560
+    private let artSize: CGFloat = 360
+    private let stackSpacing: CGFloat = 18
     #else
     private let artSize: CGFloat = 340
+    private let stackSpacing: CGFloat = 22
     #endif
 
     private var queueList: some View {
@@ -167,7 +228,7 @@ struct NowPlayingView: View {
                 ArtworkView(item: e.item, shape: .square, width: 44).frame(width: 44)
                 VStack(alignment: .leading) {
                     Text(e.item.title).lineLimit(1).foregroundStyle(current ? Color.marqueeGold : .primary)
-                    Text(e.item.artistCredit ?? e.item.grandparentTitle ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    Text(e.item.artistCredit ?? e.item.grandparentTitle ?? "").font(.caption).foregroundStyle(Color.secondary).lineLimit(1)
                 }
             }
         }

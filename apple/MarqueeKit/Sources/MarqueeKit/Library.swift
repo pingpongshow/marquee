@@ -33,8 +33,8 @@ public extension AppSession {
                                        query: .init(_type: type, sort: sort, offset: offset, limit: limit, watch: watch, genre: genre)).ok.body.json
     }
 
-    func filters(library: Int64) async throws -> LibraryFilters {
-        try await api.libraryFilters(path: .init(libraryId: library)).ok.body.json
+    func filters(library: Int64, type: Schemas.ItemType? = nil) async throws -> LibraryFilters {
+        try await api.libraryFilters(path: .init(libraryId: library), query: .init(_type: type)).ok.body.json
     }
 
     func item(_ id: Int64) async throws -> ItemDetail { try await api.getItem(path: .init(itemId: id)).ok.body.json }
@@ -152,4 +152,5 @@ public extension Components.Schemas.ItemDetail {
     var type: Schemas.ItemType { value1._type }
 }
 
-extension Components.Schemas.ItemSummary: @retroactive Identifiable {}
+extension Components.Schemas.ItemSummary: Identifiable {}
+extension Components.Schemas.Profile: Identifiable {}

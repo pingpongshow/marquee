@@ -12,7 +12,45 @@ import UIKit
 /// playback session on the server (the next one is a "preload" session until it plays).
 @MainActor @Observable
 public final class MusicPlayer {
+    /// What's playing: an album, a playlist or a station. Stations with a radio request
+    /// top themselves up as they play (MUSIC-3).
+    public struct Source: Sendable {
+        public let title: String
+        public let radio: RadioRequest?
+        public init(title: String, radio: RadioRequest? = nil) {
+            self.title = title
+            self.radio = radio
+        }
+    }
+
+    /// Volume levelling (MUSIC-9): auto uses album gain while an album plays in order.
+    public enum Levelling: String, CaseIterable, Sendable {
+        case auto, track, album, off
+        public var label: String {
+            switch self {
+            case .auto: "Automatic"
+            case .track: "Track"
+            case .album: "Album"
+            case .off: "Off"
+            }
+        }
+    }
+
+    public enum Sleep: Equatable, Sendable {
+        case at(Date)
+        case endOfTrack
+    }
+
     public private(set) var queue = PlayQueue()
+    public private(set) var source: Source?
+    /// Sleep timer: pause at a time or when the current track ends.
+    public var sleep: Sleep? { didSet { scheduleSleep() } }
+    public var levelling: Levelling = Levelling(rawValue: UserDefaults.standard.string(forKey: "marquee.levelling") ?? "") ?? .auto {
+        didSet {
+            UserDefaults.standard.set(levelling.rawValue, forKey: "marquee.levelling")
+            for item in player.items() { applyLevel(item) }
+        }
+    }
     public private(set) var playing = false
     public private(set) var time: Double = 0
     public private(set) var duration: Double = 0
@@ -20,8 +58,17 @@ public final class MusicPlayer {
 
     private let app: AppSession
     @ObservationIgnored private let player = AVQueuePlayer()
-    /// Server session per player item.
-    @ObservationIgnored private var sessions: [ObjectIdentifier: (entry: Int, session: String)] = [:]
+    /// Server session (and loudness) per player item.
+    private struct Loaded {
+        let entry: Int
+        let session: String
+        let trackGain: Double?
+        let albumGain: Double?
+        let peak: Double?
+    }
+    @ObservationIgnored private var sessions: [ObjectIdentifier: Loaded] = [:]
+    @ObservationIgnored private var sleepTask: Task<Void, Never>?
+    @ObservationIgnored private var refilling = false
     @ObservationIgnored private var observers: [NSKeyValueObservation] = []
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var lastReport = Date.distantPast
@@ -58,8 +105,18 @@ public final class MusicPlayer {
 
     // MARK: - Queue actions
 
-    public func play(_ items: [Item], start: Int = 0, shuffle: Bool = false) {
+    /// Plays items; `source` names what they are (an album or playlist) for Now Playing.
+    public func play(_ items: [Item], start: Int = 0, shuffle: Bool = false, source: String? = nil) {
+        self.source = source.map { Source(title: $0) }
         queue.load(items, start: start, shuffle: shuffle)
+        rebuild()
+    }
+
+    /// Plays a generated station; with a radio request it keeps topping itself up.
+    public func playStation(_ station: Station, radio: RadioRequest? = nil) {
+        guard !station.items.isEmpty else { return }
+        source = Source(title: station.title, radio: radio)
+        queue.load(station.items, start: 0, shuffle: false)
         rebuild()
     }
 
@@ -132,6 +189,8 @@ public final class MusicPlayer {
         for item in player.items() { endSession(for: item) }
         player.removeAllItems()
         queue = PlayQueue()
+        source = nil
+        sleep = nil
         playing = false
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
@@ -144,7 +203,8 @@ public final class MusicPlayer {
                                                                          profile: AppleDeviceProfile.current()))).ok.body.json,
               let url = app.absolute(s.url) else { return nil }
         let item = AVPlayerItem(url: url)
-        sessions[ObjectIdentifier(item)] = (entry.id, s.id)
+        sessions[ObjectIdentifier(item)] = Loaded(entry: entry.id, session: s.id, trackGain: s.trackGainDb, albumGain: s.albumGainDb, peak: s.peak)
+        applyLevel(item)
         return item
     }
 
@@ -200,6 +260,10 @@ public final class MusicPlayer {
 
     private func currentItemChanged(previous: ObjectIdentifier?) {
         // The previous track finished (or was skipped): close its session.
+        if previous != nil, sleep == .endOfTrack, player.currentItem != nil {
+            player.pause()
+            sleep = nil
+        }
         if let previous, let s = sessions.removeValue(forKey: previous) {
             let client = app.client
             let durMs = Int64(duration * 1000)
@@ -220,6 +284,65 @@ public final class MusicPlayer {
         report("playing")
         updateNowPlaying()
         refreshFollowing()
+        topUpRadio()
+    }
+
+    // MARK: - Stations, sleep and levelling
+
+    /// Continues a radio station when fewer than five tracks are left.
+    private func topUpRadio() {
+        guard var radio = source?.radio, !refilling, queue.entries.count - queue.index <= 5 else { return }
+        refilling = true
+        let exclude = queue.entries.map(\.item.id)
+        radio.exclude = exclude
+        radio.limit = 25
+        let title = source?.title
+        Task {
+            defer { refilling = false }
+            guard let st = try? await app.radio(radio), source?.title == title else { return }
+            let fresh = st.items.filter { !exclude.contains($0.id) }
+            if !fresh.isEmpty { addToQueue(fresh) }
+        }
+    }
+
+    private func scheduleSleep() {
+        sleepTask?.cancel()
+        guard case let .at(date) = sleep else { return }
+        sleepTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(max(0, date.timeIntervalSinceNow)))
+            guard !Task.isCancelled, let self else { return }
+            self.player.pause()
+            self.sleep = nil
+        }
+    }
+
+    /// Sets an item's volume from its loudness. AVFoundation can only turn audio down, so
+    /// quiet tracks play at full volume rather than being boosted.
+    private func applyLevel(_ item: AVPlayerItem) {
+        guard let l = sessions[ObjectIdentifier(item)] else { return }
+        var gain: Float = 1
+        if levelling != .off {
+            let i = queue.entries.firstIndex { $0.id == l.entry }
+            let albumRun = i.map { i in
+                let album = queue.entries[i].item.parentId
+                return album != nil && [i - 1, i + 1].contains { queue.entries.indices.contains($0) && queue.entries[$0].item.parentId == album }
+            } ?? false
+            let db = levelling == .album || (levelling == .auto && albumRun) ? (l.albumGain ?? l.trackGain) : l.trackGain
+            if let db {
+                var g = pow(10, db / 20)
+                if let peak = l.peak, peak > 0 { g = min(g, 1 / peak) }
+                gain = Float(min(g, 1))
+            }
+        }
+        let asset = item.asset
+        Task {
+            guard let track = try? await asset.loadTracks(withMediaType: .audio).first else { return }
+            let p = AVMutableAudioMixInputParameters(track: track)
+            p.setVolume(gain, at: .zero)
+            let mix = AVMutableAudioMix()
+            mix.inputParameters = [p]
+            item.audioMix = mix
+        }
     }
 
     private func report(_ state: String) {

@@ -15,7 +15,7 @@ const fields: { value: Condition["field"]; label: string; numeric?: boolean; hin
   { value: "lastPlayedDays", label: "Days since played", numeric: true },
   { value: "addedDays", label: "Days since added", numeric: true },
   { value: "bpm", label: "Tempo (BPM)", numeric: true },
-  { value: "energy", label: "Energy (0–1)", numeric: true },
+  { value: "energy", label: "Energy (0 calm – 1 intense)", numeric: true },
   { value: "key", label: "Key", hint: "e.g. A minor" },
   { value: "durationSeconds", label: "Length (seconds)", numeric: true },
 ];
