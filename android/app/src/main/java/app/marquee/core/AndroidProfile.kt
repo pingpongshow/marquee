@@ -29,8 +29,8 @@ object AndroidProfile {
             hlsVideoCodecs = video.filter { it == "h264" || it == "hevc" },
             hlsAudioCodecs = listOf("aac", "ac3", "eac3", "mp3"),
             maxAudioChannels = 6,
+            // ExoPlayer shows WebVTT sidecars, so files with subtitles can still play directly.
             textSubtitles = true,
-            hlsSubtitles = true,
         )
     }
 }
