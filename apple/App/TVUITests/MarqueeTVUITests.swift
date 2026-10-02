@@ -172,4 +172,15 @@ final class MarqueeTVUITests: XCTestCase {
         shot("tv-06-playing")
         remote.press(.menu)
     }
+
+    /// Top Shelf links (marquee://item/<id>) open the item's page.
+    func testTopShelfLink() throws {
+        try signIn()
+        app.launchArguments = [] // opening the link relaunches the app: keep the sign-in
+        app.open(URL(string: "marquee://item/359")!)
+        let title = app.staticTexts["00 Preview Test"].firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume'}")).firstMatch.waitForExistence(timeout: 5))
+        shot("tv-topshelf-link")
+    }
 }

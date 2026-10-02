@@ -11,6 +11,7 @@ struct MainView: View {
     @State private var showNowPlaying = false
     @State private var playlistPicker = PlaylistPicker.shared
     @State private var adventure = AdventurePicker.shared
+    @State private var linkedItem: LinkedItem?
 
     var body: some View {
         TabView {
@@ -47,6 +48,19 @@ struct MainView: View {
         .task { await loadLibraries() }
         .sheet(item: $playlistPicker.item) { item in AddToPlaylistSheet(item: item) }
         .sheet(item: $adventure.from) { item in AdventureSheet(from: item) }
+        // Links from the Top Shelf: marquee://play/<id> plays, marquee://item/<id> shows the page.
+        .onOpenURL { url in
+            guard url.scheme == "marquee", let id = Int64(url.lastPathComponent) else { return }
+            if url.host() == "play" { video.play(id) } else if url.host() == "item" { linkedItem = LinkedItem(id: id) }
+        }
+        .fullScreenCover(item: $linkedItem) { link in
+            NavigationStack {
+                ItemDetailView(id: link.id)
+                    .marqueeDestinations()
+                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { linkedItem = nil } } }
+            }
+            .environment(video)
+        }
         .fullScreenCover(item: $video.request) { req in
             PlayerView(request: req)
                 .environment(video)
@@ -134,4 +148,9 @@ struct LibrariesList: View {
         }
         .navigationTitle("Libraries")
     }
+}
+
+/// An item opened from a link (the Apple TV Top Shelf).
+struct LinkedItem: Identifiable {
+    let id: Int64
 }
