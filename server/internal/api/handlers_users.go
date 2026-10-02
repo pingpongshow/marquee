@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 
 	"marquee/internal/auth"
@@ -286,6 +287,9 @@ func (h *Handlers) DeleteUser(ctx context.Context, req DeleteUserRequestObject) 
 	case err != nil:
 		return nil, internal(ctx, "deleteUser", err)
 	}
+	if err := h.Avatars.Remove(ctx, req.UserId); err != nil {
+		slog.WarnContext(ctx, "remove avatar", "user", req.UserId, "err", err)
+	}
 	return DeleteUser204Response{}, nil
 }
 
@@ -301,7 +305,7 @@ func (h *Handlers) ListProfiles(ctx context.Context, _ ListProfilesRequestObject
 	}
 	out := make(ListProfiles200JSONResponse, len(list))
 	for i, u := range list {
-		out[i] = Profile{Id: u.ID, DisplayName: u.DisplayName, IsManaged: u.IsManaged, Requires: ProfileRequires(auth.SwitchCredentials(u))}
+		out[i] = toAPIProfile(u)
 	}
 	return out, nil
 }

@@ -7,6 +7,7 @@ import type { Profile } from "@/api/types";
 import { PinPad } from "@/components/PinPad";
 import { Alert, Button, Dialog, Input, Spinner } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
+import { Avatar } from "./Avatar";
 
 /** Plex Home-style profile picker with an on-screen PIN pad. */
 export function ProfileSwitcher({ onClose }: { onClose: () => void }) {
@@ -47,10 +48,9 @@ export function ProfileSwitcher({ onClose }: { onClose: () => void }) {
             {profiles.data?.map((p) => (
               <li key={p.id}>
                 <button onClick={() => choose(p)} className="group flex w-full flex-col items-center gap-2 rounded-lg p-2 hover:bg-surface-2" disabled={sw.isPending}>
-                  <span className="relative flex size-16 items-center justify-center rounded-full bg-surface-3 text-2xl font-bold group-hover:ring-2 group-hover:ring-accent">
-                    {p.displayName.slice(0, 1).toUpperCase()}
+                  <Avatar name={p.displayName} url={p.avatarUrl} className="size-16 text-2xl group-hover:ring-2 group-hover:ring-accent">
                     {needs(p) !== "none" && <Lock className="absolute -right-0.5 -bottom-0.5 size-5 rounded-full bg-surface p-1 text-muted" aria-label="Locked" />}
-                  </span>
+                  </Avatar>
                   <span className="max-w-full truncate text-sm">{p.displayName}</span>
                   {p.id === me.data?.id && <span className="text-[11px] text-accent">Current</span>}
                 </button>

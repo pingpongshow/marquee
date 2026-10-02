@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"marquee/internal/auth"
+	"marquee/internal/avatars"
 	"marquee/internal/images"
 	"marquee/internal/items"
 	"marquee/internal/library"
@@ -28,6 +29,7 @@ type Handlers struct {
 	Libraries *library.Store
 	Items     *items.Store
 	Images    *images.Service
+	Avatars   *avatars.Store
 	Logs      *logbuf.Buffer
 	Metadata  *metadata.Service
 	Plex      *plex.Importer
@@ -111,7 +113,7 @@ func (h *Handlers) GetHealth(ctx context.Context, _ GetHealthRequestObject) (Get
 func toAPIUser(u auth.User) User {
 	return User{
 		Id: u.ID, Username: u.Username, DisplayName: u.DisplayName,
-		IsAdmin: u.IsAdmin, IsManaged: u.IsManaged, HasPin: ptr(u.HasPIN), HasPassword: ptr(u.HasPassword),
+		IsAdmin: u.IsAdmin, IsManaged: u.IsManaged, HasPin: ptr(u.HasPIN), HasPassword: ptr(u.HasPassword), AvatarUrl: avatarURL(u),
 		CreatedAt: u.CreatedAt, LastSeenAt: u.LastSeenAt,
 		Restrictions: toAPIRestrictions(u.Restrictions), Preferences: toAPIPrefs(u.Preferences),
 	}
@@ -246,7 +248,7 @@ func (h *Handlers) ListSignInProfiles(ctx context.Context, _ ListSignInProfilesR
 		return nil, internal(ctx, "signInProfiles", err)
 	}
 	for _, u := range list {
-		out = append(out, Profile{Id: u.ID, DisplayName: u.DisplayName, IsManaged: u.IsManaged, Requires: ProfileRequires(auth.SwitchCredentials(u))})
+		out = append(out, toAPIProfile(u))
 	}
 	return out, nil
 }
