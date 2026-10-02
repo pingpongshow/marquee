@@ -10,7 +10,6 @@ struct MainView: View {
     @State private var video = VideoPresenter()
     @State private var showNowPlaying = false
     @State private var playlistPicker = PlaylistPicker.shared
-    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
         TabView {
@@ -52,7 +51,7 @@ struct MainView: View {
 
     private var compact: Bool {
         #if os(iOS)
-        sizeClass == .compact
+        UIDevice.current.userInterfaceIdiom == .phone
         #else
         false
         #endif
