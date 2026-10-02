@@ -1835,10 +1835,10 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
 
-  /music/sage:
+  /music/muse:
     post:
       tags: [music]
-      operationId: musicSage
+      operationId: musicMuse
       summary: A playlist from a description, e.g. "rainy Sunday jazz with a late-night feel" (MUSIC-5).
       requestBody:
         required: true
@@ -2383,7 +2383,7 @@ components:
     MusicSettings:
       type: object
       properties:
-        sonicAnalysis: { type: boolean, description: "Analyse how tracks sound (on this server's GPU) for radios, similar music and Sonic Sage." }
+        sonicAnalysis: { type: boolean, description: "Analyse how tracks sound (on this server's GPU) for radios, similar music and Muse." }
         onlineLyrics: { type: boolean, description: Look up lyrics on LRCLIB when a track has none (sends artist and title). }
         loudnessAnalysis: { type: boolean, description: Measure loudness of tracks without ReplayGain tags so volume levelling works for everything. }
 

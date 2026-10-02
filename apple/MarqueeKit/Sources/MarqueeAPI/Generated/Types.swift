@@ -491,9 +491,9 @@ public protocol APIProtocol: Sendable {
     func musicRadio(_ input: Operations.MusicRadio.Input) async throws -> Operations.MusicRadio.Output
     /// A playlist from a description, e.g. "rainy Sunday jazz with a late-night feel" (MUSIC-5).
     ///
-    /// - Remark: HTTP `POST /music/sage`.
-    /// - Remark: Generated from `#/paths//music/sage/post(musicSage)`.
-    func musicSage(_ input: Operations.MusicSage.Input) async throws -> Operations.MusicSage.Output
+    /// - Remark: HTTP `POST /music/muse`.
+    /// - Remark: Generated from `#/paths//music/muse/post(musicMuse)`.
+    func musicMuse(_ input: Operations.MusicMuse.Input) async throws -> Operations.MusicMuse.Output
     /// Sonic Adventure (MUSIC-4) — a path from one track to another through tracks that sound in between.
     ///
     /// - Remark: HTTP `POST /music/adventure`.
@@ -1732,13 +1732,13 @@ extension APIProtocol {
     }
     /// A playlist from a description, e.g. "rainy Sunday jazz with a late-night feel" (MUSIC-5).
     ///
-    /// - Remark: HTTP `POST /music/sage`.
-    /// - Remark: Generated from `#/paths//music/sage/post(musicSage)`.
-    public func musicSage(
-        headers: Operations.MusicSage.Input.Headers = .init(),
-        body: Operations.MusicSage.Input.Body
-    ) async throws -> Operations.MusicSage.Output {
-        try await musicSage(Operations.MusicSage.Input(
+    /// - Remark: HTTP `POST /music/muse`.
+    /// - Remark: Generated from `#/paths//music/muse/post(musicMuse)`.
+    public func musicMuse(
+        headers: Operations.MusicMuse.Input.Headers = .init(),
+        body: Operations.MusicMuse.Input.Body
+    ) async throws -> Operations.MusicMuse.Output {
+        try await musicMuse(Operations.MusicMuse.Input(
             headers: headers,
             body: body
         ))

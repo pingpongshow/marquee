@@ -24,7 +24,7 @@ export function MusicSettings() {
   return (
     <>
       <div className="space-y-6">
-        <Card title="Sonic analysis" description="Marquee listens to every track on this server's GPU to power radios, “sounds like” suggestions, Sonic Adventure, Sonic Sage and daily mixes. Audio never leaves the server.">
+        <Card title="Sonic analysis" description="Marquee listens to every track on this server's GPU to power radios, “sounds like” suggestions, Sonic Adventure, Muse and daily mixes. Audio never leaves the server.">
           {st && (
             <div className="space-y-2 rounded-lg bg-surface-2 p-4 text-sm">
               <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
@@ -43,7 +43,7 @@ export function MusicSettings() {
             </div>
           )}
           {!st?.available && st?.enabled && (
-            <Alert tone="info">Start the <code>sonic</code> container (it's in the compose file) to enable radios and Sonic Sage.</Alert>
+            <Alert tone="info">Start the <code>sonic</code> container (it's in the compose file) to enable radios and Muse.</Alert>
           )}
           <Toggle label="Analyse music" help="New tracks are analysed within the hour, and right after a music scan." checked={!!s.draft.sonicAnalysis} onChange={(v) => s.update({ sonicAnalysis: v })} />
           <div>

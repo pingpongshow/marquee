@@ -1,6 +1,6 @@
 // Package sonic is Marquee's music intelligence (M6.5): it has the sonic analysis sidecar
 // embed every track, keeps the embeddings in memory, and builds similar tracks, radios,
-// Sonic Adventure, Sonic Sage playlists and mixes from them (D56).
+// Sonic Adventure, Muse playlists and mixes from them (D56).
 package sonic
 
 import (

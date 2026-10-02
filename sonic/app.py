@@ -4,7 +4,7 @@ Runs next to the Marquee server on the same host and is only reachable from it
 (127.0.0.1). It reads audio files (read-only mounts) and returns:
 
 - a CLAP embedding (LAION larger_clap_general, 512-d, unit length) that captures how a
-  track sounds; text prompts embed into the same space, which powers Sonic Sage;
+  track sounds; text prompts embed into the same space, which powers Muse;
 - tempo (BPM), musical key, and an energy estimate (librosa).
 
 Nothing leaves the machine except the one-time model download from Hugging Face.

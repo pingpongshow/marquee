@@ -18338,32 +18338,32 @@ public enum Operations {
     }
     /// A playlist from a description, e.g. "rainy Sunday jazz with a late-night feel" (MUSIC-5).
     ///
-    /// - Remark: HTTP `POST /music/sage`.
-    /// - Remark: Generated from `#/paths//music/sage/post(musicSage)`.
-    public enum MusicSage {
-        public static let id: Swift.String = "musicSage"
+    /// - Remark: HTTP `POST /music/muse`.
+    /// - Remark: Generated from `#/paths//music/muse/post(musicMuse)`.
+    public enum MusicMuse {
+        public static let id: Swift.String = "musicMuse"
         public struct Input: Sendable, Hashable {
-            /// - Remark: Generated from `#/paths/music/sage/POST/header`.
+            /// - Remark: Generated from `#/paths/music/muse/POST/header`.
             public struct Headers: Sendable, Hashable {
-                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MusicSage.AcceptableContentType>]
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MusicMuse.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MusicSage.AcceptableContentType>] = .defaultValues()) {
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MusicMuse.AcceptableContentType>] = .defaultValues()) {
                     self.accept = accept
                 }
             }
-            public var headers: Operations.MusicSage.Input.Headers
-            /// - Remark: Generated from `#/paths/music/sage/POST/requestBody`.
+            public var headers: Operations.MusicMuse.Input.Headers
+            /// - Remark: Generated from `#/paths/music/muse/POST/requestBody`.
             @frozen public enum Body: Sendable, Hashable {
-                /// - Remark: Generated from `#/paths/music/sage/POST/requestBody/json`.
+                /// - Remark: Generated from `#/paths/music/muse/POST/requestBody/json`.
                 public struct JsonPayload: Codable, Hashable, Sendable {
-                    /// - Remark: Generated from `#/paths/music/sage/POST/requestBody/json/prompt`.
+                    /// - Remark: Generated from `#/paths/music/muse/POST/requestBody/json/prompt`.
                     public var prompt: Swift.String
-                    /// - Remark: Generated from `#/paths/music/sage/POST/requestBody/json/limit`.
+                    /// - Remark: Generated from `#/paths/music/muse/POST/requestBody/json/limit`.
                     public var limit: Swift.Int?
-                    /// - Remark: Generated from `#/paths/music/sage/POST/requestBody/json/libraryId`.
+                    /// - Remark: Generated from `#/paths/music/muse/POST/requestBody/json/libraryId`.
                     public var libraryId: Swift.Int64?
                     /// Creates a new `JsonPayload`.
                     ///
@@ -18386,18 +18386,18 @@ public enum Operations {
                         case libraryId
                     }
                 }
-                /// - Remark: Generated from `#/paths/music/sage/POST/requestBody/content/application\/json`.
-                case json(Operations.MusicSage.Input.Body.JsonPayload)
+                /// - Remark: Generated from `#/paths/music/muse/POST/requestBody/content/application\/json`.
+                case json(Operations.MusicMuse.Input.Body.JsonPayload)
             }
-            public var body: Operations.MusicSage.Input.Body
+            public var body: Operations.MusicMuse.Input.Body
             /// Creates a new `Input`.
             ///
             /// - Parameters:
             ///   - headers:
             ///   - body:
             public init(
-                headers: Operations.MusicSage.Input.Headers = .init(),
-                body: Operations.MusicSage.Input.Body
+                headers: Operations.MusicMuse.Input.Headers = .init(),
+                body: Operations.MusicMuse.Input.Body
             ) {
                 self.headers = headers
                 self.body = body
@@ -18405,9 +18405,9 @@ public enum Operations {
         }
         @frozen public enum Output: Sendable, Hashable {
             public struct Ok: Sendable, Hashable {
-                /// - Remark: Generated from `#/paths/music/sage/POST/responses/200/content`.
+                /// - Remark: Generated from `#/paths/music/muse/POST/responses/200/content`.
                 @frozen public enum Body: Sendable, Hashable {
-                    /// - Remark: Generated from `#/paths/music/sage/POST/responses/200/content/application\/json`.
+                    /// - Remark: Generated from `#/paths/music/muse/POST/responses/200/content/application\/json`.
                     case json(Components.Schemas.Station)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
@@ -18423,26 +18423,26 @@ public enum Operations {
                     }
                 }
                 /// Received HTTP response body
-                public var body: Operations.MusicSage.Output.Ok.Body
+                public var body: Operations.MusicMuse.Output.Ok.Body
                 /// Creates a new `Ok`.
                 ///
                 /// - Parameters:
                 ///   - body: Received HTTP response body
-                public init(body: Operations.MusicSage.Output.Ok.Body) {
+                public init(body: Operations.MusicMuse.Output.Ok.Body) {
                     self.body = body
                 }
             }
             /// OK
             ///
-            /// - Remark: Generated from `#/paths//music/sage/post(musicSage)/responses/200`.
+            /// - Remark: Generated from `#/paths//music/muse/post(musicMuse)/responses/200`.
             ///
             /// HTTP response code: `200 ok`.
-            case ok(Operations.MusicSage.Output.Ok)
+            case ok(Operations.MusicMuse.Output.Ok)
             /// The associated value of the enum case if `self` is `.ok`.
             ///
             /// - Throws: An error if `self` is not `.ok`.
             /// - SeeAlso: `.ok`.
-            public var ok: Operations.MusicSage.Output.Ok {
+            public var ok: Operations.MusicMuse.Output.Ok {
                 get throws {
                     switch self {
                     case let .ok(response):
@@ -18457,7 +18457,7 @@ public enum Operations {
             }
             /// Invalid request.
             ///
-            /// - Remark: Generated from `#/paths//music/sage/post(musicSage)/responses/400`.
+            /// - Remark: Generated from `#/paths//music/muse/post(musicMuse)/responses/400`.
             ///
             /// HTTP response code: `400 badRequest`.
             case badRequest(Components.Responses.BadRequest)
@@ -18480,7 +18480,7 @@ public enum Operations {
             }
             /// Missing or invalid credentials.
             ///
-            /// - Remark: Generated from `#/paths//music/sage/post(musicSage)/responses/401`.
+            /// - Remark: Generated from `#/paths//music/muse/post(musicMuse)/responses/401`.
             ///
             /// HTTP response code: `401 unauthorized`.
             case unauthorized(Components.Responses.Unauthorized)
@@ -18503,7 +18503,7 @@ public enum Operations {
             }
             /// A helper service isn't running.
             ///
-            /// - Remark: Generated from `#/paths//music/sage/post(musicSage)/responses/503`.
+            /// - Remark: Generated from `#/paths//music/muse/post(musicMuse)/responses/503`.
             ///
             /// HTTP response code: `503 serviceUnavailable`.
             case serviceUnavailable(Components.Responses.ServiceUnavailable)
