@@ -45,6 +45,7 @@ type Detail struct {
 	AudienceRating                       float64
 	IMDbRating                           float64
 	IMDbVotes, RTCritic, Metacritic      int
+	AniListScore                         int
 	Genres                               []string
 	Credits                              []Credit
 	LockedFields                         []string
@@ -270,7 +271,7 @@ func (s *Store) Search(ctx context.Context, acc Access, query string, perType in
 	rows, err := s.db.QueryContext(ctx, `SELECT `+cols(acc.UserID)+` FROM items_fts f JOIN items i ON i.id = f.rowid
 		LEFT JOIN items p ON p.id = i.parent_id LEFT JOIN items g ON g.id = i.grandparent_id
 		WHERE items_fts MATCH ? AND i.extra_type IS NULL AND i.type IN ('movie','show','episode','artist','album','track','video') AND `+ac+`
-		ORDER BY bm25(items_fts, 10.0, 5.0, 1.0) LIMIT 400`, append([]any{match}, aargs...)...)
+		ORDER BY bm25(items_fts, 10.0, 5.0, 1.0, 4.0) LIMIT 400`, append([]any{match}, aargs...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -318,8 +319,8 @@ func (s *Store) Get(ctx context.Context, acc Access, id int64, withPaths bool) (
 	var lockedJSON string
 	if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(summary, ''), COALESCE(tagline, ''), COALESCE(content_rating, ''), COALESCE(studio, ''),
 		COALESCE(audience_rating, 0), COALESCE(imdb_rating, 0), COALESCE(imdb_votes, 0), COALESCE(rt_critic, -1), COALESCE(metacritic, -1),
-		locked_fields FROM items WHERE id = ?`, id).Scan(&d.Plot, &d.Tagline, &d.ContentRating, &d.Studio, &d.AudienceRating,
-		&d.IMDbRating, &d.IMDbVotes, &d.RTCritic, &d.Metacritic, &lockedJSON); err != nil {
+		COALESCE(anilist_score, 0), locked_fields FROM items WHERE id = ?`, id).Scan(&d.Plot, &d.Tagline, &d.ContentRating, &d.Studio, &d.AudienceRating,
+		&d.IMDbRating, &d.IMDbVotes, &d.RTCritic, &d.Metacritic, &d.AniListScore, &lockedJSON); err != nil {
 		return d, err
 	}
 	var lockedCols []string

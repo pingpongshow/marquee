@@ -77,6 +77,14 @@ func withIdentity(d Deps, next http.Handler) http.Handler {
 				return
 			}
 			ctx = auth.WithSession(ctx, s)
+		} else if key := r.URL.Query().Get("key"); key != "" && auth.IsImageRequest(r) {
+			// Image URLs carry an image key, not the sign-in token (D85).
+			s, ok := d.Auth.ResolveImageKey(ctx, key)
+			if !ok {
+				writeError(w, http.StatusUnauthorized, "invalid_key", "image key not valid")
+				return
+			}
+			ctx = auth.WithSession(ctx, s)
 		}
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "same-origin")
