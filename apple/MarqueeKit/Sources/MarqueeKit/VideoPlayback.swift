@@ -31,6 +31,18 @@ public final class VideoPlayback {
     public private(set) var errorMessage: String?
     public private(set) var finished = false
     public private(set) var position: Double = 0
+    /// Playback speed (PLAY-19); each video starts at 1×.
+    public var speed: Float = 1 {
+        didSet {
+            player.defaultRate = speed
+            if player.rate != 0 { player.rate = speed }
+        }
+    }
+    public static let speeds: [Float] = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
+    /// Subtitle and audio timing in ms, positive = later (PLAY-17), as the server applied them.
+    public private(set) var subtitleOffsetMs = 0
+    public private(set) var audioOffsetMs = 0
+    public static let offsetLimit = 30000
 
     private let app: AppSession
     private let playlistID: Int64?
@@ -47,6 +59,10 @@ public final class VideoPlayback {
     /// The version being played (nil = the server's best).
     @ObservationIgnored private var fileID: Int64?
     @ObservationIgnored private var selection: (audio: Int64?, subtitle: Int64?) = (nil, nil)
+    /// Offsets chosen while watching; sent on every restart of this video (nil = the
+    /// server's remembered ones).
+    @ObservationIgnored private var chosenOffsets: (subtitle: Int, audio: Int)?
+    @ObservationIgnored private var offsetRestart: Task<Void, Never>?
     /// Set while playing a downloaded file (no server session; progress syncs later).
     @ObservationIgnored private var offline: (itemID: Int64, downloads: Downloads)?
     @ObservationIgnored private var offlineCounted = false
@@ -102,6 +118,8 @@ public final class VideoPlayback {
         if item?.id != itemID {
             item = try? await app.item(itemID)
             self.fileID = fileID
+            chosenOffsets = nil
+            if speed != 1 { speed = 1 } // each video starts at normal speed
         } else if fileID != nil {
             self.fileID = fileID
         }
@@ -111,9 +129,12 @@ public final class VideoPlayback {
         do {
             let s = try await client.startPlayback(body: .json(.init(
                 itemId: itemID, fileId: self.fileID, audioStreamId: audio, subtitleStreamId: subtitle, startMs: startMs,
-                maxBitrateKbps: quality == 0 ? nil : quality, measuredKbps: measured, profile: profile()))).ok.body.json
+                maxBitrateKbps: quality == 0 ? nil : quality, measuredKbps: measured,
+                subtitleOffsetMs: chosenOffsets?.subtitle, audioOffsetMs: chosenOffsets?.audio, profile: profile()))).ok.body.json
             await stopSession()
             session = s
+            subtitleOffsetMs = s.subtitleOffsetMs ?? chosenOffsets?.subtitle ?? 0
+            audioOffsetMs = s.audioOffsetMs ?? chosenOffsets?.audio ?? 0
             guard let url = app.absolute(s.url) else { throw MarqueeError("Bad stream address") }
             let playerItem = AVPlayerItem(url: url)
             playerItem.preferredForwardBufferDuration = app.isRemote ? 30 : 10
@@ -135,6 +156,25 @@ public final class VideoPlayback {
         await start(itemID: id, startMs: pos, audio: audio ?? selection.audio, subtitle: subtitle ?? selection.subtitle)
     }
 
+    /// Changes the subtitle or audio timing. The stream restarts at the same position with the
+    /// new offsets (the server remembers them for this file); quick repeated steps restart once.
+    public func setOffsets(subtitle: Int? = nil, audio: Int? = nil) {
+        guard offline == nil, let id = session?.itemId ?? item?.id else { return }
+        let limit = Self.offsetLimit
+        let sub = min(limit, max(-limit, subtitle ?? subtitleOffsetMs))
+        let aud = min(limit, max(-limit, audio ?? audioOffsetMs))
+        chosenOffsets = (sub, aud)
+        subtitleOffsetMs = sub
+        audioOffsetMs = aud
+        offsetRestart?.cancel()
+        offsetRestart = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(700))
+            guard let self, !Task.isCancelled else { return }
+            let pos = Int64(max(0, self.player.currentTime().seconds) * 1000)
+            await self.start(itemID: id, startMs: pos, audio: self.selection.audio, subtitle: self.selection.subtitle)
+        }
+    }
+
     /// Plays a downloaded file. Works without the server; progress is kept on the device and
     /// sent when the server is reachable.
     public func startLocal(itemID: Int64, file: URL, downloads: Downloads) async {
@@ -152,6 +192,7 @@ public final class VideoPlayback {
     }
 
     public func stop() async {
+        offsetRestart?.cancel()
         // The final position reaches the server before the session ends.
         let last = report(.paused, force: true)
         player.pause()

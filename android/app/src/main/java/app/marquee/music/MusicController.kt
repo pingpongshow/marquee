@@ -273,6 +273,14 @@ class MusicController(private val context: Context, private val marquee: Marquee
         prefs.edit().putInt("crossfade", seconds).apply()
     }
 
+    private val _eq = MutableStateFlow(EqSettings.load(prefs))
+    /** The equaliser, kept per device; MusicService applies it. */
+    val eq: StateFlow<EqSettings> = _eq
+    fun setEq(s: EqSettings) {
+        _eq.value = s
+        s.save(prefs)
+    }
+
     fun setLevelling(l: Levelling) {
         _levelling.value = l
         prefs.edit().putString("levelling", l.name).apply()

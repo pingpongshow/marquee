@@ -45,7 +45,7 @@ func canSeeLibrary(ctx context.Context, id int64) bool {
 func toAPIRestrictions(r auth.Restrictions) UserRestrictions {
 	out := UserRestrictions{LibraryIds: r.LibraryIDs, AllowRemote: ptr(r.RemoteAllowed()), RemoteQualityKbps: ptr(r.RemoteQualityKbps),
 		CanRequest: ptr(r.CanRequest), CanRecord: ptr(r.CanRecord), SeerrUserId: r.SeerrUserID,
-		LiveTv: ptr(r.LiveTVAllowed()), LiveTvGroups: r.LiveTVGroups}
+		LiveTv: ptr(r.LiveTVAllowed()), LiveTvGroups: r.LiveTVGroups, Friend: ptr(r.Friend)}
 	if r.MaxContentRating != nil {
 		out.MaxContentRating = ptr(UserRestrictionsMaxContentRating(*r.MaxContentRating))
 	}
@@ -83,12 +83,14 @@ func fromAPIRestrictions(r *UserRestrictions) (auth.Restrictions, error) {
 	}
 	out.LiveTVGroups = r.LiveTvGroups
 	out.SeerrUserID = r.SeerrUserId
+	set(&out.Friend, r.Friend)
 	return out, nil
 }
 
 func toAPIPrefs(p auth.Preferences) UserPreferences {
 	out := UserPreferences{AudioLanguage: nz(p.AudioLanguage), SubtitleLanguage: nz(p.SubtitleLanguage),
-		LocalQualityKbps: ptr(p.LocalQualityKbps), RemoteQualityKbps: ptr(p.RemoteQualityKbps)}
+		LocalQualityKbps: ptr(p.LocalQualityKbps), RemoteQualityKbps: ptr(p.RemoteQualityKbps),
+		CinemaTrailers: ptr(p.CinemaTrailers == nil || *p.CinemaTrailers)}
 	if p.SubtitleMode != "" {
 		out.SubtitleMode = ptr(UserPreferencesSubtitleMode(p.SubtitleMode))
 	}
@@ -101,6 +103,9 @@ func fromAPIPrefs(p UserPreferences) auth.Preferences {
 	set(&out.SubtitleLanguage, p.SubtitleLanguage)
 	set(&out.LocalQualityKbps, p.LocalQualityKbps)
 	set(&out.RemoteQualityKbps, p.RemoteQualityKbps)
+	if p.CinemaTrailers != nil && !*p.CinemaTrailers {
+		out.CinemaTrailers = p.CinemaTrailers // only "no" is stored
+	}
 	if p.SubtitleMode != nil {
 		out.SubtitleMode = string(*p.SubtitleMode)
 	}
@@ -266,6 +271,12 @@ func (h *Handlers) UpdateUser(ctx context.Context, req UpdateUserRequestObject) 
 		if err != nil {
 			return bad(err.Error())
 		}
+		// A friend stays a friend unless the editor says otherwise (older apps don't send it).
+		if b.Restrictions.Friend == nil {
+			if cur, err := h.Auth.GetUser(ctx, req.UserId); err == nil {
+				r.Friend = cur.Restrictions.Friend
+			}
+		}
 		upd.Restrictions = &r
 	}
 	u, err := h.Auth.Update(ctx, req.UserId, upd)
@@ -316,9 +327,13 @@ func (h *Handlers) ListProfiles(ctx context.Context, _ ListProfilesRequestObject
 	if err != nil {
 		return nil, internal(ctx, "profiles", err)
 	}
-	out := make(ListProfiles200JSONResponse, len(list))
-	for i, u := range list {
-		out[i] = toAPIProfile(u)
+	// Friends (USER-13) only see themselves; the household doesn't see friends.
+	me, _ := session(ctx)
+	out := ListProfiles200JSONResponse{}
+	for _, u := range list {
+		if u.ID == me.User.ID || (!me.User.Restrictions.Friend && !u.Restrictions.Friend) {
+			out = append(out, toAPIProfile(u))
+		}
 	}
 	return out, nil
 }
@@ -334,6 +349,9 @@ func (h *Handlers) SwitchProfile(ctx context.Context, req SwitchProfileRequestOb
 	}
 	if err != nil {
 		return nil, internal(ctx, "switch", err)
+	}
+	if target.ID != s.User.ID && (s.User.Restrictions.Friend || target.Restrictions.Friend) {
+		return SwitchProfile404JSONResponse{NotFoundJSONResponse(apiErr("not_found", auth.ErrUserNotFound.Error()))}, nil
 	}
 	b := req.Body
 	pin, pw := "", ""

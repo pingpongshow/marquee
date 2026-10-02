@@ -19,6 +19,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -33,6 +34,10 @@ import org.junit.Assert.assertTrue
 import java.util.concurrent.TimeUnit
 import okhttp3.MediaType.Companion.toMediaType
 import org.junit.After
+import app.marquee.api.infrastructure.Serializer
+import app.marquee.api.models.AuthResult
+import app.marquee.api.models.User
+import app.marquee.music.MusicService
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
@@ -118,7 +123,7 @@ class MarqueeUiTest {
         // Music: play an artist; the mini player appears and pauses. Reselecting the
         // Libraries tab goes back to the list.
         openLibrary("Music")
-        rule.waitText("Calm Pads", substring = true)
+        rule.waitUntil(20_000) { scrollTo(hasText("Calm Pads", substring = true)) }
         tap("Calm Pads", substring = true)
         rule.waitText("Play")
         shot("07-artist")
@@ -310,7 +315,7 @@ class MarqueeUiTest {
         back()
         rule.waitText("00 Preview Test")
         openLibrary("Music")
-        rule.waitText("Calm Pads", substring = true)
+        rule.waitUntil(20_000) { scrollTo(hasText("Calm Pads", substring = true)) }
         tap("Calm Pads", substring = true)
         rule.onAllNodes(hasContentDescription("Floating")).onFirst().performClick()
         rule.waitText("Radio")
@@ -347,7 +352,7 @@ class MarqueeUiTest {
         assumeTrue("phones and tablets only", !isTv)
         connectAndSignIn()
         openLibrary("Music")
-        rule.waitText("Calm Pads", substring = true)
+        rule.waitUntil(20_000) { scrollTo(hasText("Calm Pads", substring = true)) }
         tap("Calm Pads", substring = true)
         rule.onAllNodes(hasContentDescription("Floating")).onFirst().performClick()
         rule.waitText("Radio")
@@ -468,7 +473,13 @@ class MarqueeUiTest {
         // My Requests is at the end of the grid: scroll there once the list has reloaded.
         rule.waitUntil(15_000) { scrollTo(hasText("Withdraw")) }
         shot("r3-my-requests")
-        rule.onAllNodes(hasText("Withdraw")).onFirst().performClick()
+        // Withdraw it, and anything earlier runs left waiting, until none are left.
+        repeat(10) {
+            if (!scrollTo(hasText("Withdraw"))) return@repeat
+            val before = rule.onAllNodes(hasText("Withdraw")).fetchSemanticsNodes().size
+            rule.onAllNodes(hasText("Withdraw")).onFirst().performClick()
+            rule.waitUntil(10_000) { rule.onAllNodes(hasText("Withdraw")).fetchSemanticsNodes().size < before }
+        }
         rule.waitUntil(10_000) { !scrollTo(hasText("Withdraw")) }
     }
 
@@ -753,5 +764,243 @@ class MarqueeUiTest {
         rule.waitText("Added to $name.", 10_000)
         shot("pl1-added")
         tap("Done")
+    }
+
+    /** Connects, then signs in as the test admin (its token) instead of picking a profile. */
+    private fun signInAsAdmin() {
+        val token = adminToken ?: throw org.junit.AssumptionViolatedException("no admin token")
+        rule.waitUntilAtLeastOneExists(hasSetTextAction(), 10_000)
+        rule.onNode(hasSetTextAction()).performTextInput(server)
+        rule.onNodeWithText("Connect").performClick()
+        rule.waitText("Who's watching?")
+        val user = Serializer.kotlinxSerializationJson.decodeFromString(User.serializer(), adminApi("GET", "/me"))
+        val app = context.applicationContext as MarqueeApplication
+        kotlinx.coroutines.runBlocking { app.marquee.finish(AuthResult(token, user)) }
+        rule.waitText("Edit Home", 20_000)
+    }
+
+    private fun playMovie(title: String, fromStart: Boolean = false) {
+        openLibrary("Movies")
+        rule.waitUntil(15_000) { scrollTo(hasText(title)) }
+        tap(title)
+        rule.waitUntilAtLeastOneExists(hasText("Play") or hasText("Resume"), 10_000)
+        if (fromStart && rule.onAllNodesWithText("From start").fetchSemanticsNodes().isNotEmpty()) tap("From start")
+        else rule.onAllNodes(hasText("Play") or hasText("Resume")).onFirst().performClick()
+    }
+
+    private val videoPlaying = hasContentDescription("Video player") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Playing")
+
+    private fun openPlayerSettings() {
+        showControls()
+        rule.onNode(hasContentDescription("Playback settings")).performClick()
+        rule.waitText("Playback")
+    }
+
+    /** Playback speed (PLAY-19) and subtitle timing (PLAY-17), which the server remembers for the file. */
+    @Test fun speedAndTiming() {
+        assumeTrue("phones", !isTv)
+        connectAndSignIn()
+        playMovie("00 Preview Test")
+        rule.waitUntilAtLeastOneExists(videoPlaying, 30_000)
+        openPlayerSettings()
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("1.5×"))
+        shot("st1-speed-menu")
+        tap("1.5×")
+        rule.waitUntilAtLeastOneExists(videoPlaying, 10_000)
+        openPlayerSettings()
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("1.5×"))
+        rule.onNode(hasText("1.5×") and isSelected()).assertExists()
+        // Subtitle timing: three steps later, applied by restarting where it was.
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasContentDescription("Subtitle timing later"))
+        repeat(3) { rule.onNode(hasContentDescription("Subtitle timing later")).performClick() }
+        rule.onNode(hasContentDescription("Subtitle timing value") and hasText("+300 ms")).assertExists()
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasContentDescription("Audio timing later"))
+        shot("st2-timing")
+        Thread.sleep(3000) // the restart waits for the stepping to stop
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Close"))
+        tap("Close")
+        rule.waitUntilAtLeastOneExists(videoPlaying, 30_000)
+        back()
+        // Played again: the server applies the remembered offset, and the speed is back to 1×.
+        rule.waitUntilAtLeastOneExists(hasText("Play") or hasText("Resume"), 10_000)
+        rule.onAllNodes(hasText("Play") or hasText("Resume")).onFirst().performClick()
+        rule.waitUntilAtLeastOneExists(videoPlaying, 30_000)
+        openPlayerSettings()
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("1×"))
+        rule.onNode(hasText("1×") and isSelected()).assertExists()
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasContentDescription("Subtitle timing later"))
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Subtitle timing value") and hasText("+300 ms"), 5_000)
+        shot("st3-remembered")
+        // Reset (and remembered as 0 again).
+        rule.onAllNodes(hasText("Reset")).onFirst().performClick()
+        rule.onNode(hasContentDescription("Subtitle timing value") and hasText("0 ms")).assertExists()
+        Thread.sleep(3000)
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Close"))
+        tap("Close")
+        rule.waitUntilAtLeastOneExists(videoPlaying, 30_000)
+        back()
+    }
+
+    /**
+     * Cinema trailers (PLAY-18): the admin turns them on in Server settings; a movie played from
+     * the start opens with a trailer, which Skip all passes. The setting is put back afterwards.
+     */
+    @Test fun cinemaTrailers() {
+        assumeTrue("phones", !isTv)
+        signInAsAdmin()
+        try {
+            tap("Settings")
+            rule.waitText("Play trailers before movies")
+            rule.onNode(hasContentDescription("Play trailers before movies") and
+                SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, androidx.compose.ui.state.ToggleableState.On)).assertExists()
+            tap("Server settings")
+            rule.waitText("Cinema trailers")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Trailers: Off"), 10_000)
+            rule.onNode(hasContentDescription("More trailers")).performClick()
+            rule.onNode(hasContentDescription("Trailers: 1")).assertExists()
+            shot("ct1-server-settings")
+            tap("Save")
+            rule.waitText("Saved.")
+            assertTrue(adminApi("GET", "/settings").contains("\"trailers\":1"))
+            back()
+            back()
+            playMovie("10 Xenon", fromStart = true)
+            rule.waitText("Trailer · ", 30_000, substring = true)
+            rule.waitUntilAtLeastOneExists(videoPlaying, 30_000)
+            Thread.sleep(2000)
+            shot("ct2-trailer")
+            tap("Skip all")
+            rule.waitUntil(15_000) { rule.onAllNodesWithText("Trailer · ", substring = true).fetchSemanticsNodes().isEmpty() }
+            rule.waitUntilAtLeastOneExists(videoPlaying, 30_000)
+            shot("ct3-feature")
+            back()
+        } finally {
+            adminApi("PATCH", "/settings", """{"cinema":{"trailers":0}}""")
+        }
+    }
+
+    /** Home rows (USER-12): hide a row in Edit Home, pin a collection, open it from Home, unpin, reset. */
+    @Test fun editHomeAndPin() {
+        connectAndSignIn()
+        tap("Edit Home")
+        // Start from the default layout (a failed run may have left changes).
+        rule.waitText("Reset")
+        tap("Reset")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Hide Recently Added Movies"), 10_000)
+        rule.onNode(hasContentDescription("Hide Recently Added Movies")).performClick()
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Show Recently Added Movies"), 10_000)
+        rule.onAllNodes(hasContentDescription(" down", substring = true)).onFirst().performClick()
+        shot("eh1-edit-home")
+        tap("Done")
+        rule.waitText("Home")
+        rule.waitUntil(10_000) { rule.onAllNodesWithText("Recently Added Movies").fetchSemanticsNodes().isEmpty() }
+        shot("eh2-home-without-movies")
+
+        // Pin a collection, and find it on Home.
+        openLibrary("Movies")
+        rule.waitText("Collections")
+        shot("eh2b-movies")
+        tap("Collections")
+        rule.waitText("Test Saga", 10_000)
+        tap("Test Saga")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Pin to Home") or hasContentDescription("Unpin from Home"), 10_000)
+        if (rule.onAllNodes(hasContentDescription("Unpin from Home")).fetchSemanticsNodes().isNotEmpty()) {
+            rule.onNode(hasContentDescription("Unpin from Home")).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Pin to Home"), 10_000)
+        }
+        rule.onNode(hasContentDescription("Pin to Home")).performClick()
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Unpin from Home"), 10_000)
+        shot("eh3-pinned")
+        tap("Home")
+        rule.waitUntil(15_000) { scrollTo(hasText("Test Saga  ›")) }
+        shot("eh4-home-pinned")
+        tap("Test Saga  ›")
+        rule.waitText("In this collection", 10_000)
+        rule.onNode(hasContentDescription("Unpin from Home")).performClick()
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Pin to Home"), 10_000)
+        back()
+        // Back to the default layout.
+        rule.waitUntil(10_000) { scrollTo(hasText("Edit Home")) }
+        tap("Edit Home")
+        rule.waitText("Reset")
+        tap("Reset")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Hide Recently Added Movies"), 10_000)
+        tap("Done")
+        rule.waitText("Recently Added Movies")
+    }
+
+    /** The equaliser (Now Playing → EQ): a preset turns it on and reaches the platform effect. */
+    @Test fun equaliser() {
+        connectAndSignIn()
+        val app = context.applicationContext as MarqueeApplication
+        openLibrary("Music")
+        rule.waitUntil(20_000) { scrollTo(hasText("Library Radio")) }
+        tap("Library Radio")
+        openNowPlaying()
+        rule.onNode(hasContentDescription("Equaliser")).performClick()
+        rule.waitText("Bass Boost")
+        tap("Rock")
+        rule.waitUntil(5_000) { app.music.eq.value.let { it.on && it.preset == "Rock" } }
+        assertTrue("the device's equaliser is in use (${MusicService.equalizerBands} bands)", MusicService.equalizerBands > 0)
+        shot("eq1-rock")
+        rule.onNodeWithText("Reset").performScrollTo().performClick()
+        rule.onNode(hasContentDescription("Equaliser on")).performScrollTo().performClick()
+        shot("eq2-reset")
+        rule.waitUntil(5_000) { !app.music.eq.value.on && app.music.eq.value.preset == "Flat" }
+        rule.onNodeWithText("Done").performScrollTo().performClick()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+    }
+
+    /** Car mode (phones): entered from the Music page, Shuffle All plays, works in landscape, Exit leaves. */
+    @Test fun carMode() {
+        assumeTrue("phones", !isTv)
+        connectAndSignIn()
+        val app = context.applicationContext as MarqueeApplication
+        openLibrary("Music")
+        rule.waitText("Car mode")
+        tap("Car mode")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Car mode"), 10_000)
+        rule.waitText("Shuffle All")
+        tap("Shuffle All")
+        rule.waitUntil(20_000) { app.music.now.value != null }
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Pause"), 15_000)
+        Thread.sleep(1500)
+        shot("car1-portrait")
+        scenario.onActivity { it.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
+        Thread.sleep(2500)
+        rule.waitText("Shuffle All")
+        shot("car2-landscape")
+        scenario.onActivity { it.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+        rule.onNode(hasContentDescription("Next track")).performClick()
+        tap("Exit")
+        rule.waitUntil(10_000) { rule.onAllNodes(hasContentDescription("Car mode")).fetchSemanticsNodes().isEmpty() }
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+    }
+
+    /** Sharing (USER-13): the admin invites a friend, gets the link to share, and deletes the invite. */
+    @Test fun inviteFriend() {
+        signInAsAdmin()
+        tap("Settings")
+        rule.waitText("Users & sharing")
+        tap("Users & sharing")
+        rule.waitText("Friends", 10_000)
+        tap("Invite a friend")
+        rule.waitText("Who it's for")
+        val note = "UI friend ${(1000..9999).random()}"
+        rule.onNode(androidx.compose.ui.test.hasTestTag("inviteNote")).performTextInput(note)
+        rule.onNode(hasContentDescription("More days")).performClick()
+        shot("inv1-form")
+        tap("Create invite")
+        rule.waitText("Invite ready", 10_000)
+        rule.onNode(androidx.compose.ui.test.hasTestTag("inviteLink") and hasText("http://$server/join/", substring = true)).assertExists()
+        rule.waitText("Tailscale", substring = true)
+        shot("inv2-link")
+        tap("Done")
+        rule.waitText(note)
+        rule.waitText("Pending · expires", substring = true)
+        shot("inv3-listed")
+        rule.onNode(hasContentDescription("Delete invite $note")).performClick()
+        rule.waitUntil(10_000) { rule.onAllNodesWithText(note).fetchSemanticsNodes().isEmpty() }
+        assertTrue(!adminApi("GET", "/invites").contains(note))
     }
 }

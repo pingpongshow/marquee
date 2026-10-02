@@ -13,6 +13,7 @@ import {
   Input,
   Select,
   Spinner,
+  Toggle,
 } from "@/components/ui";
 import { StatsView } from "../settings/StatsView";
 import { AvatarPicker } from "./Avatar";
@@ -284,6 +285,12 @@ export function AccountPage() {
             )}
           </Field>
         </div>
+        <Toggle
+          label="Play trailers before movies"
+          help="When the server has cinema trailers on, and a movie starts from the beginning."
+          checked={p.cinemaTrailers !== false}
+          onChange={(v) => setPrefs({ ...p, cinemaTrailers: v })}
+        />
         <div className="flex justify-end">
           <Button
             variant="primary"

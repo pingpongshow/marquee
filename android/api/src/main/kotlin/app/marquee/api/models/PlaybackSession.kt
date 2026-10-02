@@ -55,6 +55,8 @@ import kotlinx.serialization.Contextual
  * @param trackGainDb Music: gain to apply for volume levelling (ReplayGain track gain).
  * @param albumGainDb Music: album gain, for playing whole albums.
  * @param peak Music: peak sample level (1.0 = full scale), to avoid clipping when boosting.
+ * @param subtitleOffsetMs Subtitle offset applied (PLAY-17). subtitleUrl also takes ?offsetMs= to try another without restarting.
+ * @param audioOffsetMs Audio offset applied (PLAY-17).
  */
 @Serializable
 
@@ -130,7 +132,15 @@ data class PlaybackSession (
 
     /* Music: peak sample level (1.0 = full scale), to avoid clipping when boosting. */
     @SerialName(value = "peak")
-    val peak: kotlin.Double? = null
+    val peak: kotlin.Double? = null,
+
+    /* Subtitle offset applied (PLAY-17). subtitleUrl also takes ?offsetMs= to try another without restarting. */
+    @SerialName(value = "subtitleOffsetMs")
+    val subtitleOffsetMs: kotlin.Int? = null,
+
+    /* Audio offset applied (PLAY-17). */
+    @SerialName(value = "audioOffsetMs")
+    val audioOffsetMs: kotlin.Int? = null
 
 ) {
 

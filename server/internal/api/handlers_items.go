@@ -261,6 +261,11 @@ func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 		}
 		out.Collections = &list
 	}
+	if d.Type == "collection" {
+		if sc, ok := h.Items.Smart(ctx, id); ok {
+			out.SmartRules = ptr(smartToAPI(sc))
+		}
+	}
 	for i, v := range d.Versions {
 		mv := MediaVersion{Id: v.ID, Label: v.Label, Files: make([]MediaFile, len(v.Files))}
 		for j, f := range v.Files {

@@ -11,6 +11,7 @@ import {
   Library,
   MonitorSmartphone,
   Network,
+  Popcorn,
   ScrollText,
   Server,
   Users,
@@ -18,6 +19,7 @@ import {
   Tv,
 } from "lucide-react";
 import type { ComponentType } from "react";
+import { CinemaSettings } from "./CinemaSettings";
 import { DashboardSettings } from "./DashboardSettings";
 import { MusicSettings } from "./MusicSettings";
 import { LibrariesSettings } from "./LibrariesSettings";
@@ -120,6 +122,15 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] =
           keywords:
             "sonic analysis radio sage mixes lyrics lrclib loudness replaygain volume levelling gpu",
           description: "Sonic analysis, lyrics and volume levelling.",
+        },
+        {
+          id: "cinema",
+          label: "Cinema Trailers",
+          icon: Popcorn,
+          component: CinemaSettings,
+          keywords: "trailers preroll pre-roll intro cinema before movie extras",
+          description:
+            "Trailers and a pre-roll video before movies, like at the cinema.",
         },
         {
           id: "scheduled-tasks",

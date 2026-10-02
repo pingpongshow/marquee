@@ -468,6 +468,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/seerrUserId`.
             public var seerrUserId: Swift.Int64?
+            /// Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserRestrictions/friend`.
+            public var friend: Swift.Bool?
             /// Creates a new `UserRestrictions`.
             ///
             /// - Parameters:
@@ -480,6 +484,7 @@ extension Components {
             ///   - liveTv: May watch Live TV (LIVE-4). Default true.
             ///   - liveTvGroups: Channel groups this user may watch. Null or absent = all.
             ///   - seerrUserId: The Seerr user requests are made as. Null = Seerr's API key owner.
+            ///   - friend: Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker.
             public init(
                 libraryIds: [Swift.Int64]? = nil,
                 maxContentRating: Components.Schemas.UserRestrictions.MaxContentRatingPayload? = nil,
@@ -489,7 +494,8 @@ extension Components {
                 canRecord: Swift.Bool? = nil,
                 liveTv: Swift.Bool? = nil,
                 liveTvGroups: [Swift.String]? = nil,
-                seerrUserId: Swift.Int64? = nil
+                seerrUserId: Swift.Int64? = nil,
+                friend: Swift.Bool? = nil
             ) {
                 self.libraryIds = libraryIds
                 self.maxContentRating = maxContentRating
@@ -500,6 +506,7 @@ extension Components {
                 self.liveTv = liveTv
                 self.liveTvGroups = liveTvGroups
                 self.seerrUserId = seerrUserId
+                self.friend = friend
             }
             public enum CodingKeys: String, CodingKey {
                 case libraryIds
@@ -511,6 +518,7 @@ extension Components {
                 case liveTv
                 case liveTvGroups
                 case seerrUserId
+                case friend
             }
         }
         /// - Remark: Generated from `#/components/schemas/UserPreferences`.
@@ -538,6 +546,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/UserPreferences/remoteQualityKbps`.
             public var remoteQualityKbps: Swift.Int?
+            /// Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserPreferences/cinemaTrailers`.
+            public var cinemaTrailers: Swift.Bool?
             /// Creates a new `UserPreferences`.
             ///
             /// - Parameters:
@@ -546,18 +558,21 @@ extension Components {
             ///   - subtitleMode:
             ///   - localQualityKbps: 0 = original
             ///   - remoteQualityKbps: 0 = automatic
+            ///   - cinemaTrailers: Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true.
             public init(
                 audioLanguage: Swift.String? = nil,
                 subtitleLanguage: Swift.String? = nil,
                 subtitleMode: Components.Schemas.UserPreferences.SubtitleModePayload? = nil,
                 localQualityKbps: Swift.Int? = nil,
-                remoteQualityKbps: Swift.Int? = nil
+                remoteQualityKbps: Swift.Int? = nil,
+                cinemaTrailers: Swift.Bool? = nil
             ) {
                 self.audioLanguage = audioLanguage
                 self.subtitleLanguage = subtitleLanguage
                 self.subtitleMode = subtitleMode
                 self.localQualityKbps = localQualityKbps
                 self.remoteQualityKbps = remoteQualityKbps
+                self.cinemaTrailers = cinemaTrailers
             }
             public enum CodingKeys: String, CodingKey {
                 case audioLanguage
@@ -565,6 +580,7 @@ extension Components {
                 case subtitleMode
                 case localQualityKbps
                 case remoteQualityKbps
+                case cinemaTrailers
             }
         }
         /// - Remark: Generated from `#/components/schemas/UserCreate`.
@@ -982,6 +998,8 @@ extension Components {
             public var music: Components.Schemas.MusicSettings?
             /// - Remark: Generated from `#/components/schemas/ServerSettings/integrations`.
             public var integrations: Components.Schemas.IntegrationSettings?
+            /// - Remark: Generated from `#/components/schemas/ServerSettings/cinema`.
+            public var cinema: Components.Schemas.CinemaSettings?
             /// Replaces the whole list when sent.
             ///
             /// - Remark: Generated from `#/components/schemas/ServerSettings/webhooks`.
@@ -999,6 +1017,7 @@ extension Components {
             ///   - tasks:
             ///   - music:
             ///   - integrations:
+            ///   - cinema:
             ///   - webhooks: Replaces the whole list when sent.
             public init(
                 security: Components.Schemas.SecuritySettings,
@@ -1011,6 +1030,7 @@ extension Components {
                 tasks: Components.Schemas.TaskSettings,
                 music: Components.Schemas.MusicSettings? = nil,
                 integrations: Components.Schemas.IntegrationSettings? = nil,
+                cinema: Components.Schemas.CinemaSettings? = nil,
                 webhooks: [Components.Schemas.Webhook]? = nil
             ) {
                 self.security = security
@@ -1023,6 +1043,7 @@ extension Components {
                 self.tasks = tasks
                 self.music = music
                 self.integrations = integrations
+                self.cinema = cinema
                 self.webhooks = webhooks
             }
             public enum CodingKeys: String, CodingKey {
@@ -1036,6 +1057,7 @@ extension Components {
                 case tasks
                 case music
                 case integrations
+                case cinema
                 case webhooks
             }
         }
@@ -1061,6 +1083,8 @@ extension Components {
             public var music: Components.Schemas.MusicSettings?
             /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/integrations`.
             public var integrations: Components.Schemas.IntegrationSettingsUpdate?
+            /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/cinema`.
+            public var cinema: Components.Schemas.CinemaSettings?
             /// Replaces the whole list when sent.
             ///
             /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/webhooks`.
@@ -1078,6 +1102,7 @@ extension Components {
             ///   - tasks:
             ///   - music:
             ///   - integrations:
+            ///   - cinema:
             ///   - webhooks: Replaces the whole list when sent.
             public init(
                 security: Components.Schemas.SecuritySettings? = nil,
@@ -1090,6 +1115,7 @@ extension Components {
                 tasks: Components.Schemas.TaskSettings? = nil,
                 music: Components.Schemas.MusicSettings? = nil,
                 integrations: Components.Schemas.IntegrationSettingsUpdate? = nil,
+                cinema: Components.Schemas.CinemaSettings? = nil,
                 webhooks: [Components.Schemas.Webhook]? = nil
             ) {
                 self.security = security
@@ -1102,6 +1128,7 @@ extension Components {
                 self.tasks = tasks
                 self.music = music
                 self.integrations = integrations
+                self.cinema = cinema
                 self.webhooks = webhooks
             }
             public enum CodingKeys: String, CodingKey {
@@ -1115,6 +1142,7 @@ extension Components {
                 case tasks
                 case music
                 case integrations
+                case cinema
                 case webhooks
             }
         }
@@ -1180,6 +1208,35 @@ extension Components {
                 case secret
                 case events
                 case enabled
+            }
+        }
+        /// Cinema trailers (PLAY-18) before movies that are started from the beginning.
+        ///
+        /// - Remark: Generated from `#/components/schemas/CinemaSettings`.
+        public struct CinemaSettings: Codable, Hashable, Sendable {
+            /// Trailers of other movies in the library to play first; 0 = off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CinemaSettings/trailers`.
+            public var trailers: Swift.Int?
+            /// A video (e.g. a cinema intro) played after the trailers, before the movie.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CinemaSettings/prerollItemId`.
+            public var prerollItemId: Swift.Int64?
+            /// Creates a new `CinemaSettings`.
+            ///
+            /// - Parameters:
+            ///   - trailers: Trailers of other movies in the library to play first; 0 = off.
+            ///   - prerollItemId: A video (e.g. a cinema intro) played after the trailers, before the movie.
+            public init(
+                trailers: Swift.Int? = nil,
+                prerollItemId: Swift.Int64? = nil
+            ) {
+                self.trailers = trailers
+                self.prerollItemId = prerollItemId
+            }
+            public enum CodingKeys: String, CodingKey {
+                case trailers
+                case prerollItemId
             }
         }
         /// - Remark: Generated from `#/components/schemas/MusicSettings`.
@@ -4195,6 +4252,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/PlaybackRequest/preload`.
             public var preload: Swift.Bool?
+            /// Subtitle timing (PLAY-17), ms; positive shows subtitles later. Omit both offsets to use what this user last chose for this file; values sent are remembered.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaybackRequest/subtitleOffsetMs`.
+            public var subtitleOffsetMs: Swift.Int?
+            /// Audio timing (PLAY-17), ms; positive plays the audio later. Nonzero repackages the stream (no direct play).
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaybackRequest/audioOffsetMs`.
+            public var audioOffsetMs: Swift.Int?
             /// - Remark: Generated from `#/components/schemas/PlaybackRequest/profile`.
             public var profile: Components.Schemas.DeviceProfile
             /// Creates a new `PlaybackRequest`.
@@ -4208,6 +4273,8 @@ extension Components {
             ///   - maxBitrateKbps: The app's quality setting; 0/omitted = original (home) or automatic (remote).
             ///   - measuredKbps: Measured download speed from /playback/bandwidth-test.
             ///   - preload: Prepare the next item (gapless music) without ending this device's current session. It takes over when it first reports "playing".
+            ///   - subtitleOffsetMs: Subtitle timing (PLAY-17), ms; positive shows subtitles later. Omit both offsets to use what this user last chose for this file; values sent are remembered.
+            ///   - audioOffsetMs: Audio timing (PLAY-17), ms; positive plays the audio later. Nonzero repackages the stream (no direct play).
             ///   - profile:
             public init(
                 itemId: Swift.Int64,
@@ -4218,6 +4285,8 @@ extension Components {
                 maxBitrateKbps: Swift.Int? = nil,
                 measuredKbps: Swift.Int? = nil,
                 preload: Swift.Bool? = nil,
+                subtitleOffsetMs: Swift.Int? = nil,
+                audioOffsetMs: Swift.Int? = nil,
                 profile: Components.Schemas.DeviceProfile
             ) {
                 self.itemId = itemId
@@ -4228,6 +4297,8 @@ extension Components {
                 self.maxBitrateKbps = maxBitrateKbps
                 self.measuredKbps = measuredKbps
                 self.preload = preload
+                self.subtitleOffsetMs = subtitleOffsetMs
+                self.audioOffsetMs = audioOffsetMs
                 self.profile = profile
             }
             public enum CodingKeys: String, CodingKey {
@@ -4239,6 +4310,8 @@ extension Components {
                 case maxBitrateKbps
                 case measuredKbps
                 case preload
+                case subtitleOffsetMs
+                case audioOffsetMs
                 case profile
             }
         }
@@ -4438,6 +4511,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/PlaybackSession/peak`.
             public var peak: Swift.Double?
+            /// Subtitle offset applied (PLAY-17). subtitleUrl also takes ?offsetMs= to try another without restarting.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaybackSession/subtitleOffsetMs`.
+            public var subtitleOffsetMs: Swift.Int?
+            /// Audio offset applied (PLAY-17).
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaybackSession/audioOffsetMs`.
+            public var audioOffsetMs: Swift.Int?
             /// Creates a new `PlaybackSession`.
             ///
             /// - Parameters:
@@ -4462,6 +4543,8 @@ extension Components {
             ///   - trackGainDb: Music: gain to apply for volume levelling (ReplayGain track gain).
             ///   - albumGainDb: Music: album gain, for playing whole albums.
             ///   - peak: Music: peak sample level (1.0 = full scale), to avoid clipping when boosting.
+            ///   - subtitleOffsetMs: Subtitle offset applied (PLAY-17). subtitleUrl also takes ?offsetMs= to try another without restarting.
+            ///   - audioOffsetMs: Audio offset applied (PLAY-17).
             public init(
                 id: Swift.String,
                 itemId: Swift.Int64,
@@ -4483,7 +4566,9 @@ extension Components {
                 markers: [Components.Schemas.Marker],
                 trackGainDb: Swift.Double? = nil,
                 albumGainDb: Swift.Double? = nil,
-                peak: Swift.Double? = nil
+                peak: Swift.Double? = nil,
+                subtitleOffsetMs: Swift.Int? = nil,
+                audioOffsetMs: Swift.Int? = nil
             ) {
                 self.id = id
                 self.itemId = itemId
@@ -4506,6 +4591,8 @@ extension Components {
                 self.trackGainDb = trackGainDb
                 self.albumGainDb = albumGainDb
                 self.peak = peak
+                self.subtitleOffsetMs = subtitleOffsetMs
+                self.audioOffsetMs = audioOffsetMs
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -4529,6 +4616,8 @@ extension Components {
                 case trackGainDb
                 case albumGainDb
                 case peak
+                case subtitleOffsetMs
+                case audioOffsetMs
             }
         }
         /// - Remark: Generated from `#/components/schemas/PlaybackProgress`.
@@ -4920,6 +5009,411 @@ extension Components {
                 case uploadSpeedKbps
                 case bandwidthHistory
                 case libraries
+            }
+        }
+        /// A smart collection's rules (META-7): its members are the library's movies or shows matching these, kept current. Only on collections that are smart.
+        ///
+        /// - Remark: Generated from `#/components/schemas/SmartCollectionRules`.
+        public struct SmartCollectionRules: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/itemType`.
+            @frozen public enum ItemTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case movie = "movie"
+                case show = "show"
+            }
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/itemType`.
+            public var itemType: Components.Schemas.SmartCollectionRules.ItemTypePayload
+            /// A library sort (see the sort parameter). Default title.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/sort`.
+            public var sort: Swift.String?
+            /// At most this many; 0 = all.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/limit`.
+            public var limit: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/watch`.
+            @frozen public enum WatchPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case unwatched = "unwatched"
+                case watched = "watched"
+                case inProgress = "in_progress"
+            }
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/watch`.
+            public var watch: Components.Schemas.SmartCollectionRules.WatchPayload?
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/genre`.
+            public var genre: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/decade`.
+            public var decade: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/contentRating`.
+            public var contentRating: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/resolution`.
+            @frozen public enum ResolutionPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case _4k = "4k"
+                case _1080 = "1080"
+                case _720 = "720"
+                case sd = "sd"
+            }
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/resolution`.
+            public var resolution: Components.Schemas.SmartCollectionRules.ResolutionPayload?
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/hdr`.
+            public var hdr: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/yearFrom`.
+            public var yearFrom: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/yearTo`.
+            public var yearTo: Swift.Int?
+            /// Added in the last this many days.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/addedDays`.
+            public var addedDays: Swift.Int?
+            /// Studio or network.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/studio`.
+            public var studio: Swift.String?
+            /// In the cast or crew.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/personId`.
+            public var personId: Swift.Int64?
+            /// Audience, IMDb or critic rating of at least this (0–10).
+            ///
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionRules/minRating`.
+            public var minRating: Swift.Double?
+            /// Creates a new `SmartCollectionRules`.
+            ///
+            /// - Parameters:
+            ///   - itemType:
+            ///   - sort: A library sort (see the sort parameter). Default title.
+            ///   - limit: At most this many; 0 = all.
+            ///   - watch:
+            ///   - genre:
+            ///   - decade:
+            ///   - contentRating:
+            ///   - resolution:
+            ///   - hdr:
+            ///   - yearFrom:
+            ///   - yearTo:
+            ///   - addedDays: Added in the last this many days.
+            ///   - studio: Studio or network.
+            ///   - personId: In the cast or crew.
+            ///   - minRating: Audience, IMDb or critic rating of at least this (0–10).
+            public init(
+                itemType: Components.Schemas.SmartCollectionRules.ItemTypePayload,
+                sort: Swift.String? = nil,
+                limit: Swift.Int? = nil,
+                watch: Components.Schemas.SmartCollectionRules.WatchPayload? = nil,
+                genre: Swift.String? = nil,
+                decade: Swift.Int? = nil,
+                contentRating: Swift.String? = nil,
+                resolution: Components.Schemas.SmartCollectionRules.ResolutionPayload? = nil,
+                hdr: Swift.Bool? = nil,
+                yearFrom: Swift.Int? = nil,
+                yearTo: Swift.Int? = nil,
+                addedDays: Swift.Int? = nil,
+                studio: Swift.String? = nil,
+                personId: Swift.Int64? = nil,
+                minRating: Swift.Double? = nil
+            ) {
+                self.itemType = itemType
+                self.sort = sort
+                self.limit = limit
+                self.watch = watch
+                self.genre = genre
+                self.decade = decade
+                self.contentRating = contentRating
+                self.resolution = resolution
+                self.hdr = hdr
+                self.yearFrom = yearFrom
+                self.yearTo = yearTo
+                self.addedDays = addedDays
+                self.studio = studio
+                self.personId = personId
+                self.minRating = minRating
+            }
+            public enum CodingKeys: String, CodingKey {
+                case itemType
+                case sort
+                case limit
+                case watch
+                case genre
+                case decade
+                case contentRating
+                case resolution
+                case hdr
+                case yearFrom
+                case yearTo
+                case addedDays
+                case studio
+                case personId
+                case minRating
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/SmartCollectionSave`.
+        public struct SmartCollectionSave: Codable, Hashable, Sendable {
+            /// Required when creating.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionSave/title`.
+            public var title: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/SmartCollectionSave/rules`.
+            public var rules: Components.Schemas.SmartCollectionRules
+            /// Creates a new `SmartCollectionSave`.
+            ///
+            /// - Parameters:
+            ///   - title: Required when creating.
+            ///   - rules:
+            public init(
+                title: Swift.String? = nil,
+                rules: Components.Schemas.SmartCollectionRules
+            ) {
+                self.title = title
+                self.rules = rules
+            }
+            public enum CodingKeys: String, CodingKey {
+                case title
+                case rules
+            }
+        }
+        /// The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones.
+        ///
+        /// - Remark: Generated from `#/components/schemas/HomeLayout`.
+        public struct HomeLayout: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/HomeLayout/rows`.
+            public var rows: [Components.Schemas.HomeLayoutRow]
+            /// Creates a new `HomeLayout`.
+            ///
+            /// - Parameters:
+            ///   - rows:
+            public init(rows: [Components.Schemas.HomeLayoutRow]) {
+                self.rows = rows
+            }
+            public enum CodingKeys: String, CodingKey {
+                case rows
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/HomeLayoutRow`.
+        public struct HomeLayoutRow: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/HomeLayoutRow/id`.
+            public var id: Swift.String
+            /// Filled in by the server.
+            ///
+            /// - Remark: Generated from `#/components/schemas/HomeLayoutRow/title`.
+            public var title: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/HomeLayoutRow/hidden`.
+            public var hidden: Swift.Bool?
+            /// A pinned collection or playlist (remove it from the list to unpin).
+            ///
+            /// - Remark: Generated from `#/components/schemas/HomeLayoutRow/pinned`.
+            public var pinned: Swift.Bool?
+            /// Creates a new `HomeLayoutRow`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - title: Filled in by the server.
+            ///   - hidden:
+            ///   - pinned: A pinned collection or playlist (remove it from the list to unpin).
+            public init(
+                id: Swift.String,
+                title: Swift.String? = nil,
+                hidden: Swift.Bool? = nil,
+                pinned: Swift.Bool? = nil
+            ) {
+                self.id = id
+                self.title = title
+                self.hidden = hidden
+                self.pinned = pinned
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case title
+                case hidden
+                case pinned
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/Invite`.
+        public struct Invite: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/Invite/id`.
+            public var id: Swift.Int64
+            /// Who it's for, e.g. Mum.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Invite/note`.
+            public var note: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Invite/createdAt`.
+            public var createdAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/Invite/expiresAt`.
+            public var expiresAt: Foundation.Date?
+            /// - Remark: Generated from `#/components/schemas/Invite/usedAt`.
+            public var usedAt: Foundation.Date?
+            /// The display name of who joined with it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Invite/usedBy`.
+            public var usedBy: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Invite/restrictions`.
+            public var restrictions: Components.Schemas.UserRestrictions
+            /// Creates a new `Invite`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - note: Who it's for, e.g. Mum.
+            ///   - createdAt:
+            ///   - expiresAt:
+            ///   - usedAt:
+            ///   - usedBy: The display name of who joined with it.
+            ///   - restrictions:
+            public init(
+                id: Swift.Int64,
+                note: Swift.String? = nil,
+                createdAt: Foundation.Date,
+                expiresAt: Foundation.Date? = nil,
+                usedAt: Foundation.Date? = nil,
+                usedBy: Swift.String? = nil,
+                restrictions: Components.Schemas.UserRestrictions
+            ) {
+                self.id = id
+                self.note = note
+                self.createdAt = createdAt
+                self.expiresAt = expiresAt
+                self.usedAt = usedAt
+                self.usedBy = usedBy
+                self.restrictions = restrictions
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case note
+                case createdAt
+                case expiresAt
+                case usedAt
+                case usedBy
+                case restrictions
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/InviteCreate`.
+        public struct InviteCreate: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/InviteCreate/note`.
+            public var note: Swift.String?
+            /// Default 7.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InviteCreate/expiresDays`.
+            public var expiresDays: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/InviteCreate/restrictions`.
+            public var restrictions: Components.Schemas.UserRestrictions?
+            /// Creates a new `InviteCreate`.
+            ///
+            /// - Parameters:
+            ///   - note:
+            ///   - expiresDays: Default 7.
+            ///   - restrictions:
+            public init(
+                note: Swift.String? = nil,
+                expiresDays: Swift.Int? = nil,
+                restrictions: Components.Schemas.UserRestrictions? = nil
+            ) {
+                self.note = note
+                self.expiresDays = expiresDays
+                self.restrictions = restrictions
+            }
+            public enum CodingKeys: String, CodingKey {
+                case note
+                case expiresDays
+                case restrictions
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/InviteCreated`.
+        public struct InviteCreated: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/InviteCreated/invite`.
+            public var invite: Components.Schemas.Invite
+            /// Shown once.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InviteCreated/token`.
+            public var token: Swift.String
+            /// The web page to send, relative to the server's address: /join/<token>.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InviteCreated/path`.
+            public var path: Swift.String
+            /// Creates a new `InviteCreated`.
+            ///
+            /// - Parameters:
+            ///   - invite:
+            ///   - token: Shown once.
+            ///   - path: The web page to send, relative to the server's address: /join/<token>.
+            public init(
+                invite: Components.Schemas.Invite,
+                token: Swift.String,
+                path: Swift.String
+            ) {
+                self.invite = invite
+                self.token = token
+                self.path = path
+            }
+            public enum CodingKeys: String, CodingKey {
+                case invite
+                case token
+                case path
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/InviteInfo`.
+        public struct InviteInfo: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/InviteInfo/serverName`.
+            public var serverName: Swift.String
+            /// - Remark: Generated from `#/components/schemas/InviteInfo/invitedBy`.
+            public var invitedBy: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/InviteInfo/note`.
+            public var note: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/InviteInfo/expiresAt`.
+            public var expiresAt: Foundation.Date
+            /// Creates a new `InviteInfo`.
+            ///
+            /// - Parameters:
+            ///   - serverName:
+            ///   - invitedBy:
+            ///   - note:
+            ///   - expiresAt:
+            public init(
+                serverName: Swift.String,
+                invitedBy: Swift.String? = nil,
+                note: Swift.String? = nil,
+                expiresAt: Foundation.Date
+            ) {
+                self.serverName = serverName
+                self.invitedBy = invitedBy
+                self.note = note
+                self.expiresAt = expiresAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case serverName
+                case invitedBy
+                case note
+                case expiresAt
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/InviteAccept`.
+        public struct InviteAccept: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/InviteAccept/username`.
+            public var username: Swift.String
+            /// - Remark: Generated from `#/components/schemas/InviteAccept/displayName`.
+            public var displayName: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/InviteAccept/password`.
+            public var password: Swift.String
+            /// - Remark: Generated from `#/components/schemas/InviteAccept/device`.
+            public var device: Components.Schemas.DeviceInfo
+            /// Creates a new `InviteAccept`.
+            ///
+            /// - Parameters:
+            ///   - username:
+            ///   - displayName:
+            ///   - password:
+            ///   - device:
+            public init(
+                username: Swift.String,
+                displayName: Swift.String? = nil,
+                password: Swift.String,
+                device: Components.Schemas.DeviceInfo
+            ) {
+                self.username = username
+                self.displayName = displayName
+                self.password = password
+                self.device = device
+            }
+            public enum CodingKeys: String, CodingKey {
+                case username
+                case displayName
+                case password
+                case device
             }
         }
         /// - Remark: Generated from `#/components/schemas/Hub`.
@@ -6912,6 +7406,8 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/collections`.
                 public var collections: [Components.Schemas.ItemSummary]?
+                /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/smartRules`.
+                public var smartRules: Components.Schemas.SmartCollectionRules?
                 /// Trailers, featurettes and other extras (LIB-8), trailers first.
                 ///
                 /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/extras`.
@@ -6967,6 +7463,7 @@ extension Components {
                 /// - Parameters:
                 ///   - lockedFields: Fields edited by an administrator; agents never overwrite them.
                 ///   - collections: Collections the item belongs to (META-7).
+                ///   - smartRules:
                 ///   - extras: Trailers, featurettes and other extras (LIB-8), trailers first.
                 ///   - summary:
                 ///   - audienceRating: TMDB user score, 0–10
@@ -6982,6 +7479,7 @@ extension Components {
                 public init(
                     lockedFields: [Swift.String],
                     collections: [Components.Schemas.ItemSummary]? = nil,
+                    smartRules: Components.Schemas.SmartCollectionRules? = nil,
                     extras: [Components.Schemas.ItemSummary]? = nil,
                     summary: Swift.String? = nil,
                     audienceRating: Swift.Double? = nil,
@@ -6997,6 +7495,7 @@ extension Components {
                 ) {
                     self.lockedFields = lockedFields
                     self.collections = collections
+                    self.smartRules = smartRules
                     self.extras = extras
                     self.summary = summary
                     self.audienceRating = audienceRating
@@ -7013,6 +7512,7 @@ extension Components {
                 public enum CodingKeys: String, CodingKey {
                     case lockedFields
                     case collections
+                    case smartRules
                     case extras
                     case summary
                     case audienceRating

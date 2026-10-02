@@ -40,6 +40,7 @@ import app.marquee.api.models.MatchCandidate
 import app.marquee.api.models.MatchRequest
 import app.marquee.api.models.PersonDetail
 import app.marquee.api.models.RateItemRequest
+import app.marquee.api.models.SmartCollectionSave
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -360,6 +361,83 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/libraries/{libraryId}/collections".replace("{"+"libraryId"+"}", encodeURIComponent(libraryId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /libraries/{libraryId}/smart-collections
+     * Create a smart collection from library filters (META-7, admin only).
+     * 
+     * @param libraryId 
+     * @param smartCollectionSave 
+     * @return ItemSummary
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun createSmartCollection(libraryId: kotlin.Long, smartCollectionSave: SmartCollectionSave) : ItemSummary {
+        val localVarResponse = createSmartCollectionWithHttpInfo(libraryId = libraryId, smartCollectionSave = smartCollectionSave)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ItemSummary
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /libraries/{libraryId}/smart-collections
+     * Create a smart collection from library filters (META-7, admin only).
+     * 
+     * @param libraryId 
+     * @param smartCollectionSave 
+     * @return ApiResponse<ItemSummary?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun createSmartCollectionWithHttpInfo(libraryId: kotlin.Long, smartCollectionSave: SmartCollectionSave) : ApiResponse<ItemSummary?> {
+        val localVariableConfig = createSmartCollectionRequestConfig(libraryId = libraryId, smartCollectionSave = smartCollectionSave)
+
+        return request<SmartCollectionSave, ItemSummary>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation createSmartCollection
+     *
+     * @param libraryId 
+     * @param smartCollectionSave 
+     * @return RequestConfig
+     */
+    fun createSmartCollectionRequestConfig(libraryId: kotlin.Long, smartCollectionSave: SmartCollectionSave) : RequestConfig<SmartCollectionSave> {
+        val localVariableBody = smartCollectionSave
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/libraries/{libraryId}/smart-collections".replace("{"+"libraryId"+"}", encodeURIComponent(libraryId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -1927,6 +2005,83 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/items/{itemId}/match".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /collections/{collectionId}/rules
+     * Change a smart collection&#39;s rules (and optionally its name), or turn a manual collection&#39;s listing over to rules (admin only).
+     * 
+     * @param collectionId 
+     * @param smartCollectionSave 
+     * @return ItemSummary
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun updateSmartCollection(collectionId: kotlin.Long, smartCollectionSave: SmartCollectionSave) : ItemSummary {
+        val localVarResponse = updateSmartCollectionWithHttpInfo(collectionId = collectionId, smartCollectionSave = smartCollectionSave)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ItemSummary
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /collections/{collectionId}/rules
+     * Change a smart collection&#39;s rules (and optionally its name), or turn a manual collection&#39;s listing over to rules (admin only).
+     * 
+     * @param collectionId 
+     * @param smartCollectionSave 
+     * @return ApiResponse<ItemSummary?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun updateSmartCollectionWithHttpInfo(collectionId: kotlin.Long, smartCollectionSave: SmartCollectionSave) : ApiResponse<ItemSummary?> {
+        val localVariableConfig = updateSmartCollectionRequestConfig(collectionId = collectionId, smartCollectionSave = smartCollectionSave)
+
+        return request<SmartCollectionSave, ItemSummary>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation updateSmartCollection
+     *
+     * @param collectionId 
+     * @param smartCollectionSave 
+     * @return RequestConfig
+     */
+    fun updateSmartCollectionRequestConfig(collectionId: kotlin.Long, smartCollectionSave: SmartCollectionSave) : RequestConfig<SmartCollectionSave> {
+        val localVariableBody = smartCollectionSave
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/collections/{collectionId}/rules".replace("{"+"collectionId"+"}", encodeURIComponent(collectionId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

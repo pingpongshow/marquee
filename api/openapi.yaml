@@ -501,6 +501,103 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /invites:
+    get:
+      tags: [users]
+      operationId: listInvites
+      summary: Invites to share this server with friends (USER-13, admin only).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Invite" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [users]
+      operationId: createInvite
+      summary: Make a one-time invite link; whoever opens it picks a username and password and joins with these restrictions (admin only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InviteCreate" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InviteCreated" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /invites/{inviteId}:
+    parameters:
+      - name: inviteId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    delete:
+      tags: [users]
+      operationId: deleteInvite
+      summary: Withdraw an invite (admin only). Someone who already joined keeps their account.
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /invitations/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [auth]
+      operationId: getInvitation
+      summary: What an invite link is for, before accepting it.
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InviteInfo" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /invitations/{token}/accept:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [auth]
+      operationId: acceptInvitation
+      summary: Join with an invite link, creating your account and signing in.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InviteAccept" }
+      responses:
+        "200":
+          description: Joined and signed in.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
   /profiles:
     get:
       tags: [users]
@@ -1303,6 +1400,55 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /libraries/{libraryId}/smart-collections:
+    parameters:
+      - $ref: "#/components/parameters/LibraryId"
+    post:
+      tags: [items]
+      operationId: createSmartCollection
+      summary: Create a smart collection from library filters (META-7, admin only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SmartCollectionSave" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemSummary" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /collections/{collectionId}/rules:
+    parameters:
+      - name: collectionId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    put:
+      tags: [items]
+      operationId: updateSmartCollection
+      summary: Change a smart collection's rules (and optionally its name), or turn a manual collection's listing over to rules (admin only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SmartCollectionSave" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemSummary" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /collections/{collectionId}:
     parameters:
       - name: collectionId
@@ -1378,6 +1524,54 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ItemSummary" }
         "204": { description: Nothing follows. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /me/home-layout:
+    get:
+      tags: [hubs]
+      operationId: getHomeLayout
+      summary: The person's Home rows, every available row included, in order (USER-12).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HomeLayout" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [hubs]
+      operationId: setHomeLayout
+      summary: Reorder, hide, pin (add collection-<id> / playlist-<id>) or unpin Home rows. An empty list resets to the default.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HomeLayout" }
+      responses:
+        "200":
+          description: The saved layout.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HomeLayout" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /items/{itemId}/prerolls:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [playback]
+      operationId: listPrerolls
+      summary: "What to play before a movie (PLAY-18): trailers of other movies, then the pre-roll video. Empty when off, for non-movies, or when the person opted out. Call it only when starting from the beginning."
+      responses:
+        "200":
+          description: In play order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ItemSummary" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
@@ -3132,6 +3326,7 @@ components:
           description: Channel groups this user may watch. Null or absent = all.
           items: { type: string }
         seerrUserId: { type: integer, format: int64, nullable: true, description: The Seerr user requests are made as. Null = Seerr's API key owner. }
+        friend: { type: boolean, description: "Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker." }
 
     UserPreferences:
       type: object
@@ -3141,6 +3336,7 @@ components:
         subtitleMode: { type: string, enum: [off, forced, foreign, always] }
         localQualityKbps: { type: integer, minimum: 0, description: 0 = original }
         remoteQualityKbps: { type: integer, minimum: 0, description: 0 = automatic }
+        cinemaTrailers: { type: boolean, description: "Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true." }
 
     UserCreate:
       type: object
@@ -3250,6 +3446,7 @@ components:
         tasks: { $ref: "#/components/schemas/TaskSettings" }
         music: { $ref: "#/components/schemas/MusicSettings" }
         integrations: { $ref: "#/components/schemas/IntegrationSettings" }
+        cinema: { $ref: "#/components/schemas/CinemaSettings" }
         webhooks:
           type: array
           description: Replaces the whole list when sent.
@@ -3268,6 +3465,7 @@ components:
         tasks: { $ref: "#/components/schemas/TaskSettings" }
         music: { $ref: "#/components/schemas/MusicSettings" }
         integrations: { $ref: "#/components/schemas/IntegrationSettingsUpdate" }
+        cinema: { $ref: "#/components/schemas/CinemaSettings" }
         webhooks:
           type: array
           description: Replaces the whole list when sent.
@@ -3285,6 +3483,13 @@ components:
           type: array
           items: { type: string, enum: [playback.started, playback.paused, playback.resumed, playback.stopped, playback.watched, library.added] }
         enabled: { type: boolean }
+
+    CinemaSettings:
+      type: object
+      description: Cinema trailers (PLAY-18) before movies that are started from the beginning.
+      properties:
+        trailers: { type: integer, minimum: 0, maximum: 5, description: "Trailers of other movies in the library to play first; 0 = off." }
+        prerollItemId: { type: integer, format: int64, nullable: true, description: "A video (e.g. a cinema intro) played after the trailers, before the movie." }
 
     MusicSettings:
       type: object
@@ -3961,6 +4166,16 @@ components:
         preload:
           type: boolean
           description: Prepare the next item (gapless music) without ending this device's current session. It takes over when it first reports "playing".
+        subtitleOffsetMs:
+          type: integer
+          minimum: -30000
+          maximum: 30000
+          description: "Subtitle timing (PLAY-17), ms; positive shows subtitles later. Omit both offsets to use what this user last chose for this file; values sent are remembered."
+        audioOffsetMs:
+          type: integer
+          minimum: -30000
+          maximum: 30000
+          description: "Audio timing (PLAY-17), ms; positive plays the audio later. Nonzero repackages the stream (no direct play)."
         profile: { $ref: "#/components/schemas/DeviceProfile" }
 
     PlaybackDecision:
@@ -4013,6 +4228,8 @@ components:
         trackGainDb: { type: number, description: "Music: gain to apply for volume levelling (ReplayGain track gain)." }
         albumGainDb: { type: number, description: "Music: album gain, for playing whole albums." }
         peak: { type: number, description: "Music: peak sample level (1.0 = full scale), to avoid clipping when boosting." }
+        subtitleOffsetMs: { type: integer, description: "Subtitle offset applied (PLAY-17). subtitleUrl also takes ?offsetMs= to try another without restarting." }
+        audioOffsetMs: { type: integer, description: Audio offset applied (PLAY-17). }
 
     PlaybackProgress:
       type: object
@@ -4095,6 +4312,97 @@ components:
               name: { type: string }
               type: { $ref: "#/components/schemas/LibraryType" }
               items: { type: integer }
+
+    SmartCollectionRules:
+      type: object
+      description: "A smart collection's rules (META-7): its members are the library's movies or shows matching these, kept current. Only on collections that are smart."
+      required: [itemType]
+      properties:
+        itemType: { type: string, enum: [movie, show] }
+        sort: { type: string, description: A library sort (see the sort parameter). Default title. }
+        limit: { type: integer, minimum: 0, maximum: 1000, description: At most this many; 0 = all. }
+        watch: { type: string, enum: [unwatched, watched, in_progress] }
+        genre: { type: string }
+        decade: { type: integer }
+        contentRating: { type: string }
+        resolution: { type: string, enum: ["4k", "1080", "720", sd] }
+        hdr: { type: boolean }
+        yearFrom: { type: integer }
+        yearTo: { type: integer }
+        addedDays: { type: integer, minimum: 0, description: Added in the last this many days. }
+        studio: { type: string, description: Studio or network. }
+        personId: { type: integer, format: int64, description: In the cast or crew. }
+        minRating: { type: number, minimum: 0, maximum: 10, description: "Audience, IMDb or critic rating of at least this (0–10)." }
+
+    SmartCollectionSave:
+      type: object
+      required: [rules]
+      properties:
+        title: { type: string, maxLength: 200, description: Required when creating. }
+        rules: { $ref: "#/components/schemas/SmartCollectionRules" }
+
+    HomeLayout:
+      type: object
+      required: [rows]
+      description: "The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones."
+      properties:
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/HomeLayoutRow" }
+
+    HomeLayoutRow:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string }
+        title: { type: string, readOnly: true, description: Filled in by the server. }
+        hidden: { type: boolean }
+        pinned: { type: boolean, readOnly: true, description: A pinned collection or playlist (remove it from the list to unpin). }
+
+    Invite:
+      type: object
+      required: [id, createdAt, restrictions]
+      properties:
+        id: { type: integer, format: int64 }
+        note: { type: string, description: "Who it's for, e.g. Mum." }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        usedAt: { type: string, format: date-time }
+        usedBy: { type: string, description: The display name of who joined with it. }
+        restrictions: { $ref: "#/components/schemas/UserRestrictions" }
+
+    InviteCreate:
+      type: object
+      properties:
+        note: { type: string, maxLength: 100 }
+        expiresDays: { type: integer, minimum: 1, maximum: 90, description: Default 7. }
+        restrictions: { $ref: "#/components/schemas/UserRestrictions" }
+
+    InviteCreated:
+      type: object
+      required: [invite, token, path]
+      properties:
+        invite: { $ref: "#/components/schemas/Invite" }
+        token: { type: string, description: Shown once. }
+        path: { type: string, description: "The web page to send, relative to the server's address: /join/<token>." }
+
+    InviteInfo:
+      type: object
+      required: [serverName, expiresAt]
+      properties:
+        serverName: { type: string }
+        invitedBy: { type: string }
+        note: { type: string }
+        expiresAt: { type: string, format: date-time }
+
+    InviteAccept:
+      type: object
+      required: [username, password, device]
+      properties:
+        username: { type: string, minLength: 1, maxLength: 64 }
+        displayName: { type: string, maxLength: 64 }
+        password: { type: string, minLength: 8, maxLength: 256 }
+        device: { $ref: "#/components/schemas/DeviceInfo" }
 
     Hub:
       type: object
@@ -4549,6 +4857,7 @@ components:
               type: array
               description: Collections the item belongs to (META-7).
               items: { $ref: "#/components/schemas/ItemSummary" }
+            smartRules: { $ref: "#/components/schemas/SmartCollectionRules" }
             extras:
               type: array
               description: Trailers, featurettes and other extras (LIB-8), trailers first.

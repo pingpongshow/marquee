@@ -338,20 +338,35 @@ func (m *Manager) serveSubtitle(w http.ResponseWriter, r *http.Request, s *Sessi
 	} else {
 		w.Header().Set("Content-Type", "text/vtt; charset=utf-8")
 	}
-	if r.URL.Query().Get("hls") == "1" && format == "vtt" {
+	// Timing offset (PLAY-17): the session's, or ?offsetMs= while the viewer adjusts it.
+	offset := s.SubtitleOffsetMS
+	if v, err := strconv.Atoi(r.URL.Query().Get("offsetMs")); err == nil {
+		offset = min(max(v, -MaxOffsetMS), MaxOffsetMS)
+	}
+	hls := r.URL.Query().Get("hls") == "1" && format == "vtt"
+	if !hls && offset == 0 {
+		http.ServeFile(w, r, out)
+		return
+	}
+	data, err := os.ReadFile(out)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if format == "ass" {
+		data = ShiftASS(data, offset)
+	} else {
+		data = ShiftVTT(data, offset)
+	}
+	if hls {
 		// HLS WebVTT needs a timestamp map; our media timeline starts at zero.
-		data, err := os.ReadFile(out)
-		if err != nil {
-			http.NotFound(w, r)
-			return
-		}
 		header, rest, _ := bytes.Cut(data, []byte("\n"))
 		w.Write(header)
 		io.WriteString(w, "\nX-TIMESTAMP-MAP=MPEGTS:0,LOCAL:00:00:00.000\n")
 		w.Write(rest)
 		return
 	}
-	http.ServeFile(w, r, out)
+	w.Write(data)
 }
 
 type fontAttachment struct {

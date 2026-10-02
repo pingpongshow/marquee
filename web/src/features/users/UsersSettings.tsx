@@ -5,6 +5,7 @@ import {
   Plus,
   Shield,
   Trash2,
+  UserPlus,
   UserRound,
   Users,
 } from "lucide-react";
@@ -37,6 +38,7 @@ import { SaveBar } from "../settings/SaveBar";
 import { useSectionDraft } from "../settings/useSectionDraft";
 import { Avatar, AvatarPicker } from "./Avatar";
 import { ratingOptions, remoteQualityOptions } from "./constants";
+import { InviteDialog, InviteList } from "./Invites";
 
 function describe(r: UserRestrictions, libraryNames: Map<number, string>) {
   const parts: string[] = [];
@@ -686,13 +688,71 @@ export function UsersSettings() {
   const libraryNames = new Map(
     (libraries.data ?? []).map((l) => [l.id, l.name]),
   );
+  const [inviting, setInviting] = useState(false);
+  // Friends joined through an invite (USER-13); everyone else is the household.
+  const household = users.data?.filter((u) => !u.restrictions.friend) ?? [];
+  const friends = users.data?.filter((u) => u.restrictions.friend) ?? [];
+  const row = (u: User) => (
+    <li key={u.id} className="flex items-center gap-4 py-3">
+      <Avatar
+        name={u.displayName}
+        url={u.avatarUrl}
+        className="size-10 text-sm"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-medium">{u.displayName}</span>
+          <span className="text-xs text-faint">@{u.username}</span>
+          {u.isAdmin && (
+            <Badge tone="accent">
+              <Shield className="mr-0.5 inline size-3" aria-hidden />{" "}
+              Admin
+            </Badge>
+          )}
+          {u.isManaged && <Badge>Managed</Badge>}
+          {u.hasPin && (
+            <Badge>
+              <KeyRound className="mr-0.5 inline size-3" aria-hidden />{" "}
+              PIN
+            </Badge>
+          )}
+          {u.id === me.data?.id && <Badge>You</Badge>}
+        </div>
+        <div className="truncate text-xs text-muted">
+          {u.isAdmin
+            ? "Full access"
+            : describe(u.restrictions, libraryNames) || "All libraries"}
+          {u.lastSeenAt &&
+            ` · Last active ${new Date(u.lastSeenAt).toLocaleDateString()}`}
+        </div>
+      </div>
+      <Button
+        size="sm"
+        variant="ghost"
+        aria-label={`Edit ${u.displayName}`}
+        onClick={() => setEditing(u)}
+      >
+        <Pencil className="size-4" />
+      </Button>
+      {u.id !== me.data?.id && (
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-label={`Delete ${u.displayName}`}
+          onClick={() => setDeleting(u)}
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      )}
+    </li>
+  );
 
   return (
     <div className="space-y-6">
       <SignInOptions />
       <Card
         title="Users"
-        description="Everyone who can use this server. Managed profiles are for children and shared TVs."
+        description="Everyone in your household. Managed profiles are for children and shared TVs."
         actions={
           <Button size="sm" variant="primary" onClick={() => setAdding(true)}>
             <Plus className="size-4" /> Add user
@@ -700,63 +760,34 @@ export function UsersSettings() {
         }
       >
         {users.isPending && <Spinner />}
-        <ul className="-my-2 divide-y divide-border">
-          {users.data?.map((u) => (
-            <li key={u.id} className="flex items-center gap-4 py-3">
-              <Avatar
-                name={u.displayName}
-                url={u.avatarUrl}
-                className="size-10 text-sm"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">{u.displayName}</span>
-                  <span className="text-xs text-faint">@{u.username}</span>
-                  {u.isAdmin && (
-                    <Badge tone="accent">
-                      <Shield className="mr-0.5 inline size-3" aria-hidden />{" "}
-                      Admin
-                    </Badge>
-                  )}
-                  {u.isManaged && <Badge>Managed</Badge>}
-                  {u.hasPin && (
-                    <Badge>
-                      <KeyRound className="mr-0.5 inline size-3" aria-hidden />{" "}
-                      PIN
-                    </Badge>
-                  )}
-                  {u.id === me.data?.id && <Badge>You</Badge>}
-                </div>
-                <div className="truncate text-xs text-muted">
-                  {u.isAdmin
-                    ? "Full access"
-                    : describe(u.restrictions, libraryNames) || "All libraries"}
-                  {u.lastSeenAt &&
-                    ` · Last active ${new Date(u.lastSeenAt).toLocaleDateString()}`}
-                </div>
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-label={`Edit ${u.displayName}`}
-                onClick={() => setEditing(u)}
-              >
-                <Pencil className="size-4" />
-              </Button>
-              {u.id !== me.data?.id && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={`Delete ${u.displayName}`}
-                  onClick={() => setDeleting(u)}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
+        <ul className="-my-2 divide-y divide-border">{household.map(row)}</ul>
       </Card>
+      <Card
+        title="Friends"
+        description="People outside your household you've shared this server with. They sign in with their own password and can't switch profiles."
+        actions={
+          <Button size="sm" variant="primary" onClick={() => setInviting(true)}>
+            <UserPlus className="size-4" /> Invite a friend
+          </Button>
+        }
+      >
+        {friends.length > 0 ? (
+          <ul className="-my-2 divide-y divide-border" aria-label="Friends">
+            {friends.map(row)}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted">No friends have joined yet.</p>
+        )}
+        <InviteList />
+      </Card>
+      {inviting && (
+        <InviteDialog
+          onClose={() => setInviting(false)}
+          restrictionsEditor={(value, onChange) => (
+            <RestrictionsEditor value={value} onChange={onChange} />
+          )}
+        />
+      )}
       {adding && <AddUserDialog onClose={() => setAdding(false)} />}
       {editing && (
         <EditUserDialog

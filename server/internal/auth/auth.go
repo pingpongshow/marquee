@@ -53,13 +53,14 @@ type Service struct {
 	limiter   *loginLimiter
 	pins      *loginLimiter
 	totp      *loginLimiter
+	invites   *loginLimiter
 	seenMu    sync.Mutex
 	lastSeen  map[int64]time.Time // device id → last persisted last_seen_at
 	imgSecret []byte
 }
 
 func NewService(db *sql.DB) *Service {
-	return &Service{db: db, limiter: newLoginLimiter(), pins: newLimiter(5), totp: newLimiter(5), lastSeen: map[int64]time.Time{}}
+	return &Service{db: db, limiter: newLoginLimiter(), pins: newLimiter(5), totp: newLimiter(5), invites: newLimiter(10), lastSeen: map[int64]time.Time{}}
 }
 
 // UserCount returns the number of users; zero means first-run setup is required.
