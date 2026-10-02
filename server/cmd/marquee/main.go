@@ -44,6 +44,7 @@ import (
 	"marquee/internal/settings"
 	"marquee/internal/sonic"
 	"marquee/internal/subtitles"
+	"marquee/internal/syncplay"
 	"marquee/internal/tasks"
 	"marquee/internal/trickplay"
 	"marquee/internal/watcher"
@@ -321,6 +322,9 @@ func run() error {
 	raw, _ := json.Marshal(store.Get().Integrations.LiveTVSources)
 	lastSources = string(raw)
 	go live.Run(ctx, liveWake)
+
+	watchTogether := &syncplay.Service{}
+	go watchTogether.Run(ctx)
 	lyricsSvc := &lyrics.Service{DB: database, Online: func() bool { return store.Get().Music.OnlineLyrics }}
 	go scheduler.Run(ctx)
 
@@ -340,6 +344,7 @@ func run() error {
 		Tasks: scheduler, Trickplay: trick, Webhooks: hooks, Subtitles: subs, Downloads: dl, Backups: backups, Restart: stop, Sonic: sonicSvc, Lyrics: lyricsSvc,
 		Requests: &requests.Service{DB: database, Settings: store},
 		LiveTV:   live,
+		SyncPlay: watchTogether,
 		Avatars:  &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
 		Images:   images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
 		Logs:     logs,

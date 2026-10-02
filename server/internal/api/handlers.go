@@ -24,6 +24,7 @@ import (
 	"marquee/internal/settings"
 	"marquee/internal/sonic"
 	"marquee/internal/subtitles"
+	"marquee/internal/syncplay"
 	"marquee/internal/tasks"
 	"marquee/internal/trickplay"
 	"marquee/internal/webhooks"
@@ -56,6 +57,7 @@ type Handlers struct {
 	Backups          *tasks.Backups
 	Requests         *requests.Service
 	LiveTV           *livetv.Service
+	SyncPlay         *syncplay.Service
 	// Restart stops the server gracefully; Docker starts it again.
 	Restart func()
 	Version string

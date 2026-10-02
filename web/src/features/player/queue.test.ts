@@ -1,9 +1,23 @@
 import { describe, expect, it } from "vitest";
 import type { ItemSummary } from "@/api/types";
-import { append, current, cycleRepeat, emptyQueue, followingIndex, load, move, playNext, remove, skipIndex, toggleShuffle } from "./queue";
+import {
+  append,
+  current,
+  cycleRepeat,
+  emptyQueue,
+  followingIndex,
+  load,
+  move,
+  playNext,
+  remove,
+  skipIndex,
+  toggleShuffle,
+} from "./queue";
 
-const track = (id: number) => ({ id, title: `T${id}`, type: "track" }) as ItemSummary;
-const ids = (q: { entries: { item: ItemSummary }[] }) => q.entries.map((e) => e.item.id);
+const track = (id: number) =>
+  ({ id, title: `T${id}`, type: "track" }) as ItemSummary;
+const ids = (q: { entries: { item: ItemSummary }[] }) =>
+  q.entries.map((e) => e.item.id);
 const reverse = () => {
   // Deterministic "random" that makes the Fisher–Yates shuffle reverse the list.
   return 0;
