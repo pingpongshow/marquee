@@ -4817,6 +4817,23 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ItemSummary/watchlisted`.
             public var watchlisted: Swift.Bool?
+            /// Set for extras (LIB-8).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemSummary/extraType`.
+            @frozen public enum ExtraTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case trailer = "trailer"
+                case featurette = "featurette"
+                case behindTheScenes = "behind_the_scenes"
+                case deletedScene = "deleted_scene"
+                case interview = "interview"
+                case scene = "scene"
+                case short = "short"
+                case other = "other"
+            }
+            /// Set for extras (LIB-8).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemSummary/extraType`.
+            public var extraType: Components.Schemas.ItemSummary.ExtraTypePayload?
             /// Creates a new `ItemSummary`.
             ///
             /// - Parameters:
@@ -4848,6 +4865,7 @@ extension Components {
             ///   - watchedLeafCount: Shows, seasons, artists, albums: how many episodes/tracks the user has watched.
             ///   - userRating: The user's rating, 0–10 (10 = loved).
             ///   - watchlisted: On the user's watchlist (USER-8).
+            ///   - extraType: Set for extras (LIB-8).
             public init(
                 id: Swift.Int64,
                 libraryId: Swift.Int64,
@@ -4876,7 +4894,8 @@ extension Components {
                 lastViewedAt: Foundation.Date? = nil,
                 watchedLeafCount: Swift.Int? = nil,
                 userRating: Swift.Double? = nil,
-                watchlisted: Swift.Bool? = nil
+                watchlisted: Swift.Bool? = nil,
+                extraType: Components.Schemas.ItemSummary.ExtraTypePayload? = nil
             ) {
                 self.id = id
                 self.libraryId = libraryId
@@ -4906,6 +4925,7 @@ extension Components {
                 self.watchedLeafCount = watchedLeafCount
                 self.userRating = userRating
                 self.watchlisted = watchlisted
+                self.extraType = extraType
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -4936,6 +4956,7 @@ extension Components {
                 case watchedLeafCount
                 case userRating
                 case watchlisted
+                case extraType
             }
         }
         /// Artwork ids for /images/{artworkId}. Seasons and episodes fall back to the show's art, tracks to the album's.
@@ -5292,6 +5313,10 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/collections`.
                 public var collections: [Components.Schemas.ItemSummary]?
+                /// Trailers, featurettes and other extras (LIB-8), trailers first.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/extras`.
+                public var extras: [Components.Schemas.ItemSummary]?
                 /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/summary`.
                 public var summary: Swift.String?
                 /// TMDB user score, 0–10
@@ -5343,6 +5368,7 @@ extension Components {
                 /// - Parameters:
                 ///   - lockedFields: Fields edited by an administrator; agents never overwrite them.
                 ///   - collections: Collections the item belongs to (META-7).
+                ///   - extras: Trailers, featurettes and other extras (LIB-8), trailers first.
                 ///   - summary:
                 ///   - audienceRating: TMDB user score, 0–10
                 ///   - ratings:
@@ -5357,6 +5383,7 @@ extension Components {
                 public init(
                     lockedFields: [Swift.String],
                     collections: [Components.Schemas.ItemSummary]? = nil,
+                    extras: [Components.Schemas.ItemSummary]? = nil,
                     summary: Swift.String? = nil,
                     audienceRating: Swift.Double? = nil,
                     ratings: Components.Schemas.Ratings? = nil,
@@ -5371,6 +5398,7 @@ extension Components {
                 ) {
                     self.lockedFields = lockedFields
                     self.collections = collections
+                    self.extras = extras
                     self.summary = summary
                     self.audienceRating = audienceRating
                     self.ratings = ratings
@@ -5386,6 +5414,7 @@ extension Components {
                 public enum CodingKeys: String, CodingKey {
                     case lockedFields
                     case collections
+                    case extras
                     case summary
                     case audienceRating
                     case ratings

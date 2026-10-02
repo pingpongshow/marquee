@@ -23,6 +23,11 @@ struct ItemDetailView: View {
                 VStack(alignment: .leading, spacing: 28) {
                     header(d)
                     contents(d)
+                    if let extras = d.info.extras, !extras.isEmpty {
+                        ShelfRow(title: "Extras") {
+                            ForEach(extras, id: \.id) { x in ExtraCard(extra: x) { video.play(x.id) } }
+                        }
+                    }
                     cast(d)
                     ForEach(series, id: \.collection.id) { s in
                         ShelfRow(title: s.collection.title, destination: .item(s.collection.id)) {
@@ -386,4 +391,47 @@ struct TrackRow: View {
         .buttonStyle(.plain)
         .contextMenu { ItemMenuItems(item: track) }
     }
+}
+
+/// A trailer, featurette or other extra (LIB-8): plays when chosen.
+struct ExtraCard: View {
+    let extra: Item
+    let play: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button(action: play) {
+                ArtworkView(item: extra, shape: .wide, width: width)
+                    .overlay { Image(systemName: "play.circle.fill").font(.title).foregroundStyle(.white.opacity(0.85)) }
+            }
+            #if os(tvOS)
+            .buttonStyle(.card)
+            #else
+            .buttonStyle(.plain)
+            #endif
+            .accessibilityLabel("Play \(extra.title)")
+            Text(extra.title).font(.subheadline.weight(.semibold)).lineLimit(1)
+            Text(kind).font(.caption).foregroundStyle(.secondary)
+        }
+        .frame(width: width)
+    }
+
+    private var kind: String {
+        switch extra.extraType {
+        case .trailer: "Trailer"
+        case .featurette: "Featurette"
+        case .behindTheScenes: "Behind the scenes"
+        case .deletedScene: "Deleted scene"
+        case .interview: "Interview"
+        case .scene: "Scene"
+        case .short: "Short"
+        default: "Extra"
+        }
+    }
+
+    #if os(tvOS)
+    private let width: CGFloat = 380
+    #else
+    private let width: CGFloat = 220
+    #endif
 }
