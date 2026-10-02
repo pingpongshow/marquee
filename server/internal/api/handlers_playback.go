@@ -113,7 +113,10 @@ func (h *Handlers) StartPlayback(ctx context.Context, req StartPlaybackRequestOb
 		out.SubtitleUrl = ptr(fmt.Sprintf("%ssubtitles/%d.vtt", base, s.SubtitleStreamID))
 		out.SubtitleFormat = ptr(Vtt)
 	}
-	rows, err := h.DB.QueryContext(ctx, `SELECT kind, start_ms, end_ms FROM markers WHERE file_id = ? AND kind IN ('intro', 'credits') ORDER BY start_ms`, s.FileID)
+	rows, err := h.DB.QueryContext(ctx, `SELECT kind, start_ms, end_ms FROM markers m WHERE file_id = ? AND kind IN ('intro', 'credits')
+		  -- Markers from Plex, the file or an admin beat detected ones of the same kind.
+		  AND NOT (source = 'detected' AND EXISTS (SELECT 1 FROM markers o WHERE o.file_id = m.file_id AND o.kind = m.kind AND o.source != 'detected'))
+		ORDER BY start_ms`, s.FileID)
 	if err == nil {
 		for rows.Next() {
 			var mk Marker

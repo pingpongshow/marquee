@@ -23,6 +23,7 @@ import (
 	"marquee/internal/db"
 	"marquee/internal/discovery"
 	"marquee/internal/images"
+	"marquee/internal/introdetect"
 	"marquee/internal/items"
 	"marquee/internal/library"
 	"marquee/internal/logbuf"
@@ -228,6 +229,11 @@ func run() error {
 	scheduler.Register(tasks.Task{ID: "trickplay", Name: "Make seek previews", Window: true, Bounded: true,
 		Description: "Makes the thumbnails shown while seeking through videos. A large library takes a few nights; it continues where it stopped.",
 		Run:         trick.Run, Progress: trick.Progress})
+	intros := &introdetect.Service{DB: database, FFmpeg: cfg.FFmpegPath, Dir: filepath.Join(cfg.ConfigDir, "cache", "fingerprints"),
+		Enabled: func() bool { return store.Get().Library.DetectIntros }, CUDA: player.Encoders.NVENC}
+	scheduler.Register(tasks.Task{ID: "intros", Name: "Find intros and credits", Window: true, Bounded: true,
+		Description: "Compares the audio of episodes in each season to find intros and end credits for Skip Intro and Skip Credits.",
+		Run:         intros.Run, Progress: intros.Progress})
 	lyricsSvc := &lyrics.Service{DB: database, Online: func() bool { return store.Get().Music.OnlineLyrics }}
 	go scheduler.Run(ctx)
 

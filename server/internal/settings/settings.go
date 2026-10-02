@@ -88,6 +88,7 @@ type Library struct {
 	BrowseRoots             []string `json:"browseRoots"`
 	WatchedThresholdPercent int      `json:"watchedThresholdPercent"`
 	Trickplay               bool     `json:"trickplay"`
+	DetectIntros            bool     `json:"detectIntros"`
 }
 
 type Metadata struct {
@@ -142,6 +143,7 @@ func Defaults() Settings {
 			BrowseRoots:             []string{"/media"},
 			WatchedThresholdPercent: 90,
 			Trickplay:               true,
+			DetectIntros:            true,
 		},
 		Metadata: Metadata{AnimeEpisodeOrdering: "seasonal", OMDbDailyLimit: 950},
 		Tasks:    Tasks{MaintenanceWindowStart: "03:00", MaintenanceWindowHours: 4, BackupRetention: 7},
