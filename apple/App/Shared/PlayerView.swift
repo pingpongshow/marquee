@@ -15,6 +15,10 @@ struct PlayerView: View {
     @State private var countdown: Int?
     @State private var together: WatchTogether?
     @State private var showGroup = false
+    #if os(iOS)
+    @State private var casting = false
+    @State private var castError: String?
+    #endif
 
     var body: some View {
         ZStack {
@@ -23,6 +27,9 @@ struct PlayerView: View {
                 PlayerController(playback: p, together: together, onNext: playNext)
                     .ignoresSafeArea()
                 overlays(p)
+                #if os(iOS)
+                if casting { CastingPanel(title: p.item?.title ?? "", close: close) }
+                #endif
             } else {
                 ProgressView()
             }
@@ -42,8 +49,18 @@ struct PlayerView: View {
             #endif
             await p.start(itemID: request.itemID, startMs: request.startMs, audio: tracks.audio, subtitle: tracks.subtitle, fileID: tracks.file)
             if let g = request.groupID { await t.join(g) }
+            #if os(iOS)
+            watchCast(p)
+            #endif
         }
         .onDisappear {
+            #if os(iOS)
+            let cast = CastController.shared
+            cast.videoActive = false
+            cast.onVideoConnected = nil
+            cast.onVideoEnded = nil
+            cast.onVideoFinished = nil
+            #endif
             together?.leave()
             Task { await playback?.stop() }
         }
@@ -65,6 +82,7 @@ struct PlayerView: View {
                 }
                 .accessibilityLabel("Close player")
                 Spacer()
+                CastButton(tint: .white).frame(width: 44, height: 44).background(.ultraThinMaterial, in: Circle())
                 if let t = together { togetherButton(t) }
             }
             .padding()
@@ -73,6 +91,9 @@ struct PlayerView: View {
             if let message = p.errorMessage {
                 ErrorBanner(message: message).padding().frame(maxWidth: 600)
             }
+            #if os(iOS)
+            if let castError { ErrorBanner(message: "Couldn't cast: \(castError)").padding().frame(maxWidth: 600) }
+            #endif
             Spacer()
             HStack {
                 Spacer()
@@ -94,6 +115,40 @@ struct PlayerView: View {
     }
 
     #if os(iOS)
+    /// Chromecast (D82): when a device connects, the video moves there at the current
+    /// position; when casting stops, it carries on here from where the TV was.
+    private func watchCast(_ p: VideoPlayback) {
+        let cast = CastController.shared
+        cast.videoActive = true
+        cast.onVideoConnected = { handOff(p) }
+        cast.onVideoFinished = { close() }
+        cast.onVideoEnded = { at in
+            casting = false
+            let s = p.session
+            Task { await p.start(itemID: request.itemID, startMs: Int64(at * 1000), audio: s?.audioStreamId, subtitle: s?.subtitleStreamId, fileID: s?.fileId) }
+        }
+        if cast.device != nil { handOff(p) } // already casting when the video opened
+    }
+
+    private func handOff(_ p: VideoPlayback) {
+        guard !casting, p.offlineTitle == nil else { return }
+        casting = true
+        let at = p.position
+        let s = p.session
+        let item = p.item
+        Task {
+            await p.handOff()
+            let art = app.imageURL(item?.base.images?.backdrop ?? item?.base.images?.poster, width: 640)
+            if let err = await CastController.shared.load(itemID: request.itemID, at: at, title: item?.title ?? "", subtitle: item?.base.year.map(String.init),
+                                                          artwork: art, music: false, fileID: s?.fileId, audio: s?.audioStreamId, subtitleStream: s?.subtitleStreamId) {
+                // Couldn't cast: say why and carry on here.
+                castError = err
+                casting = false
+                await p.start(itemID: request.itemID, startMs: Int64(at * 1000), audio: s?.audioStreamId, subtitle: s?.subtitleStreamId, fileID: s?.fileId)
+            }
+        }
+    }
+
     /// Watch together: start a group, or see who's in it and leave.
     @ViewBuilder private func togetherButton(_ t: WatchTogether) -> some View {
         if let g = t.group {
@@ -225,3 +280,58 @@ struct PlayerController: UIViewControllerRepresentable {
     }
     #endif
 }
+
+#if os(iOS)
+/// Shown over the player while the video plays on a Cast device: what's casting and its controls.
+struct CastingPanel: View {
+    let title: String
+    let close: () -> Void
+    @State private var drag: Double?
+
+    var body: some View {
+        let cast = CastController.shared
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VStack(spacing: 14) {
+                HStack {
+                    Button(action: close) { Image(systemName: "xmark").font(.headline).padding(12).background(.ultraThinMaterial, in: Circle()) }
+                        .accessibilityLabel("Close player")
+                    Spacer()
+                    CastButton(tint: .white).frame(width: 44, height: 44)
+                }
+                Spacer()
+                Image(systemName: "tv.and.mediabox").font(.system(size: 44)).foregroundStyle(Color.marqueeGold)
+                Text("Playing on \(cast.device ?? "Chromecast")").foregroundStyle(.secondary)
+                Text(title).font(.title2.bold()).multilineTextAlignment(.center).lineLimit(2)
+                if cast.duration > 0 {
+                    Slider(value: Binding(get: { drag ?? cast.position }, set: { drag = $0 }), in: 0...cast.duration) { editing in
+                        if !editing, let d = drag { cast.seekTo(d); drag = nil }
+                    }
+                    HStack {
+                        Text(formatTime(cast.position)).font(.caption.monospacedDigit())
+                        Spacer()
+                        Text(formatTime(cast.duration)).font(.caption.monospacedDigit())
+                    }
+                    .foregroundStyle(.secondary)
+                }
+                HStack(spacing: 44) {
+                    Button { cast.seekTo(max(0, cast.position - 10)) } label: { Image(systemName: "gobackward.10") }.accessibilityLabel("Back 10 seconds")
+                    Button { cast.toggle() } label: { Image(systemName: cast.playing ? "pause.fill" : "play.fill").font(.system(size: 44)) }
+                        .accessibilityLabel(cast.playing ? "Pause" : "Play")
+                    Button { cast.seekTo(cast.position + 30) } label: { Image(systemName: "goforward.30") }.accessibilityLabel("Forward 30 seconds")
+                }
+                .font(.title)
+                .foregroundStyle(.white)
+                Spacer()
+            }
+            .padding()
+            .frame(maxWidth: 600)
+        }
+    }
+
+    private func formatTime(_ s: Double) -> String {
+        let t = Int(s.rounded())
+        return t >= 3600 ? String(format: "%d:%02d:%02d", t / 3600, (t % 3600) / 60, t % 60) : String(format: "%d:%02d", t / 60, t % 60)
+    }
+}
+#endif

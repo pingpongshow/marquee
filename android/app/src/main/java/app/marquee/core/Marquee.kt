@@ -43,6 +43,8 @@ class Marquee(context: Context) {
     /** For fire-and-forget calls that must outlive a screen (progress reports, stopping sessions). */
     val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
     val isTv: Boolean = context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+    /** Chromecast (phones and tablets; a TV is itself the screen). */
+    val cast: MarqueeCast by lazy { MarqueeCast(context.applicationContext, this) }
 
     private val _state = MutableStateFlow(State.NoServer)
     val state: StateFlow<State> = _state

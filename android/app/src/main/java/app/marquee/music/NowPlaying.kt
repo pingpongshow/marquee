@@ -1,5 +1,6 @@
 package app.marquee.music
 
+import app.marquee.ui.CastButton
 import kotlinx.coroutines.launch
 import app.marquee.ui.initialFocus
 import app.marquee.ui.focusRing
@@ -101,6 +102,7 @@ fun NowPlayingScreen(onClose: () -> Unit) {
     val marquee = LocalMarquee.current
     val now by music.now.collectAsState()
     val source by music.source.collectAsState()
+    val castDevice by marquee.cast.device.collectAsState()
     var panel by remember { mutableStateOf(Panel.Art) }
     var radioError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -118,7 +120,9 @@ fun NowPlayingScreen(onClose: () -> Unit) {
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(if (source == null) "NOW PLAYING" else "PLAYING FROM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 source?.let { Text(it, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                castDevice?.let { Text("Playing on $it", style = MaterialTheme.typography.labelMedium, color = Gold, maxLines = 1) }
             }
+            CastButton(MaterialTheme.colorScheme.onSurface)
             PanelButton(Icons.Filled.Lyrics, "Lyrics", panel == Panel.Lyrics) { panel = if (panel == Panel.Lyrics) Panel.Art else Panel.Lyrics }
             PanelButton(Icons.AutoMirrored.Filled.QueueMusic, "Up Next", panel == Panel.Queue) { panel = if (panel == Panel.Queue) Panel.Art else Panel.Queue }
         }

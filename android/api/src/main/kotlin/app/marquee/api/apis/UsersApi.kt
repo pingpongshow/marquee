@@ -28,9 +28,14 @@ import okhttp3.Call
 import okhttp3.HttpUrl
 
 import app.marquee.api.models.AuthResult
+import app.marquee.api.models.ConnectLastFmRequest
+import app.marquee.api.models.ConnectListenBrainzRequest
 import app.marquee.api.models.Device
 import app.marquee.api.models.Error
+import app.marquee.api.models.LastFmAuthUrl200Response
+import app.marquee.api.models.LastFmAuthUrlRequest
 import app.marquee.api.models.Profile
+import app.marquee.api.models.ScrobbleStatus
 import app.marquee.api.models.SwitchProfileRequest
 import app.marquee.api.models.User
 import app.marquee.api.models.UserCreate
@@ -60,6 +65,154 @@ open class UsersApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         val defaultBasePath: String by lazy {
             System.getProperties().getProperty(ApiClient.BASE_URL_KEY, "/api/v1")
         }
+    }
+
+    /**
+     * PUT /me/scrobbling/lastfm
+     * Finish connecting Last.fm with the token last.fm returned.
+     * 
+     * @param connectLastFmRequest 
+     * @return ScrobbleStatus
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun connectLastFm(connectLastFmRequest: ConnectLastFmRequest) : ScrobbleStatus {
+        val localVarResponse = connectLastFmWithHttpInfo(connectLastFmRequest = connectLastFmRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ScrobbleStatus
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /me/scrobbling/lastfm
+     * Finish connecting Last.fm with the token last.fm returned.
+     * 
+     * @param connectLastFmRequest 
+     * @return ApiResponse<ScrobbleStatus?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun connectLastFmWithHttpInfo(connectLastFmRequest: ConnectLastFmRequest) : ApiResponse<ScrobbleStatus?> {
+        val localVariableConfig = connectLastFmRequestConfig(connectLastFmRequest = connectLastFmRequest)
+
+        return request<ConnectLastFmRequest, ScrobbleStatus>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation connectLastFm
+     *
+     * @param connectLastFmRequest 
+     * @return RequestConfig
+     */
+    fun connectLastFmRequestConfig(connectLastFmRequest: ConnectLastFmRequest) : RequestConfig<ConnectLastFmRequest> {
+        val localVariableBody = connectLastFmRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/me/scrobbling/lastfm",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /me/scrobbling/listenbrainz
+     * Send the caller&#39;s music plays to ListenBrainz with their user token (checked with ListenBrainz first).
+     * 
+     * @param connectListenBrainzRequest 
+     * @return ScrobbleStatus
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun connectListenBrainz(connectListenBrainzRequest: ConnectListenBrainzRequest) : ScrobbleStatus {
+        val localVarResponse = connectListenBrainzWithHttpInfo(connectListenBrainzRequest = connectListenBrainzRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ScrobbleStatus
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /me/scrobbling/listenbrainz
+     * Send the caller&#39;s music plays to ListenBrainz with their user token (checked with ListenBrainz first).
+     * 
+     * @param connectListenBrainzRequest 
+     * @return ApiResponse<ScrobbleStatus?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun connectListenBrainzWithHttpInfo(connectListenBrainzRequest: ConnectListenBrainzRequest) : ApiResponse<ScrobbleStatus?> {
+        val localVariableConfig = connectListenBrainzRequestConfig(connectListenBrainzRequest = connectListenBrainzRequest)
+
+        return request<ConnectListenBrainzRequest, ScrobbleStatus>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation connectListenBrainz
+     *
+     * @param connectListenBrainzRequest 
+     * @return RequestConfig
+     */
+    fun connectListenBrainzRequestConfig(connectListenBrainzRequest: ConnectListenBrainzRequest) : RequestConfig<ConnectListenBrainzRequest> {
+        val localVariableBody = connectListenBrainzRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/me/scrobbling/listenbrainz",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
     }
 
     /**
@@ -281,6 +434,142 @@ open class UsersApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
+     * DELETE /me/scrobbling/lastfm
+     * Stop sending plays to Last.fm.
+     * 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun disconnectLastFm() : Unit {
+        val localVarResponse = disconnectLastFmWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /me/scrobbling/lastfm
+     * Stop sending plays to Last.fm.
+     * 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun disconnectLastFmWithHttpInfo() : ApiResponse<Unit?> {
+        val localVariableConfig = disconnectLastFmRequestConfig()
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation disconnectLastFm
+     *
+     * @return RequestConfig
+     */
+    fun disconnectLastFmRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/me/scrobbling/lastfm",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /me/scrobbling/listenbrainz
+     * Stop sending plays to ListenBrainz.
+     * 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun disconnectListenBrainz() : Unit {
+        val localVarResponse = disconnectListenBrainzWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /me/scrobbling/listenbrainz
+     * Stop sending plays to ListenBrainz.
+     * 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun disconnectListenBrainzWithHttpInfo() : ApiResponse<Unit?> {
+        val localVariableConfig = disconnectListenBrainzRequestConfig()
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation disconnectListenBrainz
+     *
+     * @return RequestConfig
+     */
+    fun disconnectListenBrainzRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/me/scrobbling/listenbrainz",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * GET /users/{userId}/avatar
      * A user&#39;s profile picture (512×512 JPEG). Available without signing in where the sign-in profile picker is shown.
      * Use the &#x60;avatarUrl&#x60; from User or Profile; it carries a version so the response can be cached forever.
@@ -357,6 +646,150 @@ open class UsersApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /me/scrobbling/lastfm
+     * Start connecting Last.fm: the last.fm page where the person approves Marquee. Last.fm sends them back to callbackUrl with ?token&#x3D;…
+     * 
+     * @param lastFmAuthUrlRequest 
+     * @return LastFmAuthUrl200Response
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun lastFmAuthUrl(lastFmAuthUrlRequest: LastFmAuthUrlRequest) : LastFmAuthUrl200Response {
+        val localVarResponse = lastFmAuthUrlWithHttpInfo(lastFmAuthUrlRequest = lastFmAuthUrlRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as LastFmAuthUrl200Response
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /me/scrobbling/lastfm
+     * Start connecting Last.fm: the last.fm page where the person approves Marquee. Last.fm sends them back to callbackUrl with ?token&#x3D;…
+     * 
+     * @param lastFmAuthUrlRequest 
+     * @return ApiResponse<LastFmAuthUrl200Response?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun lastFmAuthUrlWithHttpInfo(lastFmAuthUrlRequest: LastFmAuthUrlRequest) : ApiResponse<LastFmAuthUrl200Response?> {
+        val localVariableConfig = lastFmAuthUrlRequestConfig(lastFmAuthUrlRequest = lastFmAuthUrlRequest)
+
+        return request<LastFmAuthUrlRequest, LastFmAuthUrl200Response>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation lastFmAuthUrl
+     *
+     * @param lastFmAuthUrlRequest 
+     * @return RequestConfig
+     */
+    fun lastFmAuthUrlRequestConfig(lastFmAuthUrlRequest: LastFmAuthUrlRequest) : RequestConfig<LastFmAuthUrlRequest> {
+        val localVariableBody = lastFmAuthUrlRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/me/scrobbling/lastfm",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /me/scrobbling/lastfm
+     * Whether the caller&#39;s plays go to Last.fm, and whether Last.fm is set up on this server (MUSIC-12).
+     * 
+     * @return ScrobbleStatus
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun lastFmStatus() : ScrobbleStatus {
+        val localVarResponse = lastFmStatusWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ScrobbleStatus
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /me/scrobbling/lastfm
+     * Whether the caller&#39;s plays go to Last.fm, and whether Last.fm is set up on this server (MUSIC-12).
+     * 
+     * @return ApiResponse<ScrobbleStatus?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun lastFmStatusWithHttpInfo() : ApiResponse<ScrobbleStatus?> {
+        val localVariableConfig = lastFmStatusRequestConfig()
+
+        return request<Unit, ScrobbleStatus>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation lastFmStatus
+     *
+     * @return RequestConfig
+     */
+    fun lastFmStatusRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/me/scrobbling/lastfm",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
             body = localVariableBody
         )
     }
@@ -564,6 +997,76 @@ open class UsersApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/users",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /me/scrobbling/listenbrainz
+     * Whether the caller&#39;s plays go to ListenBrainz (MUSIC-12).
+     * 
+     * @return ScrobbleStatus
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listenBrainzStatus() : ScrobbleStatus {
+        val localVarResponse = listenBrainzStatusWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ScrobbleStatus
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /me/scrobbling/listenbrainz
+     * Whether the caller&#39;s plays go to ListenBrainz (MUSIC-12).
+     * 
+     * @return ApiResponse<ScrobbleStatus?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listenBrainzStatusWithHttpInfo() : ApiResponse<ScrobbleStatus?> {
+        val localVariableConfig = listenBrainzStatusRequestConfig()
+
+        return request<Unit, ScrobbleStatus>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listenBrainzStatus
+     *
+     * @return RequestConfig
+     */
+    fun listenBrainzStatusRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/me/scrobbling/listenbrainz",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
