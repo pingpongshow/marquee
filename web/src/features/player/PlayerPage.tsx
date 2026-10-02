@@ -7,11 +7,11 @@ const VideoPlayer = lazy(() => import("./VideoPlayer").then((m) => ({ default: m
 
 export function PlayerPage() {
   const { itemId } = useParams({ from: "/play/$itemId" });
-  const { t, pl } = useSearch({ from: "/play/$itemId" });
+  const { t, pl, f } = useSearch({ from: "/play/$itemId" });
   return (
     <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black"><Spinner label="Loading player" /></div>}>
       {/* Keyed by item so Up Next starts a fresh player. */}
-      <VideoPlayer key={itemId} itemId={Number(itemId)} startMs={t} playlistId={pl} />
+      <VideoPlayer key={itemId} itemId={Number(itemId)} startMs={t} playlistId={pl} fileId={f} />
     </Suspense>
   );
 }

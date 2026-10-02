@@ -39,6 +39,8 @@ public final class VideoPlayback {
     @ObservationIgnored private var endObserver: NSObjectProtocol?
     @ObservationIgnored private var lastReport = Date.distantPast
     @ObservationIgnored private var fallback = 0
+    /// The version being played (nil = the server's best).
+    @ObservationIgnored private var fileID: Int64?
     @ObservationIgnored private var selection: (audio: Int64?, subtitle: Int64?) = (nil, nil)
     @ObservationIgnored private static var measured: (kbps: Int, at: Date)?
 
@@ -83,17 +85,22 @@ public final class VideoPlayback {
     }
 
     /// Starts playback of an item. `startMs` nil resumes where the user left off.
-    public func start(itemID: Int64, startMs: Int64? = nil, audio: Int64? = nil, subtitle: Int64? = nil) async {
+    public func start(itemID: Int64, startMs: Int64? = nil, audio: Int64? = nil, subtitle: Int64? = nil, fileID: Int64? = nil) async {
         errorMessage = nil
         finished = false
         guard let client = app.client else { return }
-        if item?.id != itemID { item = try? await app.item(itemID) }
+        if item?.id != itemID {
+            item = try? await app.item(itemID)
+            self.fileID = fileID
+        } else if fileID != nil {
+            self.fileID = fileID
+        }
         selection = (audio, subtitle)
         let quality = app.isRemote ? QualityPreference.remote : QualityPreference.local
         let measured = app.isRemote && quality == 0 ? await measureKbps() : nil
         do {
             let s = try await client.startPlayback(body: .json(.init(
-                itemId: itemID, audioStreamId: audio, subtitleStreamId: subtitle, startMs: startMs,
+                itemId: itemID, fileId: self.fileID, audioStreamId: audio, subtitleStreamId: subtitle, startMs: startMs,
                 maxBitrateKbps: quality == 0 ? nil : quality, measuredKbps: measured, profile: profile()))).ok.body.json
             await stopSession()
             session = s

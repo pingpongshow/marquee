@@ -26,7 +26,7 @@ struct PlayerView: View {
             let p = VideoPlayback(app: app, playlistID: request.playlistID)
             playback = p
             let tracks = PendingTracks.shared.take(request.itemID)
-            await p.start(itemID: request.itemID, startMs: request.startMs, audio: tracks.audio, subtitle: tracks.subtitle)
+            await p.start(itemID: request.itemID, startMs: request.startMs, audio: tracks.audio, subtitle: tracks.subtitle, fileID: tracks.file)
         }
         .onDisappear { Task { await playback?.stop() } }
         .onChange(of: playback?.finished) { _, done in

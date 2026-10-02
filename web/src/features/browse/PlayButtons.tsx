@@ -5,9 +5,9 @@ import { useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { fetchLeaves } from "@/api/queries";
 import type { ItemDetail } from "@/api/types";
-import { Button } from "@/components/ui";
+import { Button, Select } from "@/components/ui";
 import { useMusic } from "../player/MusicPlayer";
-import { formatTrackTime } from "./format";
+import { formatTrackTime, versionLabel } from "./format";
 
 export function PlayButtons({ item }: { item: ItemDetail }) {
   const navigate = useNavigate();
@@ -30,7 +30,9 @@ export function PlayButtons({ item }: { item: ItemDetail }) {
     onError: (_e, on) => setListed(!on),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["items"] }),
   });
-  const playVideo = (id: number, t?: number) => navigate({ to: "/play/$itemId", params: { itemId: String(id) }, search: { t } });
+  // Several versions (4K and 1080p, a director's cut): choose one, or let the server pick the best (LIB-7).
+  const [file, setFile] = useState<number | undefined>();
+  const playVideo = (id: number, t?: number) => navigate({ to: "/play/$itemId", params: { itemId: String(id) }, search: { t, f: id === item.id ? file : undefined } });
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
     try {
@@ -84,6 +86,18 @@ export function PlayButtons({ item }: { item: ItemDetail }) {
         <Button variant="primary" onClick={() => music.play([item])}>
           <Play className="size-4 fill-current" /> Play
         </Button>
+      )}
+      {playable && item.versions.length > 1 && (
+        <div className="w-56">
+          <Select aria-label="Version" value={file ?? ""} onChange={(e) => setFile(e.target.value ? Number(e.target.value) : undefined)}>
+            <option value="">Best version</option>
+            {item.versions.map((v) => (
+              <option key={v.id} value={v.files[0]?.id}>
+                {versionLabel(v)}
+              </option>
+            ))}
+          </Select>
+        </div>
       )}
       {(item.type === "movie" || item.type === "show" || item.type === "episode" || item.type === "video") && (
         <Button variant="ghost" onClick={() => toggleWatchlist.mutate(!listed)} aria-pressed={listed}>

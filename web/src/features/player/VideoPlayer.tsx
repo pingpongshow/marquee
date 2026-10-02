@@ -9,7 +9,7 @@ import { itemQuery, meQuery, systemInfoQuery } from "@/api/queries";
 import type { components } from "@/api/schema.gen";
 import type { ItemDetail, ItemSummary, MediaStream, Trickplay } from "@/api/types";
 import { Spinner } from "@/components/ui";
-import { languageName } from "../browse/format";
+import { languageName, versionLabel } from "../browse/format";
 import { deviceProfile } from "./deviceProfile";
 import { SubtitleSearchDialog } from "./SubtitleSearch";
 
@@ -67,7 +67,7 @@ function trackLabel(s: MediaStream) {
     .join(" · ");
 }
 
-type Selection = { audio?: number; subtitle?: number; quality: number };
+type Selection = { audio?: number; subtitle?: number; quality: number; file?: number };
 
 /**
  * Fallback levels when the browser can't play what it claimed it could:
@@ -81,7 +81,7 @@ function profileFor(level: number) {
   return { ...noDirect, videoCodecs: ["h264"], hlsVideoCodecs: ["h264"], tenBit: false, hdr: [] };
 }
 
-export function VideoPlayer({ itemId, startMs, playlistId }: { itemId: number; startMs?: number; playlistId?: number }) {
+export function VideoPlayer({ itemId, startMs, playlistId, fileId }: { itemId: number; startMs?: number; playlistId?: number; fileId?: number }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const item = useQuery(itemQuery(itemId));
@@ -99,7 +99,7 @@ export function VideoPlayer({ itemId, startMs, playlistId }: { itemId: number; s
   const sessionRef = useRef<PlaybackSession | null>(null);
   const [sess, setSess] = useState<PlaybackSession | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [sel, setSel] = useState<Selection>(() => ({ quality: storedQuality(false) }));
+  const [sel, setSel] = useState<Selection>(() => ({ quality: storedQuality(false), file: fileId }));
   const [restartAt, setRestartAt] = useState<number | undefined>(startMs);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
@@ -166,6 +166,7 @@ export function VideoPlayer({ itemId, startMs, playlistId }: { itemId: number; s
           api.POST("/playback/sessions", {
             body: {
               itemId,
+              fileId: sel.file,
               profile: profileFor(fallback),
               startMs: restartAt,
               audioStreamId: sel.audio,
@@ -589,6 +590,19 @@ export function VideoPlayer({ itemId, startMs, playlistId }: { itemId: number; s
           )}
           {menu === "settings" && (
             <>
+              {(item.data?.versions.length ?? 0) > 1 && (
+                <>
+                  <MenuHeading>Version</MenuHeading>
+                  {item.data!.versions.map((v) => {
+                    const id = v.files[0]?.id;
+                    return (
+                      <MenuItem key={v.id} active={id === sess?.fileId} onClick={() => id && restart({ file: id, audio: undefined, subtitle: undefined })}>
+                        {versionLabel(v)}
+                      </MenuItem>
+                    );
+                  })}
+                </>
+              )}
               <MenuHeading>Quality {remote ? "(away from home)" : "(home network)"}</MenuHeading>
               {remote && (
                 <MenuItem active={sel.quality === 0} onClick={() => (storeQuality(true, 0), restart({ quality: 0 }))}>

@@ -46,3 +46,13 @@ const langNames: Record<string, string> = {
   kor: "Korean", chi: "Chinese", zho: "Chinese", por: "Portuguese", rus: "Russian", dut: "Dutch", swe: "Swedish",
 };
 export const languageName = (code?: string) => (code ? (langNames[code] ?? code.toUpperCase()) : "Unknown");
+
+/** Names a version for pickers: its edition label, else resolution, HDR and codec (LIB-7). */
+export function versionLabel(v: { label?: string; files: { height?: number; width?: number; hdrFormat?: string; videoCodec?: string }[] }) {
+  const f = v.files[0];
+  const res = !f?.height ? "" : (f.width ?? 0) >= 3200 || f.height >= 2000 ? "4K" : f.height >= 1000 ? "1080p" : f.height >= 700 ? "720p" : "SD";
+  const hdr = f?.hdrFormat ? { dolby_vision: "Dolby Vision", hdr10: "HDR10", hdr10plus: "HDR10+", hlg: "HLG" }[f.hdrFormat] ?? "HDR" : "";
+  const codec = f?.videoCodec ? ({ hevc: "HEVC", h264: "H.264", av1: "AV1", vp9: "VP9", mpeg2video: "MPEG-2" } as Record<string, string>)[f.videoCodec] ?? f.videoCodec.toUpperCase() : "";
+  const tech = [res, hdr, codec].filter(Boolean).join(" · ");
+  return v.label ? (tech ? `${v.label} (${tech})` : v.label) : tech || "Version";
+}
