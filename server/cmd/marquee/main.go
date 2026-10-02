@@ -224,7 +224,7 @@ func run() error {
 		Description: "Reads ReplayGain tags and measures loudness of tracks without them, so volume levelling works for everything.",
 		Run:         loud.Run})
 	trick := &trickplay.Service{DB: database, FFmpeg: cfg.FFmpegPath, Dir: filepath.Join(cfg.ConfigDir, "cache", "trickplay"), Workers: 2,
-		Enabled: func() bool { return store.Get().Library.Trickplay }}
+		Enabled: func() bool { return store.Get().Library.Trickplay }, CUDA: player.Encoders.NVENC}
 	scheduler.Register(tasks.Task{ID: "trickplay", Name: "Make seek previews", Window: true, Bounded: true,
 		Description: "Makes the thumbnails shown while seeking through videos. A large library takes a few nights; it continues where it stopped.",
 		Run:         trick.Run, Progress: trick.Progress})
