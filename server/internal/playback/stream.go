@@ -81,6 +81,8 @@ func (m *Manager) StreamHandler(subtitleCache string) http.Handler {
 				return
 			}
 			m.serveSubtitle(w, r, s, sid, subtitleCache, format)
+		case file == "iframes.m3u8" || file == "iframes.mp4":
+			m.serveIFrames(w, r, s, file)
 		case file == "fonts.json":
 			m.serveFontList(w, r, s)
 		case strings.HasPrefix(file, "fonts/"):
@@ -234,6 +236,18 @@ func (m *Manager) serveMaster(w http.ResponseWriter, s *Session) {
 		}
 	}
 	b.WriteString("\nindex.m3u8\n")
+	// Scrubbing thumbnails for Apple players (PLAY-13): an I-frame-only rendition made from
+	// the seek previews, one small keyframe every 10 s.
+	if m.IFrames != nil && s.Media.Video != nil {
+		if _, _, ok := m.IFrames(s.FileID, s.Media.DurationMS); ok {
+			v := s.Media.Video
+			h := 180
+			if v.Width > 0 && v.Height > 0 {
+				h = max(2, int(math.Round(320*float64(v.Height)/float64(v.Width)/2))*2) // as the previews are made
+			}
+			fmt.Fprintf(&b, "#EXT-X-I-FRAME-STREAM-INF:BANDWIDTH=64000,CODECS=\"avc1.4d401e\",RESOLUTION=320x%d,URI=\"iframes.m3u8\"\n", h)
+		}
+	}
 	// Lower variants for adaptive bitrate (remote transcodes only).
 	for i, rg := range s.Rungs() {
 		bw := (rg.VideoKbps + audioKbps(d.AudioChannels)) * 1000
@@ -460,4 +474,34 @@ func languageLabel(code string) string {
 		return "Unknown"
 	}
 	return strings.ToUpper(code)
+}
+
+func (m *Manager) serveIFrames(w http.ResponseWriter, r *http.Request, s *Session, name string) {
+	if m.IFrames == nil {
+		http.NotFound(w, r)
+		return
+	}
+	path, playlist, ok := m.IFrames(s.FileID, s.Media.DurationMS)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	if name == "iframes.m3u8" {
+		w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+		w.Write(playlist)
+		return
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer f.Close()
+	st, err := f.Stat()
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "video/mp4")
+	http.ServeContent(w, r, "iframes.mp4", st.ModTime(), f)
 }
