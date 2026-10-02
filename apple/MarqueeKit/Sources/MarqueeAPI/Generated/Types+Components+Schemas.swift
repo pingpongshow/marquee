@@ -1441,6 +1441,12 @@ extension Components {
             public var fanartApiKeySet: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/MetadataSettings/openSubtitlesApiKeySet`.
             public var openSubtitlesApiKeySet: Swift.Bool?
+            /// Optional OpenSubtitles account; logging in raises the daily download limit.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MetadataSettings/openSubtitlesUsername`.
+            public var openSubtitlesUsername: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/MetadataSettings/openSubtitlesPasswordSet`.
+            public var openSubtitlesPasswordSet: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/MetadataSettings/omdbApiKeySet`.
             public var omdbApiKeySet: Swift.Bool?
             /// Requests per day (free OMDb keys allow 1000).
@@ -1460,6 +1466,8 @@ extension Components {
             ///   - tmdbApiKeySet:
             ///   - fanartApiKeySet:
             ///   - openSubtitlesApiKeySet:
+            ///   - openSubtitlesUsername: Optional OpenSubtitles account; logging in raises the daily download limit.
+            ///   - openSubtitlesPasswordSet:
             ///   - omdbApiKeySet:
             ///   - omdbDailyLimit: Requests per day (free OMDb keys allow 1000).
             ///   - animeEpisodeOrdering:
@@ -1467,6 +1475,8 @@ extension Components {
                 tmdbApiKeySet: Swift.Bool? = nil,
                 fanartApiKeySet: Swift.Bool? = nil,
                 openSubtitlesApiKeySet: Swift.Bool? = nil,
+                openSubtitlesUsername: Swift.String? = nil,
+                openSubtitlesPasswordSet: Swift.Bool? = nil,
                 omdbApiKeySet: Swift.Bool? = nil,
                 omdbDailyLimit: Swift.Int? = nil,
                 animeEpisodeOrdering: Components.Schemas.MetadataSettings.AnimeEpisodeOrderingPayload? = nil
@@ -1474,6 +1484,8 @@ extension Components {
                 self.tmdbApiKeySet = tmdbApiKeySet
                 self.fanartApiKeySet = fanartApiKeySet
                 self.openSubtitlesApiKeySet = openSubtitlesApiKeySet
+                self.openSubtitlesUsername = openSubtitlesUsername
+                self.openSubtitlesPasswordSet = openSubtitlesPasswordSet
                 self.omdbApiKeySet = omdbApiKeySet
                 self.omdbDailyLimit = omdbDailyLimit
                 self.animeEpisodeOrdering = animeEpisodeOrdering
@@ -1482,6 +1494,8 @@ extension Components {
                 case tmdbApiKeySet
                 case fanartApiKeySet
                 case openSubtitlesApiKeySet
+                case openSubtitlesUsername
+                case openSubtitlesPasswordSet
                 case omdbApiKeySet
                 case omdbDailyLimit
                 case animeEpisodeOrdering
@@ -1497,6 +1511,10 @@ extension Components {
             public var fanartApiKey: Swift.String?
             /// - Remark: Generated from `#/components/schemas/MetadataSettingsUpdate/openSubtitlesApiKey`.
             public var openSubtitlesApiKey: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/MetadataSettingsUpdate/openSubtitlesUsername`.
+            public var openSubtitlesUsername: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/MetadataSettingsUpdate/openSubtitlesPassword`.
+            public var openSubtitlesPassword: Swift.String?
             /// - Remark: Generated from `#/components/schemas/MetadataSettingsUpdate/omdbApiKey`.
             public var omdbApiKey: Swift.String?
             /// - Remark: Generated from `#/components/schemas/MetadataSettingsUpdate/omdbDailyLimit`.
@@ -1514,6 +1532,8 @@ extension Components {
             ///   - tmdbApiKey:
             ///   - fanartApiKey:
             ///   - openSubtitlesApiKey:
+            ///   - openSubtitlesUsername:
+            ///   - openSubtitlesPassword:
             ///   - omdbApiKey:
             ///   - omdbDailyLimit:
             ///   - animeEpisodeOrdering:
@@ -1521,6 +1541,8 @@ extension Components {
                 tmdbApiKey: Swift.String? = nil,
                 fanartApiKey: Swift.String? = nil,
                 openSubtitlesApiKey: Swift.String? = nil,
+                openSubtitlesUsername: Swift.String? = nil,
+                openSubtitlesPassword: Swift.String? = nil,
                 omdbApiKey: Swift.String? = nil,
                 omdbDailyLimit: Swift.Int? = nil,
                 animeEpisodeOrdering: Components.Schemas.MetadataSettingsUpdate.AnimeEpisodeOrderingPayload? = nil
@@ -1528,6 +1550,8 @@ extension Components {
                 self.tmdbApiKey = tmdbApiKey
                 self.fanartApiKey = fanartApiKey
                 self.openSubtitlesApiKey = openSubtitlesApiKey
+                self.openSubtitlesUsername = openSubtitlesUsername
+                self.openSubtitlesPassword = openSubtitlesPassword
                 self.omdbApiKey = omdbApiKey
                 self.omdbDailyLimit = omdbDailyLimit
                 self.animeEpisodeOrdering = animeEpisodeOrdering
@@ -1536,6 +1560,8 @@ extension Components {
                 case tmdbApiKey
                 case fanartApiKey
                 case openSubtitlesApiKey
+                case openSubtitlesUsername
+                case openSubtitlesPassword
                 case omdbApiKey
                 case omdbDailyLimit
                 case animeEpisodeOrdering
@@ -4176,6 +4202,77 @@ extension Components {
                 case title
                 case description
                 case items
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/SubtitleResult`.
+        public struct SubtitleResult: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/SubtitleResult/fileId`.
+            public var fileId: Swift.Int64
+            /// ISO 639-1 (e.g. en
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitleResult/language`.
+            public var language: Swift.String
+            /// - Remark: Generated from `#/components/schemas/SubtitleResult/release`.
+            public var release: Swift.String
+            /// - Remark: Generated from `#/components/schemas/SubtitleResult/fileName`.
+            public var fileName: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/SubtitleResult/downloads`.
+            public var downloads: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/SubtitleResult/hearingImpaired`.
+            public var hearingImpaired: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/SubtitleResult/foreignPartsOnly`.
+            public var foreignPartsOnly: Swift.Bool?
+            /// Machine or AI translated.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitleResult/aiTranslated`.
+            public var aiTranslated: Swift.Bool
+            /// Made for this exact file.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitleResult/hashMatch`.
+            public var hashMatch: Swift.Bool
+            /// Creates a new `SubtitleResult`.
+            ///
+            /// - Parameters:
+            ///   - fileId:
+            ///   - language: ISO 639-1 (e.g. en
+            ///   - release:
+            ///   - fileName:
+            ///   - downloads:
+            ///   - hearingImpaired:
+            ///   - foreignPartsOnly:
+            ///   - aiTranslated: Machine or AI translated.
+            ///   - hashMatch: Made for this exact file.
+            public init(
+                fileId: Swift.Int64,
+                language: Swift.String,
+                release: Swift.String,
+                fileName: Swift.String? = nil,
+                downloads: Swift.Int,
+                hearingImpaired: Swift.Bool,
+                foreignPartsOnly: Swift.Bool? = nil,
+                aiTranslated: Swift.Bool,
+                hashMatch: Swift.Bool
+            ) {
+                self.fileId = fileId
+                self.language = language
+                self.release = release
+                self.fileName = fileName
+                self.downloads = downloads
+                self.hearingImpaired = hearingImpaired
+                self.foreignPartsOnly = foreignPartsOnly
+                self.aiTranslated = aiTranslated
+                self.hashMatch = hashMatch
+            }
+            public enum CodingKeys: String, CodingKey {
+                case fileId
+                case language
+                case release
+                case fileName
+                case downloads
+                case hearingImpaired
+                case foreignPartsOnly
+                case aiTranslated
+                case hashMatch
             }
         }
         /// - Remark: Generated from `#/components/schemas/Stats`.
