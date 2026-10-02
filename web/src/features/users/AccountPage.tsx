@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { ListenBrainzCard } from "./ListenBrainz";
 import { TwoFactorCard } from "./TwoFactor";
 import { meQuery, useUpdateMe } from "@/api/queries";
 import type { UserPreferences } from "@/api/types";
@@ -132,6 +133,7 @@ export function AccountPage() {
       )}
 
       {u.hasPassword && <TwoFactorCard />}
+      <ListenBrainzCard />
 
       {!u.isManaged && (
         <Card

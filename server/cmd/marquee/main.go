@@ -41,6 +41,7 @@ import (
 	"marquee/internal/probe"
 	"marquee/internal/requests"
 	"marquee/internal/scanner"
+	"marquee/internal/scrobble"
 	"marquee/internal/server"
 	"marquee/internal/settings"
 	"marquee/internal/sonic"
@@ -130,7 +131,11 @@ func run() error {
 		return webhooks.Server{ID: store.ServerID(), Name: store.Get().General.ServerName, Version: config.Version}
 	}}
 	go hooks.Run(ctx)
+	scrobbler := &scrobble.Service{DB: database}
 	player.Events = func(kind string, s *playback.Session, pos int64) {
+		if s.ItemType == "track" && (kind == "playback.started" || kind == "playback.watched") {
+			go scrobbler.Played(ctx, s.UserID, s.ItemID, kind == "playback.started", s.StartedAt)
+		}
 		go func() {
 			hooks.Publish(webhooks.Event{Event: kind, User: &webhooks.User{ID: s.UserID, Name: s.UserName},
 				Device:   &webhooks.Device{Name: s.DeviceName, Platform: hooks.DevicePlatform(ctx, s.DeviceID)},
@@ -382,6 +387,7 @@ func run() error {
 		Tasks: scheduler, Trickplay: trick, Webhooks: hooks, Subtitles: subs, Downloads: dl, Backups: backups, Restart: stop, Sonic: sonicSvc, Lyrics: lyricsSvc,
 		Requests: &requests.Service{DB: database, Settings: store},
 		LiveTV:   live,
+		Scrobble: scrobbler,
 		DVR:      dvr,
 		SyncPlay: watchTogether,
 		Avatars:  &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
