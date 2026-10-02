@@ -1,0 +1,9 @@
+**/node_modules
+web/dist
+server/internal/web/dist/assets
+server/internal/web/dist/index.html
+.git
+docs
+apple
+android
+**/.DS_Store
