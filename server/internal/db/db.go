@@ -81,3 +81,38 @@ func Backup(ctx context.Context, db *sql.DB, dest string) error {
 	_, err := db.ExecContext(ctx, "VACUUM INTO ?", dest)
 	return err
 }
+
+// PendingRestorePath is where a backup chosen for restore waits for the next start.
+func PendingRestorePath(configDir string) string {
+	return filepath.Join(configDir, "restore-pending.db")
+}
+
+// ApplyPendingRestore swaps in a staged backup before the database is opened. The
+// current database is kept in backupDir as a pre-restore backup.
+func ApplyPendingRestore(dbPath, configDir, backupDir string) error {
+	pending := PendingRestorePath(configDir)
+	if _, err := os.Stat(pending); err != nil {
+		return nil
+	}
+	if err := os.MkdirAll(backupDir, 0o755); err != nil {
+		return err
+	}
+	if _, err := os.Stat(dbPath); err == nil {
+		// Fold the WAL into the old database before moving it aside.
+		if old, err := sql.Open("sqlite", "file:"+dbPath); err == nil {
+			old.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
+			old.Close()
+		}
+		keep := filepath.Join(backupDir, "pre-restore-"+time.Now().UTC().Format("20060102-150405")+".db")
+		if err := os.Rename(dbPath, keep); err != nil {
+			return err
+		}
+	}
+	os.Remove(dbPath + "-wal")
+	os.Remove(dbPath + "-shm")
+	if err := os.Rename(pending, dbPath); err != nil {
+		return err
+	}
+	slog.Info("restored database from backup")
+	return nil
+}

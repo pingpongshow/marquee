@@ -3,31 +3,11 @@ import { useNavigate } from "@tanstack/react-router";
 import { Check, Play, RotateCcw, Shuffle } from "lucide-react";
 import { useState } from "react";
 import { api, unwrap } from "@/api/client";
-import type { ItemDetail, ItemSummary } from "@/api/types";
+import { fetchLeaves } from "@/api/queries";
+import type { ItemDetail } from "@/api/types";
 import { Button } from "@/components/ui";
 import { useMusic } from "../player/MusicPlayer";
 import { formatDuration } from "./format";
-
-async function children(id: number) {
-  return (await unwrap(api.GET("/items/{itemId}/children", { params: { path: { itemId: id }, query: { limit: 500 } } }))).items;
-}
-
-/** First unwatched episode of a show (or the first episode if all are watched). */
-async function nextEpisode(showId: number): Promise<ItemSummary | undefined> {
-  const seasons = (await children(showId)).filter((s) => (s.index ?? 0) > 0);
-  let first: ItemSummary | undefined;
-  for (const s of seasons) {
-    for (const e of await children(s.id)) {
-      first ??= e;
-      if (!e.viewCount) return e;
-    }
-  }
-  return first;
-}
-
-async function albumTracks(album: number) {
-  return (await children(album)).filter((t) => t.type === "track");
-}
 
 export function PlayButtons({ item }: { item: ItemDetail }) {
   const navigate = useNavigate();
@@ -72,7 +52,7 @@ export function PlayButtons({ item }: { item: ItemDetail }) {
           loading={busy}
           onClick={() =>
             run(async () => {
-              const ep = item.type === "show" ? await nextEpisode(item.id) : (await children(item.id)).find((e) => !e.viewCount) ?? (await children(item.id))[0];
+              const [ep] = await fetchLeaves(item.id, { unwatched: true });
               if (ep) playVideo(ep.id);
             })
           }
@@ -80,30 +60,15 @@ export function PlayButtons({ item }: { item: ItemDetail }) {
           <Play className="size-4 fill-current" /> {item.watchedLeafCount ? "Continue" : "Play"}
         </Button>
       )}
-      {item.type === "album" && (
+      {(item.type === "album" || item.type === "artist") && (
         <>
-          <Button variant="primary" loading={busy} onClick={() => run(async () => music.play(await albumTracks(item.id)))}>
+          <Button variant="primary" loading={busy} onClick={() => run(async () => music.play(await fetchLeaves(item.id)))}>
             <Play className="size-4 fill-current" /> Play
           </Button>
-          <Button loading={busy} onClick={() => run(async () => music.play([...(await albumTracks(item.id))].sort(() => Math.random() - 0.5)))}>
+          <Button loading={busy} onClick={() => run(async () => music.play(await fetchLeaves(item.id), 0, { shuffle: true }))}>
             <Shuffle className="size-4" /> Shuffle
           </Button>
         </>
-      )}
-      {item.type === "artist" && (
-        <Button
-          variant="primary"
-          loading={busy}
-          onClick={() =>
-            run(async () => {
-              const tracks: ItemSummary[] = [];
-              for (const al of await children(item.id)) tracks.push(...(await albumTracks(al.id)));
-              music.play(tracks.sort(() => Math.random() - 0.5));
-            })
-          }
-        >
-          <Shuffle className="size-4" /> Shuffle artist
-        </Button>
       )}
       {item.type === "track" && (
         <Button variant="primary" onClick={() => music.play([item])}>

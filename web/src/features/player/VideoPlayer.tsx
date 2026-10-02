@@ -80,7 +80,7 @@ function profileFor(level: number) {
   return { ...noDirect, videoCodecs: ["h264"], hlsVideoCodecs: ["h264"], tenBit: false, hdr: [] };
 }
 
-export function VideoPlayer({ itemId, startMs }: { itemId: number; startMs?: number }) {
+export function VideoPlayer({ itemId, startMs, playlistId }: { itemId: number; startMs?: number; playlistId?: number }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const item = useQuery(itemQuery(itemId));
@@ -293,13 +293,22 @@ export function VideoPlayer({ itemId, startMs }: { itemId: number; startMs?: num
     };
   }, [report, stopSession, qc]);
 
-  // Up Next for episodes.
+  // Up Next: the following playlist entry when playing a playlist, else the next episode.
   useEffect(() => {
-    if (item.data?.type !== "episode") return;
+    if (!playlistId) return;
+    unwrap(api.GET("/playlists/{playlistId}/items", { params: { path: { playlistId }, query: { limit: 2000 } } }))
+      .then((p) => {
+        const i = p.items.findIndex((e) => e.item.id === itemId);
+        setNext(i >= 0 ? (p.items[i + 1]?.item ?? null) : null);
+      })
+      .catch(() => setNext(null));
+  }, [playlistId, itemId]);
+  useEffect(() => {
+    if (playlistId || item.data?.type !== "episode") return;
     unwrap(api.GET("/items/{itemId}/next", { params: { path: { itemId } } }))
       .then((n) => setNext((n as ItemSummary) ?? null))
       .catch(() => setNext(null));
-  }, [item.data?.type, itemId]);
+  }, [item.data?.type, itemId, playlistId]);
 
   const restart = (patch: Partial<Selection>) => {
     const v = videoRef.current;
@@ -323,8 +332,8 @@ export function VideoPlayer({ itemId, startMs }: { itemId: number; startMs?: num
     else document.getElementById("player-root")?.requestFullscreen();
   };
   const playNext = useCallback(() => {
-    if (next) navigate({ to: "/play/$itemId", params: { itemId: String(next.id) }, search: { t: 0 }, replace: true });
-  }, [next, navigate]);
+    if (next) navigate({ to: "/play/$itemId", params: { itemId: String(next.id) }, search: { t: 0, pl: playlistId }, replace: true });
+  }, [next, navigate, playlistId]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -655,9 +664,7 @@ function UpNext({ next, onPlay, onDismiss, secondsLeft }: { next: ItemSummary; o
       {art && <img src={imageUrl(art, 320)} alt="" className="aspect-video w-full object-cover" />}
       <div className="space-y-2 p-3">
         <div className="text-xs text-white/60 uppercase">Up next{secondsLeft <= 30 ? ` in ${secondsLeft}s` : ""}</div>
-        <div className="truncate font-semibold">
-          {next.parentTitle} · E{next.index} · {next.title}
-        </div>
+        <div className="truncate font-semibold">{next.type === "episode" ? `${next.grandparentTitle ?? next.parentTitle} · ${next.parentTitle} · E${next.index} · ${next.title}` : next.title}</div>
         <div className="flex gap-2">
           <button onClick={onPlay} className="flex-1 rounded bg-accent px-3 py-1.5 font-semibold text-black">
             Play now

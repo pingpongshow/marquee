@@ -37,7 +37,11 @@ type Handlers struct {
 	// LibrariesChanged is called after a library is created, edited or deleted.
 	LibrariesChanged func()
 	Scans            *tasks.Scans
-	Version          string
+	Tasks            *tasks.Scheduler
+	Backups          *tasks.Backups
+	// Restart stops the server gracefully; Docker starts it again.
+	Restart func()
+	Version string
 }
 
 var _ StrictServerInterface = (*Handlers)(nil)

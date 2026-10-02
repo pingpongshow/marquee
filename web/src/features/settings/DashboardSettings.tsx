@@ -90,6 +90,53 @@ function SessionCard({ s }: { s: Session }) {
   );
 }
 
+type Sample = components["schemas"]["BandwidthSample"];
+
+/** Local and remote bandwidth over the last hour, stacked (ADM-10). */
+function BandwidthChart({ samples, uploadKbps }: { samples: Sample[]; uploadKbps?: number }) {
+  const W = 600;
+  const H = 140;
+  const max = Math.max(1000, uploadKbps ?? 0, ...samples.map((x) => x.localKbps + x.remoteKbps)) * 1.1;
+  // The newest sample is "now" on the server, so the window ends there.
+  const last = samples.at(-1);
+  const start = (last ? new Date(last.at).getTime() : 0) - 60 * 60 * 1000;
+  const x = (iso: string) => ((new Date(iso).getTime() - start) / (60 * 60 * 1000)) * W;
+  const y = (kbps: number) => H - (kbps / max) * H;
+  const area = (top: (x: Sample) => number, bottom: (x: Sample) => number) => {
+    if (samples.length < 2) return "";
+    const upper = samples.map((p) => `${x(p.at).toFixed(1)},${y(top(p)).toFixed(1)}`);
+    const lower = [...samples].reverse().map((p) => `${x(p.at).toFixed(1)},${y(bottom(p)).toFixed(1)}`);
+    return `M${upper.join("L")}L${lower.join("L")}Z`;
+  };
+  const peak = Math.max(0, ...samples.map((p) => p.localKbps + p.remoteKbps));
+  return (
+    <figure>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-36 w-full" role="img" aria-label={`Bandwidth over the last hour, peak ${mbps(peak)}`}>
+        {[0.25, 0.5, 0.75].map((f) => (
+          <line key={f} x1={0} x2={W} y1={H * f} y2={H * f} className="stroke-border" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+        ))}
+        {uploadKbps ? <line x1={0} x2={W} y1={y(uploadKbps)} y2={y(uploadKbps)} className="stroke-danger" strokeDasharray="4 4" strokeWidth={1} vectorEffect="non-scaling-stroke" /> : null}
+        <path d={area((p) => p.localKbps, () => 0)} className="fill-accent/50" />
+        <path d={area((p) => p.localKbps + p.remoteKbps, (p) => p.localKbps)} className="fill-sky-400/50" />
+      </svg>
+      <figcaption className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
+        <span className="flex items-center gap-1.5">
+          <span className="size-2.5 rounded-sm bg-accent/70" /> Local
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-2.5 rounded-sm bg-sky-400/70" /> Remote
+        </span>
+        {uploadKbps ? (
+          <span className="flex items-center gap-1.5">
+            <span className="h-px w-3 border-t border-dashed border-danger" /> Upload speed
+          </span>
+        ) : null}
+        <span className="ml-auto">Peak {mbps(peak)} · last 60 minutes</span>
+      </figcaption>
+    </figure>
+  );
+}
+
 export function DashboardSettings() {
   const sessions = useQuery({ queryKey: ["dashboard", "sessions"], queryFn: () => unwrap(api.GET("/playback/sessions")), refetchInterval: 3000 });
   const status = useQuery({ queryKey: ["dashboard", "status"], queryFn: () => unwrap(api.GET("/system/status")), refetchInterval: 5000 });
@@ -104,6 +151,11 @@ export function DashboardSettings() {
           <Stat label="Local" value={mbps(st.localKbps)} />
           <Stat label="Remote" value={mbps(st.remoteKbps)} hint={st.uploadSpeedKbps ? `of ${mbps(st.uploadSpeedKbps)} upload` : "Set upload speed in Remote Access"} />
         </div>
+      )}
+      {st?.bandwidthHistory && (
+        <Card title="Bandwidth">
+          <BandwidthChart samples={st.bandwidthHistory} uploadKbps={st.uploadSpeedKbps} />
+        </Card>
       )}
       <Card title="Now playing">
         {sessions.isPending && <Spinner />}

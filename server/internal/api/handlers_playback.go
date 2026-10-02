@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"marquee/internal/items"
+	"marquee/internal/library"
 	"marquee/internal/netclass"
 	"marquee/internal/playback"
 )
@@ -66,6 +67,7 @@ func (h *Handlers) StartPlayback(ctx context.Context, req StartPlaybackRequestOb
 	set(&r.AudioStreamID, b.AudioStreamId)
 	set(&r.SubtitleStreamID, b.SubtitleStreamId)
 	set(&r.StartMS, b.StartMs)
+	set(&r.Preload, b.Preload)
 	set(&r.Quality.RequestedKbps, b.MaxBitrateKbps)
 	set(&r.Quality.MeasuredKbps, b.MeasuredKbps)
 	if r.Remote {
@@ -188,6 +190,9 @@ func (h *Handlers) ListPlaybackSessions(ctx context.Context, _ ListPlaybackSessi
 	}
 	out := ListPlaybackSessions200JSONResponse{}
 	for _, s := range h.Playback.List() {
+		if s.Preloading() {
+			continue
+		}
 		if sess.User.IsAdmin || s.UserID == sess.User.ID {
 			info := toSessionInfo(s)
 			if d, err := h.Items.Get(ctx, items.Unrestricted, s.ItemID, false); err == nil {
@@ -307,6 +312,13 @@ func (h *Handlers) HomeHubs(ctx context.Context, _ HomeHubsRequestObject) (HomeH
 			return nil, internal(ctx, "hubs", err)
 		}
 		add(fmt.Sprintf("recent-%d", l.ID), "Recently Added "+l.Name, l.ID, list)
+		if l.Type == library.Music {
+			played, err := h.Items.RecentlyPlayedAlbums(ctx, acc, l.ID, 20)
+			if err != nil {
+				return nil, internal(ctx, "hubs", err)
+			}
+			add(fmt.Sprintf("played-%d", l.ID), "Recently Played in "+l.Name, l.ID, played)
+		}
 	}
 	return out, nil
 }
@@ -325,17 +337,13 @@ func (h *Handlers) SystemStatus(ctx context.Context, _ SystemStatusRequestObject
 	cfg := h.Settings.Get()
 	out := SystemStatus{Version: h.Version, StartedAt: serverStarted, Encoders: h.Playback.Encoders.Available(cfg.Transcoder.EncoderOrder),
 		MaxTranscodes: cfg.Transcoder.MaxConcurrentTranscodes, UploadSpeedKbps: nz(cfg.RemoteAccess.UploadSpeedKbps)}
-	for _, s := range h.Playback.List() {
-		out.ActiveStreams++
-		if s.Transcoder() != nil {
-			out.ActiveTranscodes++
-		}
-		if s.Remote {
-			out.RemoteKbps += s.BitrateKbps()
-		} else {
-			out.LocalKbps += s.BitrateKbps()
-		}
+	u := h.Playback.Usage()
+	out.ActiveStreams, out.ActiveTranscodes, out.LocalKbps, out.RemoteKbps = u.Streams, u.Transcodes, u.LocalKbps, u.RemoteKbps
+	hist := []BandwidthSample{}
+	for _, x := range append(h.Playback.History(), u) {
+		hist = append(hist, BandwidthSample{At: x.At, LocalKbps: x.LocalKbps, RemoteKbps: x.RemoteKbps, Streams: x.Streams, Transcodes: x.Transcodes})
 	}
+	out.BandwidthHistory = &hist
 	libs, err := h.Libraries.List(ctx)
 	if err != nil {
 		return nil, internal(ctx, "status", err)

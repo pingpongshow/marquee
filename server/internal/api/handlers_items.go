@@ -135,7 +135,20 @@ func (h *Handlers) ListLibraryItems(ctx context.Context, req ListLibraryItemsReq
 		sort = string(*req.Params.Sort)
 	}
 	offset, limit := paging(req.Params.Offset, req.Params.Limit)
-	list, total, err := h.Items.List(ctx, access(ctx), lib.ID, typ, sort, offset, limit)
+	var f items.Filter
+	p := req.Params
+	if p.Watch != nil {
+		f.Watch = string(*p.Watch)
+	}
+	if p.Resolution != nil {
+		f.Resolution = string(*p.Resolution)
+	}
+	set(&f.Genre, p.Genre)
+	set(&f.Decade, p.Decade)
+	set(&f.ContentRating, p.ContentRating)
+	set(&f.HDR, p.Hdr)
+	set(&f.Letter, p.Letter)
+	list, total, err := h.Items.List(ctx, access(ctx), lib.ID, typ, sort, f, offset, limit)
 	if err != nil {
 		return nil, internal(ctx, "listItems", err)
 	}
@@ -306,6 +319,9 @@ func (h *Handlers) GetActivity(ctx context.Context, _ GetActivityRequestObject) 
 	}
 	if h.Playback != nil {
 		for _, s := range h.Playback.List() {
+			if s.Preloading() {
+				continue
+			}
 			snap := s.Snapshot()
 			verb := map[string]string{"paused": "paused"}[snap.State]
 			if verb == "" {
