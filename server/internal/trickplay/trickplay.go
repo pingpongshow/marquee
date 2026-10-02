@@ -155,7 +155,7 @@ func (s *Service) pending(ctx context.Context) ([]job, error) {
 		JOIN media_versions v ON v.id = f.version_id JOIN items i ON i.id = v.item_id
 		LEFT JOIN trickplay t ON t.file_id = f.id
 		WHERE f.available = 1 AND f.video_codec IS NOT NULL AND f.duration_ms >= ? AND COALESCE(f.width, 0) > 0
-		  AND (t.file_id IS NULL OR (t.mtime != f.mtime))
+		  AND (t.file_id IS NULL OR t.mtime != f.mtime OR (t.iframes = 0 AND t.error IS NULL))
 		ORDER BY i.added_at DESC`, minDuration.Milliseconds())
 	if err != nil {
 		return nil, err
@@ -182,8 +182,13 @@ func thumbHeight(w, h int) int {
 	return max(2, int(math.Round(float64(Width)*float64(h)/float64(w)/2))*2)
 }
 
-// Args is the FFmpeg command for a file's sheets, decoding on the GPU when cuda is set.
-func Args(path string, height int, hdr, cuda bool, outPattern string) []string {
+// IFramesName is the all-keyframe MP4 (one small frame per Interval) that Apple players
+// use for scrubbing thumbnails through an HLS I-frame playlist.
+const IFramesName = "iframes.mp4"
+
+// Args is the FFmpeg command for a file's sheets and its I-frame MP4 (iframes, when not
+// empty), decoding on the GPU when cuda is set.
+func Args(path string, height int, hdr, cuda bool, outPattern, iframes string) []string {
 	// round=up makes tile n the last keyframe at or before n × Interval (the default
 	// rounding picks one up to half an interval later).
 	chain := []string{fmt.Sprintf("fps=1/%d:round=up", int(Interval.Seconds()))}
@@ -200,10 +205,21 @@ func Args(path string, height int, hdr, cuda bool, outPattern string) []string {
 		}
 		chain = append(chain, fmt.Sprintf("scale=%d:%d:flags=fast_bilinear", Width, height))
 	}
-	chain = append(chain, fmt.Sprintf("tile=%dx%d", Columns, Rows))
+	tile := fmt.Sprintf("tile=%dx%d", Columns, Rows)
 	args := append([]string{"-hide_banner", "-v", "error"}, in...)
-	return append(args, "-skip_frame", "nokey", "-i", path, "-an", "-sn", "-dn", "-map", "0:v:0",
-		"-vf", strings.Join(chain, ","), "-fps_mode", "passthrough", "-q:v", "5", "-f", "image2", outPattern)
+	args = append(args, "-skip_frame", "nokey", "-i", path, "-an", "-sn", "-dn")
+	if iframes == "" {
+		return append(args, "-map", "0:v:0", "-vf", strings.Join(append(chain, tile), ","),
+			"-fps_mode", "passthrough", "-q:v", "5", "-f", "image2", outPattern)
+	}
+	// One pass, two outputs: the sprite sheets and a fragment per frame of H.264 (Main
+	// profile, every frame a keyframe) with exact 10 s timestamps.
+	graph := "[0:v:0]" + strings.Join(chain, ",") + ",split=2[s][f];[s]" + tile + "[t];[f]format=yuv420p[i]"
+	return append(args, "-filter_complex", graph,
+		"-map", "[t]", "-fps_mode", "passthrough", "-q:v", "5", "-f", "image2", outPattern,
+		"-map", "[i]", "-fps_mode", "passthrough", "-c:v", "libx264", "-preset", "veryfast", "-profile:v", "main", "-level", "3.0",
+		"-g", "1", "-bf", "0", "-crf", "28", "-video_track_timescale", "1000",
+		"-f", "mp4", "-movflags", "+frag_keyframe+empty_moov+default_base_moof", iframes)
 }
 
 func (s *Service) generate(ctx context.Context, j job) error {
@@ -225,7 +241,7 @@ func (s *Service) generateWith(ctx context.Context, j job, cuda bool) error {
 	if err := os.MkdirAll(tmp, 0o755); err != nil {
 		return err
 	}
-	args := Args(j.path, h, j.hdr, cuda, filepath.Join(tmp, "%d.jpg"))
+	args := Args(j.path, h, j.hdr, cuda, filepath.Join(tmp, "%d.jpg"), filepath.Join(tmp, IFramesName))
 	cmd := exec.CommandContext(ctx, s.FFmpeg, args...)
 	if nice, err := exec.LookPath("nice"); err == nil {
 		cmd = exec.CommandContext(ctx, nice, append([]string{"-n", "15", s.FFmpeg}, args...)...)
@@ -262,12 +278,13 @@ func (s *Service) record(ctx context.Context, j job, genErr error) {
 	if genErr != nil {
 		msg = genErr.Error()
 	}
-	_, err := s.DB.ExecContext(ctx, `INSERT INTO trickplay (file_id, mtime, interval_ms, width, height, count, error)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+	_, statErr := os.Stat(filepath.Join(s.Dir, strconv.FormatInt(j.fileID, 10), IFramesName))
+	_, err := s.DB.ExecContext(ctx, `INSERT INTO trickplay (file_id, mtime, interval_ms, width, height, count, error, iframes)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(file_id) DO UPDATE SET mtime = excluded.mtime, interval_ms = excluded.interval_ms, width = excluded.width,
-		height = excluded.height, count = excluded.count, error = excluded.error,
+		height = excluded.height, count = excluded.count, error = excluded.error, iframes = excluded.iframes,
 		generated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
-		j.fileID, j.mtime, Interval.Milliseconds(), Width, thumbHeight(j.width, j.height), count, msg)
+		j.fileID, j.mtime, Interval.Milliseconds(), Width, thumbHeight(j.width, j.height), count, msg, genErr == nil && statErr == nil)
 	if err != nil {
 		slog.Warn("trickplay record", "err", err)
 	}
@@ -294,4 +311,16 @@ func (s *Service) cleanup(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// IFrames returns a file's I-frame MP4 for scrubbing thumbnails, if it has one.
+func (s *Service) IFrames(fileID int64) (string, bool) {
+	var ok bool
+	s.DB.QueryRow(`SELECT iframes = 1 AND error IS NULL FROM trickplay WHERE file_id = ?`, fileID).Scan(&ok)
+	if !ok {
+		return "", false
+	}
+	p := filepath.Join(s.Dir, strconv.FormatInt(fileID, 10), IFramesName)
+	_, err := os.Stat(p)
+	return p, err == nil
 }
