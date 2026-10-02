@@ -249,6 +249,10 @@ func run() error {
 	scheduler.Register(tasks.Task{ID: "refresh-metadata", Name: "Refresh metadata", Window: true,
 		Description: "Updates shows with new or recently aired episodes (titles and summaries TMDB fills in after airing) and movies not refreshed for six months. Edited fields stay as they are.",
 		Run:         meta.RefreshStale})
+	metadata.MBUserAgent = "Marquee/" + config.Version + " (self-hosted media server)"
+	scheduler.Register(tasks.Task{ID: "musicbrainz", Name: "Enrich music from MusicBrainz", Window: true, Bounded: true,
+		Description: "Adds genres, album types (albums, EPs, singles, live, compilations) and original release dates from MusicBrainz, one request a second. A large library takes a night or two; it continues where it stopped.",
+		Run:         meta.EnrichMusic})
 	scheduler.Register(tasks.Task{ID: "collections", Name: "Update collections", Every: 7 * 24 * time.Hour,
 		Description: "Groups movies into their film series (TMDB collections), including movies matched before collections existed.",
 		Run:         meta.SyncCollections})

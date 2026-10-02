@@ -198,6 +198,14 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                         )
                     }
                 }
+                ItemType.ARTIST -> Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    // Plexamp-style sections by release type (MusicBrainz, META-3).
+                    releaseSections(pg.children).forEach { (title, list) ->
+                        Shelf(title, list, sidePadding) { _, it ->
+                            PosterCard(it, marquee.imageUrl(it.images?.poster, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) })
+                        }
+                    }
+                }
                 else -> Shelf(when (d.type) { ItemType.SHOW -> "Seasons"; ItemType.ARTIST -> "Albums"; else -> "In this collection" }, pg.children, sidePadding) { _, it ->
                     PosterCard(it, marquee.imageUrl(it.images?.poster, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) })
                 }
@@ -282,3 +290,10 @@ private fun TvHeader(d: ItemDetail, square: Boolean, actions: @Composable () -> 
         }
     }
 }
+
+/** An artist's releases by release type: Albums (and unknown), Singles & EPs, Live Albums… */
+fun releaseSections(items: List<ItemSummary>): List<Pair<String, List<ItemSummary>>> = listOf(
+    "Albums" to setOf("album", ""), "Singles & EPs" to setOf("ep", "single"), "Live Albums" to setOf("live"),
+    "Compilations" to setOf("compilation"), "Soundtracks" to setOf("soundtrack"), "Remixes" to setOf("remix"),
+    "Demos" to setOf("demo"), "Other" to setOf("other"),
+).map { (title, types) -> title to items.filter { (it.releaseType?.value ?: "") in types } }.filter { it.second.isNotEmpty() }

@@ -18,6 +18,7 @@ import (
 	"sync"
 
 	"marquee/internal/metadata/deezer"
+	"marquee/internal/metadata/musicbrainz"
 	"marquee/internal/metadata/tmdb"
 	"marquee/internal/scanner/naming"
 	"marquee/internal/settings"
@@ -32,6 +33,7 @@ type Service struct {
 	mu         sync.Mutex
 	omdbBudget ratingsBudget
 	deezer     *deezer.Client
+	mb         *musicbrainz.Client
 	client     *tmdb.Client
 	key        string
 	lang       string

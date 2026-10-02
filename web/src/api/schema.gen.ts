@@ -3491,6 +3491,11 @@ export interface components {
              * @enum {string}
              */
             extraType?: "trailer" | "featurette" | "behind_the_scenes" | "deleted_scene" | "interview" | "scene" | "short" | "other";
+            /**
+             * @description Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
+             * @enum {string}
+             */
+            releaseType?: "album" | "ep" | "single" | "compilation" | "live" | "soundtrack" | "remix" | "demo" | "other";
         };
         /** @description Artwork ids for /images/{artworkId}. Seasons and episodes fall back to the show's art, tracks to the album's. */
         ItemImages: {
