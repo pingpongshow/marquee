@@ -30,6 +30,7 @@ import app.marquee.api.models.ItemSummary
 import app.marquee.api.models.ItemType
 import app.marquee.api.models.MediaVersion
 import app.marquee.api.models.Ratings
+import app.marquee.api.models.SmartCollectionRules
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -75,6 +76,7 @@ import kotlinx.serialization.Contextual
  * @param extraType Set for extras (LIB-8).
  * @param releaseType Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
  * @param collections Collections the item belongs to (META-7).
+ * @param smartRules 
  * @param extras Trailers, featurettes and other extras (LIB-8), trailers first.
  * @param summary 
  * @param audienceRating TMDB user score, 0–10
@@ -210,6 +212,9 @@ data class ItemDetail (
     /* Collections the item belongs to (META-7). */
     @SerialName(value = "collections")
     val collections: kotlin.collections.List<ItemSummary>? = null,
+
+    @SerialName(value = "smartRules")
+    val smartRules: SmartCollectionRules? = null,
 
     /* Trailers, featurettes and other extras (LIB-8), trailers first. */
     @SerialName(value = "extras")

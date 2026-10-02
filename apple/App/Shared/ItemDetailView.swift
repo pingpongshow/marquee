@@ -129,6 +129,11 @@ struct ItemDetailView: View {
                         NavigationLink(value: Route.item(showID)) { Text(show).font(.headline).foregroundStyle(.secondary) }.buttonStyle(.plain)
                     }
                     Text(d.title).font(.largeTitle.bold()).lineLimit(3)
+                    if d.info.smartRules != nil {
+                        // Members follow rules set on the web (META-7).
+                        Label("Smart collection", systemImage: "sparkles").font(.caption.weight(.semibold)).foregroundStyle(Color.marqueeGold)
+                            .accessibilityIdentifier("smartCollection")
+                    }
                     if let artist = d.base.artistCredit, d.type != .artist { Text(artist).font(.title3).foregroundStyle(.secondary) }
                     Text(metaLine(d)).font(.subheadline).foregroundStyle(.secondary)
                     if !d.info.genres.isEmpty { Text(d.info.genres.joined(separator: ", ")).font(.caption).foregroundStyle(.tertiary) }
@@ -209,7 +214,7 @@ struct ItemDetailView: View {
                 Button { music.play([d.base]) } label: { Label("Play", systemImage: "play.fill") }.buttonStyle(.borderedProminent)
                 radioButton(d)
             case .collection:
-                EmptyView()
+                PinToHomeButton(rowID: AppSession.pinnedRowID(collection: d.id))
             }
             #if os(iOS)
             if [.movie, .episode, .video, .season, .show, .album, .artist, .track].contains(d.type) {

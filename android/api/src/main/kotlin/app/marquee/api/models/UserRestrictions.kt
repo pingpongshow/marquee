@@ -40,6 +40,7 @@ import kotlinx.serialization.Contextual
  * @param liveTv May watch Live TV (LIVE-4). Default true.
  * @param liveTvGroups Channel groups this user may watch. Null or absent = all.
  * @param seerrUserId The Seerr user requests are made as. Null = Seerr's API key owner.
+ * @param friend Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker.
  */
 @Serializable
 
@@ -79,7 +80,11 @@ data class UserRestrictions (
 
     /* The Seerr user requests are made as. Null = Seerr's API key owner. */
     @SerialName(value = "seerrUserId")
-    val seerrUserId: kotlin.Long? = null
+    val seerrUserId: kotlin.Long? = null,
+
+    /* Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker. */
+    @SerialName(value = "friend")
+    val friend: kotlin.Boolean? = null
 
 ) {
 

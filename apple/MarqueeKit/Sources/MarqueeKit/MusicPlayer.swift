@@ -84,6 +84,10 @@ public final class MusicPlayer {
     public var crossfade: Int = UserDefaults.standard.integer(forKey: "marquee.crossfade") {
         didSet { UserDefaults.standard.set(crossfade, forKey: "marquee.crossfade") }
     }
+    /// The equaliser (iOS/iPadOS): biquads in an audio tap on each track's mix.
+    public let equalizer = Equalizer()
+    /// Playing to an AirPlay device, where the equaliser may not be heard.
+    public private(set) var airPlaying = false
     @ObservationIgnored private var fader: AVPlayer?
     @ObservationIgnored private var fadeTask: Task<Void, Never>?
     @ObservationIgnored private var fadingFrom: ObjectIdentifier?
@@ -107,6 +111,8 @@ public final class MusicPlayer {
         let trackGain: Double?
         let albumGain: Double?
         let peak: Double?
+        /// HLS streams can't take an audio tap (no equaliser).
+        var hls = false
     }
     @ObservationIgnored private var sessions: [ObjectIdentifier: Loaded] = [:]
     @ObservationIgnored private var sleepTask: Task<Void, Never>?
@@ -155,6 +161,16 @@ public final class MusicPlayer {
             MainActor.assumeIsolated { self?.itemFailed(id) }
         }
         setUpRemoteCommands()
+        equalizer.onChange = { [weak self] in
+            guard let self else { return }
+            for item in self.player.items() { self.applyLevel(item) }
+        }
+        #if os(iOS)
+        NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.updateRoute() }
+        }
+        updateRoute()
+        #endif
         // Signing out, switching profile or forgetting the server ends the music.
         app.onUserChange = { [weak self] in self?.stop() }
     }
@@ -290,6 +306,7 @@ public final class MusicPlayer {
         if let local = downloads?.localURL(entry.item.id) {
             let item = AVPlayerItem(url: local)
             sessions[ObjectIdentifier(item)] = Loaded(entry: entry.id, session: "", trackGain: nil, albumGain: nil, peak: nil)
+            applyLevel(item) // no loudness data, but the equaliser's tap
             watch(item)
             return item
         }
@@ -298,7 +315,8 @@ public final class MusicPlayer {
                                                                          profile: AppleDeviceProfile.current()))).ok.body.json,
               let url = app.absolute(s.url) else { return nil }
         let item = AVPlayerItem(url: url)
-        sessions[ObjectIdentifier(item)] = Loaded(entry: entry.id, session: s.id, trackGain: s.trackGainDb, albumGain: s.albumGainDb, peak: s.peak)
+        sessions[ObjectIdentifier(item)] = Loaded(entry: entry.id, session: s.id, trackGain: s.trackGainDb, albumGain: s.albumGainDb, peak: s.peak,
+                                                  hls: url.path().hasSuffix(".m3u8"))
         applyLevel(item)
         watch(item)
         return item
@@ -552,7 +570,13 @@ public final class MusicPlayer {
         if let s = sessions[ObjectIdentifier(item)], let i = queue.entries.firstIndex(where: { $0.id == s.entry }),
            queue.entries.indices.contains(i + 1), let a = queue.entries[i].item.parentId, queue.entries[i + 1].item.parentId == a { return }
         let tail = AVPlayerItem(url: url)
-        tail.audioMix = item.audioMix
+        // The same level, with an equaliser tap of its own (a tap can't serve two items).
+        if let p = item.audioMix?.inputParameters.first {
+            var level: Float = 1, end: Float = 1
+            var range = CMTimeRange()
+            p.getVolumeRamp(for: .zero, startVolume: &level, endVolume: &end, timeRange: &range)
+            tail.audioMix = mix(trackID: p.trackID, gain: level, tap: p.audioTapProcessor != nil)
+        }
         let f = AVPlayer(playerItem: tail)
         f.seek(to: CMTime(seconds: time + 0.2, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
         f.play()
@@ -624,16 +648,40 @@ public final class MusicPlayer {
                 gain = Float(min(g, 1))
             }
         }
+        let tap = equalizer.enabled && !l.hls
         let asset = item.asset
         Task {
             guard let track = try? await asset.loadTracks(withMediaType: .audio).first else { return }
-            let p = AVMutableAudioMixInputParameters(track: track)
-            p.setVolume(gain, at: .zero)
-            let mix = AVMutableAudioMix()
-            mix.inputParameters = [p]
-            item.audioMix = mix
+            item.audioMix = mix(trackID: track.trackID, gain: gain, tap: tap)
         }
     }
+
+    /// An audio mix: the levelling volume, and the equaliser's tap when it's on.
+    private func mix(trackID: CMPersistentTrackID, gain: Float, tap: Bool) -> AVAudioMix {
+        let p = AVMutableAudioMixInputParameters()
+        p.trackID = trackID
+        p.setVolume(gain, at: .zero)
+        if tap { p.audioTapProcessor = equalizer.makeTap() }
+        let mix = AVMutableAudioMix()
+        mix.inputParameters = [p]
+        return mix
+    }
+
+    /// Why the equaliser can't be heard right now, if it can't.
+    public var equalizerNote: String? {
+        if remote != nil { return "The equaliser doesn't apply while casting: the speaker plays the music itself." }
+        if let item = player.currentItem, sessions[ObjectIdentifier(item)]?.hls == true {
+            return "This track streams in a format the equaliser can't adjust."
+        }
+        if airPlaying { return "The equaliser may not apply while playing over AirPlay." }
+        return nil
+    }
+
+    #if os(iOS)
+    private func updateRoute() {
+        airPlaying = AVAudioSession.sharedInstance().currentRoute.outputs.contains { $0.portType == .airPlay }
+    }
+    #endif
 
     private func report(_ state: String) {
         guard let item = player.currentItem, let s = sessions[ObjectIdentifier(item)], !s.session.isEmpty, let client = app.client else { return }

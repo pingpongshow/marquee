@@ -36,3 +36,26 @@ func TestJobArgs(t *testing.T) {
 		t.Errorf("copy restart:\n%s", cmd)
 	}
 }
+
+func TestJobOffsets(t *testing.T) {
+	// Audio offset: the audio comes from a second, shifted read of the file.
+	j := Job{Input: "/m/a.mkv", Decision: Decide(archer(), appleTV, Limits{}), VideoIndex: 0, AudioIndex: 4, SubIndex: -1, Dir: "/t", Encoder: "nvenc",
+		Plan: []float64{0, 6, 12}, StartSegment: 1, AudioOffsetMS: -250}
+	cmd := strings.Join(j.Args(), " ")
+	if !strings.Contains(cmd, "-ss 6.050 -itsoffset -0.250 -copyts -i /m/a.mkv") || !strings.Contains(cmd, "-map 1:4") {
+		t.Errorf("audio offset:\n%s", cmd)
+	}
+	// Burned-in text subtitles drawn against shifted timestamps.
+	m := archer()
+	m.Subtitle = &SubtitleStream{Codec: "subrip", Index: 3}
+	j = Job{Input: "/m/a.mkv", Decision: Decide(m, chrome, Limits{}), VideoIndex: 0, AudioIndex: 4, SubIndex: 3, SubRelIndex: 0, Dir: "/t", Encoder: "software", SubOffsetMS: 1500}
+	j.Decision.BurnSubtitle = true
+	cmd = strings.Join(j.Args(), " ")
+	if !strings.Contains(cmd, "setpts=PTS-1.500/TB,subtitles=f='/m/a.mkv':si=0,setpts=PTS+1.500/TB") {
+		t.Errorf("subtitle offset:\n%s", cmd)
+	}
+	// An audio offset rules out direct play.
+	if d := Decide(archer(), appleTV, Limits{Resync: true}); d.Method == DirectPlay {
+		t.Errorf("resync direct played: %+v", d)
+	}
+}

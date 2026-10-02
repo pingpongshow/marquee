@@ -12,6 +12,7 @@ struct HomeView: View {
     @State private var error: String?
 
     @State private var groups: [WatchGroup] = []
+    @State private var editing = false
 
     var body: some View {
         ScrollView {
@@ -40,7 +41,7 @@ struct HomeView: View {
                 }
                 ForEach(hubs, id: \.id) { hub in
                     let wide = hub.id == "continue-watching"
-                    ShelfRow(title: hub.title, destination: hub.libraryId.map { Route.library($0) }) {
+                    ShelfRow(title: hub.title, destination: destination(hub)) {
                         ForEach(hub.items, id: \.id) { item in
                             if wide && item.isPlayableVideo {
                                 ContinueCard(item: item)
@@ -50,10 +51,37 @@ struct HomeView: View {
                         }
                     }
                 }
+                #if os(tvOS)
+                if loaded {
+                    Button { editing = true } label: { Label("Edit Home", systemImage: "slider.horizontal.3") }
+                        .padding(.horizontal, sidePadding)
+                }
+                #endif
             }
             .padding(.vertical)
         }
         .navigationTitle("Home")
+        #if os(iOS)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { editing = true } label: { Label("Edit Home", systemImage: "slider.horizontal.3") }
+            }
+        }
+        #endif
+        #if os(iOS)
+        .sheet(isPresented: $editing, onDismiss: { Task { await load() } }) {
+            NavigationStack {
+                HomeEditView()
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { editing = false } } }
+            }
+        }
+        #else
+        // Full screen on the TV: a sheet is too narrow for the rows and their buttons.
+        .fullScreenCover(isPresented: $editing, onDismiss: { Task { await load() } }) {
+            NavigationStack { HomeEditView() }
+                .background(Color(white: 0.06).ignoresSafeArea())
+        }
+        #endif
         .refreshable { await load() }
         .task {
             // Watch-together groups to join, refreshed while Home is open.
@@ -72,6 +100,13 @@ struct HomeView: View {
     #else
     private let rowSpacing: CGFloat = 28
     #endif
+
+    /// Where a row's title leads: its library, or a pinned collection or playlist (USER-12).
+    private func destination(_ hub: Hub) -> Route? {
+        if hub.id.hasPrefix("collection-"), let id = Int64(hub.id.dropFirst("collection-".count)) { return .item(id) }
+        if hub.id.hasPrefix("playlist-"), let id = Int64(hub.id.dropFirst("playlist-".count)) { return .playlist(id) }
+        return hub.libraryId.map { .library($0) }
+    }
 
     private func load() async {
         do {

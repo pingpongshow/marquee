@@ -121,9 +121,13 @@ fun PosterCard(item: ItemSummary, imageUrl: String?, width: Dp, onClick: () -> U
 
 /** A titled horizontal row of cards (Home hubs, cast, related). */
 @Composable
-fun <T> Shelf(title: String, items: List<T>, sidePadding: Dp, content: @Composable (index: Int, item: T) -> Unit) {
+fun <T> Shelf(title: String, items: List<T>, sidePadding: Dp, onTitle: (() -> Unit)? = null, content: @Composable (index: Int, item: T) -> Unit) {
     Column {
-        Text(title, Modifier.padding(start = sidePadding, bottom = 4.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        // A title that opens the whole list (a pinned collection or playlist) reads "Title ›".
+        if (onTitle != null) Text("$title  ›", Modifier.padding(start = sidePadding - 4.dp, bottom = 4.dp).focusRing(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(6.dp)).clickable(onClick = onTitle).padding(horizontal = 4.dp),
+            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        else Text(title, Modifier.padding(start = sidePadding, bottom = 4.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         // Vertical padding leaves room for a focused card's scale and border.
         LazyRow(contentPadding = PaddingValues(horizontal = sidePadding, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             itemsIndexed(items) { i, it -> content(i, it) }

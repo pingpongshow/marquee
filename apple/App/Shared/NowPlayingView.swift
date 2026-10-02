@@ -106,7 +106,12 @@ struct NowPlayingView: View {
         #if os(iOS)
         // Where it plays: AirPlay (HomePod, Sonos…) and Chromecast, beside what's playing.
         HStack(alignment: .center) {
-            Color.clear.frame(width: 72, height: 1)
+            // Car mode and the equaliser on the left, balancing the outputs on the right.
+            HStack(spacing: 6) {
+                CarModeButton().labelStyle(.iconOnly).font(.callout).foregroundStyle(.secondary).frame(width: 32, height: 32)
+                EqualizerButton().frame(width: 32, height: 32)
+            }
+            .frame(width: 72, alignment: .leading)
             Spacer(minLength: 0)
             sourceTitle
             Spacer(minLength: 0)

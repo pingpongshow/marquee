@@ -291,7 +291,9 @@ func (h *Handlers) ListSignInProfiles(ctx context.Context, _ ListSignInProfilesR
 		return nil, internal(ctx, "signInProfiles", err)
 	}
 	for _, u := range list {
-		out = append(out, toAPIProfile(u))
+		if !u.Restrictions.Friend { // friends sign in with their password (USER-13)
+			out = append(out, toAPIProfile(u))
+		}
 	}
 	return out, nil
 }
@@ -315,6 +317,8 @@ func (h *Handlers) PinLogin(ctx context.Context, req PinLoginRequestObject) (Pin
 	case errors.Is(err, auth.ErrWrongPIN):
 		slog.WarnContext(ctx, "wrong PIN", "user", b.UserId, "ip", ip)
 		return PinLogin401JSONResponse{UnauthorizedJSONResponse(apiErr("wrong_pin", "incorrect PIN"))}, nil
+	case err == nil && u.Restrictions.Friend:
+		return PinLogin401JSONResponse{UnauthorizedJSONResponse(apiErr("password_required", "sign in with your username and password"))}, nil
 	case err == nil && pinBlockedBy2FA(ctx, u):
 		return PinLogin401JSONResponse{UnauthorizedJSONResponse(apiErr("password_required", errPinNeeds2FA))}, nil
 	case errors.Is(err, auth.ErrPasswordRequired):

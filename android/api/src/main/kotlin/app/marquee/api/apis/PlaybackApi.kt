@@ -30,6 +30,7 @@ import okhttp3.HttpUrl
 import app.marquee.api.models.DownloadSubtitle201Response
 import app.marquee.api.models.DownloadSubtitleRequest
 import app.marquee.api.models.Error
+import app.marquee.api.models.ItemSummary
 import app.marquee.api.models.PlaybackProgress
 import app.marquee.api.models.PlaybackRequest
 import app.marquee.api.models.PlaybackSession
@@ -431,6 +432,79 @@ open class PlaybackApi(basePath: kotlin.String = defaultBasePath, client: Call.F
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/playback/sessions",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /items/{itemId}/prerolls
+     * What to play before a movie (PLAY-18): trailers of other movies, then the pre-roll video. Empty when off, for non-movies, or when the person opted out. Call it only when starting from the beginning.
+     * 
+     * @param itemId 
+     * @return kotlin.collections.List<ItemSummary>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listPrerolls(itemId: kotlin.Long) : kotlin.collections.List<ItemSummary> {
+        val localVarResponse = listPrerollsWithHttpInfo(itemId = itemId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<ItemSummary>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /items/{itemId}/prerolls
+     * What to play before a movie (PLAY-18): trailers of other movies, then the pre-roll video. Empty when off, for non-movies, or when the person opted out. Call it only when starting from the beginning.
+     * 
+     * @param itemId 
+     * @return ApiResponse<kotlin.collections.List<ItemSummary>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listPrerollsWithHttpInfo(itemId: kotlin.Long) : ApiResponse<kotlin.collections.List<ItemSummary>?> {
+        val localVariableConfig = listPrerollsRequestConfig(itemId = itemId)
+
+        return request<Unit, kotlin.collections.List<ItemSummary>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listPrerolls
+     *
+     * @param itemId 
+     * @return RequestConfig
+     */
+    fun listPrerollsRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/items/{itemId}/prerolls".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

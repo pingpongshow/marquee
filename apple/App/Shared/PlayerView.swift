@@ -16,6 +16,11 @@ struct PlayerView: View {
     @State private var countdown: Int?
     @State private var together: WatchTogether?
     @State private var showGroup = false
+    /// Cinema trailers (PLAY-18) playing before the movie, and which one is on.
+    @State private var trailers: [Item] = []
+    @State private var trailerIndex: Int?
+    /// Subtitle or audio timing being adjusted (PLAY-17).
+    @State private var timing: TimingKind?
     #if os(iOS)
     @State private var casting = false
     @State private var castError: String?
@@ -25,7 +30,8 @@ struct PlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             if let p = playback {
-                PlayerController(playback: p, together: together, onNext: playNext)
+                PlayerController(playback: p, together: together, onNext: playNext,
+                                 trailer: trailerIndex == nil ? nil : TrailerActions(skip: nextTrailer, skipAll: skipTrailers))
                     .ignoresSafeArea()
                 overlays(p)
                 #if os(iOS)
@@ -42,7 +48,6 @@ struct PlayerView: View {
             let t = WatchTogether(app: app, player: p.player, itemID: request.itemID)
             together = t
             p.onRestart = { [weak t] in t?.restarting() }
-            let tracks = PendingTracks.shared.take(request.itemID)
             #if os(iOS)
             // Downloaded: play from the device (works offline, saves bandwidth).
             if let file = downloads.localURL(request.itemID) {
@@ -50,11 +55,14 @@ struct PlayerView: View {
                 return
             }
             #endif
-            await p.start(itemID: request.itemID, startMs: request.startMs, audio: tracks.audio, subtitle: tracks.subtitle, fileID: tracks.file)
-            if let g = request.groupID { await t.join(g) }
-            #if os(iOS)
-            watchCast(p)
-            #endif
+            let reel = await cinemaReel()
+            if !reel.isEmpty {
+                trailers = reel
+                trailerIndex = 0
+                await p.start(itemID: reel[0].id, startMs: 0)
+                return
+            }
+            await startFeature(p)
         }
         .onDisappear {
             #if os(iOS)
@@ -69,8 +77,14 @@ struct PlayerView: View {
         }
         .onChange(of: playback?.finished) { _, done in
             guard done == true else { return }
+            if trailerIndex != nil { nextTrailer(); return }
             if playback?.nextUp != nil { startCountdown() } else { close() }
         }
+        #if os(iOS)
+        .sheet(item: $timing) { kind in
+            if let p = playback { TimingSheet(kind: kind, playback: p).presentationDetents([.height(300)]) }
+        }
+        #endif
         #if os(tvOS)
         .onExitCommand { close() }
         #endif
@@ -85,11 +99,15 @@ struct PlayerView: View {
                 }
                 .accessibilityLabel("Close player")
                 Spacer()
-                CastButton(tint: .white).frame(width: 44, height: 44).background(.ultraThinMaterial, in: Circle())
-                if let t = together { togetherButton(t) }
+                if trailerIndex == nil {
+                    if together?.group == nil { optionsMenu(p) }
+                    CastButton(tint: .white).frame(width: 44, height: 44).background(.ultraThinMaterial, in: Circle())
+                    if let t = together { togetherButton(t) }
+                }
             }
             .padding()
             #endif
+            if let i = trailerIndex, trailers.indices.contains(i) { trailerBar(trailers[i]) }
             if let t = together, let e = t.error { Text(e).font(.footnote).foregroundStyle(.red).padding(.horizontal) }
             if let message = p.errorMessage {
                 ErrorBanner(message: message).padding().frame(maxWidth: 600)
@@ -175,6 +193,89 @@ struct PlayerView: View {
     }
     #endif
 
+    // MARK: - Cinema trailers (PLAY-18)
+
+    /// Trailers and the pre-roll to play first: only for a movie started from the beginning,
+    /// not when joining a group or casting.
+    private func cinemaReel() async -> [Item] {
+        guard request.groupID == nil else { return [] }
+        #if os(iOS)
+        if CastController.shared.device != nil { return [] }
+        #endif
+        var fromStart = request.startMs == 0
+        if request.startMs == nil, let d = try? await app.item(request.itemID) {
+            fromStart = d.type == .movie && (d.base.viewOffsetMs ?? 0) == 0
+        }
+        guard fromStart else { return [] }
+        return await app.prerolls(request.itemID)
+    }
+
+    /// The movie itself (after any trailers), with the tracks chosen on its page.
+    private func startFeature(_ p: VideoPlayback) async {
+        trailerIndex = nil
+        let tracks = PendingTracks.shared.take(request.itemID)
+        await p.start(itemID: request.itemID, startMs: request.startMs,
+                      audio: tracks.audio, subtitle: tracks.subtitle, fileID: tracks.file)
+        if let g = request.groupID, let t = together { await t.join(g) }
+        #if os(iOS)
+        watchCast(p)
+        #endif
+    }
+
+    private func nextTrailer() {
+        guard let i = trailerIndex, let p = playback else { return }
+        if i + 1 < trailers.count {
+            trailerIndex = i + 1
+            Task { await p.start(itemID: trailers[i + 1].id, startMs: 0) }
+        } else {
+            skipTrailers()
+        }
+    }
+
+    private func skipTrailers() {
+        guard trailerIndex != nil, let p = playback else { return }
+        trailerIndex = nil
+        Task { await startFeature(p) }
+    }
+
+    /// What's showing, with Skip and Skip All.
+    private func trailerBar(_ t: Item) -> some View {
+        HStack(spacing: 12) {
+            Text("Trailer · \(t.parentTitle ?? t.title)").font(.headline).lineLimit(1).minimumScaleFactor(0.7)
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(.ultraThinMaterial, in: Capsule())
+                .accessibilityIdentifier("trailerTitle")
+            Spacer()
+            #if os(iOS)
+            Button("Skip") { nextTrailer() }.buttonStyle(.bordered)
+            Button("Skip All") { skipTrailers() }.buttonStyle(.borderedProminent)
+            #endif
+        }
+        .padding(.horizontal)
+        #if os(tvOS)
+        .padding(.top, 40)
+        #endif
+    }
+
+    #if os(iOS)
+    /// Speed and subtitle/audio timing (PLAY-19, PLAY-17); hidden while watching together.
+    private func optionsMenu(_ p: VideoPlayback) -> some View {
+        Menu {
+            Picker("Speed", selection: Binding(get: { p.speed }, set: { p.speed = $0 })) {
+                ForEach(VideoPlayback.speeds, id: \.self) { Text(speedLabel($0)).tag($0) }
+            }
+            .pickerStyle(.menu)
+            if p.offlineTitle == nil {
+                Button("Subtitle Timing (\(offsetLabel(p.subtitleOffsetMs)))", systemImage: "captions.bubble") { timing = .subtitle }
+                Button("Audio Timing (\(offsetLabel(p.audioOffsetMs)))", systemImage: "waveform") { timing = .audio }
+            }
+        } label: {
+            Image(systemName: "gearshape").font(.headline).padding(12).background(.ultraThinMaterial, in: Circle())
+        }
+        .accessibilityLabel("Playback settings")
+    }
+    #endif
+
     private func startCountdown() {
         countdown = 10
         Task {
@@ -227,10 +328,14 @@ struct PlayerController: UIViewControllerRepresentable {
     let playback: VideoPlayback
     var together: WatchTogether?
     let onNext: () -> Void
+    /// Set while a cinema trailer plays.
+    var trailer: TrailerActions?
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let vc = AVPlayerViewController()
         vc.player = playback.player
+        // Speed has its own menu, which watch together can hide (PLAY-19).
+        vc.speeds = []
         #if os(iOS)
         vc.updatesNowPlayingInfoCenter = true
         vc.allowsPictureInPicturePlayback = true
@@ -246,15 +351,18 @@ struct PlayerController: UIViewControllerRepresentable {
         #if os(tvOS)
         // Siri Remote: "Skip Intro" and "Next Episode" appear as contextual actions.
         var actions: [UIAction] = []
-        if let m = playback.activeMarker {
+        if let trailer {
+            actions = [UIAction(title: "Skip Trailer") { _ in trailer.skip() },
+                       UIAction(title: "Skip All Trailers") { _ in trailer.skipAll() }]
+        } else if let m = playback.activeMarker {
             actions.append(UIAction(title: m.kind == .intro ? "Skip Intro" : "Skip Credits") { _ in playback.skipMarker() })
         }
-        if playback.nextUp != nil, let item = playback.player.currentItem, item.duration.isNumeric,
+        if trailer == nil, playback.nextUp != nil, let item = playback.player.currentItem, item.duration.isNumeric,
            item.duration.seconds - playback.position < 60 {
             actions.append(UIAction(title: "Next Episode", image: UIImage(systemName: "forward.end.fill")) { _ in onNext() })
         }
         if vc.contextualActions.map(\.title) != actions.map(\.title) { vc.contextualActions = actions }
-        vc.transportBarCustomMenuItems = audioMenu() + togetherMenu()
+        vc.transportBarCustomMenuItems = trailer != nil ? [] : speedMenu() + timingMenus() + audioMenu() + togetherMenu()
         #endif
     }
 
@@ -268,6 +376,30 @@ struct PlayerController: UIViewControllerRepresentable {
                            children: people + [UIAction(title: "Leave the Group", attributes: .destructive) { _ in t.leave() }])]
         }
         return [UIAction(title: "Watch Together", image: UIImage(systemName: "person.2")) { _ in Task { await t.start() } }]
+    }
+
+    /// Playback speed (PLAY-19); not while watching together.
+    private func speedMenu() -> [UIMenuElement] {
+        guard together?.group == nil else { return [] }
+        let actions = VideoPlayback.speeds.map { v in
+            UIAction(title: speedLabel(v), state: playback.speed == v ? .on : .off) { _ in playback.speed = v }
+        }
+        return [UIMenu(title: "Speed", image: UIImage(systemName: "gauge.with.dots.needle.67percent"), children: actions)]
+    }
+
+    /// Subtitle and audio timing in 100 ms steps (PLAY-17); not while watching together.
+    private func timingMenus() -> [UIMenuElement] {
+        guard together?.group == nil, playback.offlineTitle == nil else { return [] }
+        func menu(_ title: String, _ icon: String, _ value: Int, _ set: @escaping (Int) -> Void) -> UIMenu {
+            UIMenu(title: "\(title) (\(offsetLabel(value)))", image: UIImage(systemName: icon), children: [
+                UIAction(title: "100 ms Earlier", image: UIImage(systemName: "minus")) { _ in set(value - 100) },
+                UIAction(title: "100 ms Later", image: UIImage(systemName: "plus")) { _ in set(value + 100) },
+                UIAction(title: "Reset", attributes: value == 0 ? .disabled : []) { _ in set(0) },
+            ])
+        }
+        // Icons apart from the player's own Subtitles and Audio buttons beside them.
+        return [menu("Subtitle Timing", "timer", playback.subtitleOffsetMs) { playback.setOffsets(subtitle: $0) },
+                menu("Audio Timing", "metronome", playback.audioOffsetMs) { playback.setOffsets(audio: $0) }]
     }
 
     /// Audio tracks (switching restarts the stream at the same position).
@@ -284,7 +416,65 @@ struct PlayerController: UIViewControllerRepresentable {
     #endif
 }
 
+/// Skip buttons for a cinema trailer (the TV shows them as contextual actions).
+struct TrailerActions {
+    let skip: () -> Void
+    let skipAll: () -> Void
+}
+
+enum TimingKind: String, Identifiable {
+    case subtitle, audio
+    var id: String { rawValue }
+}
+
+func speedLabel(_ v: Float) -> String {
+    v == 1 ? "Normal (1×)" : "\(v.formatted(.number.precision(.fractionLength(0...2))))×"
+}
+
+/// "+100 ms", "−250 ms", "0 ms".
+func offsetLabel(_ ms: Int) -> String {
+    ms == 0 ? "0 ms" : ms > 0 ? "+\(ms) ms" : "−\(-ms) ms"
+}
+
 #if os(iOS)
+/// Subtitle or audio timing: −/+ 100 ms, the current value and Reset (PLAY-17).
+struct TimingSheet: View {
+    let kind: TimingKind
+    let playback: VideoPlayback
+    @Environment(\.dismiss) private var dismiss
+
+    private var value: Int { kind == .subtitle ? playback.subtitleOffsetMs : playback.audioOffsetMs }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 18) {
+                Text(offsetLabel(value)).font(.system(size: 40, weight: .bold).monospacedDigit())
+                    .accessibilityIdentifier("timingValue")
+                Text(value == 0 ? "As in the file" : value > 0 ? "\(kind == .subtitle ? "Subtitles" : "Sound") later" : "\(kind == .subtitle ? "Subtitles" : "Sound") earlier")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                HStack(spacing: 28) {
+                    Button { set(value - 100) } label: { Image(systemName: "minus").font(.title2.bold()).frame(width: 64, height: 44) }
+                        .accessibilityLabel("100 ms earlier")
+                    Button("Reset") { set(0) }.disabled(value == 0)
+                    Button { set(value + 100) } label: { Image(systemName: "plus").font(.title2.bold()).frame(width: 64, height: 44) }
+                        .accessibilityLabel("100 ms later")
+                }
+                .buttonStyle(.bordered)
+                Text("The video picks up where you are with the new timing, and Marquee remembers it for this file.")
+                    .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            }
+            .padding()
+            .navigationTitle(kind == .subtitle ? "Subtitle Timing" : "Audio Timing")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+    }
+
+    private func set(_ ms: Int) {
+        if kind == .subtitle { playback.setOffsets(subtitle: ms) } else { playback.setOffsets(audio: ms) }
+    }
+}
+
 /// Shown over the player while the video plays on a Cast device: what's casting and its controls.
 struct CastingPanel: View {
     let title: String

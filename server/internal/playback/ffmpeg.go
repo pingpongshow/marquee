@@ -80,6 +80,8 @@ type Job struct {
 	Encoder      string // nvenc, qsv, software
 	QSVDevice    string
 	Preset       string // speed, balanced, quality
+	// Timing offsets (PLAY-17), in ms: positive plays the audio / shows burned-in subtitles later.
+	AudioOffsetMS, SubOffsetMS int
 	// OutputFile, when set, writes one fast-start MP4 there (offline downloads) instead of
 	// streaming fragments to stdout; progress is reported on stdout.
 	OutputFile string
@@ -146,6 +148,18 @@ func (j Job) Args() []string {
 		}
 		a = append(a, "-copyts", "-i", j.SubExternal)
 	}
+	// A shifted audio track is read from the file a second time, offset.
+	audioInput := 0
+	if j.AudioOffsetMS != 0 && j.AudioIndex >= 0 {
+		audioInput = 1
+		if imageExternal {
+			audioInput = 2
+		}
+		if start > 0 {
+			a = append(a, "-ss", strconv.FormatFloat(start, 'f', 3, 64))
+		}
+		a = append(a, "-itsoffset", strconv.FormatFloat(float64(j.AudioOffsetMS)/1000, 'f', 3, 64), "-copyts", "-i", j.Input)
+	}
 
 	// ---- video ----
 	if j.VideoIndex >= 0 {
@@ -170,6 +184,11 @@ func (j Job) Args() []string {
 			default:
 				// CPU frames: draw subtitles at source size, tone map, scale, then hand the
 				// frames to the hardware encoder.
+				// Burned-in text subtitles are drawn against shifted timestamps to move them.
+				subShift := j.SubOffsetMS != 0 && !imageExternal && !j.SubImage
+				if burn && subShift {
+					chain = append(chain, fmt.Sprintf("setpts=PTS-%.3f/TB", float64(j.SubOffsetMS)/1000))
+				}
 				if burn {
 					switch {
 					case imageExternal:
@@ -181,6 +200,9 @@ func (j Job) Args() []string {
 					default:
 						chain = append(chain, fmt.Sprintf("subtitles=f=%s:si=%d", escapeFilterPath(j.Input), j.SubRelIndex))
 					}
+				}
+				if burn && subShift {
+					chain = append(chain, fmt.Sprintf("setpts=PTS+%.3f/TB", float64(j.SubOffsetMS)/1000))
 				}
 				if d.ToneMap {
 					chain = append(chain, "tonemapx=tonemap=bt2390:desat=0:peak=100:t=bt709:m=bt709:p=bt709:format=yuv420p")
@@ -237,7 +259,7 @@ func (j Job) Args() []string {
 
 	// ---- audio ----
 	if j.AudioIndex >= 0 {
-		a = append(a, "-map", fmt.Sprintf("0:%d", j.AudioIndex))
+		a = append(a, "-map", fmt.Sprintf("%d:%d", audioInput, j.AudioIndex))
 		if d.AudioCopy {
 			a = append(a, "-c:a", "copy")
 			if strings.EqualFold(j.AudioCodec, "aac") {

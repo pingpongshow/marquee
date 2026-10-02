@@ -85,6 +85,7 @@ class Marquee(context: Context) {
     val livetv get() = LivetvApi(base, http)
     val syncplay get() = SyncplayApi(base, http)
     val activity get() = app.marquee.api.apis.ActivityApi(base, http)
+    val settings get() = app.marquee.api.apis.SettingsApi(base, http)
 
     val isRemote: Boolean get() = info?.networkClass == NetworkClass.REMOTE
     /** Signed in but the server can't be reached. */
@@ -167,6 +168,9 @@ class Marquee(context: Context) {
                 if ((e as? app.marquee.api.infrastructure.ClientException)?.statusCode == 401) signOutLocally() else _state.value = State.SignedIn
             }
     }
+
+    /** After the signed-in user changed their own account (preferences). */
+    fun updated(user: User) { _me.value = user }
 
     suspend fun signIn(username: String, password: String, totpCode: String? = null) = finish(withContext(Dispatchers.IO) {
         auth.login(LoginRequest(username, password, device, totpCode = totpCode))

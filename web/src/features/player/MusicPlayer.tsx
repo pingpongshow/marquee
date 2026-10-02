@@ -11,6 +11,14 @@ import {
 import { api, imageUrl, session as authSession, unwrap } from "@/api/client";
 import type { ItemSummary, RadioRequest } from "@/api/types";
 import { deviceProfile } from "./deviceProfile";
+import {
+  createEqChain,
+  routeEq,
+  storedEq,
+  storeEq,
+  type EqChain,
+  type EqSettings,
+} from "./eqDsp";
 import { MiniPlayer, NowPlaying } from "./NowPlaying";
 import * as Q from "./queue";
 
@@ -33,6 +41,10 @@ type State = {
   playing: boolean;
   volume: number;
   expanded: boolean;
+  /** The equaliser, stored per browser. */
+  eq: EqSettings;
+  /** False when this browser has no Web Audio, so the equaliser can't work. */
+  eqSupported: boolean;
 };
 
 /** The playhead, which updates several times a second while playing. */
@@ -49,6 +61,7 @@ type Actions = {
   setCrossfade: (s: number) => void;
   setDJ: (m: DJMode | null) => void;
   setSleep: (s: number | "track" | null) => void;
+  setEq: (eq: EqSettings) => void;
   /** source names what's playing (an album or playlist) for the Now Playing header. */
   play: (
     tracks: ItemSummary[],
@@ -239,12 +252,16 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const fading = useRef(false);
   const cur = Q.current(queue);
 
-  // Web Audio graph for levelling: element → per-element gain → master (volume) → speakers.
-  // Created on the first play (browsers require a user gesture).
+  const [eq, setEqState] = useState<EqSettings>(storedEq);
+  const eqRef = useRef(eq);
+
+  // Web Audio graph for levelling: element → per-element gain → master (volume) →
+  // equaliser (when on) → speakers. Created on the first play (browsers require a user gesture).
   const graph = useRef<{
     ctx: AudioContext;
     master: GainNode;
     gains: GainNode[];
+    eq: EqChain;
   } | null>(null);
   const ensureGraph = useCallback(() => {
     if (graph.current || typeof AudioContext === "undefined")
@@ -252,7 +269,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     try {
       const ctx = new AudioContext();
       const master = ctx.createGain();
-      master.connect(ctx.destination);
+      const chain = createEqChain(ctx);
+      routeEq(chain, master, ctx.destination, eqRef.current);
       const gains = audios.current.map((a) => {
         const g = ctx.createGain();
         if (a) {
@@ -262,7 +280,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         g.connect(master);
         return g;
       });
-      graph.current = { ctx, master, gains };
+      graph.current = { ctx, master, gains, eq: chain };
     } catch {
       graph.current = null;
     }
@@ -688,6 +706,17 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         store("marquee.dj", m);
       },
       setSleep,
+      setEq: (next) => {
+        setEqState(next);
+        eqRef.current = next;
+        storeEq(next);
+        const g = graph.current;
+        if (g) {
+          routeEq(g.eq, g.master, g.ctx.destination, next);
+          // Changing it is a user gesture, the moment a suspended context may resume.
+          if (g.ctx.state === "suspended") g.ctx.resume().catch(() => {});
+        }
+      },
       play: (tracks, start = 0, opts) => {
         unload(1 - active.current);
         setSource(opts?.source ? { title: opts.source } : undefined);
@@ -751,6 +780,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       playing,
       volume,
       expanded,
+      eq,
+      eqSupported: typeof AudioContext !== "undefined",
     }),
     [
       actions,
@@ -764,6 +795,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       playing,
       volume,
       expanded,
+      eq,
     ],
   );
   const timeValue = useMemo(() => ({ time, duration }), [time, duration]);

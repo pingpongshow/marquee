@@ -77,6 +77,7 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			OnlineLyrics:     ptr(s.Music.OnlineLyrics),
 			LoudnessAnalysis: ptr(s.Music.LoudnessAnalysis),
 		},
+		Cinema: &CinemaSettings{Trailers: ptr(s.Cinema.Trailers), PrerollItemId: s.Cinema.PrerollItemID},
 		Integrations: &IntegrationSettings{
 			SeerrUrl:         ptr(s.Integrations.SeerrURL),
 			SeerrApiKeySet:   ptr(s.Integrations.SeerrAPIKey != ""),
@@ -181,6 +182,17 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		set(&s.Music.SonicAnalysis, m.SonicAnalysis)
 		set(&s.Music.OnlineLyrics, m.OnlineLyrics)
 		set(&s.Music.LoudnessAnalysis, m.LoudnessAnalysis)
+	}
+	if c := u.Cinema; c != nil {
+		if c.Trailers != nil {
+			s.Cinema.Trailers = min(max(*c.Trailers, 0), 5)
+		}
+		if c.PrerollItemId != nil {
+			s.Cinema.PrerollItemID = c.PrerollItemId
+			if *c.PrerollItemId <= 0 {
+				s.Cinema.PrerollItemID = nil
+			}
+		}
 	}
 	if i := u.Integrations; i != nil {
 		if i.SeerrUrl != nil {

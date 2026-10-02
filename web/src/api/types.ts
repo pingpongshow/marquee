@@ -40,3 +40,6 @@ export type Trickplay = S["Trickplay"];
 export type Lyrics = S["Lyrics"];
 export type MusicStatus = S["MusicStatus"];
 export type SmartRules = S["SmartRules"];
+export type SmartCollectionRules = S["SmartCollectionRules"];
+export type Invite = S["Invite"];
+export type InviteCreated = S["InviteCreated"];

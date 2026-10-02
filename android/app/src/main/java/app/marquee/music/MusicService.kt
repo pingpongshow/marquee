@@ -49,7 +49,12 @@ class MusicService : MediaLibraryService() {
     private val gains = ConcurrentHashMap<Long, Pair<Double?, Double?>>()
     private var enhancer: LoudnessEnhancer? = null
     private val prefs by lazy { getSharedPreferences("marquee.music", MODE_PRIVATE) }
-    private val levellingChanged = SharedPreferences.OnSharedPreferenceChangeListener { _, key -> if (key == "levelling") mediaSession?.player?.let(::level) }
+    private val levellingChanged = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
+        if (key == "levelling") mediaSession?.player?.let(::level)
+        if (key?.startsWith("eq.") == true) EqSettings.load(p).let { s -> equalizers.forEach { it.apply(s) } }
+    }
+    /** The equaliser on the main player's audio session, and on the crossfade player's. */
+    private val equalizers = mutableListOf<SessionEqualizer>()
     private var ticker: Job? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private val app get() = application as MarqueeApplication
@@ -84,6 +89,9 @@ class MusicService : MediaLibraryService() {
         player.audioSessionId = audioSession
         mediaSourceFactory = DefaultMediaSourceFactory(ResolvingDataSource.Factory(http, resolver))
         enhancer = runCatching { LoudnessEnhancer(audioSession).apply { enabled = true } }.getOrNull()
+        // The equaliser rides on the same session, which this service owns for its lifetime
+        // (it's never regenerated, so the effect needn't be re-attached).
+        equalizers += SessionEqualizer(audioSession).also { it.apply(EqSettings.load(prefs)); equalizerBands = it.bands }
         prefs.registerOnSharedPreferenceChangeListener(levellingChanged)
         player.addListener(object : Player.Listener {
             override fun onEvents(p: Player, events: Player.Events) {
@@ -189,7 +197,13 @@ class MusicService : MediaLibraryService() {
     private fun faderPlayer(): ExoPlayer = fader ?: ExoPlayer.Builder(this)
         .setMediaSourceFactory(mediaSourceFactory)
         .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), false)
-        .build().also { fader = it }
+        .build().also { f ->
+            // Its own session with the same equaliser, so a fading tail sounds like the rest.
+            val session = (getSystemService(AUDIO_SERVICE) as AudioManager).generateAudioSessionId()
+            f.audioSessionId = session
+            equalizers += SessionEqualizer(session).also { it.apply(EqSettings.load(prefs)) }
+            fader = f
+        }
 
     private fun crossfadeSeconds() = prefs.getInt("crossfade", 0)
 
@@ -294,6 +308,11 @@ class MusicService : MediaLibraryService() {
         }
     }
 
+    companion object {
+        /** Bands of the platform equaliser in use: -1 before the service starts, 0 when the device has none. */
+        @Volatile var equalizerBands = -1
+    }
+
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = mediaSession
 
     override fun onTaskRemoved(rootIntent: android.content.Intent?) {
@@ -306,6 +325,8 @@ class MusicService : MediaLibraryService() {
         watcher?.cancel()
         prefs.unregisterOnSharedPreferenceChangeListener(levellingChanged)
         enhancer?.release()
+        equalizers.forEach { it.release() }
+        equalizers.clear()
         fadeJob?.cancel()
         fader?.release()
         resolved.keys.toList().forEach { finish(it, mediaSession?.player?.currentPosition ?: 0) }

@@ -28,6 +28,7 @@ type Settings struct {
 	Metadata     Metadata     `json:"metadata"`
 	Tasks        Tasks        `json:"tasks"`
 	Music        Music        `json:"music"`
+	Cinema       Cinema       `json:"cinema"`
 	Webhooks     []Webhook    `json:"webhooks"`
 	Integrations Integrations `json:"integrations"`
 }
@@ -66,6 +67,12 @@ type Webhook struct {
 	Secret  string   `json:"secret"` // signs payloads (HMAC-SHA256) when set
 	Events  []string `json:"events"`
 	Enabled bool     `json:"enabled"`
+}
+
+// Cinema plays trailers (and a pre-roll video) before movies (PLAY-18).
+type Cinema struct {
+	Trailers      int    `json:"trailers"` // 0–5; 0 = off
+	PrerollItemID *int64 `json:"prerollItemId,omitempty"`
 }
 
 // Music configures the M6.5 music features.

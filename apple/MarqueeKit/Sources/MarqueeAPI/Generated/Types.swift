@@ -146,6 +146,31 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /users/{userId}/avatar`.
     /// - Remark: Generated from `#/paths//users/{userId}/avatar/delete(deleteAvatar)`.
     func deleteAvatar(_ input: Operations.DeleteAvatar.Input) async throws -> Operations.DeleteAvatar.Output
+    /// Invites to share this server with friends (USER-13, admin only).
+    ///
+    /// - Remark: HTTP `GET /invites`.
+    /// - Remark: Generated from `#/paths//invites/get(listInvites)`.
+    func listInvites(_ input: Operations.ListInvites.Input) async throws -> Operations.ListInvites.Output
+    /// Make a one-time invite link; whoever opens it picks a username and password and joins with these restrictions (admin only).
+    ///
+    /// - Remark: HTTP `POST /invites`.
+    /// - Remark: Generated from `#/paths//invites/post(createInvite)`.
+    func createInvite(_ input: Operations.CreateInvite.Input) async throws -> Operations.CreateInvite.Output
+    /// Withdraw an invite (admin only). Someone who already joined keeps their account.
+    ///
+    /// - Remark: HTTP `DELETE /invites/{inviteId}`.
+    /// - Remark: Generated from `#/paths//invites/{inviteId}/delete(deleteInvite)`.
+    func deleteInvite(_ input: Operations.DeleteInvite.Input) async throws -> Operations.DeleteInvite.Output
+    /// What an invite link is for, before accepting it.
+    ///
+    /// - Remark: HTTP `GET /invitations/{token}`.
+    /// - Remark: Generated from `#/paths//invitations/{token}/get(getInvitation)`.
+    func getInvitation(_ input: Operations.GetInvitation.Input) async throws -> Operations.GetInvitation.Output
+    /// Join with an invite link, creating your account and signing in.
+    ///
+    /// - Remark: HTTP `POST /invitations/{token}/accept`.
+    /// - Remark: Generated from `#/paths//invitations/{token}/accept/post(acceptInvitation)`.
+    func acceptInvitation(_ input: Operations.AcceptInvitation.Input) async throws -> Operations.AcceptInvitation.Output
     /// Profiles that can be switched to from this device (Plex Home equivalent).
     ///
     /// - Remark: HTTP `GET /profiles`.
@@ -360,6 +385,16 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /libraries/{libraryId}/collections`.
     /// - Remark: Generated from `#/paths//libraries/{libraryId}/collections/post(createCollection)`.
     func createCollection(_ input: Operations.CreateCollection.Input) async throws -> Operations.CreateCollection.Output
+    /// Create a smart collection from library filters (META-7, admin only).
+    ///
+    /// - Remark: HTTP `POST /libraries/{libraryId}/smart-collections`.
+    /// - Remark: Generated from `#/paths//libraries/{libraryId}/smart-collections/post(createSmartCollection)`.
+    func createSmartCollection(_ input: Operations.CreateSmartCollection.Input) async throws -> Operations.CreateSmartCollection.Output
+    /// Change a smart collection's rules (and optionally its name), or turn a manual collection's listing over to rules (admin only).
+    ///
+    /// - Remark: HTTP `PUT /collections/{collectionId}/rules`.
+    /// - Remark: Generated from `#/paths//collections/{collectionId}/rules/put(updateSmartCollection)`.
+    func updateSmartCollection(_ input: Operations.UpdateSmartCollection.Input) async throws -> Operations.UpdateSmartCollection.Output
     /// Delete a collection; its items stay in the library (admin only).
     ///
     /// - Remark: HTTP `DELETE /collections/{collectionId}`.
@@ -380,6 +415,21 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /items/{itemId}/next`.
     /// - Remark: Generated from `#/paths//items/{itemId}/next/get(nextItem)`.
     func nextItem(_ input: Operations.NextItem.Input) async throws -> Operations.NextItem.Output
+    /// The person's Home rows, every available row included, in order (USER-12).
+    ///
+    /// - Remark: HTTP `GET /me/home-layout`.
+    /// - Remark: Generated from `#/paths//me/home-layout/get(getHomeLayout)`.
+    func getHomeLayout(_ input: Operations.GetHomeLayout.Input) async throws -> Operations.GetHomeLayout.Output
+    /// Reorder, hide, pin (add collection-<id> / playlist-<id>) or unpin Home rows. An empty list resets to the default.
+    ///
+    /// - Remark: HTTP `PUT /me/home-layout`.
+    /// - Remark: Generated from `#/paths//me/home-layout/put(setHomeLayout)`.
+    func setHomeLayout(_ input: Operations.SetHomeLayout.Input) async throws -> Operations.SetHomeLayout.Output
+    /// What to play before a movie (PLAY-18): trailers of other movies, then the pre-roll video. Empty when off, for non-movies, or when the person opted out. Call it only when starting from the beginning.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/prerolls`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/prerolls/get(listPrerolls)`.
+    func listPrerolls(_ input: Operations.ListPrerolls.Input) async throws -> Operations.ListPrerolls.Output
     /// Rows for the Home screen (Continue Watching, Recently Added…).
     ///
     /// - Remark: HTTP `GET /hubs/home`.
@@ -1076,6 +1126,67 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// Invites to share this server with friends (USER-13, admin only).
+    ///
+    /// - Remark: HTTP `GET /invites`.
+    /// - Remark: Generated from `#/paths//invites/get(listInvites)`.
+    public func listInvites(headers: Operations.ListInvites.Input.Headers = .init()) async throws -> Operations.ListInvites.Output {
+        try await listInvites(Operations.ListInvites.Input(headers: headers))
+    }
+    /// Make a one-time invite link; whoever opens it picks a username and password and joins with these restrictions (admin only).
+    ///
+    /// - Remark: HTTP `POST /invites`.
+    /// - Remark: Generated from `#/paths//invites/post(createInvite)`.
+    public func createInvite(
+        headers: Operations.CreateInvite.Input.Headers = .init(),
+        body: Operations.CreateInvite.Input.Body
+    ) async throws -> Operations.CreateInvite.Output {
+        try await createInvite(Operations.CreateInvite.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Withdraw an invite (admin only). Someone who already joined keeps their account.
+    ///
+    /// - Remark: HTTP `DELETE /invites/{inviteId}`.
+    /// - Remark: Generated from `#/paths//invites/{inviteId}/delete(deleteInvite)`.
+    public func deleteInvite(
+        path: Operations.DeleteInvite.Input.Path,
+        headers: Operations.DeleteInvite.Input.Headers = .init()
+    ) async throws -> Operations.DeleteInvite.Output {
+        try await deleteInvite(Operations.DeleteInvite.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// What an invite link is for, before accepting it.
+    ///
+    /// - Remark: HTTP `GET /invitations/{token}`.
+    /// - Remark: Generated from `#/paths//invitations/{token}/get(getInvitation)`.
+    public func getInvitation(
+        path: Operations.GetInvitation.Input.Path,
+        headers: Operations.GetInvitation.Input.Headers = .init()
+    ) async throws -> Operations.GetInvitation.Output {
+        try await getInvitation(Operations.GetInvitation.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Join with an invite link, creating your account and signing in.
+    ///
+    /// - Remark: HTTP `POST /invitations/{token}/accept`.
+    /// - Remark: Generated from `#/paths//invitations/{token}/accept/post(acceptInvitation)`.
+    public func acceptInvitation(
+        path: Operations.AcceptInvitation.Input.Path,
+        headers: Operations.AcceptInvitation.Input.Headers = .init(),
+        body: Operations.AcceptInvitation.Input.Body
+    ) async throws -> Operations.AcceptInvitation.Output {
+        try await acceptInvitation(Operations.AcceptInvitation.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
     /// Profiles that can be switched to from this device (Plex Home equivalent).
     ///
     /// - Remark: HTTP `GET /profiles`.
@@ -1614,6 +1725,36 @@ extension APIProtocol {
             body: body
         ))
     }
+    /// Create a smart collection from library filters (META-7, admin only).
+    ///
+    /// - Remark: HTTP `POST /libraries/{libraryId}/smart-collections`.
+    /// - Remark: Generated from `#/paths//libraries/{libraryId}/smart-collections/post(createSmartCollection)`.
+    public func createSmartCollection(
+        path: Operations.CreateSmartCollection.Input.Path,
+        headers: Operations.CreateSmartCollection.Input.Headers = .init(),
+        body: Operations.CreateSmartCollection.Input.Body
+    ) async throws -> Operations.CreateSmartCollection.Output {
+        try await createSmartCollection(Operations.CreateSmartCollection.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Change a smart collection's rules (and optionally its name), or turn a manual collection's listing over to rules (admin only).
+    ///
+    /// - Remark: HTTP `PUT /collections/{collectionId}/rules`.
+    /// - Remark: Generated from `#/paths//collections/{collectionId}/rules/put(updateSmartCollection)`.
+    public func updateSmartCollection(
+        path: Operations.UpdateSmartCollection.Input.Path,
+        headers: Operations.UpdateSmartCollection.Input.Headers = .init(),
+        body: Operations.UpdateSmartCollection.Input.Body
+    ) async throws -> Operations.UpdateSmartCollection.Output {
+        try await updateSmartCollection(Operations.UpdateSmartCollection.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
     /// Delete a collection; its items stay in the library (admin only).
     ///
     /// - Remark: HTTP `DELETE /collections/{collectionId}`.
@@ -1664,6 +1805,39 @@ extension APIProtocol {
         headers: Operations.NextItem.Input.Headers = .init()
     ) async throws -> Operations.NextItem.Output {
         try await nextItem(Operations.NextItem.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// The person's Home rows, every available row included, in order (USER-12).
+    ///
+    /// - Remark: HTTP `GET /me/home-layout`.
+    /// - Remark: Generated from `#/paths//me/home-layout/get(getHomeLayout)`.
+    public func getHomeLayout(headers: Operations.GetHomeLayout.Input.Headers = .init()) async throws -> Operations.GetHomeLayout.Output {
+        try await getHomeLayout(Operations.GetHomeLayout.Input(headers: headers))
+    }
+    /// Reorder, hide, pin (add collection-<id> / playlist-<id>) or unpin Home rows. An empty list resets to the default.
+    ///
+    /// - Remark: HTTP `PUT /me/home-layout`.
+    /// - Remark: Generated from `#/paths//me/home-layout/put(setHomeLayout)`.
+    public func setHomeLayout(
+        headers: Operations.SetHomeLayout.Input.Headers = .init(),
+        body: Operations.SetHomeLayout.Input.Body
+    ) async throws -> Operations.SetHomeLayout.Output {
+        try await setHomeLayout(Operations.SetHomeLayout.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// What to play before a movie (PLAY-18): trailers of other movies, then the pre-roll video. Empty when off, for non-movies, or when the person opted out. Call it only when starting from the beginning.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/prerolls`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/prerolls/get(listPrerolls)`.
+    public func listPrerolls(
+        path: Operations.ListPrerolls.Input.Path,
+        headers: Operations.ListPrerolls.Input.Headers = .init()
+    ) async throws -> Operations.ListPrerolls.Output {
+        try await listPrerolls(Operations.ListPrerolls.Input(
             path: path,
             headers: headers
         ))

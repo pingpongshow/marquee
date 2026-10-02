@@ -87,6 +87,7 @@ struct PlaylistView: View {
                             PlaylistDownloadButton(id: id)
                             #endif
                         }
+                        PinToHomeButton(rowID: AppSession.pinnedRowID(playlist: id))
                     }
                 }
                 #if os(iOS)

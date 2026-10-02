@@ -34,7 +34,7 @@ Priority key:
 | META-4 | Personal videos: folder and filename based. Date comes from file metadata. Thumbnails are extracted from a video frame. | P0 |
 | META-5 | Fix Match / Unmatch / manual search, edit any field, lock edited fields, and custom posters/backgrounds. | P0 |
 | META-6 | Cast and crew with photos, plus person pages that list their filmography in your library. | P1 |
-| META-7 | Collections: manual and automatic (TMDB collections). Smart collections are filter-based. | P1 |
+| META-7 | Collections: manual and automatic (TMDB collections). Smart collections are filter-based. ✅ Smart collections from library filters (year range, recently added, studio/network, person, minimum rating, plus the library filters), kept current (D86). | P1 |
 | META-8 | Ratings (critic/audience), genres, studios, content ratings and tags. | P0 |
 | META-9 | Lyrics: embedded, `.lrc` sidecar and LRCLIB, with timed lyrics. | P1 |
 | META-10 | Local artwork (`poster.jpg`, `fanart.jpg`, `folder.jpg`) takes precedence. | P0 |
@@ -60,6 +60,9 @@ Priority key:
 | PLAY-12 | Chapters, plus intro and credits markers with "Skip Intro" / "Skip Credits". | P1 |
 | PLAY-13 | Trickplay: seek-bar thumbnail previews. | P1 |
 | PLAY-14 | Pre-generated "optimized versions" for remote or mobile use. | P2 |
+| PLAY-17 | **Subtitle and audio timing:** per-viewer offsets (±30 s) from the player, remembered per person and file. Subtitles shift when served (sidecar, HLS rendition, ASS, burn-in); audio shifts by repackaging, so it isn't direct played (D86). | P1 |
+| PLAY-18 | **Cinema trailers:** before a movie started from the beginning, play up to five trailers of other movies in the library (unwatched and recent first), then an optional pre-roll video, with Skip. Server setting; each person can turn it off (D86). | P2 |
+| PLAY-19 | Playback speed 0.5×–2× in the video players (not during watch together). | P2 |
 
 ## 3a. Automatic quality & network awareness
 
@@ -109,6 +112,8 @@ The owner wants the best music experience possible: everything Plexamp and Plex'
 | MUSIC-17 | **Mixes for you from listening history:** curated mixes like Plexamp's, from what each person plays, skips and rates (taste clusters, "discovery" of rarely played library tracks near their taste, rediscover, decade and mood mixes), refreshed daily. Builds on MUSIC-7. | P1 |
 | MUSIC-18 | **Browse and play by mood and style:** Plexamp-style mood, style and genre pages with stations and playlists for each (moods from sonic analysis and tags, styles from tags/MusicBrainz), on every client. | P1 |
 | MUSIC-19 | **Playlist downloads:** download whole playlists (including smart playlists and mixes) for offline playback on Apple and Android, kept in sync as they change. | P1 |
+| MUSIC-20 | **Equaliser:** presets and custom bands for music, per device (web, iPhone/iPad, Android) (D86). | P2 |
+| MUSIC-21 | **Car mode:** a Plexamp-style full-screen music screen with large controls and one-tap stations on iPhone and Android phones (D86). | P2 |
 
 ## 3b-2. Watch together
 
@@ -150,6 +155,8 @@ Plex-style Live TV on every client (see the owner's reference screenshot: Guide 
 | USER-7 | Playlists for video and music, plus smart playlists (smart playlists: MUSIC-8, M6.5). | P1 |
 | USER-8 | Watchlist. | P1 |
 | USER-9 | TOTP two-factor auth for admin/WAN logins. ✅ Any password account can turn it on (D75). | P2 |
+| USER-12 | **Customisable Home:** each person reorders and hides Home rows and pins collections and playlists as rows (D86). | P1 |
+| USER-13 | **Sharing with friends:** admins make one-time invite links with library, rating and remote restrictions; friends pick a username and password, aren't on the household's profile picker and can't switch into household profiles. Friends reach the server over an address they can use (for example a shared Tailscale node; Tailscale itself isn't changed) (D86). | P1 |
 
 ## 5. Remote access (WAN)
 

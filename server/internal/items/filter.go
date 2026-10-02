@@ -9,13 +9,20 @@ import (
 
 // Filter narrows a library listing (the Plex library filter bar).
 type Filter struct {
-	Watch         string // "", "unwatched", "watched", "in_progress"
-	Genre         string
-	Decade        int // e.g. 1990
-	ContentRating string
-	Resolution    string // "4k", "1080", "720", "sd"
-	HDR           bool
-	Letter        string // "A"–"Z" or "#"
+	Watch         string `json:"watch,omitempty"` // "", "unwatched", "watched", "in_progress"
+	Genre         string `json:"genre,omitempty"`
+	Decade        int    `json:"decade,omitempty"` // e.g. 1990
+	ContentRating string `json:"contentRating,omitempty"`
+	Resolution    string `json:"resolution,omitempty"` // "4k", "1080", "720", "sd"
+	HDR           bool   `json:"hdr,omitempty"`
+	Letter        string `json:"-"` // "A"–"Z" or "#"
+	// For smart collections (META-7).
+	YearFrom  int     `json:"yearFrom,omitempty"`
+	YearTo    int     `json:"yearTo,omitempty"`
+	AddedDays int     `json:"addedDays,omitempty"` // added in the last N days
+	Studio    string  `json:"studio,omitempty"`
+	PersonID  int64   `json:"personId,omitempty"`  // in the cast or crew
+	MinRating float64 `json:"minRating,omitempty"` // audience or critic rating, 0–10
 }
 
 // letterExpr is the A–Z jump-bar bucket of an item: its sort title's first letter, or "#".
@@ -70,6 +77,27 @@ func (f Filter) clause(uid int64) (string, []any) {
 	if f.Letter != "" {
 		conds = append(conds, letterExpr+` = ?`)
 		args = append(args, strings.ToUpper(f.Letter))
+	}
+	if f.YearFrom > 0 {
+		conds, args = append(conds, `i.year >= ?`), append(args, f.YearFrom)
+	}
+	if f.YearTo > 0 {
+		conds, args = append(conds, `i.year <= ?`), append(args, f.YearTo)
+	}
+	if f.AddedDays > 0 {
+		conds = append(conds, `i.added_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ?)`)
+		args = append(args, "-"+strconv.Itoa(f.AddedDays)+" days")
+	}
+	if f.Studio != "" {
+		conds, args = append(conds, `i.studio = ? COLLATE NOCASE`), append(args, f.Studio)
+	}
+	if f.PersonID > 0 {
+		conds = append(conds, `EXISTS (SELECT 1 FROM credits c WHERE c.item_id = i.id AND c.person_id = ?)`)
+		args = append(args, f.PersonID)
+	}
+	if f.MinRating > 0 {
+		conds = append(conds, `COALESCE(i.audience_rating, i.imdb_rating, i.critic_rating, 0) >= ?`)
+		args = append(args, f.MinRating)
 	}
 	return strings.Join(conds, " AND "), args
 }

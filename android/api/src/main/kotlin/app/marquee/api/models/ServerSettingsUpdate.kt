@@ -23,6 +23,7 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.CinemaSettings
 import app.marquee.api.models.GeneralSettings
 import app.marquee.api.models.IntegrationSettingsUpdate
 import app.marquee.api.models.LibraryGlobalSettings
@@ -52,6 +53,7 @@ import kotlinx.serialization.Contextual
  * @param tasks 
  * @param music 
  * @param integrations 
+ * @param cinema 
  * @param webhooks Replaces the whole list when sent.
  */
 @Serializable
@@ -87,6 +89,9 @@ data class ServerSettingsUpdate (
 
     @SerialName(value = "integrations")
     val integrations: IntegrationSettingsUpdate? = null,
+
+    @SerialName(value = "cinema")
+    val cinema: CinemaSettings? = null,
 
     /* Replaces the whole list when sent. */
     @SerialName(value = "webhooks")

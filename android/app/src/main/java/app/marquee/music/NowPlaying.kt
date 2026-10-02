@@ -9,6 +9,7 @@ import app.marquee.api.models.RadioRequest
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -96,8 +97,9 @@ fun MiniPlayer(onOpen: () -> Unit) {
 }
 
 /** Full-screen Now Playing: artwork or lyrics or the queue, rating, radio, sleep timer and Guest DJ. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun NowPlayingScreen(onClose: () -> Unit) {
+fun NowPlayingScreen(onClose: () -> Unit, onCarMode: (() -> Unit)? = null) {
     val music = LocalMusic.current
     val marquee = LocalMarquee.current
     val now by music.now.collectAsState()
@@ -144,13 +146,21 @@ fun NowPlayingScreen(onClose: () -> Unit) {
             Text(n.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(listOf(n.artist, n.album).filter { it.isNotBlank() }.joinToString(" · "), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             Transport()
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                RatingStars(music.rating.collectAsState().value, music::rate, size = if (marquee.isTv) 22 else 24)
+            // Wraps onto a second line on narrow phones.
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)) {
+                Box(Modifier.height(48.dp), contentAlignment = Alignment.Center) {
+                    RatingStars(music.rating.collectAsState().value, music::rate, size = if (marquee.isTv) 22 else 24)
+                }
                 IconButton(::startRadio, Modifier.focusRing()) { Icon(Icons.Filled.Radio, "Start Radio", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 SleepButton()
                 DJButton()
                 LevellingButton()
                 CrossfadeButton()
+                EqButton()
+                // Car mode on phones (the big-button screen).
+                if (onCarMode != null && !marquee.isTv) IconButton(onCarMode, Modifier.focusRing()) {
+                    Icon(Icons.Filled.DirectionsCar, "Car mode", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
             radioError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         }

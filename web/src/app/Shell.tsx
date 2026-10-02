@@ -64,7 +64,8 @@ function UserMenu({
 }: {
   name: string;
   avatarUrl?: string;
-  onSwitch: () => void;
+  /** Absent for friends, who can't switch profiles (USER-13). */
+  onSwitch?: () => void;
   onSignOut: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -101,9 +102,11 @@ function UserMenu({
           <Link to="/account" className={item}>
             <UserRound className="size-4" aria-hidden /> Account
           </Link>
-          <button onClick={onSwitch} className={item}>
-            <Users className="size-4" aria-hidden /> Switch profile
-          </button>
+          {onSwitch && (
+            <button onClick={onSwitch} className={item}>
+              <Users className="size-4" aria-hidden /> Switch profile
+            </button>
+          )}
           <button onClick={onSignOut} className={item}>
             <LogOut className="size-4" aria-hidden /> Sign out
           </button>
@@ -262,7 +265,11 @@ export function Shell({ children }: { children: ReactNode }) {
           <UserMenu
             name={me.data?.displayName ?? ""}
             avatarUrl={me.data?.avatarUrl}
-            onSwitch={() => setSwitching(true)}
+            onSwitch={
+              me.data?.restrictions.friend
+                ? undefined
+                : () => setSwitching(true)
+            }
             onSignOut={() => void signOut()}
           />
         </div>

@@ -14,6 +14,7 @@ import {
   Repeat1,
   Shuffle,
   SkipBack,
+  SlidersVertical,
   SkipForward,
   Volume2,
   X,
@@ -32,6 +33,7 @@ import {
   type Levelling,
 } from "./MusicPlayer";
 import type { Entry } from "./queue";
+import { EqualizerSheet } from "./Equalizer";
 
 export function fmtTime(s: number) {
   if (!isFinite(s) || s < 0) return "0:00";
@@ -397,6 +399,7 @@ export function NowPlaying() {
   const [panel, setPanel] = useState<"queue" | "lyrics" | null>(() =>
     window.matchMedia("(min-width: 1024px)").matches ? "queue" : null,
   );
+  const [eqOpen, setEqOpen] = useState(false);
   const d =
     isFinite(m.duration) && m.duration > 0
       ? m.duration
@@ -444,6 +447,17 @@ export function NowPlaying() {
           )}
         </div>
         <SleepMenu />
+        <button
+          onClick={() => setEqOpen(true)}
+          className={clsx(
+            "rounded-full p-2 hover:bg-white/10",
+            m.eq.enabled && "text-accent",
+          )}
+          aria-label="Equaliser"
+          title="Equaliser"
+        >
+          <SlidersVertical className="size-5" />
+        </button>
         <button
           onClick={() => setPanel((p) => (p === "lyrics" ? null : "lyrics"))}
           className={clsx(
@@ -531,6 +545,7 @@ export function NowPlaying() {
           </aside>
         )}
       </div>
+      {eqOpen && <EqualizerSheet onClose={() => setEqOpen(false)} />}
     </div>
   );
 }

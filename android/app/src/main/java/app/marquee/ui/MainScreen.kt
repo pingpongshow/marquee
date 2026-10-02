@@ -77,7 +77,7 @@ fun MainScreen() {
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route ?: "home"
-    val fullScreen = route.startsWith("player") || route == "nowplaying" || route.startsWith("live/")
+    val fullScreen = route.startsWith("player") || route == "nowplaying" || route.startsWith("live/") || route.startsWith("carmode")
     // Live TV gets a tab when it's set up; on phones Playlists then moves under Libraries.
     val liveOn by produceState(false) { value = withContext(Dispatchers.IO) { runCatching { marquee.livetv.liveTvStatus().enabled }.getOrDefault(false) } }
     val tabs = buildList {
@@ -147,7 +147,13 @@ private fun Routes(nav: NavHostController) {
         composable("live/{id}", listOf(navArgument("id") { type = NavType.LongType })) { LiveWatchScreen(nav, it.arguments!!.getLong("id")) }
         composable("approvals") { ApprovalsScreen() }
         composable("stats") { StatsScreen() }
-        composable("nowplaying") { NowPlayingScreen(onClose = { nav.popBackStack() }) }
+        composable("nowplaying") { NowPlayingScreen(onClose = { nav.popBackStack() }, onCarMode = { nav.navigate("carmode") }) }
+        composable("carmode?lib={lib}", listOf(navArgument("lib") { type = NavType.LongType; defaultValue = -1L })) {
+            app.marquee.music.CarModeScreen(it.arguments!!.getLong("lib").takeIf { l -> l >= 0 }, onExit = { nav.popBackStack() })
+        }
+        composable("edithome") { EditHomeScreen(nav) }
+        composable("users") { UsersScreen() }
+        composable("serversettings") { ServerSettingsScreen() }
     }
 }
 

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"marquee/internal/items"
-	"marquee/internal/library"
 	"marquee/internal/netclass"
 	"marquee/internal/playback"
 )
@@ -69,6 +68,7 @@ func (h *Handlers) StartPlayback(ctx context.Context, req StartPlaybackRequestOb
 	set(&r.SubtitleStreamID, b.SubtitleStreamId)
 	set(&r.StartMS, b.StartMs)
 	set(&r.Preload, b.Preload)
+	r.SubtitleOffsetMS, r.AudioOffsetMS = b.SubtitleOffsetMs, b.AudioOffsetMs
 	set(&r.Quality.RequestedKbps, b.MaxBitrateKbps)
 	set(&r.Quality.MeasuredKbps, b.MeasuredKbps)
 	if r.Remote {
@@ -95,7 +95,7 @@ func (h *Handlers) StartPlayback(ctx context.Context, req StartPlaybackRequestOb
 		Decision: toAPIDecision(s.Decision), LimitKbps: nz(s.LimitKbps), LimitReason: nz(s.LimitReason),
 		NetworkClass: NetworkClass(ri.Class), AudioStreamId: nz(s.AudioStreamID), SubtitleStreamId: nz(s.SubtitleStreamID),
 		TrackGainDb: f32(s.TrackGainDB), AlbumGainDb: f32(s.AlbumGainDB), Peak: f32(s.Peak),
-		Markers: []Marker{}}
+		SubtitleOffsetMs: ptr(s.SubtitleOffsetMS), AudioOffsetMs: ptr(s.AudioOffsetMS), Markers: []Marker{}}
 	switch {
 	case s.Decision.Method == playback.DirectPlay:
 		out.Url, out.Protocol, out.ContentType = base+"file", File, ptr(playback.FileContentType(s))
@@ -275,62 +275,6 @@ func (h *Handlers) NextItem(ctx context.Context, req NextItemRequestObject) (Nex
 		return nil, internal(ctx, "next", err)
 	}
 	return NextItem200JSONResponse(toAPISummary(next)), nil
-}
-
-func (h *Handlers) HomeHubs(ctx context.Context, _ HomeHubsRequestObject) (HomeHubsResponseObject, error) {
-	if _, ok := session(ctx); !ok {
-		return HomeHubs401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
-	}
-	acc := access(ctx)
-	libs, err := h.Libraries.List(ctx)
-	if err != nil {
-		return nil, internal(ctx, "hubs", err)
-	}
-	var home []int64
-	for _, l := range libs {
-		if canSeeLibrary(ctx, l.ID) && (l.Options.IncludeInHome == nil || *l.Options.IncludeInHome) {
-			home = append(home, l.ID)
-		}
-	}
-	out := HomeHubs200JSONResponse{}
-	add := func(id, title string, lib int64, list []items.Summary) {
-		if len(list) == 0 {
-			return
-		}
-		hub := Hub{Id: id, Title: title, LibraryId: nz(lib), Items: make([]ItemSummary, len(list))}
-		for i, it := range list {
-			hub.Items[i] = toAPISummary(it)
-		}
-		out = append(out, hub)
-	}
-	cw, err := h.Items.ContinueWatching(ctx, acc, home, 20)
-	if err != nil {
-		return nil, internal(ctx, "hubs", err)
-	}
-	add("continue-watching", "Continue Watching", 0, cw)
-	wl, err := h.Items.Watchlist(ctx, acc, 30)
-	if err != nil {
-		return nil, internal(ctx, "hubs", err)
-	}
-	add("watchlist", "Your Watchlist", 0, wl)
-	for _, l := range libs {
-		if !canSeeLibrary(ctx, l.ID) || (l.Options.IncludeInHome != nil && !*l.Options.IncludeInHome) {
-			continue
-		}
-		list, err := h.Items.RecentlyAdded(ctx, acc, l.ID, string(l.Type), 20)
-		if err != nil {
-			return nil, internal(ctx, "hubs", err)
-		}
-		add(fmt.Sprintf("recent-%d", l.ID), "Recently Added "+l.Name, l.ID, list)
-		if l.Type == library.Music {
-			played, err := h.Items.RecentlyPlayedAlbums(ctx, acc, l.ID, 20)
-			if err != nil {
-				return nil, internal(ctx, "hubs", err)
-			}
-			add(fmt.Sprintf("played-%d", l.ID), "Recently Played in "+l.Name, l.ID, played)
-		}
-	}
-	return out, nil
 }
 
 // ---------- dashboard ----------

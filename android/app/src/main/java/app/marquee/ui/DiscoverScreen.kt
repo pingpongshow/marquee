@@ -217,6 +217,7 @@ fun DiscoverScreen(nav: NavHostController) {
                     RequestRow(r, action = if (r.status == RequestState.PENDING) "Withdraw" else null) {
                         scope.launch {
                             withContext(Dispatchers.IO) { runCatching { marquee.requests.cancelRequest(r.id) } }
+                                .onSuccess { mine = mine.filterNot { it.id == r.id } } // gone at once, before Seerr's lists reload
                             reload++
                         }
                     }

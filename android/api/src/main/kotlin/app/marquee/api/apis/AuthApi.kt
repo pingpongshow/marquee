@@ -33,6 +33,8 @@ import app.marquee.api.models.AuthorizeQuickConnectRequest
 import app.marquee.api.models.DisableTotpRequest
 import app.marquee.api.models.EnableTotp200Response
 import app.marquee.api.models.Error
+import app.marquee.api.models.InviteAccept
+import app.marquee.api.models.InviteInfo
 import app.marquee.api.models.LoginRequest
 import app.marquee.api.models.MeUpdate
 import app.marquee.api.models.PinLoginRequest
@@ -69,6 +71,83 @@ open class AuthApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
         val defaultBasePath: String by lazy {
             System.getProperties().getProperty(ApiClient.BASE_URL_KEY, "/api/v1")
         }
+    }
+
+    /**
+     * POST /invitations/{token}/accept
+     * Join with an invite link, creating your account and signing in.
+     * 
+     * @param token 
+     * @param inviteAccept 
+     * @return AuthResult
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun acceptInvitation(token: kotlin.String, inviteAccept: InviteAccept) : AuthResult {
+        val localVarResponse = acceptInvitationWithHttpInfo(token = token, inviteAccept = inviteAccept)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as AuthResult
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /invitations/{token}/accept
+     * Join with an invite link, creating your account and signing in.
+     * 
+     * @param token 
+     * @param inviteAccept 
+     * @return ApiResponse<AuthResult?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun acceptInvitationWithHttpInfo(token: kotlin.String, inviteAccept: InviteAccept) : ApiResponse<AuthResult?> {
+        val localVariableConfig = acceptInvitationRequestConfig(token = token, inviteAccept = inviteAccept)
+
+        return request<InviteAccept, AuthResult>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation acceptInvitation
+     *
+     * @param token 
+     * @param inviteAccept 
+     * @return RequestConfig
+     */
+    fun acceptInvitationRequestConfig(token: kotlin.String, inviteAccept: InviteAccept) : RequestConfig<InviteAccept> {
+        val localVariableBody = inviteAccept
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/invitations/{token}/accept".replace("{"+"token"+"}", encodeURIComponent(token.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
     }
 
     /**
@@ -361,6 +440,79 @@ open class AuthApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /invitations/{token}
+     * What an invite link is for, before accepting it.
+     * 
+     * @param token 
+     * @return InviteInfo
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getInvitation(token: kotlin.String) : InviteInfo {
+        val localVarResponse = getInvitationWithHttpInfo(token = token)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as InviteInfo
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /invitations/{token}
+     * What an invite link is for, before accepting it.
+     * 
+     * @param token 
+     * @return ApiResponse<InviteInfo?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getInvitationWithHttpInfo(token: kotlin.String) : ApiResponse<InviteInfo?> {
+        val localVariableConfig = getInvitationRequestConfig(token = token)
+
+        return request<Unit, InviteInfo>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getInvitation
+     *
+     * @param token 
+     * @return RequestConfig
+     */
+    fun getInvitationRequestConfig(token: kotlin.String) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/invitations/{token}".replace("{"+"token"+"}", encodeURIComponent(token.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
             body = localVariableBody
         )
     }

@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { clsx } from "clsx";
-import { AlertTriangle, ChevronRight } from "lucide-react";
+import { AlertTriangle, ChevronRight, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { api, imageUrl, personPhotoUrl, unwrap } from "@/api/client";
 import { itemChildrenQuery, itemQuery, meQuery } from "@/api/queries";
 import type { Credit, ItemDetail, ItemSummary, MediaStream } from "@/api/types";
-import { Alert, Spinner } from "@/components/ui";
+import { Alert, Button, Spinner } from "@/components/ui";
+import { PinToHomeButton } from "../home/EditHome";
+import { describeRules, SmartRulesDialog } from "./SmartCollection";
 import { useMusicState } from "../player/MusicPlayer";
 import { ItemActions } from "./ItemActions";
 import { ItemMenu } from "./ItemMenu";
@@ -375,6 +377,7 @@ export function ItemPage() {
   const { itemId } = useParams({ from: "/item/$itemId" });
   const item = useQuery(itemQuery(Number(itemId)));
   const me = useQuery(meQuery);
+  const [editingRules, setEditingRules] = useState(false);
   if (item.isPending) return <Spinner />;
   if (item.isError) return <div className="p-8"><Alert tone="error">{item.error.message}</Alert></div>;
   const d = item.data;
@@ -404,7 +407,13 @@ export function ItemPage() {
         </div>
         <div className="min-w-0 flex-1">
           <Breadcrumbs item={d} />
+          {d.smartRules && (
+            <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold tracking-wider text-faint uppercase">
+              <Sparkles className="size-3.5 text-accent" aria-hidden /> Smart collection
+            </div>
+          )}
           <h1 className="text-3xl font-bold">{d.title}</h1>
+          {d.smartRules && <div className="mt-1 text-sm text-muted">{describeRules(d.smartRules)}</div>}
           {d.artistCredit && d.type !== "artist" && <div className="mt-1 text-lg text-muted">{d.artistCredit}</div>}
           <div className="mt-2 text-sm text-muted">{meta.join(" · ")}</div>
           {d.genres.length > 0 && <div className="mt-1 text-sm text-faint">{d.genres.join(", ")}</div>}
@@ -413,10 +422,17 @@ export function ItemPage() {
             <Rating key={d.id} itemId={d.id} value={d.userRating} />
           </div>
           <PlayButtons key={d.id} item={d} />
-          <div className="mt-4 flex items-center gap-3">
+          <div className="mt-4 flex flex-wrap items-center gap-3">
             <ItemMenu item={d} />
             {me.data?.isAdmin && <ItemActions item={d} />}
+            {d.type === "collection" && <PinToHomeButton kind="collection" id={d.id} />}
+            {d.smartRules && me.data?.isAdmin && (
+              <Button variant="ghost" onClick={() => setEditingRules(true)}>
+                <Sparkles className="size-4" /> Edit rules
+              </Button>
+            )}
           </div>
+          {editingRules && <SmartRulesDialog collection={d} onClose={() => setEditingRules(false)} />}
           {d.tagline && <p className="mt-4 text-lg text-muted italic">{d.tagline}</p>}
           {!d.available && (
             <div className="mt-4 flex items-center gap-2 text-sm text-danger">

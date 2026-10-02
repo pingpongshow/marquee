@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import app.marquee.api.models.LibraryType
@@ -29,6 +30,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -90,7 +93,16 @@ fun HomeScreen(nav: NavHostController) {
     when (val h = hubs) {
         null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         else -> LazyColumn(contentPadding = PaddingValues(vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(26.dp)) {
-            item { Text("Home", Modifier.padding(horizontal = sidePadding), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+            item {
+                Row(Modifier.padding(horizontal = sidePadding).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Home", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    // Rows: order, hide and pinned collections and playlists (USER-12).
+                    if (!marquee.isOffline) androidx.compose.material3.TextButton({ nav.navigate("edithome") }, Modifier.focusRing()) {
+                        Icon(Icons.Filled.Edit, null)
+                        Text("Edit Home", Modifier.padding(start = 6.dp))
+                    }
+                }
+            }
             // Others watching together, to join (SYNC-1).
             items(groups, key = { "g" + it.id }) { g ->
                 Row(Modifier.padding(horizontal = sidePadding).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Gold.copy(alpha = 0.12f))
@@ -116,7 +128,7 @@ fun HomeScreen(nav: NavHostController) {
             if (!marquee.isOffline) h.exceptionOrNull()?.let { e -> item { Text("Couldn't load: ${e.message}", Modifier.padding(horizontal = sidePadding), color = MaterialTheme.colorScheme.error) } }
             itemsIndexed(h.getOrDefault(emptyList()), key = { _, it -> it.id }) { hi, hub ->
                 val wide = hub.id == "continue-watching"
-                Shelf(hub.title, hub.items, sidePadding) { i, it ->
+                Shelf(hub.title, hub.items, sidePadding, onTitle = HomeRows.route(hub.id)?.let { r -> { nav.navigate(r) } }) { i, it ->
                     val art = if (wide) it.images?.thumb ?: it.images?.backdrop else it.images?.poster
                     PosterCard(it, marquee.imageUrl(art, 300), if (wide) cardWidth * 1.6f else cardWidth, { openItem(nav, it, play = wide) },
                         shape = if (wide) Shape.Wide else shapeFor(it), autoFocus = marquee.isTv && hi == 0 && i == 0)
@@ -213,6 +225,10 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
     Column {
         Row(Modifier.padding(horizontal = sidePadding, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(library?.name ?: "", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            if (isMusic && !marquee.isTv) OutlinedButton({ nav.navigate("carmode?lib=$libraryId") }) {
+                Icon(androidx.compose.material.icons.Icons.Filled.DirectionsCar, null)
+                Text("Car mode", Modifier.padding(start = 6.dp))
+            }
             if (library?.type == LibraryType.MOVIES) listOf(false to "All", true to "Collections").forEach { (c, label) ->
                 androidx.compose.material3.FilterChip(collections == c, {
                     if (collections != c) { collections = c; items.clear(); total = -1; loadMore() }
@@ -265,6 +281,7 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
                     OutlinedButton(onClick = { music.play(tracks.shuffled(), 0, source = title) }) { Text("Shuffle") }
                     if (!marquee.isTv) PlaylistDownloadButton(playlistId)
                 }
+                PinToHomeButton("playlist-$playlistId")
             }
         }
         items(entries.size) { i ->
@@ -301,12 +318,13 @@ fun SearchScreen(nav: NavHostController) {
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
     val me by marquee.me.collectAsState()
     val scope = rememberCoroutineScope()
-    Column(Modifier.padding(sidePadding), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(sidePadding), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Avatar(me?.displayName ?: "?", marquee.absolute(me?.avatarUrl), 56)
@@ -317,9 +335,13 @@ fun SettingsScreen(nav: NavHostController) {
         }
         Text("Server: ${marquee.server?.name ?: ""} · ${if (marquee.isRemote) "Tailscale (away)" else "home network"}", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("Version ${marquee.info?.version ?: ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        TrailersPreference()
+        // Buttons wrap onto more lines rather than running off a phone's edge.
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { nav.navigate("stats") }) { Text("Your Stats") }
             if (me?.isAdmin == true) OutlinedButton(onClick = { nav.navigate("approvals") }) { Text("Requests") }
+            if (me?.isAdmin == true) OutlinedButton(onClick = { nav.navigate("users") }) { Text("Users & sharing") }
+            if (me?.isAdmin == true) OutlinedButton(onClick = { nav.navigate("serversettings") }) { Text("Server settings") }
             OutlinedButton(onClick = { scope.launch { marquee.signOut() } }) { Text("Switch profile") }
             OutlinedButton(onClick = { marquee.forgetServer() }) { Text("Use a different server") }
         }

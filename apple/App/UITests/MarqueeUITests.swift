@@ -556,4 +556,413 @@ final class MarqueeUITests: XCTestCase {
         app.buttons["Cancel"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Upcoming"].waitForNonExistence(timeout: 10))
     }
+
+    // MARK: - Plex parity (PLAY-17/18/19, USER-12/13, META-7, equaliser, car mode)
+
+    /// Opens a movie by title from the Movies library.
+    private func openMovie(_ prefix: String) {
+        openLibrary("Movies")
+        XCTAssertTrue(app.navigationBars["Movies"].waitForExistence(timeout: 10))
+        let movie = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
+        XCTAssertTrue(movie.waitForExistence(timeout: 10))
+        movie.tap()
+    }
+
+    /// Cinema trailers left on by another test would play first: skip them.
+    private func skipTrailersIfAny() {
+        let skipAll = app.buttons["Skip All"]
+        if skipAll.waitForExistence(timeout: 3) { skipAll.tap() }
+    }
+
+    /// Speed and subtitle/audio timing from the player's settings menu (PLAY-19, PLAY-17).
+    func testPlayerSpeedAndTiming() throws {
+        let user = try temporaryUser()
+        signIn(username: user.name, password: user.password)
+        openMovie("00 Long Test")
+        let play = app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume'}")).firstMatch
+        XCTAssertTrue(play.waitForExistence(timeout: 10))
+        play.tap()
+        skipTrailersIfAny()
+        let settings = app.buttons["Playback settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 15))
+        sleep(3)
+        settings.tap()
+        let speed = app.buttons["Speed"].firstMatch
+        XCTAssertTrue(speed.waitForExistence(timeout: 5))
+        shot("ps1-settings-menu")
+        speed.tap()
+        let fast = app.buttons["1.5×"].firstMatch
+        XCTAssertTrue(fast.waitForExistence(timeout: 5))
+        shot("ps2-speeds")
+        fast.tap()
+        // The menu shows the choice next time.
+        settings.tap()
+        app.buttons["Speed"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["1.5×"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["1.5×"].firstMatch.isSelected, "1.5× is the chosen speed")
+        app.buttons["1.5×"].firstMatch.tap()
+
+        // Subtitle timing: +200 ms restarts the stream with the offset.
+        settings.tap()
+        let subs = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Subtitle Timing'")).firstMatch
+        XCTAssertTrue(subs.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Audio Timing'")).firstMatch.exists)
+        subs.tap()
+        let value = app.staticTexts["timingValue"]
+        XCTAssertTrue(value.waitForExistence(timeout: 5))
+        XCTAssertEqual(value.label, "0 ms")
+        app.buttons["100 ms later"].tap()
+        app.buttons["100 ms later"].tap()
+        XCTAssertEqual(value.label, "+200 ms")
+        shot("ps3-subtitle-timing")
+        sleep(4) // the stream restarts with it
+        app.buttons["Done"].tap()
+        app.buttons["Close player"].tap()
+
+        // The server remembers it for this file: playing again starts with +200 ms, at 1×.
+        let again = app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume'}")).firstMatch
+        XCTAssertTrue(again.waitForExistence(timeout: 10))
+        again.tap()
+        skipTrailersIfAny()
+        XCTAssertTrue(settings.waitForExistence(timeout: 15))
+        sleep(3)
+        settings.tap()
+        let remembered = app.buttons["Subtitle Timing (+200 ms)"]
+        XCTAssertTrue(remembered.waitForExistence(timeout: 5), "the offset was remembered")
+        shot("ps4-remembered")
+        app.buttons["Speed"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Normal (1×)"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Normal (1×)"].firstMatch.isSelected, "a new video starts at 1×")
+        app.buttons["Normal (1×)"].firstMatch.tap()
+        // Reset (so the remembered offset doesn't follow the next run).
+        settings.tap()
+        remembered.tap()
+        XCTAssertTrue(value.waitForExistence(timeout: 5))
+        app.buttons["Reset"].tap()
+        XCTAssertEqual(value.label, "0 ms")
+        sleep(4)
+        app.buttons["Done"].tap()
+        app.buttons["Close player"].tap()
+    }
+
+    /// Puts the cinema settings back when the test ends, however it ends.
+    private func restoreCinema(_ before: [String: Any]) {
+        let url = "http://\(server)/api/v1/settings", token = adminToken
+        let body: [String: Any] = ["cinema": ["trailers": before["trailers"] as? Int ?? 0, "prerollItemId": before["prerollItemId"] as? Int ?? 0]]
+        addTeardownBlock { Self.send("PATCH", url, token: token, body) }
+    }
+
+    /// Cinema trailers (PLAY-18): with one trailer on, a movie started from the beginning plays
+    /// another movie's trailer first, named, with Skip All.
+    func testCinemaTrailers() throws {
+        let before = try adminAPI("GET", "/settings")["cinema"] as? [String: Any] ?? [:]
+        try adminAPI("PATCH", "/settings", ["cinema": ["trailers": 1, "prerollItemId": 0]])
+        restoreCinema(before)
+        let user = try temporaryUser()
+        signIn(username: user.name, password: user.password)
+        openMovie("00 Long Test")
+        let play = app.buttons["Play"].firstMatch
+        XCTAssertTrue(play.waitForExistence(timeout: 10))
+        play.tap()
+        let label = app.staticTexts["trailerTitle"]
+        XCTAssertTrue(label.waitForExistence(timeout: 15), "a trailer plays first")
+        XCTAssertEqual(label.label, "Trailer · 00 Preview Test")
+        XCTAssertTrue(app.buttons["Skip"].exists)
+        sleep(2)
+        shot("ct1-trailer")
+        app.buttons["Skip All"].tap()
+        XCTAssertTrue(label.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Playback settings"].waitForExistence(timeout: 10), "the movie plays")
+        sleep(2)
+        shot("ct2-movie")
+        app.buttons["Close player"].tap()
+
+        // The person's own setting turns them off.
+        app.buttons["Settings"].firstMatch.tap()
+        let toggle = app.switches["Play trailers before movies"]
+        for _ in 0..<5 where !toggle.isHittable { app.swipeUp() }
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        XCTAssertEqual(toggle.value as? String, "1")
+        toggle.switches.firstMatch.tap()
+        let off = NSPredicate(format: "value == '0'")
+        expectation(for: off, evaluatedWith: toggle)
+        waitForExpectations(timeout: 5)
+        shot("ct3-setting-off")
+        sleep(1)
+        toggle.switches.firstMatch.tap() // back on for other tests
+        expectation(for: NSPredicate(format: "value == '1'"), evaluatedWith: toggle)
+        waitForExpectations(timeout: 5)
+    }
+
+    /// Edit Home and Pin to Home (USER-12): hide a row, pin a collection, open it from its
+    /// Home row, unpin it, then reset the layout.
+    func testEditHomeAndPin() throws {
+        let user = try temporaryUser()
+        signIn(username: user.name, password: user.password)
+        let movies = app.descendants(matching: .any)["Recently Added Movies"].firstMatch
+        XCTAssertTrue(movies.waitForExistence(timeout: 10))
+        app.buttons["Edit Home"].tap()
+        let hide = app.buttons["Hide Recently Added Movies"]
+        XCTAssertTrue(hide.waitForExistence(timeout: 10))
+        shot("eh1-edit-home")
+        hide.tap()
+        XCTAssertTrue(app.buttons["Show Recently Added Movies"].waitForExistence(timeout: 5))
+        app.buttons["Done"].tap()
+        XCTAssertTrue(movies.waitForNonExistence(timeout: 10), "the hidden row is gone from Home")
+        shot("eh2-home-without-row")
+
+        // Pin the Test Saga collection.
+        openLibrary("Movies")
+        XCTAssertTrue(app.navigationBars["Movies"].waitForExistence(timeout: 10))
+        app.buttons["Sort and filter"].tap()
+        app.buttons["Collections"].tap()
+        let saga = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Test Saga'")).firstMatch
+        XCTAssertTrue(saga.waitForExistence(timeout: 10))
+        saga.tap()
+        let pin = app.buttons["Pin to Home"]
+        XCTAssertTrue(pin.waitForExistence(timeout: 10))
+        pin.tap()
+        XCTAssertTrue(app.buttons["Unpin from Home"].waitForExistence(timeout: 5))
+        shot("eh3-pinned")
+
+        // Home shows it; its title opens the collection.
+        app.buttons["Home"].firstMatch.tap()
+        let row = app.buttons["Test Saga"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "the pinned collection is a Home row")
+        shot("eh4-home-pinned")
+        row.tap()
+        let unpin = app.buttons["Unpin from Home"]
+        XCTAssertTrue(unpin.waitForExistence(timeout: 10))
+        unpin.tap()
+        XCTAssertTrue(app.buttons["Pin to Home"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.firstMatch.tap()
+
+        // Back to the default layout.
+        app.buttons["Edit Home"].tap()
+        let reset = app.buttons["Reset to Default"]
+        XCTAssertTrue(reset.waitForExistence(timeout: 10))
+        reset.tap()
+        XCTAssertTrue(hide.waitForExistence(timeout: 5))
+        app.buttons["Done"].tap()
+        XCTAssertTrue(movies.waitForExistence(timeout: 10))
+    }
+
+    /// Starts the Music library's radio and opens Now Playing.
+    private func playRadioAndOpenNowPlaying() {
+        openLibrary("Music")
+        let radio = app.buttons["Library Radio"]
+        XCTAssertTrue(radio.waitForExistence(timeout: 15))
+        radio.tap()
+        let mini = app.buttons["miniPlayer"]
+        XCTAssertTrue(mini.waitForExistence(timeout: 20))
+        sleep(2)
+        mini.tap()
+        XCTAssertTrue(app.staticTexts["PLAYING FROM"].waitForExistence(timeout: 5))
+    }
+
+    /// The equaliser (iPhone/iPad): turn it on, pick a preset, and the music keeps playing.
+    func testEqualizer() {
+        connectAndSignIn()
+        playRadioAndOpenNowPlaying()
+        let eq = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Equaliser'")).firstMatch
+        XCTAssertTrue(eq.waitForExistence(timeout: 5))
+        eq.tap()
+        let toggle = app.switches["Equaliser"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        if toggle.value as? String == "0" { toggle.switches.firstMatch.tap() }
+        XCTAssertEqual(toggle.value as? String, "1")
+        app.buttons["Bass Boost"].tap()
+        XCTAssertTrue(app.buttons["Bass Boost"].isSelected)
+        let low = app.sliders["31 hertz"]
+        XCTAssertTrue(low.exists)
+        XCTAssertEqual(low.value as? String, "+6.0 decibels")
+        shot("eq1-sheet")
+        // A custom band makes it "Custom".
+        app.sliders["1k hertz"].adjust(toNormalizedSliderPosition: 0.8)
+        XCTAssertTrue(app.staticTexts["Custom"].waitForExistence(timeout: 5))
+        app.buttons["Done"].tap()
+        XCTAssertTrue(app.buttons["Equaliser on"].waitForExistence(timeout: 5))
+        // Still playing through the equaliser: the clock moves.
+        let clock = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH '-'")).firstMatch
+        let t1 = clock.label
+        sleep(3)
+        XCTAssertNotEqual(clock.label, t1, "music plays on with the equaliser")
+        XCTAssertFalse(app.staticTexts["musicError"].exists)
+        shot("eq2-playing")
+        // Off again (it's kept on the device).
+        app.buttons["Equaliser on"].tap()
+        app.buttons["Flat"].tap()
+        app.switches["Equaliser"].switches.firstMatch.tap()
+        app.buttons["Done"].tap()
+    }
+
+    /// Car mode: big controls and quick-start tiles, in portrait and landscape.
+    func testCarMode() {
+        connectAndSignIn()
+        openLibrary("Music")
+        let open = app.buttons["Car Mode"].firstMatch
+        XCTAssertTrue(open.waitForExistence(timeout: 10))
+        open.tap()
+        XCTAssertTrue(app.buttons["Exit car mode"].waitForExistence(timeout: 5))
+        let car = app.otherElements["carMode"]
+        XCTAssertTrue(car.exists)
+        shot("car1-empty")
+        let tiles = car.buttons.matching(identifier: "carTile")
+        XCTAssertEqual(tiles.count, 4)
+        tiles["Library Radio"].tap()
+        let title = app.staticTexts["carTitle"]
+        XCTAssertTrue(title.waitForExistence(timeout: 20), "the radio starts")
+        XCTAssertTrue(car.buttons["Pause"].waitForExistence(timeout: 10))
+        shot("car2-playing")
+        let first = title.label
+        car.buttons["Next track"].tap()
+        expectation(for: NSPredicate(format: "label != %@", first), evaluatedWith: title)
+        waitForExpectations(timeout: 15)
+        XCUIDevice.shared.orientation = .landscapeLeft
+        sleep(2)
+        XCTAssertTrue(app.buttons["Exit car mode"].isHittable)
+        XCTAssertTrue(tiles["Shuffle All"].isHittable)
+        XCTAssertTrue(car.buttons["Pause"].isHittable)
+        shot("car3-landscape")
+        XCUIDevice.shared.orientation = .portrait
+        car.buttons["Pause"].tap()
+        XCTAssertTrue(car.buttons["Play"].waitForExistence(timeout: 5))
+        app.buttons["Exit car mode"].tap()
+
+        // Also from Now Playing.
+        app.buttons["miniPlayer"].tap()
+        XCTAssertTrue(app.staticTexts["PLAYING FROM"].waitForExistence(timeout: 5))
+        app.buttons["Car Mode"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Exit car mode"].waitForExistence(timeout: 5))
+        app.buttons["Exit car mode"].tap()
+    }
+
+    /// Signs in with a username and password from the profile picker.
+    private func signIn(username: String, password: String) {
+        let address = app.textFields["Home address, e.g. 10.1.1.10:32500"]
+        XCTAssertTrue(address.waitForExistence(timeout: 10))
+        address.tap()
+        address.typeText(server)
+        app.buttons["Connect"].tap()
+        let other = app.buttons["Sign in with username and password"]
+        XCTAssertTrue(other.waitForExistence(timeout: 15))
+        other.tap()
+        let field = app.textFields["Username"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText(username)
+        app.secureTextFields["Password"].tap()
+        app.secureTextFields["Password"].typeText(password)
+        app.buttons["Sign In"].tap()
+        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
+    }
+
+    /// A temporary account (other clients' tests share the server's profiles, and their Home
+    /// layouts and remembered offsets); deleted when the test ends.
+    private func temporaryUser(admin: Bool = false) throws -> (name: String, password: String) {
+        let name = "ui\(admin ? "admin" : "user")-\(Int.random(in: 1000...9999))"
+        let pass = "correct horse battery"
+        let user = try adminAPI("POST", "/users", ["username": name, "displayName": name, "password": pass, "isAdmin": admin])
+        let id = try XCTUnwrap(user["id"] as? Int)
+        let url = "http://\(server)/api/v1/users/\(id)", token = adminToken
+        addTeardownBlock { Self.send("DELETE", url, token: token) }
+        return (name, pass)
+    }
+
+    /// Sharing (USER-13): invite a friend, share the link, see the invite and delete it; the
+    /// household and friends are listed apart.
+    func testInviteFriend() throws {
+        let admin = try temporaryUser(admin: true)
+        signIn(username: admin.name, password: admin.password)
+        app.buttons["Settings"].firstMatch.tap()
+        let users = app.buttons["Users and Friends"]
+        XCTAssertTrue(users.waitForExistence(timeout: 10))
+        users.tap()
+        XCTAssertTrue(app.staticTexts["HOUSEHOLD"].waitForExistence(timeout: 10) || app.staticTexts["Household"].exists)
+        XCTAssertTrue(app.staticTexts["Kiddo"].waitForExistence(timeout: 10))
+        shot("inv1-users")
+        // Other tests' accounts can push it below the fold.
+        let invite = app.buttons["Invite a Friend"]
+        for _ in 0..<8 where !(invite.exists && invite.isHittable) { app.swipeUp() }
+        invite.tap()
+        let note = app.textFields["Note (who it's for)"]
+        XCTAssertTrue(note.waitForExistence(timeout: 5))
+        note.tap()
+        let label = "UITest Friend \(Int.random(in: 100...999))"
+        note.typeText(label)
+        app.switches["Can request titles"].switches.firstMatch.tap()
+        shot("inv2-form")
+        app.buttons["Create Invite"].tap()
+        let link = app.staticTexts["inviteLink"]
+        XCTAssertTrue(link.waitForExistence(timeout: 10))
+        XCTAssertTrue(link.label.hasPrefix("http://\(server)/join/"), link.label)
+        shot("inv3-link")
+        // The system share sheet.
+        app.buttons["Share Link"].tap()
+        let copy = app.buttons["Copy"].firstMatch
+        XCTAssertTrue(copy.waitForExistence(timeout: 10) || app.otherElements["ActivityListView"].waitForExistence(timeout: 2), "the share sheet opens")
+        shot("inv4-share-sheet")
+        if copy.exists { copy.tap() } else { app.buttons["Close"].firstMatch.tap() }
+        XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5))
+        app.buttons["Done"].tap()
+
+        // Listed as pending; the server has it with the chosen restrictions.
+        let row = app.staticTexts[label]
+        for _ in 0..<8 where !(row.exists && row.isHittable) { app.swipeUp() }
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        let created = try XCTUnwrap(try adminList("/invites").first { $0["note"] as? String == label })
+        XCTAssertEqual((created["restrictions"] as? [String: Any])?["canRequest"] as? Bool, true)
+        shot("inv5-invites")
+        app.buttons["Delete invite \(label)"].tap()
+        XCTAssertTrue(row.waitForNonExistence(timeout: 10))
+        XCTAssertNil(try adminList("/invites").first { $0["note"] as? String == label })
+    }
+
+    /// Cinema trailer settings (admin): change the count, save, and put it back.
+    func testCinemaSettings() throws {
+        let before = try adminAPI("GET", "/settings")["cinema"] as? [String: Any] ?? [:]
+        let was = before["trailers"] as? Int ?? 0
+        restoreCinema(before)
+        let admin = try temporaryUser(admin: true)
+        signIn(username: admin.name, password: admin.password)
+        app.buttons["Settings"].firstMatch.tap()
+        let cinema = app.buttons["Cinema Trailers"]
+        XCTAssertTrue(cinema.waitForExistence(timeout: 10))
+        cinema.tap()
+        let picker = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Trailers before movies'")).firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: 10))
+        picker.tap()
+        let want = was == 2 ? "3" : "2"
+        app.buttons[want].firstMatch.tap()
+        // A pre-roll picked by search.
+        let search = app.textFields["Search for a video"]
+        search.tap()
+        search.typeText("Long Test")
+        let result = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '00 Long Test'")).firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 10))
+        result.tap()
+        XCTAssertTrue(app.buttons["Clear Pre-roll"].waitForExistence(timeout: 5))
+        shot("cs1-cinema")
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts["Saved."].waitForExistence(timeout: 10))
+        let saved = try adminAPI("GET", "/settings")["cinema"] as? [String: Any] ?? [:]
+        XCTAssertEqual(saved["trailers"] as? Int, Int(want))
+        XCTAssertEqual(saved["prerollItemId"] as? Int, 322)
+    }
+
+    /// A request that doesn't need an expectation, for teardown blocks (which run even when a
+    /// failure stops the test, unlike defer).
+    private static func send(_ method: String, _ url: String, token: String?, _ body: [String: Any]? = nil) {
+        guard let token, let u = URL(string: url) else { return }
+        var req = URLRequest(url: u)
+        req.httpMethod = method
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if let body {
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        }
+        let done = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: req) { _, _, _ in done.signal() }.resume()
+        _ = done.wait(timeout: .now() + 15)
+    }
 }

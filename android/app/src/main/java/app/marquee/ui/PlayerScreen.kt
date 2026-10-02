@@ -27,11 +27,14 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Forward30
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.CastConnected
@@ -52,6 +55,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -93,6 +97,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.navigation.NavHostController
 import app.marquee.api.models.ItemDetail
+import app.marquee.api.models.ItemSummary
 import app.marquee.api.models.ItemType
 import app.marquee.api.models.Marker
 import app.marquee.api.models.MediaStream
@@ -108,14 +113,28 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** What the viewer picked in the player's settings; null means the server's choice. */
-private data class Choice(val fileId: Long? = null, val audio: Long? = null, val subtitle: Long? = null, val maxKbps: Int? = null)
+/**
+ * What the viewer picked in the player's settings; null means the server's choice. The
+ * timing offsets (PLAY-17) are sent together once either is changed, and the server
+ * remembers them for this file.
+ */
+private data class Choice(val fileId: Long? = null, val audio: Long? = null, val subtitle: Long? = null, val maxKbps: Int? = null,
+    val subOffset: Int? = null, val audioOffset: Int? = null)
 
 /** Quality caps offered in the player (kbps; null = no cap). */
 private val qualities = listOf<Pair<String, Int?>>(
     "Original" to null, "20 Mbps 1080p" to 20_000, "12 Mbps 1080p" to 12_000, "8 Mbps 1080p" to 8_000,
     "4 Mbps 720p" to 4_000, "2 Mbps 720p" to 2_000, "1 Mbps 480p" to 1_000,
 )
+
+/** Playback speeds offered in the player (PLAY-19). */
+private val speeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+
+private fun speedLabel(s: Float) = (if (s == s.toInt().toFloat()) s.toInt().toString() else s.toString()) + "×"
+
+/** Subtitle and audio timing limits and step (PLAY-17), ms. */
+private const val maxOffset = 30_000
+private const val offsetStep = 100
 
 /**
  * Plays a video: asks the server for a session (direct play, direct stream or transcode for
@@ -156,6 +175,13 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     val groupError by together.error.collectAsState()
     var groupPanel by remember { mutableStateOf(false) }
     var finding by remember { mutableStateOf(false) }
+    // Playback speed (PLAY-19): 1× for every new video.
+    var speed by remember { mutableFloatStateOf(1f) }
+    // Cinema trailers (PLAY-18): what plays before the movie, and which one is playing (-1 = the movie).
+    var rolls by remember { mutableStateOf(emptyList<ItemSummary>()) }
+    var roll by remember { mutableIntStateOf(-1) }
+    // Bumped by a timing change; the session restarts once the stepping stops.
+    var timingChange by remember { mutableIntStateOf(0) }
     LaunchedEffect(groupId) { if (groupId != null) { delay(1500); together.join(groupId) } }
     // Downloaded: play the file on the device, even when the server is reachable (D64).
     val downloads = LocalDownloads.current
@@ -180,11 +206,15 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
         }
     }
 
-    /** Starts (or restarts, after a settings change) a server session at a position. */
-    suspend fun start(at: Long?, c: Choice) = withContext(Dispatchers.Main) {
+    /**
+     * Starts (or restarts, after a settings change) a server session at a position. A trailer
+     * before the movie plays as its own session, with the server's choices.
+     */
+    suspend fun start(at: Long?, c: Choice, playId: Long = itemId) = withContext(Dispatchers.Main) {
         val old = session
-        val req = PlaybackRequest(itemId, AndroidProfile.profile, fileId = c.fileId, audioStreamId = c.audio, subtitleStreamId = c.subtitle,
-            startMs = at, maxBitrateKbps = c.maxKbps)
+        val req = if (playId != itemId) PlaybackRequest(playId, AndroidProfile.profile, startMs = at)
+        else PlaybackRequest(itemId, AndroidProfile.profile, fileId = c.fileId, audioStreamId = c.audio, subtitleStreamId = c.subtitle,
+            startMs = at, maxBitrateKbps = c.maxKbps, subtitleOffsetMs = c.subOffset, audioOffsetMs = c.audioOffset)
         // Started on the session's own scope: if the screen goes away while the server is
         // starting it, the session is stopped as soon as it arrives rather than left running.
         val pending = marquee.scope.async { runCatching { marquee.playback.startPlayback(req) } }
@@ -232,7 +262,43 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             val begin = startMs ?: downloads.resumePosition(itemId)
             if (begin > 0) player.seekTo(begin)
             player.playWhenReady = true
-        } else start(startMs, choice)
+        } else {
+            // Cinema trailers (PLAY-18): a movie started from the beginning (not resumed) gets
+            // the server's trailers and pre-roll first; the list is empty when they're off.
+            val d = detailReady.await()
+            val fromStart = startMs == 0L || (startMs == null && (d?.viewOffsetMs ?: 0) <= 0)
+            val pre = if (d?.type == ItemType.MOVIE && fromStart && groupId == null)
+                withContext(Dispatchers.IO) { runCatching { marquee.playback.listPrerolls(itemId) }.getOrDefault(emptyList()) } else emptyList()
+            if (pre.isNotEmpty() && !casting) {
+                rolls = pre
+                roll = 0
+                start(0, choice, pre[0].id)
+            } else start(startMs, choice)
+        }
+    }
+    // Watching together keeps everyone at 1×.
+    LaunchedEffect(group != null) { if (group != null && speed != 1f) { speed = 1f; player.setPlaybackSpeed(1f) } }
+    LaunchedEffect(timingChange) {
+        if (timingChange == 0) return@LaunchedEffect
+        delay(800)
+        start(player.currentPosition, choice)
+    }
+
+    /** After the trailers (or on Skip all): the movie itself, at 1×. */
+    fun startFeature() {
+        roll = -1
+        rolls = emptyList()
+        speed = 1f
+        player.setPlaybackSpeed(1f)
+        scope.launch { start(startMs, choice) }
+    }
+
+    fun nextRoll() {
+        if (roll + 1 < rolls.size) {
+            roll++
+            val r = rolls[roll]
+            scope.launch { start(0, Choice(), r.id) }
+        } else startFeature()
     }
     LaunchedEffect(Unit) {
         withContext(Dispatchers.Main) {
@@ -260,6 +326,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             override fun onPlaybackStateChanged(state: Int) {
                 buffering = state == Player.STATE_BUFFERING || state == Player.STATE_IDLE
                 if (state != Player.STATE_ENDED) return
+                if (roll >= 0) { nextRoll(); return }
                 if (local != null) { recordLocal(ended = true); if (stillShowing()) nav.popBackStack(); return }
                 report(PlaybackProgress.State.PAUSED)
                 // Up next: the following episode (or nothing), unless the viewer has already left.
@@ -271,6 +338,8 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                 }
             }
             override fun onPlayerError(e: androidx.media3.common.PlaybackException) {
+                // A trailer that won't play is skipped rather than holding up the movie.
+                if (roll >= 0) { nextRoll(); return }
                 error = "This video can't be played on this device (${e.errorCodeName})."
             }
         }
@@ -296,6 +365,8 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     LaunchedEffect(castDevice) {
         if (castDevice != null && local == null && !casting) {
             casting = true
+            roll = -1
+            rolls = emptyList()
             castError = null
             val here = session
             player.pause()
@@ -386,7 +457,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                         Text(d?.let { if (it.type == ItemType.EPISODE) listOfNotNull(it.parentTitle, it.index?.let { i -> "E$i" }, it.title).joinToString(" · ") else it.title } ?: "",
                             color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    if (local == null) IconButton({ if (group == null) together.start() else groupPanel = true; poke() }, Modifier.focusRing()) {
+                    if (local == null && roll < 0) IconButton({ if (group == null) together.start() else groupPanel = true; poke() }, Modifier.focusRing()) {
                         val g = group
                         if (g == null) Icon(Icons.Filled.Groups, "Watch together", tint = Color.White)
                         else Row(verticalAlignment = Alignment.CenterVertically) {
@@ -394,8 +465,8 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                             Text("${g.members.size}", color = Gold, style = MaterialTheme.typography.labelSmall)
                         }
                     }
-                    if (local == null) CastButton()
-                    if (local == null) IconButton({ settings = true; poke() }, Modifier.focusRing()) { Icon(Icons.Filled.Settings, "Playback settings", tint = Color.White) }
+                    if (local == null && roll < 0) CastButton()
+                    if (local == null && roll < 0) IconButton({ settings = true; poke() }, Modifier.focusRing()) { Icon(Icons.Filled.Settings, "Playback settings", tint = Color.White) }
                 }
                 // Middle: back 10, play/pause, forward 30.
                 Row(Modifier.align(Alignment.Center), horizontalArrangement = Arrangement.spacedBy(36.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -418,6 +489,20 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = if (controls) 96.dp else 32.dp, end = 32.dp).focusRing(),
         ) { Text(if (marker.kind == Marker.Kind.CREDITS) "Skip Credits" else "Skip Intro") }
 
+        // The trailer playing, and the way past it (PLAY-18).
+        rolls.getOrNull(roll)?.let { r ->
+            Row(
+                Modifier.align(Alignment.BottomEnd).padding(bottom = if (controls) 96.dp else 32.dp, end = 32.dp)
+                    .background(Color.Black.copy(alpha = 0.6f), androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("Trailer · ${r.parentTitle ?: r.title}", color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 280.dp))
+                TextButton({ nextRoll() }, Modifier.focusRing()) { Text("Skip", color = Gold) }
+                Button({ startFeature() }, Modifier.focusRing()) { Text("Skip all") }
+            }
+        }
+
         groupError?.let { Text(it, Modifier.align(Alignment.TopCenter).padding(top = 72.dp), color = MaterialTheme.colorScheme.error) }
         val g = group
         if (groupPanel && g != null) androidx.compose.material3.AlertDialog(
@@ -435,6 +520,18 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
         )
         if (settings) PlayerSettings(
             detail, session, choice,
+            together = group != null, speed = speed,
+            onSpeed = { s ->
+                settings = false
+                speed = s
+                player.setPlaybackSpeed(s)
+                poke()
+            },
+            onTiming = { sub, audio ->
+                // Both are sent once either changes; the restart waits for the stepping to stop.
+                choice = choice.copy(subOffset = sub, audioOffset = audio)
+                timingChange++
+            },
             onPick = { c ->
                 settings = false
                 choice = c
@@ -484,7 +581,11 @@ private fun ScrubBar(pos: Long, dur: Long, thumbs: TrickplayThumbs?, scrubbing: 
 
 /** Audio, subtitles, quality and version, applied by restarting the session where it is. */
 @Composable
-private fun PlayerSettings(detail: ItemDetail?, session: PlaybackSession?, choice: Choice, onPick: (Choice) -> Unit, onClose: () -> Unit, onFind: () -> Unit = {}) {
+private fun PlayerSettings(
+    detail: ItemDetail?, session: PlaybackSession?, choice: Choice, together: Boolean, speed: Float,
+    onSpeed: (Float) -> Unit, onTiming: (sub: Int, audio: Int) -> Unit,
+    onPick: (Choice) -> Unit, onClose: () -> Unit, onFind: () -> Unit = {},
+) {
     val version = detail?.versions?.firstOrNull { v -> v.files.any { it.id == (choice.fileId ?: session?.fileId) } } ?: detail?.versions?.firstOrNull()
     val file = version?.files?.firstOrNull { it.id == (choice.fileId ?: session?.fileId) } ?: version?.files?.firstOrNull()
     val streams = file?.streams.orEmpty()
@@ -492,6 +593,8 @@ private fun PlayerSettings(detail: ItemDetail?, session: PlaybackSession?, choic
     val subs = streams.filter { it.kind == MediaStream.Kind.SUBTITLE }
     val curAudio = choice.audio ?: session?.audioStreamId
     val curSub = if (choice.subtitle == -1L) null else choice.subtitle ?: session?.subtitleStreamId
+    val subOffset = choice.subOffset ?: session?.subtitleOffsetMs ?: 0
+    val audioOffset = choice.audioOffset ?: session?.audioOffsetMs ?: 0
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)).clickable(remember { MutableInteractionSource() }, null, onClick = onClose)) {
         LazyColumn(
             Modifier.align(Alignment.CenterEnd).width(340.dp).fillMaxSize().background(MaterialTheme.colorScheme.surface).padding(vertical = 16.dp)
@@ -512,6 +615,17 @@ private fun PlayerSettings(detail: ItemDetail?, session: PlaybackSession?, choic
             item { Option("Off", curSub == null, first = true) { onPick(choice.copy(subtitle = -1)) } }
             items(subs) { s -> Option(streamLabel(s), s.id == curSub) { onPick(choice.copy(subtitle = s.id)) } }
             item { Option("Find subtitles…", false, onClick = onFind) }
+            // Speed and timing are each viewer's own, so not while watching together.
+            if (!together) {
+                item { Heading("Speed") }
+                items(speeds) { s -> Option(speedLabel(s), s == speed) { onSpeed(s) } }
+                item { Heading("Subtitle timing") }
+                item { Timing("Subtitle timing", subOffset) { onTiming(it, audioOffset) } }
+                if (file == null || streams.any { it.kind == MediaStream.Kind.VIDEO }) {
+                    item { Heading("Audio timing") }
+                    item { Timing("Audio timing", audioOffset) { onTiming(subOffset, it) } }
+                }
+            }
             item { Heading("Quality") }
             items(qualities) { (label, kbps) -> Option(label, choice.maxKbps == kbps) { onPick(choice.copy(maxKbps = kbps)) } }
             session?.let { s ->
@@ -524,6 +638,19 @@ private fun PlayerSettings(detail: ItemDetail?, session: PlaybackSession?, choic
             }
             item { TextButton(onClose, Modifier.padding(horizontal = 8.dp).focusRing()) { Text("Close") } }
         }
+    }
+}
+
+/** A timing offset: earlier and later by 100 ms, the value, and Reset. Positive = later. */
+@Composable
+private fun Timing(label: String, ms: Int, onChange: (Int) -> Unit) {
+    fun set(v: Int) = onChange(v.coerceIn(-maxOffset, maxOffset))
+    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconButton({ set(ms - offsetStep) }, Modifier.focusRing()) { Icon(Icons.Filled.Remove, "$label earlier") }
+        Text(if (ms == 0) "0 ms" else "%+d ms".format(ms), Modifier.weight(1f).semantics { contentDescription = "$label value" },
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center, fontWeight = FontWeight.SemiBold)
+        IconButton({ set(ms + offsetStep) }, Modifier.focusRing()) { Icon(Icons.Filled.Add, "$label later") }
+        TextButton({ set(0) }, Modifier.focusRing(), enabled = ms != 0) { Text("Reset") }
     }
 }
 
