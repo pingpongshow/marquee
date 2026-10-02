@@ -1,6 +1,6 @@
 # Open Questions
 
-_Last updated: 2026-10-01_
+_Last updated: 2026-10-02_
 
 ## Open
 
@@ -10,8 +10,8 @@ _Last updated: 2026-10-01_
 | Q9 | Open source (and which license) or private? | Licensing of dependencies, repo hosting. | Private GitHub repo. |
 | Q10 | Anime default: seasonal (TVDB-style) or absolute episode numbering? | Anime agent defaults. | Seasonal, with a per-show override. |
 | Q12 | Should `Video/Hentai` and `Video/XXX` (not in Plex today) become libraries, e.g. hidden from managed users? | Library and restriction setup. | Excluded. |
-| Q14 | Sonic analysis model for M6.5: Essentia (discogs-effnet embeddings plus mood/BPM/key models), CLAP (text-and-audio embeddings, enabling local natural-language playlists), or both? | Quality of "similar" and of Sonic Sage prompts. GPU time for the initial pass over ~16,100 tracks. | Both: Essentia for features and similarity, CLAP for text prompts; prototype on a sample before committing. |
 | Q15 | Sonic Sage with an LLM: allow an optional cloud LLM (e.g. Claude API key) to interpret longer prompts, or keep everything local? | Privacy (prompts and track titles would be sent) vs. prompt quality. | Optional and off by default; local CLAP works without it. |
+| Q16 | Request Apple's CarPlay audio entitlement for the developer team? | The app has a CarPlay audio scene (mixes, stations, library, downloads). Simulator builds include the entitlement; device builds can only include it once Apple grants it to the team (a request form on developer.apple.com). | CarPlay stays off on devices until granted; nothing else is affected. |
 | Q13 | Photos: build our own (P2), or leave photos to the Immich instance already on the host? | Scope. | Leave to Immich. Revisit after v1.0. |
 
 ## Answered
@@ -26,3 +26,4 @@ _Last updated: 2026-10-01_
 | Q8 | **Marquee** |
 | Q11 | Tech stack approved. |
 | Q7 | TMDB key added 2026-10-01. OMDb optional (owner asked whether to add it; it has been added as an optional ratings source). |
+| Q14 | Decided by D56 (2026-10-02): CLAP (`laion/larger_clap_general`) for both similarity and text prompts, librosa for tempo, key and energy. Essentia was not needed. |

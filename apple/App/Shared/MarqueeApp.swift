@@ -37,6 +37,9 @@ struct MarqueeApp: App {
         player.downloads = dl
         AppDelegate.downloads = dl
         _downloads = State(initialValue: dl)
+        Shared.app = session
+        Shared.music = player
+        Shared.downloads = dl
         #endif
     }
 
