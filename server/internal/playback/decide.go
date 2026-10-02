@@ -27,6 +27,8 @@ type DeviceProfile struct {
 	HLSAudioCodecs []string
 	// TextSubtitles: the client can show WebVTT sidecar subtitles.
 	TextSubtitles bool
+	// ASSSubtitles: the client renders styled ASS/SSA itself.
+	ASSSubtitles bool
 }
 
 type Method string
@@ -101,6 +103,7 @@ type Decision struct {
 	AudioChannels int
 	BurnSubtitle  bool // burn the selected (image) subtitle into the video
 	SubtitleVTT   bool // deliver the selected text subtitle as a WebVTT sidecar
+	SubtitleASS   bool // deliver it as the original ASS (client renders styling and fonts)
 	ToneMap       bool
 	Reasons       []string
 	retag         bool // video is fine apart from its codec tag; direct stream fixes it
@@ -187,6 +190,8 @@ func Decide(m Media, p DeviceProfile, l Limits) Decision {
 		if s.IsImage() {
 			d.BurnSubtitle = true
 			reason("image subtitles (%s) must be burned in", s.Codec)
+		} else if (s.Codec == "ass" || s.Codec == "ssa") && p.ASSSubtitles {
+			d.SubtitleASS = true
 		} else if p.TextSubtitles {
 			d.SubtitleVTT = true
 		} else {

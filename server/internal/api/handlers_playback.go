@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"marquee/internal/items"
 	"marquee/internal/netclass"
@@ -20,6 +21,7 @@ func toProfile(p DeviceProfile) playback.DeviceProfile {
 	set(&out.MaxHeight, p.MaxHeight)
 	set(&out.TenBit, p.TenBit)
 	set(&out.TextSubtitles, p.TextSubtitles)
+	set(&out.ASSSubtitles, p.AssSubtitles)
 	if p.Hdr != nil {
 		for _, h := range *p.Hdr {
 			out.HDR = append(out.HDR, string(h))
@@ -98,8 +100,14 @@ func (h *Handlers) StartPlayback(ctx context.Context, req StartPlaybackRequestOb
 	default:
 		out.Url, out.Protocol = base+"master.m3u8", Hls
 	}
-	if s.Decision.SubtitleVTT && s.SubtitleStreamID > 0 {
+	switch {
+	case s.Decision.SubtitleASS && s.SubtitleStreamID > 0:
+		out.SubtitleUrl = ptr(fmt.Sprintf("%ssubtitles/%d.ass", base, s.SubtitleStreamID))
+		out.SubtitleFormat = ptr(Ass)
+		out.FontsUrl = ptr(base + "fonts.json")
+	case s.Decision.SubtitleVTT && s.SubtitleStreamID > 0:
 		out.SubtitleUrl = ptr(fmt.Sprintf("%ssubtitles/%d.vtt", base, s.SubtitleStreamID))
+		out.SubtitleFormat = ptr(Vtt)
 	}
 	rows, err := h.DB.QueryContext(ctx, `SELECT kind, start_ms, end_ms FROM markers WHERE file_id = ? AND kind IN ('intro', 'credits') ORDER BY start_ms`, s.FileID)
 	if err == nil {
@@ -181,7 +189,24 @@ func (h *Handlers) ListPlaybackSessions(ctx context.Context, _ ListPlaybackSessi
 	out := ListPlaybackSessions200JSONResponse{}
 	for _, s := range h.Playback.List() {
 		if sess.User.IsAdmin || s.UserID == sess.User.ID {
-			out = append(out, toSessionInfo(s))
+			info := toSessionInfo(s)
+			if d, err := h.Items.Get(ctx, items.Unrestricted, s.ItemID, false); err == nil {
+				switch {
+				case d.Thumb > 0:
+					info.ImageId = ptr(d.Thumb)
+				case d.Backdrop > 0:
+					info.ImageId = ptr(d.Backdrop)
+				case d.Poster > 0:
+					info.ImageId = ptr(d.Poster)
+				}
+				switch d.Type {
+				case "episode":
+					info.Subtitle = ptr(fmt.Sprintf("%s · E%d · %s", d.ParentTitle, d.Index, d.Title))
+				case "track":
+					info.Subtitle = ptr(d.ParentTitle)
+				}
+			}
+			out = append(out, info)
 		}
 	}
 	return out, nil
@@ -284,4 +309,85 @@ func (h *Handlers) HomeHubs(ctx context.Context, _ HomeHubsRequestObject) (HomeH
 		add(fmt.Sprintf("recent-%d", l.ID), "Recently Added "+l.Name, l.ID, list)
 	}
 	return out, nil
+}
+
+// ---------- dashboard ----------
+
+var serverStarted = time.Now()
+
+func (h *Handlers) SystemStatus(ctx context.Context, _ SystemStatusRequestObject) (SystemStatusResponseObject, error) {
+	switch authed, admin := isAdmin(ctx); {
+	case !authed:
+		return SystemStatus401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !admin:
+		return SystemStatus403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	cfg := h.Settings.Get()
+	out := SystemStatus{Version: h.Version, StartedAt: serverStarted, Encoders: h.Playback.Encoders.Available(cfg.Transcoder.EncoderOrder),
+		MaxTranscodes: cfg.Transcoder.MaxConcurrentTranscodes, UploadSpeedKbps: nz(cfg.RemoteAccess.UploadSpeedKbps)}
+	for _, s := range h.Playback.List() {
+		out.ActiveStreams++
+		if s.Transcoder() != nil {
+			out.ActiveTranscodes++
+		}
+		if s.Remote {
+			out.RemoteKbps += s.BitrateKbps()
+		} else {
+			out.LocalKbps += s.BitrateKbps()
+		}
+	}
+	libs, err := h.Libraries.List(ctx)
+	if err != nil {
+		return nil, internal(ctx, "status", err)
+	}
+	for _, l := range libs {
+		out.Libraries = append(out.Libraries, struct {
+			Id    int64       `json:"id"`
+			Items int         `json:"items"`
+			Name  string      `json:"name"`
+			Type  LibraryType `json:"type"`
+		}{Id: l.ID, Items: l.ItemCount, Name: l.Name, Type: LibraryType(l.Type)})
+	}
+	return SystemStatus200JSONResponse(out), nil
+}
+
+func (h *Handlers) PlayHistory(ctx context.Context, req PlayHistoryRequestObject) (PlayHistoryResponseObject, error) {
+	switch authed, admin := isAdmin(ctx); {
+	case !authed:
+		return PlayHistory401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !admin:
+		return PlayHistory403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	limit := 50
+	if req.Params.Limit != nil && *req.Params.Limit > 0 && *req.Params.Limit <= 500 {
+		limit = *req.Params.Limit
+	}
+	rows, err := h.DB.QueryContext(ctx, `SELECT h.id, COALESCE(u.display_name, ''), COALESCE(d.name, ''), COALESCE(h.item_id, 0), h.item_title,
+		h.started_at, COALESCE(h.stopped_at, ''), COALESCE(h.position_ms, 0), COALESCE(h.decision, ''), COALESCE(h.network_class, ''),
+		COALESCE(h.video_encoder, ''), COALESCE(h.bitrate_kbps, 0), h.source
+		FROM play_history h LEFT JOIN users u ON u.id = h.user_id LEFT JOIN devices d ON d.id = h.device_id
+		ORDER BY h.started_at DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, internal(ctx, "history", err)
+	}
+	defer rows.Close()
+	out := PlayHistory200JSONResponse{}
+	for rows.Next() {
+		var e HistoryEntry
+		var user, dev, started, stopped, method, nc, enc, src string
+		var item, pos int64
+		var kbps int
+		if err := rows.Scan(&e.Id, &user, &dev, &item, &e.Title, &started, &stopped, &pos, &method, &nc, &enc, &kbps, &src); err != nil {
+			return nil, internal(ctx, "history", err)
+		}
+		e.UserName, e.DeviceName, e.ItemId, e.PositionMs = nz(user), nz(dev), nz(item), nz(pos)
+		e.Method, e.NetworkClass, e.Encoder, e.BitrateKbps = nz(method), nz(nc), nz(enc), nz(kbps)
+		e.Source = HistoryEntrySource(src)
+		e.StartedAt, _ = time.Parse(time.RFC3339Nano, started)
+		if t, err := time.Parse(time.RFC3339Nano, stopped); err == nil {
+			e.StoppedAt = &t
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
 }
