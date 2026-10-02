@@ -60,7 +60,7 @@ _Last updated: 2026-10-01. Status: **Draft**._
 - **person / credit** (item_id, person_id, role, character, order)
 - **tag** (genre, studio, collection, label, country, mood) + item_tag
 - **artwork** (item_id, kind: poster|backdrop|logo|thumb|banner, source, local cache path, selected)
-- **user** (id, name, password_hash, pin, is_admin, is_managed, restrictions JSON, preferences JSON)
+- **user** (id, name, password_hash, pin, is_admin, is_managed, restrictions JSON, preferences JSON, avatar_version). The profile picture is `<config>/avatars/<id>.jpg`.
 - **device / session_token** (user_id, device name, platform, token hash, last_seen)
 - **user_item_state** (user_id, item_id, view_offset_ms, play_count, last_viewed_at, rating, is_watchlisted)
 - **playlist / playlist_item**

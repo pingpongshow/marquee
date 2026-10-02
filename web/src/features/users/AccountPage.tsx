@@ -3,6 +3,7 @@ import { useState } from "react";
 import { meQuery, useUpdateMe } from "@/api/queries";
 import type { UserPreferences } from "@/api/types";
 import { Alert, Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
+import { AvatarPicker } from "./Avatar";
 import { languageOptions, localQualityOptions, remoteQualityOptions } from "./constants";
 
 /** Per-user account and playback preferences (any user). */
@@ -32,6 +33,7 @@ export function AccountPage() {
       {update.isError && <Alert tone="error">{update.error.message}</Alert>}
 
       <Card title="Profile">
+        <AvatarPicker user={u} />
         <Field label="Display name">{(id) => <Input id={id} maxLength={64} value={name ?? u.displayName} onChange={(e) => setName(e.target.value)} />}</Field>
         <div className="flex justify-end">
           <Button variant="primary" disabled={!name || name === u.displayName} loading={update.isPending} onClick={() => update.mutate({ displayName: name ?? undefined }, { onSuccess: done("Profile saved.") })}>

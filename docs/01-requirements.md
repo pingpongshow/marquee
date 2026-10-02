@@ -91,6 +91,7 @@ Priority key:
 | USER-1 | Local accounts. The first-run setup creates the admin. No cloud account is required. | P0 |
 | USER-2 | Managed users (Plex Home equivalent): PIN switching, content rating limits and library restrictions. | P0 |
 | USER-10 | **PIN sign-in (Plex-style):** a "Who's watching?" profile picker on the sign-in screen. Passwords are required only for administrators. PIN and password are optional for everyone else. Profiles with a PIN sign in with it, profiles with only a password use it, and profiles with neither open with one tap (Plex Home style). The admin chooses where it's allowed: home network only (default), everywhere, or off. Five wrong PINs lock the profile for 15 minutes. | P0 |
+| USER-11 | **Profile pictures (optional):** users upload a picture for themselves, and admins for anyone. The user drags and zooms it inside the round frame used for profile bubbles, which show it on the sign-in picker, the profile switcher, the account menu and the user list. Users without one show their initial. | P1 |
 | USER-3 | Per-device sessions and tokens that can be listed and revoked. | P0 |
 | USER-4 | TV-friendly login: Apple TV shows a code and you approve it from your phone or web ("Quick Connect"). | P1 |
 | USER-5 | Per-user watch state: resume offset, played/unplayed, play count, last watched, and ratings. | P0 |

@@ -6,6 +6,7 @@ import type { Profile } from "@/api/types";
 import { PinPad } from "@/components/PinPad";
 import { Alert, Button, Field, Input, Spinner } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
+import { Avatar } from "@/features/users/Avatar";
 import { AuthLayout } from "./AuthLayout";
 
 function PasswordForm({ onBack }: { onBack?: () => void }) {
@@ -64,10 +65,9 @@ function ProfilePicker({ profiles, onUsePassword }: { profiles: Profile[]; onUse
           {profiles.map((p) => (
             <li key={p.id}>
               <button onClick={() => choose(p)} disabled={login.isPending} className="group flex w-full flex-col items-center gap-2 rounded-lg p-2 hover:bg-surface-2">
-                <span className="relative flex size-16 items-center justify-center rounded-full bg-surface-3 text-2xl font-bold group-hover:ring-2 group-hover:ring-accent">
-                  {p.displayName.slice(0, 1).toUpperCase()}
+                <Avatar name={p.displayName} url={p.avatarUrl} className="size-16 text-2xl group-hover:ring-2 group-hover:ring-accent">
                   {p.requires !== "none" && <Lock className="absolute -right-0.5 -bottom-0.5 size-5 rounded-full bg-surface p-1 text-muted" aria-label="Locked" />}
-                </span>
+                </Avatar>
                 <span className="max-w-full truncate text-sm">{p.displayName}</span>
               </button>
             </li>
@@ -82,7 +82,7 @@ function ProfilePicker({ profiles, onUsePassword }: { profiles: Profile[]; onUse
   return (
     <div className="space-y-5">
       <div className="text-center">
-        <div className="mx-auto mb-2 flex size-16 items-center justify-center rounded-full bg-surface-3 text-2xl font-bold">{chosen.displayName.slice(0, 1).toUpperCase()}</div>
+        <Avatar name={chosen.displayName} url={chosen.avatarUrl} className="mx-auto mb-2 size-16 text-2xl" />
         <div className="font-medium">{chosen.displayName}</div>
       </div>
       {login.isError && <Alert tone="error">{login.error.message}</Alert>}

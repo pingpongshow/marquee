@@ -6,6 +6,7 @@ import type { User, UserRestrictions } from "@/api/types";
 import { Alert, Button, Card, Dialog, Field, Input, Select, Spinner, Toggle } from "@/components/ui";
 import { SaveBar } from "../settings/SaveBar";
 import { useSectionDraft } from "../settings/useSectionDraft";
+import { Avatar, AvatarPicker } from "./Avatar";
 import { ratingOptions, remoteQualityOptions } from "./constants";
 
 function Badge({ children, tone = "muted" }: { children: React.ReactNode; tone?: "accent" | "muted" }) {
@@ -167,6 +168,7 @@ function AddUserDialog({ onClose }: { onClose: () => void }) {
 
 function EditUserDialog({ user, isSelf, onClose }: { user: User; isSelf: boolean; onClose: () => void }) {
   const update = useUpdateUser();
+  const live = useQuery(usersQuery).data?.find((u) => u.id === user.id) ?? user; // picture changes save immediately
   const [displayName, setDisplayName] = useState(user.displayName);
   const [password, setPassword] = useState("");
   const [pin, setPin] = useState<string | null>(null);
@@ -204,6 +206,7 @@ function EditUserDialog({ user, isSelf, onClose }: { user: User; isSelf: boolean
     >
       <div className="space-y-5">
         {update.isError && <Alert tone="error">{update.error.message}</Alert>}
+        <AvatarPicker user={live} />
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Display name">{(id) => <Input id={id} maxLength={64} value={displayName} onChange={(e) => setDisplayName(e.target.value)} />}</Field>
           {!user.isManaged && (
@@ -277,7 +280,7 @@ export function UsersSettings() {
         <ul className="-my-2 divide-y divide-border">
           {users.data?.map((u) => (
             <li key={u.id} className="flex items-center gap-4 py-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-3 text-sm font-bold">{u.displayName.slice(0, 1).toUpperCase()}</div>
+              <Avatar name={u.displayName} url={u.avatarUrl} className="size-10 text-sm" />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">{u.displayName}</span>

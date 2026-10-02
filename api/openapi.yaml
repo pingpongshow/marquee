@@ -245,6 +245,61 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /users/{userId}/avatar:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    get:
+      tags: [users]
+      operationId: getAvatar
+      summary: A user's profile picture (512×512 JPEG). Available without signing in where the sign-in profile picker is shown.
+      description: Use the `avatarUrl` from User or Profile; it carries a version so the response can be cached forever.
+      security: []
+      parameters:
+        - name: v
+          in: query
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Image.
+          headers:
+            Cache-Control: { schema: { type: string } }
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [users]
+      operationId: setAvatar
+      summary: Upload a profile picture (yourself, or any user as an administrator). JPEG, PNG or WebP up to 10 MB; it is center-cropped to a square and stored at 512×512.
+      description: Clients crop and position the picture themselves and upload the square result.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [users]
+      operationId: deleteAvatar
+      summary: Remove a profile picture (yourself, or any user as an administrator).
+      responses:
+        "200":
+          description: Removed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /profiles:
     get:
       tags: [users]
@@ -1110,6 +1165,7 @@ components:
         isManaged: { type: boolean, description: Managed profiles (e.g. children) sign in only by switching profile with a PIN. }
         hasPin: { type: boolean }
         hasPassword: { type: boolean }
+        avatarUrl: { type: string, description: Profile picture URL; absent when the user has none. }
         createdAt: { type: string, format: date-time }
         lastSeenAt: { type: string, format: date-time }
         restrictions: { $ref: "#/components/schemas/UserRestrictions" }
@@ -1179,6 +1235,7 @@ components:
         displayName: { type: string }
         isManaged: { type: boolean }
         requires: { type: string, enum: [none, pin, password], description: What switching to this profile asks for. }
+        avatarUrl: { type: string, description: Profile picture URL; absent when the user has none. }
 
     PinLoginRequest:
       type: object

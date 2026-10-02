@@ -177,6 +177,33 @@ export interface paths {
         patch: operations["updateUser"];
         trace?: never;
     };
+    "/users/{userId}/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A user's profile picture (512×512 JPEG). Available without signing in where the sign-in profile picker is shown.
+         * @description Use the `avatarUrl` from User or Profile; it carries a version so the response can be cached forever.
+         */
+        get: operations["getAvatar"];
+        /**
+         * Upload a profile picture (yourself, or any user as an administrator). JPEG, PNG or WebP up to 10 MB; it is center-cropped to a square and stored at 512×512.
+         * @description Clients crop and position the picture themselves and upload the square result.
+         */
+        put: operations["setAvatar"];
+        post?: never;
+        /** Remove a profile picture (yourself, or any user as an administrator). */
+        delete: operations["deleteAvatar"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profiles": {
         parameters: {
             query?: never;
@@ -809,6 +836,8 @@ export interface components {
             isManaged: boolean;
             hasPin?: boolean;
             hasPassword?: boolean;
+            /** @description Profile picture URL; absent when the user has none. */
+            avatarUrl?: string;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -876,6 +905,8 @@ export interface components {
              * @enum {string}
              */
             requires: "none" | "pin" | "password";
+            /** @description Profile picture URL; absent when the user has none. */
+            avatarUrl?: string;
         };
         PinLoginRequest: {
             /** Format: int64 */
@@ -2020,6 +2051,87 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    getAvatar: {
+        parameters: {
+            query?: {
+                v?: number;
+            };
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Image. */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setAvatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteAvatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listProfiles: {

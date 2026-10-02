@@ -7,6 +7,7 @@ import type { LibraryType } from "@/api/types";
 import { ActivityIndicator } from "@/features/activity/ActivityIndicator";
 import { UpdateBanner } from "@/features/activity/UpdateBanner";
 import { SearchBox } from "@/features/search/SearchBox";
+import { Avatar } from "@/features/users/Avatar";
 import { ProfileSwitcher } from "@/features/users/ProfileSwitcher";
 import { useMusic } from "@/features/player/MusicPlayer";
 import { useAuth } from "@/lib/auth";
@@ -32,7 +33,7 @@ function Logo() {
 const navItem = "flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-text";
 const navActive = { className: "bg-surface-2 !text-text font-medium" };
 
-function UserMenu({ name, onSwitch, onSignOut }: { name: string; onSwitch: () => void; onSignOut: () => void }) {
+function UserMenu({ name, avatarUrl, onSwitch, onSignOut }: { name: string; avatarUrl?: string; onSwitch: () => void; onSignOut: () => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -45,7 +46,7 @@ function UserMenu({ name, onSwitch, onSignOut }: { name: string; onSwitch: () =>
   return (
     <div className="relative" ref={ref}>
       <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-2 rounded-full p-0.5 pr-2 hover:bg-surface-2" aria-expanded={open} aria-label="Account menu">
-        <span className="flex size-8 items-center justify-center rounded-full bg-accent text-sm font-bold text-black">{name.slice(0, 1).toUpperCase()}</span>
+        <Avatar name={name} url={avatarUrl} className="size-8 !bg-accent text-sm text-black" />
         <span className="hidden text-sm text-muted sm:inline">{name}</span>
       </button>
       {open && (
@@ -117,7 +118,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <SearchBox />
         <div className="ml-auto flex items-center gap-3">
           {me.data?.isAdmin && <ActivityIndicator />}
-          <UserMenu name={me.data?.displayName ?? ""} onSwitch={() => setSwitching(true)} onSignOut={() => void signOut()} />
+          <UserMenu name={me.data?.displayName ?? ""} avatarUrl={me.data?.avatarUrl} onSwitch={() => setSwitching(true)} onSignOut={() => void signOut()} />
         </div>
       </header>
       <div className="flex min-h-0 flex-1">

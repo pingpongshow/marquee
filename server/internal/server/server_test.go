@@ -6,15 +6,21 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/jpeg"
+	"image/png"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"marquee/internal/api"
 	"marquee/internal/auth"
+	"marquee/internal/avatars"
 	"marquee/internal/db"
 	"marquee/internal/items"
 	"marquee/internal/library"
@@ -56,7 +62,8 @@ func newHarness(t *testing.T) *harness {
 	authSvc := auth.NewService(database)
 	h := New(Deps{
 		Handlers: &api.Handlers{DB: database, Auth: authSvc, Settings: store,
-			Libraries: library.NewStore(database), Items: items.NewStore(database), Version: "test"},
+			Libraries: library.NewStore(database), Items: items.NewStore(database), Version: "test",
+			Avatars: &avatars.Store{DB: database, Dir: filepath.Join(dir, "avatars")}},
 		Auth:       authSvc,
 		Classifier: netclass.New([]string{"127.0.0.0/8"}, ""),
 	})
@@ -355,5 +362,78 @@ func TestPinSignIn(t *testing.T) {
 	}
 	if code := pin(tot.Id, ""); code != 403 {
 		t.Fatalf("PIN accepted while disabled: %d", code)
+	}
+}
+
+func (h *harness) raw(method, path string, body []byte) (*http.Response, []byte) {
+	h.t.Helper()
+	req, _ := http.NewRequest(method, h.srv.URL+path, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/octet-stream")
+	if h.token != "" {
+		req.Header.Set("Authorization", "Bearer "+h.token)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		h.t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp, b
+}
+
+func TestAvatars(t *testing.T) {
+	h := newHarness(t)
+	var res api.AuthResult
+	h.do("POST", "/setup", map[string]any{"serverName": "T", "username": "admin", "password": "correct horse", "device": device}, &res)
+	adminToken := res.Token
+	h.token = adminToken
+	var me, kid api.User
+	h.do("GET", "/me", nil, &me)
+	h.do("POST", "/users", map[string]any{"username": "kid", "isManaged": true}, &kid)
+
+	var pic bytes.Buffer
+	png.Encode(&pic, image.NewRGBA(image.Rect(0, 0, 200, 100)))
+	resp, body := h.raw("PUT", fmt.Sprintf("/api/v1/users/%d/avatar", kid.Id), pic.Bytes())
+	var updated api.User
+	json.Unmarshal(body, &updated)
+	if resp.StatusCode != 200 || updated.AvatarUrl == nil {
+		t.Fatalf("admin upload for kid: %d %s", resp.StatusCode, body)
+	}
+	if resp, _ := h.raw("PUT", fmt.Sprintf("/api/v1/users/%d/avatar", kid.Id), []byte("not an image")); resp.StatusCode != 400 {
+		t.Fatalf("garbage upload: %d", resp.StatusCode)
+	}
+
+	// The sign-in picker shows it without a token.
+	h.token = ""
+	var profiles []api.Profile
+	h.do("GET", "/auth/profiles", nil, &profiles)
+	var url string
+	for _, p := range profiles {
+		if p.Id == kid.Id && p.AvatarUrl != nil {
+			url = *p.AvatarUrl
+		}
+	}
+	if url != *updated.AvatarUrl {
+		t.Fatalf("profile avatarUrl %q, user %q", url, *updated.AvatarUrl)
+	}
+	resp, body = h.raw("GET", url, nil)
+	if resp.StatusCode != 200 || resp.Header.Get("Content-Type") != "image/jpeg" || !strings.Contains(resp.Header.Get("Cache-Control"), "immutable") {
+		t.Fatalf("get avatar: %d %v", resp.StatusCode, resp.Header)
+	}
+	if img, err := jpeg.Decode(bytes.NewReader(body)); err != nil || img.Bounds().Dx() != avatars.Size || img.Bounds().Dy() != avatars.Size {
+		t.Fatalf("stored avatar: %v", err)
+	}
+
+	// Users can change only their own.
+	h.do("POST", "/auth/pin", map[string]any{"userId": kid.Id, "device": device}, &res)
+	h.token = res.Token
+	if resp, _ := h.raw("PUT", fmt.Sprintf("/api/v1/users/%d/avatar", me.Id), pic.Bytes()); resp.StatusCode != 403 {
+		t.Fatalf("kid changed admin's picture: %d", resp.StatusCode)
+	}
+	if resp, body := h.raw("DELETE", fmt.Sprintf("/api/v1/users/%d/avatar", kid.Id), nil); resp.StatusCode != 200 || strings.Contains(string(body), "avatarUrl") {
+		t.Fatalf("kid removed own picture: %d %s", resp.StatusCode, body)
+	}
+	if resp, _ := h.raw("GET", url, nil); resp.StatusCode != 404 {
+		t.Fatalf("removed avatar still served: %d", resp.StatusCode)
 	}
 }
