@@ -2300,6 +2300,10 @@ extension Components {
             public var posterUrl: Swift.String?
             /// - Remark: Generated from `#/components/schemas/DiscoverItem/backdropUrl`.
             public var backdropUrl: Swift.String?
+            /// TMDB's user score, 0–10 (absent with too few votes).
+            ///
+            /// - Remark: Generated from `#/components/schemas/DiscoverItem/tmdbRating`.
+            public var tmdbRating: Swift.Double?
             /// - Remark: Generated from `#/components/schemas/DiscoverItem/availability`.
             public var availability: Components.Schemas.Availability
             /// The title in this library, when it's here.
@@ -2320,6 +2324,7 @@ extension Components {
             ///   - overview:
             ///   - posterUrl:
             ///   - backdropUrl:
+            ///   - tmdbRating: TMDB's user score, 0–10 (absent with too few votes).
             ///   - availability:
             ///   - itemId: The title in this library, when it's here.
             ///   - requestId: The caller's open Marquee request for it.
@@ -2331,6 +2336,7 @@ extension Components {
                 overview: Swift.String? = nil,
                 posterUrl: Swift.String? = nil,
                 backdropUrl: Swift.String? = nil,
+                tmdbRating: Swift.Double? = nil,
                 availability: Components.Schemas.Availability,
                 itemId: Swift.Int64? = nil,
                 requestId: Swift.Int64? = nil
@@ -2342,6 +2348,7 @@ extension Components {
                 self.overview = overview
                 self.posterUrl = posterUrl
                 self.backdropUrl = backdropUrl
+                self.tmdbRating = tmdbRating
                 self.availability = availability
                 self.itemId = itemId
                 self.requestId = requestId
@@ -2354,9 +2361,109 @@ extension Components {
                 case overview
                 case posterUrl
                 case backdropUrl
+                case tmdbRating
                 case availability
                 case itemId
                 case requestId
+            }
+        }
+        /// Public ratings of a title, through Seerr. Each part is absent when unknown.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TitleRatings`.
+        public struct TitleRatings: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/TitleRatings/rottenTomatoes`.
+            public struct RottenTomatoesPayload: Codable, Hashable, Sendable {
+                /// Tomatometer percentage.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TitleRatings/rottenTomatoes/criticsScore`.
+                public var criticsScore: Swift.Int?
+                /// e.g. Certified Fresh, Fresh, Rotten.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TitleRatings/rottenTomatoes/criticsRating`.
+                public var criticsRating: Swift.String?
+                /// Popcornmeter percentage.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TitleRatings/rottenTomatoes/audienceScore`.
+                public var audienceScore: Swift.Int?
+                /// e.g. Upright, Spilled.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TitleRatings/rottenTomatoes/audienceRating`.
+                public var audienceRating: Swift.String?
+                /// - Remark: Generated from `#/components/schemas/TitleRatings/rottenTomatoes/url`.
+                public var url: Swift.String?
+                /// Creates a new `RottenTomatoesPayload`.
+                ///
+                /// - Parameters:
+                ///   - criticsScore: Tomatometer percentage.
+                ///   - criticsRating: e.g. Certified Fresh, Fresh, Rotten.
+                ///   - audienceScore: Popcornmeter percentage.
+                ///   - audienceRating: e.g. Upright, Spilled.
+                ///   - url:
+                public init(
+                    criticsScore: Swift.Int? = nil,
+                    criticsRating: Swift.String? = nil,
+                    audienceScore: Swift.Int? = nil,
+                    audienceRating: Swift.String? = nil,
+                    url: Swift.String? = nil
+                ) {
+                    self.criticsScore = criticsScore
+                    self.criticsRating = criticsRating
+                    self.audienceScore = audienceScore
+                    self.audienceRating = audienceRating
+                    self.url = url
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case criticsScore
+                    case criticsRating
+                    case audienceScore
+                    case audienceRating
+                    case url
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/TitleRatings/rottenTomatoes`.
+            public var rottenTomatoes: Components.Schemas.TitleRatings.RottenTomatoesPayload?
+            /// - Remark: Generated from `#/components/schemas/TitleRatings/imdb`.
+            public struct ImdbPayload: Codable, Hashable, Sendable {
+                /// IMDb user rating, 0–10.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TitleRatings/imdb/rating`.
+                public var rating: Swift.Double?
+                /// - Remark: Generated from `#/components/schemas/TitleRatings/imdb/url`.
+                public var url: Swift.String?
+                /// Creates a new `ImdbPayload`.
+                ///
+                /// - Parameters:
+                ///   - rating: IMDb user rating, 0–10.
+                ///   - url:
+                public init(
+                    rating: Swift.Double? = nil,
+                    url: Swift.String? = nil
+                ) {
+                    self.rating = rating
+                    self.url = url
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case rating
+                    case url
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/TitleRatings/imdb`.
+            public var imdb: Components.Schemas.TitleRatings.ImdbPayload?
+            /// Creates a new `TitleRatings`.
+            ///
+            /// - Parameters:
+            ///   - rottenTomatoes:
+            ///   - imdb:
+            public init(
+                rottenTomatoes: Components.Schemas.TitleRatings.RottenTomatoesPayload? = nil,
+                imdb: Components.Schemas.TitleRatings.ImdbPayload? = nil
+            ) {
+                self.rottenTomatoes = rottenTomatoes
+                self.imdb = imdb
+            }
+            public enum CodingKeys: String, CodingKey {
+                case rottenTomatoes
+                case imdb
             }
         }
         /// - Remark: Generated from `#/components/schemas/DiscoverPage`.

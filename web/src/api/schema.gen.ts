@@ -549,6 +549,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/items/{itemId}/popular": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        /** An artist's most-listened tracks that are in the library, most popular first (ListenBrainz, MUSIC-15). Empty until MusicBrainz enrichment has looked the artist up. */
+        get: operations["listPopularTracks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/images/{artworkId}": {
         parameters: {
             query?: never;
@@ -1507,6 +1526,26 @@ export interface paths {
         };
         /** A show's seasons and which are available or requested, for choosing what to request. */
         get: operations["requestableShow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests/ratings/{mediaType}/{tmdbId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mediaType: "movie" | "tv";
+                tmdbId: number;
+            };
+            cookie?: never;
+        };
+        /** A title's Rotten Tomatoes and IMDb ratings, for Discover's details (REQ-2). Empty when there are none. */
+        get: operations["titleRatings"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2669,6 +2708,8 @@ export interface components {
             overview?: string;
             posterUrl?: string;
             backdropUrl?: string;
+            /** @description TMDB's user score, 0–10 (absent with too few votes). */
+            tmdbRating?: number;
             availability: components["schemas"]["Availability"];
             /**
              * Format: int64
@@ -2680,6 +2721,25 @@ export interface components {
              * @description The caller's open Marquee request for it.
              */
             requestId?: number;
+        };
+        /** @description Public ratings of a title, through Seerr. Each part is absent when unknown. */
+        TitleRatings: {
+            rottenTomatoes?: {
+                /** @description Tomatometer percentage. */
+                criticsScore?: number;
+                /** @description e.g. Certified Fresh, Fresh, Rotten. */
+                criticsRating?: string;
+                /** @description Popcornmeter percentage. */
+                audienceScore?: number;
+                /** @description e.g. Upright, Spilled. */
+                audienceRating?: string;
+                url?: string;
+            };
+            imdb?: {
+                /** @description IMDb user rating, 0–10. */
+                rating?: number;
+                url?: string;
+            };
         };
         DiscoverPage: {
             results: components["schemas"]["DiscoverItem"][];
@@ -4826,6 +4886,30 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    listPopularTracks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     getImage: {
         parameters: {
             query?: {
@@ -6506,6 +6590,31 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    titleRatings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mediaType: "movie" | "tv";
+                tmdbId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ratings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TitleRatings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };

@@ -34,6 +34,7 @@ type Service struct {
 	omdbBudget ratingsBudget
 	deezer     *deezer.Client
 	mb         *musicbrainz.Client
+	web        *musicbrainz.Web
 	client     *tmdb.Client
 	key        string
 	lang       string

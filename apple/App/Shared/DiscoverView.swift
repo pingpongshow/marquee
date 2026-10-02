@@ -144,6 +144,7 @@ struct RequestSheet: View {
     @Environment(\.dismiss) private var dismiss
     let item: DiscoverItem
     @State private var show: RequestableShow?
+    @State private var ratings: TitleRatings?
     @State private var seasons: Set<Int> = []
     @State private var busy = false
     @State private var done = false
@@ -171,6 +172,7 @@ struct RequestSheet: View {
                 }
             }
             .task { await loadShow() }
+            .task { ratings = try? await app.titleRatings(item) }
         }
     }
 
@@ -183,6 +185,15 @@ struct RequestSheet: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(item.title).font(.headline)
                     Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                    let chips = app.ratingChips(item, ratings)
+                    if !chips.isEmpty {
+                        HStack(spacing: 10) {
+                            ForEach(chips, id: \.label) { c in
+                                (Text(c.label + " ").foregroundStyle(.secondary) + Text(c.value).bold()).font(.caption)
+                            }
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
                     Text(item.overview ?? "No description available.").font(.caption)
                 }
             }

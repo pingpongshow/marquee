@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
+import { clsx } from "clsx";
 import { AlertTriangle, ChevronRight } from "lucide-react";
+import { useState } from "react";
 import { api, imageUrl, personPhotoUrl, unwrap } from "@/api/client";
 import { itemChildrenQuery, itemQuery, meQuery } from "@/api/queries";
 import type { Credit, ItemDetail, ItemSummary, MediaStream } from "@/api/types";
@@ -151,7 +153,13 @@ function Children({ item }: { item: ItemDetail }) {
   const list = children.data.items;
   const heading = { show: "Seasons", season: "Episodes", artist: "Albums", album: "Tracks", collection: "In this collection" }[item.type as string] ?? "Contents";
 
-  if (item.type === "artist") return <ArtistReleases list={list} />;
+  if (item.type === "artist")
+    return (
+      <>
+        <PopularTracks artist={item} />
+        <ArtistReleases list={list} />
+      </>
+    );
   // Episodes and tracks are rows; seasons and albums are poster cards.
   const rows = item.type === "season" || item.type === "album";
   return (
@@ -204,6 +212,47 @@ function CardGrid({ list }: { list: ItemSummary[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** The artist's most-listened tracks in the library (ListenBrainz, MUSIC-15). */
+function PopularTracks({ artist }: { artist: ItemDetail }) {
+  const music = useMusic();
+  const [all, setAll] = useState(false);
+  const popular = useQuery({
+    queryKey: ["items", artist.id, "popular"],
+    queryFn: () => unwrap(api.GET("/items/{itemId}/popular", { params: { path: { itemId: artist.id } } })),
+  });
+  const tracks = popular.data?.items ?? [];
+  if (!tracks.length) return null;
+  const shown = all ? tracks : tracks.slice(0, 5);
+  return (
+    <section className="mt-10">
+      <h2 className="mb-4 text-lg font-semibold">Popular</h2>
+      <ol className="divide-y divide-border rounded-lg border border-border bg-surface">
+        {shown.map((t, i) => (
+          <li key={t.id}>
+            <button
+              type="button"
+              onClick={() => music.play(tracks, i, { source: `${artist.title} – Popular` })}
+              className={clsx("flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-surface-2", music.current?.item.id === t.id && "text-accent")}
+            >
+              <span className="w-6 shrink-0 text-right text-sm text-faint tabular-nums">{i + 1}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{t.title}</span>
+                <span className="block truncate text-xs text-muted">{t.parentTitle}</span>
+              </span>
+              <span className="shrink-0 text-sm text-muted tabular-nums">{formatTrackTime(t.durationMs)}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
+      {tracks.length > 5 && (
+        <button type="button" className="mt-2 text-sm text-muted hover:text-text" onClick={() => setAll((v) => !v)}>
+          {all ? "Show fewer" : `Show all ${tracks.length}`}
+        </button>
+      )}
+    </section>
   );
 }
 

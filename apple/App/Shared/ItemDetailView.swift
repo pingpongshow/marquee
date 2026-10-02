@@ -9,6 +9,8 @@ struct ItemDetailView: View {
     let id: Int64
     @State private var detail: ItemDetail?
     @State private var children: [Item] = []
+    @State private var popular: [Item] = []
+    @State private var allPopular = false
     @State private var related: [Item] = []
     @State private var soundsLike: [Item] = []
     @State private var series: [(collection: Item, members: [Item])] = []
@@ -69,6 +71,7 @@ struct ItemDetailView: View {
             detail = d
             if d.base.childCount > 0 { children = try await app.children(id) }
             if [.movie, .show, .artist, .album].contains(d.type) { related = (try? await app.related(id)) ?? [] }
+            if d.type == .artist { popular = (try? await app.popularTracks(id)) ?? [] }
             if d.type == .artist || d.type == .album { soundsLike = (try? await app.sonicSimilar(id, limit: 15)) ?? [] }
             watchlisted = d.base.watchlisted ?? false
             var found: [(collection: Item, members: [Item])] = []
@@ -319,6 +322,7 @@ struct ItemDetailView: View {
         if !children.isEmpty {
             switch d.type {
             case .artist:
+                if !popular.isEmpty { popularSection(d) }
                 // Plexamp-style sections by release type (MusicBrainz, META-3).
                 ForEach(releaseSections(children), id: \.title) { section in
                     ShelfRow(title: section.title) {
@@ -343,6 +347,32 @@ struct ItemDetailView: View {
                 }
             default:
                 EmptyView()
+            }
+        }
+    }
+
+    /// The artist's most-listened tracks (ListenBrainz, MUSIC-15): five, or all ten.
+    @ViewBuilder private func popularSection(_ d: ItemDetail) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Popular").font(.title3.bold()).padding(.horizontal, sidePadding).padding(.bottom, 6)
+            ForEach(Array((allPopular ? popular : Array(popular.prefix(5))).enumerated()), id: \.element.id) { i, t in
+                Button { music.play(popular, start: i, source: "\(d.title) – Popular") } label: {
+                    HStack(spacing: 14) {
+                        Text("\(i + 1)").font(.callout.monospacedDigit()).foregroundStyle(.secondary).frame(width: 28, alignment: .trailing)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(t.title).lineLimit(1).foregroundStyle(music.current?.item.id == t.id ? Color.marqueeGold : .primary)
+                            if let album = t.parentTitle { Text(album).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, sidePadding).padding(.vertical, 8)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            if popular.count > 5 {
+                Button(allPopular ? "Show Fewer" : "Show All \(popular.count)") { allPopular.toggle() }
+                    .font(.callout).padding(.horizontal, sidePadding).padding(.top, 4)
             }
         }
     }

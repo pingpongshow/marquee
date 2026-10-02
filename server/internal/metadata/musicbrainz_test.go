@@ -30,7 +30,18 @@ func fakeMusicBrainz(t *testing.T) (*httptest.Server, *int) {
 		case r.URL.Path == "/artist":
 			io.WriteString(w, `{"artists":[]}`)
 		case r.URL.Path == "/artist/lobos":
-			io.WriteString(w, `{"id":"lobos","name":"Los Lobos","sort-name":"Lobos, Los","genres":[{"name":"roots rock","count":5},{"name":"rock","count":9},{"name":"tex-mex","count":2},{"name":"chicano","count":1}]}`)
+			io.WriteString(w, `{"id":"lobos","name":"Los Lobos","sort-name":"Lobos, Los","genres":[{"name":"roots rock","count":5},{"name":"rock","count":9},{"name":"tex-mex","count":2},{"name":"chicano","count":1}],
+				"relations":[{"type":"wikidata","url":{"resource":"https://www.wikidata.org/wiki/Q1"}}]}`)
+		case r.URL.Path == "/wiki/Special:EntityData/Q1.json":
+			io.WriteString(w, `{"entities":{"Q1":{"sitelinks":{"enwiki":{"title":"Los Lobos"}}}}}`)
+		case r.URL.Path == "/en/api/rest_v1/page/summary/Los_Lobos":
+			io.WriteString(w, `{"type":"standard","extract":"Los Lobos is an American rock band from East Los Angeles."}`)
+		case r.URL.Path == "/1/popularity/top-recordings-for-artist/lobos":
+			io.WriteString(w, `[{"recording_mbid":"r-missing","recording_name":"Not Here","total_listen_count":900},
+				{"recording_mbid":"r-kiko","recording_name":"Kiko and the Lavender Moon","total_listen_count":500},
+				{"recording_mbid":"r-other","recording_name":"Angels With Dirty Faces","total_listen_count":300}]`)
+		case strings.HasPrefix(r.URL.Path, "/1/popularity/"):
+			http.NotFound(w, r)
 		case r.URL.Path == "/artist/tagged":
 			io.WriteString(w, `{"id":"tagged","name":"Johnny Cash","sort-name":"Cash, Johnny","genres":[{"name":"country","count":7}]}`)
 		case r.URL.Path == "/release/rel1":
@@ -69,10 +80,13 @@ func TestEnrichMusic(t *testing.T) {
 	mustExec(t, d, `INSERT INTO external_ids(item_id, provider, value) VALUES (4, 'musicbrainz', 'rel1')`)
 	mustExec(t, d, `INSERT INTO items(id, library_id, type, title, sort_title) VALUES (5, 1, 'artist', 'Twins', 'Twins')`)
 	mustExec(t, d, `INSERT INTO tags(kind, name) VALUES ('genre', 'Roots-Rock')`)
+	mustExec(t, d, `INSERT INTO items(id, library_id, type, title, sort_title, parent_id, grandparent_id) VALUES (20, 1, 'track', 'Angels with Dirty Faces', 'a', 2, 1)`)
+	mustExec(t, d, `INSERT INTO items(id, library_id, type, title, sort_title, parent_id, grandparent_id) VALUES (21, 1, 'track', 'Kiko & the Lavender Moon (live)', 'k', 2, 1)`)
+	mustExec(t, d, `INSERT INTO external_ids(item_id, provider, value) VALUES (21, 'musicbrainz', 'r-kiko')`)
 
 	mb := musicbrainz.New("test")
 	mb.BaseURL, mb.Interval = srv.URL, time.Millisecond
-	s := &Service{DB: d, mb: mb}
+	s := &Service{DB: d, mb: mb, web: &musicbrainz.Web{Wikidata: srv.URL, Wikipedia: srv.URL + "/%s", ListenBrainz: srv.URL, UserAgent: "test", HTTP: srv.Client()}}
 	msg, err := s.EnrichMusic(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -109,6 +123,13 @@ func TestEnrichMusic(t *testing.T) {
 	}
 	if v := str(`SELECT COUNT(*) FROM external_ids WHERE item_id = 5`); v != "0" {
 		t.Errorf("ambiguous artist matched")
+	}
+	// A bio from Wikipedia, and popular tracks matched by recording id, then title.
+	if v := str(`SELECT summary FROM items WHERE id = 1`); !strings.HasPrefix(v, "Los Lobos is an American rock band") {
+		t.Errorf("bio: %q", v)
+	}
+	if v := str(`SELECT group_concat(track_id, ',') FROM (SELECT track_id FROM music_popular WHERE artist_id = 1 ORDER BY rank)`); v != "21,20" {
+		t.Errorf("popular: %q", v)
 	}
 	// Each item is looked up once.
 	before := *hits
