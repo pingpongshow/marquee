@@ -51,6 +51,7 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			IgnorePatterns:          ptr(append([]string{}, s.Library.IgnorePatterns...)),
 			BrowseRoots:             ptr(append([]string{}, s.Library.BrowseRoots...)),
 			WatchedThresholdPercent: ptr(s.Library.WatchedThresholdPercent),
+			Trickplay:               ptr(s.Library.Trickplay),
 		},
 		Metadata: MetadataSettings{
 			TmdbApiKeySet:          ptr(s.Metadata.TMDBAPIKey != ""),
@@ -129,6 +130,7 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		set(&s.Library.IgnorePatterns, l.IgnorePatterns)
 		set(&s.Library.BrowseRoots, l.BrowseRoots)
 		set(&s.Library.WatchedThresholdPercent, l.WatchedThresholdPercent)
+		set(&s.Library.Trickplay, l.Trickplay)
 	}
 	if m := u.Metadata; m != nil {
 		set(&s.Metadata.TMDBAPIKey, m.TmdbApiKey)

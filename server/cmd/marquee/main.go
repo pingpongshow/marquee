@@ -38,6 +38,7 @@ import (
 	"marquee/internal/settings"
 	"marquee/internal/sonic"
 	"marquee/internal/tasks"
+	"marquee/internal/trickplay"
 	"marquee/internal/watcher"
 )
 
@@ -222,6 +223,11 @@ func run() error {
 	scheduler.Register(tasks.Task{ID: "loudness", Name: "Measure music loudness", Window: true,
 		Description: "Reads ReplayGain tags and measures loudness of tracks without them, so volume levelling works for everything.",
 		Run:         loud.Run})
+	trick := &trickplay.Service{DB: database, FFmpeg: cfg.FFmpegPath, Dir: filepath.Join(cfg.ConfigDir, "cache", "trickplay"), Workers: 2,
+		Enabled: func() bool { return store.Get().Library.Trickplay }}
+	scheduler.Register(tasks.Task{ID: "trickplay", Name: "Make seek previews", Window: true, Bounded: true,
+		Description: "Makes the thumbnails shown while seeking through videos. A large library takes a few nights; it continues where it stopped.",
+		Run:         trick.Run, Progress: trick.Progress})
 	lyricsSvc := &lyrics.Service{DB: database, Online: func() bool { return store.Get().Music.OnlineLyrics }}
 	go scheduler.Run(ctx)
 
@@ -239,7 +245,7 @@ func run() error {
 		Handlers: &api.Handlers{
 			DB: database, Auth: authSvc, Settings: store, Libraries: libraries,
 			Items: items.NewStore(database), Scans: scans, Version: config.Version,
-			Tasks: scheduler, Backups: backups, Restart: stop, Sonic: sonicSvc, Lyrics: lyricsSvc,
+			Tasks: scheduler, Trickplay: trick, Backups: backups, Restart: stop, Sonic: sonicSvc, Lyrics: lyricsSvc,
 			Avatars:  &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
 			Images:   images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
 			Logs:     logs,

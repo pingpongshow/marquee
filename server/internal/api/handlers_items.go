@@ -344,6 +344,16 @@ func (h *Handlers) GetActivity(ctx context.Context, _ GetActivityRequestObject) 
 				Progress: &ScanProgress{Phase: Metadata, Done: p.Done, Total: p.Total}})
 		}
 	}
+	if h.Tasks != nil {
+		for _, t := range h.Tasks.Running() {
+			if t.Progress == nil {
+				continue // short tasks aren't worth showing
+			}
+			done, total := t.Progress()
+			out.Tasks = append(out.Tasks, ActivityTask{Id: "task:" + t.ID, Kind: Task, State: ActivityTaskStateRunning, Title: t.Name,
+				Progress: &ScanProgress{Phase: Metadata, Done: done, Total: total}})
+		}
+	}
 	active := h.Scans.Active()
 	if len(active) == 0 {
 		return GetActivity200JSONResponse(out), nil

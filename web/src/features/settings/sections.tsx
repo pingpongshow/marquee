@@ -29,7 +29,7 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] = 
     label: "Server",
     sections: [
       { id: "general", label: "General", icon: Server, component: GeneralSettings, keywords: "server name language restart reboot", description: "Server identity and defaults." },
-      { id: "libraries", label: "Libraries", icon: Library, component: LibrariesSettings, keywords: "folders paths scan add library ignore patterns watcher file watching empty trash refresh metadata", description: "Add and manage the folders Marquee organises, and how they are scanned." },
+      { id: "libraries", label: "Libraries", icon: Library, component: LibrariesSettings, keywords: "folders paths scan add library ignore patterns watcher file watching empty trash refresh metadata trickplay seek previews thumbnails", description: "Add and manage the folders Marquee organises, and how they are scanned." },
       { id: "network", label: "Network", icon: Network, component: NetworkSettings, keywords: "lan subnets local port discovery bonjour address", description: "Which devices count as local, and how local apps find this server." },
       { id: "remote-access", label: "Remote Access", icon: Globe, component: RemoteAccessSettings, keywords: "tailscale remote wan upload speed bandwidth limit internet", description: "Streaming to devices away from home over Tailscale, and how bandwidth is shared." },
       { id: "transcoder", label: "Transcoder", icon: Cpu, component: TranscoderSettings, keywords: "nvenc qsv quick sync gpu hardware encoder hevc tone mapping quality ladder preset max transcodes throttle", description: "Hardware encoders, quality and the automatic remote quality ladder." },

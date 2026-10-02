@@ -1179,6 +1179,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/items/{itemId}/trickplay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        /** Seek-bar preview thumbnails for a video (PLAY-13), as sprite sheets of columns × rows tiles. */
+        get: operations["getTrickplay"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/trickplay/{sheet}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+                sheet: number;
+            };
+            cookie?: never;
+        };
+        /** One sprite sheet; thumbnail n is on sheet n / (columns × rows). */
+        get: operations["getTrickplaySheet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/items/{itemId}/lyrics": {
         parameters: {
             query?: never;
@@ -1496,6 +1535,8 @@ export interface components {
             /** @description Directories the folder picker may browse. */
             browseRoots?: string[];
             watchedThresholdPercent?: number;
+            /** @description Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie. */
+            trickplay?: boolean;
         };
         MetadataSettings: {
             readonly tmdbApiKeySet?: boolean;
@@ -1588,7 +1629,7 @@ export interface components {
             /** @description Stable id, e.g. scan:3 */
             id: string;
             /** @enum {string} */
-            kind: "scan" | "import" | "stream";
+            kind: "scan" | "import" | "stream" | "task";
             /** @example Scanning Movies */
             title: string;
             /** @enum {string} */
@@ -2076,6 +2117,21 @@ export interface components {
             title: string;
             description?: string;
             items: components["schemas"]["ItemSummary"][];
+        };
+        Trickplay: {
+            /**
+             * Format: int64
+             * @description Thumbnail n shows the video at n × intervalMs.
+             */
+            intervalMs: number;
+            /** @description One thumbnail's width in pixels. */
+            width: number;
+            height: number;
+            columns: number;
+            rows: number;
+            /** @description Thumbnails in total. */
+            count: number;
+            sheets: number;
         };
         Lyrics: {
             synced: boolean;
@@ -4615,6 +4671,56 @@ export interface operations {
                 content?: never;
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getTrickplay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Trickplay"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getTrickplaySheet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+                sheet: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Image. */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };

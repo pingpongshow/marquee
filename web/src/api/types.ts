@@ -36,6 +36,7 @@ export type TaskInfo = S["TaskInfo"];
 export type Backup = S["Backup"];
 export type RadioRequest = S["RadioRequest"];
 export type Station = S["Station"];
+export type Trickplay = S["Trickplay"];
 export type Lyrics = S["Lyrics"];
 export type MusicStatus = S["MusicStatus"];
 export type SmartRules = S["SmartRules"];
