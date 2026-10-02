@@ -1,0 +1,10 @@
+node_modules/
+.DS_Store
+# Built web client (embedded into the server at build time)
+server/internal/web/dist/*
+!server/internal/web/dist/.gitkeep
+# Local deploy secrets
+deploy/.env
+*.db
+*.db-shm
+*.db-wal

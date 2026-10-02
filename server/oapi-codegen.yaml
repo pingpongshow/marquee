@@ -1,0 +1,10 @@
+# Generates Go server interfaces and models from ../api/openapi.yaml. Run: go generate ./...
+package: api
+output: api.gen.go # relative to internal/api, where go generate runs
+generate:
+  std-http-server: true
+  strict-server: true
+  models: true
+  embedded-spec: true
+output-options:
+  skip-prune: true
