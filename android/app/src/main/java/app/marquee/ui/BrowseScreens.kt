@@ -1,5 +1,6 @@
 package app.marquee.ui
 
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -253,6 +254,7 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
                 if (tracks.any { it.type == ItemType.TRACK }) Row(Modifier.padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(onClick = { music.play(tracks, 0, source = title) }) { Text("Play") }
                     OutlinedButton(onClick = { music.play(tracks.shuffled(), 0, source = title) }) { Text("Shuffle") }
+                    if (!marquee.isTv) PlaylistDownloadButton(playlistId)
                 }
             }
         }
@@ -312,5 +314,22 @@ fun SettingsScreen(nav: NavHostController) {
             OutlinedButton(onClick = { marquee.forgetServer() }) { Text("Use a different server") }
         }
         Box(Modifier.width(1.dp))
+    }
+}
+
+/** Keep a playlist on the device, in step with its changes (MUSIC-19). */
+@Composable
+private fun PlaylistDownloadButton(id: Long) {
+    val downloads = LocalDownloads.current
+    val synced by downloads.playlists.collectAsState()
+    val entries by downloads.entries.collectAsState()
+    val ids = synced[id]
+    if (ids == null) {
+        OutlinedButton({ downloads.scope.launch { runCatching { downloads.syncPlaylist(id) } } }) { Text("Download") }
+    } else {
+        val done = ids.count { entries[it]?.state == app.marquee.core.Downloads.State.Done }
+        OutlinedButton({ downloads.unsyncPlaylist(id) }, Modifier.semantics { stateDescription = if (done == ids.size) "Downloaded" else "$done of ${ids.size}" }) {
+            Text(if (done == ids.size) "Downloaded · Remove" else "$done/${ids.size} · Remove")
+        }
     }
 }

@@ -546,4 +546,23 @@ class MarqueeUiTest {
         if (isTv) rule.waitText("Playing", 15_000)
         else rule.waitUntilAtLeastOneExists(hasContentDescription("Open Now Playing"), 15_000)
     }
+
+    /** Playlist downloads (MUSIC-19): keep "Road Trip" on the device, then remove it. */
+    @Test fun playlistDownload() {
+        assumeTrue("phones and tablets only", !isTv)
+        connectAndSignIn()
+        tap("Libraries")
+        rule.waitText("Playlists")
+        rule.onAllNodesWithText("Playlists").onFirst().performClick()
+        rule.waitText("Road Trip")
+        tap("Road Trip")
+        rule.waitText("Shuffle")
+        if (rule.onAllNodesWithText("Remove", substring = true).fetchSemanticsNodes().isNotEmpty()) tap("Remove", substring = true)
+        tap("Download")
+        val downloaded = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Downloaded")
+        rule.waitUntilAtLeastOneExists(downloaded, 60_000)
+        shot("pd1-downloaded")
+        rule.onNode(downloaded).performClick()
+        rule.waitText("Download")
+    }
 }

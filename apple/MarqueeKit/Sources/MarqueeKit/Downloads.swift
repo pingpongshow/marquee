@@ -40,6 +40,8 @@ public final class Downloads {
         public var url: String? // server path to fetch
         public var added: Date
         public var resumeMs: Int64?
+        /// Downloaded because a synced playlist has it (removed when no synced playlist does).
+        public var viaPlaylist: Bool?
     }
 
     /// A play made while offline, waiting to be sent.
@@ -69,10 +71,17 @@ public final class Downloads {
 
     private static var indexURL: URL { directory.appending(path: "index.json") }
     private static var pendingURL: URL { directory.appending(path: "pending.json") }
+    private static var playlistsURL: URL { directory.appending(path: "playlists.json") }
+
+    /// Playlists kept on the device (MUSIC-19): playlist id -> its items when last synced.
+    public private(set) var syncedPlaylists: [Int64: Set<Int64>] = [:]
 
     public init() {
         if let data = try? Data(contentsOf: Self.indexURL), let list = try? JSONDecoder().decode([Entry].self, from: data) {
             entries = Dictionary(uniqueKeysWithValues: list.map { ($0.id, $0) })
+        }
+        if let data = try? Data(contentsOf: Self.playlistsURL), let m = try? JSONDecoder().decode([Int64: Set<Int64>].self, from: data) {
+            syncedPlaylists = m
         }
         if let data = try? Data(contentsOf: Self.pendingURL) {
             pending = (try? JSONDecoder().decode([PendingProgress].self, from: data)) ?? []
@@ -94,7 +103,56 @@ public final class Downloads {
             if case .downloading = e.state, let path = e.url { fetch(itemID: e.id, path: path) }
         }
         pollConversions()
-        Task { await flushProgress() }
+        Task {
+            await flushProgress()
+            // Playlists kept on the device follow their changes.
+            for id in syncedPlaylists.keys { await syncPlaylist(id) }
+        }
+    }
+
+    // MARK: - Playlists
+
+    /// Keeps a playlist on the device: downloads what's new in it and drops what left it
+    /// (tracks downloaded on their own are never removed). Videos come at Medium quality.
+    public func syncPlaylist(_ id: Int64) async {
+        guard let app, let entriesNow = try? await app.playlistItems(id) else { return }
+        let items = entriesNow.map(\.item).filter { [.track, .movie, .episode, .video].contains($0._type) }
+        let now = Set(items.map(\.id))
+        let before = syncedPlaylists[id] ?? []
+        syncedPlaylists[id] = now
+        savePlaylists()
+        for it in items where entries[it.id] == nil {
+            try? await download(it, quality: it._type == .track ? .original : .medium)
+            entries[it.id]?.viaPlaylist = true
+        }
+        save()
+        dropOrphans(Array(before.subtracting(now)))
+    }
+
+    /// Stops keeping a playlist; its tracks go unless another synced playlist has them.
+    public func unsyncPlaylist(_ id: Int64) {
+        guard let ids = syncedPlaylists.removeValue(forKey: id) else { return }
+        savePlaylists()
+        dropOrphans(Array(ids))
+    }
+
+    public func isSynced(_ playlist: Int64) -> Bool { syncedPlaylists[playlist] != nil }
+
+    /// How many of a synced playlist's items are on the device.
+    public func syncedCount(_ playlist: Int64) -> (done: Int, total: Int) {
+        let ids = syncedPlaylists[playlist] ?? []
+        return (ids.filter { entries[$0]?.state == .done }.count, ids.count)
+    }
+
+    private func dropOrphans(_ ids: [Int64]) {
+        let kept = syncedPlaylists.values.reduce(into: Set<Int64>()) { $0.formUnion($1) }
+        for id in ids where !kept.contains(id) && entries[id]?.viaPlaylist == true {
+            remove(id)
+        }
+    }
+
+    private func savePlaylists() {
+        if let data = try? JSONEncoder().encode(syncedPlaylists) { try? data.write(to: Self.playlistsURL, options: .atomic) }
     }
 
     // MARK: - Starting and removing
