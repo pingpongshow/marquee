@@ -158,7 +158,10 @@ func (r SmartRules) where() (string, []any) {
 // smartFrom is the FROM clause smart playlists evaluate over.
 func smartFrom(uid int64) string {
 	return summaryFrom + ` LEFT JOIN user_item_state us ON us.item_id = i.id AND us.user_id = ` + strconv.FormatInt(uid, 10) +
-		` LEFT JOIN sonic so ON so.item_id = i.id`
+		// Energy is compared as a percentile of the analysed library (0 = calmest, 1 = most
+		// intense): raw values bunch up across mastered music, so fixed thresholds mean little.
+		` LEFT JOIN (SELECT item_id, bpm, musical_key, mode, percent_rank() OVER (ORDER BY energy) AS energy
+		   FROM sonic WHERE energy IS NOT NULL) so ON so.item_id = i.id`
 }
 
 // SmartItems evaluates a smart playlist's rules for acc.

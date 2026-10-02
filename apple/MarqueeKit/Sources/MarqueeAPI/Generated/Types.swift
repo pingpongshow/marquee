@@ -393,6 +393,46 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /system/restart`.
     /// - Remark: Generated from `#/paths//system/restart/post(restartServer)`.
     func restartServer(_ input: Operations.RestartServer.Input) async throws -> Operations.RestartServer.Output
+    /// Sonic analysis progress and whether the analysis service is running.
+    ///
+    /// - Remark: HTTP `GET /music/status`.
+    /// - Remark: Generated from `#/paths//music/status/get(musicStatus)`.
+    func musicStatus(_ input: Operations.MusicStatus.Input) async throws -> Operations.MusicStatus.Output
+    /// Tracks, albums or artists (matching the item's type) that sound like it (MUSIC-2).
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/sonic-similar`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/sonic-similar/get(sonicSimilar)`.
+    func sonicSimilar(_ input: Operations.SonicSimilar.Input) async throws -> Operations.SonicSimilar.Output
+    /// A station (MUSIC-3) from a track, album or artist, a genre, a decade, a mood, your favourites or the whole library. Ask again with exclude to continue it.
+    ///
+    /// - Remark: HTTP `POST /music/radio`.
+    /// - Remark: Generated from `#/paths//music/radio/post(musicRadio)`.
+    func musicRadio(_ input: Operations.MusicRadio.Input) async throws -> Operations.MusicRadio.Output
+    /// A playlist from a description, e.g. "rainy Sunday jazz with a late-night feel" (MUSIC-5).
+    ///
+    /// - Remark: HTTP `POST /music/sage`.
+    /// - Remark: Generated from `#/paths//music/sage/post(musicSage)`.
+    func musicSage(_ input: Operations.MusicSage.Input) async throws -> Operations.MusicSage.Output
+    /// Sonic Adventure (MUSIC-4) — a path from one track to another through tracks that sound in between.
+    ///
+    /// - Remark: HTTP `POST /music/adventure`.
+    /// - Remark: Generated from `#/paths//music/adventure/post(musicAdventure)`.
+    func musicAdventure(_ input: Operations.MusicAdventure.Input) async throws -> Operations.MusicAdventure.Output
+    /// Your daily mixes (MUSIC-7), built from your listening; they change once a day.
+    ///
+    /// - Remark: HTTP `GET /music/mixes`.
+    /// - Remark: Generated from `#/paths//music/mixes/get(musicMixes)`.
+    func musicMixes(_ input: Operations.MusicMixes.Input) async throws -> Operations.MusicMixes.Output
+    /// Your rating (MUSIC-11), 0–10 (half stars; 10 = loved), or null to clear it.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/rating`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/rating/put(rateItem)`.
+    func rateItem(_ input: Operations.RateItem.Input) async throws -> Operations.RateItem.Output
+    /// A track's lyrics (MUSIC-10), timed when available, from the file, a .lrc sidecar or LRCLIB.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/lyrics`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/lyrics/get(getLyrics)`.
+    func getLyrics(_ input: Operations.GetLyrics.Input) async throws -> Operations.GetLyrics.Output
     /// List directories under the configured browse roots, for the library folder picker (admin only).
     ///
     /// - Remark: HTTP `GET /filesystem/browse`.
@@ -1341,6 +1381,108 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//system/restart/post(restartServer)`.
     public func restartServer(headers: Operations.RestartServer.Input.Headers = .init()) async throws -> Operations.RestartServer.Output {
         try await restartServer(Operations.RestartServer.Input(headers: headers))
+    }
+    /// Sonic analysis progress and whether the analysis service is running.
+    ///
+    /// - Remark: HTTP `GET /music/status`.
+    /// - Remark: Generated from `#/paths//music/status/get(musicStatus)`.
+    public func musicStatus(headers: Operations.MusicStatus.Input.Headers = .init()) async throws -> Operations.MusicStatus.Output {
+        try await musicStatus(Operations.MusicStatus.Input(headers: headers))
+    }
+    /// Tracks, albums or artists (matching the item's type) that sound like it (MUSIC-2).
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/sonic-similar`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/sonic-similar/get(sonicSimilar)`.
+    public func sonicSimilar(
+        path: Operations.SonicSimilar.Input.Path,
+        query: Operations.SonicSimilar.Input.Query = .init(),
+        headers: Operations.SonicSimilar.Input.Headers = .init()
+    ) async throws -> Operations.SonicSimilar.Output {
+        try await sonicSimilar(Operations.SonicSimilar.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// A station (MUSIC-3) from a track, album or artist, a genre, a decade, a mood, your favourites or the whole library. Ask again with exclude to continue it.
+    ///
+    /// - Remark: HTTP `POST /music/radio`.
+    /// - Remark: Generated from `#/paths//music/radio/post(musicRadio)`.
+    public func musicRadio(
+        headers: Operations.MusicRadio.Input.Headers = .init(),
+        body: Operations.MusicRadio.Input.Body
+    ) async throws -> Operations.MusicRadio.Output {
+        try await musicRadio(Operations.MusicRadio.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// A playlist from a description, e.g. "rainy Sunday jazz with a late-night feel" (MUSIC-5).
+    ///
+    /// - Remark: HTTP `POST /music/sage`.
+    /// - Remark: Generated from `#/paths//music/sage/post(musicSage)`.
+    public func musicSage(
+        headers: Operations.MusicSage.Input.Headers = .init(),
+        body: Operations.MusicSage.Input.Body
+    ) async throws -> Operations.MusicSage.Output {
+        try await musicSage(Operations.MusicSage.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Sonic Adventure (MUSIC-4) — a path from one track to another through tracks that sound in between.
+    ///
+    /// - Remark: HTTP `POST /music/adventure`.
+    /// - Remark: Generated from `#/paths//music/adventure/post(musicAdventure)`.
+    public func musicAdventure(
+        headers: Operations.MusicAdventure.Input.Headers = .init(),
+        body: Operations.MusicAdventure.Input.Body
+    ) async throws -> Operations.MusicAdventure.Output {
+        try await musicAdventure(Operations.MusicAdventure.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Your daily mixes (MUSIC-7), built from your listening; they change once a day.
+    ///
+    /// - Remark: HTTP `GET /music/mixes`.
+    /// - Remark: Generated from `#/paths//music/mixes/get(musicMixes)`.
+    public func musicMixes(
+        query: Operations.MusicMixes.Input.Query = .init(),
+        headers: Operations.MusicMixes.Input.Headers = .init()
+    ) async throws -> Operations.MusicMixes.Output {
+        try await musicMixes(Operations.MusicMixes.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Your rating (MUSIC-11), 0–10 (half stars; 10 = loved), or null to clear it.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/rating`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/rating/put(rateItem)`.
+    public func rateItem(
+        path: Operations.RateItem.Input.Path,
+        headers: Operations.RateItem.Input.Headers = .init(),
+        body: Operations.RateItem.Input.Body
+    ) async throws -> Operations.RateItem.Output {
+        try await rateItem(Operations.RateItem.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// A track's lyrics (MUSIC-10), timed when available, from the file, a .lrc sidecar or LRCLIB.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/lyrics`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/lyrics/get(getLyrics)`.
+    public func getLyrics(
+        path: Operations.GetLyrics.Input.Path,
+        headers: Operations.GetLyrics.Input.Headers = .init()
+    ) async throws -> Operations.GetLyrics.Output {
+        try await getLyrics(Operations.GetLyrics.Input(
+            path: path,
+            headers: headers
+        ))
     }
     /// List directories under the configured browse roots, for the library folder picker (admin only).
     ///

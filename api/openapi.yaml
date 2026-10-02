@@ -2676,7 +2676,10 @@ components:
             type: object
             required: [field, op, value]
             properties:
-              field: { type: string, enum: [genre, artist, album, title, year, rating, playCount, lastPlayedDays, addedDays, bpm, energy, key, durationSeconds] }
+              field:
+                type: string
+                enum: [genre, artist, album, title, year, rating, playCount, lastPlayedDays, addedDays, bpm, energy, key, durationSeconds]
+                description: "energy is a percentile of the analysed library: 0 = the calmest tracks, 0.8 = more intense than 80% of them."
               op: { type: string, enum: [is, isNot, contains, notContains, gt, lt] }
               value: { type: string }
         sort: { type: string, enum: [random, title, artist, year, -year, added, -added, rating, -rating, playCount, -playCount, lastPlayed, -lastPlayed] }

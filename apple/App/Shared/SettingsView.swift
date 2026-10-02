@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(AppSession.self) private var app
+    @Environment(MusicPlayer.self) private var music
     @State private var local = QualityPreference.local
     @State private var remote = QualityPreference.remote
     @State private var switching = false
@@ -45,6 +46,16 @@ struct SettingsView: View {
                 Text("Video quality")
             } footer: {
                 Text("Original plays files untouched when this device supports them. Automatic picks the best quality your connection allows.")
+            }
+            Section {
+                @Bindable var music = music
+                Picker("Volume levelling", selection: $music.levelling) {
+                    ForEach(MusicPlayer.Levelling.allCases, id: \.self) { Text($0.label).tag($0) }
+                }
+            } header: {
+                Text("Music")
+            } footer: {
+                Text("Plays tracks at an even volume using their loudness. Automatic keeps an album's own dynamics when you play it in order.")
             }
             #if os(iOS)
             Section {

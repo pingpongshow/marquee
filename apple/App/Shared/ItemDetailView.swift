@@ -10,6 +10,7 @@ struct ItemDetailView: View {
     @State private var detail: ItemDetail?
     @State private var children: [Item] = []
     @State private var related: [Item] = []
+    @State private var soundsLike: [Item] = []
     @State private var error: String?
     @State private var audioID: Int64?
     @State private var subtitleID: Int64?
@@ -21,6 +22,11 @@ struct ItemDetailView: View {
                     header(d)
                     contents(d)
                     cast(d)
+                    if !soundsLike.isEmpty {
+                        ShelfRow(title: d.type == .artist ? "Artists that sound similar" : "Albums that sound similar") {
+                            ForEach(soundsLike, id: \.id) { PosterCard(item: $0) }
+                        }
+                    }
                     if !related.isEmpty {
                         ShelfRow(title: d.type == .artist || d.type == .album ? "Similar in your library" : "More like this") {
                             ForEach(related, id: \.id) { PosterCard(item: $0) }
@@ -49,6 +55,7 @@ struct ItemDetailView: View {
             detail = d
             if d.base.childCount > 0 { children = try await app.children(id) }
             if [.movie, .show, .artist, .album].contains(d.type) { related = (try? await app.related(id)) ?? [] }
+            if d.type == .artist || d.type == .album { soundsLike = (try? await app.sonicSimilar(id, limit: 15)) ?? [] }
         } catch {
             self.error = error.localizedDescription
         }
@@ -150,12 +157,14 @@ struct ItemDetailView: View {
                 }
                 .buttonStyle(.borderedProminent)
             case .album, .artist:
-                Button { Task { music.play(try await app.leaves(d.id)) } } label: { Label("Play", systemImage: "play.fill") }
+                Button { Task { music.play(try await app.leaves(d.id), source: d.title) } } label: { Label("Play", systemImage: "play.fill") }
                     .buttonStyle(.borderedProminent)
-                Button { Task { music.play(try await app.leaves(d.id), shuffle: true) } } label: { Label("Shuffle", systemImage: "shuffle") }
+                Button { Task { music.play(try await app.leaves(d.id), shuffle: true, source: d.title) } } label: { Label("Shuffle", systemImage: "shuffle") }
                     .buttonStyle(.bordered)
+                radioButton(d)
             case .track:
                 Button { music.play([d.base]) } label: { Label("Play", systemImage: "play.fill") }.buttonStyle(.borderedProminent)
+                radioButton(d)
             }
             if d.base.isPlayableVideo || d.type == .show || d.type == .season {
                 Button {
@@ -171,6 +180,16 @@ struct ItemDetailView: View {
             Menu { ItemMenuItems(item: d.base) } label: { Image(systemName: "ellipsis").padding(.horizontal, 4) }
                 .buttonStyle(.bordered)
         }
+    }
+
+    private func radioButton(_ d: ItemDetail) -> some View {
+        Button {
+            let req = RadioRequest(seed: .item, itemId: d.id, limit: 50)
+            Task { if let st = try? await app.radio(req) { music.playStation(st, radio: req) } }
+        } label: {
+            Label("Radio", systemImage: "dot.radiowaves.left.and.right")
+        }
+        .buttonStyle(.bordered)
     }
 
     /// Audio and subtitle choices for videos (the player's own menu also switches text
@@ -229,7 +248,7 @@ struct ItemDetailView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Tracks").font(.title3.bold()).padding(.horizontal, sidePadding).padding(.bottom, 6)
                     ForEach(Array(children.enumerated()), id: \.element.id) { i, t in
-                        TrackRow(track: t, album: d.base) { music.play(children.filter { $0._type == .track }, start: i) }
+                        TrackRow(track: t, album: d.base) { music.play(children.filter { $0._type == .track }, start: i, source: d.title) }
                     }
                 }
             default:

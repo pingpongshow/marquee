@@ -18,6 +18,9 @@ struct LibraryView: View {
     var body: some View {
         ScrollView {
             if let error { ErrorBanner(message: error).padding() }
+            if library?._type == .music {
+                MusicDiscoverView(libraryID: libraryID).padding(.top)
+            }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: minWidth, maximum: minWidth * 1.4), spacing: gap, alignment: .top)], spacing: gap) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { i, item in
                     PosterCard(item: item, width: minWidth)
