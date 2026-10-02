@@ -1580,6 +1580,43 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /items/{itemId}/trickplay:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [playback]
+      operationId: getTrickplay
+      summary: Seek-bar preview thumbnails for a video (PLAY-13), as sprite sheets of columns × rows tiles.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Trickplay" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/trickplay/{sheet}:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+      - name: sheet
+        in: path
+        required: true
+        schema: { type: integer, minimum: 0 }
+    get:
+      tags: [playback]
+      operationId: getTrickplaySheet
+      summary: One sprite sheet; thumbnail n is on sheet n / (columns × rows).
+      responses:
+        "200":
+          description: Image.
+          headers:
+            Cache-Control: { schema: { type: string } }
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /items/{itemId}/lyrics:
     parameters:
       - $ref: "#/components/parameters/ItemId"
@@ -2032,6 +2069,7 @@ components:
           description: Directories the folder picker may browse.
           items: { type: string, example: /media }
         watchedThresholdPercent: { type: integer, minimum: 50, maximum: 100 }
+        trickplay: { type: boolean, description: "Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie." }
 
     MetadataSettings:
       type: object
@@ -2144,7 +2182,7 @@ components:
       required: [id, kind, title, state]
       properties:
         id: { type: string, description: "Stable id, e.g. scan:3" }
-        kind: { type: string, enum: [scan, import, stream] }
+        kind: { type: string, enum: [scan, import, stream, task] }
         title: { type: string, example: Scanning Movies }
         state: { type: string, enum: [queued, running] }
         libraryId: { type: integer, format: int64 }
@@ -2646,6 +2684,18 @@ components:
         items:
           type: array
           items: { $ref: "#/components/schemas/ItemSummary" }
+
+    Trickplay:
+      type: object
+      required: [intervalMs, width, height, columns, rows, count, sheets]
+      properties:
+        intervalMs: { type: integer, format: int64, description: Thumbnail n shows the video at n × intervalMs. }
+        width: { type: integer, description: One thumbnail's width in pixels. }
+        height: { type: integer }
+        columns: { type: integer }
+        rows: { type: integer }
+        count: { type: integer, description: Thumbnails in total. }
+        sheets: { type: integer }
 
     Lyrics:
       type: object
