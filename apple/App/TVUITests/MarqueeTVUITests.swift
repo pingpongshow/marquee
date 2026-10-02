@@ -97,7 +97,7 @@ final class MarqueeTVUITests: XCTestCase {
         XCTAssertTrue(musicTab.waitForExistence(timeout: 10))
         focus(musicTab, direction: .right)
         remote.press(.select)
-        XCTAssertTrue(app.staticTexts["Sonic Sage"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Muse"].waitForExistence(timeout: 10))
         let radio = app.buttons["Library Radio"]
         XCTAssertTrue(radio.waitForExistence(timeout: 10))
         // Down to the stations row (focus lands wherever is closest), then left along it.

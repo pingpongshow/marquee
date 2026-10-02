@@ -20,11 +20,11 @@ export function useRadio() {
   });
 }
 
-/** Builds a playlist from a description (Sonic Sage, MUSIC-5) and plays it. */
-export function useSage() {
+/** Builds a playlist from a description (Muse, MUSIC-5) and plays it. */
+export function useMuse() {
   const music = useMusic();
   return useMutation({
-    mutationFn: (body: { prompt: string; libraryId?: number }) => unwrap(api.POST("/music/sage", { body: { ...body, limit: 40 } })),
+    mutationFn: (body: { prompt: string; libraryId?: number }) => unwrap(api.POST("/music/muse", { body: { ...body, limit: 40 } })),
     onSuccess: (st) => {
       if (st.items.length) music.playStation(st);
     },

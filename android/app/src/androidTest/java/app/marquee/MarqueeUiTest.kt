@@ -143,20 +143,20 @@ class MarqueeUiTest {
     }
 
     /**
-     * Sonic Sage, Now Playing's source, lyrics and ratings (M6.5). Needs the test music
+     * Muse, Now Playing's source, lyrics and ratings (M6.5). Needs the test music
      * library and the sonic analysis sidecar.
      */
     @Test fun musicFeatures() {
         connectAndSignIn()
         openLibrary("Music")
-        rule.waitText("Sonic Sage", 20_000)
+        rule.waitText("Muse", 20_000)
         shot("m1-discover")
         rule.onNode(hasSetTextAction()).performTextInput("white noise and static hiss")
         rule.onNode(hasText("Play") and hasClickAction() and !hasContentDescription("Play")).performClick()
         openNowPlaying()
         rule.waitText("white noise and static hiss")
         rule.waitUntilAtLeastOneExists(hasText("Hiss Theory", substring = true) or hasText("Static Kids", substring = true), 10_000)
-        shot("m2-now-playing-sage")
+        shot("m2-now-playing-muse")
         rule.onNode(hasContentDescription("Up Next")).performClick()
         Thread.sleep(1000)
         shot("m3-up-next")
@@ -182,7 +182,10 @@ class MarqueeUiTest {
         Thread.sleep(1500)
         rule.waitUntilAtLeastOneExists(rated, 5_000)
         shot("m6-rated")
-        rule.onNode(hasContentDescription("3 stars")).performClick() // clears it again
+        // Half stars: the left half of the third star.
+        rule.onNode(hasContentDescription("2.5 stars")).performClick()
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Rating") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "2.5 of 5 stars"), 5_000)
+        rule.onNode(hasContentDescription("2.5 stars")).performClick() // clears it again
         rule.onNode(hasContentDescription("Start Radio")).performClick()
         rule.waitText("Floating 1 Radio", 15_000, substring = true)
         shot("m7-track-radio")

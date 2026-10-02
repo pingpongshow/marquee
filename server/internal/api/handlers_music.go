@@ -190,30 +190,30 @@ func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) 
 	return MusicRadio200JSONResponse(out), nil
 }
 
-func (h *Handlers) MusicSage(ctx context.Context, req MusicSageRequestObject) (MusicSageResponseObject, error) {
+func (h *Handlers) MusicMuse(ctx context.Context, req MusicMuseRequestObject) (MusicMuseResponseObject, error) {
 	s, ok := session(ctx)
 	if !ok {
-		return MusicSage401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+		return MusicMuse401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	prompt := strings.TrimSpace(req.Body.Prompt)
 	if len(prompt) < 2 {
-		return MusicSage400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "describe the music you want"))}, nil
+		return MusicMuse400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "describe the music you want"))}, nil
 	}
 	n := 30
 	set(&n, req.Body.Limit)
 	o := sonic.Options{Keep: keepFor(access(ctx), req.Body.LibraryId), Avoid: h.Sonic.Avoid(ctx, s.User.ID)}
-	st, err := h.Sonic.Sage(ctx, prompt, n, o)
+	st, err := h.Sonic.Muse(ctx, prompt, n, o)
 	if err != nil {
 		if code, msg, status := sonicErr(err); status == 503 {
-			return MusicSage503JSONResponse{ServiceUnavailableJSONResponse(apiErr(code, msg))}, nil
+			return MusicMuse503JSONResponse{ServiceUnavailableJSONResponse(apiErr(code, msg))}, nil
 		}
-		return nil, internal(ctx, "sage", err)
+		return nil, internal(ctx, "muse", err)
 	}
 	out, err := h.station(ctx, st)
 	if err != nil {
-		return nil, internal(ctx, "sage", err)
+		return nil, internal(ctx, "muse", err)
 	}
-	return MusicSage200JSONResponse(out), nil
+	return MusicMuse200JSONResponse(out), nil
 }
 
 func (h *Handlers) MusicAdventure(ctx context.Context, req MusicAdventureRequestObject) (MusicAdventureResponseObject, error) {

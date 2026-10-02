@@ -6,10 +6,10 @@ import { api, imageUrl, unwrap } from "@/api/client";
 import type { Station } from "@/api/types";
 import { Alert } from "@/components/ui";
 import { useMusic } from "../player/MusicPlayer";
-import { useRadio, useSage } from "./useRadio";
+import { useRadio, useMuse } from "./useRadio";
 
 const moods = ["Chill", "Energetic", "Focus", "Melancholy", "Party", "Romantic", "Dreamy", "Aggressive"];
-const sagePrompts = ["Rainy Sunday jazz", "Late-night drive synthwave", "Upbeat 80s pop for cleaning the house", "Acoustic songs for a quiet evening"];
+const musePrompts = ["Rainy Sunday jazz", "Late-night drive synthwave", "Upbeat 80s pop for cleaning the house", "Acoustic songs for a quiet evening"];
 
 /** A mix's cover: the first four album covers. */
 function MixArt({ station, className }: { station: Station; className?: string }) {
@@ -25,11 +25,11 @@ function MixArt({ station, className }: { station: Station; className?: string }
   );
 }
 
-/** The top of a music library: Sonic Sage, stations and daily mixes (M6.5). */
+/** The top of a music library: Muse, stations and daily mixes (M6.5). */
 export function MusicDiscover({ libraryId }: { libraryId: number }) {
   const music = useMusic();
   const radio = useRadio();
-  const sage = useSage();
+  const muse = useMuse();
   const [prompt, setPrompt] = useState("");
   const status = useQuery({ queryKey: ["music", "status"], queryFn: () => unwrap(api.GET("/music/status")), staleTime: 60_000 });
   const mixes = useQuery({ queryKey: ["music", "mixes", libraryId], queryFn: () => unwrap(api.GET("/music/mixes", { params: { query: { libraryId } } })) });
@@ -42,10 +42,10 @@ export function MusicDiscover({ libraryId }: { libraryId: number }) {
   const ready = !!st?.enabled && st.analyzed > 0;
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (prompt.trim().length > 1) sage.mutate({ prompt: prompt.trim(), libraryId });
+    if (prompt.trim().length > 1) muse.mutate({ prompt: prompt.trim(), libraryId });
   };
-  const busy = radio.isPending || sage.isPending;
-  const error = radio.error ?? sage.error;
+  const busy = radio.isPending || muse.isPending;
+  const error = radio.error ?? muse.error;
 
   if (st && !st.enabled) return null;
   return (
@@ -53,19 +53,19 @@ export function MusicDiscover({ libraryId }: { libraryId: number }) {
       {st && st.analyzed < st.total && (
         <p className="flex items-center gap-2 text-sm text-muted">
           <Sparkles className="size-4 text-accent" aria-hidden />
-          {st.available ? `Listening to your music: ${st.analyzed.toLocaleString()} of ${st.total.toLocaleString()} tracks analysed. Radios and mixes improve as it goes.` : "The sonic analysis service isn't running, so radios and Sonic Sage are unavailable."}
+          {st.available ? `Listening to your music: ${st.analyzed.toLocaleString()} of ${st.total.toLocaleString()} tracks analysed. Radios and mixes improve as it goes.` : "The sonic analysis service isn't running, so radios and Muse are unavailable."}
         </p>
       )}
       {error && <Alert tone="error">{error.message}</Alert>}
 
       {ready && (
         <form onSubmit={submit} className="rounded-xl border border-border bg-gradient-to-br from-accent/10 via-surface to-surface p-5">
-          <label htmlFor="sage" className="mb-2 flex items-center gap-2 text-sm font-semibold">
-            <Sparkles className="size-4 text-accent" aria-hidden /> Sonic Sage
+          <label htmlFor="muse" className="mb-2 flex items-center gap-2 text-sm font-semibold">
+            <Sparkles className="size-4 text-accent" aria-hidden /> Muse
           </label>
           <div className="flex gap-2">
             <input
-              id="sage"
+              id="muse"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Describe what you want to hear…"
@@ -73,12 +73,12 @@ export function MusicDiscover({ libraryId }: { libraryId: number }) {
               className="h-11 flex-1 rounded-lg border border-border bg-surface-2 px-4 placeholder:text-faint focus:border-accent focus:outline-none"
             />
             <button type="submit" disabled={busy || prompt.trim().length < 2} className="flex h-11 items-center gap-2 rounded-lg bg-accent px-5 font-medium text-black disabled:opacity-50">
-              {sage.isPending ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4 fill-current" />} Play
+              {muse.isPending ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4 fill-current" />} Play
             </button>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            {sagePrompts.map((p) => (
-              <button key={p} type="button" onClick={() => sage.mutate({ prompt: p, libraryId })} disabled={busy} className="rounded-full bg-surface-2 px-3 py-1 text-xs text-muted hover:text-text">
+            {musePrompts.map((p) => (
+              <button key={p} type="button" onClick={() => muse.mutate({ prompt: p, libraryId })} disabled={busy} className="rounded-full bg-surface-2 px-3 py-1 text-xs text-muted hover:text-text">
                 {p}
               </button>
             ))}

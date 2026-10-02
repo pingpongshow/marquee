@@ -254,7 +254,7 @@ func run() error {
 		slog.Warn("sonic index", "err", err)
 	}
 	scheduler.Register(tasks.Task{ID: "sonic", Name: "Analyse music", Every: time.Hour,
-		Description: "Listens to new tracks on the GPU so radios, similar music, mixes and Sonic Sage include them.",
+		Description: "Listens to new tracks on the GPU so radios, similar music, mixes and Muse include them.",
 		Run:         sonicSvc.Analyze})
 	runSonic := func() { scheduler.RunNow(ctx, "sonic") }
 	afterMusicScan.Store(&runSonic)

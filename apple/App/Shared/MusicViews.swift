@@ -1,7 +1,7 @@
 import MarqueeKit
 import SwiftUI
 
-/// Sonic Sage, stations and daily mixes at the top of a music library (M6.5).
+/// Muse, stations and daily mixes at the top of a music library (M6.5).
 struct MusicDiscoverView: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
@@ -19,13 +19,13 @@ struct MusicDiscoverView: View {
                 if status.analyzed < status.total {
                     Label(status.available
                           ? "Listening to your music: \(status.analyzed.formatted()) of \(status.total.formatted()) tracks analysed. Radios and mixes improve as it goes."
-                          : "The sonic analysis service isn't running, so radios and Sonic Sage are unavailable.",
+                          : "The sonic analysis service isn't running, so radios and Muse are unavailable.",
                           systemImage: "sparkles")
                         .font(.footnote).foregroundStyle(.secondary)
                         .padding(.horizontal, sidePadding)
                 }
                 if let error { ErrorBanner(message: error).padding(.horizontal, sidePadding) }
-                sage
+                muse
                 stations
                 if !mixes.isEmpty {
                     ShelfRow(title: "Mixes for you") {
@@ -46,17 +46,17 @@ struct MusicDiscoverView: View {
         decades = ((try? await app.filters(library: libraryID, type: .album))?.decades.map(\.value) ?? []).prefix(6).map { $0 }
     }
 
-    private var sage: some View {
+    private var muse: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Sonic Sage", systemImage: "wand.and.stars").font(.title3.bold())
+            Label("Muse", systemImage: "wand.and.stars").font(.title3.bold())
             HStack {
                 TextField("Describe what you want to hear…", text: $prompt)
-                    .onSubmit { runSage(prompt) }
+                    .onSubmit { runMuse(prompt) }
                     #if os(iOS)
                     .textFieldStyle(.roundedBorder)
                     .submitLabel(.go)
                     #endif
-                Button { runSage(prompt) } label: {
+                Button { runMuse(prompt) } label: {
                     if busy { ProgressView() } else { Label("Play", systemImage: "play.fill") }
                 }
                 .buttonStyle(.borderedProminent)
@@ -64,8 +64,8 @@ struct MusicDiscoverView: View {
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: chipSpacing) {
-                    ForEach(sageSuggestions, id: \.self) { s in
-                        Button(s) { prompt = s; runSage(s) }.buttonStyle(.bordered).font(.footnote)
+                    ForEach(museSuggestions, id: \.self) { s in
+                        Button(s) { prompt = s; runMuse(s) }.buttonStyle(.bordered).font(.footnote)
                     }
                 }
                 #if os(tvOS)
@@ -112,10 +112,10 @@ struct MusicDiscoverView: View {
     private let chipSpacing: CGFloat = 8
     #endif
 
-    private func runSage(_ text: String) {
+    private func runMuse(_ text: String) {
         let p = text.trimmingCharacters(in: .whitespaces)
         guard p.count > 1, !busy else { return }
-        run { music.playStation(try await app.sage(p, library: libraryID)) }
+        run { music.playStation(try await app.muse(p, library: libraryID)) }
     }
 
     private func startRadio(_ req: RadioRequest) {
@@ -185,16 +185,46 @@ struct RatingStars: View {
     var body: some View {
         HStack(spacing: 6) {
             ForEach(1...5, id: \.self) { star in
-                Button { set(star) } label: {
-                    Image(systemName: symbol(star)).foregroundStyle(symbol(star) == "star" ? Color.secondary : Color.marqueeGold)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(star) star\(star == 1 ? "" : "s")")
+                #if os(tvOS)
+                Button { set(star) } label: { image(star) }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(star) star\(star == 1 ? "" : "s")")
+                #else
+                // The left half of a star gives a half star.
+                image(star)
+                    .contentShape(Rectangle())
+                    .overlay {
+                        GeometryReader { g in
+                            Color.clear.contentShape(Rectangle())
+                                .onTapGesture(coordinateSpace: .local) { p in
+                                    pick(p.x < g.size.width / 2 ? Double(star * 2 - 1) : Double(star * 2))
+                                }
+                        }
+                    }
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityLabel("\(star) star\(star == 1 ? "" : "s")")
+                    .accessibilityAction { pick(Double(star * 2)) }
+                #endif
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Rating")
         .accessibilityValue(rating.map { String(format: "%.1f stars", $0 / 2) } ?? "Not rated")
+        .accessibilityAdjustableAction { dir in
+            let r = rating ?? 0
+            pick(min(10, max(0, r + (dir == .increment ? 1 : -1))))
+        }
+    }
+
+    private func image(_ star: Int) -> some View {
+        Image(systemName: symbol(star)).foregroundStyle(symbol(star) == "star" ? Color.secondary : Color.marqueeGold)
+    }
+
+    /// Sets a rating (0–10); choosing the current value again clears it.
+    private func pick(_ v: Double) {
+        let next: Double? = (v == rating || v == 0) ? nil : v
+        rating = next
+        Task { try? await app.rate(itemID, next) }
     }
 
     private func symbol(_ star: Int) -> String {
@@ -204,8 +234,8 @@ struct RatingStars: View {
         return "star"
     }
 
-    /// Tapping a star gives it; tapping the same full star again makes it a half; tapping
-    /// the half clears the rating.
+    /// tvOS (no touch position): pressing a star gives it; pressing the same full star again
+    /// makes it a half; pressing the half clears the rating.
     private func set(_ star: Int) {
         let full = Double(star * 2)
         let next: Double? = rating == full ? full - 1 : rating == full - 1 ? nil : full

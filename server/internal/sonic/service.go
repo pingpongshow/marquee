@@ -379,7 +379,7 @@ func (s *Service) RadioFromVector(v []float32, title string, o Options) Station 
 	return Station{Title: title, IDs: TrackIDs(s.Index.Flow(v, nil, o))}
 }
 
-// TextVector embeds a prompt (Sonic Sage, moods).
+// TextVector embeds a prompt (Muse, moods).
 func (s *Service) TextVector(ctx context.Context, prompt string) ([]float32, error) {
 	vs, err := s.Client.EmbedText(ctx, []string{prompt})
 	if err != nil {
@@ -391,8 +391,8 @@ func (s *Service) TextVector(ctx context.Context, prompt string) ([]float32, err
 	return normalize(vs[0]), nil
 }
 
-// Sage builds a playlist from a description ("rainy Sunday jazz").
-func (s *Service) Sage(ctx context.Context, prompt string, n int, o Options) (Station, error) {
+// Muse builds a playlist from a description ("rainy Sunday jazz").
+func (s *Service) Muse(ctx context.Context, prompt string, n int, o Options) (Station, error) {
 	v, err := s.TextVector(ctx, prompt)
 	if err != nil {
 		return Station{}, err

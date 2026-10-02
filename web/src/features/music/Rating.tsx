@@ -16,7 +16,20 @@ export function Rating({ itemId, value, size = "md" }: { itemId: number; value?:
   const shown = hover ?? local ?? 0;
   const px = size === "sm" ? "size-4" : "size-5";
   return (
-    <div className="flex items-center" onMouseLeave={() => setHover(null)} role="radiogroup" aria-label="Your rating">
+    <div
+      className="flex items-center"
+      onMouseLeave={() => setHover(null)}
+      role="radiogroup"
+      aria-label="Your rating"
+      onKeyDown={(e) => {
+        // Arrow keys move in half stars.
+        if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+        e.preventDefault();
+        const next = Math.min(10, Math.max(0, (local ?? 0) + (e.key === "ArrowRight" ? 1 : -1)));
+        setLocal(next || undefined);
+        rate.mutate(next || null);
+      }}
+    >
       {[1, 2, 3, 4, 5].map((n) => {
         const full = shown >= n * 2;
         const half = !full && shown >= n * 2 - 1;
@@ -35,7 +48,9 @@ export function Rating({ itemId, value, size = "md" }: { itemId: number; value?:
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              const v = hover ?? n * 2;
+              // Where the click landed (works for taps too, which have no hover).
+              const r = e.currentTarget.getBoundingClientRect();
+              const v = e.clientX > 0 ? (e.clientX - r.left < r.width / 2 ? n * 2 - 1 : n * 2) : (hover ?? n * 2);
               const next = v === local ? null : v;
               setLocal(next ?? undefined);
               rate.mutate(next);
