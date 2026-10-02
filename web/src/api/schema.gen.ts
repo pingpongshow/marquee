@@ -897,6 +897,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/webhooks/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a test event to a webhook URL now (admin only). */
+        post: operations["testWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/stats": {
         parameters: {
             query?: never;
@@ -1578,6 +1595,8 @@ export interface components {
             metadata: components["schemas"]["MetadataSettings"];
             tasks: components["schemas"]["TaskSettings"];
             music?: components["schemas"]["MusicSettings"];
+            /** @description Replaces the whole list when sent. */
+            webhooks?: components["schemas"]["Webhook"][];
         };
         ServerSettingsUpdate: {
             security?: components["schemas"]["SecuritySettings"];
@@ -1589,6 +1608,22 @@ export interface components {
             metadata?: components["schemas"]["MetadataSettingsUpdate"];
             tasks?: components["schemas"]["TaskSettings"];
             music?: components["schemas"]["MusicSettings"];
+            /** @description Replaces the whole list when sent. */
+            webhooks?: components["schemas"]["Webhook"][];
+        };
+        Webhook: {
+            /** @description Assigned by the server. */
+            id?: string;
+            name: string;
+            /**
+             * Format: uri
+             * @description http(s) URL that receives a JSON POST per event.
+             */
+            url: string;
+            /** @description When set, payloads are signed: X-Marquee-Signature: sha256=<HMAC-SHA256 of the body>. */
+            secret?: string;
+            events: ("playback.started" | "playback.paused" | "playback.resumed" | "playback.stopped" | "playback.watched" | "library.added")[];
+            enabled: boolean;
         };
         MusicSettings: {
             /** @description Analyse how tracks sound (on this server's GPU) for radios */
@@ -4284,6 +4319,42 @@ export interface operations {
                     "application/json": components["schemas"]["HistoryEntry"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    testWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uri */
+                    url: string;
+                    secret?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Delivered or not. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ok: boolean;
+                        /** @description The receiver's HTTP status. */
+                        status?: number;
+                        error?: string;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };

@@ -11807,6 +11807,250 @@ public enum Operations {
             }
         }
     }
+    /// Send a test event to a webhook URL now (admin only).
+    ///
+    /// - Remark: HTTP `POST /webhooks/test`.
+    /// - Remark: Generated from `#/paths//webhooks/test/post(testWebhook)`.
+    public enum TestWebhook {
+        public static let id: Swift.String = "testWebhook"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/webhooks/test/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.TestWebhook.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.TestWebhook.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.TestWebhook.Input.Headers
+            /// - Remark: Generated from `#/paths/webhooks/test/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/webhooks/test/POST/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// - Remark: Generated from `#/paths/webhooks/test/POST/requestBody/json/url`.
+                    public var url: Swift.String
+                    /// - Remark: Generated from `#/paths/webhooks/test/POST/requestBody/json/secret`.
+                    public var secret: Swift.String?
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - url:
+                    ///   - secret:
+                    public init(
+                        url: Swift.String,
+                        secret: Swift.String? = nil
+                    ) {
+                        self.url = url
+                        self.secret = secret
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case url
+                        case secret
+                    }
+                }
+                /// - Remark: Generated from `#/paths/webhooks/test/POST/requestBody/content/application\/json`.
+                case json(Operations.TestWebhook.Input.Body.JsonPayload)
+            }
+            public var body: Operations.TestWebhook.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            ///   - body:
+            public init(
+                headers: Operations.TestWebhook.Input.Headers = .init(),
+                body: Operations.TestWebhook.Input.Body
+            ) {
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/webhooks/test/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/webhooks/test/POST/responses/200/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/webhooks/test/POST/responses/200/content/json/ok`.
+                        public var ok: Swift.Bool
+                        /// The receiver's HTTP status.
+                        ///
+                        /// - Remark: Generated from `#/paths/webhooks/test/POST/responses/200/content/json/status`.
+                        public var status: Swift.Int?
+                        /// - Remark: Generated from `#/paths/webhooks/test/POST/responses/200/content/json/error`.
+                        public var error: Swift.String?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - ok:
+                        ///   - status: The receiver's HTTP status.
+                        ///   - error:
+                        public init(
+                            ok: Swift.Bool,
+                            status: Swift.Int? = nil,
+                            error: Swift.String? = nil
+                        ) {
+                            self.ok = ok
+                            self.status = status
+                            self.error = error
+                        }
+                        public enum CodingKeys: String, CodingKey {
+                            case ok
+                            case status
+                            case error
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/webhooks/test/POST/responses/200/content/application\/json`.
+                    case json(Operations.TestWebhook.Output.Ok.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.TestWebhook.Output.Ok.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.TestWebhook.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.TestWebhook.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Delivered or not.
+            ///
+            /// - Remark: Generated from `#/paths//webhooks/test/post(testWebhook)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.TestWebhook.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.TestWebhook.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//webhooks/test/post(testWebhook)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//webhooks/test/post(testWebhook)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//webhooks/test/post(testWebhook)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
     /// Playback statistics (ADM-4). Administrators can see everyone or one user; others see their own (their "year in music").
     ///
     /// - Remark: HTTP `GET /stats`.

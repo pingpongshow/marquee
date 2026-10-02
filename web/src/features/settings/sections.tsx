@@ -1,4 +1,4 @@
-import { Activity, AudioLines, BarChart3, CalendarClock, Cpu, Database, Download, Globe, Library, MonitorSmartphone, Network, ScrollText, Server, Users } from "lucide-react";
+import { Activity, AudioLines, BarChart3, CalendarClock, Webhook, Cpu, Database, Download, Globe, Library, MonitorSmartphone, Network, ScrollText, Server, Users } from "lucide-react";
 import type { ComponentType } from "react";
 import { DashboardSettings } from "./DashboardSettings";
 import { MusicSettings } from "./MusicSettings";
@@ -7,6 +7,7 @@ import { LogsSettings } from "./LogsSettings";
 import { PlexImportSettings } from "./PlexImportSettings";
 import { GeneralSettings, MetadataSettings, NetworkSettings, RemoteAccessSettings } from "./ServerSections";
 import { StatsView } from "./StatsView";
+import { WebhooksSettings } from "./WebhooksSettings";
 import { ScheduledTasksSettings } from "./TasksSettings";
 import { TranscoderSettings } from "./TranscoderSettings";
 import { DevicesSettings } from "../users/DevicesSettings";
@@ -37,6 +38,7 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] = 
       { id: "metadata", label: "Metadata", icon: Database, component: MetadataSettings, keywords: "tmdb omdb api key ratings imdb rotten tomatoes artwork posters deezer", description: "Online metadata providers and their API keys." },
       { id: "music", label: "Music", icon: AudioLines, component: MusicSettings, keywords: "sonic analysis radio sage mixes lyrics lrclib loudness replaygain volume levelling gpu", description: "Sonic analysis, lyrics and volume levelling." },
       { id: "scheduled-tasks", label: "Scheduled Tasks", icon: CalendarClock, component: ScheduledTasksSettings, keywords: "maintenance window backup restore database optimize tasks run now retention", description: "Maintenance window, background tasks and database backups." },
+      { id: "webhooks", label: "Webhooks", icon: Webhook, component: WebhooksSettings, keywords: "webhooks notifications home assistant discord integrations events play stop new", description: "Tell other services when something plays or new titles arrive." },
       { id: "plex-import", label: "Plex Import", icon: Download, component: PlexImportSettings, keywords: "plex import watch history migrate accounts path mapping", description: "Bring over watch history, playlists and customisations from Plex." },
     ],
   },
