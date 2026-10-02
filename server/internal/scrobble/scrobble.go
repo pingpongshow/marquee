@@ -1,6 +1,6 @@
-// Package scrobble sends what people play to ListenBrainz (MUSIC-12, D80): "playing now" when a
-// track starts and a listen once it counts as played (half way), for every client, from the
-// server. Each user connects with their own ListenBrainz token.
+// Package scrobble sends what people play to ListenBrainz and Last.fm (MUSIC-12, D80, D81):
+// "playing now" when a track starts and a listen once it counts as played (half way), for
+// every client, from the server. Each user connects their own accounts.
 package scrobble
 
 import (
@@ -21,6 +21,10 @@ type Service struct {
 	DB   *sql.DB
 	Base string // default https://api.listenbrainz.org
 	HTTP *http.Client
+	// LastFM returns the server's Last.fm API key and secret; LastFMBase overrides the
+	// Last.fm API address (tests).
+	LastFM     LastFMKeys
+	LastFMBase string
 }
 
 func (s *Service) base() string {
@@ -75,9 +79,9 @@ type Status struct {
 	Error     string // the last submission problem, if any
 }
 
-func (s *Service) Status(ctx context.Context, userID int64) Status {
+func (s *Service) Status(ctx context.Context, userID int64, service string) Status {
 	var st Status
-	if s.DB.QueryRowContext(ctx, `SELECT username, error FROM user_scrobble WHERE user_id = ? AND service = 'listenbrainz'`, userID).
+	if s.DB.QueryRowContext(ctx, `SELECT username, error FROM user_scrobble WHERE user_id = ? AND service = ?`, userID, service).
 		Scan(&st.Username, &st.Error) == nil {
 		st.Connected = true
 	}
@@ -103,9 +107,14 @@ func (s *Service) Connect(ctx context.Context, userID int64, token string) (Stat
 	return Status{Connected: true, Username: v.UserName}, nil
 }
 
-func (s *Service) Disconnect(ctx context.Context, userID int64) error {
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM user_scrobble WHERE user_id = ? AND service = 'listenbrainz'`, userID)
+func (s *Service) Disconnect(ctx context.Context, userID int64, service string) error {
+	_, err := s.DB.ExecContext(ctx, `DELETE FROM user_scrobble WHERE user_id = ? AND service = ?`, userID, service)
 	return err
+}
+
+type track struct {
+	title, album, artist, mbid, albumMBID string
+	durationMS, index                     int64
 }
 
 type listen struct {
@@ -113,53 +122,83 @@ type listen struct {
 	Meta       map[string]any `json:"track_metadata"`
 }
 
-// Played reports playback of a track: started (playing now) or played (a listen, at startedAt).
+// Played reports playback of a track to every service the user connected: started (playing
+// now) or played (a listen, at startedAt).
 func (s *Service) Played(ctx context.Context, userID, trackID int64, nowPlaying bool, startedAt time.Time) {
-	var token string
-	if s.DB.QueryRowContext(ctx, `SELECT token FROM user_scrobble WHERE user_id = ? AND service = 'listenbrainz'`, userID).Scan(&token) != nil {
+	rows, err := s.DB.QueryContext(ctx, `SELECT service, token FROM user_scrobble WHERE user_id = ?`, userID)
+	if err != nil {
 		return
 	}
-	var typ, title, album, artist, credit, mbid, albumMBID string
-	var durMS sql.NullInt64
-	var idx sql.NullInt64
-	err := s.DB.QueryRowContext(ctx, `SELECT t.type, t.title, COALESCE(a.title, ''), COALESCE(g.title, ''), COALESCE(t.artist_credit, ''),
+	tokens := map[string]string{}
+	for rows.Next() {
+		var svc, tok string
+		if rows.Scan(&svc, &tok) == nil {
+			tokens[svc] = tok
+		}
+	}
+	rows.Close()
+	if len(tokens) == 0 {
+		return
+	}
+	var typ, credit string
+	var t track
+	var durMS, idx sql.NullInt64
+	err = s.DB.QueryRowContext(ctx, `SELECT t.type, t.title, COALESCE(a.title, ''), COALESCE(g.title, ''), COALESCE(t.artist_credit, ''),
 			COALESCE((SELECT value FROM external_ids WHERE item_id = t.id AND provider = 'musicbrainz'), ''),
 			COALESCE((SELECT value FROM external_ids WHERE item_id = a.id AND provider = 'musicbrainz'), ''),
 			t.duration_ms, t.idx
 		FROM items t LEFT JOIN items a ON a.id = t.parent_id LEFT JOIN items g ON g.id = t.grandparent_id WHERE t.id = ?`, trackID).
-		Scan(&typ, &title, &album, &artist, &credit, &mbid, &albumMBID, &durMS, &idx)
+		Scan(&typ, &t.title, &t.album, &t.artist, &credit, &t.mbid, &t.albumMBID, &durMS, &idx)
 	if err != nil || typ != "track" {
 		return
 	}
 	if credit != "" {
-		artist = credit // the track's own credit, e.g. with featured artists
+		t.artist = credit // the track's own credit, e.g. with featured artists
 	}
+	t.durationMS, t.index = durMS.Int64, idx.Int64
+	for svc, tok := range tokens {
+		var err error
+		switch svc {
+		case "listenbrainz":
+			err = s.sendListenBrainz(ctx, tok, t, nowPlaying, startedAt.Unix())
+		case "lastfm":
+			if !s.LastFMAvailable() {
+				continue
+			}
+			err = s.sendLastFM(ctx, tok, t, nowPlaying, startedAt.Unix())
+		default:
+			continue
+		}
+		msg := ""
+		if err != nil {
+			msg = err.Error()
+			slog.Warn("scrobble", "service", svc, "user", userID, "err", err)
+		}
+		s.DB.ExecContext(ctx, `UPDATE user_scrobble SET error = ? WHERE user_id = ? AND service = ?`, msg, userID, svc)
+	}
+}
+
+func (s *Service) sendListenBrainz(ctx context.Context, token string, t track, nowPlaying bool, startedAt int64) error {
 	info := map[string]any{"media_player": "Marquee", "submission_client": "Marquee"}
-	if durMS.Valid && durMS.Int64 > 0 {
-		info["duration_ms"] = durMS.Int64
+	if t.durationMS > 0 {
+		info["duration_ms"] = t.durationMS
 	}
-	if mbid != "" {
-		info["recording_mbid"] = mbid
+	if t.mbid != "" {
+		info["recording_mbid"] = t.mbid
 	}
-	if albumMBID != "" {
-		info["release_mbid"] = albumMBID
+	if t.albumMBID != "" {
+		info["release_mbid"] = t.albumMBID
 	}
-	if idx.Valid {
-		info["tracknumber"] = idx.Int64
+	if t.index > 0 {
+		info["tracknumber"] = t.index
 	}
-	meta := map[string]any{"artist_name": artist, "track_name": title, "additional_info": info}
-	if album != "" {
-		meta["release_name"] = album
+	meta := map[string]any{"artist_name": t.artist, "track_name": t.title, "additional_info": info}
+	if t.album != "" {
+		meta["release_name"] = t.album
 	}
-	body := map[string]any{"listen_type": "single", "payload": []listen{{ListenedAt: startedAt.Unix(), Meta: meta}}}
+	body := map[string]any{"listen_type": "single", "payload": []listen{{ListenedAt: startedAt, Meta: meta}}}
 	if nowPlaying {
 		body = map[string]any{"listen_type": "playing_now", "payload": []listen{{Meta: meta}}}
 	}
-	err = s.call(ctx, http.MethodPost, "/1/submit-listens", token, body, nil)
-	msg := ""
-	if err != nil {
-		msg = err.Error()
-		slog.Warn("listenbrainz", "user", userID, "err", err)
-	}
-	s.DB.ExecContext(ctx, `UPDATE user_scrobble SET error = ? WHERE user_id = ? AND service = 'listenbrainz'`, msg, userID)
+	return s.call(ctx, http.MethodPost, "/1/submit-listens", token, body, nil)
 }

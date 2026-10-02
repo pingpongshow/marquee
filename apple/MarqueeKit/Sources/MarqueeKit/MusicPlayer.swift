@@ -496,7 +496,12 @@ public final class MusicPlayer {
     // MARK: - System integration
 
     private func activateAudioSession() {
-        #if os(iOS) || os(tvOS)
+        #if os(iOS)
+        // Long-form audio: AirPlay 2 speakers (HomePod, Sonos and other AirPlay 2 speakers,
+        // including several at once) are offered as routes for music, as in Apple Music.
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, policy: .longFormAudio)
+        try? AVAudioSession.sharedInstance().setActive(true)
+        #elseif os(tvOS)
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
         try? AVAudioSession.sharedInstance().setActive(true)
         #endif

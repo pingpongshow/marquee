@@ -8,7 +8,7 @@ import (
 	"marquee/internal/scrobble"
 )
 
-// Scrobbling to ListenBrainz (MUSIC-12, D80).
+// Scrobbling to ListenBrainz and Last.fm (MUSIC-12, D80, D81).
 
 func toAPIScrobble(st scrobble.Status) ScrobbleStatus {
 	return ScrobbleStatus{Connected: st.Connected, Username: nz(st.Username), Error: nz(st.Error)}
@@ -19,7 +19,7 @@ func (h *Handlers) ListenBrainzStatus(ctx context.Context, _ ListenBrainzStatusR
 	if !ok {
 		return ListenBrainzStatus401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	return ListenBrainzStatus200JSONResponse(toAPIScrobble(h.Scrobble.Status(ctx, s.User.ID))), nil
+	return ListenBrainzStatus200JSONResponse(toAPIScrobble(h.Scrobble.Status(ctx, s.User.ID, "listenbrainz"))), nil
 }
 
 func (h *Handlers) ConnectListenBrainz(ctx context.Context, req ConnectListenBrainzRequestObject) (ConnectListenBrainzResponseObject, error) {
@@ -46,8 +46,63 @@ func (h *Handlers) DisconnectListenBrainz(ctx context.Context, _ DisconnectListe
 	if !ok {
 		return DisconnectListenBrainz401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if err := h.Scrobble.Disconnect(ctx, s.User.ID); err != nil {
+	if err := h.Scrobble.Disconnect(ctx, s.User.ID, "listenbrainz"); err != nil {
 		return nil, internal(ctx, "disconnectListenBrainz", err)
 	}
 	return DisconnectListenBrainz204Response{}, nil
+}
+
+func (h *Handlers) LastFmStatus(ctx context.Context, _ LastFmStatusRequestObject) (LastFmStatusResponseObject, error) {
+	s, ok := session(ctx)
+	if !ok {
+		return LastFmStatus401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	out := toAPIScrobble(h.Scrobble.Status(ctx, s.User.ID, "lastfm"))
+	out.Available = ptr(h.Scrobble.LastFMAvailable())
+	return LastFmStatus200JSONResponse(out), nil
+}
+
+func (h *Handlers) LastFmAuthUrl(ctx context.Context, req LastFmAuthUrlRequestObject) (LastFmAuthUrlResponseObject, error) {
+	if _, ok := session(ctx); !ok {
+		return LastFmAuthUrl401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	cb := ""
+	if req.Body.CallbackUrl != nil {
+		cb = *req.Body.CallbackUrl
+	}
+	u, err := h.Scrobble.LastFMAuthURL(cb)
+	if err != nil {
+		return LastFmAuthUrl503JSONResponse{ServiceUnavailableJSONResponse(apiErr("not_configured", err.Error()))}, nil
+	}
+	return LastFmAuthUrl200JSONResponse{Url: u}, nil
+}
+
+func (h *Handlers) ConnectLastFm(ctx context.Context, req ConnectLastFmRequestObject) (ConnectLastFmResponseObject, error) {
+	s, ok := session(ctx)
+	if !ok {
+		return ConnectLastFm401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	st, err := h.Scrobble.ConnectLastFM(ctx, s.User.ID, strings.TrimSpace(req.Body.Token))
+	switch {
+	case errors.Is(err, scrobble.ErrLastFMOff), errors.Is(err, scrobble.ErrLastFMKey):
+		return ConnectLastFm503JSONResponse{ServiceUnavailableJSONResponse(apiErr("not_configured", err.Error()))}, nil
+	case errors.Is(err, scrobble.ErrBadToken):
+		return ConnectLastFm400JSONResponse{BadRequestJSONResponse(apiErr("invalid_token", "Last.fm didn't accept the approval; try connecting again"))}, nil
+	case err != nil:
+		return ConnectLastFm502JSONResponse{BadGatewayJSONResponse(apiErr("unreachable", "Couldn't reach Last.fm: "+err.Error()))}, nil
+	}
+	out := toAPIScrobble(st)
+	out.Available = ptr(true)
+	return ConnectLastFm200JSONResponse(out), nil
+}
+
+func (h *Handlers) DisconnectLastFm(ctx context.Context, _ DisconnectLastFmRequestObject) (DisconnectLastFmResponseObject, error) {
+	s, ok := session(ctx)
+	if !ok {
+		return DisconnectLastFm401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	if err := h.Scrobble.Disconnect(ctx, s.User.ID, "lastfm"); err != nil {
+		return nil, internal(ctx, "disconnectLastFm", err)
+	}
+	return DisconnectLastFm204Response{}, nil
 }
