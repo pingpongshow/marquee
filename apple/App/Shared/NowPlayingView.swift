@@ -175,6 +175,7 @@ struct NowPlayingView: View {
                 .accessibilityLabel(panel == .lyrics ? "Show Up Next" : "Lyrics")
                 #endif
                 SleepMenu().labelStyle(.iconOnly)
+                DJMenu()
                 LevellingMenu()
             }
             .font(.title3)
@@ -227,7 +228,12 @@ struct NowPlayingView: View {
             HStack(spacing: 12) {
                 ArtworkView(item: e.item, shape: .square, width: 44).frame(width: 44)
                 VStack(alignment: .leading) {
-                    Text(e.item.title).lineLimit(1).foregroundStyle(current ? Color.marqueeGold : .primary)
+                    HStack(spacing: 6) {
+                        if e.dj != nil {
+                            Text("DJ").font(.caption2.bold()).padding(.horizontal, 4).background(Color.marqueeGold.opacity(0.25), in: RoundedRectangle(cornerRadius: 3))
+                        }
+                        Text(e.item.title).lineLimit(1).foregroundStyle(current ? Color.marqueeGold : .primary)
+                    }
                     Text(e.item.artistCredit ?? e.item.grandparentTitle ?? "").font(.caption).foregroundStyle(Color.secondary).lineLimit(1)
                 }
             }

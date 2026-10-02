@@ -327,3 +327,42 @@ func (h *Handlers) GetLyrics(ctx context.Context, req GetLyricsRequestObject) (G
 	}
 	return GetLyrics200JSONResponse(out), nil
 }
+
+// MusicDJ picks a Guest DJ track (MUSIC-6).
+func (h *Handlers) MusicDJ(ctx context.Context, req MusicDJRequestObject) (MusicDJResponseObject, error) {
+	s, ok := session(ctx)
+	if !ok {
+		return MusicDJ401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	none := MusicDJ404JSONResponse{NotFoundJSONResponse(apiErr("nothing", "nothing fits right now"))}
+	b := req.Body
+	acc := access(ctx)
+	t := h.Sonic.Index.Get(b.TrackId)
+	if t == nil || h.Items.Visible(ctx, acc, b.TrackId) != nil {
+		return none, nil
+	}
+	o := sonic.Options{Keep: keepFor(acc, &t.LibraryID), Avoid: h.Sonic.Avoid(ctx, s.User.ID), Exclude: map[int64]bool{}}
+	if b.Exclude != nil {
+		for _, id := range *b.Exclude {
+			o.Exclude[id] = true
+		}
+	}
+	plays := func(ids []int64) map[int64]int {
+		out := map[int64]int{}
+		for _, id := range ids {
+			var n int
+			h.DB.QueryRowContext(ctx, `SELECT COALESCE(play_count, 0) FROM user_item_state WHERE user_id = ? AND item_id = ?`, s.User.ID, id).Scan(&n)
+			out[id] = n
+		}
+		return out
+	}
+	pick := h.Sonic.Index.DJPick(t, string(b.Mode), o, plays)
+	if pick == nil {
+		return none, nil
+	}
+	d, err := h.Items.Get(ctx, acc, pick.ItemID, false)
+	if err != nil {
+		return none, nil
+	}
+	return MusicDJ200JSONResponse(toAPISummary(d.Summary)), nil
+}

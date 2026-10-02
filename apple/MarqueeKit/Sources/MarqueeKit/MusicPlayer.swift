@@ -36,6 +36,27 @@ public final class MusicPlayer {
         }
     }
 
+    /// Guest DJ modes (MUSIC-6): a DJ weaves a track in every few songs.
+    public enum DJ: String, CaseIterable, Sendable {
+        case stretch, groupie, deepCuts = "deep_cuts", contempo
+        public var label: String {
+            switch self {
+            case .stretch: "DJ Stretch"
+            case .groupie: "DJ Groupie"
+            case .deepCuts: "DJ Deep Cuts"
+            case .contempo: "DJ Contempo"
+            }
+        }
+        public var help: String {
+            switch self {
+            case .stretch: "Tracks that sound like what's playing, by other artists"
+            case .groupie: "More from the artist's other albums"
+            case .deepCuts: "The artist's tracks you play least"
+            case .contempo: "A similar sound from the same era"
+            }
+        }
+    }
+
     public enum Sleep: Equatable, Sendable {
         case at(Date)
         case endOfTrack
@@ -45,6 +66,14 @@ public final class MusicPlayer {
     public private(set) var source: Source?
     /// Sleep timer: pause at a time or when the current track ends.
     public var sleep: Sleep? { didSet { scheduleSleep() } }
+    public var dj: DJ? = DJ(rawValue: UserDefaults.standard.string(forKey: "marquee.dj") ?? "") {
+        didSet {
+            UserDefaults.standard.set(dj?.rawValue, forKey: "marquee.dj")
+            djCount = 0
+        }
+    }
+    @ObservationIgnored private var djCount = 0
+    @ObservationIgnored private var djBusy = false
     public var levelling: Levelling = Levelling(rawValue: UserDefaults.standard.string(forKey: "marquee.levelling") ?? "") ?? .auto {
         didSet {
             UserDefaults.standard.set(levelling.rawValue, forKey: "marquee.levelling")
@@ -298,6 +327,26 @@ public final class MusicPlayer {
         updateNowPlaying()
         refreshFollowing()
         topUpRadio()
+        guestDJ()
+    }
+
+    /// After every third of your own tracks, asks the Guest DJ for one to play next.
+    private func guestDJ() {
+        guard let dj, !djBusy, let cur = queue.current else { return }
+        if cur.dj != nil { djCount = 0; return }
+        djCount += 1
+        let nextIsDJ = queue.upcoming.first?.dj != nil
+        guard djCount >= 3, !nextIsDJ, let client = app.client else { return }
+        djBusy = true
+        let exclude = queue.entries.map(\.item.id)
+        Task {
+            defer { djBusy = false }
+            guard let pick = try? await client.musicDJ(body: .json(.init(trackId: cur.item.id, mode: .init(rawValue: dj.rawValue)!, exclude: exclude))).ok.body.json,
+                  queue.current?.id == cur.id else { return }
+            queue.playNext([pick], dj: dj.rawValue)
+            djCount = 0
+            refreshFollowing()
+        }
     }
 
     // MARK: - Stations, sleep and levelling

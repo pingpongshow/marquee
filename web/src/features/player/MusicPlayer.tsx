@@ -6,6 +6,7 @@ import { MiniPlayer, NowPlaying } from "./NowPlaying";
 import * as Q from "./queue";
 
 export type Levelling = "off" | "track" | "album" | "auto";
+export type DJMode = "stretch" | "groupie" | "deep_cuts" | "contempo";
 export type Source = { title: string; radio?: RadioRequest };
 
 type Ctx = {
@@ -14,6 +15,12 @@ type Ctx = {
   playStation: (station: { title: string; items: ItemSummary[] }, radio?: RadioRequest) => void;
   levelling: Levelling;
   setLevelling: (l: Levelling) => void;
+  /** Crossfade between tracks in seconds (0 = off); never within an album played in order. */
+  crossfade: number;
+  setCrossfade: (s: number) => void;
+  /** Guest DJ (MUSIC-6): weaves a track in every few songs. */
+  dj: DJMode | null;
+  setDJ: (m: DJMode | null) => void;
   /** Sleep timer: an epoch time to pause at, "track" (end of this track), or null. */
   sleep: number | "track" | null;
   setSleep: (s: number | "track" | null) => void;
@@ -73,6 +80,26 @@ function levelGain(l: Loaded | null, mode: Levelling, albumRun: boolean): number
 }
 
 const PRELOAD_SECONDS = 15;
+const DJ_EVERY = 3; // a DJ pick after this many of your own tracks
+
+function stored<T extends string | number>(key: string, fallback: T, valid: (v: string) => boolean): T {
+  try {
+    const v = localStorage.getItem(key);
+    if (v !== null && valid(v)) return (typeof fallback === "number" ? Number(v) : v) as T;
+  } catch {
+    /* storage unavailable */
+  }
+  return fallback;
+}
+
+function store(key: string, v: string | number | null) {
+  try {
+    if (v === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, String(v));
+  } catch {
+    /* storage unavailable */
+  }
+}
 
 function storedVolume() {
   try {
@@ -122,6 +149,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [source, setSource] = useState<Source | undefined>();
   const [levelling, setLevellingState] = useState<Levelling>(storedLevelling);
   const [sleep, setSleep] = useState<number | "track" | null>(null);
+  const [crossfade, setCrossfadeState] = useState<number>(() => stored<number>("marquee.crossfade", 0, (v) => Number(v) >= 0 && Number(v) <= 12));
+  const [dj, setDJState] = useState<DJMode | null>(() => stored<string>("marquee.dj", "", (v) => ["stretch", "groupie", "deep_cuts", "contempo"].includes(v)) as DJMode || null);
+  const crossfadeRef = useRef(crossfade);
+  const fading = useRef(false);
   const cur = Q.current(queue);
 
   // Web Audio graph for levelling: element → per-element gain → master (volume) → speakers.
@@ -153,6 +184,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     levellingRef.current = levelling;
     volumeRef.current = volume;
+    crossfadeRef.current = crossfade;
   });
   /** Applies volume and levelling to element i (album gain when the previous track was from the same album). */
   const applyGain = useCallback((i: number) => {
@@ -259,6 +291,33 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       .finally(() => (refilling.current = false));
   }, [queue, source]);
 
+  // Guest DJ: after every few of your tracks, weave one in from the DJ.
+  const djCount = useRef(0);
+  const djBusy = useRef(false);
+  useEffect(() => {
+    if (!dj || curKey === undefined || djBusy.current) return;
+    const q = queueRef.current;
+    const entry = q.entries[q.index];
+    if (!entry || entry.dj) {
+      djCount.current = 0;
+      return;
+    }
+    djCount.current += 1;
+    const following = q.entries[q.index + 1];
+    if (djCount.current < DJ_EVERY || following?.dj) return;
+    djBusy.current = true;
+    const exclude = q.entries.map((e) => e.item.id);
+    unwrap(api.POST("/music/dj", { body: { trackId: entry.item.id, mode: dj, exclude } }))
+      .then((pick) => {
+        if (queueRef.current.entries[queueRef.current.index]?.key !== entry.key) return; // moved on
+        unload(1 - active.current); // the preloaded "next" track changes
+        setQueue((cq) => Q.playNext(cq, [pick], dj));
+        djCount.current = 0;
+      })
+      .catch(() => {})
+      .finally(() => (djBusy.current = false));
+  }, [curKey, dj, unload]);
+
   // Sleep timer.
   useEffect(() => {
     if (typeof sleep !== "number") return;
@@ -340,6 +399,38 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       loaded.current[idle] = { key: following.key, sessionId: "", ready: false }; // reserve
       loadInto(idle, following, true).catch(() => (loaded.current[idle] = null));
     }
+    // Crossfade into what follows, except within an album played in order (gapless albums
+    // stay gapless, like Plexamp's sweet fades) and when the sleep timer ends this track.
+    const cf = crossfadeRef.current;
+    const g = graph.current;
+    const pre = loaded.current[idle];
+    const sameAlbum = !!following && following.item.parentId === q.entries[q.index]?.item.parentId && (following.item.index ?? 0) === (q.entries[q.index]?.item.index ?? -1) + 1;
+    if (cf > 0 && g && following && fi !== q.index && !fading.current && pre?.ready && pre.key === following.key && !sameAlbum && sleep !== "track" &&
+      isFinite(a.duration) && a.duration - a.currentTime <= cf && a.duration > cf * 2) {
+      fading.current = true;
+      const now = g.ctx.currentTime;
+      const left = Math.max(0.5, a.duration - a.currentTime);
+      const out = g.gains[i]!;
+      out.gain.setValueAtTime(out.gain.value, now);
+      out.gain.linearRampToValueAtTime(0, now + left);
+      // Hand over: the next track becomes the active one while this one fades out.
+      active.current = idle;
+      const nq = { ...q, index: fi };
+      queueRef.current = nq;
+      const target = levelGain(pre, levellingRef.current, false);
+      const into = g.gains[idle]!;
+      into.gain.setValueAtTime(0, now);
+      into.gain.linearRampToValueAtTime(target, now + left);
+      const b = el(idle);
+      b.play().catch(() => {});
+      setDuration(b.duration);
+      setTime(0);
+      setQueue(nq);
+      window.setTimeout(() => {
+        unload(i);
+        fading.current = false;
+      }, left * 1000 + 250);
+    }
   };
 
   const onEnded = (i: number) => {
@@ -407,6 +498,18 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       } catch {
         /* storage unavailable */
       }
+    },
+    crossfade,
+    setCrossfade: (s) => {
+      setCrossfadeState(s);
+      crossfadeRef.current = s;
+      store("marquee.crossfade", s);
+    },
+    dj,
+    setDJ: (m) => {
+      setDJState(m);
+      djCount.current = 0;
+      store("marquee.dj", m);
     },
     sleep,
     setSleep,
