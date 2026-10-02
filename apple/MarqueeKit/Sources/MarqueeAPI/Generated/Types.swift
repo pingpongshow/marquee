@@ -373,6 +373,36 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /webhooks/test`.
     /// - Remark: Generated from `#/paths//webhooks/test/post(testWebhook)`.
     func testWebhook(_ input: Operations.TestWebhook.Input) async throws -> Operations.TestWebhook.Output
+    /// Watch-together groups the caller can join (members can see any group on the server).
+    ///
+    /// - Remark: HTTP `GET /syncplay/groups`.
+    /// - Remark: Generated from `#/paths//syncplay/groups/get(listWatchGroups)`.
+    func listWatchGroups(_ input: Operations.ListWatchGroups.Input) async throws -> Operations.ListWatchGroups.Output
+    /// Start watching something together; the caller is the first member.
+    ///
+    /// - Remark: HTTP `POST /syncplay/groups`.
+    /// - Remark: Generated from `#/paths//syncplay/groups/post(createWatchGroup)`.
+    func createWatchGroup(_ input: Operations.CreateWatchGroup.Input) async throws -> Operations.CreateWatchGroup.Output
+    /// The group's state. With since, waits (up to 25 s) for a newer version - long polling.
+    ///
+    /// - Remark: HTTP `GET /syncplay/groups/{groupId}`.
+    /// - Remark: Generated from `#/paths//syncplay/groups/{groupId}/get(getWatchGroup)`.
+    func getWatchGroup(_ input: Operations.GetWatchGroup.Input) async throws -> Operations.GetWatchGroup.Output
+    /// Join a group.
+    ///
+    /// - Remark: HTTP `POST /syncplay/groups/{groupId}/join`.
+    /// - Remark: Generated from `#/paths//syncplay/groups/{groupId}/join/post(joinWatchGroup)`.
+    func joinWatchGroup(_ input: Operations.JoinWatchGroup.Input) async throws -> Operations.JoinWatchGroup.Output
+    /// Leave a group; the last one out ends it.
+    ///
+    /// - Remark: HTTP `POST /syncplay/groups/{groupId}/leave`.
+    /// - Remark: Generated from `#/paths//syncplay/groups/{groupId}/leave/post(leaveWatchGroup)`.
+    func leaveWatchGroup(_ input: Operations.LeaveWatchGroup.Input) async throws -> Operations.LeaveWatchGroup.Output
+    /// Play, pause or seek for everyone in the group (members only).
+    ///
+    /// - Remark: HTTP `POST /syncplay/groups/{groupId}/command`.
+    /// - Remark: Generated from `#/paths//syncplay/groups/{groupId}/command/post(watchGroupCommand)`.
+    func watchGroupCommand(_ input: Operations.WatchGroupCommand.Input) async throws -> Operations.WatchGroupCommand.Output
     /// Whether Live TV is set up, and how many channels there are.
     ///
     /// - Remark: HTTP `GET /livetv/status`.
@@ -1529,6 +1559,82 @@ extension APIProtocol {
         body: Operations.TestWebhook.Input.Body
     ) async throws -> Operations.TestWebhook.Output {
         try await testWebhook(Operations.TestWebhook.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Watch-together groups the caller can join (members can see any group on the server).
+    ///
+    /// - Remark: HTTP `GET /syncplay/groups`.
+    /// - Remark: Generated from `#/paths//syncplay/groups/get(listWatchGroups)`.
+    public func listWatchGroups(headers: Operations.ListWatchGroups.Input.Headers = .init()) async throws -> Operations.ListWatchGroups.Output {
+        try await listWatchGroups(Operations.ListWatchGroups.Input(headers: headers))
+    }
+    /// Start watching something together; the caller is the first member.
+    ///
+    /// - Remark: HTTP `POST /syncplay/groups`.
+    /// - Remark: Generated from `#/paths//syncplay/groups/post(createWatchGroup)`.
+    public func createWatchGroup(
+        headers: Operations.CreateWatchGroup.Input.Headers = .init(),
+        body: Operations.CreateWatchGroup.Input.Body
+    ) async throws -> Operations.CreateWatchGroup.Output {
+        try await createWatchGroup(Operations.CreateWatchGroup.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// The group's state. With since, waits (up to 25 s) for a newer version - long polling.
+    ///
+    /// - Remark: HTTP `GET /syncplay/groups/{groupId}`.
+    /// - Remark: Generated from `#/paths//syncplay/groups/{groupId}/get(getWatchGroup)`.
+    public func getWatchGroup(
+        path: Operations.GetWatchGroup.Input.Path,
+        query: Operations.GetWatchGroup.Input.Query = .init(),
+        headers: Operations.GetWatchGroup.Input.Headers = .init()
+    ) async throws -> Operations.GetWatchGroup.Output {
+        try await getWatchGroup(Operations.GetWatchGroup.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Join a group.
+    ///
+    /// - Remark: HTTP `POST /syncplay/groups/{groupId}/join`.
+    /// - Remark: Generated from `#/paths//syncplay/groups/{groupId}/join/post(joinWatchGroup)`.
+    public func joinWatchGroup(
+        path: Operations.JoinWatchGroup.Input.Path,
+        headers: Operations.JoinWatchGroup.Input.Headers = .init()
+    ) async throws -> Operations.JoinWatchGroup.Output {
+        try await joinWatchGroup(Operations.JoinWatchGroup.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Leave a group; the last one out ends it.
+    ///
+    /// - Remark: HTTP `POST /syncplay/groups/{groupId}/leave`.
+    /// - Remark: Generated from `#/paths//syncplay/groups/{groupId}/leave/post(leaveWatchGroup)`.
+    public func leaveWatchGroup(
+        path: Operations.LeaveWatchGroup.Input.Path,
+        headers: Operations.LeaveWatchGroup.Input.Headers = .init()
+    ) async throws -> Operations.LeaveWatchGroup.Output {
+        try await leaveWatchGroup(Operations.LeaveWatchGroup.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Play, pause or seek for everyone in the group (members only).
+    ///
+    /// - Remark: HTTP `POST /syncplay/groups/{groupId}/command`.
+    /// - Remark: Generated from `#/paths//syncplay/groups/{groupId}/command/post(watchGroupCommand)`.
+    public func watchGroupCommand(
+        path: Operations.WatchGroupCommand.Input.Path,
+        headers: Operations.WatchGroupCommand.Input.Headers = .init(),
+        body: Operations.WatchGroupCommand.Input.Body
+    ) async throws -> Operations.WatchGroupCommand.Output {
+        try await watchGroupCommand(Operations.WatchGroupCommand.Input(
+            path: path,
             headers: headers,
             body: body
         ))

@@ -1,5 +1,11 @@
 package app.marquee.ui
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.DownloadDone
@@ -69,12 +75,35 @@ fun openItem(nav: NavHostController, item: ItemSummary, play: Boolean = false) {
 fun HomeScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
     val connection by marquee.connection.collectAsState()
+    val me by marquee.me.collectAsState()
+    var groups by remember { mutableStateOf(emptyList<app.marquee.api.models.WatchGroup>()) }
+    LaunchedEffect(connection) {
+        while (true) {
+            groups = withContext(Dispatchers.IO) { runCatching { marquee.syncplay.listWatchGroups() }.getOrDefault(emptyList()) }
+                .filter { g -> g.members.none { it.userId == me?.id } }
+            kotlinx.coroutines.delay(15_000)
+        }
+    }
     val hubs by produceState<Result<List<Hub>>?>(null, connection) { value = withContext(Dispatchers.IO) { runCatching { marquee.hubs.homeHubs() } } }
     val cardWidth = if (marquee.isTv) 130.dp else 120.dp
     when (val h = hubs) {
         null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         else -> LazyColumn(contentPadding = PaddingValues(vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(26.dp)) {
             item { Text("Home", Modifier.padding(horizontal = sidePadding), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+            // Others watching together, to join (SYNC-1).
+            items(groups, key = { "g" + it.id }) { g ->
+                Row(Modifier.padding(horizontal = sidePadding).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Gold.copy(alpha = 0.12f))
+                    .focusCard({ nav.navigate("player/${g.itemId}?group=${g.id}") }, RoundedCornerShape(12.dp)).semantics { contentDescription = "Join ${g.title}" }
+                    .padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(Icons.Filled.Groups, null, tint = Gold)
+                    Column(Modifier.weight(1f)) {
+                        Text(g.title, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        Text("${g.members.joinToString { it.name }} ${if (g.members.size == 1) "is" else "are"} watching together", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    }
+                    Text("Join", color = Gold, fontWeight = FontWeight.Bold)
+                }
+            }
             marquee.lastError?.let { e ->
                 item {
                     Column(Modifier.padding(horizontal = sidePadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {

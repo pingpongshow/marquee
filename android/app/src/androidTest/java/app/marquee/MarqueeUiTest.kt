@@ -31,6 +31,7 @@ import androidx.media3.session.SessionToken
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import java.util.concurrent.TimeUnit
+import okhttp3.MediaType.Companion.toMediaType
 import org.junit.After
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -492,5 +493,42 @@ class MarqueeUiTest {
         Thread.sleep(3000)
         shot("l4-next-channel")
         back()
+    }
+
+    private val adminToken = args.getString("admintoken")?.takeIf { it != "none" }
+
+    /** Calls the server as the test admin (the other viewer in watch-together). */
+    private fun adminApi(method: String, path: String, body: String? = null): String {
+        val token = adminToken ?: throw org.junit.AssumptionViolatedException("no admin token")
+        val req = okhttp3.Request.Builder().url("http://$server/api/v1$path").header("Authorization", "Bearer $token")
+            .method(method, body?.let { okhttp3.RequestBody.create("application/json".toMediaType(), it) } ?: if (method == "POST") okhttp3.RequestBody.create(null, ByteArray(0)) else null)
+            .build()
+        return okhttp3.OkHttpClient().newCall(req).execute().use { it.body!!.string() }
+    }
+
+    /** Watch together (SYNC-1): the admin starts a group; this device joins from Home and follows the admin's pause. */
+    @Test fun watchTogether() {
+        val created = adminApi("POST", "/syncplay/groups", """{"itemId":359,"positionMs":30000}""")
+        val id = Regex("\"id\":\"([0-9a-f]+)\"").find(created)!!.groupValues[1]
+        try {
+            connectAndSignIn()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Join 00 Preview Test"), 30_000)
+            shot("w1-home-join")
+            rule.onNode(hasContentDescription("Join 00 Preview Test")).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Watching together"), 30_000)
+            rule.waitUntil(20_000) { adminApi("GET", "/syncplay/groups/$id").contains("\"name\":\"Kiddo\"") }
+            shot("w2-joined")
+            adminApi("POST", "/syncplay/groups/$id/command", """{"action":"pause","positionMs":60000}""")
+            val paused = hasContentDescription("Video player") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Paused")
+            rule.waitUntilAtLeastOneExists(paused, 15_000)
+            Thread.sleep(1500)
+            var at = 0L
+            onMainPosition { at = it }
+            assertTrue("following the admin to 60 s, at $at", at in 58_000..62_000)
+            shot("w3-paused-by-admin")
+            back()
+        } finally {
+            adminApi("POST", "/syncplay/groups/$id/leave")
+        }
     }
 }

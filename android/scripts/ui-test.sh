@@ -12,7 +12,8 @@ OUT="${3:-build/ui-shots}"
 "$ADB" shell rm -rf /sdcard/Android/data/app.marquee/files/shots
 # Android's one-time "Viewing full screen" hint would cover the player's controls.
 "$ADB" shell settings put secure immersive_mode_confirmations confirmed
-"$ADB" shell am instrument -w -e server "$SERVER" -e class "$CLASS" app.marquee.test/androidx.test.runner.AndroidJUnitRunner | tee build/ui-test.log
+# MARQUEE_TEST_ADMIN_TOKEN lets tests act as a second viewer (watch together).
+"$ADB" shell am instrument -w -e server "$SERVER" -e class "$CLASS" -e admintoken "${MARQUEE_TEST_ADMIN_TOKEN:-none}" app.marquee.test/androidx.test.runner.AndroidJUnitRunner | tee build/ui-test.log
 rm -rf "$OUT" && mkdir -p "$OUT"
 "$ADB" pull /sdcard/Android/data/app.marquee/files/shots/. "$OUT" >/dev/null 2>&1 || true
 grep -q "^OK (" build/ui-test.log
