@@ -262,7 +262,9 @@ func (h *Handlers) GetMe(ctx context.Context, _ GetMeRequestObject) (GetMeRespon
 	if !ok {
 		return GetMe401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	return GetMe200JSONResponse(toAPIUser(s.User)), nil
+	u := toAPIUser(s.User)
+	u.ImageKey = nz(h.Auth.ImageKey(ctx, s.User.ID))
+	return GetMe200JSONResponse(u), nil
 }
 
 // pinSignInAllowed reports whether PIN sign-in is enabled for the caller's network.

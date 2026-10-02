@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 
+	"marquee/internal/metadata/anilist"
 	"marquee/internal/metadata/deezer"
 	"marquee/internal/metadata/musicbrainz"
 	"marquee/internal/metadata/tmdb"
@@ -29,12 +30,16 @@ type Progress struct{ Done, Total int }
 type Service struct {
 	DB       *sql.DB
 	Settings *settings.Store
+	// CacheDir holds downloaded reference data (the anime-lists mapping).
+	CacheDir string
 
 	mu         sync.Mutex
 	omdbBudget ratingsBudget
 	deezer     *deezer.Client
 	mb         *musicbrainz.Client
 	web        *musicbrainz.Web
+	ani        *anilist.Client
+	aniRun     sync.Mutex
 	client     *tmdb.Client
 	key        string
 	lang       string

@@ -44,6 +44,7 @@ import kotlinx.serialization.Contextual
  * @param hasPin 
  * @param hasPassword 
  * @param hasTwoFactor Two-factor sign-in (an authenticator code) is on.
+ * @param imageKey Only from /me: use as ?key= on image, person photo and avatar URLs instead of the sign-in token (D85). It grants those images and nothing else.
  * @param avatarUrl Profile picture URL; absent when the user has none.
  * @param lastSeenAt 
  */
@@ -85,6 +86,10 @@ data class User (
     /* Two-factor sign-in (an authenticator code) is on. */
     @SerialName(value = "hasTwoFactor")
     val hasTwoFactor: kotlin.Boolean? = null,
+
+    /* Only from /me: use as ?key= on image, person photo and avatar URLs instead of the sign-in token (D85). It grants those images and nothing else. */
+    @SerialName(value = "imageKey")
+    val imageKey: kotlin.String? = null,
 
     /* Profile picture URL; absent when the user has none. */
     @SerialName(value = "avatarUrl")

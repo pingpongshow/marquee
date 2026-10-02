@@ -332,6 +332,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/User/hasTwoFactor`.
             public var hasTwoFactor: Swift.Bool?
+            /// Only from /me: use as ?key= on image, person photo and avatar URLs instead of the sign-in token (D85). It grants those images and nothing else.
+            ///
+            /// - Remark: Generated from `#/components/schemas/User/imageKey`.
+            public var imageKey: Swift.String?
             /// Profile picture URL; absent when the user has none.
             ///
             /// - Remark: Generated from `#/components/schemas/User/avatarUrl`.
@@ -355,6 +359,7 @@ extension Components {
             ///   - hasPin:
             ///   - hasPassword:
             ///   - hasTwoFactor: Two-factor sign-in (an authenticator code) is on.
+            ///   - imageKey: Only from /me: use as ?key= on image, person photo and avatar URLs instead of the sign-in token (D85). It grants those images and nothing else.
             ///   - avatarUrl: Profile picture URL; absent when the user has none.
             ///   - createdAt:
             ///   - lastSeenAt:
@@ -369,6 +374,7 @@ extension Components {
                 hasPin: Swift.Bool? = nil,
                 hasPassword: Swift.Bool? = nil,
                 hasTwoFactor: Swift.Bool? = nil,
+                imageKey: Swift.String? = nil,
                 avatarUrl: Swift.String? = nil,
                 createdAt: Foundation.Date,
                 lastSeenAt: Foundation.Date? = nil,
@@ -383,6 +389,7 @@ extension Components {
                 self.hasPin = hasPin
                 self.hasPassword = hasPassword
                 self.hasTwoFactor = hasTwoFactor
+                self.imageKey = imageKey
                 self.avatarUrl = avatarUrl
                 self.createdAt = createdAt
                 self.lastSeenAt = lastSeenAt
@@ -398,6 +405,7 @@ extension Components {
                 case hasPin
                 case hasPassword
                 case hasTwoFactor
+                case imageKey
                 case avatarUrl
                 case createdAt
                 case lastSeenAt
@@ -6778,6 +6786,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Ratings/metacritic`.
             public var metacritic: Swift.Int?
+            /// AniList average score 0–100 (anime, META-2).
+            ///
+            /// - Remark: Generated from `#/components/schemas/Ratings/anilist`.
+            public var anilist: Swift.Int?
             /// Creates a new `Ratings`.
             ///
             /// - Parameters:
@@ -6785,22 +6797,26 @@ extension Components {
             ///   - imdbVotes:
             ///   - rottenTomatoes: Tomatometer critic score 0–100
             ///   - metacritic: 0–100
+            ///   - anilist: AniList average score 0–100 (anime, META-2).
             public init(
                 imdb: Swift.Double? = nil,
                 imdbVotes: Swift.Int? = nil,
                 rottenTomatoes: Swift.Int? = nil,
-                metacritic: Swift.Int? = nil
+                metacritic: Swift.Int? = nil,
+                anilist: Swift.Int? = nil
             ) {
                 self.imdb = imdb
                 self.imdbVotes = imdbVotes
                 self.rottenTomatoes = rottenTomatoes
                 self.metacritic = metacritic
+                self.anilist = anilist
             }
             public enum CodingKeys: String, CodingKey {
                 case imdb
                 case imdbVotes
                 case rottenTomatoes
                 case metacritic
+                case anilist
             }
         }
         /// - Remark: Generated from `#/components/schemas/Credit`.

@@ -192,9 +192,15 @@ func (m *Sessions) Start(ctx context.Context, channelID, userID int64, url strin
 			cancel()
 			<-s.done
 			os.RemoveAll(s.dir)
+			if ctx.Err() != nil {
+				return nil, ctx.Err() // the viewer moved on (e.g. flicking through channels): not a failure
+			}
 			msg := strings.TrimSpace(stderr.String())
 			if i := strings.LastIndex(msg, "\n"); i >= 0 {
 				msg = msg[i+1:]
+			}
+			if msg == "" {
+				msg = err.Error() // FFmpeg said nothing: say why we gave up (timed out, exited)
 			}
 			last = fmt.Errorf("%w (%s: %s)", ErrUnavailable, enc, msg)
 			slog.Warn("live stream failed to start", "channel", channelID, "encoder", enc, "err", msg)
