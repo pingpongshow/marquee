@@ -282,6 +282,39 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /items/{itemId}/watched`.
     /// - Remark: Generated from `#/paths//items/{itemId}/watched/delete(markUnwatched)`.
     func markUnwatched(_ input: Operations.MarkUnwatched.Input) async throws -> Operations.MarkUnwatched.Output
+    /// Save to your watchlist (USER-8). Movies and episodes leave it once watched.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/watchlist`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/watchlist/put(addToWatchlist)`.
+    func addToWatchlist(_ input: Operations.AddToWatchlist.Input) async throws -> Operations.AddToWatchlist.Output
+    /// - Remark: HTTP `DELETE /items/{itemId}/watchlist`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/watchlist/delete(removeFromWatchlist)`.
+    func removeFromWatchlist(_ input: Operations.RemoveFromWatchlist.Input) async throws -> Operations.RemoveFromWatchlist.Output
+    /// Your watchlist, most recently added first.
+    ///
+    /// - Remark: HTTP `GET /watchlist`.
+    /// - Remark: Generated from `#/paths//watchlist/get(getWatchlist)`.
+    func getWatchlist(_ input: Operations.GetWatchlist.Input) async throws -> Operations.GetWatchlist.Output
+    /// Create a manual collection (META-7, admin only). List collections with the library's items endpoint and type=collection.
+    ///
+    /// - Remark: HTTP `POST /libraries/{libraryId}/collections`.
+    /// - Remark: Generated from `#/paths//libraries/{libraryId}/collections/post(createCollection)`.
+    func createCollection(_ input: Operations.CreateCollection.Input) async throws -> Operations.CreateCollection.Output
+    /// Delete a collection; its items stay in the library (admin only).
+    ///
+    /// - Remark: HTTP `DELETE /collections/{collectionId}`.
+    /// - Remark: Generated from `#/paths//collections/{collectionId}/delete(deleteCollection)`.
+    func deleteCollection(_ input: Operations.DeleteCollection.Input) async throws -> Operations.DeleteCollection.Output
+    /// Add items from the same library to a collection (admin only).
+    ///
+    /// - Remark: HTTP `POST /collections/{collectionId}/items`.
+    /// - Remark: Generated from `#/paths//collections/{collectionId}/items/post(addToCollection)`.
+    func addToCollection(_ input: Operations.AddToCollection.Input) async throws -> Operations.AddToCollection.Output
+    /// Take an item out of a collection (admin only).
+    ///
+    /// - Remark: HTTP `DELETE /collections/{collectionId}/items/{itemId}`.
+    /// - Remark: Generated from `#/paths//collections/{collectionId}/items/{itemId}/delete(removeFromCollection)`.
+    func removeFromCollection(_ input: Operations.RemoveFromCollection.Input) async throws -> Operations.RemoveFromCollection.Output
     /// The episode after this one (Up Next), if any.
     ///
     /// - Remark: HTTP `GET /items/{itemId}/next`.
@@ -1101,6 +1134,93 @@ extension APIProtocol {
         headers: Operations.MarkUnwatched.Input.Headers = .init()
     ) async throws -> Operations.MarkUnwatched.Output {
         try await markUnwatched(Operations.MarkUnwatched.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Save to your watchlist (USER-8). Movies and episodes leave it once watched.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/watchlist`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/watchlist/put(addToWatchlist)`.
+    public func addToWatchlist(
+        path: Operations.AddToWatchlist.Input.Path,
+        headers: Operations.AddToWatchlist.Input.Headers = .init()
+    ) async throws -> Operations.AddToWatchlist.Output {
+        try await addToWatchlist(Operations.AddToWatchlist.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// - Remark: HTTP `DELETE /items/{itemId}/watchlist`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/watchlist/delete(removeFromWatchlist)`.
+    public func removeFromWatchlist(
+        path: Operations.RemoveFromWatchlist.Input.Path,
+        headers: Operations.RemoveFromWatchlist.Input.Headers = .init()
+    ) async throws -> Operations.RemoveFromWatchlist.Output {
+        try await removeFromWatchlist(Operations.RemoveFromWatchlist.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Your watchlist, most recently added first.
+    ///
+    /// - Remark: HTTP `GET /watchlist`.
+    /// - Remark: Generated from `#/paths//watchlist/get(getWatchlist)`.
+    public func getWatchlist(headers: Operations.GetWatchlist.Input.Headers = .init()) async throws -> Operations.GetWatchlist.Output {
+        try await getWatchlist(Operations.GetWatchlist.Input(headers: headers))
+    }
+    /// Create a manual collection (META-7, admin only). List collections with the library's items endpoint and type=collection.
+    ///
+    /// - Remark: HTTP `POST /libraries/{libraryId}/collections`.
+    /// - Remark: Generated from `#/paths//libraries/{libraryId}/collections/post(createCollection)`.
+    public func createCollection(
+        path: Operations.CreateCollection.Input.Path,
+        headers: Operations.CreateCollection.Input.Headers = .init(),
+        body: Operations.CreateCollection.Input.Body
+    ) async throws -> Operations.CreateCollection.Output {
+        try await createCollection(Operations.CreateCollection.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Delete a collection; its items stay in the library (admin only).
+    ///
+    /// - Remark: HTTP `DELETE /collections/{collectionId}`.
+    /// - Remark: Generated from `#/paths//collections/{collectionId}/delete(deleteCollection)`.
+    public func deleteCollection(
+        path: Operations.DeleteCollection.Input.Path,
+        headers: Operations.DeleteCollection.Input.Headers = .init()
+    ) async throws -> Operations.DeleteCollection.Output {
+        try await deleteCollection(Operations.DeleteCollection.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Add items from the same library to a collection (admin only).
+    ///
+    /// - Remark: HTTP `POST /collections/{collectionId}/items`.
+    /// - Remark: Generated from `#/paths//collections/{collectionId}/items/post(addToCollection)`.
+    public func addToCollection(
+        path: Operations.AddToCollection.Input.Path,
+        headers: Operations.AddToCollection.Input.Headers = .init(),
+        body: Operations.AddToCollection.Input.Body
+    ) async throws -> Operations.AddToCollection.Output {
+        try await addToCollection(Operations.AddToCollection.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Take an item out of a collection (admin only).
+    ///
+    /// - Remark: HTTP `DELETE /collections/{collectionId}/items/{itemId}`.
+    /// - Remark: Generated from `#/paths//collections/{collectionId}/items/{itemId}/delete(removeFromCollection)`.
+    public func removeFromCollection(
+        path: Operations.RemoveFromCollection.Input.Path,
+        headers: Operations.RemoveFromCollection.Input.Headers = .init()
+    ) async throws -> Operations.RemoveFromCollection.Output {
+        try await removeFromCollection(Operations.RemoveFromCollection.Input(
             path: path,
             headers: headers
         ))

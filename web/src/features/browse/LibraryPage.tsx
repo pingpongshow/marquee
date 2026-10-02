@@ -23,6 +23,8 @@ export type LibrarySearch = {
   rating?: string;
   res?: ListQuery["resolution"];
   view?: "grid" | "list";
+  /** Movie libraries: browse collections instead of movies. */
+  show?: "collections";
 };
 
 const PAGE = 100;
@@ -50,6 +52,7 @@ export function validateLibrarySearch(s: Record<string, unknown>): LibrarySearch
     rating: str(s.rating),
     res: str(s.res) as LibrarySearch["res"],
     view: s.view === "list" ? "list" : undefined,
+    show: s.show === "collections" ? "collections" : undefined,
   };
 }
 
@@ -94,7 +97,10 @@ export function LibraryPage() {
   const [seed] = useState(() => Date.now());
 
   const set = (patch: Partial<LibrarySearch>) => navigate({ search: (s: LibrarySearch) => ({ ...s, ...patch }), replace: true });
-  const query: ListQuery = { sort, watch: search.watch, genre: search.genre, decade: search.decade, contentRating: search.rating, resolution: search.res };
+  const collections = lib?.type === "movies" && search.show === "collections";
+  const query: ListQuery = collections
+    ? { sort, type: "collection" }
+    : { sort, watch: search.watch, genre: search.genre, decade: search.decade, contentRating: search.rating, resolution: search.res };
   const filtered = !!(search.watch || search.genre || search.decade || search.rating || search.res);
 
   const filters = useQuery({
@@ -159,11 +165,33 @@ export function LibraryPage() {
       <div className="min-w-0 flex-1 p-6 lg:p-8">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold">{lib?.name ?? "Library"}</h1>
-          {first.data && <span className="text-sm text-muted">{total.toLocaleString()} {filtered ? "matching" : "items"}</span>}
+          {lib?.type === "movies" && (
+            <div className="flex rounded-md bg-surface-2 p-0.5 text-sm" role="tablist" aria-label="Show">
+              {(
+                [
+                  [undefined, "Movies"],
+                  ["collections", "Collections"],
+                ] as const
+              ).map(([v, label]) => (
+                <button
+                  key={label}
+                  role="tab"
+                  aria-selected={search.show === v}
+                  onClick={() => set({ show: v, watch: undefined, genre: undefined, decade: undefined, rating: undefined, res: undefined })}
+                  className={clsx("rounded px-3 py-1", search.show === v ? "bg-surface-3 text-text" : "text-muted hover:text-text")}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {first.data && <span className="text-sm text-muted">{total.toLocaleString()} {filtered ? "matching" : collections ? "collections" : "items"}</span>}
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <Button size="sm" variant={filtersOpen || filtered ? "primary" : "secondary"} onClick={() => setFiltersOpen((v) => !v)} aria-expanded={filtersOpen}>
-              <Filter className="size-4" /> Filter
-            </Button>
+            {!collections && (
+              <Button size="sm" variant={filtersOpen || filtered ? "primary" : "secondary"} onClick={() => setFiltersOpen((v) => !v)} aria-expanded={filtersOpen}>
+                <Filter className="size-4" /> Filter
+              </Button>
+            )}
             <div className="w-44">
             <Select aria-label="Sort by" className="h-8" value={sort} onChange={(e) => set({ sort: e.target.value === "title" ? undefined : (e.target.value as LibrarySearch["sort"]) })}>
               {sortOptions
@@ -186,7 +214,7 @@ export function LibraryPage() {
           </div>
         </div>
 
-        {filtersOpen && (
+        {filtersOpen && !collections && (
           <div className="mb-4 grid gap-3 rounded-lg border border-border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-5">
             <Select aria-label="Watched state" value={search.watch ?? ""} onChange={(e) => set({ watch: (e.target.value || undefined) as LibrarySearch["watch"] })}>
               <option value="">{isMusic ? "Any play state" : "Watched or not"}</option>

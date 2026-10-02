@@ -308,6 +308,11 @@ func (h *Handlers) HomeHubs(ctx context.Context, _ HomeHubsRequestObject) (HomeH
 		return nil, internal(ctx, "hubs", err)
 	}
 	add("continue-watching", "Continue Watching", 0, cw)
+	wl, err := h.Items.Watchlist(ctx, acc, 30)
+	if err != nil {
+		return nil, internal(ctx, "hubs", err)
+	}
+	add("watchlist", "Your Watchlist", 0, wl)
 	for _, l := range libs {
 		if !canSeeLibrary(ctx, l.ID) || (l.Options.IncludeInHome != nil && !*l.Options.IncludeInHome) {
 			continue
