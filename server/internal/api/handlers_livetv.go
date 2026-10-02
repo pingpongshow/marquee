@@ -17,8 +17,12 @@ func toAPIProg(p *livetv.Prog) *LiveProgramme {
 	if p == nil {
 		return nil
 	}
-	return &LiveProgramme{Id: p.ID, Start: p.Start, End: p.Stop, Title: p.Title, Subtitle: nz(p.Subtitle), Description: nz(p.Description),
-		Category: nz(p.Category), Episode: nz(p.Episode), ImageUrl: nz(p.Image)}
+	out := &LiveProgramme{Id: p.ID, Start: p.Start, End: p.Stop, Title: p.Title, Subtitle: nz(p.Subtitle), Description: nz(p.Description),
+		Category: nz(p.Category), Episode: nz(p.Episode), ImageUrl: nz(p.Image), Series: ptr(p.Series)}
+	if p.Recording != "" {
+		out.Recording = ptr(LiveProgrammeRecording(p.Recording))
+	}
+	return out
 }
 
 func liveFilter(group *string, fav *bool) livetv.Filter {
@@ -42,6 +46,13 @@ func (h *Handlers) LiveTvStatus(ctx context.Context, _ LiveTvStatusRequestObject
 func (h *Handlers) liveStatus(ctx context.Context) LiveTvStatus {
 	n, until, sources := h.LiveTV.Status(ctx)
 	out := LiveTvStatus{Enabled: h.LiveTV.Enabled(), Channels: n, GuideUntil: until}
+	if h.DVR != nil {
+		out.DvrAvailable = ptr(h.DVR.Available())
+		out.RecordingsActive = ptr(h.DVR.Active())
+		if s, ok := session(ctx); ok {
+			out.CanRecord = ptr(canRecord(s) && *out.DvrAvailable)
+		}
+	}
 	out.Sources = make([]struct {
 		Channels    int        `json:"channels"`
 		Error       *string    `json:"error,omitempty"`

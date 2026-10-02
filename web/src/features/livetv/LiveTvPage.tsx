@@ -10,7 +10,7 @@ import {
   VolumeX,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Select, Spinner } from "@/components/ui";
+import { Alert, Button, Select, Spinner } from "@/components/ui";
 import {
   type LiveChannel,
   type LiveFilter,
@@ -22,6 +22,13 @@ import {
   minutesLeft,
   timeLabel,
   useFavorite,
+  type Recording,
+  recordingRulesQuery,
+  recordingsQuery,
+  formatSize,
+  useCancelRecording,
+  useDeleteRule,
+  useSchedule,
 } from "./api";
 import { LivePlayer } from "./LivePlayer";
 
@@ -34,7 +41,7 @@ const CHANNEL_COL = 132;
 export function LiveTvPage() {
   const status = useQuery(liveStatusQuery);
   const groups = useQuery(liveGroupsQuery);
-  const [tab, setTab] = useState<"guide" | "now">("guide");
+  const [tab, setTab] = useState<"guide" | "now" | "recordings">("guide");
   const [filter, setFilter] = useState<LiveFilter>(
     () => localStorageGet("marquee.livetv.filter") ?? "all",
   );
@@ -63,7 +70,10 @@ export function LiveTvPage() {
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold whitespace-nowrap">Live TV</h1>
         <div className="ml-4 flex gap-1" role="tablist">
-          {(["guide", "now"] as const).map((t) => (
+          {(status.data?.canRecord
+            ? (["guide", "now", "recordings"] as const)
+            : (["guide", "now"] as const)
+          ).map((t) => (
             <button
               key={t}
               role="tab"
@@ -76,11 +86,20 @@ export function LiveTvPage() {
                   : "text-muted hover:text-text",
               )}
             >
-              {t === "guide" ? "Guide" : "What's On"}
+              {t === "guide"
+                ? "Guide"
+                : t === "now"
+                  ? "What's On"
+                  : "Recordings"}
             </button>
           ))}
         </div>
-        <div className="ml-auto w-48 shrink-0">
+        <div
+          className={clsx(
+            "ml-auto w-48 shrink-0",
+            tab === "recordings" && "invisible",
+          )}
+        >
           <Select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
@@ -97,7 +116,7 @@ export function LiveTvPage() {
         </div>
       </div>
 
-      {current && (
+      {current && tab !== "recordings" && (
         <div className="relative mx-auto aspect-video max-h-[42vh] overflow-hidden rounded-lg bg-black">
           <LivePlayer
             key={current.id}
@@ -142,7 +161,9 @@ export function LiveTvPage() {
         </div>
       )}
 
-      {channels.isPending ? (
+      {tab === "recordings" ? (
+        <Recordings />
+      ) : channels.isPending ? (
         <Spinner />
       ) : !channels.data?.length ? (
         <p className="text-muted">
@@ -156,6 +177,7 @@ export function LiveTvPage() {
           filter={filter}
           selected={current?.id}
           onPick={setPreview}
+          canRecord={!!status.data?.canRecord}
         />
       ) : (
         <WhatsOn
@@ -227,11 +249,13 @@ function Guide({
   filter,
   selected,
   onPick,
+  canRecord,
 }: {
   channels: LiveChannel[];
   filter: LiveFilter;
   selected?: number;
   onPick: (id: number) => void;
+  canRecord: boolean;
 }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -373,7 +397,9 @@ function Guide({
                       key={p.id}
                       role="gridcell"
                       onClick={() =>
-                        onAir ? onPick(c.id) : setDetails({ p, c })
+                        onAir && c.id !== selected
+                          ? onPick(c.id)
+                          : setDetails({ p, c })
                       }
                       style={{ left: left + 2, width: right - left - 4 }}
                       className={clsx(
@@ -383,8 +409,21 @@ function Guide({
                           : "bg-surface-2 hover:bg-surface-3",
                       )}
                     >
-                      <div className="truncate text-sm font-medium">
-                        {p.title}
+                      <div className="flex items-center gap-1.5 truncate text-sm font-medium">
+                        {p.recording && (
+                          <span
+                            className={clsx(
+                              "size-2 shrink-0 rounded-full bg-red-500",
+                              p.recording === "recording" && "animate-pulse",
+                            )}
+                            aria-label={
+                              p.recording === "recording"
+                                ? "Recording"
+                                : "Will record"
+                            }
+                          />
+                        )}
+                        <span className="truncate">{p.title}</span>
                       </div>
                       <div className="truncate text-xs text-muted">
                         {onAir ? `${minutesLeft(p)}m left` : timeLabel(p.start)}
@@ -435,6 +474,13 @@ function Guide({
             </p>
             {details.p.description && (
               <p className="text-sm">{details.p.description}</p>
+            )}
+            {canRecord && new Date(details.p.end) > now && (
+              <RecordButtons
+                programme={details.p}
+                channel={details.c}
+                onDone={() => setDetails(null)}
+              />
             )}
           </div>
         </div>
@@ -579,6 +625,226 @@ export function LiveWatchPage({ channelId }: { channelId: number }) {
         <div className="absolute inset-x-0 bottom-24 text-center text-danger">
           {error}
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Record, record the series, or cancel (LIVE-5). */
+function RecordButtons({
+  programme: p,
+  channel: c,
+  onDone,
+}: {
+  programme: LiveProgramme;
+  channel: LiveChannel;
+  onDone: () => void;
+}) {
+  const schedule = useSchedule();
+  const cancel = useCancelRecording();
+  const recordings = useQuery(recordingsQuery);
+  const rec = recordings.data?.find(
+    (r) =>
+      r.channelId === c.id &&
+      new Date(r.start).getTime() === new Date(p.start).getTime() &&
+      (r.status === "scheduled" || r.status === "recording"),
+  );
+  const error = schedule.error ?? cancel.error;
+  if (recordings.isPending) return <Spinner />;
+  return (
+    <div className="space-y-2 pt-2">
+      {p.series && (
+        <p className="text-xs text-muted">
+          A series recording covers this title.
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {rec ? (
+          <Button
+            variant="ghost"
+            loading={cancel.isPending}
+            onClick={() => cancel.mutate({ id: rec.id }, { onSuccess: onDone })}
+          >
+            {rec.status === "recording" ? "Stop recording" : "Don't record"}
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            loading={schedule.isPending && !schedule.variables?.series}
+            onClick={() =>
+              schedule.mutate(
+                { channelId: c.id, start: p.start },
+                { onSuccess: onDone },
+              )
+            }
+          >
+            Record
+          </Button>
+        )}
+        {!p.series && (
+          <Button
+            variant="ghost"
+            loading={schedule.isPending && !!schedule.variables?.series}
+            onClick={() =>
+              schedule.mutate(
+                {
+                  channelId: c.id,
+                  start: p.start,
+                  series: true,
+                  anyChannel: true,
+                },
+                { onSuccess: onDone },
+              )
+            }
+          >
+            Record series
+          </Button>
+        )}
+      </div>
+      {error && <Alert tone="error">{error.message}</Alert>}
+    </div>
+  );
+}
+
+function when(r: Recording) {
+  const d = new Date(r.start);
+  return `${d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })} ${timeLabel(d)}–${timeLabel(r.end)}`;
+}
+
+/** The DVR: in progress, upcoming, series and finished recordings (LIVE-5). */
+function Recordings() {
+  const recordings = useQuery(recordingsQuery);
+  const rules = useQuery(recordingRulesQuery);
+  const cancel = useCancelRecording();
+  const stopSeries = useDeleteRule();
+  if (recordings.isPending) return <Spinner />;
+  const list = recordings.data ?? [];
+  const active = list.filter((r) => r.status === "recording");
+  const upcoming = list.filter((r) => r.status === "scheduled");
+  const done = list.filter(
+    (r) => r.status === "completed" || r.status === "failed",
+  );
+  const row = (r: Recording, action: React.ReactNode) => (
+    <li
+      key={r.id}
+      className="flex items-center gap-3 rounded-lg bg-surface px-4 py-3"
+    >
+      {r.status === "recording" && (
+        <span className="size-2.5 shrink-0 animate-pulse rounded-full bg-red-500" />
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-medium">
+          {r.itemId ? (
+            <Link
+              to="/item/$itemId"
+              params={{ itemId: String(r.itemId) }}
+              className="hover:underline"
+            >
+              {r.title}
+            </Link>
+          ) : (
+            r.title
+          )}
+          {r.series && (
+            <span className="ml-2 text-xs font-normal text-muted">Series</span>
+          )}
+        </div>
+        <div className="truncate text-sm text-muted">
+          {[r.episode, r.subtitle].filter(Boolean).join(" · ")}
+          {(r.episode || r.subtitle) && " · "}
+          {r.channelName} · {when(r)}
+          {r.sizeBytes ? ` · ${formatSize(r.sizeBytes)}` : ""}
+        </div>
+        {r.status === "failed" && (
+          <div className="truncate text-sm text-danger">
+            Failed: {r.error || "unknown error"}
+          </div>
+        )}
+      </div>
+      {action}
+    </li>
+  );
+  const section = (title: string, items: React.ReactNode[]) =>
+    items.length > 0 && (
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold tracking-wide text-muted uppercase">
+          {title}
+        </h2>
+        <ul className="space-y-2">{items}</ul>
+      </section>
+    );
+  if (!list.length && !rules.data?.length)
+    return (
+      <p className="text-muted">
+        Nothing recorded yet. Pick a programme in the guide and choose Record.
+      </p>
+    );
+  return (
+    <div className="space-y-6">
+      {cancel.error && <Alert tone="error">{cancel.error.message}</Alert>}
+      {section(
+        "Recording now",
+        active.map((r) =>
+          row(
+            r,
+            <Button variant="ghost" onClick={() => cancel.mutate({ id: r.id })}>
+              Stop
+            </Button>,
+          ),
+        ),
+      )}
+      {section(
+        "Upcoming",
+        upcoming.map((r) =>
+          row(
+            r,
+            <Button variant="ghost" onClick={() => cancel.mutate({ id: r.id })}>
+              Cancel
+            </Button>,
+          ),
+        ),
+      )}
+      {section(
+        "Series",
+        (rules.data ?? []).map((s) => (
+          <li
+            key={s.id}
+            className="flex items-center gap-3 rounded-lg bg-surface px-4 py-3"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-medium">{s.title}</div>
+              <div className="text-sm text-muted">
+                {s.channelName || "Any channel"} · {s.upcoming} upcoming
+              </div>
+            </div>
+            <Button variant="ghost" onClick={() => stopSeries.mutate(s.id)}>
+              Stop series
+            </Button>
+          </li>
+        )),
+      )}
+      {section(
+        "Recorded",
+        done.map((r) =>
+          row(
+            r,
+            <Button
+              variant="ghost"
+              onClick={() => {
+                if (
+                  r.status === "failed" ||
+                  window.confirm(`Delete the recording of ${r.title}?`)
+                )
+                  cancel.mutate({
+                    id: r.id,
+                    deleteFile: r.status !== "failed",
+                  });
+              }}
+            >
+              {r.status === "failed" ? "Dismiss" : "Delete"}
+            </Button>,
+          ),
+        ),
       )}
     </div>
   );

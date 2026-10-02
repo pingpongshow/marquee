@@ -73,6 +73,7 @@ type Job struct {
 	SubExternal  string // external subtitle file to burn
 	SubImage     bool   // the subtitle to burn is a bitmap format (overlay) rather than text (libass)
 	VideoCodec   string // source video codec (for stream-copy tagging)
+	AudioCodec   string // source audio codec (for stream-copy fixes)
 	StartSegment int
 	Plan         []float64 // segment start times (seconds); nil = every SegmentSeconds
 	Dir          string
@@ -239,6 +240,9 @@ func (j Job) Args() []string {
 		a = append(a, "-map", fmt.Sprintf("0:%d", j.AudioIndex))
 		if d.AudioCopy {
 			a = append(a, "-c:a", "copy")
+			if strings.EqualFold(j.AudioCodec, "aac") {
+				a = append(a, "-bsf:a", "aac_adtstoasc") // AAC from MPEG-TS has ADTS headers MP4 can't hold
+			}
 		} else {
 			a = append(a, "-c:a", "aac", "-ac", strconv.Itoa(d.AudioChannels), "-b:a", fmt.Sprintf("%dk", audioKbps(d.AudioChannels)))
 		}

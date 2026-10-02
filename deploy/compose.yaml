@@ -27,6 +27,7 @@ services:
       - /mnt/data/Video:/media/video:ro
       - /mnt/data/Music:/media/music:ro
       - /mnt/docker/plex:/plex:ro          # Plex import (read-only)
+      - ${RECORDINGS_DIR:-./recordings}:/recordings   # Live TV recordings (LIVE-5), writable
     tmpfs:
       - /transcode:size=16g,uid=${PUID:-99},gid=${PGID:-100},mode=0750
 

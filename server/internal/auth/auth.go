@@ -30,7 +30,7 @@ type User struct {
 	IsManaged    bool
 	HasPIN       bool
 	HasPassword  bool
-	HasTOTP      bool // two-factor sign-in is on
+	HasTOTP      bool  // two-factor sign-in is on
 	Avatar       int64 // profile picture version; 0 = none
 	CreatedAt    time.Time
 	LastSeenAt   *time.Time

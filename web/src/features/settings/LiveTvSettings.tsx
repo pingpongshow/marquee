@@ -197,6 +197,7 @@ export function LiveTvSettings() {
         </p>
       )}
       {refresh.error && <Alert tone="error">{refresh.error.message}</Alert>}
+      {server.length > 0 && <RecordingSettings />}
       <SaveBar
         dirty={dirty}
         saving={save.isPending}
@@ -217,5 +218,71 @@ export function LiveTvSettings() {
         onReset={() => setDraft(null)}
       />
     </div>
+  );
+}
+
+/** DVR (LIVE-5): where recordings go and how much padding they get. Saved on change. */
+function RecordingSettings() {
+  const query = useQuery(settingsQuery);
+  const status = useQuery(liveStatusQuery);
+  const save = useUpdateSettings();
+  const i = query.data?.integrations;
+  const minutes = (n: number) => (n === 0 ? "None" : `${n} min`);
+  return (
+    <Card
+      title="Recording"
+      description={
+        status.data?.dvrAvailable ? (
+          "Recordings go to the recordings folder and appear in the Recorded TV and Recorded Movies libraries. Allow people to record in Settings → Users."
+        ) : (
+          <span className="text-danger">
+            The recordings folder (/recordings in the container) can't be
+            written, so recording is off.
+          </span>
+        )
+      }
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Start early">
+          {(id) => (
+            <Select
+              id={id}
+              value={i?.dvrPaddingBefore ?? 1}
+              onChange={(e) =>
+                save.mutate({
+                  integrations: { dvrPaddingBefore: Number(e.target.value) },
+                })
+              }
+            >
+              {[0, 1, 2, 5, 10].map((n) => (
+                <option key={n} value={n}>
+                  {minutes(n)}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+        <Field label="End late">
+          {(id) => (
+            <Select
+              id={id}
+              value={i?.dvrPaddingAfter ?? 3}
+              onChange={(e) =>
+                save.mutate({
+                  integrations: { dvrPaddingAfter: Number(e.target.value) },
+                })
+              }
+            >
+              {[0, 1, 3, 5, 10, 15, 30, 60].map((n) => (
+                <option key={n} value={n}>
+                  {minutes(n)}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+      </div>
+      {save.error && <Alert tone="error">{save.error.message}</Alert>}
+    </Card>
   );
 }

@@ -78,9 +78,11 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			LoudnessAnalysis: ptr(s.Music.LoudnessAnalysis),
 		},
 		Integrations: &IntegrationSettings{
-			SeerrUrl:       ptr(s.Integrations.SeerrURL),
-			SeerrApiKeySet: ptr(s.Integrations.SeerrAPIKey != ""),
-			LiveTvSources:  ptr(toAPILiveSources(s.Integrations.LiveTVSources)),
+			SeerrUrl:         ptr(s.Integrations.SeerrURL),
+			SeerrApiKeySet:   ptr(s.Integrations.SeerrAPIKey != ""),
+			LiveTvSources:    ptr(toAPILiveSources(s.Integrations.LiveTVSources)),
+			DvrPaddingBefore: ptr(s.Integrations.DVRPaddingBefore),
+			DvrPaddingAfter:  ptr(s.Integrations.DVRPaddingAfter),
 		},
 		Webhooks: ptr(toAPIWebhooks(s.Webhooks)),
 	}
@@ -184,6 +186,8 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 			s.Integrations.SeerrURL = strings.TrimRight(strings.TrimSpace(*i.SeerrUrl), "/")
 		}
 		set(&s.Integrations.SeerrAPIKey, i.SeerrApiKey)
+		set(&s.Integrations.DVRPaddingBefore, i.DvrPaddingBefore)
+		set(&s.Integrations.DVRPaddingAfter, i.DvrPaddingAfter)
 		if i.LiveTvSources != nil {
 			s.Integrations.LiveTVSources = make([]settings.LiveTVSource, len(*i.LiveTvSources))
 			for k, src := range *i.LiveTvSources {
