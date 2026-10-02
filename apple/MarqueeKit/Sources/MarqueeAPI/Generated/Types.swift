@@ -563,11 +563,16 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /requests/search`.
     /// - Remark: Generated from `#/paths//requests/search/get(searchRequestable)`.
     func searchRequestable(_ input: Operations.SearchRequestable.Input) async throws -> Operations.SearchRequestable.Output
-    /// Trending, popular and upcoming titles from Seerr (REQ-2).
+    /// Trending, popular and upcoming titles from Seerr (REQ-2), optionally by network, studio or genre, in an order. A network means shows; a studio means films.
     ///
     /// - Remark: HTTP `GET /requests/discover`.
     /// - Remark: Generated from `#/paths//requests/discover/get(discoverRequestable)`.
     func discoverRequestable(_ input: Operations.DiscoverRequestable.Input) async throws -> Operations.DiscoverRequestable.Output
+    /// Discover's filters: TV networks, film studios and movie and TV genres.
+    ///
+    /// - Remark: HTTP `GET /requests/discover/filters`.
+    /// - Remark: Generated from `#/paths//requests/discover/filters/get(discoverFilters)`.
+    func discoverFilters(_ input: Operations.DiscoverFilters.Input) async throws -> Operations.DiscoverFilters.Output
     /// A show's seasons and which are available or requested, for choosing what to request.
     ///
     /// - Remark: HTTP `GET /requests/tv/{tmdbId}`.
@@ -2086,7 +2091,7 @@ extension APIProtocol {
             headers: headers
         ))
     }
-    /// Trending, popular and upcoming titles from Seerr (REQ-2).
+    /// Trending, popular and upcoming titles from Seerr (REQ-2), optionally by network, studio or genre, in an order. A network means shows; a studio means films.
     ///
     /// - Remark: HTTP `GET /requests/discover`.
     /// - Remark: Generated from `#/paths//requests/discover/get(discoverRequestable)`.
@@ -2098,6 +2103,13 @@ extension APIProtocol {
             query: query,
             headers: headers
         ))
+    }
+    /// Discover's filters: TV networks, film studios and movie and TV genres.
+    ///
+    /// - Remark: HTTP `GET /requests/discover/filters`.
+    /// - Remark: Generated from `#/paths//requests/discover/filters/get(discoverFilters)`.
+    public func discoverFilters(headers: Operations.DiscoverFilters.Input.Headers = .init()) async throws -> Operations.DiscoverFilters.Output {
+        try await discoverFilters(Operations.DiscoverFilters.Input(headers: headers))
     }
     /// A show's seasons and which are available or requested, for choosing what to request.
     ///

@@ -736,4 +736,21 @@ class MarqueeUiTest {
         tap("Close")
         rule.waitUntilAtLeastOneExists(playing, 10_000) // still playing here
     }
+
+    /** Add to playlist (USER-7): from a movie's page into a new playlist, then an album track's menu. */
+    @Test fun addToPlaylist() {
+        connectAndSignIn()
+        openLibrary("Movies")
+        rule.waitText("00 Preview Test")
+        tap("00 Preview Test")
+        rule.waitText("Add to playlist", 10_000)
+        tap("Add to playlist")
+        rule.waitUntilAtLeastOneExists(hasText("New playlist"), 10_000)
+        val name = "UI list ${(1000..9999).random()}"
+        rule.onNode(hasSetTextAction() and hasText("New playlist")).performTextInput(name)
+        tap("Create")
+        rule.waitText("Added to $name.", 10_000)
+        shot("pl1-added")
+        tap("Done")
+    }
 }

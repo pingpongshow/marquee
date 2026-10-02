@@ -31,6 +31,8 @@ type Service struct {
 
 	ratingsMu sync.Mutex
 	ratings   map[string]cachedRatings
+	genres    [][]Genre
+	genresAt  time.Time
 }
 
 type cachedRatings struct {
@@ -191,12 +193,47 @@ func (s *Service) Search(ctx context.Context, userID int64, q string, page int) 
 	return s.annotate(ctx, userID, p.Results), p.Page, p.TotalPages, nil
 }
 
-func (s *Service) Discover(ctx context.Context, userID int64, category string, page int) ([]Item, int, int, error) {
-	p, err := s.seerr().Discover(ctx, category, page)
+func (s *Service) Discover(ctx context.Context, userID int64, category string, b Browse, page int) ([]Item, int, int, error) {
+	p, err := s.seerr().Discover(ctx, category, b, page)
 	if err != nil {
 		return nil, 0, 0, err
 	}
 	return s.annotate(ctx, userID, p.Results), p.Page, p.TotalPages, nil
+}
+
+// Networks and Studios are the ones offered as Discover filters (TMDB ids, as Seerr uses).
+var (
+	Networks = []Genre{{213, "Netflix"}, {2739, "Disney+"}, {1024, "Prime Video"}, {2552, "Apple TV+"}, {453, "Hulu"},
+		{49, "HBO"}, {3186, "Max"}, {4330, "Paramount+"}, {3353, "Peacock"}, {67, "Showtime"}, {318, "Starz"},
+		{174, "AMC"}, {88, "FX"}, {2, "ABC"}, {16, "CBS"}, {6, "NBC"}, {19, "FOX"}, {71, "The CW"}, {4, "BBC One"},
+		{80, "Adult Swim"}, {1112, "Crunchyroll"}, {64, "Discovery"}}
+	Studios = []Genre{{2, "Disney"}, {127928, "20th Century"}, {34, "Sony Pictures"}, {174, "Warner Bros."},
+		{33, "Universal"}, {4, "Paramount"}, {3, "Pixar"}, {521, "DreamWorks"}, {420, "Marvel Studios"}, {1, "Lucasfilm"},
+		{41077, "A24"}, {1632, "Lionsgate"}, {3172, "Blumhouse"}, {6704, "Illumination"}, {10342, "Studio Ghibli"}}
+)
+
+// Filters are Discover's choices: networks, studios and Seerr's genres (kept a day).
+func (s *Service) Filters(ctx context.Context) (movieGenres, tvGenres []Genre, err error) {
+	s.ratingsMu.Lock()
+	if s.genres != nil && time.Since(s.genresAt) < 24*time.Hour {
+		m, t := s.genres[0], s.genres[1]
+		s.ratingsMu.Unlock()
+		return m, t, nil
+	}
+	s.ratingsMu.Unlock()
+	if !s.Enabled() {
+		return nil, nil, ErrNotConfigured
+	}
+	if movieGenres, err = s.seerr().Genres(ctx, false); err != nil {
+		return nil, nil, err
+	}
+	if tvGenres, err = s.seerr().Genres(ctx, true); err != nil {
+		return nil, nil, err
+	}
+	s.ratingsMu.Lock()
+	s.genres, s.genresAt = [][]Genre{movieGenres, tvGenres}, time.Now()
+	s.ratingsMu.Unlock()
+	return movieGenres, tvGenres, nil
 }
 
 // Season is a show's season and where it stands.

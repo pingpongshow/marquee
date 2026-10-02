@@ -1,5 +1,11 @@
 package app.marquee.ui
 
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.Icons
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -86,9 +92,30 @@ val RequestState.label: String
 private val categories = listOf(
     RequestsApi.CategoryDiscoverRequestable.TRENDING to "Trending",
     RequestsApi.CategoryDiscoverRequestable.MOVIES to "Movies",
-    RequestsApi.CategoryDiscoverRequestable.TV to "Shows",
-    RequestsApi.CategoryDiscoverRequestable.UPCOMING to "Coming Soon",
+    RequestsApi.CategoryDiscoverRequestable.TV to "TV Shows",
+    RequestsApi.CategoryDiscoverRequestable.UPCOMING to "Upcoming movies",
+    RequestsApi.CategoryDiscoverRequestable.UPCOMING_TV to "Upcoming shows",
 )
+
+private val sorts = listOf(
+    RequestsApi.SortDiscoverRequestable.POPULAR to "Popular",
+    RequestsApi.SortDiscoverRequestable.RATING to "Top rated",
+    RequestsApi.SortDiscoverRequestable.NEWEST to "Newest",
+    RequestsApi.SortDiscoverRequestable.TITLE to "A–Z",
+)
+
+/** A chip that opens a list to pick from (null = all). */
+@Composable
+private fun <T> PickChip(label: String, options: List<Pair<T, String>>, selected: T, onPick: (T) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        FilterChip(false, { open = true }, { Text(options.firstOrNull { it.first == selected }?.second ?: label) },
+            Modifier.focusRing(RoundedCornerShape(8.dp)), trailingIcon = { Icon(Icons.Filled.ArrowDropDown, null) })
+        DropdownMenu(open, { open = false }) {
+            options.forEach { (v, name) -> DropdownMenuItem({ Text(name) }, { onPick(v); open = false }) }
+        }
+    }
+}
 
 private fun DiscoverItem.requestable() =
     availability == Availability.NONE || (mediaType == DiscoverItem.MediaType.TV && availability == Availability.PARTIAL)
@@ -106,17 +133,44 @@ fun DiscoverScreen(nav: NavHostController) {
     var error by remember { mutableStateOf<String?>(null) }
     var picked by remember { mutableStateOf<DiscoverItem?>(null) }
     var reload by remember { mutableIntStateOf(0) }
+    // Narrowing (movies and shows): network or studio, genre, order (REQ-2).
+    var network by remember { mutableStateOf<Long?>(null) }
+    var studio by remember { mutableStateOf<Long?>(null) }
+    var genre by remember { mutableStateOf<Long?>(null) }
+    var sort by remember { mutableStateOf(RequestsApi.SortDiscoverRequestable.POPULAR) }
+    var page by remember { mutableIntStateOf(1) }
+    var hasMore by remember { mutableStateOf(false) }
+    var loadingMore by remember { mutableStateOf(false) }
+    val filters by produceState<app.marquee.api.models.DiscoverFilters200Response?>(null) {
+        value = withContext(Dispatchers.IO) { runCatching { marquee.requests.discoverFilters() }.getOrNull() }
+    }
+    val browsing = category == RequestsApi.CategoryDiscoverRequestable.MOVIES || category == RequestsApi.CategoryDiscoverRequestable.TV
+    suspend fun fetch(p: Int) = withContext(Dispatchers.IO) {
+        val q = query.trim()
+        if (q.isNotEmpty()) marquee.requests.searchRequestable(q, p)
+        else marquee.requests.discoverRequestable(category, p, network.takeIf { browsing }, studio.takeIf { browsing }, genre.takeIf { browsing }, sort.takeIf { browsing })
+    }
 
-    LaunchedEffect(status, category, query, reload) {
+    LaunchedEffect(status, category, query, reload, network, studio, genre, sort) {
         val s = status ?: return@LaunchedEffect
         if (!s.enabled || !s.canRequest) return@LaunchedEffect
-        val q = query.trim()
-        if (q.isNotEmpty()) delay(350)
-        withContext(Dispatchers.IO) {
-            runCatching { if (q.isEmpty()) marquee.requests.discoverRequestable(category).results else marquee.requests.searchRequestable(q).results }
-                .onSuccess { items = it; error = null }
-                .onFailure { error = it.message }
-            mine = runCatching { marquee.requests.listRequests() }.getOrDefault(emptyList())
+        if (query.isNotBlank()) delay(350)
+        runCatching { fetch(1) }
+            .onSuccess { items = it.results; page = it.page; hasMore = it.page < it.totalPages; error = null }
+            .onFailure { error = it.message }
+        mine = withContext(Dispatchers.IO) { runCatching { marquee.requests.listRequests() }.getOrDefault(emptyList()) }
+    }
+    fun loadMore() {
+        if (!hasMore || loadingMore) return
+        loadingMore = true
+        scope.launch {
+            runCatching { fetch(page + 1) }.onSuccess { p ->
+                val seen = items.orEmpty().map { "${it.mediaType}-${it.tmdbId}" }.toSet()
+                items = items.orEmpty() + p.results.filter { "${it.mediaType}-${it.tmdbId}" !in seen }
+                page = p.page
+                hasMore = p.page < p.totalPages
+            }
+            loadingMore = false
         }
     }
 
@@ -137,20 +191,24 @@ fun DiscoverScreen(nav: NavHostController) {
                     OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("Find a movie or show to request") })
                     if (query.isBlank()) LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(categories) { (c, label) ->
-                            FilterChip(category == c, { category = c }, { Text(label) }, Modifier.focusRing(RoundedCornerShape(8.dp)).initialFocus(marquee.isTv && c == category))
+                            FilterChip(category == c, { category = c; network = null; studio = null; genre = null; sort = RequestsApi.SortDiscoverRequestable.POPULAR },
+                                { Text(label) }, Modifier.focusRing(RoundedCornerShape(8.dp)).initialFocus(marquee.isTv && c == category))
                         }
                     }
-                    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                }
-            }
-            val list = items
-            if (list == null) item(span = { GridItemSpan(maxLineSpan) }) { Box(Modifier.padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
-            else items(list, key = { "${it.mediaType}-${it.tmdbId}" }) { it ->
-                DiscoverCard(it) {
-                    when {
-                        it.itemId != null -> nav.navigate("item/${it.itemId}")
-                        else -> picked = it // its details, with Request when it can be
+                    if (query.isBlank() && browsing) LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val f = filters
+                        item {
+                            if (category == RequestsApi.CategoryDiscoverRequestable.TV)
+                                PickChip("Network", listOf<Pair<Long?, String>>(null to "All networks") + f?.networks.orEmpty().map { it.id to it.name }, network) { network = it }
+                            else PickChip("Studio", listOf<Pair<Long?, String>>(null to "All studios") + f?.studios.orEmpty().map { it.id to it.name }, studio) { studio = it }
+                        }
+                        item {
+                            val g = if (category == RequestsApi.CategoryDiscoverRequestable.TV) f?.tvGenres else f?.movieGenres
+                            PickChip("Genre", listOf<Pair<Long?, String>>(null to "All genres") + g.orEmpty().map { it.id to it.name }, genre) { genre = it }
+                        }
+                        item { PickChip("Sort", sorts, sort) { sort = it } }
                     }
+                    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 }
             }
             if (mine.isNotEmpty()) {
@@ -161,6 +219,17 @@ fun DiscoverScreen(nav: NavHostController) {
                             withContext(Dispatchers.IO) { runCatching { marquee.requests.cancelRequest(r.id) } }
                             reload++
                         }
+                    }
+                }
+            }
+            val list = items
+            if (list == null) item(span = { GridItemSpan(maxLineSpan) }) { Box(Modifier.padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+            else itemsIndexed(list, key = { _, it -> "${it.mediaType}-${it.tmdbId}" }) { i, it ->
+                if (i == list.lastIndex) LaunchedEffect(list.size) { loadMore() } // the next page, near the end
+                DiscoverCard(it) {
+                    when {
+                        it.itemId != null -> nav.navigate("item/${it.itemId}")
+                        else -> picked = it // its details, with Request when it can be
                     }
                 }
             }

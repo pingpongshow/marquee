@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.filled.Radio
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,6 +71,7 @@ private data class Page(val detail: ItemDetail, val children: List<ItemSummary>,
     val popular: List<ItemSummary> = emptyList())
 
 /** Detail page for any item: header, play buttons, contents, cast and related titles. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun ItemScreen(nav: NavHostController, itemId: Long) {
     val marquee = LocalMarquee.current
@@ -120,6 +122,8 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
             watched = on
             scope.launch { withContext(Dispatchers.IO) { runCatching { if (on) marquee.items.markWatched(d.id) else marquee.items.markUnwatched(d.id) } } }
         }) { Icon(if (watched) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked, null); Text(if (watched) "Watched" else "Mark watched") }
+        if (d.type in listOf(ItemType.MOVIE, ItemType.SHOW, ItemType.SEASON, ItemType.EPISODE, ItemType.VIDEO, ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK))
+            AddToPlaylistButton(d.id, music = d.type in listOf(ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK))
     }
     @Composable fun Download() {
         if (!marquee.isTv && d.type in listOf(ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO, ItemType.TRACK, ItemType.ALBUM, ItemType.ARTIST, ItemType.SEASON, ItemType.SHOW))
@@ -172,7 +176,11 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
             }
         }
         if (!marquee.isTv) {
-            item { Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = sidePadding), horizontalArrangement = Arrangement.spacedBy(10.dp)) { Actions() } }
+            // Buttons wrap onto more lines rather than hiding off the edge of a phone.
+            item {
+                FlowRow(Modifier.padding(horizontal = sidePadding), horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)) { Actions() }
+            }
             d.summary?.takeIf { it.isNotBlank() }?.let { s -> item { Text(s, Modifier.padding(horizontal = sidePadding), maxLines = 8, overflow = TextOverflow.Ellipsis) } }
         }
         if (pg.children.isNotEmpty()) item {
@@ -196,7 +204,12 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                         ListItem(
                             headlineContent = { Text(t.title, maxLines = 1) },
                             leadingContent = { Text("${t.index ?: i + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                            trailingContent = { Text(t.durationMs?.let { formatTime(it) } ?: "") },
+                            trailingContent = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(t.durationMs?.let { formatTime(it) } ?: "")
+                                    if (!marquee.isTv) TrackMenu(t)
+                                }
+                            },
                             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
                             modifier = Modifier.focusCard({ music.play(tracks, i, source = d.title) }),
                         )

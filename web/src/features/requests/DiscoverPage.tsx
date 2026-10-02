@@ -1,10 +1,18 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { clsx } from "clsx";
 import { Search, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, unwrap } from "@/api/client";
-import { Alert, Badge, Button, Dialog, Input, Spinner } from "@/components/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Dialog,
+  Input,
+  Select,
+  Spinner,
+} from "@/components/ui";
 import {
   availabilityLabel,
   type DiscoverItem,
@@ -17,10 +25,19 @@ import { RequestDialog } from "./RequestDialog";
 
 const categories = [
   { id: "trending", label: "Trending" },
-  { id: "movies", label: "Popular movies" },
-  { id: "tv", label: "Popular shows" },
-  { id: "upcoming", label: "Coming soon" },
+  { id: "movies", label: "Movies" },
+  { id: "tv", label: "TV Shows" },
+  { id: "upcoming", label: "Upcoming movies" },
+  { id: "upcoming_tv", label: "Upcoming shows" },
 ] as const;
+
+const sorts = [
+  { id: "popular", label: "Popular" },
+  { id: "rating", label: "Top rated" },
+  { id: "newest", label: "Newest" },
+  { id: "title", label: "A–Z" },
+] as const;
+type Sort = (typeof sorts)[number]["id"];
 
 /** Discover (REQ-1, REQ-2): find titles that aren't here and ask for them. */
 export function DiscoverPage() {
@@ -30,23 +47,97 @@ export function DiscoverPage() {
   const [category, setCategory] =
     useState<(typeof categories)[number]["id"]>("trending");
   const [picked, setPicked] = useState<DiscoverItem | null>(null);
+  const [network, setNetwork] = useState<number | null>(null);
+  const [studio, setStudio] = useState<number | null>(null);
+  const [genre, setGenre] = useState<number | null>(null);
+  const [sort, setSort] = useState<Sort>("popular");
+  const browsing = category === "movies" || category === "tv";
+  const filters = useQuery({
+    queryKey: ["requests", "filters"],
+    queryFn: () => unwrap(api.GET("/requests/discover/filters")),
+    staleTime: 3_600_000,
+    enabled: !!status.data?.enabled && !!status.data?.canRequest,
+  });
+  const pickCategory = (c: (typeof categories)[number]["id"]) => {
+    setCategory(c);
+    setNetwork(null);
+    setStudio(null);
+    setGenre(null);
+    setSort("popular");
+  };
   const [viewing, setViewing] = useState<DiscoverItem | null>(null);
   useEffect(() => {
     const t = setTimeout(() => setTerm(q.trim()), 350);
     return () => clearTimeout(t);
   }, [q]);
-  const results = useQuery({
-    queryKey: ["requests", "discover", term, category],
-    queryFn: () =>
+  // Pages load as you scroll (Seerr has thousands of titles per list).
+  const results = useInfiniteQuery({
+    queryKey: [
+      "requests",
+      "discover",
+      term,
+      category,
+      network,
+      studio,
+      genre,
+      sort,
+    ],
+    queryFn: ({ pageParam }) =>
       term
         ? unwrap(
-            api.GET("/requests/search", { params: { query: { q: term } } }),
+            api.GET("/requests/search", {
+              params: { query: { q: term, page: pageParam } },
+            }),
           )
         : unwrap(
-            api.GET("/requests/discover", { params: { query: { category } } }),
+            api.GET("/requests/discover", {
+              params: {
+                query: {
+                  category,
+                  page: pageParam,
+                  ...(browsing
+                    ? {
+                        network: network ?? undefined,
+                        studio: studio ?? undefined,
+                        genre: genre ?? undefined,
+                        sort,
+                      }
+                    : {}),
+                },
+              },
+            }),
           ),
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.page < last.totalPages ? last.page + 1 : undefined,
     enabled: !!status.data?.enabled && !!status.data?.canRequest,
   });
+  const list = useMemo(() => {
+    // Pages can overlap as lists shift; show each title once.
+    const seen = new Set<string>();
+    return (results.data?.pages ?? [])
+      .flatMap((p) => p.results)
+      .filter((it) => {
+        const k = `${it.mediaType}-${it.tmdbId}`;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+  }, [results.data]);
+  const more = useRef<HTMLDivElement>(null);
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = results;
+  useEffect(() => {
+    const el = more.current;
+    if (!el || !hasNextPage) return;
+    const io = new IntersectionObserver(
+      (e) => {
+        if (e[0]?.isIntersecting && !isFetchingNextPage) void fetchNextPage();
+      },
+      { rootMargin: "600px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, list.length]);
 
   if (status.isPending) return <Spinner />;
   if (!status.data?.enabled)
@@ -93,7 +184,7 @@ export function DiscoverPage() {
               key={c.id}
               role="tab"
               aria-selected={category === c.id}
-              onClick={() => setCategory(c.id)}
+              onClick={() => pickCategory(c.id)}
               className={clsx(
                 "rounded-full px-4 py-1.5 text-sm",
                 category === c.id
@@ -106,26 +197,82 @@ export function DiscoverPage() {
           ))}
         </div>
       )}
+      {!term && browsing && (
+        <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
+          {category === "tv" ? (
+            <FilterSelect
+              label="Network"
+              value={network}
+              onChange={setNetwork}
+              options={filters.data?.networks ?? []}
+              all="All networks"
+            />
+          ) : (
+            <FilterSelect
+              label="Studio"
+              value={studio}
+              onChange={setStudio}
+              options={filters.data?.studios ?? []}
+              all="All studios"
+            />
+          )}
+          <FilterSelect
+            label="Genre"
+            value={genre}
+            onChange={setGenre}
+            options={
+              (category === "tv"
+                ? filters.data?.tvGenres
+                : filters.data?.movieGenres) ?? []
+            }
+            all="All genres"
+          />
+          <div className="sm:w-40">
+            <Select
+              aria-label="Sort"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as Sort)}
+            >
+              {sorts.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
+      )}
+      <MyRequests />
       {results.isPending ? (
         <Spinner />
       ) : results.error ? (
         <Alert tone="error">{results.error.message}</Alert>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-4">
-          {results.data?.results.map((it) => (
-            <Card
-              key={`${it.mediaType}-${it.tmdbId}`}
-              item={it}
-              onRequest={() => setPicked(it)}
-              onOpen={() => setViewing(it)}
-            />
-          ))}
-          {results.data?.results.length === 0 && (
-            <p className="text-muted">Nothing found.</p>
-          )}
-        </div>
+        <>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-4">
+            {list.map((it) => (
+              <Card
+                key={`${it.mediaType}-${it.tmdbId}`}
+                item={it}
+                onRequest={() => setPicked(it)}
+                onOpen={() => setViewing(it)}
+              />
+            ))}
+          </div>
+          {list.length === 0 && <p className="text-muted">Nothing found.</p>}
+          <div ref={more} className="flex justify-center py-4">
+            {results.isFetchingNextPage ? (
+              <Spinner />
+            ) : (
+              results.hasNextPage && (
+                <Button variant="ghost" onClick={() => results.fetchNextPage()}>
+                  Load more
+                </Button>
+              )
+            )}
+          </div>
+        </>
       )}
-      <MyRequests />
       {picked && (
         <RequestDialog item={picked} onClose={() => setPicked(null)} />
       )}
@@ -289,6 +436,39 @@ function TitleRatings({ item }: { item: DiscoverItem }) {
           </span>
         );
       })}
+    </div>
+  );
+}
+
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+  all,
+}: {
+  label: string;
+  value: number | null;
+  onChange: (v: number | null) => void;
+  options: { id: number; name: string }[];
+  all: string;
+}) {
+  return (
+    <div className="sm:w-48">
+      <Select
+        aria-label={label}
+        value={value ?? ""}
+        onChange={(e) =>
+          onChange(e.target.value ? Number(e.target.value) : null)
+        }
+      >
+        <option value="">{all}</option>
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.name}
+          </option>
+        ))}
+      </Select>
     </div>
   );
 }

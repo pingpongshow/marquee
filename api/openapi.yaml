@@ -2051,12 +2051,16 @@ paths:
     get:
       tags: [requests]
       operationId: discoverRequestable
-      summary: Trending, popular and upcoming titles from Seerr (REQ-2).
+      summary: "Trending, popular and upcoming titles from Seerr (REQ-2), optionally by network, studio or genre, in an order. A network means shows; a studio means films."
       parameters:
         - name: category
           in: query
-          schema: { type: string, enum: [trending, movies, tv, upcoming], default: trending }
+          schema: { type: string, enum: [trending, movies, tv, upcoming, upcoming_tv], default: trending }
         - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: network, in: query, schema: { type: integer, format: int64 }, description: "A TV network (from /requests/discover/filters)." }
+        - { name: studio, in: query, schema: { type: integer, format: int64 }, description: A film studio. }
+        - { name: genre, in: query, schema: { type: integer, format: int64 }, description: A movie or TV genre (matching the category). }
+        - { name: sort, in: query, schema: { type: string, enum: [popular, rating, newest, title], default: popular }, description: For movies and tv. }
       responses:
         "200":
           description: Results.
@@ -2065,6 +2069,28 @@ paths:
               schema: { $ref: "#/components/schemas/DiscoverPage" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /requests/discover/filters:
+    get:
+      tags: [requests]
+      operationId: discoverFilters
+      summary: "Discover's filters: TV networks, film studios and movie and TV genres."
+      responses:
+        "200":
+          description: Filters.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [networks, studios, movieGenres, tvGenres]
+                properties:
+                  networks: { type: array, items: { $ref: "#/components/schemas/NamedId" } }
+                  studios: { type: array, items: { $ref: "#/components/schemas/NamedId" } }
+                  movieGenres: { type: array, items: { $ref: "#/components/schemas/NamedId" } }
+                  tvGenres: { type: array, items: { $ref: "#/components/schemas/NamedId" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "502": { $ref: "#/components/responses/BadGateway" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
 
@@ -3530,6 +3556,13 @@ components:
         available: { type: boolean, description: "Last.fm: the server has Last.fm's API keys, so people can connect." }
         username: { type: string, description: The account plays go to. }
         error: { type: string, description: The last problem sending a play. }
+
+    NamedId:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
 
     TitleRatings:
       type: object

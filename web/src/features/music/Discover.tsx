@@ -141,14 +141,14 @@ export function MusicDiscover({ libraryId }: { libraryId: number }) {
               id="muse"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe what you want to hear…"
+              placeholder="Describe a mood or moment…"
               maxLength={300}
-              className="h-11 flex-1 rounded-lg border border-border bg-surface-2 px-4 placeholder:text-faint focus:border-accent focus:outline-none"
+              className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-surface-2 px-4 placeholder:text-faint focus:border-accent focus:outline-none"
             />
             <button
               type="submit"
               disabled={busy || prompt.trim().length < 2}
-              className="flex h-11 items-center gap-2 rounded-lg bg-accent px-5 font-medium text-black disabled:opacity-50"
+              className="flex h-11 shrink-0 items-center gap-2 rounded-lg bg-accent px-4 font-medium text-black disabled:opacity-50 sm:px-5"
             >
               {muse.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
