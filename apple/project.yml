@@ -31,6 +31,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.marquee.Marquee
         TARGETED_DEVICE_FAMILY: "1,2"
+        "CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]": App/iOS/Marquee-Simulator.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     info:
@@ -45,6 +46,13 @@ targets:
         NSBonjourServices: [_marquee._tcp]
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true   # self-hosted server over plain HTTP on the LAN and Tailscale (WireGuard-encrypted)
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+          UISceneConfigurations:
+            CPTemplateApplicationSceneSessionRoleApplication:
+              - UISceneClassName: CPTemplateApplicationScene
+                UISceneConfigurationName: CarPlay
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).CarPlaySceneDelegate
         ITSAppUsesNonExemptEncryption: false
   MarqueeUITests:
     type: bundle.ui-testing
