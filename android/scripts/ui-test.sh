@@ -10,6 +10,8 @@ CLASS="${2:-app.marquee.MarqueeUiTest}"
 OUT="${3:-build/ui-shots}"
 ./gradlew -q :app:installDebug :app:installDebugAndroidTest
 "$ADB" shell rm -rf /sdcard/Android/data/app.marquee/files/shots
+# Android's one-time "Viewing full screen" hint would cover the player's controls.
+"$ADB" shell settings put secure immersive_mode_confirmations confirmed
 "$ADB" shell am instrument -w -e server "$SERVER" -e class "$CLASS" app.marquee.test/androidx.test.runner.AndroidJUnitRunner | tee build/ui-test.log
 rm -rf "$OUT" && mkdir -p "$OUT"
 "$ADB" pull /sdcard/Android/data/app.marquee/files/shots/. "$OUT" >/dev/null 2>&1 || true
