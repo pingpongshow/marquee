@@ -31,6 +31,8 @@ tags:
   - name: hubs
   - name: playlists
   - name: music
+  - name: livetv
+    description: Live TV channels and guide from M3U/XMLTV sources and Dispatcharr (LIVE-1..4).
   - name: requests
     description: Seerr search and requests (REQ-1, REQ-2), approved by admins in Marquee.
 
@@ -1393,6 +1395,174 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /livetv/status:
+    get:
+      tags: [livetv]
+      operationId: liveTvStatus
+      summary: Whether Live TV is set up, and how many channels there are.
+      responses:
+        "200":
+          description: Status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LiveTvStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /livetv/channels:
+    get:
+      tags: [livetv]
+      operationId: listLiveChannels
+      summary: Channels in number order, with what's on now and next.
+      parameters:
+        - { name: group, in: query, schema: { type: string }, description: Only this group (category). }
+        - { name: favorites, in: query, schema: { type: boolean }, description: Only the caller's favourites. }
+      responses:
+        "200":
+          description: Channels.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/LiveChannel" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /livetv/groups:
+    get:
+      tags: [livetv]
+      operationId: listLiveGroups
+      summary: Channel groups (categories) with their channel counts.
+      responses:
+        "200":
+          description: Groups.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [name, channels]
+                  properties:
+                    name: { type: string }
+                    channels: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /livetv/guide:
+    get:
+      tags: [livetv]
+      operationId: liveGuide
+      summary: The guide grid - programmes per channel between two times (at most 24 hours).
+      parameters:
+        - { name: start, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: end, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: group, in: query, schema: { type: string } }
+        - { name: favorites, in: query, schema: { type: boolean } }
+      responses:
+        "200":
+          description: Rows, one per channel.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [channelId, programmes]
+                  properties:
+                    channelId: { type: integer, format: int64 }
+                    programmes:
+                      type: array
+                      items: { $ref: "#/components/schemas/LiveProgramme" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /livetv/channels/{channelId}/favorite:
+    parameters:
+      - { name: channelId, in: path, required: true, schema: { type: integer, format: int64 } }
+    put:
+      tags: [livetv]
+      operationId: favoriteLiveChannel
+      summary: Add a channel to the caller's favourites.
+      responses:
+        "204": { description: Added. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [livetv]
+      operationId: unfavoriteLiveChannel
+      summary: Remove a channel from the caller's favourites.
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /livetv/channels/{channelId}/logo:
+    parameters:
+      - { name: channelId, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      tags: [livetv]
+      operationId: liveChannelLogo
+      summary: The channel's logo, fetched from its source and cached (no sign-in needed, like artwork).
+      security: []
+      responses:
+        "200":
+          description: The image.
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /livetv/channels/{channelId}/play:
+    parameters:
+      - { name: channelId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [livetv]
+      operationId: playLiveChannel
+      summary: Start watching a channel. Returns a live HLS session (copied or transcoded for the device).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [profile]
+              properties:
+                profile: { $ref: "#/components/schemas/DeviceProfile" }
+                maxBitrateKbps: { type: integer, minimum: 0 }
+      responses:
+        "200":
+          description: The session.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LiveSession" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /livetv/sessions/{sessionId}:
+    parameters:
+      - { name: sessionId, in: path, required: true, schema: { type: string } }
+    delete:
+      tags: [livetv]
+      operationId: stopLiveSession
+      summary: Stop watching (the stream also stops by itself when nothing fetches it for a minute).
+      responses:
+        "204": { description: Stopped. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /livetv/refresh:
+    post:
+      tags: [livetv]
+      operationId: refreshLiveTv
+      summary: Reload channels and the guide from every source now (admin only).
+      responses:
+        "200":
+          description: What each source returned.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LiveTvStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /requests/status:
     get:
       tags: [requests]
@@ -2704,6 +2874,79 @@ components:
         detectIntros: { type: boolean, description: "Find intros and end credits in TV episodes by comparing their audio, for Skip Intro and Skip Credits (PLAY-12). Markers from Plex or the files take precedence." }
         trickplay: { type: boolean, description: "Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie." }
 
+    LiveTvStatus:
+      type: object
+      required: [enabled, channels, sources]
+      properties:
+        enabled: { type: boolean, description: At least one source is set up. }
+        channels: { type: integer }
+        guideUntil: { type: string, format: date-time, description: The end of the loaded guide. }
+        sources:
+          type: array
+          items:
+            type: object
+            required: [id, name, channels, programmes]
+            properties:
+              id: { type: string }
+              name: { type: string }
+              channels: { type: integer }
+              programmes: { type: integer }
+              refreshedAt: { type: string, format: date-time }
+              error: { type: string }
+
+    LiveChannel:
+      type: object
+      required: [id, name, favorite]
+      properties:
+        id: { type: integer, format: int64 }
+        number: { type: string, description: "The channel number as the source gives it (e.g. 4 or 4.1)." }
+        name: { type: string }
+        group: { type: string }
+        logoUrl: { type: string, description: Server-relative; no token needed. }
+        favorite: { type: boolean }
+        now: { $ref: "#/components/schemas/LiveProgramme" }
+        next: { $ref: "#/components/schemas/LiveProgramme" }
+
+    LiveProgramme:
+      type: object
+      required: [id, start, end, title]
+      properties:
+        id: { type: integer, format: int64 }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+        title: { type: string }
+        subtitle: { type: string, description: The episode's name. }
+        description: { type: string }
+        category: { type: string }
+        episode: { type: string, description: "As the guide gives it, e.g. S2 E5." }
+        imageUrl: { type: string }
+
+    LiveSession:
+      type: object
+      required: [id, url, channelId, method]
+      properties:
+        id: { type: string }
+        url: { type: string, description: The live HLS playlist (server-relative; the session id is its credential). }
+        channelId: { type: integer, format: int64 }
+        method: { type: string, enum: [copy, transcode] }
+        videoCodec: { type: string }
+        audioCodec: { type: string }
+
+    LiveTvSource:
+      type: object
+      required: [name, kind, url]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        kind:
+          type: string
+          enum: [m3u, dispatcharr]
+          description: "dispatcharr: url is Dispatcharr's address and its /output/m3u and /output/epg are used."
+        url: { type: string, description: The M3U playlist (m3u) or Dispatcharr's address. }
+        epgUrl: { type: string, description: "XMLTV guide (m3u sources; optional, else the playlist's url-tvg)." }
+        userAgent: { type: string }
+        enabled: { type: boolean }
+
     RequestsStatus:
       type: object
       required: [enabled, canRequest, pendingApprovals]
@@ -2801,12 +3044,19 @@ components:
       properties:
         seerrUrl: { type: string, description: "Seerr's address, e.g. http://10.1.1.10:5055. Empty turns requests off." }
         seerrApiKeySet: { type: boolean, readOnly: true }
+        liveTvSources:
+          type: array
+          items: { $ref: "#/components/schemas/LiveTvSource" }
 
     IntegrationSettingsUpdate:
       type: object
       properties:
         seerrUrl: { type: string }
         seerrApiKey: { type: string, description: Write-only. }
+        liveTvSources:
+          type: array
+          description: Replaces the whole list when sent.
+          items: { $ref: "#/components/schemas/LiveTvSource" }
 
     MetadataSettings:
       type: object

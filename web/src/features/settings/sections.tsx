@@ -15,6 +15,7 @@ import {
   Server,
   Users,
   Inbox,
+  Tv,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { DashboardSettings } from "./DashboardSettings";
@@ -29,6 +30,7 @@ import {
   RemoteAccessSettings,
 } from "./ServerSections";
 import { StatsView } from "./StatsView";
+import { LiveTvSettings } from "./LiveTvSettings";
 import { RequestsSettings } from "./RequestsSettings";
 import { WebhooksSettings } from "./WebhooksSettings";
 import { ScheduledTasksSettings } from "./TasksSettings";
@@ -128,6 +130,16 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] =
             "maintenance window backup restore database optimize tasks run now retention",
           description:
             "Maintenance window, background tasks and database backups.",
+        },
+        {
+          id: "live-tv",
+          label: "Live TV",
+          icon: Tv,
+          component: LiveTvSettings,
+          keywords:
+            "live tv iptv m3u xmltv epg guide dispatcharr pluto channels tuner",
+          description:
+            "Channels and the guide from Dispatcharr or an M3U playlist.",
         },
         {
           id: "requests",

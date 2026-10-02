@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -28,6 +29,7 @@ import (
 	"marquee/internal/introdetect"
 	"marquee/internal/items"
 	"marquee/internal/library"
+	"marquee/internal/livetv"
 	"marquee/internal/logbuf"
 	"marquee/internal/loudness"
 	"marquee/internal/lyrics"
@@ -297,6 +299,28 @@ func run() error {
 				UserAudioLang: u.Preferences.AudioLanguage, UserSubLang: u.Preferences.SubtitleLanguage, UserSubMode: u.Preferences.SubtitleMode}, nil
 		}}
 	go dl.Run(ctx)
+
+	// Live TV (LIVE-1..4): channels and guide refreshed every few hours and when sources change.
+	livetv.LogoDir = filepath.Join(cfg.ConfigDir, "cache", "livetv-logos")
+	live := &livetv.Service{DB: database, Settings: store, Sessions: &livetv.Sessions{
+		FFmpeg: cfg.FFmpegPath, FFprobe: cfg.FFprobePath, Dir: filepath.Join(cfg.TranscodeDir, "live"),
+		Encoders: player.EncoderChoices, QSVDevice: player.Encoders.QSVDevice,
+	}}
+	liveWake := make(chan struct{}, 1)
+	lastSources := ""
+	store.Subscribe(func(s settings.Settings) {
+		raw, _ := json.Marshal(s.Integrations.LiveTVSources)
+		if string(raw) != lastSources {
+			lastSources = string(raw)
+			select {
+			case liveWake <- struct{}{}:
+			default:
+			}
+		}
+	})
+	raw, _ := json.Marshal(store.Get().Integrations.LiveTVSources)
+	lastSources = string(raw)
+	go live.Run(ctx, liveWake)
 	lyricsSvc := &lyrics.Service{DB: database, Online: func() bool { return store.Get().Music.OnlineLyrics }}
 	go scheduler.Run(ctx)
 
@@ -315,6 +339,7 @@ func run() error {
 		Items: items.NewStore(database), Scans: scans, Version: config.Version,
 		Tasks: scheduler, Trickplay: trick, Webhooks: hooks, Subtitles: subs, Downloads: dl, Backups: backups, Restart: stop, Sonic: sonicSvc, Lyrics: lyricsSvc,
 		Requests: &requests.Service{DB: database, Settings: store},
+		LiveTV:   live,
 		Avatars:  &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
 		Images:   images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
 		Logs:     logs,
@@ -328,6 +353,7 @@ func run() error {
 	handler := server.New(server.Deps{
 		Handlers:   apiHandlers,
 		Downloads:  apiHandlers.DownloadFiles(),
+		Live:       live.Sessions.Handler(),
 		Stream:     player.StreamHandler(filepath.Join(cfg.ConfigDir, "cache", "subtitles")),
 		Auth:       authSvc,
 		Classifier: classifier,

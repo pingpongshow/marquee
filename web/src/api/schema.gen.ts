@@ -1028,6 +1028,168 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/livetv/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether Live TV is set up, and how many channels there are. */
+        get: operations["liveTvStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Channels in number order, with what's on now and next. */
+        get: operations["listLiveChannels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Channel groups (categories) with their channel counts. */
+        get: operations["listLiveGroups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/guide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The guide grid - programmes per channel between two times (at most 24 hours). */
+        get: operations["liveGuide"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/channels/{channelId}/favorite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Add a channel to the caller's favourites. */
+        put: operations["favoriteLiveChannel"];
+        post?: never;
+        /** Remove a channel from the caller's favourites. */
+        delete: operations["unfavoriteLiveChannel"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/channels/{channelId}/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelId: number;
+            };
+            cookie?: never;
+        };
+        /** The channel's logo, fetched from its source and cached (no sign-in needed, like artwork). */
+        get: operations["liveChannelLogo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/channels/{channelId}/play": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start watching a channel. Returns a live HLS session (copied or transcoded for the device). */
+        post: operations["playLiveChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Stop watching (the stream also stops by itself when nothing fetches it for a minute). */
+        delete: operations["stopLiveSession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reload channels and the guide from every source now (admin only). */
+        post: operations["refreshLiveTv"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/requests/status": {
         parameters: {
             query?: never;
@@ -2027,6 +2189,80 @@ export interface components {
             /** @description Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie. */
             trickplay?: boolean;
         };
+        LiveTvStatus: {
+            /** @description At least one source is set up. */
+            enabled: boolean;
+            channels: number;
+            /**
+             * Format: date-time
+             * @description The end of the loaded guide.
+             */
+            guideUntil?: string;
+            sources: {
+                id: string;
+                name: string;
+                channels: number;
+                programmes: number;
+                /** Format: date-time */
+                refreshedAt?: string;
+                error?: string;
+            }[];
+        };
+        LiveChannel: {
+            /** Format: int64 */
+            id: number;
+            /** @description The channel number as the source gives it (e.g. 4 or 4.1). */
+            number?: string;
+            name: string;
+            group?: string;
+            /** @description Server-relative; no token needed. */
+            logoUrl?: string;
+            favorite: boolean;
+            now?: components["schemas"]["LiveProgramme"];
+            next?: components["schemas"]["LiveProgramme"];
+        };
+        LiveProgramme: {
+            /** Format: int64 */
+            id: number;
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            title: string;
+            /** @description The episode's name. */
+            subtitle?: string;
+            description?: string;
+            category?: string;
+            /** @description As the guide gives it, e.g. S2 E5. */
+            episode?: string;
+            imageUrl?: string;
+        };
+        LiveSession: {
+            id: string;
+            /** @description The live HLS playlist (server-relative; the session id is its credential). */
+            url: string;
+            /** Format: int64 */
+            channelId: number;
+            /** @enum {string} */
+            method: "copy" | "transcode";
+            videoCodec?: string;
+            audioCodec?: string;
+        };
+        LiveTvSource: {
+            id?: string;
+            name: string;
+            /**
+             * @description dispatcharr: url is Dispatcharr's address and its /output/m3u and /output/epg are used.
+             * @enum {string}
+             */
+            kind: "m3u" | "dispatcharr";
+            /** @description The M3U playlist (m3u) or Dispatcharr's address. */
+            url: string;
+            /** @description XMLTV guide (m3u sources; optional, else the playlist's url-tvg). */
+            epgUrl?: string;
+            userAgent?: string;
+            enabled?: boolean;
+        };
         RequestsStatus: {
             /** @description Seerr is configured. */
             enabled: boolean;
@@ -2117,11 +2353,14 @@ export interface components {
             /** @description Seerr's address, e.g. http://10.1.1.10:5055. Empty turns requests off. */
             seerrUrl?: string;
             readonly seerrApiKeySet?: boolean;
+            liveTvSources?: components["schemas"]["LiveTvSource"][];
         };
         IntegrationSettingsUpdate: {
             seerrUrl?: string;
             /** @description Write-only. */
             seerrApiKey?: string;
+            /** @description Replaces the whole list when sent. */
+            liveTvSources?: components["schemas"]["LiveTvSource"][];
         };
         MetadataSettings: {
             readonly tmdbApiKeySet?: boolean;
@@ -5070,6 +5309,251 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    liveTvStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveTvStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listLiveChannels: {
+        parameters: {
+            query?: {
+                /** @description Only this group (category). */
+                group?: string;
+                /** @description Only the caller's favourites. */
+                favorites?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Channels. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveChannel"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listLiveGroups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Groups. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        name: string;
+                        channels: number;
+                    }[];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    liveGuide: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+                group?: string;
+                favorites?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rows, one per channel. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: int64 */
+                        channelId: number;
+                        programmes: components["schemas"]["LiveProgramme"][];
+                    }[];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    favoriteLiveChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Added. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    unfavoriteLiveChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    liveChannelLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    playLiveChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channelId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    profile: components["schemas"]["DeviceProfile"];
+                    maxBitrateKbps?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description The session. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveSession"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    stopLiveSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stopped. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    refreshLiveTv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What each source returned. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveTvStatus"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };
