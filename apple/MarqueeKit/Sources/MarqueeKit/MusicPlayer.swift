@@ -80,6 +80,14 @@ public final class MusicPlayer {
             for item in player.items() { applyLevel(item) }
         }
     }
+    /// Crossfade length in seconds, 0 = off (MUSIC-9). Albums played in order stay gapless.
+    public var crossfade: Int = UserDefaults.standard.integer(forKey: "marquee.crossfade") {
+        didSet { UserDefaults.standard.set(crossfade, forKey: "marquee.crossfade") }
+    }
+    @ObservationIgnored private var fader: AVPlayer?
+    @ObservationIgnored private var fadeTask: Task<Void, Never>?
+    @ObservationIgnored private var fadingFrom: ObjectIdentifier?
+    @ObservationIgnored private var fadedSession: (Loaded, Double)?
     public private(set) var playing = false
     public private(set) var time: Double = 0
     public private(set) var duration: Double = 0
@@ -129,6 +137,7 @@ public final class MusicPlayer {
                 self.time = t.seconds.isFinite ? t.seconds : 0
                 if let d = self.player.currentItem?.duration.seconds, d.isFinite { self.duration = d }
                 if Date().timeIntervalSince(self.lastReport) > 15, self.playing { self.report("playing") }
+                self.maybeCrossfade()
             }
         }
         setUpRemoteCommands()
@@ -295,6 +304,12 @@ public final class MusicPlayer {
     }
 
     private func currentItemChanged(previous: ObjectIdentifier?) {
+        // Fading out on the crossfade player: its session ends when the fade does.
+        if let previous, previous == fadingFrom, let s = sessions.removeValue(forKey: previous) {
+            fadedSession = (s, duration)
+            afterTrackChange()
+            return
+        }
         // The previous track finished (or was skipped): close its session.
         if previous != nil, sleep == .endOfTrack, player.currentItem != nil {
             player.pause()
@@ -314,12 +329,17 @@ public final class MusicPlayer {
                 _ = try? await client?.stopPlayback(path: .init(sessionId: s.session))
             }
         }
-        guard let item = player.currentItem, let s = sessions[ObjectIdentifier(item)] else {
-            if player.currentItem == nil, queue.current != nil, previous != nil, queue.followingIndex < 0 {
+        guard player.currentItem != nil else {
+            if queue.current != nil, previous != nil, queue.followingIndex < 0 {
                 playing = false // reached the end of the queue
             }
             return
         }
+        afterTrackChange()
+    }
+
+    private func afterTrackChange() {
+        guard let item = player.currentItem, let s = sessions[ObjectIdentifier(item)] else { return }
         if let i = queue.entries.firstIndex(where: { $0.id == s.entry }), i != queue.index { queue.setIndex(i) }
         time = 0
         duration = Double(queue.current?.item.durationMs ?? 0) / 1000
@@ -375,6 +395,64 @@ public final class MusicPlayer {
             guard !Task.isCancelled, let self else { return }
             self.player.pause()
             self.sleep = nil
+        }
+    }
+
+    // MARK: - Crossfade
+
+    /// A few times a second: when the track is about to end, a second player takes over its
+    /// tail and fades it out while the queue moves on and fades in.
+    private func maybeCrossfade() {
+        let secs = Double(crossfade)
+        guard secs > 0, fadeTask == nil, playing, duration > secs * 3, duration - time <= secs,
+              player.items().count >= 2, let item = player.currentItem, let url = (item.asset as? AVURLAsset)?.url else { return }
+        // Consecutive tracks of one album stay gapless.
+        if let s = sessions[ObjectIdentifier(item)], let i = queue.entries.firstIndex(where: { $0.id == s.entry }),
+           queue.entries.indices.contains(i + 1), let a = queue.entries[i].item.parentId, queue.entries[i + 1].item.parentId == a { return }
+        let tail = AVPlayerItem(url: url)
+        tail.audioMix = item.audioMix
+        let f = AVPlayer(playerItem: tail)
+        f.seek(to: CMTime(seconds: time + 0.2, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        f.play()
+        fader = f
+        fadingFrom = ObjectIdentifier(item)
+        fadeTask = Task { [weak self] in
+            // Hand over only once the tail is audibly playing.
+            for _ in 0..<60 where f.timeControlStatus != .playing { try? await Task.sleep(for: .milliseconds(25)) }
+            guard let self else { return }
+            guard f.timeControlStatus == .playing else { self.endFade(); return }
+            self.player.volume = 0
+            self.player.advanceToNextItem()
+            let steps = Int(secs * 25)
+            for i in 1...steps {
+                if Task.isCancelled { break }
+                let t = Double(i) / Double(steps)
+                self.player.volume = Float(sin(t * .pi / 2)) // equal power keeps the loudness steady
+                f.volume = Float(cos(t * .pi / 2))
+                try? await Task.sleep(for: .milliseconds(40))
+            }
+            self.endFade()
+        }
+    }
+
+    private func endFade() {
+        fader?.pause()
+        fader = nil
+        fadeTask = nil
+        fadingFrom = nil
+        player.volume = 1
+        guard let (s, dur) = fadedSession else { return }
+        fadedSession = nil
+        if s.session.isEmpty {
+            if let e = queue.entries.first(where: { $0.id == s.entry }) {
+                downloads?.recordProgress(itemID: e.item.id, positionMs: Int64(dur * 1000), watched: true)
+            }
+            return
+        }
+        let client = app.client
+        Task {
+            _ = try? await client?.reportPlayback(path: .init(sessionId: s.session), body: .json(.init(positionMs: Int64(dur * 1000), state: .paused)))
+            _ = try? await client?.stopPlayback(path: .init(sessionId: s.session))
         }
     }
 

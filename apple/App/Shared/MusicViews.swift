@@ -536,3 +536,23 @@ struct MoodStyleView: View {
         }
     }
 }
+
+/// Crossfade: off or 2–12 seconds (MUSIC-9); albums played in order stay gapless.
+struct CrossfadeMenu: View {
+    @Environment(MusicPlayer.self) private var music
+
+    var body: some View {
+        @Bindable var music = music
+        Menu {
+            Picker("Crossfade", selection: $music.crossfade) {
+                Text("Off").tag(0)
+                ForEach([2, 4, 6, 8, 12], id: \.self) { Text("\($0) seconds").tag($0) }
+            }
+        } label: {
+            Label(music.crossfade == 0 ? "Crossfade off" : "Crossfade \(music.crossfade) seconds", systemImage: "arrow.left.arrow.right")
+                .labelStyle(.iconOnly)
+                .foregroundStyle(music.crossfade == 0 ? Color.secondary : Color.marqueeGold)
+        }
+        .accessibilityLabel(music.crossfade == 0 ? "Crossfade off" : "Crossfade \(music.crossfade) seconds")
+    }
+}
