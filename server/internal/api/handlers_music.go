@@ -252,8 +252,14 @@ func (h *Handlers) MusicMixes(ctx context.Context, req MusicMixesRequestObject) 
 		if err != nil {
 			return nil, internal(ctx, "mixes", err)
 		}
-		st.Id = ptr("daily-" + strconv.Itoa(i+1))
+		st.Id = ptr(m.ID)
+		if m.ID == "" {
+			st.Id = ptr("daily-" + strconv.Itoa(i+1))
+		}
 		st.Description = ptr(mixDescription(st.Items))
+		if m.Description != "" {
+			st.Description = ptr(m.Description)
+		}
 		out = append(out, st)
 	}
 	return out, nil

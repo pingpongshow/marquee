@@ -22,6 +22,7 @@ import { PlayerPage } from "@/features/player/PlayerPage";
 import { PlaylistPage } from "@/features/playlists/PlaylistPage";
 import { PlaylistsPage } from "@/features/playlists/PlaylistsPage";
 import { LiveTvPage, LiveWatchPage } from "@/features/livetv/LiveTvPage";
+import { MoodStylePage } from "@/features/music/MoodStylePage";
 import { DiscoverPage } from "@/features/requests/DiscoverPage";
 import { SearchPage } from "@/features/search/SearchPage";
 import { AccountPage } from "@/features/users/AccountPage";
@@ -135,6 +136,11 @@ const liveWatchRoute = createRoute({
     return <LiveWatchPage channelId={Number(channelId)} />;
   },
 });
+const moodStyleRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/music/$libraryId/$kind/$name",
+  component: MoodStylePage,
+});
 const discoverRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/discover",
@@ -165,6 +171,7 @@ export const settingsSectionRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([
+  moodStyleRoute,
   liveTvRoute,
   liveWatchRoute,
   discoverRoute,
