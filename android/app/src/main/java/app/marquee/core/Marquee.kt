@@ -80,6 +80,7 @@ class Marquee(context: Context) {
     val requests get() = RequestsApi(base, http)
     val livetv get() = LivetvApi(base, http)
     val syncplay get() = SyncplayApi(base, http)
+    val activity get() = app.marquee.api.apis.ActivityApi(base, http)
 
     val isRemote: Boolean get() = info?.networkClass == NetworkClass.REMOTE
     /** Signed in but the server can't be reached. */

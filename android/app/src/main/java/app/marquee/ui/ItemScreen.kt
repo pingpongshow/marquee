@@ -1,5 +1,15 @@
 package app.marquee.ui
 
+import androidx.compose.runtime.remember
+
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.BookmarkAdded
+import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import app.marquee.api.models.RadioRequest
@@ -92,6 +102,21 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 .onFailure { Toast.makeText(context, it.message ?: "Couldn't start a radio", Toast.LENGTH_LONG).show() }
         }
     }) { Icon(Icons.Filled.Radio, null); Text("Radio") }
+    /** Watchlist (USER-8) and watched state, for movies and shows. */
+    @Composable fun StateButtons() {
+        var listed by remember(d.id) { mutableStateOf(d.watchlisted == true) }
+        var watched by remember(d.id) { mutableStateOf((d.viewCount ?: 0) > 0 || (d.leafCount > 0 && d.watchedLeafCount == d.leafCount)) }
+        if (d.type == ItemType.MOVIE || d.type == ItemType.SHOW) OutlinedButton(modifier = Modifier.focusRing(), onClick = {
+            val on = !listed
+            listed = on
+            scope.launch { withContext(Dispatchers.IO) { runCatching { if (on) marquee.items.addToWatchlist(d.id) else marquee.items.removeFromWatchlist(d.id) } } }
+        }) { Icon(if (listed) Icons.Filled.BookmarkAdded else Icons.Filled.BookmarkAdd, null); Text(if (listed) "On Watchlist" else "Watchlist") }
+        if (d.type in listOf(ItemType.MOVIE, ItemType.SHOW, ItemType.SEASON, ItemType.EPISODE, ItemType.VIDEO)) OutlinedButton(modifier = Modifier.focusRing(), onClick = {
+            val on = !watched
+            watched = on
+            scope.launch { withContext(Dispatchers.IO) { runCatching { if (on) marquee.items.markWatched(d.id) else marquee.items.markUnwatched(d.id) } } }
+        }) { Icon(if (watched) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked, null); Text(if (watched) "Watched" else "Mark watched") }
+    }
     @Composable fun Download() {
         if (!marquee.isTv && d.type in listOf(ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO, ItemType.TRACK, ItemType.ALBUM, ItemType.ARTIST, ItemType.SEASON, ItemType.SHOW))
             DownloadButton(d.summary())
@@ -124,6 +149,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 }
                 else -> {}
             }
+        StateButtons()
         Download()
     }
     LazyColumn(contentPadding = PaddingValues(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
@@ -195,6 +221,28 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
         if (pg.similar.isNotEmpty()) item {
             Shelf(if (d.type == ItemType.ARTIST) "Similar artists" else "Sounds similar", pg.similar, sidePadding) { _, it ->
                 PosterCard(it, marquee.imageUrl(it.images?.poster, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) })
+            }
+        }
+        // Extras: trailers, featurettes and more (LIB-8).
+        d.extras?.takeIf { it.isNotEmpty() }?.let { extras ->
+            item {
+                Shelf("Extras", extras, sidePadding) { _, it ->
+                    Column(Modifier.width(if (marquee.isTv) 220.dp else 180.dp)) {
+                        Artwork(marquee.imageUrl(it.images?.thumb ?: it.images?.poster, 300), it.title, Shape.Wide,
+                            Modifier.fillMaxWidth().focusCard({ nav.navigate("player/${it.id}") }).semantics { contentDescription = "Play ${it.title}" })
+                        Text(it.title, Modifier.padding(top = 6.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
+                        it.extraType?.let { t -> Text(t.value.replace('_', ' ').replaceFirstChar { c -> c.uppercase() }, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                }
+            }
+        }
+        // Film series this belongs to (META-7).
+        d.collections?.takeIf { it.isNotEmpty() }?.let { cols ->
+            item {
+                Shelf("Part of", cols, sidePadding) { _, it ->
+                    PosterCard(it, marquee.imageUrl(it.images?.poster, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) })
+                }
             }
         }
         if (pg.related.isNotEmpty()) item {

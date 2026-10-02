@@ -143,6 +143,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     val group by together.group.collectAsState()
     val groupError by together.error.collectAsState()
     var groupPanel by remember { mutableStateOf(false) }
+    var finding by remember { mutableStateOf(false) }
     LaunchedEffect(groupId) { if (groupId != null) { delay(1500); together.join(groupId) } }
     // Downloaded: play the file on the device, even when the server is reachable (D64).
     val downloads = LocalDownloads.current
@@ -391,7 +392,18 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                 scope.launch { start(at, c) }
             },
             onClose = { settings = false; poke() },
+            onFind = { settings = false; finding = true },
         )
+        if (finding) FindSubtitles(itemId, onClose = { finding = false; poke() }) { streamId ->
+            finding = false
+            val c = choice.copy(subtitle = streamId)
+            choice = c
+            val at = player.currentPosition
+            scope.launch {
+                detail = withContext(Dispatchers.IO) { runCatching { marquee.items.getItem(itemId) }.getOrNull() } ?: detail
+                start(at, c)
+            }
+        }
     }
 }
 
@@ -422,7 +434,7 @@ private fun ScrubBar(pos: Long, dur: Long, thumbs: TrickplayThumbs?, scrubbing: 
 
 /** Audio, subtitles, quality and version, applied by restarting the session where it is. */
 @Composable
-private fun PlayerSettings(detail: ItemDetail?, session: PlaybackSession?, choice: Choice, onPick: (Choice) -> Unit, onClose: () -> Unit) {
+private fun PlayerSettings(detail: ItemDetail?, session: PlaybackSession?, choice: Choice, onPick: (Choice) -> Unit, onClose: () -> Unit, onFind: () -> Unit = {}) {
     val version = detail?.versions?.firstOrNull { v -> v.files.any { it.id == (choice.fileId ?: session?.fileId) } } ?: detail?.versions?.firstOrNull()
     val file = version?.files?.firstOrNull { it.id == (choice.fileId ?: session?.fileId) } ?: version?.files?.firstOrNull()
     val streams = file?.streams.orEmpty()
@@ -449,6 +461,7 @@ private fun PlayerSettings(detail: ItemDetail?, session: PlaybackSession?, choic
             item { Heading("Subtitles") }
             item { Option("Off", curSub == null, first = true) { onPick(choice.copy(subtitle = -1)) } }
             items(subs) { s -> Option(streamLabel(s), s.id == curSub) { onPick(choice.copy(subtitle = s.id)) } }
+            item { Option("Find subtitles…", false, onClick = onFind) }
             item { Heading("Quality") }
             items(qualities) { (label, kbps) -> Option(label, choice.maxKbps == kbps) { onPick(choice.copy(maxKbps = kbps)) } }
             session?.let { s ->
@@ -494,4 +507,48 @@ private fun streamLabel(s: MediaStream): String {
         "Forced".takeIf { s.forced }, "SDH".takeIf { s.hearingImpaired },
     )
     return bits.joinToString(" · ").ifBlank { "Track ${s.id}" }
+}
+
+/** Find subtitles on OpenSubtitles (PLAY-7): hash matches first; picking one downloads it. */
+@Composable
+private fun FindSubtitles(itemId: Long, onClose: () -> Unit, onDownloaded: (Long) -> Unit) {
+    val marquee = LocalMarquee.current
+    val scope = rememberCoroutineScope()
+    val lang = remember { java.util.Locale.getDefault().language.ifBlank { "en" } }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val results by androidx.compose.runtime.produceState<List<app.marquee.api.models.SubtitleResult>?>(null) {
+        value = withContext(Dispatchers.IO) {
+            runCatching { marquee.playback.searchSubtitles(itemId, if (lang == "en") "en" else "$lang,en") }.onFailure { error = it.message }.getOrDefault(emptyList())
+        }
+    }
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)).clickable(remember { MutableInteractionSource() }, null, onClick = onClose)) {
+        LazyColumn(
+            Modifier.align(Alignment.CenterEnd).width(380.dp).fillMaxSize().background(MaterialTheme.colorScheme.surface).padding(vertical = 16.dp)
+                .clickable(remember { MutableInteractionSource() }, null) {},
+        ) {
+            item { Text("Find subtitles", Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            error?.let { e -> item { Text(e, Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error) } }
+            val list = results
+            if (list == null) item { CircularProgressIndicator(Modifier.padding(16.dp)) }
+            else if (list.isEmpty() && error == null) item { Text("Nothing found.", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            else items(list) { r ->
+                Column(Modifier.fillMaxWidth().focusCard({
+                    if (busy) return@focusCard
+                    busy = true
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            runCatching { marquee.playback.downloadSubtitle(itemId, app.marquee.api.models.DownloadSubtitleRequest(r.fileId, r.language, r.release, r.hearingImpaired)).streamId }
+                        }.onSuccess(onDownloaded).onFailure { error = it.message; busy = false }
+                    }
+                }).padding(horizontal = 16.dp, vertical = 10.dp)) {
+                    Text(r.release, maxLines = 2, fontWeight = if (r.hashMatch) FontWeight.Bold else FontWeight.Normal)
+                    Text(listOfNotNull(r.language.uppercase(), "Exact match".takeIf { r.hashMatch }, "SDH".takeIf { r.hearingImpaired },
+                        "Machine translated".takeIf { r.aiTranslated }, "${r.downloads} downloads").joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall, color = if (r.hashMatch) Gold else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            item { TextButton(onClose, Modifier.padding(horizontal = 8.dp).focusRing()) { Text("Close") } }
+        }
+    }
 }

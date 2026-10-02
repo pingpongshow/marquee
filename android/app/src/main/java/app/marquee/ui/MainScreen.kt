@@ -146,6 +146,7 @@ private fun Routes(nav: NavHostController) {
         }
         composable("live/{id}", listOf(navArgument("id") { type = NavType.LongType })) { LiveWatchScreen(nav, it.arguments!!.getLong("id")) }
         composable("approvals") { ApprovalsScreen() }
+        composable("stats") { StatsScreen() }
         composable("nowplaying") { NowPlayingScreen(onClose = { nav.popBackStack() }) }
     }
 }
