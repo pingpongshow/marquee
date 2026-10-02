@@ -59,6 +59,8 @@ export function deviceProfile(): DeviceProfile {
     hlsVideoCodecs: hlsVideo,
     hlsAudioCodecs: hlsAudio,
     textSubtitles: true,
+    // Styled anime subtitles are drawn by JASSUB (libass in WebAssembly).
+    assSubtitles: typeof WebAssembly === "object" && typeof Worker === "function" && typeof OffscreenCanvas === "function",
   };
   return cached;
 }
