@@ -33,6 +33,7 @@ type Summary struct {
 	ViewCount     int
 	LastViewedAt  string
 	WatchedLeaves int
+	UserRating    float64 // 0 = not rated
 }
 
 type Detail struct {
@@ -136,7 +137,8 @@ func cols(uid int64) string {
 	COALESCE((SELECT last_viewed_at FROM user_item_state WHERE user_id = ` + u + ` AND item_id = i.id), ''),
 	CASE WHEN i.type IN ('show', 'season', 'artist', 'album') THEN (SELECT COUNT(*) FROM items l
 		JOIN user_item_state x ON x.item_id = l.id AND x.user_id = ` + u + ` AND x.play_count > 0
-		WHERE (l.parent_id = i.id OR l.grandparent_id = i.id) AND l.type IN ('episode', 'track')) ELSE 0 END`
+		WHERE (l.parent_id = i.id OR l.grandparent_id = i.id) AND l.type IN ('episode', 'track')) ELSE 0 END,
+	COALESCE((SELECT rating FROM user_item_state WHERE user_id = ` + u + ` AND item_id = i.id), 0)`
 }
 
 // art builds a COALESCE over the selected artwork of kind for each aliased item, so
@@ -160,7 +162,7 @@ func scanSummary(row interface{ Scan(...any) error }, extra ...any) (Summary, er
 	err := row.Scan(append([]any{&s.ID, &s.LibraryID, &s.Type, &s.Title, &s.OriginalTitle, &s.Year, &s.Index, &s.AbsIndex, &s.Disc,
 		&s.ParentID, &s.GrandparentID, &s.ParentTitle, &s.GrandparentTitle, &s.ArtistCredit, &s.ChildCount, &s.LeafCount,
 		&s.DurationMS, &s.ReleaseDate, &s.Available, &s.MatchState, &added, &s.Poster, &s.Backdrop, &s.Thumb, &s.Logo,
-		&s.ViewOffsetMS, &s.ViewCount, &s.LastViewedAt, &s.WatchedLeaves}, extra...)...)
+		&s.ViewOffsetMS, &s.ViewCount, &s.LastViewedAt, &s.WatchedLeaves, &s.UserRating}, extra...)...)
 	s.AddedAt, _ = time.Parse(time.RFC3339Nano, added)
 	return s, err
 }

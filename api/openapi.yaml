@@ -30,6 +30,7 @@ tags:
   - name: playback
   - name: hubs
   - name: playlists
+  - name: music
 
 paths:
   /system/info:
@@ -1225,6 +1226,7 @@ paths:
               type: object
               properties:
                 title: { type: string, minLength: 1, maxLength: 200 }
+                rules: { $ref: "#/components/schemas/SmartRules" }
       responses:
         "200":
           description: Updated.
@@ -1429,6 +1431,171 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /music/status:
+    get:
+      tags: [music]
+      operationId: musicStatus
+      summary: Sonic analysis progress and whether the analysis service is running.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MusicStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /items/{itemId}/sonic-similar:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [music]
+      operationId: sonicSimilar
+      summary: Tracks, albums or artists (matching the item's type) that sound like it (MUSIC-2).
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ItemSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /music/radio:
+    post:
+      tags: [music]
+      operationId: musicRadio
+      summary: A station (MUSIC-3) from a track, album or artist, a genre, a decade, a mood, your favourites or the whole library. Ask again with exclude to continue it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RadioRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Station" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /music/sage:
+    post:
+      tags: [music]
+      operationId: musicSage
+      summary: A playlist from a description, e.g. "rainy Sunday jazz with a late-night feel" (MUSIC-5).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                prompt: { type: string, minLength: 2, maxLength: 300 }
+                limit: { type: integer, minimum: 5, maximum: 100, default: 30 }
+                libraryId: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Station" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /music/adventure:
+    post:
+      tags: [music]
+      operationId: musicAdventure
+      summary: Sonic Adventure (MUSIC-4) — a path from one track to another through tracks that sound in between.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fromId, toId]
+              properties:
+                fromId: { type: integer, format: int64 }
+                toId: { type: integer, format: int64 }
+                length: { type: integer, minimum: 3, maximum: 60, default: 15 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Station" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /music/mixes:
+    get:
+      tags: [music]
+      operationId: musicMixes
+      summary: Your daily mixes (MUSIC-7), built from your listening; they change once a day.
+      parameters:
+        - name: libraryId
+          in: query
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Station" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /items/{itemId}/rating:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    put:
+      tags: [items]
+      operationId: rateItem
+      summary: Your rating (MUSIC-11), 0–10 (half stars; 10 = loved), or null to clear it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rating: { type: number, minimum: 0, maximum: 10, nullable: true }
+      responses:
+        "204": { description: Saved. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/lyrics:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [music]
+      operationId: getLyrics
+      summary: A track's lyrics (MUSIC-10), timed when available, from the file, a .lrc sidecar or LRCLIB.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Lyrics" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /filesystem/browse:
     get:
       tags: [filesystem]
@@ -1533,6 +1700,11 @@ components:
           schema: { $ref: "#/components/schemas/Error" }
     TooManyRequests:
       description: Rate limited.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ServiceUnavailable:
+      description: A helper service isn't running.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -1754,6 +1926,7 @@ components:
         library: { $ref: "#/components/schemas/LibraryGlobalSettings" }
         metadata: { $ref: "#/components/schemas/MetadataSettings" }
         tasks: { $ref: "#/components/schemas/TaskSettings" }
+        music: { $ref: "#/components/schemas/MusicSettings" }
 
     ServerSettingsUpdate:
       type: object
@@ -1766,6 +1939,14 @@ components:
         library: { $ref: "#/components/schemas/LibraryGlobalSettings" }
         metadata: { $ref: "#/components/schemas/MetadataSettingsUpdate" }
         tasks: { $ref: "#/components/schemas/TaskSettings" }
+        music: { $ref: "#/components/schemas/MusicSettings" }
+
+    MusicSettings:
+      type: object
+      properties:
+        sonicAnalysis: { type: boolean, description: Analyse how tracks sound (on this server's GPU) for radios, similar music and Sonic Sage. }
+        onlineLyrics: { type: boolean, description: Look up lyrics on LRCLIB when a track has none (sends artist and title). }
+        loudnessAnalysis: { type: boolean, description: Measure loudness of tracks without ReplayGain tags so volume levelling works for everything. }
 
     SecuritySettings:
       type: object
@@ -2184,6 +2365,9 @@ components:
         subtitleFormat: { type: string, enum: [vtt, ass] }
         fontsUrl: { type: string, description: "With ASS subtitles: JSON list of fonts embedded in the file ({name, url}[])." }
         markers: { type: array, items: { $ref: "#/components/schemas/Marker" } }
+        trackGainDb: { type: number, description: "Music: gain to apply for volume levelling (ReplayGain track gain)." }
+        albumGainDb: { type: number, description: "Music: album gain, for playing whole albums." }
+        peak: { type: number, description: "Music: peak sample level (1.0 = full scale), to avoid clipping when boosting." }
 
     PlaybackProgress:
       type: object
@@ -2355,6 +2539,7 @@ components:
           description: Posters/covers of up to four items, for the playlist's mosaic.
           items: { type: integer, format: int64 }
         updatedAt: { type: string, format: date-time }
+        rules: { $ref: "#/components/schemas/SmartRules" }
 
     PlaylistCreate:
       type: object
@@ -2366,6 +2551,7 @@ components:
           type: array
           maxItems: 500
           items: { type: integer, format: int64 }
+        rules: { $ref: "#/components/schemas/SmartRules" }
 
     PlaylistItemPage:
       type: object
@@ -2421,6 +2607,81 @@ components:
         streams: { type: integer }
         transcodes: { type: integer }
 
+    MusicStatus:
+      type: object
+      required: [enabled, available, running, analyzed, total]
+      properties:
+        enabled: { type: boolean }
+        available: { type: boolean, description: The analysis service is running. }
+        running: { type: boolean }
+        model: { type: string }
+        device: { type: string }
+        analyzed: { type: integer }
+        total: { type: integer }
+        failed: { type: integer }
+        progress: { type: integer }
+        runTotal: { type: integer }
+
+    RadioRequest:
+      type: object
+      required: [seed]
+      properties:
+        seed: { type: string, enum: [item, genre, decade, mood, favourites, library] }
+        itemId: { type: integer, format: int64, description: "With seed item: a track, album or artist." }
+        value: { type: string, description: "With genre: the genre; decade: e.g. 1990; mood: a word or phrase." }
+        libraryId: { type: integer, format: int64 }
+        limit: { type: integer, minimum: 5, maximum: 100, default: 50 }
+        exclude:
+          type: array
+          description: Tracks already queued (to continue a station).
+          items: { type: integer, format: int64 }
+
+    Station:
+      type: object
+      required: [title, items]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ItemSummary" }
+
+    Lyrics:
+      type: object
+      required: [synced, lines, source]
+      properties:
+        synced: { type: boolean }
+        source: { type: string, enum: [embedded, sidecar, lrclib] }
+        lines: { type: array, items: { $ref: "#/components/schemas/LyricLine" } }
+
+    LyricLine:
+      type: object
+      required: [text]
+      properties:
+        timeMs: { type: integer, format: int64, description: When the line is sung (synced lyrics only). }
+        text: { type: string }
+
+    SmartRules:
+      type: object
+      description: A smart playlist's rules (MUSIC-8); its contents are worked out each time it's opened.
+      required: [match, conditions]
+      properties:
+        match: { type: string, enum: [all, any] }
+        conditions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            required: [field, op, value]
+            properties:
+              field: { type: string, enum: [genre, artist, album, title, year, rating, playCount, lastPlayedDays, addedDays, bpm, energy, key, durationSeconds] }
+              op: { type: string, enum: [is, isNot, contains, notContains, gt, lt] }
+              value: { type: string }
+        sort: { type: string, enum: [random, title, artist, year, -year, added, -added, rating, -rating, playCount, -playCount, lastPlayed, -lastPlayed] }
+        limit: { type: integer, minimum: 1, maximum: 2000 }
+
     ItemSummary:
       type: object
       required: [id, libraryId, type, title, childCount, leafCount, available, matchState, addedAt]
@@ -2451,6 +2712,7 @@ components:
         viewCount: { type: integer }
         lastViewedAt: { type: string, format: date-time }
         watchedLeafCount: { type: integer, description: "Shows, seasons, artists, albums: how many episodes/tracks the user has watched." }
+        userRating: { type: number, description: "The user's rating, 0–10 (10 = loved)." }
 
     ItemImages:
       type: object

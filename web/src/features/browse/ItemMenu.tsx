@@ -1,9 +1,11 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Disc3, ListEnd, ListPlus, ListStart, MoreHorizontal, Radio, UserRound } from "lucide-react";
+import { Compass, Disc3, ListEnd, ListPlus, ListStart, MoreHorizontal, Radio, Shuffle, UserRound } from "lucide-react";
 import { useState } from "react";
 import { fetchLeaves } from "@/api/queries";
 import type { ItemSummary } from "@/api/types";
 import { Menu, MenuDivider, MenuItem } from "@/components/Menu";
+import { AdventureDialog } from "../music/Adventure";
+import { useRadio } from "../music/useRadio";
 import { AddToPlaylistDialog } from "../playlists/AddToPlaylist";
 import { useMusic } from "../player/MusicPlayer";
 
@@ -14,6 +16,8 @@ export function ItemMenu({ item, className }: { item: ItemSummary; className?: s
   const player = useMusic();
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
+  const [adventure, setAdventure] = useState(false);
+  const radio = useRadio();
   const isMusic = music.has(item.type);
   const leaves = async () => (item.type === "track" ? [item] : await fetchLeaves(item.id));
   return (
@@ -27,8 +31,16 @@ export function ItemMenu({ item, className }: { item: ItemSummary; className?: s
             <MenuItem icon={<ListEnd />} onClick={async () => player.addToQueue(await leaves())}>
               Add to queue
             </MenuItem>
+            <MenuItem icon={<Radio />} onClick={() => radio.mutate({ seed: "item", itemId: item.id })}>
+              Start Radio
+            </MenuItem>
+            {item.type === "track" && (
+              <MenuItem icon={<Compass />} onClick={() => setAdventure(true)}>
+                Sonic Adventure…
+              </MenuItem>
+            )}
             {item.type !== "track" && (
-              <MenuItem icon={<Radio />} onClick={async () => player.play(await fetchLeaves(item.id, { shuffle: true }))}>
+              <MenuItem icon={<Shuffle />} onClick={async () => player.play(await fetchLeaves(item.id, { shuffle: true }))}>
                 Shuffle play
               </MenuItem>
             )}
@@ -50,6 +62,7 @@ export function ItemMenu({ item, className }: { item: ItemSummary; className?: s
         )}
       </Menu>
       {adding && <AddToPlaylistDialog item={item} onClose={() => setAdding(false)} />}
+      {adventure && <AdventureDialog from={item} onClose={() => setAdventure(false)} />}
     </>
   );
 }

@@ -3,6 +3,7 @@ package items
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ type Playlist struct {
 	DurationMS int64
 	ImageIDs   []int64
 	UpdatedAt  time.Time
+	Rules      *SmartRules // smart playlists only
 }
 
 type PlaylistEntry struct {
@@ -27,7 +29,7 @@ type PlaylistEntry struct {
 
 var leafTypes = map[string]string{"video": "'movie', 'episode', 'video'", "audio": "'track'"}
 
-const playlistCols = `pl.id, pl.title, pl.kind, pl.updated_at,
+const playlistCols = `pl.id, pl.title, pl.kind, pl.updated_at, COALESCE(pl.smart_rule, ''), pl.user_id,
 	(SELECT COUNT(*) FROM playlist_items x WHERE x.playlist_id = pl.id),
 	(SELECT COALESCE(SUM(i.duration_ms), 0) FROM playlist_items x JOIN items i ON i.id = x.item_id WHERE x.playlist_id = pl.id)`
 
@@ -37,14 +39,18 @@ func (s *Store) scanPlaylists(ctx context.Context, q string, args ...any) ([]Pla
 		return nil, err
 	}
 	out := []Playlist{}
+	var owners []int64
 	for rows.Next() {
 		var p Playlist
-		var updated string
-		if err := rows.Scan(&p.ID, &p.Title, &p.Kind, &updated, &p.ItemCount, &p.DurationMS); err != nil {
+		var updated, rules string
+		var owner int64
+		if err := rows.Scan(&p.ID, &p.Title, &p.Kind, &updated, &rules, &owner, &p.ItemCount, &p.DurationMS); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		p.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)
+		p.Rules = parseRules(rules)
+		owners = append(owners, owner)
 		out = append(out, p)
 	}
 	rows.Close()
@@ -52,6 +58,23 @@ func (s *Store) scanPlaylists(ctx context.Context, q string, args ...any) ([]Pla
 		return nil, err
 	}
 	for i := range out {
+		if r := out[i].Rules; r != nil {
+			// Smart: work out the contents now.
+			list, total, err := s.SmartItems(ctx, Access{UserID: owners[i]}, out[i].Kind, *r, 0, 2000)
+			if err != nil {
+				return nil, err
+			}
+			out[i].ItemCount, out[i].DurationMS, out[i].ImageIDs = total, 0, []int64{}
+			seen := map[int64]bool{}
+			for _, it := range list {
+				out[i].DurationMS += it.DurationMS
+				if it.Poster != 0 && !seen[it.Poster] && len(out[i].ImageIDs) < 4 {
+					seen[it.Poster] = true
+					out[i].ImageIDs = append(out[i].ImageIDs, it.Poster)
+				}
+			}
+			continue
+		}
 		out[i].ImageIDs = []int64{}
 		err := eachRow(ctx, s.db, `SELECT DISTINCT `+art("poster", "i", "p", "g")+` AS a FROM playlist_items x JOIN items i ON i.id = x.item_id
 			LEFT JOIN items p ON p.id = i.parent_id LEFT JOIN items g ON g.id = i.grandparent_id
@@ -93,13 +116,21 @@ func (s *Store) Playlist(ctx context.Context, uid, id int64) (Playlist, error) {
 	return list[0], nil
 }
 
-func (s *Store) CreatePlaylist(ctx context.Context, acc Access, title, kind string, itemIDs []int64) (Playlist, error) {
-	res, err := s.db.ExecContext(ctx, `INSERT INTO playlists (user_id, title, kind) VALUES (?, ?, ?)`, acc.UserID, strings.TrimSpace(title), kind)
+func (s *Store) CreatePlaylist(ctx context.Context, acc Access, title, kind string, itemIDs []int64, rules *SmartRules) (Playlist, error) {
+	var raw any
+	if rules != nil {
+		if err := rules.Validate(); err != nil {
+			return Playlist{}, err
+		}
+		b, _ := json.Marshal(rules)
+		raw = string(b)
+	}
+	res, err := s.db.ExecContext(ctx, `INSERT INTO playlists (user_id, title, kind, smart_rule) VALUES (?, ?, ?, ?)`, acc.UserID, strings.TrimSpace(title), kind, raw)
 	if err != nil {
 		return Playlist{}, err
 	}
 	id, _ := res.LastInsertId()
-	if len(itemIDs) > 0 {
+	if len(itemIDs) > 0 && rules == nil {
 		if err := s.AddToPlaylist(ctx, acc, id, itemIDs); err != nil && !errors.Is(err, ErrPlaylistKind) {
 			return Playlist{}, err
 		}
@@ -133,6 +164,9 @@ func (s *Store) AddToPlaylist(ctx context.Context, acc Access, id int64, itemIDs
 	pl, err := s.Playlist(ctx, acc.UserID, id)
 	if err != nil {
 		return err
+	}
+	if pl.Rules != nil {
+		return ErrSmartPlaylist
 	}
 	var add []int64
 	for _, itemID := range itemIDs {
@@ -172,8 +206,20 @@ func (s *Store) AddToPlaylist(ctx context.Context, acc Access, id int64, itemIDs
 
 // PlaylistItems returns a page of a playlist's entries that acc can see.
 func (s *Store) PlaylistItems(ctx context.Context, acc Access, id int64, offset, limit int) ([]PlaylistEntry, int, error) {
-	if _, err := s.Playlist(ctx, acc.UserID, id); err != nil {
+	pl, err := s.Playlist(ctx, acc.UserID, id)
+	if err != nil {
 		return nil, 0, err
+	}
+	if pl.Rules != nil {
+		list, total, err := s.SmartItems(ctx, acc, pl.Kind, *pl.Rules, offset, limit)
+		if err != nil {
+			return nil, 0, err
+		}
+		out := make([]PlaylistEntry, len(list))
+		for i, it := range list {
+			out[i] = PlaylistEntry{EntryID: it.ID, Item: it} // smart entries can't be moved or removed
+		}
+		return out, total, nil
 	}
 	ac, aargs := acc.clause()
 	from := summaryFrom + ` JOIN playlist_items x ON x.item_id = i.id WHERE x.playlist_id = ? AND ` + ac
@@ -232,4 +278,14 @@ func (s *Store) MovePlaylistItem(ctx context.Context, uid, id, entryID, afterID 
 		}
 	}
 	return s.touchPlaylist(ctx, `UPDATE playlist_items SET ord = ? WHERE id = ? AND playlist_id = ?`, ord, entryID, id)
+}
+
+// SetRules replaces a smart playlist's rules.
+func (s *Store) SetRules(ctx context.Context, uid, id int64, rules SmartRules) error {
+	if err := rules.Validate(); err != nil {
+		return err
+	}
+	b, _ := json.Marshal(rules)
+	return s.touchPlaylist(ctx, `UPDATE playlists SET smart_rule = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+		WHERE id = ? AND user_id = ? AND smart_rule IS NOT NULL`, string(b), id, uid)
 }

@@ -600,3 +600,64 @@ func TestQuickConnect(t *testing.T) {
 		t.Fatalf("token must be handed out once: %+v", st)
 	}
 }
+
+func TestSmartPlaylistAndRatings(t *testing.T) {
+	h := newHarness(t)
+	var res api.AuthResult
+	h.do("POST", "/setup", map[string]any{"serverName": "T", "username": "admin", "password": "correct horse", "device": device}, &res)
+	h.token = res.Token
+	var alib api.Library
+	h.do("POST", "/libraries", map[string]any{"name": "Music", "type": "music", "paths": []string{filepath.Join(h.media, "music")}}, &alib)
+	exec := func(q string, args ...any) int64 {
+		r, err := h.db.Exec(q, args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		id, _ := r.LastInsertId()
+		return id
+	}
+	artist := exec(`INSERT INTO items(library_id, type, title, sort_title) VALUES (?, 'artist', 'Band', 'Band')`, alib.Id)
+	album := exec(`INSERT INTO items(library_id, type, title, sort_title, parent_id, year) VALUES (?, 'album', 'Record', 'Record', ?, 1994)`, alib.Id, artist)
+	jazz := exec(`INSERT INTO tags(kind, name) VALUES ('genre', 'Jazz')`)
+	exec(`INSERT INTO item_tags(item_id, tag_id) VALUES (?, ?)`, album, jazz)
+	var tracks []int64
+	for i := 1; i <= 4; i++ {
+		tracks = append(tracks, exec(`INSERT INTO items(library_id, type, title, sort_title, parent_id, grandparent_id, idx, duration_ms) VALUES (?, 'track', ?, ?, ?, ?, ?, 200000)`,
+			alib.Id, fmt.Sprintf("Song %d", i), fmt.Sprintf("Song %d", i), album, artist, i))
+	}
+	// Rate two tracks 4+ stars.
+	for _, id := range tracks[:2] {
+		if code := h.do("PUT", fmt.Sprintf("/items/%d/rating", id), map[string]any{"rating": 9}, nil); code != 204 {
+			t.Fatalf("rate: %d", code)
+		}
+	}
+	var it api.ItemDetail
+	h.do("GET", fmt.Sprintf("/items/%d", tracks[0]), nil, &it)
+	if it.UserRating == nil || *it.UserRating != 9 {
+		t.Fatalf("rating not returned: %+v", it.UserRating)
+	}
+	rules := map[string]any{"match": "all", "conditions": []map[string]any{
+		{"field": "genre", "op": "is", "value": "jazz"}, {"field": "rating", "op": "gt", "value": "7"}}, "sort": "title"}
+	var pl api.Playlist
+	if code := h.do("POST", "/playlists", map[string]any{"title": "Loved jazz", "kind": "audio", "rules": rules}, &pl); code != 201 || pl.ItemCount != 2 || pl.Rules == nil {
+		t.Fatalf("smart create: %d %+v", code, pl)
+	}
+	var page api.PlaylistItemPage
+	h.do("GET", fmt.Sprintf("/playlists/%d/items", pl.Id), nil, &page)
+	if page.Total != 2 || page.Items[0].Item.Title != "Song 1" {
+		t.Fatalf("smart items: %+v", page)
+	}
+	// Rating another track updates the playlist by itself.
+	h.do("PUT", fmt.Sprintf("/items/%d/rating", tracks[3]), map[string]any{"rating": 10}, nil)
+	h.do("GET", fmt.Sprintf("/playlists/%d/items", pl.Id), nil, &page)
+	if page.Total != 3 {
+		t.Fatalf("smart playlist didn't update: %d", page.Total)
+	}
+	if code := h.do("POST", fmt.Sprintf("/playlists/%d/items", pl.Id), map[string]any{"itemIds": []int64{tracks[2]}}, nil); code != 400 {
+		t.Fatalf("adding to a smart playlist: %d", code)
+	}
+	bad := map[string]any{"match": "all", "conditions": []map[string]any{{"field": "title", "op": "gt", "value": "x"}}}
+	if code := h.do("POST", "/playlists", map[string]any{"title": "Bad", "kind": "audio", "rules": bad}, nil); code != 400 {
+		t.Fatalf("invalid rules accepted: %d", code)
+	}
+}

@@ -10,6 +10,7 @@ import type { ItemSummary } from "@/api/types";
 import type { operations } from "@/api/schema.gen";
 import { Alert, Button, Select, Spinner } from "@/components/ui";
 import { ItemMenu } from "./ItemMenu";
+import { MusicDiscover } from "../music/Discover";
 import { Poster } from "./Poster";
 import { formatDuration, subtitleFor } from "./format";
 
@@ -236,6 +237,7 @@ export function LibraryPage() {
           </div>
         )}
 
+        {isMusic && !filtered && <MusicDiscover libraryId={id} />}
         {first.isPending && <Spinner />}
         {first.isError && <Alert tone="error">{first.error.message}</Alert>}
         {first.data?.total === 0 &&

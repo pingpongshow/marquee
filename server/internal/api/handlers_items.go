@@ -84,6 +84,9 @@ func toAPISummary(s items.Summary) ItemSummary {
 	out.ViewOffsetMs = nz(s.ViewOffsetMS)
 	out.ViewCount = nz(s.ViewCount)
 	out.WatchedLeafCount = nz(s.WatchedLeaves)
+	if s.UserRating > 0 {
+		out.UserRating = ptr(float32(s.UserRating))
+	}
 	if t, err := time.Parse(time.RFC3339Nano, s.LastViewedAt); err == nil {
 		out.LastViewedAt = &t
 	}
@@ -202,6 +205,7 @@ func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 		OriginallyAvailableAt: sum.OriginallyAvailableAt, Available: sum.Available,
 		MatchState: ItemDetailMatchState(sum.MatchState), AddedAt: sum.AddedAt, Images: sum.Images,
 		ViewOffsetMs: sum.ViewOffsetMs, ViewCount: sum.ViewCount, WatchedLeafCount: sum.WatchedLeafCount, LastViewedAt: sum.LastViewedAt,
+		UserRating:     sum.UserRating,
 		AudienceRating: nz(float32(d.AudienceRating)), Credits: make([]Credit, len(d.Credits)),
 		Summary: nz(d.Plot), Tagline: nz(d.Tagline), ContentRating: nz(d.ContentRating), Studio: nz(d.Studio),
 		Genres: d.Genres, ExternalIds: d.ExternalIDs, LockedFields: d.LockedFields,

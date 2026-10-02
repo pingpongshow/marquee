@@ -27,6 +27,14 @@ type Settings struct {
 	Library      Library      `json:"library"`
 	Metadata     Metadata     `json:"metadata"`
 	Tasks        Tasks        `json:"tasks"`
+	Music        Music        `json:"music"`
+}
+
+// Music configures the M6.5 music features.
+type Music struct {
+	SonicAnalysis    bool `json:"sonicAnalysis"`
+	OnlineLyrics     bool `json:"onlineLyrics"`
+	LoudnessAnalysis bool `json:"loudnessAnalysis"`
 }
 
 type Security struct {
@@ -135,6 +143,7 @@ func Defaults() Settings {
 		},
 		Metadata: Metadata{AnimeEpisodeOrdering: "seasonal", OMDbDailyLimit: 950},
 		Tasks:    Tasks{MaintenanceWindowStart: "03:00", MaintenanceWindowHours: 4, BackupRetention: 7},
+		Music:    Music{SonicAnalysis: true, OnlineLyrics: false, LoudnessAnalysis: true},
 	}
 }
 

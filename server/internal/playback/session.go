@@ -52,6 +52,8 @@ type Request struct {
 // Session is an active playback.
 type Session struct {
 	Plan []float64 // HLS segment start times (seconds)
+	// Volume levelling for music (MUSIC-9), in dB; nil when unknown.
+	TrackGainDB, AlbumGainDB, Peak *float64
 	// TextSubs are the file's text subtitles, offered as WebVTT renditions to clients that
 	// need subtitles inside HLS (HLSSubs).
 	TextSubs         []SubtitleRendition
@@ -357,6 +359,12 @@ func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 	}
 	s.ItemType = typ
 	s.Title = title
+	defer func() {
+		if typ == "track" && s.FileID > 0 {
+			m.DB.QueryRowContext(ctx, `SELECT track_gain_db, album_gain_db, track_peak FROM media_files WHERE id = ?`, s.FileID).
+				Scan(&s.TrackGainDB, &s.AlbumGainDB, &s.Peak)
+		}
+	}()
 	if typ == "episode" && grand.Valid {
 		s.Title = grand.String + " – " + title
 	} else if typ == "track" && grand.Valid {

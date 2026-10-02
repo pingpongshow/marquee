@@ -94,6 +94,7 @@ func (h *Handlers) StartPlayback(ctx context.Context, req StartPlaybackRequestOb
 	out := PlaybackSession{Id: s.ID, ItemId: s.ItemID, FileId: ptr(s.FileID), StartMs: s.StartMS, DurationMs: s.Media.DurationMS,
 		Decision: toAPIDecision(s.Decision), LimitKbps: nz(s.LimitKbps), LimitReason: nz(s.LimitReason),
 		NetworkClass: NetworkClass(ri.Class), AudioStreamId: nz(s.AudioStreamID), SubtitleStreamId: nz(s.SubtitleStreamID),
+		TrackGainDb: f32(s.TrackGainDB), AlbumGainDb: f32(s.AlbumGainDB), Peak: f32(s.Peak),
 		Markers: []Marker{}}
 	switch {
 	case s.Decision.Method == playback.DirectPlay:
@@ -399,4 +400,12 @@ func (h *Handlers) PlayHistory(ctx context.Context, req PlayHistoryRequestObject
 		out = append(out, e)
 	}
 	return out, rows.Err()
+}
+
+func f32(v *float64) *float32 {
+	if v == nil {
+		return nil
+	}
+	f := float32(*v)
+	return &f
 }

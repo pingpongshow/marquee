@@ -11,6 +11,9 @@ import { formatDuration, formatTrackTime } from "../browse/format";
 import { ItemMenu } from "../browse/ItemMenu";
 import { useMusic } from "../player/MusicPlayer";
 import { PlaylistMosaic } from "./PlaylistMosaic";
+import { RulesEditor, rulesValid } from "./RulesEditor";
+import type { SmartRules } from "@/api/types";
+import { Sparkles } from "lucide-react";
 
 function shuffled<T>(list: T[]) {
   const out = [...list];
@@ -38,6 +41,14 @@ export function PlaylistPage() {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [drag, setDrag] = useState<number | null>(null);
+  const [editingRules, setEditingRules] = useState<SmartRules | null>(null);
+  const saveRules = useMutation({
+    mutationFn: (rules: SmartRules) => unwrap(api.PATCH("/playlists/{playlistId}", { params: { path: { playlistId: id } }, body: { rules } })),
+    onSuccess: () => {
+      setEditingRules(null);
+      invalidate();
+    },
+  });
   const [over, setOver] = useState<number | null>(null);
   const invalidate = () => qc.invalidateQueries({ queryKey: ["playlists"] });
 
@@ -104,7 +115,10 @@ export function PlaylistPage() {
       <header className="mb-8 flex flex-col gap-6 sm:flex-row sm:items-end">
         <PlaylistMosaic playlist={p} size={400} className="size-48 shadow-xl" />
         <div className="min-w-0 flex-1">
-          <div className="text-xs font-semibold tracking-wider text-faint uppercase">{p.kind === "audio" ? "Music playlist" : "Video playlist"}</div>
+          <div className="flex items-center gap-1.5 text-xs font-semibold tracking-wider text-faint uppercase">
+            {p.rules && <Sparkles className="size-3.5 text-accent" aria-hidden />}
+            {p.rules ? "Smart playlist" : p.kind === "audio" ? "Music playlist" : "Video playlist"}
+          </div>
           {renaming === null ? (
             <h1 className="mt-1 flex items-center gap-2 text-3xl font-bold">
               <span className="truncate">{p.title}</span>
@@ -139,6 +153,11 @@ export function PlaylistPage() {
             <Button disabled={!items.length} onClick={() => play(0, true)}>
               <Shuffle className="size-4" /> Shuffle
             </Button>
+            {p.rules && (
+              <Button variant="ghost" onClick={() => setEditingRules(p.rules!)}>
+                <Sparkles className="size-4" /> Edit rules
+              </Button>
+            )}
             <Button variant="ghost" onClick={() => setConfirmDelete(true)}>
               <Trash2 className="size-4" /> Delete
             </Button>
@@ -155,7 +174,7 @@ export function PlaylistPage() {
           return (
             <li
               key={e.entryId}
-              draggable
+              draggable={!p.rules}
               onDragStart={() => setDrag(e.entryId)}
               onDragOver={(ev) => {
                 ev.preventDefault();
@@ -178,7 +197,7 @@ export function PlaylistPage() {
                 over === i && drag !== null && drag !== e.entryId && "border-t-2 border-t-accent",
               )}
             >
-              <GripVertical className="size-4 shrink-0 cursor-grab text-faint" aria-hidden />
+              {!p.rules && <GripVertical className="size-4 shrink-0 cursor-grab text-faint" aria-hidden />}
               <span className="w-6 shrink-0 text-right text-sm text-faint tabular-nums">{i + 1}</span>
               <button onClick={() => play(i)} className="flex min-w-0 flex-1 items-center gap-3 text-left" disabled={!it.available}>
                 <span className={clsx("shrink-0 overflow-hidden rounded bg-surface-3", it.type === "track" ? "size-10" : "aspect-video w-20")}>
@@ -194,13 +213,32 @@ export function PlaylistPage() {
               </Link>
               <span className="w-14 shrink-0 text-right text-sm text-muted tabular-nums">{it.type === "track" ? formatTrackTime(it.durationMs) : formatDuration(it.durationMs)}</span>
               <ItemMenu item={it} />
-              <button onClick={() => remove.mutate(e.entryId)} className="rounded p-1 text-muted opacity-0 group-hover:opacity-100 hover:text-text focus:opacity-100" aria-label={`Remove ${it.title}`}>
+              <button hidden={!!p.rules} onClick={() => remove.mutate(e.entryId)} className="rounded p-1 text-muted opacity-0 group-hover:opacity-100 hover:text-text focus:opacity-100" aria-label={`Remove ${it.title}`}>
                 <X className="size-4" />
               </button>
             </li>
           );
         })}
       </ol>
+      <Dialog
+        open={!!editingRules}
+        wide
+        onClose={() => setEditingRules(null)}
+        title="Smart playlist rules"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setEditingRules(null)}>
+              Cancel
+            </Button>
+            <Button variant="primary" disabled={!editingRules || !rulesValid(editingRules)} loading={saveRules.isPending} onClick={() => editingRules && saveRules.mutate(editingRules)}>
+              Save
+            </Button>
+          </>
+        }
+      >
+        {saveRules.isError && <Alert tone="error">{saveRules.error.message}</Alert>}
+        {editingRules && <RulesEditor value={editingRules} onChange={setEditingRules} />}
+      </Dialog>
       <Dialog
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}

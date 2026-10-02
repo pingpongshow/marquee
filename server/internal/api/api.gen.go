@@ -457,6 +457,27 @@ func (e LogEntryLevel) Valid() bool {
 	}
 }
 
+// Defines values for LyricsSource.
+const (
+	Embedded LyricsSource = "embedded"
+	Lrclib   LyricsSource = "lrclib"
+	Sidecar  LyricsSource = "sidecar"
+)
+
+// Valid indicates whether the value is a known member of the LyricsSource enum.
+func (e LyricsSource) Valid() bool {
+	switch e {
+	case Embedded:
+		return true
+	case Lrclib:
+		return true
+	case Sidecar:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for MarkerKind.
 const (
 	Credits MarkerKind = "credits"
@@ -838,6 +859,36 @@ func (e QuickConnectStateStatus) Valid() bool {
 	}
 }
 
+// Defines values for RadioRequestSeed.
+const (
+	RadioRequestSeedDecade     RadioRequestSeed = "decade"
+	RadioRequestSeedFavourites RadioRequestSeed = "favourites"
+	RadioRequestSeedGenre      RadioRequestSeed = "genre"
+	RadioRequestSeedItem       RadioRequestSeed = "item"
+	RadioRequestSeedLibrary    RadioRequestSeed = "library"
+	RadioRequestSeedMood       RadioRequestSeed = "mood"
+)
+
+// Valid indicates whether the value is a known member of the RadioRequestSeed enum.
+func (e RadioRequestSeed) Valid() bool {
+	switch e {
+	case RadioRequestSeedDecade:
+		return true
+	case RadioRequestSeedFavourites:
+		return true
+	case RadioRequestSeedGenre:
+		return true
+	case RadioRequestSeedItem:
+		return true
+	case RadioRequestSeedLibrary:
+		return true
+	case RadioRequestSeedMood:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ScanProgressPhase.
 const (
 	Cleanup  ScanProgressPhase = "cleanup"
@@ -877,6 +928,156 @@ func (e SecuritySettingsPinSignIn) Valid() bool {
 	case SecuritySettingsPinSignInLocal:
 		return true
 	case SecuritySettingsPinSignInOff:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SmartRulesConditionsField.
+const (
+	SmartRulesConditionsFieldAddedDays       SmartRulesConditionsField = "addedDays"
+	SmartRulesConditionsFieldAlbum           SmartRulesConditionsField = "album"
+	SmartRulesConditionsFieldArtist          SmartRulesConditionsField = "artist"
+	SmartRulesConditionsFieldBpm             SmartRulesConditionsField = "bpm"
+	SmartRulesConditionsFieldDurationSeconds SmartRulesConditionsField = "durationSeconds"
+	SmartRulesConditionsFieldEnergy          SmartRulesConditionsField = "energy"
+	SmartRulesConditionsFieldGenre           SmartRulesConditionsField = "genre"
+	SmartRulesConditionsFieldKey             SmartRulesConditionsField = "key"
+	SmartRulesConditionsFieldLastPlayedDays  SmartRulesConditionsField = "lastPlayedDays"
+	SmartRulesConditionsFieldPlayCount       SmartRulesConditionsField = "playCount"
+	SmartRulesConditionsFieldRating          SmartRulesConditionsField = "rating"
+	SmartRulesConditionsFieldTitle           SmartRulesConditionsField = "title"
+	SmartRulesConditionsFieldYear            SmartRulesConditionsField = "year"
+)
+
+// Valid indicates whether the value is a known member of the SmartRulesConditionsField enum.
+func (e SmartRulesConditionsField) Valid() bool {
+	switch e {
+	case SmartRulesConditionsFieldAddedDays:
+		return true
+	case SmartRulesConditionsFieldAlbum:
+		return true
+	case SmartRulesConditionsFieldArtist:
+		return true
+	case SmartRulesConditionsFieldBpm:
+		return true
+	case SmartRulesConditionsFieldDurationSeconds:
+		return true
+	case SmartRulesConditionsFieldEnergy:
+		return true
+	case SmartRulesConditionsFieldGenre:
+		return true
+	case SmartRulesConditionsFieldKey:
+		return true
+	case SmartRulesConditionsFieldLastPlayedDays:
+		return true
+	case SmartRulesConditionsFieldPlayCount:
+		return true
+	case SmartRulesConditionsFieldRating:
+		return true
+	case SmartRulesConditionsFieldTitle:
+		return true
+	case SmartRulesConditionsFieldYear:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SmartRulesConditionsOp.
+const (
+	Contains    SmartRulesConditionsOp = "contains"
+	Gt          SmartRulesConditionsOp = "gt"
+	Is          SmartRulesConditionsOp = "is"
+	IsNot       SmartRulesConditionsOp = "isNot"
+	Lt          SmartRulesConditionsOp = "lt"
+	NotContains SmartRulesConditionsOp = "notContains"
+)
+
+// Valid indicates whether the value is a known member of the SmartRulesConditionsOp enum.
+func (e SmartRulesConditionsOp) Valid() bool {
+	switch e {
+	case Contains:
+		return true
+	case Gt:
+		return true
+	case Is:
+		return true
+	case IsNot:
+		return true
+	case Lt:
+		return true
+	case NotContains:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SmartRulesMatch.
+const (
+	All SmartRulesMatch = "all"
+	Any SmartRulesMatch = "any"
+)
+
+// Valid indicates whether the value is a known member of the SmartRulesMatch enum.
+func (e SmartRulesMatch) Valid() bool {
+	switch e {
+	case All:
+		return true
+	case Any:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SmartRulesSort.
+const (
+	SmartRulesSortAdded           SmartRulesSort = "added"
+	SmartRulesSortArtist          SmartRulesSort = "artist"
+	SmartRulesSortLastPlayed      SmartRulesSort = "lastPlayed"
+	SmartRulesSortMinusAdded      SmartRulesSort = "-added"
+	SmartRulesSortMinusLastPlayed SmartRulesSort = "-lastPlayed"
+	SmartRulesSortMinusPlayCount  SmartRulesSort = "-playCount"
+	SmartRulesSortMinusRating     SmartRulesSort = "-rating"
+	SmartRulesSortMinusYear       SmartRulesSort = "-year"
+	SmartRulesSortPlayCount       SmartRulesSort = "playCount"
+	SmartRulesSortRandom          SmartRulesSort = "random"
+	SmartRulesSortRating          SmartRulesSort = "rating"
+	SmartRulesSortTitle           SmartRulesSort = "title"
+	SmartRulesSortYear            SmartRulesSort = "year"
+)
+
+// Valid indicates whether the value is a known member of the SmartRulesSort enum.
+func (e SmartRulesSort) Valid() bool {
+	switch e {
+	case SmartRulesSortAdded:
+		return true
+	case SmartRulesSortArtist:
+		return true
+	case SmartRulesSortLastPlayed:
+		return true
+	case SmartRulesSortMinusAdded:
+		return true
+	case SmartRulesSortMinusLastPlayed:
+		return true
+	case SmartRulesSortMinusPlayCount:
+		return true
+	case SmartRulesSortMinusRating:
+		return true
+	case SmartRulesSortMinusYear:
+		return true
+	case SmartRulesSortPlayCount:
+		return true
+	case SmartRulesSortRandom:
+		return true
+	case SmartRulesSortRating:
+		return true
+	case SmartRulesSortTitle:
+		return true
+	case SmartRulesSortYear:
 		return true
 	default:
 		return false
@@ -1430,14 +1631,17 @@ type ItemDetail struct {
 	ParentTitle           *string              `json:"parentTitle,omitempty"`
 
 	// Ratings External ratings (OMDb). Absent values are unknown.
-	Ratings   *Ratings       `json:"ratings,omitempty"`
-	Studio    *string        `json:"studio,omitempty"`
-	Summary   *string        `json:"summary,omitempty"`
-	Tagline   *string        `json:"tagline,omitempty"`
-	Title     string         `json:"title"`
-	Type      ItemType       `json:"type"`
-	Versions  []MediaVersion `json:"versions"`
-	ViewCount *int           `json:"viewCount,omitempty"`
+	Ratings *Ratings `json:"ratings,omitempty"`
+	Studio  *string  `json:"studio,omitempty"`
+	Summary *string  `json:"summary,omitempty"`
+	Tagline *string  `json:"tagline,omitempty"`
+	Title   string   `json:"title"`
+	Type    ItemType `json:"type"`
+
+	// UserRating The user's rating, 0–10 (10 = loved).
+	UserRating *float32       `json:"userRating,omitempty"`
+	Versions   []MediaVersion `json:"versions"`
+	ViewCount  *int           `json:"viewCount,omitempty"`
 
 	// ViewOffsetMs Resume position for the current user.
 	ViewOffsetMs *int64 `json:"viewOffsetMs,omitempty"`
@@ -1515,7 +1719,10 @@ type ItemSummary struct {
 	ParentTitle           *string               `json:"parentTitle,omitempty"`
 	Title                 string                `json:"title"`
 	Type                  ItemType              `json:"type"`
-	ViewCount             *int                  `json:"viewCount,omitempty"`
+
+	// UserRating The user's rating, 0–10 (10 = loved).
+	UserRating *float32 `json:"userRating,omitempty"`
+	ViewCount  *int     `json:"viewCount,omitempty"`
 
 	// ViewOffsetMs Resume position for the current user.
 	ViewOffsetMs *int64 `json:"viewOffsetMs,omitempty"`
@@ -1632,6 +1839,24 @@ type LoginRequest struct {
 	Password string     `json:"password"`
 	Username string     `json:"username"`
 }
+
+// LyricLine defines model for LyricLine.
+type LyricLine struct {
+	Text string `json:"text"`
+
+	// TimeMs When the line is sung (synced lyrics only).
+	TimeMs *int64 `json:"timeMs,omitempty"`
+}
+
+// Lyrics defines model for Lyrics.
+type Lyrics struct {
+	Lines  []LyricLine  `json:"lines"`
+	Source LyricsSource `json:"source"`
+	Synced bool         `json:"synced"`
+}
+
+// LyricsSource defines model for Lyrics.Source.
+type LyricsSource string
 
 // Marker defines model for Marker.
 type Marker struct {
@@ -1768,6 +1993,34 @@ type MetadataSettingsUpdate struct {
 // MetadataSettingsUpdateAnimeEpisodeOrdering defines model for MetadataSettingsUpdate.AnimeEpisodeOrdering.
 type MetadataSettingsUpdateAnimeEpisodeOrdering string
 
+// MusicSettings defines model for MusicSettings.
+type MusicSettings struct {
+	// LoudnessAnalysis Measure loudness of tracks without ReplayGain tags so volume levelling works for everything.
+	LoudnessAnalysis *bool `json:"loudnessAnalysis,omitempty"`
+
+	// OnlineLyrics Look up lyrics on LRCLIB when a track has none (sends artist and title).
+	OnlineLyrics *bool `json:"onlineLyrics,omitempty"`
+
+	// SonicAnalysis Analyse how tracks sound (on this server's GPU) for radios
+	SonicAnalysis *bool `json:"sonicAnalysis,omitempty"`
+}
+
+// MusicStatus defines model for MusicStatus.
+type MusicStatus struct {
+	Analyzed int `json:"analyzed"`
+
+	// Available The analysis service is running.
+	Available bool    `json:"available"`
+	Device    *string `json:"device,omitempty"`
+	Enabled   bool    `json:"enabled"`
+	Failed    *int    `json:"failed,omitempty"`
+	Model     *string `json:"model,omitempty"`
+	Progress  *int    `json:"progress,omitempty"`
+	RunTotal  *int    `json:"runTotal,omitempty"`
+	Running   bool    `json:"running"`
+	Total     int     `json:"total"`
+}
+
 // NetworkClass How the server classified the caller's connection. Remote includes Tailscale.
 type NetworkClass string
 
@@ -1870,6 +2123,8 @@ type PlaybackRequest struct {
 
 // PlaybackSession defines model for PlaybackSession.
 type PlaybackSession struct {
+	// AlbumGainDb Music: album gain, for playing whole albums.
+	AlbumGainDb   *float32         `json:"albumGainDb,omitempty"`
 	AudioStreamId *int64           `json:"audioStreamId,omitempty"`
 	Decision      PlaybackDecision `json:"decision"`
 	DurationMs    int64            `json:"durationMs"`
@@ -1886,8 +2141,11 @@ type PlaybackSession struct {
 	Markers     []Marker `json:"markers"`
 
 	// NetworkClass How the server classified the caller's connection. Remote includes Tailscale.
-	NetworkClass NetworkClass            `json:"networkClass"`
-	Protocol     PlaybackSessionProtocol `json:"protocol"`
+	NetworkClass NetworkClass `json:"networkClass"`
+
+	// Peak Music: peak sample level (1.0 = full scale), to avoid clipping when boosting.
+	Peak     *float32                `json:"peak,omitempty"`
+	Protocol PlaybackSessionProtocol `json:"protocol"`
 
 	// StartMs Where to start (the resume position unless startMs was given).
 	StartMs          int64                          `json:"startMs"`
@@ -1896,6 +2154,9 @@ type PlaybackSession struct {
 
 	// SubtitleUrl The selected text subtitle as WebVTT or ASS (absent when burned in or off).
 	SubtitleUrl *string `json:"subtitleUrl,omitempty"`
+
+	// TrackGainDb Music: gain to apply for volume levelling (ReplayGain track gain).
+	TrackGainDb *float32 `json:"trackGainDb,omitempty"`
 
 	// Url Path to play: a file (direct play), progressive audio, or an HLS master playlist.
 	Url string `json:"url"`
@@ -1949,15 +2210,21 @@ type Playlist struct {
 	ImageIds  []int64      `json:"imageIds"`
 	ItemCount int          `json:"itemCount"`
 	Kind      PlaylistKind `json:"kind"`
-	Title     string       `json:"title"`
-	UpdatedAt time.Time    `json:"updatedAt"`
+
+	// Rules A smart playlist's rules (MUSIC-8); its contents are worked out each time it's opened.
+	Rules     *SmartRules `json:"rules,omitempty"`
+	Title     string      `json:"title"`
+	UpdatedAt time.Time   `json:"updatedAt"`
 }
 
 // PlaylistCreate defines model for PlaylistCreate.
 type PlaylistCreate struct {
 	ItemIds *[]int64     `json:"itemIds,omitempty"`
 	Kind    PlaylistKind `json:"kind"`
-	Title   string       `json:"title"`
+
+	// Rules A smart playlist's rules (MUSIC-8); its contents are worked out each time it's opened.
+	Rules *SmartRules `json:"rules,omitempty"`
+	Title string      `json:"title"`
 }
 
 // PlaylistEntry defines model for PlaylistEntry.
@@ -2157,6 +2424,24 @@ type QuickConnectState struct {
 // QuickConnectStateStatus defines model for QuickConnectState.Status.
 type QuickConnectStateStatus string
 
+// RadioRequest defines model for RadioRequest.
+type RadioRequest struct {
+	// Exclude Tracks already queued (to continue a station).
+	Exclude *[]int64 `json:"exclude,omitempty"`
+
+	// ItemId With seed item: a track, album or artist.
+	ItemId    *int64           `json:"itemId,omitempty"`
+	LibraryId *int64           `json:"libraryId,omitempty"`
+	Limit     *int             `json:"limit,omitempty"`
+	Seed      RadioRequestSeed `json:"seed"`
+
+	// Value With genre: the genre; decade: e.g. 1990; mood: a word or phrase.
+	Value *string `json:"value,omitempty"`
+}
+
+// RadioRequestSeed defines model for RadioRequest.Seed.
+type RadioRequestSeed string
+
 // Ratings External ratings (OMDb). Absent values are unknown.
 type Ratings struct {
 	// Imdb 0–10
@@ -2230,6 +2515,7 @@ type ServerSettings struct {
 	General      GeneralSettings       `json:"general"`
 	Library      LibraryGlobalSettings `json:"library"`
 	Metadata     MetadataSettings      `json:"metadata"`
+	Music        *MusicSettings        `json:"music,omitempty"`
 	Network      NetworkSettings       `json:"network"`
 	RemoteAccess RemoteAccessSettings  `json:"remoteAccess"`
 	Security     SecuritySettings      `json:"security"`
@@ -2244,6 +2530,7 @@ type ServerSettingsUpdate struct {
 
 	// Metadata Secret keys are write-only. Send an empty string to clear one.
 	Metadata     *MetadataSettingsUpdate `json:"metadata,omitempty"`
+	Music        *MusicSettings          `json:"music,omitempty"`
 	Network      *NetworkSettings        `json:"network,omitempty"`
 	RemoteAccess *RemoteAccessSettings   `json:"remoteAccess,omitempty"`
 	Security     *SecuritySettings       `json:"security,omitempty"`
@@ -2257,6 +2544,38 @@ type SetupRequest struct {
 	Password   string     `json:"password"`
 	ServerName string     `json:"serverName"`
 	Username   string     `json:"username"`
+}
+
+// SmartRules A smart playlist's rules (MUSIC-8); its contents are worked out each time it's opened.
+type SmartRules struct {
+	Conditions []struct {
+		Field SmartRulesConditionsField `json:"field"`
+		Op    SmartRulesConditionsOp    `json:"op"`
+		Value string                    `json:"value"`
+	} `json:"conditions"`
+	Limit *int            `json:"limit,omitempty"`
+	Match SmartRulesMatch `json:"match"`
+	Sort  *SmartRulesSort `json:"sort,omitempty"`
+}
+
+// SmartRulesConditionsField defines model for SmartRules.Conditions.Field.
+type SmartRulesConditionsField string
+
+// SmartRulesConditionsOp defines model for SmartRules.Conditions.Op.
+type SmartRulesConditionsOp string
+
+// SmartRulesMatch defines model for SmartRules.Match.
+type SmartRulesMatch string
+
+// SmartRulesSort defines model for SmartRules.Sort.
+type SmartRulesSort string
+
+// Station defines model for Station.
+type Station struct {
+	Description *string       `json:"description,omitempty"`
+	Id          *string       `json:"id,omitempty"`
+	Items       []ItemSummary `json:"items"`
+	Title       string        `json:"title"`
 }
 
 // SwitchProfileRequest defines model for SwitchProfileRequest.
@@ -2478,6 +2797,9 @@ type Forbidden = Error
 // NotFound defines model for NotFound.
 type NotFound = Error
 
+// ServiceUnavailable defines model for ServiceUnavailable.
+type ServiceUnavailable = Error
+
 // TooManyRequests defines model for TooManyRequests.
 type TooManyRequests = Error
 
@@ -2532,6 +2854,16 @@ type SearchMatchesParams struct {
 	Year  *int    `form:"year,omitempty" json:"year,omitempty"`
 }
 
+// RateItemJSONBody defines parameters for RateItem.
+type RateItemJSONBody struct {
+	Rating *float32 `json:"rating,omitempty"`
+}
+
+// SonicSimilarParams defines parameters for SonicSimilar.
+type SonicSimilarParams struct {
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // LibraryFiltersParams defines parameters for LibraryFilters.
 type LibraryFiltersParams struct {
 	Type *ItemType `form:"type,omitempty" json:"type,omitempty"`
@@ -2578,6 +2910,25 @@ type GetLogsParams struct {
 // GetLogsParamsLevel defines parameters for GetLogs.
 type GetLogsParamsLevel string
 
+// MusicAdventureJSONBody defines parameters for MusicAdventure.
+type MusicAdventureJSONBody struct {
+	FromId int64 `json:"fromId"`
+	Length *int  `json:"length,omitempty"`
+	ToId   int64 `json:"toId"`
+}
+
+// MusicMixesParams defines parameters for MusicMixes.
+type MusicMixesParams struct {
+	LibraryId *int64 `form:"libraryId,omitempty" json:"libraryId,omitempty"`
+}
+
+// MusicSageJSONBody defines parameters for MusicSage.
+type MusicSageJSONBody struct {
+	LibraryId *int64 `json:"libraryId,omitempty"`
+	Limit     *int   `json:"limit,omitempty"`
+	Prompt    string `json:"prompt"`
+}
+
 // GetPersonPhotoParams defines parameters for GetPersonPhoto.
 type GetPersonPhotoParams struct {
 	// W Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920.
@@ -2596,7 +2947,9 @@ type ListPlaylistsParams struct {
 
 // UpdatePlaylistJSONBody defines parameters for UpdatePlaylist.
 type UpdatePlaylistJSONBody struct {
-	Title *string `json:"title,omitempty"`
+	// Rules A smart playlist's rules (MUSIC-8); its contents are worked out each time it's opened.
+	Rules *SmartRules `json:"rules,omitempty"`
+	Title *string     `json:"title,omitempty"`
 }
 
 // ListPlaylistItemsParams defines parameters for ListPlaylistItems.
@@ -2652,6 +3005,9 @@ type ApplyMatchJSONRequestBody = MatchRequest
 // EditItemJSONRequestBody defines body for EditItem for application/json ContentType.
 type EditItemJSONRequestBody = ItemEdit
 
+// RateItemJSONRequestBody defines body for RateItem for application/json ContentType.
+type RateItemJSONRequestBody RateItemJSONBody
+
 // CreateLibraryJSONRequestBody defines body for CreateLibrary for application/json ContentType.
 type CreateLibraryJSONRequestBody = LibraryCreate
 
@@ -2660,6 +3016,15 @@ type UpdateLibraryJSONRequestBody = LibraryUpdate
 
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = MeUpdate
+
+// MusicAdventureJSONRequestBody defines body for MusicAdventure for application/json ContentType.
+type MusicAdventureJSONRequestBody MusicAdventureJSONBody
+
+// MusicRadioJSONRequestBody defines body for MusicRadio for application/json ContentType.
+type MusicRadioJSONRequestBody = RadioRequest
+
+// MusicSageJSONRequestBody defines body for MusicSage for application/json ContentType.
+type MusicSageJSONRequestBody MusicSageJSONBody
 
 // StartPlaybackJSONRequestBody defines body for StartPlayback for application/json ContentType.
 type StartPlaybackJSONRequestBody = PlaybackRequest
@@ -2768,6 +3133,9 @@ type ServerInterface interface {
 	// ItemLeaves Playable items under a show, season, artist, album or collection, in play order (for Play all / Shuffle). At most 2,000.
 	// (GET /items/{itemId}/leaves)
 	ItemLeaves(w http.ResponseWriter, r *http.Request, itemId ItemId, params ItemLeavesParams)
+	// GetLyrics A track's lyrics (MUSIC-10), timed when available, from the file, a .lrc sidecar or LRCLIB.
+	// (GET /items/{itemId}/lyrics)
+	GetLyrics(w http.ResponseWriter, r *http.Request, itemId ItemId)
 	// SearchMatches Candidate matches for Fix Match (admin only, movies and shows).
 	// (GET /items/{itemId}/match)
 	SearchMatches(w http.ResponseWriter, r *http.Request, itemId ItemId, params SearchMatchesParams)
@@ -2780,12 +3148,18 @@ type ServerInterface interface {
 	// NextItem The episode after this one (Up Next), if any.
 	// (GET /items/{itemId}/next)
 	NextItem(w http.ResponseWriter, r *http.Request, itemId ItemId)
+	// RateItem Your rating (MUSIC-11), 0–10 (half stars; 10 = loved), or null to clear it.
+	// (PUT /items/{itemId}/rating)
+	RateItem(w http.ResponseWriter, r *http.Request, itemId ItemId)
 	// RefreshItem Re-download metadata for a matched movie or show, keeping locked fields (admin only).
 	// (POST /items/{itemId}/refresh)
 	RefreshItem(w http.ResponseWriter, r *http.Request, itemId ItemId)
 	// RelatedItems Similar items from the same library ("More like this"), by shared genres and people.
 	// (GET /items/{itemId}/related)
 	RelatedItems(w http.ResponseWriter, r *http.Request, itemId ItemId)
+	// SonicSimilar Tracks, albums or artists (matching the item's type) that sound like it (MUSIC-2).
+	// (GET /items/{itemId}/sonic-similar)
+	SonicSimilar(w http.ResponseWriter, r *http.Request, itemId ItemId, params SonicSimilarParams)
 
 	// (DELETE /items/{itemId}/watched)
 	MarkUnwatched(w http.ResponseWriter, r *http.Request, itemId ItemId)
@@ -2831,6 +3205,21 @@ type ServerInterface interface {
 	// UpdateMe Update your own profile, password, PIN or preferences.
 	// (PATCH /me)
 	UpdateMe(w http.ResponseWriter, r *http.Request)
+	// MusicAdventure Sonic Adventure (MUSIC-4) — a path from one track to another through tracks that sound in between.
+	// (POST /music/adventure)
+	MusicAdventure(w http.ResponseWriter, r *http.Request)
+	// MusicMixes Your daily mixes (MUSIC-7), built from your listening; they change once a day.
+	// (GET /music/mixes)
+	MusicMixes(w http.ResponseWriter, r *http.Request, params MusicMixesParams)
+	// MusicRadio A station (MUSIC-3) from a track, album or artist, a genre, a decade, a mood, your favourites or the whole library. Ask again with exclude to continue it.
+	// (POST /music/radio)
+	MusicRadio(w http.ResponseWriter, r *http.Request)
+	// MusicSage A playlist from a description, e.g. "rainy Sunday jazz with a late-night feel" (MUSIC-5).
+	// (POST /music/sage)
+	MusicSage(w http.ResponseWriter, r *http.Request)
+	// MusicStatus Sonic analysis progress and whether the analysis service is running.
+	// (GET /music/status)
+	MusicStatus(w http.ResponseWriter, r *http.Request)
 	// GetPerson A person and the items in your libraries they appear in.
 	// (GET /people/{personId})
 	GetPerson(w http.ResponseWriter, r *http.Request, personId int64)
@@ -3484,6 +3873,32 @@ func (siw *ServerInterfaceWrapper) ItemLeaves(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// GetLyrics operation middleware
+func (siw *ServerInterfaceWrapper) GetLyrics(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "itemId" -------------
+	var itemId ItemId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "itemId", r.PathValue("itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetLyrics(w, r, itemId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SearchMatches operation middleware
 func (siw *ServerInterfaceWrapper) SearchMatches(w http.ResponseWriter, r *http.Request) {
 
@@ -3617,6 +4032,32 @@ func (siw *ServerInterfaceWrapper) NextItem(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
+// RateItem operation middleware
+func (siw *ServerInterfaceWrapper) RateItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "itemId" -------------
+	var itemId ItemId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "itemId", r.PathValue("itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RateItem(w, r, itemId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RefreshItem operation middleware
 func (siw *ServerInterfaceWrapper) RefreshItem(w http.ResponseWriter, r *http.Request) {
 
@@ -3660,6 +4101,48 @@ func (siw *ServerInterfaceWrapper) RelatedItems(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RelatedItems(w, r, itemId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SonicSimilar operation middleware
+func (siw *ServerInterfaceWrapper) SonicSimilar(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "itemId" -------------
+	var itemId ItemId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "itemId", r.PathValue("itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SonicSimilarParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SonicSimilar(w, r, itemId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4172,6 +4655,95 @@ func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MusicAdventure operation middleware
+func (siw *ServerInterfaceWrapper) MusicAdventure(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MusicAdventure(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MusicMixes operation middleware
+func (siw *ServerInterfaceWrapper) MusicMixes(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params MusicMixesParams
+
+	// ------------- Optional query parameter "libraryId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "libraryId", r.URL.Query(), &params.LibraryId, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "libraryId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "libraryId", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MusicMixes(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MusicRadio operation middleware
+func (siw *ServerInterfaceWrapper) MusicRadio(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MusicRadio(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MusicSage operation middleware
+func (siw *ServerInterfaceWrapper) MusicSage(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MusicSage(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MusicStatus operation middleware
+func (siw *ServerInterfaceWrapper) MusicStatus(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MusicStatus(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5278,6 +5850,14 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/backups/{name}", wrapper.DownloadBackup)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/backups/{name}/restore", wrapper.RestoreBackup)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/system/restart", wrapper.RestartServer)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/music/status", wrapper.MusicStatus)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/items/{itemId}/sonic-similar", wrapper.SonicSimilar)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/music/radio", wrapper.MusicRadio)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/music/sage", wrapper.MusicSage)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/music/adventure", wrapper.MusicAdventure)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/music/mixes", wrapper.MusicMixes)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/items/{itemId}/rating", wrapper.RateItem)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/items/{itemId}/lyrics", wrapper.GetLyrics)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/filesystem/browse", wrapper.BrowseFilesystem)
 
 	return m
@@ -5290,6 +5870,8 @@ type ConflictJSONResponse Error
 type ForbiddenJSONResponse Error
 
 type NotFoundJSONResponse Error
+
+type ServiceUnavailableJSONResponse Error
 
 type TooManyRequestsJSONResponse Error
 
@@ -6421,6 +7003,56 @@ func (response ItemLeaves404JSONResponse) VisitItemLeavesResponse(w http.Respons
 	return err
 }
 
+type GetLyricsRequestObject struct {
+	ItemId ItemId `json:"itemId"`
+}
+
+type GetLyricsResponseObject interface {
+	VisitGetLyricsResponse(w http.ResponseWriter) error
+}
+
+type GetLyrics200JSONResponse Lyrics
+
+func (response GetLyrics200JSONResponse) VisitGetLyricsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetLyrics401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetLyrics401JSONResponse) VisitGetLyricsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetLyrics404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetLyrics404JSONResponse) VisitGetLyricsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SearchMatchesRequestObject struct {
 	ItemId ItemId `json:"itemId"`
 	Params SearchMatchesParams
@@ -6716,6 +7348,65 @@ func (response NextItem404JSONResponse) VisitNextItemResponse(w http.ResponseWri
 	return err
 }
 
+type RateItemRequestObject struct {
+	ItemId ItemId `json:"itemId"`
+	Body   *RateItemJSONRequestBody
+}
+
+type RateItemResponseObject interface {
+	VisitRateItemResponse(w http.ResponseWriter) error
+}
+
+type RateItem204Response struct {
+}
+
+func (response RateItem204Response) VisitRateItemResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RateItem400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response RateItem400JSONResponse) VisitRateItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RateItem401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response RateItem401JSONResponse) VisitRateItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RateItem404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RateItem404JSONResponse) VisitRateItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RefreshItemRequestObject struct {
 	ItemId ItemId `json:"itemId"`
 }
@@ -6840,6 +7531,71 @@ func (response RelatedItems404JSONResponse) VisitRelatedItemsResponse(w http.Res
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SonicSimilarRequestObject struct {
+	ItemId ItemId `json:"itemId"`
+	Params SonicSimilarParams
+}
+
+type SonicSimilarResponseObject interface {
+	VisitSonicSimilarResponse(w http.ResponseWriter) error
+}
+
+type SonicSimilar200JSONResponse []ItemSummary
+
+func (response SonicSimilar200JSONResponse) VisitSonicSimilarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SonicSimilar401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response SonicSimilar401JSONResponse) VisitSonicSimilarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SonicSimilar404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response SonicSimilar404JSONResponse) VisitSonicSimilarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SonicSimilar409JSONResponse struct{ ConflictJSONResponse }
+
+func (response SonicSimilar409JSONResponse) VisitSonicSimilarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -7616,6 +8372,283 @@ func (response UpdateMe403JSONResponse) VisitUpdateMeResponse(w http.ResponseWri
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MusicAdventureRequestObject struct {
+	Body *MusicAdventureJSONRequestBody
+}
+
+type MusicAdventureResponseObject interface {
+	VisitMusicAdventureResponse(w http.ResponseWriter) error
+}
+
+type MusicAdventure200JSONResponse Station
+
+func (response MusicAdventure200JSONResponse) VisitMusicAdventureResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MusicAdventure401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response MusicAdventure401JSONResponse) VisitMusicAdventureResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MusicAdventure404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response MusicAdventure404JSONResponse) VisitMusicAdventureResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MusicAdventure409JSONResponse struct{ ConflictJSONResponse }
+
+func (response MusicAdventure409JSONResponse) VisitMusicAdventureResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MusicMixesRequestObject struct {
+	Params MusicMixesParams
+}
+
+type MusicMixesResponseObject interface {
+	VisitMusicMixesResponse(w http.ResponseWriter) error
+}
+
+type MusicMixes200JSONResponse []Station
+
+func (response MusicMixes200JSONResponse) VisitMusicMixesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MusicMixes401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response MusicMixes401JSONResponse) VisitMusicMixesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MusicRadioRequestObject struct {
+	Body *MusicRadioJSONRequestBody
+}
+
+type MusicRadioResponseObject interface {
+	VisitMusicRadioResponse(w http.ResponseWriter) error
+}
+
+type MusicRadio200JSONResponse Station
+
+func (response MusicRadio200JSONResponse) VisitMusicRadioResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MusicRadio400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response MusicRadio400JSONResponse) VisitMusicRadioResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MusicRadio401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response MusicRadio401JSONResponse) VisitMusicRadioResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MusicRadio409JSONResponse struct{ ConflictJSONResponse }
+
+func (response MusicRadio409JSONResponse) VisitMusicRadioResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MusicRadio503JSONResponse struct{ ServiceUnavailableJSONResponse }
+
+func (response MusicRadio503JSONResponse) VisitMusicRadioResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MusicSageRequestObject struct {
+	Body *MusicSageJSONRequestBody
+}
+
+type MusicSageResponseObject interface {
+	VisitMusicSageResponse(w http.ResponseWriter) error
+}
+
+type MusicSage200JSONResponse Station
+
+func (response MusicSage200JSONResponse) VisitMusicSageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MusicSage400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response MusicSage400JSONResponse) VisitMusicSageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MusicSage401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response MusicSage401JSONResponse) VisitMusicSageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MusicSage503JSONResponse struct{ ServiceUnavailableJSONResponse }
+
+func (response MusicSage503JSONResponse) VisitMusicSageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MusicStatusRequestObject struct {
+}
+
+type MusicStatusResponseObject interface {
+	VisitMusicStatusResponse(w http.ResponseWriter) error
+}
+
+type MusicStatus200JSONResponse MusicStatus
+
+func (response MusicStatus200JSONResponse) VisitMusicStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MusicStatus401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response MusicStatus401JSONResponse) VisitMusicStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -9758,6 +10791,9 @@ type StrictServerInterface interface {
 	// ItemLeaves Playable items under a show, season, artist, album or collection, in play order (for Play all / Shuffle). At most 2,000.
 	// (GET /items/{itemId}/leaves)
 	ItemLeaves(ctx context.Context, request ItemLeavesRequestObject) (ItemLeavesResponseObject, error)
+	// GetLyrics A track's lyrics (MUSIC-10), timed when available, from the file, a .lrc sidecar or LRCLIB.
+	// (GET /items/{itemId}/lyrics)
+	GetLyrics(ctx context.Context, request GetLyricsRequestObject) (GetLyricsResponseObject, error)
 	// SearchMatches Candidate matches for Fix Match (admin only, movies and shows).
 	// (GET /items/{itemId}/match)
 	SearchMatches(ctx context.Context, request SearchMatchesRequestObject) (SearchMatchesResponseObject, error)
@@ -9770,12 +10806,18 @@ type StrictServerInterface interface {
 	// NextItem The episode after this one (Up Next), if any.
 	// (GET /items/{itemId}/next)
 	NextItem(ctx context.Context, request NextItemRequestObject) (NextItemResponseObject, error)
+	// RateItem Your rating (MUSIC-11), 0–10 (half stars; 10 = loved), or null to clear it.
+	// (PUT /items/{itemId}/rating)
+	RateItem(ctx context.Context, request RateItemRequestObject) (RateItemResponseObject, error)
 	// RefreshItem Re-download metadata for a matched movie or show, keeping locked fields (admin only).
 	// (POST /items/{itemId}/refresh)
 	RefreshItem(ctx context.Context, request RefreshItemRequestObject) (RefreshItemResponseObject, error)
 	// RelatedItems Similar items from the same library ("More like this"), by shared genres and people.
 	// (GET /items/{itemId}/related)
 	RelatedItems(ctx context.Context, request RelatedItemsRequestObject) (RelatedItemsResponseObject, error)
+	// SonicSimilar Tracks, albums or artists (matching the item's type) that sound like it (MUSIC-2).
+	// (GET /items/{itemId}/sonic-similar)
+	SonicSimilar(ctx context.Context, request SonicSimilarRequestObject) (SonicSimilarResponseObject, error)
 
 	// (DELETE /items/{itemId}/watched)
 	MarkUnwatched(ctx context.Context, request MarkUnwatchedRequestObject) (MarkUnwatchedResponseObject, error)
@@ -9821,6 +10863,21 @@ type StrictServerInterface interface {
 	// UpdateMe Update your own profile, password, PIN or preferences.
 	// (PATCH /me)
 	UpdateMe(ctx context.Context, request UpdateMeRequestObject) (UpdateMeResponseObject, error)
+	// MusicAdventure Sonic Adventure (MUSIC-4) — a path from one track to another through tracks that sound in between.
+	// (POST /music/adventure)
+	MusicAdventure(ctx context.Context, request MusicAdventureRequestObject) (MusicAdventureResponseObject, error)
+	// MusicMixes Your daily mixes (MUSIC-7), built from your listening; they change once a day.
+	// (GET /music/mixes)
+	MusicMixes(ctx context.Context, request MusicMixesRequestObject) (MusicMixesResponseObject, error)
+	// MusicRadio A station (MUSIC-3) from a track, album or artist, a genre, a decade, a mood, your favourites or the whole library. Ask again with exclude to continue it.
+	// (POST /music/radio)
+	MusicRadio(ctx context.Context, request MusicRadioRequestObject) (MusicRadioResponseObject, error)
+	// MusicSage A playlist from a description, e.g. "rainy Sunday jazz with a late-night feel" (MUSIC-5).
+	// (POST /music/sage)
+	MusicSage(ctx context.Context, request MusicSageRequestObject) (MusicSageResponseObject, error)
+	// MusicStatus Sonic analysis progress and whether the analysis service is running.
+	// (GET /music/status)
+	MusicStatus(ctx context.Context, request MusicStatusRequestObject) (MusicStatusResponseObject, error)
 	// GetPerson A person and the items in your libraries they appear in.
 	// (GET /people/{personId})
 	GetPerson(ctx context.Context, request GetPersonRequestObject) (GetPersonResponseObject, error)
@@ -10557,6 +11614,32 @@ func (sh *strictHandler) ItemLeaves(w http.ResponseWriter, r *http.Request, item
 	}
 }
 
+// GetLyrics operation middleware
+func (sh *strictHandler) GetLyrics(w http.ResponseWriter, r *http.Request, itemId ItemId) {
+	var request GetLyricsRequestObject
+
+	request.ItemId = itemId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetLyrics(ctx, request.(GetLyricsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetLyrics")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetLyricsResponseObject); ok {
+		if err := validResponse.VisitGetLyricsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // SearchMatches operation middleware
 func (sh *strictHandler) SearchMatches(w http.ResponseWriter, r *http.Request, itemId ItemId, params SearchMatchesParams) {
 	var request SearchMatchesRequestObject
@@ -10676,6 +11759,39 @@ func (sh *strictHandler) NextItem(w http.ResponseWriter, r *http.Request, itemId
 	}
 }
 
+// RateItem operation middleware
+func (sh *strictHandler) RateItem(w http.ResponseWriter, r *http.Request, itemId ItemId) {
+	var request RateItemRequestObject
+
+	request.ItemId = itemId
+
+	var body RateItemJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RateItem(ctx, request.(RateItemRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RateItem")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RateItemResponseObject); ok {
+		if err := validResponse.VisitRateItemResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // RefreshItem operation middleware
 func (sh *strictHandler) RefreshItem(w http.ResponseWriter, r *http.Request, itemId ItemId) {
 	var request RefreshItemRequestObject
@@ -10721,6 +11837,33 @@ func (sh *strictHandler) RelatedItems(w http.ResponseWriter, r *http.Request, it
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RelatedItemsResponseObject); ok {
 		if err := validResponse.VisitRelatedItemsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SonicSimilar operation middleware
+func (sh *strictHandler) SonicSimilar(w http.ResponseWriter, r *http.Request, itemId ItemId, params SonicSimilarParams) {
+	var request SonicSimilarRequestObject
+
+	request.ItemId = itemId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SonicSimilar(ctx, request.(SonicSimilarRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SonicSimilar")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SonicSimilarResponseObject); ok {
+		if err := validResponse.VisitSonicSimilarResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -11124,6 +12267,149 @@ func (sh *strictHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateMeResponseObject); ok {
 		if err := validResponse.VisitUpdateMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MusicAdventure operation middleware
+func (sh *strictHandler) MusicAdventure(w http.ResponseWriter, r *http.Request) {
+	var request MusicAdventureRequestObject
+
+	var body MusicAdventureJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MusicAdventure(ctx, request.(MusicAdventureRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MusicAdventure")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MusicAdventureResponseObject); ok {
+		if err := validResponse.VisitMusicAdventureResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MusicMixes operation middleware
+func (sh *strictHandler) MusicMixes(w http.ResponseWriter, r *http.Request, params MusicMixesParams) {
+	var request MusicMixesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MusicMixes(ctx, request.(MusicMixesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MusicMixes")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MusicMixesResponseObject); ok {
+		if err := validResponse.VisitMusicMixesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MusicRadio operation middleware
+func (sh *strictHandler) MusicRadio(w http.ResponseWriter, r *http.Request) {
+	var request MusicRadioRequestObject
+
+	var body MusicRadioJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MusicRadio(ctx, request.(MusicRadioRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MusicRadio")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MusicRadioResponseObject); ok {
+		if err := validResponse.VisitMusicRadioResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MusicSage operation middleware
+func (sh *strictHandler) MusicSage(w http.ResponseWriter, r *http.Request) {
+	var request MusicSageRequestObject
+
+	var body MusicSageJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MusicSage(ctx, request.(MusicSageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MusicSage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MusicSageResponseObject); ok {
+		if err := validResponse.VisitMusicSageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MusicStatus operation middleware
+func (sh *strictHandler) MusicStatus(w http.ResponseWriter, r *http.Request) {
+	var request MusicStatusRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MusicStatus(ctx, request.(MusicStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MusicStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MusicStatusResponseObject); ok {
+		if err := validResponse.VisitMusicStatusResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -12191,252 +13477,280 @@ func (sh *strictHandler) SetAvatar(w http.ResponseWriter, r *http.Request, userI
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
