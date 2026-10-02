@@ -330,6 +330,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /activity/history`.
     /// - Remark: Generated from `#/paths//activity/history/get(playHistory)`.
     func playHistory(_ input: Operations.PlayHistory.Input) async throws -> Operations.PlayHistory.Output
+    /// Playback statistics (ADM-4). Administrators can see everyone or one user; others see their own (their "year in music").
+    ///
+    /// - Remark: HTTP `GET /stats`.
+    /// - Remark: Generated from `#/paths//stats/get(getStats)`.
+    func getStats(_ input: Operations.GetStats.Input) async throws -> Operations.GetStats.Output
     /// Server health for the dashboard (admin only).
     ///
     /// - Remark: HTTP `GET /system/status`.
@@ -1254,6 +1259,19 @@ extension APIProtocol {
         headers: Operations.PlayHistory.Input.Headers = .init()
     ) async throws -> Operations.PlayHistory.Output {
         try await playHistory(Operations.PlayHistory.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Playback statistics (ADM-4). Administrators can see everyone or one user; others see their own (their "year in music").
+    ///
+    /// - Remark: HTTP `GET /stats`.
+    /// - Remark: Generated from `#/paths//stats/get(getStats)`.
+    public func getStats(
+        query: Operations.GetStats.Input.Query = .init(),
+        headers: Operations.GetStats.Input.Headers = .init()
+    ) async throws -> Operations.GetStats.Output {
+        try await getStats(Operations.GetStats.Input(
             query: query,
             headers: headers
         ))
