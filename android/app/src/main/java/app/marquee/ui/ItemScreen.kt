@@ -1,0 +1,204 @@
+package app.marquee.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavHostController
+import app.marquee.api.models.Credit
+import app.marquee.api.models.ItemDetail
+import app.marquee.api.models.ItemSummary
+import app.marquee.api.models.ItemType
+import coil3.compose.AsyncImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+private data class Page(val detail: ItemDetail, val children: List<ItemSummary>, val related: List<ItemSummary>)
+
+/** Detail page for any item: header, play buttons, contents, cast and related titles. */
+@Composable
+fun ItemScreen(nav: NavHostController, itemId: Long) {
+    val marquee = LocalMarquee.current
+    val music = LocalMusic.current
+    val scope = rememberCoroutineScope()
+    val page by produceState<Result<Page>?>(null, itemId) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val d = marquee.items.getItem(itemId)
+                val children = if (d.childCount > 0) marquee.items.listItemChildren(itemId, limit = 500).items else emptyList()
+                val related = if (d.type in listOf(ItemType.MOVIE, ItemType.SHOW, ItemType.ALBUM, ItemType.ARTIST)) runCatching { marquee.items.relatedItems(itemId) }.getOrDefault(emptyList()) else emptyList()
+                Page(d, children, related)
+            }
+        }
+    }
+    val p = page
+    if (p == null) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }; return }
+    val pg = p.getOrElse { Text("Couldn't load: ${it.message}", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.error); return }
+    val d = pg.detail
+    fun leaves(shuffle: Boolean = false, unwatched: Boolean = false, then: (List<ItemSummary>) -> Unit) = scope.launch {
+        val l = withContext(Dispatchers.IO) { runCatching { marquee.items.itemLeaves(d.id, shuffle, unwatched) }.getOrDefault(emptyList()) }
+        then(l)
+    }
+    val square = d.type in listOf(ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK)
+    @Composable fun Actions() {
+            when (d.type) {
+                ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO -> {
+                    val resume = (d.viewOffsetMs ?: 0) > 0
+                    Button(onClick = { nav.navigate("player/${d.id}") }, modifier = Modifier.focusRing().initialFocus(marquee.isTv)) {
+                        Icon(Icons.Filled.PlayArrow, null)
+                        Text(if (resume) "Resume" else "Play")
+                    }
+                    if (resume) OutlinedButton(modifier = Modifier.focusRing(), onClick = { nav.navigate("player/${d.id}?start=0") }) {
+                        Icon(Icons.Filled.Replay, null)
+                        Text("From start")
+                    }
+                }
+                ItemType.SHOW, ItemType.SEASON -> Button(onClick = { leaves(unwatched = true) { l -> l.firstOrNull()?.let { nav.navigate("player/${it.id}") } } }, modifier = Modifier.focusRing().initialFocus(marquee.isTv)) {
+                    Icon(Icons.Filled.PlayArrow, null)
+                    Text(if ((d.watchedLeafCount ?: 0) > 0) "Continue" else "Play")
+                }
+                ItemType.ALBUM, ItemType.ARTIST -> {
+                    Button(onClick = { leaves { music.play(it, 0, source = d.title) } }, modifier = Modifier.focusRing().initialFocus(marquee.isTv)) { Icon(Icons.Filled.PlayArrow, null); Text("Play") }
+                    OutlinedButton(modifier = Modifier.focusRing(), onClick = { leaves(shuffle = true) { music.play(it, 0, source = d.title) } }) { Icon(Icons.Filled.Shuffle, null); Text("Shuffle") }
+                }
+                ItemType.TRACK -> Button(onClick = { leaves { music.play(it, 0) } }, modifier = Modifier.focusRing().initialFocus(marquee.isTv)) { Icon(Icons.Filled.PlayArrow, null); Text("Play") }
+                else -> {}
+            }
+    }
+    LazyColumn(contentPadding = PaddingValues(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
+        item {
+            if (marquee.isTv) TvHeader(d, square) { Actions() } else {
+                Box(Modifier.fillMaxWidth().height(220.dp)) {
+                    marquee.imageUrl(d.images?.backdrop, 1280)?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize()) }
+                    Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background))))
+                }
+                Row(Modifier.padding(horizontal = sidePadding), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                    Artwork(marquee.imageUrl(d.images?.poster ?: d.images?.thumb, 300), d.title, if (square) Shape.Square else Shape.Poster, Modifier.width(120.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { Meta(d) }
+                }
+            }
+        }
+        if (!marquee.isTv) {
+            item { Row(Modifier.padding(horizontal = sidePadding), horizontalArrangement = Arrangement.spacedBy(12.dp)) { Actions() } }
+            d.summary?.takeIf { it.isNotBlank() }?.let { s -> item { Text(s, Modifier.padding(horizontal = sidePadding), maxLines = 8, overflow = TextOverflow.Ellipsis) } }
+        }
+        if (pg.children.isNotEmpty()) item {
+            when (d.type) {
+                ItemType.SEASON -> Column {
+                    Text("Episodes", Modifier.padding(horizontal = sidePadding, vertical = 4.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    pg.children.forEach { ep ->
+                        ListItem(
+                            headlineContent = { Text("${ep.index ?: ""}. ${ep.title}") },
+                            supportingContent = { Text(listOfNotNull(ep.durationMs?.let { formatTime(it) }, if ((ep.viewCount ?: 0) > 0) "Watched" else null).joinToString(" · ")) },
+                            leadingContent = { Artwork(marquee.imageUrl(ep.images?.thumb, 200), ep.title, Shape.Wide, Modifier.width(120.dp)) },
+                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+                            modifier = Modifier.focusCard({ nav.navigate("player/${ep.id}") }),
+                        )
+                    }
+                }
+                ItemType.ALBUM -> Column {
+                    Text("Tracks", Modifier.padding(horizontal = sidePadding, vertical = 4.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    val tracks = pg.children.filter { it.type == ItemType.TRACK }
+                    tracks.forEachIndexed { i, t ->
+                        ListItem(
+                            headlineContent = { Text(t.title, maxLines = 1) },
+                            leadingContent = { Text("${t.index ?: i + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                            trailingContent = { Text(t.durationMs?.let { formatTime(it) } ?: "") },
+                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+                            modifier = Modifier.focusCard({ music.play(tracks, i, source = d.title) }),
+                        )
+                    }
+                }
+                else -> Shelf(when (d.type) { ItemType.SHOW -> "Seasons"; ItemType.ARTIST -> "Albums"; else -> "In this collection" }, pg.children, sidePadding) { _, it ->
+                    PosterCard(it, marquee.imageUrl(it.images?.poster, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) })
+                }
+            }
+        }
+        val cast = d.credits.filter { it.role == Credit.Role.ACTOR }.take(20)
+        if (cast.isNotEmpty()) item {
+            Column {
+                Text("Cast", Modifier.padding(start = sidePadding, bottom = 10.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                LazyRow(contentPadding = PaddingValues(horizontal = sidePadding), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    items(cast) { c ->
+                        Column(Modifier.width(84.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Avatar(c.name, if (c.hasPhoto == true) marquee.absolute("/api/v1/people/${c.personId}/photo?w=160&token=${marquee.token}") else null, 72)
+                            Text(c.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
+                            c.character?.let { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        }
+                    }
+                }
+            }
+        }
+        if (pg.related.isNotEmpty()) item {
+            Shelf("More like this", pg.related, sidePadding) { _, it ->
+                PosterCard(it, marquee.imageUrl(it.images?.poster, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun Meta(d: ItemDetail) {
+    if (d.type == ItemType.EPISODE) d.grandparentTitle?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    Text(d.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 3)
+    if (d.type != ItemType.ARTIST) d.artistCredit?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    Text(listOfNotNull(d.year?.toString(), d.contentRating, d.durationMs?.takeIf { d.type in listOf(ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO) }?.let { formatTime(it) }).joinToString(" · "),
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (d.genres.isNotEmpty()) Text(d.genres.joinToString(", "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+/** TV: the backdrop fills the screen's top with the details and actions over it, in view from the start. */
+@Composable
+private fun TvHeader(d: ItemDetail, square: Boolean, actions: @Composable () -> Unit) {
+    val marquee = LocalMarquee.current
+    val bg = MaterialTheme.colorScheme.background
+    Box(Modifier.fillMaxWidth().height(400.dp)) {
+        marquee.imageUrl(d.images?.backdrop, 1280)?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize()) }
+        Box(Modifier.matchParentSize().background(Brush.horizontalGradient(0f to bg, 0.65f to bg.copy(alpha = 0.6f), 1f to Color.Transparent)))
+        Box(Modifier.matchParentSize().background(Brush.verticalGradient(0.6f to Color.Transparent, 1f to bg)))
+        Row(Modifier.align(Alignment.BottomStart).padding(horizontal = 48.dp, vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(28.dp), verticalAlignment = Alignment.Bottom) {
+            Artwork(marquee.imageUrl(d.images?.poster ?: d.images?.thumb, 300), d.title, if (square) Shape.Square else Shape.Poster, Modifier.width(if (square) 200.dp else 160.dp))
+            Column(Modifier.widthIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Meta(d)
+                d.summary?.takeIf { it.isNotBlank() }?.let { Text(it, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium) }
+                Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) { actions() }
+            }
+        }
+    }
+}
