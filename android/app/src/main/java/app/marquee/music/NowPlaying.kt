@@ -146,6 +146,7 @@ fun NowPlayingScreen(onClose: () -> Unit) {
                 SleepButton()
                 DJButton()
                 LevellingButton()
+                CrossfadeButton()
             }
             radioError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         }

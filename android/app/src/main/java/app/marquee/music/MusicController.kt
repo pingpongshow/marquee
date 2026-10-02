@@ -221,6 +221,14 @@ class MusicController(private val context: Context, private val marquee: Marquee
     /** Volume levelling (MUSIC-10); MusicService applies it. */
     val levelling: StateFlow<Levelling> = _levelling
     private fun levellingPref() = prefs.getString("levelling", null)?.let { n -> Levelling.entries.firstOrNull { it.name == n } } ?: Levelling.Auto
+    private val _crossfade = MutableStateFlow(prefs.getInt("crossfade", 0))
+    /** Crossfade length in seconds; 0 = off (MUSIC-9). MusicService applies it. */
+    val crossfade: StateFlow<Int> = _crossfade
+    fun setCrossfade(seconds: Int) {
+        _crossfade.value = seconds
+        prefs.edit().putInt("crossfade", seconds).apply()
+    }
+
     fun setLevelling(l: Levelling) {
         _levelling.value = l
         prefs.edit().putString("levelling", l.name).apply()

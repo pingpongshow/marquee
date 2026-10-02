@@ -82,6 +82,7 @@ class MusicService : MediaLibraryService() {
             .setHandleAudioBecomingNoisy(true)
             .build()
         player.audioSessionId = audioSession
+        mediaSourceFactory = DefaultMediaSourceFactory(ResolvingDataSource.Factory(http, resolver))
         enhancer = runCatching { LoudnessEnhancer(audioSession).apply { enabled = true } }.getOrNull()
         prefs.registerOnSharedPreferenceChangeListener(levellingChanged)
         player.addListener(object : Player.Listener {
@@ -94,7 +95,8 @@ class MusicService : MediaLibraryService() {
             }
             override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
                 // The previous track finished or was skipped: record where it ended and close its session.
-                current?.let { prev ->
+                // While it's fading out on the crossfade player, that waits until the fade ends.
+                current?.takeIf { it != fadingFrom }?.let { prev ->
                     val end = if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) lastDuration else lastPosition
                     if (prev in local) {
                         // A play counts once half the track has played, as on the server.
@@ -106,7 +108,14 @@ class MusicService : MediaLibraryService() {
                 level(player)
                 report(player, PlaybackProgress.State.PLAYING)
             }
-            override fun onIsPlayingChanged(isPlaying: Boolean) = report(player, if (isPlaying) PlaybackProgress.State.PLAYING else PlaybackProgress.State.PAUSED)
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                report(player, if (isPlaying) PlaybackProgress.State.PLAYING else PlaybackProgress.State.PAUSED)
+                // Paused mid-crossfade: the tail stops too.
+                if (!isPlaying && player.playbackState == Player.STATE_READY && fadeJob?.isActive == true) {
+                    fadeJob?.cancel()
+                    endFade(player)
+                }
+            }
 
             // A new queue: close sessions for tracks that were loaded ahead but left it.
             override fun onTimelineChanged(timeline: Timeline, reason: Int) {
@@ -127,6 +136,14 @@ class MusicService : MediaLibraryService() {
                 player.play()
             }
         })
+        // Watch for track ends to crossfade.
+        marquee.scope.launch(kotlinx.coroutines.Dispatchers.Main) {
+            while (true) {
+                delay(200)
+                val p = mediaSession?.player ?: break
+                maybeCrossfade(p)
+            }
+        }
         ticker = marquee.scope.launch {
             while (true) {
                 delay(15_000)
@@ -142,6 +159,85 @@ class MusicService : MediaLibraryService() {
      * Volume levelling (MUSIC-10): cuts with the player's volume and boosts with a loudness
      * enhancer (which limits peaks), so quiet tracks come up as well as loud ones down.
      */
+    // ---- Crossfade (MUSIC-9) ----
+    // A second player takes over the outgoing track's tail and fades it out while the main
+    // player moves on and fades in. Consecutive tracks of one album stay gapless.
+
+    private lateinit var mediaSourceFactory: DefaultMediaSourceFactory
+    private var fader: ExoPlayer? = null
+    private var fadeJob: Job? = null
+    private var fadingFrom: Long? = null
+    private var baseVolume = 1f // from volume levelling
+    private var ramp = 1f // the crossfade's share of the main player's volume
+
+    private fun applyVolume(p: Player) { p.volume = baseVolume * ramp }
+
+    private fun faderPlayer(): ExoPlayer = fader ?: ExoPlayer.Builder(this)
+        .setMediaSourceFactory(mediaSourceFactory)
+        .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), false)
+        .build().also { fader = it }
+
+    private fun crossfadeSeconds() = prefs.getInt("crossfade", 0)
+
+    private fun sameAlbumNext(p: Player): Boolean {
+        val next = p.nextMediaItemIndex.takeIf { it >= 0 } ?: return false
+        val a = p.currentMediaItem?.mediaMetadata?.extras?.getLong("album", -1) ?: -1
+        val b = p.getMediaItemAt(next).mediaMetadata.extras?.getLong("album", -2) ?: -2
+        return a >= 0 && a == b && !p.shuffleModeEnabled
+    }
+
+    /** Called a few times a second: starts a crossfade when the track is about to end. */
+    private fun maybeCrossfade(p: Player) {
+        val secs = crossfadeSeconds()
+        if (secs <= 0 || fadeJob?.isActive == true || !p.isPlaying || !p.hasNextMediaItem() || p.repeatMode == Player.REPEAT_MODE_ONE) return
+        val dur = p.duration
+        if (dur <= secs * 3000L || dur - p.currentPosition > secs * 1000L || sameAlbumNext(p)) return
+        val item = p.currentMediaItem ?: return
+        val id = item.mediaId.toLongOrNull() ?: return
+        val f = faderPlayer()
+        val fromVolume = baseVolume
+        fadingFrom = id
+        f.setMediaItem(item.buildUpon().setUri("marquee://track/$id").build())
+        f.prepare()
+        f.seekTo(p.currentPosition + 200)
+        f.volume = fromVolume
+        f.play()
+        fadeJob = marquee.scope.launch(kotlinx.coroutines.Dispatchers.Main) {
+            // Hand over only once the tail is audibly playing; otherwise don't crossfade.
+            val started = kotlinx.coroutines.withTimeoutOrNull(1500) { while (!f.isPlaying) delay(25); true } == true
+            if (!started) {
+                f.stop(); f.clearMediaItems(); fadingFrom = null
+                return@launch
+            }
+            val end = f.duration
+            android.util.Log.i("Marquee", "crossfade ${secs}s from track $id at ${p.currentPosition}/${p.duration} ms")
+            ramp = 0f
+            applyVolume(p)
+            p.seekToNextMediaItem()
+            val steps = secs * 25
+            for (i in 1..steps) {
+                val t = i / steps.toFloat()
+                // Equal-power curves keep the loudness steady through the blend.
+                ramp = kotlin.math.sin(t * Math.PI / 2).toFloat()
+                applyVolume(p)
+                f.volume = fromVolume * kotlin.math.cos(t * Math.PI / 2).toFloat()
+                delay(40)
+            }
+            endFade(p, end)
+        }
+    }
+
+    private fun endFade(p: Player, endMs: Long = 0) {
+        fader?.let { it.stop(); it.clearMediaItems() }
+        ramp = 1f
+        applyVolume(p)
+        val from = fadingFrom
+        fadingFrom = null
+        if (from != null) {
+            if (from in local) app.downloads.recordProgress(from, endMs, watched = true) else finish(from, endMs)
+        }
+    }
+
     private fun level(p: Player) {
         val id = p.currentMediaItem?.mediaId?.toLongOrNull()
         val (track, album) = id?.let { gains[it] } ?: (null to null)
@@ -153,7 +249,8 @@ class MusicService : MediaLibraryService() {
             Levelling.Auto -> if (inAlbumOrder(p)) album ?: track else track
         } ?: 0.0
         val g = db.coerceIn(-15.0, 6.0)
-        p.volume = if (g < 0) 10.0.pow(g / 20).toFloat() else 1f
+        baseVolume = if (g < 0) 10.0.pow(g / 20).toFloat() else 1f
+        applyVolume(p)
         runCatching { enhancer?.setTargetGain(if (g > 0) (g * 100).roundToInt() else 0) }
     }
 
@@ -194,6 +291,8 @@ class MusicService : MediaLibraryService() {
         ticker?.cancel()
         prefs.unregisterOnSharedPreferenceChangeListener(levellingChanged)
         enhancer?.release()
+        fadeJob?.cancel()
+        fader?.release()
         resolved.keys.toList().forEach { finish(it, mediaSession?.player?.currentPosition ?: 0) }
         mediaSession?.run {
             player.release()

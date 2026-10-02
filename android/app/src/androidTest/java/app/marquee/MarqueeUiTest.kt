@@ -565,4 +565,31 @@ class MarqueeUiTest {
         rule.onNode(downloaded).performClick()
         rule.waitText("Download")
     }
+
+    /** Crossfade (MUSIC-9): with 4 s set, the next track starts before the current one ends. */
+    @Test fun crossfade() {
+        assumeTrue("phones", !isTv)
+        connectAndSignIn()
+        val app = context.applicationContext as MarqueeApplication
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.setCrossfade(4) }
+        openLibrary("Music")
+        rule.waitUntil(20_000) { scrollTo(hasText("Library Radio")) }
+        tap("Library Radio")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Open Now Playing"), 20_000)
+        rule.onNode(hasContentDescription("Open Now Playing")).performClick()
+        rule.waitText("PLAYING FROM")
+        Thread.sleep(3000)
+        val first = app.music.now.value?.id
+        // Jump to 8 s before the end.
+        val dur = app.music.position.value.second
+        assertTrue("duration known", dur > 10_000)
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.seek(dur - 8_000) }
+        // The next track takes over about 4 s before the end, not at it.
+        val start = System.currentTimeMillis()
+        rule.waitUntil(15_000) { app.music.now.value?.id != first }
+        val took = System.currentTimeMillis() - start
+        assertTrue("took over after $took ms (expected ~4 s, well before 8 s)", took in 2_000..6_500)
+        shot("cf1-after-crossfade")
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.setCrossfade(0); app.music.stop() }
+    }
 }

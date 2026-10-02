@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.automirrored.filled.StarHalf
@@ -388,6 +389,25 @@ private fun TileRow(title: String, names: List<String>, onOpen: (String) -> Unit
                         .semantics { contentDescription = "$n ${title.lowercase().removeSuffix("s")}" }.padding(10.dp),
                     contentAlignment = Alignment.BottomStart,
                 ) { Text(n, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 2) }
+            }
+        }
+    }
+}
+
+/** Crossfade: off, or 2–12 seconds (albums played in order stay gapless). */
+@Composable
+fun CrossfadeButton() {
+    val music = LocalMusic.current
+    val secs by music.crossfade.collectAsState()
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton({ open = true }, Modifier.focusRing()) {
+            Icon(Icons.Filled.SwapHoriz, if (secs == 0) "Crossfade off" else "Crossfade $secs seconds", tint = if (secs == 0) MaterialTheme.colorScheme.onSurfaceVariant else Gold)
+        }
+        DropdownMenu(open, { open = false }) {
+            listOf(0, 2, 4, 6, 8, 12).forEach { s ->
+                DropdownMenuItem({ Text(if (s == 0) "Crossfade off" else "Crossfade $s s", fontWeight = if (s == secs) FontWeight.Bold else FontWeight.Normal) },
+                    { music.setCrossfade(s); open = false })
             }
         }
     }
