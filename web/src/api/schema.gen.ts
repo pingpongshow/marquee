@@ -2320,6 +2320,8 @@ export interface components {
             hasPassword?: boolean;
             /** @description Two-factor sign-in (an authenticator code) is on. */
             hasTwoFactor?: boolean;
+            /** @description Only from /me: use as ?key= on image, person photo and avatar URLs instead of the sign-in token (D85). It grants those images and nothing else. */
+            imageKey?: string;
             /** @description Profile picture URL; absent when the user has none. */
             avatarUrl?: string;
             /** Format: date-time */
@@ -3730,6 +3732,8 @@ export interface components {
             rottenTomatoes?: number;
             /** @description 0–100 */
             metacritic?: number;
+            /** @description AniList average score 0–100 (anime, META-2). */
+            anilist?: number;
         };
         Credit: {
             /** Format: int64 */

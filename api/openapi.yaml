@@ -3101,6 +3101,7 @@ components:
         hasPin: { type: boolean }
         hasPassword: { type: boolean }
         hasTwoFactor: { type: boolean, description: Two-factor sign-in (an authenticator code) is on. }
+        imageKey: { type: string, description: "Only from /me: use as ?key= on image, person photo and avatar URLs instead of the sign-in token (D85). It grants those images and nothing else." }
         avatarUrl: { type: string, description: Profile picture URL; absent when the user has none. }
         createdAt: { type: string, format: date-time }
         lastSeenAt: { type: string, format: date-time }
@@ -4512,6 +4513,7 @@ components:
         imdbVotes: { type: integer }
         rottenTomatoes: { type: integer, description: Tomatometer critic score 0–100 }
         metacritic: { type: integer, description: "0–100" }
+        anilist: { type: integer, description: "AniList average score 0–100 (anime, META-2)." }
 
     Credit:
       type: object

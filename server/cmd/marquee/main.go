@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -97,7 +98,10 @@ func run() error {
 		return err
 	}
 	logs := logbuf.New(5000)
-	slog.SetDefault(slog.New(logbuf.NewHandler(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: cfg.LogLevel}), logs)))
+	// Logs go to stderr (docker logs), the admin log viewer and config/logs, which outlives
+	// container updates (10 MB × 5).
+	logFile := &logbuf.RotatingFile{Dir: filepath.Join(cfg.ConfigDir, "logs"), MaxBytes: 10 << 20, Keep: 5}
+	slog.SetDefault(slog.New(logbuf.NewHandler(slog.NewTextHandler(io.MultiWriter(os.Stderr, logFile), &slog.HandlerOptions{Level: cfg.LogLevel}), logs)))
 	slog.Info("starting Marquee", "version", config.Version, "config", cfg.ConfigDir)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -169,7 +173,7 @@ func run() error {
 			Workers: 8,
 		},
 	}
-	meta := &metadata.Service{DB: database, Settings: store}
+	meta := &metadata.Service{DB: database, Settings: store, CacheDir: filepath.Join(cfg.ConfigDir, "cache")}
 	var afterMusicScan atomic.Pointer[func()] // set once the scheduler exists
 	scans.AfterScan = func(ctx context.Context, lib library.Library, report func(scanner.Progress)) error {
 		lang := ""
@@ -192,6 +196,9 @@ func run() error {
 			return err
 		}
 		announce(ctx, lib.ID) // after matching, so payloads carry proper titles
+		if lib.Type == library.Anime {
+			go meta.EnrichAnime(ctx) // AniList titles and details for new shows (META-2)
+		}
 		return meta.RefreshRatings(ctx, lib.ID)
 	}
 	// Adding a TMDB key starts matching everything that was scanned without one.
@@ -261,6 +268,9 @@ func run() error {
 	scheduler.Register(tasks.Task{ID: "musicbrainz", Name: "Enrich music from MusicBrainz", Window: true, Bounded: true,
 		Description: "Adds genres, album types (albums, EPs, singles, live, compilations) and original release dates from MusicBrainz, one request a second. A large library takes a night or two; it continues where it stopped.",
 		Run:         meta.EnrichMusic})
+	scheduler.Register(tasks.Task{ID: "anilist", Name: "Enrich anime from AniList", Window: true, Bounded: true,
+		Description: "Adds the names anime is known by (romaji, English, Japanese — all searchable), studios, genres and AniList scores to shows and films in anime libraries.",
+		Run:         meta.EnrichAnime})
 	scheduler.Register(tasks.Task{ID: "collections", Name: "Update collections", Every: 7 * 24 * time.Hour,
 		Description: "Groups movies into their film series (TMDB collections), including movies matched before collections existed.",
 		Run:         meta.SyncCollections})

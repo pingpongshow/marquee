@@ -35,6 +35,7 @@ import kotlinx.serialization.Contextual
  * @param imdbVotes 
  * @param rottenTomatoes Tomatometer critic score 0–100
  * @param metacritic 0–100
+ * @param anilist AniList average score 0–100 (anime, META-2).
  */
 @Serializable
 
@@ -53,7 +54,11 @@ data class Ratings (
 
     /* 0–100 */
     @SerialName(value = "metacritic")
-    val metacritic: kotlin.Int? = null
+    val metacritic: kotlin.Int? = null,
+
+    /* AniList average score 0–100 (anime, META-2). */
+    @SerialName(value = "anilist")
+    val anilist: kotlin.Int? = null
 
 ) {
 

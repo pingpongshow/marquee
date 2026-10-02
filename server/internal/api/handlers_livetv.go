@@ -255,6 +255,9 @@ func (h *Handlers) PlayLiveChannel(ctx context.Context, req PlayLiveChannelReque
 		if errors.Is(err, livetv.ErrUnavailable) {
 			return PlayLiveChannel502JSONResponse{BadGatewayJSONResponse(apiErr("unavailable", err.Error()))}, nil
 		}
+		if ctx.Err() != nil {
+			return nil, ctx.Err() // the viewer left before the channel tuned
+		}
 		return nil, internal(ctx, "playLive", err)
 	}
 	h.LiveTV.Watched(ctx, u.ID, c.ID)

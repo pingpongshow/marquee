@@ -49,11 +49,12 @@ type Session struct {
 }
 
 type Service struct {
-	db       *sql.DB
-	limiter  *loginLimiter
-	pins     *loginLimiter
-	seenMu   sync.Mutex
-	lastSeen map[int64]time.Time // device id → last persisted last_seen_at
+	db        *sql.DB
+	limiter   *loginLimiter
+	pins      *loginLimiter
+	seenMu    sync.Mutex
+	lastSeen  map[int64]time.Time // device id → last persisted last_seen_at
+	imgSecret []byte
 }
 
 func NewService(db *sql.DB) *Service {

@@ -286,7 +286,7 @@ func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 		}
 		out.Versions[i] = mv
 	}
-	if d.IMDbRating > 0 || d.RTCritic >= 0 || d.Metacritic >= 0 {
+	if d.IMDbRating > 0 || d.RTCritic >= 0 || d.Metacritic >= 0 || d.AniListScore > 0 {
 		r := Ratings{Imdb: nz(float32(d.IMDbRating)), ImdbVotes: nz(d.IMDbVotes)}
 		if d.RTCritic >= 0 {
 			r.RottenTomatoes = ptr(d.RTCritic)
@@ -294,6 +294,7 @@ func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 		if d.Metacritic >= 0 {
 			r.Metacritic = ptr(d.Metacritic)
 		}
+		r.Anilist = nz(d.AniListScore)
 		out.Ratings = &r
 	}
 	for i, c := range d.Credits {
