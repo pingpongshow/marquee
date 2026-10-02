@@ -21,7 +21,7 @@ var ErrSegmentTimeout = errors.New("transcoder didn't produce the segment in tim
 // far ahead of the viewer, and falling back to the next encoder if one fails.
 type Transcoder struct {
 	FFmpeg        string
-	Job           Job      // template; StartSegment and Encoder are set per run
+	Job           Job      // template; StartSegment and Encoder are set per run; Plan is fixed
 	Encoders      []string // fallback order, e.g. nvenc, qsv, software
 	TotalSegments int
 	ThrottleAhead int // segments allowed ahead of the last request before pausing
@@ -49,6 +49,14 @@ func (t *Transcoder) Encoder() string {
 
 func (t *Transcoder) segPath(k int) string { return filepath.Join(t.Job.Dir, strconv.Itoa(k)+".m4s") }
 
+// plan returns the segment start times.
+func (t *Transcoder) plan() []float64 {
+	if t.Job.Plan != nil {
+		return t.Job.Plan
+	}
+	return FixedPlan(int64(t.TotalSegments) * SegmentSeconds * 1000)
+}
+
 func exists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
@@ -67,6 +75,10 @@ func (t *Transcoder) start(k int) error {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	t.stderr = &tailBuffer{max: 4096}
 	cmd.Stderr = t.stderr
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
 	if err := cmd.Start(); err != nil {
 		return err
 	}
@@ -74,8 +86,25 @@ func (t *Transcoder) start(k int) error {
 	t.cmd, t.startSeg, t.produced, t.paused = cmd, k, k-1, false
 	t.exited, t.exitErr = make(chan struct{}), nil
 	exited := t.exited
+	plan := t.plan()
 	go func() {
-		err := cmd.Wait()
+		var waitErr error
+		waited := false
+		wait := func() error {
+			if !waited {
+				waitErr, waited = cmd.Wait(), true
+			}
+			return waitErr
+		}
+		// The last segment is kept only if FFmpeg finished the file normally.
+		splitErr := splitFragments(stdout, job.Dir, plan, k, func() bool { return wait() == nil })
+		if splitErr != nil && !waited {
+			syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		}
+		err := wait()
+		if err == nil && splitErr != nil {
+			err = splitErr
+		}
 		t.mu.Lock()
 		if t.cmd == cmd {
 			t.exitErr = err
@@ -107,8 +136,8 @@ func (t *Transcoder) killLocked() {
 	t.mu.Lock()
 }
 
-// refreshProduced advances the count of finished segments. With -hls_flags temp_file a
-// segment file only appears once it is complete. Caller holds t.mu.
+// refreshProduced advances the count of finished segments. A segment file only appears
+// once it is complete (splitFragments renames it into place). Caller holds t.mu.
 func (t *Transcoder) refreshProduced() {
 	for exists(t.segPath(t.produced + 1)) {
 		t.produced++
@@ -127,7 +156,7 @@ func (t *Transcoder) Init(ctx context.Context) (string, error) {
 	}
 	start := t.startSeg
 	t.mu.Unlock()
-	// FFmpeg creates init.mp4 before filling it; it is complete once the first segment exists.
+	// init.mp4 is written before the first segment; wait for that segment so playback can go on.
 	if err := t.waitFor(ctx, t.segPath(start), start); err != nil {
 		return "", err
 	}

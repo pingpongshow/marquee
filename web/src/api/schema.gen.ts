@@ -105,6 +105,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/quickconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A TV or other device asks to sign in with a code (Quick Connect). It shows the code and polls until someone approves it. */
+        post: operations["startQuickConnect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/quickconnect/{secret}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether the code has been approved. Once it has, the response carries the sign-in token (only once). */
+        get: operations["pollQuickConnect"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/quickconnect/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve a device's Quick Connect code; it signs in as you. */
+        post: operations["authorizeQuickConnect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/logout": {
         parameters: {
             query?: never;
@@ -1047,6 +1098,10 @@ export interface components {
             networkClass: components["schemas"]["NetworkClass"];
             /** @description The sign-in screen should offer the profile picker with PINs from this network. */
             pinSignIn?: boolean;
+            /** @description The server's home-network address (Settings → Network), so apps reached over Tailscale learn it. */
+            lanUrl?: string;
+            /** @description The Tailscale address (Settings → Remote Access), so apps on the LAN learn where to go when away. */
+            remoteUrl?: string;
         };
         Health: {
             /** @enum {string} */
@@ -1535,6 +1590,8 @@ export interface components {
             textSubtitles?: boolean;
             /** @description Can render styled ASS/SSA subtitles itself (e.g. JASSUB); they're then sent as .ass with the file's fonts. */
             assSubtitles?: boolean;
+            /** @description Text subtitles must come inside the HLS stream (AVPlayer). Every text track is listed as a WebVTT rendition, and a file with a subtitle selected is repackaged rather than played directly. */
+            hlsSubtitles?: boolean;
         };
         PlaybackRequest: {
             /** Format: int64 */
@@ -1560,6 +1617,8 @@ export interface components {
             maxBitrateKbps?: number;
             /** @description Measured download speed from /playback/bandwidth-test. */
             measuredKbps?: number;
+            /** @description Prepare the next item (gapless music) without ending this device's current session. It takes over when it first reports "playing". */
+            preload?: boolean;
             profile: components["schemas"]["DeviceProfile"];
         };
         PlaybackDecision: {
@@ -1740,6 +1799,20 @@ export interface components {
             item: components["schemas"]["ItemSummary"];
             role: string;
             character?: string;
+        };
+        QuickConnectStart: {
+            /** @description Six characters to show on screen. */
+            code: string;
+            /** @description Kept by the device to poll for the result. */
+            secret: string;
+            /** Format: date-time */
+            expiresAt: string;
+            pollIntervalMs: number;
+        };
+        QuickConnectState: {
+            /** @enum {string} */
+            status: "pending" | "approved" | "expired";
+            auth?: components["schemas"]["AuthResult"];
         };
         /** @enum {string} */
         PlaylistKind: "video" | "audio";
@@ -2229,6 +2302,87 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    startQuickConnect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    device: components["schemas"]["DeviceInfo"];
+                };
+            };
+        };
+        responses: {
+            /** @description Show the code; poll with the secret. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuickConnectStart"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    pollQuickConnect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                secret: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuickConnectState"];
+                };
+            };
+        };
+    };
+    authorizeQuickConnect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Approved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        deviceName: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
         };
     };

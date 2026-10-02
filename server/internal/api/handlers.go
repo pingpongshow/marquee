@@ -38,6 +38,7 @@ type Handlers struct {
 	LibrariesChanged func()
 	Scans            *tasks.Scans
 	Tasks            *tasks.Scheduler
+	QuickConnect     auth.QuickConnect
 	Backups          *tasks.Backups
 	// Restart stops the server gracefully; Docker starts it again.
 	Restart func()
@@ -100,6 +101,8 @@ func (h *Handlers) GetSystemInfo(ctx context.Context, _ GetSystemInfoRequestObje
 		SetupRequired: n == 0,
 		NetworkClass:  NetworkClass(requestInfo(ctx).Class),
 		PinSignIn:     ptr(h.pinSignInAllowed(ctx)),
+		LanUrl:        nz(h.Settings.Get().Network.LANURL),
+		RemoteUrl:     remoteURL(h.Settings.Get()),
 	}, nil
 }
 
@@ -301,4 +304,12 @@ func (h *Handlers) PinLogin(ctx context.Context, req PinLoginRequestObject) (Pin
 		return nil, internal(ctx, "pinLogin", err)
 	}
 	return PinLogin200JSONResponse{Token: token, User: toAPIUser(u)}, nil
+}
+
+// remoteURL is the Tailscale address apps use away from home, when remote access is on.
+func remoteURL(s settings.Settings) *string {
+	if !s.RemoteAccess.Enabled {
+		return nil
+	}
+	return nz(s.RemoteAccess.RemoteURL)
 }

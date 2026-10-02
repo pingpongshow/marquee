@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -50,6 +51,11 @@ type Request struct {
 
 // Session is an active playback.
 type Session struct {
+	Plan []float64 // HLS segment start times (seconds)
+	// TextSubs are the file's text subtitles, offered as WebVTT renditions to clients that
+	// need subtitles inside HLS (HLSSubs).
+	TextSubs         []SubtitleRendition
+	HLSSubs          bool
 	ID               string
 	UserID           int64
 	UserName         string
@@ -131,6 +137,7 @@ type Manager struct {
 	FFmpeg       string
 	TranscodeDir string
 	Encoders     Encoders
+	FFprobe      string
 
 	mu       sync.Mutex
 	sessions map[string]*Session
@@ -266,7 +273,24 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 	q.Remote = r.Remote
 	q.OtherRemoteKbps, q.OtherRemoteCount = m.remoteUsage("")
 	s.LimitKbps, s.LimitReason = MaxKbps(q, cfg.RemoteAccess)
-	s.Decision = Decide(s.Media, r.Profile, Limits{MaxKbps: s.LimitKbps, Remote: r.Remote, PreferHEVC: r.Remote && cfg.Transcoder.PreferHEVCRemote})
+	limits := Limits{MaxKbps: s.LimitKbps, Remote: r.Remote, PreferHEVC: r.Remote && cfg.Transcoder.PreferHEVCRemote}
+	s.Decision = Decide(s.Media, r.Profile, limits)
+	// Copied video is cut on its own keyframes; without an index of them, transcode instead.
+	var plan []float64
+	if s.Decision.Method == DirectStream && s.Media.Video != nil {
+		kf, err := m.keyframes(ctx, s.FileID, s.Path, s.Media.Container, 15*time.Second)
+		if err == nil {
+			plan = KeyframePlan(kf, float64(s.Media.DurationMS)/1000, SegmentSeconds)
+		} else {
+			slog.Warn("no keyframe index; transcoding video", "file", s.Path, "err", err)
+			limits.NoVideoCopy = true
+			s.Decision = Decide(s.Media, r.Profile, limits)
+		}
+	}
+	if plan == nil {
+		plan = FixedPlan(s.Media.DurationMS)
+	}
+	s.Plan = plan
 	if s.Decision.ToneMap && !cfg.Transcoder.ToneMapping {
 		s.Decision.ToneMap = false
 	}
@@ -277,7 +301,7 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 			return nil, ErrBusy
 		}
 		job := Job{Input: s.Path, Decision: s.Decision, VideoIndex: -1, AudioIndex: -1, SubIndex: -1, SubRelIndex: -1,
-			Dir: filepath.Join(m.TranscodeDir, s.ID), Preset: cfg.Transcoder.Preset, QSVDevice: m.Encoders.QSVDevice}
+			Dir: filepath.Join(m.TranscodeDir, s.ID), Preset: cfg.Transcoder.Preset, QSVDevice: m.Encoders.QSVDevice, Plan: plan}
 		if v := s.Media.Video; v != nil {
 			job.VideoIndex, job.VideoCodec = v.Index, v.Codec
 		}
@@ -289,11 +313,11 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 			job.SubRelIndex = m.subtitleRelIndex(ctx, s.FileID, sub.Index)
 		}
 		s.transcoder = &Transcoder{FFmpeg: m.FFmpeg, Job: job, Encoders: m.Encoders.Available(cfg.Transcoder.EncoderOrder),
-			TotalSegments: SegmentCount(s.Media.DurationMS), ThrottleAhead: cfg.Transcoder.ThrottleSegmentsAhead}
+			TotalSegments: len(plan), ThrottleAhead: cfg.Transcoder.ThrottleSegmentsAhead}
 		if s.Decision.VideoCopy {
 			s.transcoder.Encoders = []string{"software"} // copying video needs no encoder
 		}
-		s.transcoder.lastRequest = int(s.StartMS / 1000 / SegmentSeconds)
+		s.transcoder.lastRequest = segmentFor(plan, float64(s.StartMS)/1000)
 	}
 
 	res, err := m.DB.ExecContext(ctx, `INSERT INTO play_history(user_id, item_id, device_id, item_title, started_at, position_ms,
@@ -363,6 +387,7 @@ func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 		id                    int64
 		index                 int
 		kind, codec, lang     string
+		title                 string
 		def, forced           bool
 		channels, w, h, depth int
 		kbps                  int
@@ -371,7 +396,7 @@ func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 	}
 	rows, err := m.DB.QueryContext(ctx, `SELECT id, COALESCE(stream_index, -1), kind, codec, COALESCE(language, ''), is_default, is_forced,
 		COALESCE(channels, 0), COALESCE(width, 0), COALESCE(height, 0), COALESCE(bit_depth, 8), COALESCE(bitrate_kbps, 0),
-		COALESCE(frame_rate, 0), COALESCE(external_path, '') FROM streams WHERE file_id = ? ORDER BY id`, s.FileID)
+		COALESCE(frame_rate, 0), COALESCE(external_path, ''), COALESCE(title, '') FROM streams WHERE file_id = ? ORDER BY id`, s.FileID)
 	if err != nil {
 		return err
 	}
@@ -379,7 +404,7 @@ func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 	for rows.Next() {
 		var st stream
 		if err := rows.Scan(&st.id, &st.index, &st.kind, &st.codec, &st.lang, &st.def, &st.forced, &st.channels, &st.w, &st.h,
-			&st.depth, &st.kbps, &st.fps, &st.external); err != nil {
+			&st.depth, &st.kbps, &st.fps, &st.external, &st.title); err != nil {
 			rows.Close()
 			return err
 		}
@@ -459,6 +484,12 @@ func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 		}
 	} else if r.SubtitleStreamID == 0 {
 		sub = autoSubtitle(subs, r, audio, func(st *stream) (string, bool) { return st.lang, st.forced })
+	}
+	s.HLSSubs = r.Profile.HLSSubtitles
+	for _, st := range subs {
+		if !(&SubtitleStream{Codec: st.codec}).IsImage() {
+			s.TextSubs = append(s.TextSubs, SubtitleRendition{ID: st.id, Language: st.lang, Title: st.title, Forced: st.forced})
+		}
 	}
 	if sub != nil {
 		s.Media.Subtitle = &SubtitleStream{ID: sub.id, Index: sub.index, Codec: sub.codec, External: sub.external}
@@ -713,4 +744,43 @@ func codecTag(probeJSON string, index int) string {
 		}
 	}
 	return ""
+}
+
+// keyframes returns the cached keyframe index of a file, building it if needed. Indexes
+// from Matroska Cues or MP4 tables take milliseconds; others may need an ffprobe scan,
+// bounded by timeout here (a background task fills them in ahead of time).
+func (m *Manager) keyframes(ctx context.Context, fileID int64, path, container string, timeout time.Duration) ([]float64, error) {
+	var size, mtime int64
+	if err := m.DB.QueryRowContext(ctx, `SELECT size, mtime FROM media_files WHERE id = ?`, fileID).Scan(&size, &mtime); err != nil {
+		return nil, err
+	}
+	var cachedSize, cachedMtime int64
+	var data string
+	err := m.DB.QueryRowContext(ctx, `SELECT size, mtime, times FROM keyframes WHERE file_id = ?`, fileID).Scan(&cachedSize, &cachedMtime, &data)
+	if err == nil && cachedSize == size && cachedMtime == mtime {
+		var kf []float64
+		if json.Unmarshal([]byte(data), &kf) == nil && len(kf) > 0 {
+			return kf, nil
+		}
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	kf, err := Keyframes(ctx, m.FFprobe, path, normalizeContainer(container))
+	if err != nil {
+		return nil, err
+	}
+	for i := range kf {
+		kf[i] = math.Round(kf[i]*1000) / 1000
+	}
+	b, _ := json.Marshal(kf)
+	m.DB.ExecContext(context.WithoutCancel(ctx), `INSERT INTO keyframes(file_id, size, mtime, times) VALUES (?, ?, ?, ?)
+		ON CONFLICT(file_id) DO UPDATE SET size = excluded.size, mtime = excluded.mtime, times = excluded.times`, fileID, size, mtime, string(b))
+	return kf, nil
+}
+
+// SubtitleRendition is a text subtitle track offered inside HLS.
+type SubtitleRendition struct {
+	ID              int64
+	Language, Title string
+	Forced          bool
 }

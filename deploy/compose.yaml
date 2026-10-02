@@ -16,8 +16,9 @@ services:
     runtime: nvidia           # NVIDIA NVENC/NVDEC
     devices:
       - /dev/dri:/dev/dri
-    ports:
-      - "32500:32500"
+    # Host networking so Bonjour reaches the LAN (apps find the server automatically).
+    # Marquee listens on 32500 on every host interface, as the published port did.
+    network_mode: host
     environment:
       TZ: ${TZ:-America/Los_Angeles}
       MARQUEE_LOG_LEVEL: ${MARQUEE_LOG_LEVEL:-info}

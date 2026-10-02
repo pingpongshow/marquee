@@ -101,3 +101,16 @@ func TestHev1MP4IsRepackagedNotDirectPlayed(t *testing.T) {
 		t.Fatalf("hvc1 MP4 should direct play: %+v", d)
 	}
 }
+
+func TestHLSSubtitlesForceRepackaging(t *testing.T) {
+	apple := appleTV
+	apple.HLSSubtitles = true
+	m := Media{Container: "mp4", BitrateKbps: 5000, Video: &VideoStream{Codec: "h264", Height: 1080, BitDepth: 8}, Audio: &AudioStream{Codec: "aac", Channels: 2}}
+	if d := Decide(m, apple, Limits{}); d.Method != DirectPlay {
+		t.Fatalf("no subtitle: %+v", d)
+	}
+	m.Subtitle = &SubtitleStream{Codec: "subrip", Index: 2}
+	if d := Decide(m, apple, Limits{}); d.Method != DirectStream || !d.SubtitleHLS || !d.VideoCopy {
+		t.Fatalf("text subtitle should repackage into HLS: %+v", d)
+	}
+}

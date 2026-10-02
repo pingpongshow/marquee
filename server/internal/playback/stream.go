@@ -1,12 +1,14 @@
 package playback
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"mime"
 	"net/http"
 	"os"
@@ -44,7 +46,7 @@ func (m *Manager) StreamHandler(subtitleCache string) http.Handler {
 		case file == "index.m3u8":
 			w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
 			w.Header().Set("Cache-Control", "no-cache")
-			w.Write(Playlist(s.Media.DurationMS))
+			w.Write(PlanPlaylist(s.Plan, s.Media.DurationMS))
 		case file == "init.mp4":
 			m.serveFromTranscoder(w, r, s, -1)
 		case strings.HasSuffix(file, ".m4s"):
@@ -54,6 +56,13 @@ func (m *Manager) StreamHandler(subtitleCache string) http.Handler {
 				return
 			}
 			m.serveFromTranscoder(w, r, s, k)
+		case strings.HasPrefix(file, "subtitles/") && strings.HasSuffix(file, ".m3u8"):
+			sid, err := strconv.ParseInt(strings.TrimSuffix(strings.TrimPrefix(file, "subtitles/"), ".m3u8"), 10, 64)
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			serveSubtitlePlaylist(w, s, sid)
 		case strings.HasPrefix(file, "subtitles/") && (strings.HasSuffix(file, ".vtt") || strings.HasSuffix(file, ".ass")):
 			name := strings.TrimPrefix(file, "subtitles/")
 			format := strings.TrimPrefix(filepath.Ext(name), ".")
@@ -170,7 +179,33 @@ func (m *Manager) serveMaster(w http.ResponseWriter, s *Session) {
 	}
 	var b strings.Builder
 	b.WriteString("#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-INDEPENDENT-SEGMENTS\n")
+	// Text subtitles as WebVTT renditions, so the player's own menu can switch them.
+	subs := s.HLSSubs && len(s.TextSubs) > 0
+	if subs {
+		for _, t := range s.TextSubs {
+			name := t.Title
+			if name == "" {
+				name = languageLabel(t.Language)
+			}
+			if t.Forced && !strings.Contains(strings.ToLower(name), "forced") {
+				name += " (Forced)"
+			}
+			def := "NO"
+			if t.ID == s.SubtitleStreamID {
+				def = "YES"
+			}
+			fmt.Fprintf(&b, "#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID=\"subs\",NAME=\"%s\",DEFAULT=%s,AUTOSELECT=%s,FORCED=%s",
+				strings.ReplaceAll(name, `"`, "'"), def, def, map[bool]string{true: "YES", false: "NO"}[t.Forced])
+			if t.Language != "" {
+				fmt.Fprintf(&b, ",LANGUAGE=\"%s\"", t.Language)
+			}
+			fmt.Fprintf(&b, ",URI=\"subtitles/%d.m3u8\"\n", t.ID)
+		}
+	}
 	fmt.Fprintf(&b, "#EXT-X-STREAM-INF:BANDWIDTH=%d,CODECS=\"%s\"", bw, codecsString(s))
+	if subs {
+		b.WriteString(",SUBTITLES=\"subs\"")
+	}
 	if v := s.Media.Video; v != nil {
 		h, wdt := v.Height, v.Width
 		if !d.VideoCopy && d.Height > 0 && v.Height > 0 {
@@ -260,6 +295,19 @@ func (m *Manager) serveSubtitle(w http.ResponseWriter, r *http.Request, s *Sessi
 		w.Header().Set("Content-Type", "text/x-ssa; charset=utf-8")
 	} else {
 		w.Header().Set("Content-Type", "text/vtt; charset=utf-8")
+	}
+	if r.URL.Query().Get("hls") == "1" && format == "vtt" {
+		// HLS WebVTT needs a timestamp map; our media timeline starts at zero.
+		data, err := os.ReadFile(out)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		header, rest, _ := bytes.Cut(data, []byte("\n"))
+		w.Write(header)
+		io.WriteString(w, "\nX-TIMESTAMP-MAP=MPEGTS:0,LOCAL:00:00:00.000\n")
+		w.Write(rest)
+		return
 	}
 	http.ServeFile(w, r, out)
 }
@@ -356,4 +404,36 @@ func (m *Manager) serveAudioTranscode(w http.ResponseWriter, r *http.Request, s 
 	if err := cmd.Run(); err != nil && r.Context().Err() == nil {
 		slog.Warn("audio transcode failed", "file", s.Path, "err", err)
 	}
+}
+
+// serveSubtitlePlaylist is a one-segment WebVTT media playlist for a subtitle rendition.
+func serveSubtitlePlaylist(w http.ResponseWriter, s *Session, streamID int64) {
+	found := false
+	for _, t := range s.TextSubs {
+		found = found || t.ID == streamID
+	}
+	if !found {
+		http.Error(w, "no such subtitle", http.StatusNotFound)
+		return
+	}
+	dur := float64(s.Media.DurationMS) / 1000
+	w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+	w.Header().Set("Cache-Control", "no-cache")
+	fmt.Fprintf(w, "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:%d\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-MEDIA-SEQUENCE:0\n#EXTINF:%.3f,\n%d.vtt?hls=1\n#EXT-X-ENDLIST\n",
+		int(math.Ceil(dur)), dur, streamID)
+}
+
+// languageLabel names a subtitle track that has no title.
+func languageLabel(code string) string {
+	names := map[string]string{"eng": "English", "en": "English", "jpn": "Japanese", "ja": "Japanese", "spa": "Spanish", "es": "Spanish",
+		"fre": "French", "fra": "French", "fr": "French", "ger": "German", "deu": "German", "de": "German", "ita": "Italian", "it": "Italian",
+		"por": "Portuguese", "pt": "Portuguese", "chi": "Chinese", "zho": "Chinese", "zh": "Chinese", "kor": "Korean", "ko": "Korean",
+		"rus": "Russian", "ru": "Russian", "ara": "Arabic", "hin": "Hindi", "dut": "Dutch", "nld": "Dutch", "swe": "Swedish", "pol": "Polish"}
+	if n, ok := names[strings.ToLower(code)]; ok {
+		return n
+	}
+	if code == "" || code == "und" {
+		return "Unknown"
+	}
+	return strings.ToUpper(code)
 }
