@@ -1,6 +1,6 @@
 # Marquee
 
-A self-hosted, Plex-like media server and client ecosystem: a Docker server plus web, iPhone/iPad and Apple TV apps (Android later). It streams video and music over LAN and WAN and can import an existing Plex library.
+A self-hosted, Plex-like media server and client ecosystem: a Docker server plus web, iPhone/iPad, Apple TV and Android (phone and TV) apps. It streams video and music over LAN and WAN and can import an existing Plex library.
 
 ## Documentation
 
@@ -34,6 +34,7 @@ Highlights:
 | `server/` | Go server (`cmd/marquee`, `internal/…`) |
 | `web/` | React web client, built into the server binary |
 | `apple/` | iPhone/iPad and Apple TV apps (XcodeGen `project.yml`, `MarqueeKit` Swift package) |
+| `android/` | Android phone and TV app (Gradle; `api/` generated client, `app/` Compose UI) |
 | `sonic/` | Sonic analysis sidecar (Python, CLAP on the GPU) |
 | `deploy/` | Dockerfiles, compose file, env example |
 | `docs/` | Plan, requirements, architecture and decisions |
@@ -44,6 +45,8 @@ Highlights:
 cd server && go generate ./... && go test ./...      # regenerate API stubs, run tests
 cd web && npm run gen:api && npm run build             # regenerate TS types, build into server
 cd apple && scripts/gen-api.sh && xcodegen generate    # regenerate the Swift client and Xcode project
+cd android && scripts/gen-api.sh && ./gradlew :app:assembleDebug   # regenerate the Kotlin client, build the APK
+cd android && scripts/ui-test.sh                       # UI tests on the running emulator against a dev server on :32597
 MARQUEE_CONFIG_DIR=/tmp/mq MARQUEE_TRANSCODE_DIR=/tmp/mq-tx go run ./server/cmd/marquee
 cd web && npm run dev                                  # hot-reload UI on :5173, proxies /api to :32500
 ```
