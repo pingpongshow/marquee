@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -10,7 +11,28 @@ import (
 
 func toAPIPlaylist(p items.Playlist) Playlist {
 	return Playlist{Id: p.ID, Title: p.Title, Kind: PlaylistKind(p.Kind), ItemCount: p.ItemCount, DurationMs: p.DurationMS,
-		ImageIds: p.ImageIDs, UpdatedAt: p.UpdatedAt}
+		ImageIds: p.ImageIDs, UpdatedAt: p.UpdatedAt, Rules: rulesToAPI(p.Rules)}
+}
+
+// The API and store rule types share their JSON shape.
+func rulesFromAPI(r *SmartRules) *items.SmartRules {
+	if r == nil {
+		return nil
+	}
+	var out items.SmartRules
+	b, _ := json.Marshal(r)
+	json.Unmarshal(b, &out)
+	return &out
+}
+
+func rulesToAPI(r *items.SmartRules) *SmartRules {
+	if r == nil {
+		return nil
+	}
+	var out SmartRules
+	b, _ := json.Marshal(r)
+	json.Unmarshal(b, &out)
+	return &out
 }
 
 var errPlaylistNotFound = apiErr("not_found", "playlist not found")
@@ -45,8 +67,11 @@ func (h *Handlers) CreatePlaylist(ctx context.Context, req CreatePlaylistRequest
 	}
 	var ids []int64
 	set(&ids, b.ItemIds)
-	p, err := h.Items.CreatePlaylist(ctx, access(ctx), b.Title, string(b.Kind), ids)
+	p, err := h.Items.CreatePlaylist(ctx, access(ctx), b.Title, string(b.Kind), ids, rulesFromAPI(b.Rules))
 	if err != nil {
+		if b.Rules != nil {
+			return CreatePlaylist400JSONResponse{BadRequestJSONResponse(apiErr("invalid_rules", err.Error()))}, nil
+		}
 		return nil, internal(ctx, "createPlaylist", err)
 	}
 	return CreatePlaylist201JSONResponse(toAPIPlaylist(p)), nil
@@ -80,6 +105,13 @@ func (h *Handlers) UpdatePlaylist(ctx context.Context, req UpdatePlaylistRequest
 			return UpdatePlaylist404JSONResponse{NotFoundJSONResponse(errPlaylistNotFound)}, nil
 		} else if err != nil {
 			return nil, internal(ctx, "updatePlaylist", err)
+		}
+	}
+	if r := rulesFromAPI(req.Body.Rules); r != nil {
+		if err := h.Items.SetRules(ctx, s.User.ID, req.PlaylistId, *r); errors.Is(err, items.ErrNotFound) {
+			return UpdatePlaylist404JSONResponse{NotFoundJSONResponse(errPlaylistNotFound)}, nil
+		} else if err != nil {
+			return UpdatePlaylist400JSONResponse{BadRequestJSONResponse(apiErr("invalid_rules", err.Error()))}, nil
 		}
 	}
 	p, err := h.Items.Playlist(ctx, s.User.ID, req.PlaylistId)
@@ -138,7 +170,7 @@ func (h *Handlers) AddPlaylistItems(ctx context.Context, req AddPlaylistItemsReq
 	switch {
 	case errors.Is(err, items.ErrNotFound):
 		return AddPlaylistItems404JSONResponse{NotFoundJSONResponse(errPlaylistNotFound)}, nil
-	case errors.Is(err, items.ErrPlaylistKind):
+	case errors.Is(err, items.ErrPlaylistKind), errors.Is(err, items.ErrSmartPlaylist):
 		return AddPlaylistItems400JSONResponse{BadRequestJSONResponse(apiErr("wrong_kind", err.Error()))}, nil
 	case err != nil:
 		return nil, internal(ctx, "addPlaylistItems", err)

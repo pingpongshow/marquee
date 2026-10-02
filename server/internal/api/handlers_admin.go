@@ -65,6 +65,11 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			MaintenanceWindowHours: ptr(s.Tasks.MaintenanceWindowHours),
 			BackupRetention:        ptr(s.Tasks.BackupRetention),
 		},
+		Music: &MusicSettings{
+			SonicAnalysis:    ptr(s.Music.SonicAnalysis),
+			OnlineLyrics:     ptr(s.Music.OnlineLyrics),
+			LoudnessAnalysis: ptr(s.Music.LoudnessAnalysis),
+		},
 	}
 }
 
@@ -139,6 +144,11 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		set(&s.Tasks.MaintenanceWindowStart, t.MaintenanceWindowStart)
 		set(&s.Tasks.MaintenanceWindowHours, t.MaintenanceWindowHours)
 		set(&s.Tasks.BackupRetention, t.BackupRetention)
+	}
+	if m := u.Music; m != nil {
+		set(&s.Music.SonicAnalysis, m.SonicAnalysis)
+		set(&s.Music.OnlineLyrics, m.OnlineLyrics)
+		set(&s.Music.LoudnessAnalysis, m.LoudnessAnalysis)
 	}
 }
 

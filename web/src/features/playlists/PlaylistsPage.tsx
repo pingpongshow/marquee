@@ -6,17 +6,21 @@ import { useState, type FormEvent } from "react";
 import { api, unwrap } from "@/api/client";
 import { playlistsQuery } from "@/api/queries";
 import type { PlaylistKind } from "@/api/types";
-import { Alert, Button, Dialog, Field, Input, Select, Spinner } from "@/components/ui";
+import { Alert, Button, Dialog, Field, Input, Select, Spinner, Toggle } from "@/components/ui";
 import { formatDuration } from "../browse/format";
 import { PlaylistMosaic } from "./PlaylistMosaic";
+import { defaultRules, RulesEditor, rulesValid } from "./RulesEditor";
+import type { SmartRules } from "@/api/types";
 
 function NewPlaylistDialog({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [kind, setKind] = useState<PlaylistKind>("audio");
+  const [smart, setSmart] = useState(false);
+  const [rules, setRules] = useState<SmartRules>(defaultRules);
   const create = useMutation({
-    mutationFn: () => unwrap(api.POST("/playlists", { body: { title: title.trim(), kind } })),
+    mutationFn: () => unwrap(api.POST("/playlists", { body: { title: title.trim(), kind, rules: smart ? rules : undefined } })),
     onSuccess: (p) => {
       qc.invalidateQueries({ queryKey: ["playlists"] });
       navigate({ to: "/playlist/$playlistId", params: { playlistId: String(p.id) } });
@@ -29,6 +33,7 @@ function NewPlaylistDialog({ onClose }: { onClose: () => void }) {
   return (
     <Dialog
       open
+      wide={smart}
       onClose={onClose}
       title="New playlist"
       footer={
@@ -36,7 +41,7 @@ function NewPlaylistDialog({ onClose }: { onClose: () => void }) {
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={!title.trim()} loading={create.isPending} onClick={() => create.mutate()}>
+          <Button variant="primary" disabled={!title.trim() || (smart && !rulesValid(rules))} loading={create.isPending} onClick={() => create.mutate()}>
             Create
           </Button>
         </>
@@ -53,6 +58,8 @@ function NewPlaylistDialog({ onClose }: { onClose: () => void }) {
             </Select>
           )}
         </Field>
+        <Toggle label="Smart playlist" help="Fills itself from rules and stays up to date as you add music and listen." checked={smart} onChange={setSmart} />
+        {smart && <RulesEditor value={rules} onChange={setRules} />}
       </form>
     </Dialog>
   );

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 )
 
 // PersonCredit is one item a person appears in.
@@ -125,4 +126,65 @@ func (s *Store) Leaves(ctx context.Context, acc Access, id int64, unwatchedFirst
 		}
 	}
 	return out, nil
+}
+
+// ByIDs returns the visible items among ids, in the given order.
+func (s *Store) ByIDs(ctx context.Context, acc Access, ids []int64) ([]Summary, error) {
+	if len(ids) == 0 {
+		return []Summary{}, nil
+	}
+	ac, aargs := acc.clause()
+	args := make([]any, 0, len(ids)+len(aargs))
+	ph := make([]string, len(ids))
+	for i, id := range ids {
+		ph[i] = "?"
+		args = append(args, id)
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT `+cols(acc.UserID)+summaryFrom+` WHERE i.id IN (`+strings.Join(ph, ",")+`) AND `+ac,
+		append(args, aargs...)...)
+	if err != nil {
+		return nil, err
+	}
+	list, err := collect(rows)
+	if err != nil {
+		return nil, err
+	}
+	byID := make(map[int64]Summary, len(list))
+	for _, it := range list {
+		byID[it.ID] = it
+	}
+	out := make([]Summary, 0, len(ids))
+	for _, id := range ids {
+		if it, ok := byID[id]; ok {
+			out = append(out, it)
+		}
+	}
+	return out, nil
+}
+
+// SetRating stores (or clears, with nil) the user's 0–10 rating.
+func (s *Store) SetRating(ctx context.Context, uid, itemID int64, rating *float64) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO user_item_state(user_id, item_id, rating) VALUES (?, ?, ?)
+		ON CONFLICT(user_id, item_id) DO UPDATE SET rating = excluded.rating, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`, uid, itemID, rating)
+	return err
+}
+
+// TrackIDsWhere returns music track ids matching a genre (on the track or its album/artist)
+// or a decade, in a library the user can see.
+func (s *Store) TrackIDsByGenre(ctx context.Context, acc Access, genre string) ([]int64, error) {
+	ac, aargs := acc.clause()
+	rows, err := s.db.QueryContext(ctx, `SELECT DISTINCT i.id`+summaryFrom+`
+		JOIN item_tags it ON it.item_id IN (i.id, i.parent_id, i.grandparent_id) JOIN tags t ON t.id = it.tag_id AND t.kind = 'genre'
+		WHERE i.type = 'track' AND t.name = ? COLLATE NOCASE AND `+ac, append([]any{genre}, aargs...)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []int64
+	for rows.Next() {
+		var id int64
+		rows.Scan(&id)
+		out = append(out, id)
+	}
+	return out, rows.Err()
 }
