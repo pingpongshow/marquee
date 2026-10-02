@@ -4204,6 +4204,99 @@ extension Components {
                 case items
             }
         }
+        /// - Remark: Generated from `#/components/schemas/Download`.
+        public struct Download: Codable, Hashable, Sendable {
+            /// "original-<item>" for originals.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Download/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/Download/itemId`.
+            public var itemId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/Download/quality`.
+            @frozen public enum QualityPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case original = "original"
+                case high = "high"
+                case medium = "medium"
+                case low = "low"
+            }
+            /// - Remark: Generated from `#/components/schemas/Download/quality`.
+            public var quality: Components.Schemas.Download.QualityPayload
+            /// - Remark: Generated from `#/components/schemas/Download/status`.
+            @frozen public enum StatusPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case queued = "queued"
+                case converting = "converting"
+                case ready = "ready"
+                case failed = "failed"
+            }
+            /// - Remark: Generated from `#/components/schemas/Download/status`.
+            public var status: Components.Schemas.Download.StatusPayload
+            /// Conversion progress
+            ///
+            /// - Remark: Generated from `#/components/schemas/Download/progress`.
+            public var progress: Swift.Double
+            /// Bytes
+            ///
+            /// - Remark: Generated from `#/components/schemas/Download/size`.
+            public var size: Swift.Int64?
+            /// Where to fetch the file once ready (supports HTTP ranges; send the token as for streams).
+            ///
+            /// - Remark: Generated from `#/components/schemas/Download/url`.
+            public var url: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Download/fileName`.
+            public var fileName: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Download/error`.
+            public var error: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Download/createdAt`.
+            public var createdAt: Foundation.Date?
+            /// Creates a new `Download`.
+            ///
+            /// - Parameters:
+            ///   - id: "original-<item>" for originals.
+            ///   - itemId:
+            ///   - quality:
+            ///   - status:
+            ///   - progress: Conversion progress
+            ///   - size: Bytes
+            ///   - url: Where to fetch the file once ready (supports HTTP ranges; send the token as for streams).
+            ///   - fileName:
+            ///   - error:
+            ///   - createdAt:
+            public init(
+                id: Swift.String,
+                itemId: Swift.Int64,
+                quality: Components.Schemas.Download.QualityPayload,
+                status: Components.Schemas.Download.StatusPayload,
+                progress: Swift.Double,
+                size: Swift.Int64? = nil,
+                url: Swift.String? = nil,
+                fileName: Swift.String? = nil,
+                error: Swift.String? = nil,
+                createdAt: Foundation.Date? = nil
+            ) {
+                self.id = id
+                self.itemId = itemId
+                self.quality = quality
+                self.status = status
+                self.progress = progress
+                self.size = size
+                self.url = url
+                self.fileName = fileName
+                self.error = error
+                self.createdAt = createdAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case itemId
+                case quality
+                case status
+                case progress
+                case size
+                case url
+                case fileName
+                case error
+                case createdAt
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/SubtitleResult`.
         public struct SubtitleResult: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/SubtitleResult/fileId`.
