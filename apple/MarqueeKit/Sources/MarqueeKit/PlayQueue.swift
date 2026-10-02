@@ -7,6 +7,8 @@ public struct PlayQueue: Sendable, Equatable {
     public struct Entry: Identifiable, Sendable, Equatable {
         public let id: Int   // unique per slot, so duplicates of a track stay distinct
         public let item: Item
+        /// Set for tracks the Guest DJ wove in (MUSIC-6).
+        public var dj: String? = nil
         public static func == (a: Entry, b: Entry) -> Bool { a.id == b.id }
     }
     public enum Repeat: Sendable { case off, all, one }
@@ -23,8 +25,8 @@ public struct PlayQueue: Sendable, Equatable {
     public var current: Entry? { entries.indices.contains(index) ? entries[index] : nil }
     public var upcoming: ArraySlice<Entry> { index >= 0 && index + 1 <= entries.count ? entries[(index + 1)...] : [] }
 
-    private mutating func wrap(_ items: [Item]) -> [Entry] {
-        items.map { item in defer { nextKey += 1 }; return Entry(id: nextKey, item: item) }
+    private mutating func wrap(_ items: [Item], dj: String? = nil) -> [Entry] {
+        items.map { item in defer { nextKey += 1 }; return Entry(id: nextKey, item: item, dj: dj) }
     }
 
     public mutating func load(_ items: [Item], start: Int = 0, shuffle: Bool = false) {
@@ -64,9 +66,9 @@ public struct PlayQueue: Sendable, Equatable {
         repeatMode = repeatMode == .off ? .all : repeatMode == .all ? .one : .off
     }
 
-    public mutating func playNext(_ items: [Item]) {
+    public mutating func playNext(_ items: [Item], dj: String? = nil) {
         guard index >= 0 else { load(items); return }
-        let add = wrap(items)
+        let add = wrap(items, dj: dj)
         entries.insert(contentsOf: add, at: index + 1)
         if var o = original, let cur = current, let at = o.firstIndex(of: cur) {
             o.insert(contentsOf: add, at: at + 1)

@@ -499,6 +499,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /music/adventure`.
     /// - Remark: Generated from `#/paths//music/adventure/post(musicAdventure)`.
     func musicAdventure(_ input: Operations.MusicAdventure.Input) async throws -> Operations.MusicAdventure.Output
+    /// Guest DJ (MUSIC-6) — one track to weave in after the one playing.
+    ///
+    /// stretch: sounds like it, by another artist. groupie: the artist's other albums. deep_cuts: the artist's least-played tracks. contempo: a similar sound from the same era.
+    ///
+    /// - Remark: HTTP `POST /music/dj`.
+    /// - Remark: Generated from `#/paths//music/dj/post(musicDJ)`.
+    func musicDJ(_ input: Operations.MusicDJ.Input) async throws -> Operations.MusicDJ.Output
     /// Your daily mixes (MUSIC-7), built from your listening; they change once a day.
     ///
     /// - Remark: HTTP `GET /music/mixes`.
@@ -1745,6 +1752,21 @@ extension APIProtocol {
         body: Operations.MusicAdventure.Input.Body
     ) async throws -> Operations.MusicAdventure.Output {
         try await musicAdventure(Operations.MusicAdventure.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Guest DJ (MUSIC-6) — one track to weave in after the one playing.
+    ///
+    /// stretch: sounds like it, by another artist. groupie: the artist's other albums. deep_cuts: the artist's least-played tracks. contempo: a similar sound from the same era.
+    ///
+    /// - Remark: HTTP `POST /music/dj`.
+    /// - Remark: Generated from `#/paths//music/dj/post(musicDJ)`.
+    public func musicDJ(
+        headers: Operations.MusicDJ.Input.Headers = .init(),
+        body: Operations.MusicDJ.Input.Body
+    ) async throws -> Operations.MusicDJ.Output {
+        try await musicDJ(Operations.MusicDJ.Input(
             headers: headers,
             body: body
         ))

@@ -18774,6 +18774,213 @@ public enum Operations {
             }
         }
     }
+    /// Guest DJ (MUSIC-6) — one track to weave in after the one playing.
+    ///
+    /// stretch: sounds like it, by another artist. groupie: the artist's other albums. deep_cuts: the artist's least-played tracks. contempo: a similar sound from the same era.
+    ///
+    /// - Remark: HTTP `POST /music/dj`.
+    /// - Remark: Generated from `#/paths//music/dj/post(musicDJ)`.
+    public enum MusicDJ {
+        public static let id: Swift.String = "musicDJ"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/music/dj/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MusicDJ.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MusicDJ.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.MusicDJ.Input.Headers
+            /// - Remark: Generated from `#/paths/music/dj/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/music/dj/POST/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// - Remark: Generated from `#/paths/music/dj/POST/requestBody/json/trackId`.
+                    public var trackId: Swift.Int64
+                    /// - Remark: Generated from `#/paths/music/dj/POST/requestBody/json/mode`.
+                    @frozen public enum ModePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case stretch = "stretch"
+                        case groupie = "groupie"
+                        case deepCuts = "deep_cuts"
+                        case contempo = "contempo"
+                    }
+                    /// - Remark: Generated from `#/paths/music/dj/POST/requestBody/json/mode`.
+                    public var mode: Operations.MusicDJ.Input.Body.JsonPayload.ModePayload
+                    /// Tracks already queued.
+                    ///
+                    /// - Remark: Generated from `#/paths/music/dj/POST/requestBody/json/exclude`.
+                    public var exclude: [Swift.Int64]?
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - trackId:
+                    ///   - mode:
+                    ///   - exclude: Tracks already queued.
+                    public init(
+                        trackId: Swift.Int64,
+                        mode: Operations.MusicDJ.Input.Body.JsonPayload.ModePayload,
+                        exclude: [Swift.Int64]? = nil
+                    ) {
+                        self.trackId = trackId
+                        self.mode = mode
+                        self.exclude = exclude
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case trackId
+                        case mode
+                        case exclude
+                    }
+                }
+                /// - Remark: Generated from `#/paths/music/dj/POST/requestBody/content/application\/json`.
+                case json(Operations.MusicDJ.Input.Body.JsonPayload)
+            }
+            public var body: Operations.MusicDJ.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            ///   - body:
+            public init(
+                headers: Operations.MusicDJ.Input.Headers = .init(),
+                body: Operations.MusicDJ.Input.Body
+            ) {
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/music/dj/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/music/dj/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.ItemSummary)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ItemSummary {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.MusicDJ.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.MusicDJ.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//music/dj/post(musicDJ)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.MusicDJ.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.MusicDJ.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//music/dj/post(musicDJ)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//music/dj/post(musicDJ)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
     /// Your daily mixes (MUSIC-7), built from your listening; they change once a day.
     ///
     /// - Remark: HTTP `GET /music/mixes`.

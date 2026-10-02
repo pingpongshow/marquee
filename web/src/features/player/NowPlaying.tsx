@@ -7,7 +7,7 @@ import { api, imageUrl, unwrap } from "@/api/client";
 import { Menu, MenuItem } from "@/components/Menu";
 import { Rating } from "../music/Rating";
 import type { ItemSummary } from "@/api/types";
-import { useMusic, type Levelling } from "./MusicPlayer";
+import { useMusic, type DJMode, type Levelling } from "./MusicPlayer";
 import type { Entry } from "./queue";
 
 export function fmtTime(s: number) {
@@ -205,7 +205,14 @@ export function QueueList({ dark }: { dark?: boolean }) {
       <button onClick={() => m.jump(e.key)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
         <Art item={e.item} size={40} className="size-10" />
         <div className="min-w-0">
-          <div className="truncate text-sm">{e.item.title}</div>
+          <div className="flex items-center gap-1.5 truncate text-sm">
+            {e.dj && (
+              <span className="shrink-0 rounded bg-accent/20 px-1 text-[10px] font-semibold text-accent" title={djLabels[e.dj as DJMode]}>
+                DJ
+              </span>
+            )}
+            <span className="truncate">{e.item.title}</span>
+          </div>
           <div className={clsx("truncate text-xs", dark ? "text-white/60" : "text-muted")}>{artist(e.item)}</div>
         </div>
       </button>
@@ -323,6 +330,8 @@ export function NowPlaying() {
             <Rating key={t.id} itemId={t.id} value={t.userRating} />
             <Volume className="flex" />
             <LevellingSelect />
+            <CrossfadeSelect />
+            <DJSelect />
           </div>
         </div>
         {panel && (
@@ -395,6 +404,43 @@ function SleepMenu() {
 }
 
 const levellingLabels: Record<Levelling, string> = { auto: "Volume levelling: auto", track: "Level each track", album: "Level by album", off: "No levelling" };
+
+const selectCls = "rounded-md border border-white/20 bg-black/30 px-2 py-1 text-xs text-white/80";
+
+function CrossfadeSelect() {
+  const m = useMusic();
+  return (
+    <select value={m.crossfade} onChange={(e) => m.setCrossfade(Number(e.target.value))} aria-label="Crossfade" className={selectCls} title="Albums played in order stay gapless">
+      {[0, 2, 4, 6, 8, 12].map((s) => (
+        <option key={s} value={s}>
+          {s ? `Crossfade: ${s}s` : "Crossfade: off"}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+export const djLabels: Record<DJMode, string> = { stretch: "DJ Stretch", groupie: "DJ Groupie", deep_cuts: "DJ Deep Cuts", contempo: "DJ Contempo" };
+const djHelp: Record<DJMode, string> = {
+  stretch: "Tracks that sound like what's playing, by other artists",
+  groupie: "More from the artist's other albums",
+  deep_cuts: "The artist's tracks you play least",
+  contempo: "A similar sound from the same era",
+};
+
+function DJSelect() {
+  const m = useMusic();
+  return (
+    <select value={m.dj ?? ""} onChange={(e) => m.setDJ((e.target.value || null) as DJMode | null)} aria-label="Guest DJ" className={selectCls} title={m.dj ? djHelp[m.dj] : "A DJ weaves a track in every few songs"}>
+      <option value="">Guest DJ: off</option>
+      {(Object.keys(djLabels) as DJMode[]).map((k) => (
+        <option key={k} value={k}>
+          {djLabels[k]}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 function LevellingSelect() {
   const m = useMusic();

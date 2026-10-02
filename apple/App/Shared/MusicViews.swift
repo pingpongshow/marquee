@@ -321,3 +321,24 @@ struct LevellingMenu: View {
         .accessibilityLabel("Volume levelling: \(music.levelling.label)")
     }
 }
+
+/// Guest DJ choice (MUSIC-6).
+struct DJMenu: View {
+    @Environment(MusicPlayer.self) private var music
+
+    var body: some View {
+        @Bindable var music = music
+        Menu {
+            Picker("Guest DJ", selection: $music.dj) {
+                Text("Off").tag(MusicPlayer.DJ?.none)
+                ForEach(MusicPlayer.DJ.allCases, id: \.self) { d in
+                    Text(d.label).tag(MusicPlayer.DJ?.some(d))
+                }
+            }
+        } label: {
+            Label(music.dj?.label ?? "Guest DJ", systemImage: music.dj == nil ? "person.wave.2" : "person.wave.2.fill")
+                .labelStyle(.iconOnly)
+        }
+        .accessibilityLabel(music.dj.map { "Guest DJ: \($0.label)" } ?? "Guest DJ: off")
+    }
+}
