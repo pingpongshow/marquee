@@ -7,7 +7,11 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.test.isSelected
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -83,7 +87,7 @@ class MarqueeUiTest {
         rule.waitText("Who's watching?")
         shot("02-who-is-watching")
         tap(profile)
-        rule.waitText("Continue Watching", substring = true)
+        rule.waitText("Recently Added", 20_000, substring = true)
         shot("03-home")
     }
 
@@ -199,7 +203,13 @@ class MarqueeUiTest {
     @Test fun tvRemoteNavigation() {
         assumeTrue("TV only", isTv)
         connectAndSignIn()
-        key(KeyEvent.KEYCODE_DPAD_DOWN) // Continue Watching → Recently Added Anime
+        // Down the shelves until the anime show has focus.
+        val anime = hasContentDescription("Test Anime") and isFocused()
+        for (i in 0 until 6) {
+            if (rule.onAllNodes(anime).fetchSemanticsNodes().isNotEmpty()) break
+            key(KeyEvent.KEYCODE_DPAD_DOWN)
+        }
+        rule.onNode(anime).assertExists()
         key(KeyEvent.KEYCODE_DPAD_CENTER)
         rule.waitText("Seasons")
         shot("t1-show")
@@ -210,7 +220,7 @@ class MarqueeUiTest {
         key(KeyEvent.KEYCODE_BACK)
         rule.waitText("Seasons")
         key(KeyEvent.KEYCODE_BACK)
-        rule.waitText("Continue Watching")
+        rule.waitText("Recently Added", substring = true)
     }
 
     private fun key(code: Int) {
@@ -367,5 +377,63 @@ class MarqueeUiTest {
     private fun shell(cmd: String) {
         InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(cmd).close()
         Thread.sleep(1500)
+    }
+
+    /** Marquee's player controls: settings restart the stream at a new quality; TV scrubs with previews. */
+    @Test fun videoPlayerControls() {
+        connectAndSignIn()
+        openLibrary("Movies")
+        rule.waitText("00 Preview Test")
+        tap("00 Preview Test")
+        rule.waitUntilAtLeastOneExists(hasText("Play") or hasText("Resume"), 10_000)
+        rule.onAllNodes(hasText("Play") or hasText("Resume")).onFirst().performClick()
+        val playing = hasContentDescription("Video player") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Playing")
+        rule.waitUntilAtLeastOneExists(playing, 30_000)
+        if (isTv) {
+            // Controls fade; then the remote scrubs with a preview and select jumps there.
+            rule.waitUntil(10_000) { rule.onAllNodes(hasContentDescription("Playback settings")).fetchSemanticsNodes().isEmpty() }
+            var before = 0L
+            onMainPosition { before = it }
+            repeat(3) { key(KeyEvent.KEYCODE_DPAD_RIGHT) }
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Position"), 5_000)
+            Thread.sleep(1500)
+            shot("p1-tv-scrub-preview")
+            key(KeyEvent.KEYCODE_DPAD_CENTER)
+            rule.waitUntilAtLeastOneExists(playing, 15_000)
+            // Three presses: about 30 s further on.
+            var after = 0L
+            rule.waitUntil(5_000) { onMainPosition { after = it }; after - before >= 25_000 }
+            assertTrue("jumped ${after - before} ms", after - before in 25_000..45_000)
+        } else {
+            showControls()
+            Thread.sleep(500)
+            shot("p1-controls")
+            rule.onNode(hasContentDescription("Playback settings")).performClick()
+            rule.waitText("Playback")
+            shot("p2-settings")
+            rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("4 Mbps 720p"))
+            tap("4 Mbps 720p")
+            rule.waitUntilAtLeastOneExists(playing, 30_000)
+            showControls()
+            rule.onNode(hasContentDescription("Playback settings")).performClick()
+            rule.waitText("Playback")
+            rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("4 Mbps 720p"))
+            rule.onNode(hasText("4 Mbps 720p") and isSelected()).assertExists() // the stream restarted with the cap
+            shot("p3-transcoding")
+            tap("Close")
+        }
+        back()
+    }
+
+    /** The video player's position in ms, from its progress semantics. */
+    private fun onMainPosition(got: (Long) -> Unit) {
+        val node = rule.onNode(hasContentDescription("Video player")).fetchSemanticsNode()
+        got((node.config[SemanticsProperties.ProgressBarRangeInfo].current * 1000).toLong())
+    }
+
+    private fun showControls() {
+        if (rule.onAllNodes(hasContentDescription("Playback settings")).fetchSemanticsNodes().isEmpty())
+            rule.onNode(hasContentDescription("Video player")).performClick()
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Playback settings"), 5_000)
     }
 }
