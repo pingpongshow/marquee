@@ -21,6 +21,7 @@ import { MusicProvider } from "@/features/player/MusicPlayer";
 import { PlayerPage } from "@/features/player/PlayerPage";
 import { PlaylistPage } from "@/features/playlists/PlaylistPage";
 import { PlaylistsPage } from "@/features/playlists/PlaylistsPage";
+import { LiveTvPage, LiveWatchPage } from "@/features/livetv/LiveTvPage";
 import { DiscoverPage } from "@/features/requests/DiscoverPage";
 import { SearchPage } from "@/features/search/SearchPage";
 import { AccountPage } from "@/features/users/AccountPage";
@@ -120,6 +121,19 @@ const playlistRoute = createRoute({
   path: "/playlist/$playlistId",
   component: PlaylistPage,
 });
+const liveTvRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/livetv",
+  component: LiveTvPage,
+});
+const liveWatchRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/livetv/watch/$channelId",
+  component: function LiveWatch() {
+    const { channelId } = liveWatchRoute.useParams();
+    return <LiveWatchPage channelId={Number(channelId)} />;
+  },
+});
 const discoverRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/discover",
@@ -150,6 +164,8 @@ export const settingsSectionRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([
+  liveTvRoute,
+  liveWatchRoute,
   discoverRoute,
   homeRoute,
   playRoute,

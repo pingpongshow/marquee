@@ -37,6 +37,19 @@ type Integrations struct {
 	// Seerr takes requests for titles that aren't in the library (REQ-1).
 	SeerrURL    string `json:"seerrUrl"`
 	SeerrAPIKey string `json:"seerrApiKey"`
+	// LiveTVSources feed Live TV (LIVE-1).
+	LiveTVSources []LiveTVSource `json:"liveTvSources"`
+}
+
+// LiveTVSource is an M3U playlist with its XMLTV guide, or a Dispatcharr server.
+type LiveTVSource struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Kind      string `json:"kind"` // m3u, dispatcharr
+	URL       string `json:"url"`
+	EPGURL    string `json:"epgUrl"`
+	UserAgent string `json:"userAgent"`
+	Enabled   bool   `json:"enabled"`
 }
 
 // Webhook is a URL told about events (ADM-5).

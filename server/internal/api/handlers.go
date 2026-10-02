@@ -13,6 +13,7 @@ import (
 	"marquee/internal/images"
 	"marquee/internal/items"
 	"marquee/internal/library"
+	"marquee/internal/livetv"
 	"marquee/internal/logbuf"
 	"marquee/internal/lyrics"
 	"marquee/internal/metadata"
@@ -54,6 +55,7 @@ type Handlers struct {
 	Lyrics           *lyrics.Service
 	Backups          *tasks.Backups
 	Requests         *requests.Service
+	LiveTV           *livetv.Service
 	// Restart stops the server gracefully; Docker starts it again.
 	Restart func()
 	Version string

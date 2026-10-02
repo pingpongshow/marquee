@@ -80,6 +80,7 @@ func toAPISettings(s settings.Settings) ServerSettings {
 		Integrations: &IntegrationSettings{
 			SeerrUrl:       ptr(s.Integrations.SeerrURL),
 			SeerrApiKeySet: ptr(s.Integrations.SeerrAPIKey != ""),
+			LiveTvSources:  ptr(toAPILiveSources(s.Integrations.LiveTVSources)),
 		},
 		Webhooks: ptr(toAPIWebhooks(s.Webhooks)),
 	}
@@ -183,6 +184,26 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 			s.Integrations.SeerrURL = strings.TrimRight(strings.TrimSpace(*i.SeerrUrl), "/")
 		}
 		set(&s.Integrations.SeerrAPIKey, i.SeerrApiKey)
+		if i.LiveTvSources != nil {
+			s.Integrations.LiveTVSources = make([]settings.LiveTVSource, len(*i.LiveTvSources))
+			for k, src := range *i.LiveTvSources {
+				id := ""
+				if src.Id != nil {
+					id = *src.Id
+				}
+				if id == "" {
+					id = newWebhookID()
+				}
+				out := settings.LiveTVSource{ID: id, Name: strings.TrimSpace(src.Name), Kind: string(src.Kind), URL: strings.TrimSpace(src.Url), Enabled: src.Enabled == nil || *src.Enabled}
+				if src.EpgUrl != nil {
+					out.EPGURL = strings.TrimSpace(*src.EpgUrl)
+				}
+				if src.UserAgent != nil {
+					out.UserAgent = strings.TrimSpace(*src.UserAgent)
+				}
+				s.Integrations.LiveTVSources[k] = out
+			}
+		}
 	}
 	if u.Webhooks != nil {
 		s.Webhooks = make([]settings.Webhook, len(*u.Webhooks))
@@ -432,4 +453,12 @@ func (h *Handlers) librariesChanged() {
 	if h.LibrariesChanged != nil {
 		go h.LibrariesChanged()
 	}
+}
+
+func toAPILiveSources(in []settings.LiveTVSource) []LiveTvSource {
+	out := make([]LiveTvSource, len(in))
+	for i, s := range in {
+		out[i] = LiveTvSource{Id: ptr(s.ID), Name: s.Name, Kind: LiveTvSourceKind(s.Kind), Url: s.URL, EpgUrl: nz(s.EPGURL), UserAgent: nz(s.UserAgent), Enabled: ptr(s.Enabled)}
+	}
+	return out
 }
