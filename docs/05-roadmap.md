@@ -17,7 +17,7 @@ The build order is designed for **minimal rework**: the contract first, then the
 | M7 ✅ | **Plex parity polish** | Intro/credits detection, trickplay, collections/smart playlists, watchlist, lyrics, editions/extras, offline downloads (iOS), stats/history, webhooks, OpenSubtitles search, backups UI | v1.0 success criteria met (see vision doc). |
 | M8 | **Android & extras** | Android phone/TV app, Chromecast, CarPlay, MPV player engine on Apple, photos library | — |
 | M9 ✅ | **Live TV, requests and music extras** | Live TV with a Plex-style guide (M3U/XMLTV, free channels via admin sources, Dispatcharr; LIVE-1–4), Seerr requests and Discover (REQ-1, REQ-2), renaming Muse (MUSIC-16), half-star rating input everywhere (MUSIC-11), history-based "Mixes for you" (MUSIC-17), mood and style browsing (MUSIC-18), playlist downloads (MUSIC-19). Every feature on server, web, Apple and Android. Added at the owner's request 2026-10-02. | Owner watches live TV and requests titles from any client; music items used daily. |
-| Later | DVR (LIVE-5), TOTP 2FA | — | — |
+| Later | DVR (LIVE-5) | — | — |
 
 ## Working approach
 

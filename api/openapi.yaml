@@ -1397,6 +1397,92 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /auth/totp:
+    get:
+      tags: [auth]
+      operationId: totpStatus
+      summary: Whether the caller's account has two-factor sign-in.
+      responses:
+        "200":
+          description: Status.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enabled]
+                properties:
+                  enabled: { type: boolean }
+                  recoveryCodesLeft: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/totp/setup:
+    post:
+      tags: [auth]
+      operationId: setupTotp
+      summary: Start turning on two-factor sign-in - a new secret for the authenticator app.
+      responses:
+        "200":
+          description: The secret, also as an otpauth:// URL for a QR code.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [secret, otpauthUrl]
+                properties:
+                  secret: { type: string }
+                  otpauthUrl: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /auth/totp/enable:
+    post:
+      tags: [auth]
+      operationId: enableTotp
+      summary: Finish turning on two-factor sign-in with a code from the app; returns one-time recovery codes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        "200":
+          description: On, with recovery codes (shown once).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [recoveryCodes]
+                properties:
+                  recoveryCodes:
+                    type: array
+                    items: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/totp/disable:
+    post:
+      tags: [auth]
+      operationId: disableTotp
+      summary: Turn off two-factor sign-in (needs a current code or a recovery code). Admins can turn it off for another user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: { type: string }
+                userId: { type: integer, format: int64, description: "Admins only: another user's (no code needed)." }
+      responses:
+        "204": { description: Off. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /syncplay/groups:
     get:
       tags: [syncplay]
@@ -2697,6 +2783,7 @@ components:
       properties:
         username: { type: string }
         password: { type: string }
+        totpCode: { type: string, description: "The authenticator code (or a recovery code) when the account has two-factor sign-in." }
         device: { $ref: "#/components/schemas/DeviceInfo" }
 
     AuthResult:
@@ -2717,6 +2804,7 @@ components:
         isManaged: { type: boolean, description: Managed profiles (e.g. children) sign in only by switching profile with a PIN. }
         hasPin: { type: boolean }
         hasPassword: { type: boolean }
+        hasTwoFactor: { type: boolean, description: Two-factor sign-in (an authenticator code) is on. }
         avatarUrl: { type: string, description: Profile picture URL; absent when the user has none. }
         createdAt: { type: string, format: date-time }
         lastSeenAt: { type: string, format: date-time }
@@ -2798,6 +2886,7 @@ components:
         userId: { type: integer, format: int64 }
         pin: { type: string }
         password: { type: string, description: For profiles that have a password but no PIN. }
+        totpCode: { type: string, description: "With a password, when the account has two-factor sign-in." }
         device: { $ref: "#/components/schemas/DeviceInfo" }
 
     SwitchProfileRequest:

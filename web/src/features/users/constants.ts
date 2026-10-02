@@ -16,7 +16,10 @@ export const remoteQualityOptions = [
   { value: 1000, label: "360p · 1 Mbps" },
 ];
 
-export const localQualityOptions = [{ value: 0, label: "Original (no transcoding)" }, ...remoteQualityOptions.slice(1)];
+export const localQualityOptions = [
+  { value: 0, label: "Original (no transcoding)" },
+  ...remoteQualityOptions.slice(1),
+];
 
 export const languageOptions = [
   ["", "Default"],

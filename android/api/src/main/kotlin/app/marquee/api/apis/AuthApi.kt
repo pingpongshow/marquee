@@ -30,6 +30,8 @@ import okhttp3.HttpUrl
 import app.marquee.api.models.AuthResult
 import app.marquee.api.models.AuthorizeQuickConnect200Response
 import app.marquee.api.models.AuthorizeQuickConnectRequest
+import app.marquee.api.models.DisableTotpRequest
+import app.marquee.api.models.EnableTotp200Response
 import app.marquee.api.models.Error
 import app.marquee.api.models.LoginRequest
 import app.marquee.api.models.MeUpdate
@@ -38,7 +40,9 @@ import app.marquee.api.models.Profile
 import app.marquee.api.models.QuickConnectStart
 import app.marquee.api.models.QuickConnectState
 import app.marquee.api.models.SetupRequest
+import app.marquee.api.models.SetupTotp200Response
 import app.marquee.api.models.StartQuickConnectRequest
+import app.marquee.api.models.TotpStatus200Response
 import app.marquee.api.models.User
 
 import kotlinx.serialization.SerialName
@@ -211,6 +215,152 @@ open class AuthApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /auth/totp/disable
+     * Turn off two-factor sign-in (needs a current code or a recovery code). Admins can turn it off for another user.
+     * 
+     * @param disableTotpRequest 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun disableTotp(disableTotpRequest: DisableTotpRequest) : Unit {
+        val localVarResponse = disableTotpWithHttpInfo(disableTotpRequest = disableTotpRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /auth/totp/disable
+     * Turn off two-factor sign-in (needs a current code or a recovery code). Admins can turn it off for another user.
+     * 
+     * @param disableTotpRequest 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun disableTotpWithHttpInfo(disableTotpRequest: DisableTotpRequest) : ApiResponse<Unit?> {
+        val localVariableConfig = disableTotpRequestConfig(disableTotpRequest = disableTotpRequest)
+
+        return request<DisableTotpRequest, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation disableTotp
+     *
+     * @param disableTotpRequest 
+     * @return RequestConfig
+     */
+    fun disableTotpRequestConfig(disableTotpRequest: DisableTotpRequest) : RequestConfig<DisableTotpRequest> {
+        val localVariableBody = disableTotpRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/auth/totp/disable",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /auth/totp/enable
+     * Finish turning on two-factor sign-in with a code from the app; returns one-time recovery codes.
+     * 
+     * @param authorizeQuickConnectRequest 
+     * @return EnableTotp200Response
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun enableTotp(authorizeQuickConnectRequest: AuthorizeQuickConnectRequest) : EnableTotp200Response {
+        val localVarResponse = enableTotpWithHttpInfo(authorizeQuickConnectRequest = authorizeQuickConnectRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as EnableTotp200Response
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /auth/totp/enable
+     * Finish turning on two-factor sign-in with a code from the app; returns one-time recovery codes.
+     * 
+     * @param authorizeQuickConnectRequest 
+     * @return ApiResponse<EnableTotp200Response?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun enableTotpWithHttpInfo(authorizeQuickConnectRequest: AuthorizeQuickConnectRequest) : ApiResponse<EnableTotp200Response?> {
+        val localVariableConfig = enableTotpRequestConfig(authorizeQuickConnectRequest = authorizeQuickConnectRequest)
+
+        return request<AuthorizeQuickConnectRequest, EnableTotp200Response>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation enableTotp
+     *
+     * @param authorizeQuickConnectRequest 
+     * @return RequestConfig
+     */
+    fun enableTotpRequestConfig(authorizeQuickConnectRequest: AuthorizeQuickConnectRequest) : RequestConfig<AuthorizeQuickConnectRequest> {
+        val localVariableBody = authorizeQuickConnectRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/auth/totp/enable",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
             body = localVariableBody
         )
     }
@@ -645,6 +795,76 @@ open class AuthApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
     }
 
     /**
+     * POST /auth/totp/setup
+     * Start turning on two-factor sign-in - a new secret for the authenticator app.
+     * 
+     * @return SetupTotp200Response
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun setupTotp() : SetupTotp200Response {
+        val localVarResponse = setupTotpWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as SetupTotp200Response
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /auth/totp/setup
+     * Start turning on two-factor sign-in - a new secret for the authenticator app.
+     * 
+     * @return ApiResponse<SetupTotp200Response?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun setupTotpWithHttpInfo() : ApiResponse<SetupTotp200Response?> {
+        val localVariableConfig = setupTotpRequestConfig()
+
+        return request<Unit, SetupTotp200Response>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation setupTotp
+     *
+     * @return RequestConfig
+     */
+    fun setupTotpRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/auth/totp/setup",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * POST /auth/quickconnect
      * A TV or other device asks to sign in with a code (Quick Connect). It shows the code and polls until someone approves it.
      * 
@@ -714,6 +934,76 @@ open class AuthApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /auth/totp
+     * Whether the caller&#39;s account has two-factor sign-in.
+     * 
+     * @return TotpStatus200Response
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun totpStatus() : TotpStatus200Response {
+        val localVarResponse = totpStatusWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as TotpStatus200Response
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /auth/totp
+     * Whether the caller&#39;s account has two-factor sign-in.
+     * 
+     * @return ApiResponse<TotpStatus200Response?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun totpStatusWithHttpInfo() : ApiResponse<TotpStatus200Response?> {
+        val localVariableConfig = totpStatusRequestConfig()
+
+        return request<Unit, TotpStatus200Response>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation totpStatus
+     *
+     * @return RequestConfig
+     */
+    fun totpStatusRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/auth/totp",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
             body = localVariableBody
         )
     }

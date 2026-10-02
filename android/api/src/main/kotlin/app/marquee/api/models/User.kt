@@ -43,6 +43,7 @@ import kotlinx.serialization.Contextual
  * @param preferences 
  * @param hasPin 
  * @param hasPassword 
+ * @param hasTwoFactor Two-factor sign-in (an authenticator code) is on.
  * @param avatarUrl Profile picture URL; absent when the user has none.
  * @param lastSeenAt 
  */
@@ -80,6 +81,10 @@ data class User (
 
     @SerialName(value = "hasPassword")
     val hasPassword: kotlin.Boolean? = null,
+
+    /* Two-factor sign-in (an authenticator code) is on. */
+    @SerialName(value = "hasTwoFactor")
+    val hasTwoFactor: kotlin.Boolean? = null,
 
     /* Profile picture URL; absent when the user has none. */
     @SerialName(value = "avatarUrl")

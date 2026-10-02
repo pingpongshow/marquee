@@ -256,6 +256,10 @@ extension Components {
             public var username: Swift.String
             /// - Remark: Generated from `#/components/schemas/LoginRequest/password`.
             public var password: Swift.String
+            /// The authenticator code (or a recovery code) when the account has two-factor sign-in.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LoginRequest/totpCode`.
+            public var totpCode: Swift.String?
             /// - Remark: Generated from `#/components/schemas/LoginRequest/device`.
             public var device: Components.Schemas.DeviceInfo
             /// Creates a new `LoginRequest`.
@@ -263,19 +267,23 @@ extension Components {
             /// - Parameters:
             ///   - username:
             ///   - password:
+            ///   - totpCode: The authenticator code (or a recovery code) when the account has two-factor sign-in.
             ///   - device:
             public init(
                 username: Swift.String,
                 password: Swift.String,
+                totpCode: Swift.String? = nil,
                 device: Components.Schemas.DeviceInfo
             ) {
                 self.username = username
                 self.password = password
+                self.totpCode = totpCode
                 self.device = device
             }
             public enum CodingKeys: String, CodingKey {
                 case username
                 case password
+                case totpCode
                 case device
             }
         }
@@ -320,6 +328,10 @@ extension Components {
             public var hasPin: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/User/hasPassword`.
             public var hasPassword: Swift.Bool?
+            /// Two-factor sign-in (an authenticator code) is on.
+            ///
+            /// - Remark: Generated from `#/components/schemas/User/hasTwoFactor`.
+            public var hasTwoFactor: Swift.Bool?
             /// Profile picture URL; absent when the user has none.
             ///
             /// - Remark: Generated from `#/components/schemas/User/avatarUrl`.
@@ -342,6 +354,7 @@ extension Components {
             ///   - isManaged: Managed profiles (e.g. children) sign in only by switching profile with a PIN.
             ///   - hasPin:
             ///   - hasPassword:
+            ///   - hasTwoFactor: Two-factor sign-in (an authenticator code) is on.
             ///   - avatarUrl: Profile picture URL; absent when the user has none.
             ///   - createdAt:
             ///   - lastSeenAt:
@@ -355,6 +368,7 @@ extension Components {
                 isManaged: Swift.Bool,
                 hasPin: Swift.Bool? = nil,
                 hasPassword: Swift.Bool? = nil,
+                hasTwoFactor: Swift.Bool? = nil,
                 avatarUrl: Swift.String? = nil,
                 createdAt: Foundation.Date,
                 lastSeenAt: Foundation.Date? = nil,
@@ -368,6 +382,7 @@ extension Components {
                 self.isManaged = isManaged
                 self.hasPin = hasPin
                 self.hasPassword = hasPassword
+                self.hasTwoFactor = hasTwoFactor
                 self.avatarUrl = avatarUrl
                 self.createdAt = createdAt
                 self.lastSeenAt = lastSeenAt
@@ -382,6 +397,7 @@ extension Components {
                 case isManaged
                 case hasPin
                 case hasPassword
+                case hasTwoFactor
                 case avatarUrl
                 case createdAt
                 case lastSeenAt
@@ -723,6 +739,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/PinLoginRequest/password`.
             public var password: Swift.String?
+            /// With a password, when the account has two-factor sign-in.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PinLoginRequest/totpCode`.
+            public var totpCode: Swift.String?
             /// - Remark: Generated from `#/components/schemas/PinLoginRequest/device`.
             public var device: Components.Schemas.DeviceInfo
             /// Creates a new `PinLoginRequest`.
@@ -731,22 +751,26 @@ extension Components {
             ///   - userId:
             ///   - pin:
             ///   - password: For profiles that have a password but no PIN.
+            ///   - totpCode: With a password, when the account has two-factor sign-in.
             ///   - device:
             public init(
                 userId: Swift.Int64,
                 pin: Swift.String? = nil,
                 password: Swift.String? = nil,
+                totpCode: Swift.String? = nil,
                 device: Components.Schemas.DeviceInfo
             ) {
                 self.userId = userId
                 self.pin = pin
                 self.password = password
+                self.totpCode = totpCode
                 self.device = device
             }
             public enum CodingKeys: String, CodingKey {
                 case userId
                 case pin
                 case password
+                case totpCode
                 case device
             }
         }

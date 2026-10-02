@@ -1028,6 +1028,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether the caller's account has two-factor sign-in. */
+        get: operations["totpStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/totp/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start turning on two-factor sign-in - a new secret for the authenticator app. */
+        post: operations["setupTotp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/totp/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish turning on two-factor sign-in with a code from the app; returns one-time recovery codes. */
+        post: operations["enableTotp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/totp/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn off two-factor sign-in (needs a current code or a recovery code). Admins can turn it off for another user. */
+        post: operations["disableTotp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/syncplay/groups": {
         parameters: {
             query?: never;
@@ -2027,6 +2095,8 @@ export interface components {
         LoginRequest: {
             username: string;
             password: string;
+            /** @description The authenticator code (or a recovery code) when the account has two-factor sign-in. */
+            totpCode?: string;
             device: components["schemas"]["DeviceInfo"];
         };
         AuthResult: {
@@ -2043,6 +2113,8 @@ export interface components {
             isManaged: boolean;
             hasPin?: boolean;
             hasPassword?: boolean;
+            /** @description Two-factor sign-in (an authenticator code) is on. */
+            hasTwoFactor?: boolean;
             /** @description Profile picture URL; absent when the user has none. */
             avatarUrl?: string;
             /** Format: date-time */
@@ -2128,6 +2200,8 @@ export interface components {
             pin?: string;
             /** @description For profiles that have a password but no PIN. */
             password?: string;
+            /** @description With a password, when the account has two-factor sign-in. */
+            totpCode?: string;
             device: components["schemas"]["DeviceInfo"];
         };
         SwitchProfileRequest: {
@@ -5445,6 +5519,117 @@ export interface operations {
                         error?: string;
                     };
                 };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    totpStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        enabled: boolean;
+                        recoveryCodesLeft?: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setupTotp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The secret, also as an otpauth:// URL for a QR code. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        secret: string;
+                        otpauthUrl: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    enableTotp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description On, with recovery codes (shown once). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        recoveryCodes: string[];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    disableTotp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code?: string;
+                    /**
+                     * Format: int64
+                     * @description Admins only: another user's (no code needed).
+                     */
+                    userId?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Off. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];

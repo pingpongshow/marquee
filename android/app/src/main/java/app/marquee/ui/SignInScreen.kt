@@ -39,6 +39,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.platform.testTag
+import app.marquee.api.infrastructure.ClientError
+import app.marquee.api.infrastructure.ClientException
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.marquee.api.models.Profile
@@ -94,10 +97,10 @@ fun SignInScreen() {
             label = if (p.requires == Profile.Requires.PIN) "PIN" else "Password",
             numeric = p.requires == Profile.Requires.PIN,
             onDismiss = { asking = null },
-        ) { secret ->
+        ) { secret, code ->
             runCatching {
-                if (p.requires == Profile.Requires.PIN) marquee.signInProfile(p.id, secret, null) else marquee.signInProfile(p.id, null, secret)
-            }.exceptionOrNull()?.let { "That didn't work. Try again." }
+                if (p.requires == Profile.Requires.PIN) marquee.signInProfile(p.id, secret, null) else marquee.signInProfile(p.id, null, secret, code)
+            }.exceptionOrNull()?.let { signInError(it, "That didn't work. Try again.") }
         }
     }
     if (manual) UsernameDialog(onDismiss = { manual = false })
@@ -112,10 +115,31 @@ fun Avatar(name: String, url: String?, size: Int) {
     }
 }
 
-/** Asks for a PIN or password; submit returns an error message, or null when it worked. */
+/** Returned by a sign-in when the account also needs an authenticator code (USER-9). */
+private const val NEEDS_CODE = "Enter the code from your authenticator app, or a recovery code."
+
+/** The message for a failed sign-in: [NEEDS_CODE] when two-factor is on, else [fallback]. */
+private fun signInError(e: Throwable, fallback: String): String {
+    val body = ((e as? ClientException)?.response as? ClientError<*>)?.body?.toString() ?: ""
+    return when {
+        "totp_required" in body -> NEEDS_CODE
+        "invalid_totp" in body -> "That code didn't work. Try the newest one."
+        else -> fallback
+    }
+}
+
 @Composable
-private fun SecretDialog(title: String, label: String, numeric: Boolean, onDismiss: () -> Unit, submit: suspend (String) -> String?) {
+private fun CodeField(code: String, onChange: (String) -> Unit) {
+    OutlinedTextField(code, onChange, label = { Text("Authenticator code") }, singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii), modifier = Modifier.testTag("totpCode"))
+}
+
+/** Asks for a PIN or password (and an authenticator code when needed); submit returns an error message, or null when it worked. */
+@Composable
+private fun SecretDialog(title: String, label: String, numeric: Boolean, onDismiss: () -> Unit, submit: suspend (String, String?) -> String?) {
     var value by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+    var needsCode by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     AlertDialog(
@@ -126,10 +150,14 @@ private fun SecretDialog(title: String, label: String, numeric: Boolean, onDismi
                 OutlinedTextField(value, { value = it }, label = { Text(label) }, singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = if (numeric) KeyboardType.NumberPassword else KeyboardType.Password))
+                if (needsCode) CodeField(code) { code = it }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
-        confirmButton = { Button(onClick = { scope.launch { error = submit(value) } }, enabled = value.isNotEmpty()) { Text("Sign In") } },
+        confirmButton = {
+            Button(onClick = { scope.launch { error = submit(value, code.takeIf { needsCode }); if (error == NEEDS_CODE) needsCode = true } },
+                enabled = value.isNotEmpty() && (!needsCode || code.isNotBlank())) { Text("Sign In") }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
@@ -139,6 +167,8 @@ private fun UsernameDialog(onDismiss: () -> Unit) {
     val marquee = LocalMarquee.current
     var user by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+    var needsCode by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     AlertDialog(
@@ -149,12 +179,19 @@ private fun UsernameDialog(onDismiss: () -> Unit) {
                 OutlinedTextField(user, { user = it }, label = { Text("Username") }, singleLine = true)
                 OutlinedTextField(pass, { pass = it }, label = { Text("Password") }, singleLine = true, visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+                if (needsCode) CodeField(code) { code = it }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
         confirmButton = {
-            Button(onClick = { scope.launch { runCatching { marquee.signIn(user, pass) }.onFailure { error = "Wrong username or password." } } },
-                enabled = user.isNotBlank() && pass.isNotEmpty()) { Text("Sign In") }
+            Button(onClick = {
+                scope.launch {
+                    runCatching { marquee.signIn(user, pass, code.takeIf { needsCode }) }.onFailure {
+                        error = signInError(it, "Wrong username or password.")
+                        if (error == NEEDS_CODE) needsCode = true
+                    }
+                }
+            }, enabled = user.isNotBlank() && pass.isNotEmpty() && (!needsCode || code.isNotBlank())) { Text("Sign In") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )

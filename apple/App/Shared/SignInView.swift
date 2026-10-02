@@ -133,6 +133,8 @@ private struct PasswordForm: View {
     let onError: (String) -> Void
     @State private var username = ""
     @State private var password = ""
+    @State private var code = ""
+    @State private var needsCode = false
     @State private var busy = false
 
     var body: some View {
@@ -144,17 +146,30 @@ private struct PasswordForm: View {
                 #endif
                 .autocorrectionDisabled()
             SecureField("Password", text: $password).textContentType(.password)
+            if needsCode {
+                TextField("Authenticator code", text: $code)
+                    .textContentType(.oneTimeCode)
+                    #if os(iOS)
+                    .keyboardType(.numberPad)
+                    #endif
+                    .accessibilityIdentifier("totpCode")
+            }
             Button {
                 busy = true
                 Task {
-                    do { try await app.signIn(username: username, password: password) } catch { onError(error.localizedDescription) }
+                    do {
+                        try await app.signIn(username: username, password: password, totpCode: needsCode ? code : nil)
+                    } catch is TwoFactorRequired {
+                        needsCode = true
+                        onError("Enter the code from your authenticator app, or a recovery code.")
+                    } catch { onError(error.localizedDescription) }
                     busy = false
                 }
             } label: {
                 if busy { ProgressView() } else { Text("Sign In").frame(maxWidth: .infinity) }
             }
             .buttonStyle(.borderedProminent)
-            .disabled(username.isEmpty || password.isEmpty || busy)
+            .disabled(username.isEmpty || password.isEmpty || (needsCode && code.isEmpty) || busy)
         }
         #if os(iOS)
         .textFieldStyle(.roundedBorder)

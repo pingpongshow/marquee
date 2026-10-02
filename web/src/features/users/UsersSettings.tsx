@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   KeyRound,
   Pencil,
@@ -495,6 +495,7 @@ function EditUserDialog({
             )}
           </Field>
         </div>
+        {live.hasTwoFactor && !isSelf && <TwoFactorOff user={live} />}
         {!user.isManaged && (
           <Toggle
             label="Administrator"
@@ -512,6 +513,35 @@ function EditUserDialog({
         )}
       </div>
     </Dialog>
+  );
+}
+
+/** Turns off another user's two-factor sign-in, e.g. when they've lost their phone (USER-9). */
+function TwoFactorOff({ user }: { user: User }) {
+  const qc = useQueryClient();
+  const off = useMutation({
+    mutationFn: () =>
+      unwrap(api.POST("/auth/totp/disable", { body: { userId: user.id } })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: usersQuery.queryKey }),
+  });
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
+      <div className="text-sm">
+        <div className="font-medium">Two-factor sign-in is on</div>
+        <div className="text-muted">
+          Turn it off if {user.displayName} can't get to their authenticator app
+          or recovery codes.
+        </div>
+        {off.isError && <Alert tone="error">{off.error.message}</Alert>}
+      </div>
+      <Button
+        variant="ghost"
+        loading={off.isPending}
+        onClick={() => off.mutate()}
+      >
+        Turn off
+      </Button>
+    </div>
   );
 }
 

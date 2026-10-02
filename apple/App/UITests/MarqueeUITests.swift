@@ -1,3 +1,4 @@
+import CryptoKit
 import XCTest
 
 /// End-to-end flows against a running Marquee server (MARQUEE_TEST_SERVER, default the
@@ -263,8 +264,9 @@ final class MarqueeUITests: XCTestCase {
 
     /// Calls the server as the test admin (the other viewer in watch-together tests).
     @discardableResult
-    private func adminAPI(_ method: String, _ path: String, _ body: [String: Any]? = nil) throws -> [String: Any] {
-        guard let token = adminToken else { throw XCTSkip("MARQUEE_TEST_ADMIN_TOKEN not set") }
+    private func adminAPI(_ method: String, _ path: String, _ body: [String: Any]? = nil, as userToken: String? = nil) throws -> [String: Any] {
+        guard let admin = adminToken else { throw XCTSkip("MARQUEE_TEST_ADMIN_TOKEN not set") }
+        let token = userToken ?? admin
         var req = URLRequest(url: URL(string: "http://\(server)/api/v1\(path)")!)
         req.httpMethod = method
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -428,5 +430,62 @@ final class MarqueeUITests: XCTestCase {
         app.buttons["miniPlayer"].tap()
         XCTAssertTrue(app.staticTexts["PLAYING FROM"].waitForExistence(timeout: 5))
         shot("s3-adventure-playing")
+    }
+
+    /// RFC 6238 code for a base32 secret, `ahead` steps from now.
+    private func totp(_ secret: String, ahead: Int = 0) -> String {
+        let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
+        var bits = 0, value = 0
+        var key = [UInt8]()
+        for c in secret.uppercased() {
+            guard let i = alphabet.firstIndex(of: c) else { continue }
+            value = (value << 5) | i
+            bits += 5
+            if bits >= 8 { key.append(UInt8((value >> (bits - 8)) & 0xFF)); bits -= 8 }
+        }
+        var step = UInt64(Int(Date().timeIntervalSince1970) / 30 + ahead).bigEndian
+        let mac = Array(HMAC<Insecure.SHA1>.authenticationCode(for: Data(bytes: &step, count: 8), using: SymmetricKey(data: key)))
+        let o = Int(mac[19] & 15)
+        let n = (UInt32(mac[o] & 0x7F) << 24 | UInt32(mac[o + 1]) << 16 | UInt32(mac[o + 2]) << 8 | UInt32(mac[o + 3])) % 1_000_000
+        return String(format: "%06u", n)
+    }
+
+    /// Two-factor sign-in (USER-9): a password account with an authenticator is asked for a code.
+    func testTwoFactorSignIn() throws {
+        let name = "twofa-ios-\(Int.random(in: 1000...9999))"
+        let pass = "correct horse battery"
+        let user = try adminAPI("POST", "/users", ["username": name, "displayName": name, "password": pass])
+        let id = try XCTUnwrap(user["id"] as? Int)
+        defer { _ = try? adminAPI("DELETE", "/users/\(id)") }
+        let login = try adminAPI("POST", "/auth/login", ["username": name, "password": pass, "device": ["clientId": "uitest-\(name)", "name": "UI test", "platform": "ios"]])
+        let token = try XCTUnwrap(login["token"] as? String)
+        let setup = try adminAPI("POST", "/auth/totp/setup", as: token)
+        let secret = try XCTUnwrap(setup["secret"] as? String)
+        let on = try adminAPI("POST", "/auth/totp/enable", ["code": totp(secret)], as: token)
+        XCTAssertEqual((on["recoveryCodes"] as? [Any])?.count, 10)
+
+        let address = app.textFields["Home address, e.g. 10.1.1.10:32500"]
+        XCTAssertTrue(address.waitForExistence(timeout: 10))
+        address.tap()
+        address.typeText(server)
+        app.buttons["Connect"].tap()
+        let other = app.buttons["Sign in with username and password"]
+        XCTAssertTrue(other.waitForExistence(timeout: 15))
+        other.tap()
+        let username = app.textFields["Username"]
+        XCTAssertTrue(username.waitForExistence(timeout: 5))
+        username.tap()
+        username.typeText(name)
+        app.secureTextFields["Password"].tap()
+        app.secureTextFields["Password"].typeText(pass)
+        app.buttons["Sign In"].tap()
+        let code = app.textFields["totpCode"]
+        XCTAssertTrue(code.waitForExistence(timeout: 10))
+        shot("t1-code-asked")
+        code.tap()
+        code.typeText(totp(secret, ahead: 1)) // the enable code's step is used up
+        app.buttons["Sign In"].tap()
+        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
+        shot("t2-signed-in")
     }
 }

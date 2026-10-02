@@ -13684,6 +13684,737 @@ public enum Operations {
             }
         }
     }
+    /// Whether the caller's account has two-factor sign-in.
+    ///
+    /// - Remark: HTTP `GET /auth/totp`.
+    /// - Remark: Generated from `#/paths//auth/totp/get(totpStatus)`.
+    public enum TotpStatus {
+        public static let id: Swift.String = "totpStatus"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/auth/totp/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.TotpStatus.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.TotpStatus.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.TotpStatus.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.TotpStatus.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/auth/totp/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/auth/totp/GET/responses/200/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/auth/totp/GET/responses/200/content/json/enabled`.
+                        public var enabled: Swift.Bool
+                        /// - Remark: Generated from `#/paths/auth/totp/GET/responses/200/content/json/recoveryCodesLeft`.
+                        public var recoveryCodesLeft: Swift.Int?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - enabled:
+                        ///   - recoveryCodesLeft:
+                        public init(
+                            enabled: Swift.Bool,
+                            recoveryCodesLeft: Swift.Int? = nil
+                        ) {
+                            self.enabled = enabled
+                            self.recoveryCodesLeft = recoveryCodesLeft
+                        }
+                        public enum CodingKeys: String, CodingKey {
+                            case enabled
+                            case recoveryCodesLeft
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/auth/totp/GET/responses/200/content/application\/json`.
+                    case json(Operations.TotpStatus.Output.Ok.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.TotpStatus.Output.Ok.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.TotpStatus.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.TotpStatus.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Status.
+            ///
+            /// - Remark: Generated from `#/paths//auth/totp/get(totpStatus)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.TotpStatus.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.TotpStatus.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//auth/totp/get(totpStatus)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Start turning on two-factor sign-in - a new secret for the authenticator app.
+    ///
+    /// - Remark: HTTP `POST /auth/totp/setup`.
+    /// - Remark: Generated from `#/paths//auth/totp/setup/post(setupTotp)`.
+    public enum SetupTotp {
+        public static let id: Swift.String = "setupTotp"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/auth/totp/setup/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SetupTotp.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SetupTotp.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.SetupTotp.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.SetupTotp.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/auth/totp/setup/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/auth/totp/setup/POST/responses/200/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/auth/totp/setup/POST/responses/200/content/json/secret`.
+                        public var secret: Swift.String
+                        /// - Remark: Generated from `#/paths/auth/totp/setup/POST/responses/200/content/json/otpauthUrl`.
+                        public var otpauthUrl: Swift.String
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - secret:
+                        ///   - otpauthUrl:
+                        public init(
+                            secret: Swift.String,
+                            otpauthUrl: Swift.String
+                        ) {
+                            self.secret = secret
+                            self.otpauthUrl = otpauthUrl
+                        }
+                        public enum CodingKeys: String, CodingKey {
+                            case secret
+                            case otpauthUrl
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/auth/totp/setup/POST/responses/200/content/application\/json`.
+                    case json(Operations.SetupTotp.Output.Ok.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.SetupTotp.Output.Ok.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.SetupTotp.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.SetupTotp.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// The secret, also as an otpauth:// URL for a QR code.
+            ///
+            /// - Remark: Generated from `#/paths//auth/totp/setup/post(setupTotp)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.SetupTotp.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.SetupTotp.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//auth/totp/setup/post(setupTotp)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Conflicts with current state.
+            ///
+            /// - Remark: Generated from `#/paths//auth/totp/setup/post(setupTotp)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Components.Responses.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Components.Responses.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Finish turning on two-factor sign-in with a code from the app; returns one-time recovery codes.
+    ///
+    /// - Remark: HTTP `POST /auth/totp/enable`.
+    /// - Remark: Generated from `#/paths//auth/totp/enable/post(enableTotp)`.
+    public enum EnableTotp {
+        public static let id: Swift.String = "enableTotp"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/auth/totp/enable/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.EnableTotp.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.EnableTotp.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.EnableTotp.Input.Headers
+            /// - Remark: Generated from `#/paths/auth/totp/enable/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/auth/totp/enable/POST/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// - Remark: Generated from `#/paths/auth/totp/enable/POST/requestBody/json/code`.
+                    public var code: Swift.String
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - code:
+                    public init(code: Swift.String) {
+                        self.code = code
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case code
+                    }
+                }
+                /// - Remark: Generated from `#/paths/auth/totp/enable/POST/requestBody/content/application\/json`.
+                case json(Operations.EnableTotp.Input.Body.JsonPayload)
+            }
+            public var body: Operations.EnableTotp.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            ///   - body:
+            public init(
+                headers: Operations.EnableTotp.Input.Headers = .init(),
+                body: Operations.EnableTotp.Input.Body
+            ) {
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/auth/totp/enable/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/auth/totp/enable/POST/responses/200/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/auth/totp/enable/POST/responses/200/content/json/recoveryCodes`.
+                        public var recoveryCodes: [Swift.String]
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - recoveryCodes:
+                        public init(recoveryCodes: [Swift.String]) {
+                            self.recoveryCodes = recoveryCodes
+                        }
+                        public enum CodingKeys: String, CodingKey {
+                            case recoveryCodes
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/auth/totp/enable/POST/responses/200/content/application\/json`.
+                    case json(Operations.EnableTotp.Output.Ok.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.EnableTotp.Output.Ok.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.EnableTotp.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.EnableTotp.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// On, with recovery codes (shown once).
+            ///
+            /// - Remark: Generated from `#/paths//auth/totp/enable/post(enableTotp)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.EnableTotp.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.EnableTotp.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//auth/totp/enable/post(enableTotp)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//auth/totp/enable/post(enableTotp)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Turn off two-factor sign-in (needs a current code or a recovery code). Admins can turn it off for another user.
+    ///
+    /// - Remark: HTTP `POST /auth/totp/disable`.
+    /// - Remark: Generated from `#/paths//auth/totp/disable/post(disableTotp)`.
+    public enum DisableTotp {
+        public static let id: Swift.String = "disableTotp"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/auth/totp/disable/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DisableTotp.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DisableTotp.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.DisableTotp.Input.Headers
+            /// - Remark: Generated from `#/paths/auth/totp/disable/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/auth/totp/disable/POST/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// - Remark: Generated from `#/paths/auth/totp/disable/POST/requestBody/json/code`.
+                    public var code: Swift.String?
+                    /// Admins only: another user's (no code needed).
+                    ///
+                    /// - Remark: Generated from `#/paths/auth/totp/disable/POST/requestBody/json/userId`.
+                    public var userId: Swift.Int64?
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - code:
+                    ///   - userId: Admins only: another user's (no code needed).
+                    public init(
+                        code: Swift.String? = nil,
+                        userId: Swift.Int64? = nil
+                    ) {
+                        self.code = code
+                        self.userId = userId
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case code
+                        case userId
+                    }
+                }
+                /// - Remark: Generated from `#/paths/auth/totp/disable/POST/requestBody/content/application\/json`.
+                case json(Operations.DisableTotp.Input.Body.JsonPayload)
+            }
+            public var body: Operations.DisableTotp.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            ///   - body:
+            public init(
+                headers: Operations.DisableTotp.Input.Headers = .init(),
+                body: Operations.DisableTotp.Input.Body
+            ) {
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Off.
+            ///
+            /// - Remark: Generated from `#/paths//auth/totp/disable/post(disableTotp)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.DisableTotp.Output.NoContent)
+            /// Off.
+            ///
+            /// - Remark: Generated from `#/paths//auth/totp/disable/post(disableTotp)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.DisableTotp.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//auth/totp/disable/post(disableTotp)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//auth/totp/disable/post(disableTotp)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//auth/totp/disable/post(disableTotp)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
     /// Watch-together groups the caller can join (members can see any group on the server).
     ///
     /// - Remark: HTTP `GET /syncplay/groups`.

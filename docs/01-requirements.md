@@ -149,7 +149,7 @@ Plex-style Live TV on every client (see the owner's reference screenshot: Guide 
 | USER-6 | Continue Watching / On Deck, Recently Added and Up Next (next episode). | P0 |
 | USER-7 | Playlists for video and music, plus smart playlists (smart playlists: MUSIC-8, M6.5). | P1 |
 | USER-8 | Watchlist. | P1 |
-| USER-9 | TOTP two-factor auth for admin/WAN logins. | P2 |
+| USER-9 | TOTP two-factor auth for admin/WAN logins. ✅ Any password account can turn it on (D75). | P2 |
 
 ## 5. Remote access (WAN)
 

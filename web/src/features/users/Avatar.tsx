@@ -7,13 +7,34 @@ import type { User } from "@/api/types";
 import { Alert, Button, Dialog } from "@/components/ui";
 
 /** A round profile picture, or the first letter of the name when there's none (USER-11). */
-export function Avatar({ name, url, className, children }: { name: string; url?: string | null; className?: string; children?: ReactNode }) {
+export function Avatar({
+  name,
+  url,
+  className,
+  children,
+}: {
+  name: string;
+  url?: string | null;
+  className?: string;
+  children?: ReactNode;
+}) {
   const [broken, setBroken] = useState<string | null>(null);
   const show = url && broken !== url;
   return (
-    <span className={clsx("relative flex shrink-0 items-center justify-center rounded-full bg-surface-3 font-bold", className)}>
+    <span
+      className={clsx(
+        "relative flex shrink-0 items-center justify-center rounded-full bg-surface-3 font-bold",
+        className,
+      )}
+    >
       {show ? (
-        <img src={avatarSrc(url)} alt="" draggable={false} onError={() => setBroken(url)} className="size-full rounded-full object-cover" />
+        <img
+          src={avatarSrc(url)}
+          alt=""
+          draggable={false}
+          onError={() => setBroken(url)}
+          className="size-full rounded-full object-cover"
+        />
       ) : (
         name.slice(0, 1).toUpperCase()
       )}
@@ -28,21 +49,34 @@ const MAX_ZOOM = 4;
 
 type View = { zoom: number; x: number; y: number }; // x, y: image top-left relative to the frame
 
-async function send(method: "PUT" | "DELETE", userId: number, body?: Blob): Promise<User> {
+async function send(
+  method: "PUT" | "DELETE",
+  userId: number,
+  body?: Blob,
+): Promise<User> {
   const res = await fetch(`/api/v1/users/${userId}/avatar`, {
     method,
     body,
-    headers: { Authorization: `Bearer ${session.token}`, ...(body ? { "Content-Type": "application/octet-stream" } : {}) },
+    headers: {
+      Authorization: `Bearer ${session.token}`,
+      ...(body ? { "Content-Type": "application/octet-stream" } : {}),
+    },
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, data.code ?? "error", data.message ?? res.statusText);
+  if (!res.ok)
+    throw new ApiError(
+      res.status,
+      data.code ?? "error",
+      data.message ?? res.statusText,
+    );
   return data as User;
 }
 
 function useAvatarMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ userId, blob }: { userId: number; blob?: Blob }) => send(blob ? "PUT" : "DELETE", userId, blob),
+    mutationFn: ({ userId, blob }: { userId: number; blob?: Blob }) =>
+      send(blob ? "PUT" : "DELETE", userId, blob),
     onSuccess: (u) => {
       qc.setQueryData<User>(["me"], (me) => (me && me.id === u.id ? u : me));
       qc.invalidateQueries({ queryKey: ["users"] });
@@ -62,23 +96,40 @@ export function AvatarPicker({ user }: { user: User }) {
   };
   return (
     <div className="flex items-center gap-4">
-      <button type="button" onClick={() => input.current?.click()} className="group relative rounded-full" aria-label="Choose a profile picture">
-        <Avatar name={user.displayName} url={user.avatarUrl} className="size-20 text-3xl" />
+      <button
+        type="button"
+        onClick={() => input.current?.click()}
+        className="group relative rounded-full"
+        aria-label="Choose a profile picture"
+      >
+        <Avatar
+          name={user.displayName}
+          url={user.avatarUrl}
+          className="size-20 text-3xl"
+        />
         <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
           <Camera className="size-6 text-white" aria-hidden />
         </span>
       </button>
       <div className="flex flex-wrap gap-2">
         <Button size="sm" onClick={() => input.current?.click()}>
-          <ImagePlus className="size-4" aria-hidden /> {user.avatarUrl ? "Change picture" : "Add picture"}
+          <ImagePlus className="size-4" aria-hidden />{" "}
+          {user.avatarUrl ? "Change picture" : "Add picture"}
         </Button>
         {user.avatarUrl && (
-          <Button size="sm" variant="ghost" loading={remove.isPending} onClick={() => remove.mutate({ userId: user.id })}>
+          <Button
+            size="sm"
+            variant="ghost"
+            loading={remove.isPending}
+            onClick={() => remove.mutate({ userId: user.id })}
+          >
             <Trash2 className="size-4" aria-hidden /> Remove
           </Button>
         )}
       </div>
-      {remove.isError && <span className="text-sm text-danger">{remove.error.message}</span>}
+      {remove.isError && (
+        <span className="text-sm text-danger">{remove.error.message}</span>
+      )}
       <input
         ref={input}
         type="file"
@@ -96,11 +147,21 @@ export function AvatarPicker({ user }: { user: User }) {
 }
 
 /** Lets the user drag and zoom a picture inside the round frame used for profile bubbles. */
-function AvatarEditor({ src, user, onClose }: { src: string; user: User; onClose: () => void }) {
+function AvatarEditor({
+  src,
+  user,
+  onClose,
+}: {
+  src: string;
+  user: User;
+  onClose: () => void;
+}) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [view, setView] = useState<View>({ zoom: 1, x: 0, y: 0 });
-  const drag = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
+  const drag = useRef<{ px: number; py: number; x: number; y: number } | null>(
+    null,
+  );
   const [dragging, setDragging] = useState(false);
   const save = useAvatarMutation();
 
@@ -108,7 +169,11 @@ function AvatarEditor({ src, user, onClose }: { src: string; user: User; onClose
     const i = new Image();
     i.onload = () => {
       const s = FRAME / Math.min(i.naturalWidth, i.naturalHeight);
-      setView({ zoom: 1, x: (FRAME - i.naturalWidth * s) / 2, y: (FRAME - i.naturalHeight * s) / 2 });
+      setView({
+        zoom: 1,
+        x: (FRAME - i.naturalWidth * s) / 2,
+        y: (FRAME - i.naturalHeight * s) / 2,
+      });
       setImg(i);
     };
     i.onerror = () => setLoadError(true);
@@ -121,7 +186,11 @@ function AvatarEditor({ src, user, onClose }: { src: string; user: User; onClose
   const clamp = (v: View): View => {
     if (!img) return v;
     const s = base * v.zoom;
-    return { zoom: v.zoom, x: Math.min(0, Math.max(FRAME - img.naturalWidth * s, v.x)), y: Math.min(0, Math.max(FRAME - img.naturalHeight * s, v.y)) };
+    return {
+      zoom: v.zoom,
+      x: Math.min(0, Math.max(FRAME - img.naturalWidth * s, v.x)),
+      y: Math.min(0, Math.max(FRAME - img.naturalHeight * s, v.y)),
+    };
   };
   // Zoom around the frame's center.
   const zoomTo = (z: number) =>
@@ -146,8 +215,23 @@ function AvatarEditor({ src, user, onClose }: { src: string; user: User; onClose
       ctx.fillStyle = "#fff";
       ctx.fillRect(0, 0, OUT, OUT);
       ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(img, -view.x / scale, -view.y / scale, FRAME / scale, FRAME / scale, 0, 0, OUT, OUT);
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("couldn't encode the picture"))), "image/jpeg", 0.9);
+      ctx.drawImage(
+        img,
+        -view.x / scale,
+        -view.y / scale,
+        FRAME / scale,
+        FRAME / scale,
+        0,
+        0,
+        OUT,
+        OUT,
+      );
+      canvas.toBlob(
+        (b) =>
+          b ? resolve(b) : reject(new Error("couldn't encode the picture")),
+        "image/jpeg",
+        0.9,
+      );
     });
 
   return (
@@ -164,7 +248,12 @@ function AvatarEditor({ src, user, onClose }: { src: string; user: User; onClose
             variant="primary"
             disabled={!img}
             loading={save.isPending}
-            onClick={async () => save.mutate({ userId: user.id, blob: await export_() }, { onSuccess: onClose })}
+            onClick={async () =>
+              save.mutate(
+                { userId: user.id, blob: await export_() },
+                { onSuccess: onClose },
+              )
+            }
           >
             Save
           </Button>
@@ -172,29 +261,56 @@ function AvatarEditor({ src, user, onClose }: { src: string; user: User; onClose
       }
     >
       <div className="space-y-5">
-        {loadError && <Alert tone="error">This file isn't an image this browser can open.</Alert>}
+        {loadError && (
+          <Alert tone="error">
+            This file isn't an image this browser can open.
+          </Alert>
+        )}
         {save.isError && <Alert tone="error">{save.error.message}</Alert>}
-        <p className="text-center text-sm text-muted">Drag to position. Zoom with the slider or scroll wheel.</p>
+        <p className="text-center text-sm text-muted">
+          Drag to position. Zoom with the slider or scroll wheel.
+        </p>
         <div
           className="relative mx-auto touch-none overflow-hidden rounded-lg bg-black select-none"
-          style={{ width: FRAME, height: FRAME, cursor: dragging ? "grabbing" : "grab" }}
+          style={{
+            width: FRAME,
+            height: FRAME,
+            cursor: dragging ? "grabbing" : "grab",
+          }}
           tabIndex={0}
           aria-label="Picture position. Use arrow keys to move and plus or minus to zoom."
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId);
-            drag.current = { px: e.clientX, py: e.clientY, x: view.x, y: view.y };
+            drag.current = {
+              px: e.clientX,
+              py: e.clientY,
+              x: view.x,
+              y: view.y,
+            };
             setDragging(true);
           }}
           onPointerMove={(e) => {
             const d = drag.current;
-            if (d) setView((v) => clamp({ ...v, x: d.x + e.clientX - d.px, y: d.y + e.clientY - d.py }));
+            if (d)
+              setView((v) =>
+                clamp({
+                  ...v,
+                  x: d.x + e.clientX - d.px,
+                  y: d.y + e.clientY - d.py,
+                }),
+              );
           }}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
           onWheel={(e) => zoomTo(view.zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1))}
           onKeyDown={(e) => {
             const step = 8;
-            const moves: Record<string, [number, number]> = { ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] };
+            const moves: Record<string, [number, number]> = {
+              ArrowLeft: [step, 0],
+              ArrowRight: [-step, 0],
+              ArrowUp: [0, step],
+              ArrowDown: [0, -step],
+            };
             const m = moves[e.key];
             if (m) {
               e.preventDefault();
@@ -209,14 +325,23 @@ function AvatarEditor({ src, user, onClose }: { src: string; user: User; onClose
               alt=""
               draggable={false}
               className="pointer-events-none absolute top-0 left-0 max-w-none origin-top-left"
-              style={{ width: img.naturalWidth, height: img.naturalHeight, transform: `translate(${view.x}px, ${view.y}px) scale(${scale})` }}
+              style={{
+                width: img.naturalWidth,
+                height: img.naturalHeight,
+                transform: `translate(${view.x}px, ${view.y}px) scale(${scale})`,
+              }}
             />
           )}
           {/* Dim everything outside the circle that profile bubbles show. */}
           <div className="pointer-events-none absolute inset-0 rounded-full shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] ring-2 ring-white/80" />
         </div>
         <div className="mx-auto flex max-w-64 items-center gap-3">
-          <button type="button" onClick={() => zoomTo(view.zoom / 1.2)} className="rounded p-1 text-muted hover:text-text" aria-label="Zoom out">
+          <button
+            type="button"
+            onClick={() => zoomTo(view.zoom / 1.2)}
+            className="rounded p-1 text-muted hover:text-text"
+            aria-label="Zoom out"
+          >
             <Minus className="size-4" />
           </button>
           <input
@@ -229,7 +354,12 @@ function AvatarEditor({ src, user, onClose }: { src: string; user: User; onClose
             aria-label="Zoom"
             className="flex-1 accent-[var(--color-accent)]"
           />
-          <button type="button" onClick={() => zoomTo(view.zoom * 1.2)} className="rounded p-1 text-muted hover:text-text" aria-label="Zoom in">
+          <button
+            type="button"
+            onClick={() => zoomTo(view.zoom * 1.2)}
+            className="rounded p-1 text-muted hover:text-text"
+            aria-label="Zoom in"
+          >
             <Plus className="size-4" />
           </button>
         </div>

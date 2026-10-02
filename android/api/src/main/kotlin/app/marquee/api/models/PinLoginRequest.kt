@@ -36,6 +36,7 @@ import kotlinx.serialization.Contextual
  * @param device 
  * @param pin 
  * @param password For profiles that have a password but no PIN.
+ * @param totpCode With a password, when the account has two-factor sign-in.
  */
 @Serializable
 
@@ -52,7 +53,11 @@ data class PinLoginRequest (
 
     /* For profiles that have a password but no PIN. */
     @SerialName(value = "password")
-    val password: kotlin.String? = null
+    val password: kotlin.String? = null,
+
+    /* With a password, when the account has two-factor sign-in. */
+    @SerialName(value = "totpCode")
+    val totpCode: kotlin.String? = null
 
 ) {
 

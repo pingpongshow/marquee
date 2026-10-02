@@ -23,7 +23,6 @@
 
 package app.marquee.api.models
 
-import app.marquee.api.models.DeviceInfo
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -32,27 +31,18 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param username 
- * @param password 
- * @param device 
- * @param totpCode The authenticator code (or a recovery code) when the account has two-factor sign-in.
+ * @param secret 
+ * @param otpauthUrl 
  */
 @Serializable
 
-data class LoginRequest (
+data class SetupTotp200Response (
 
-    @SerialName(value = "username")
-    val username: kotlin.String,
+    @SerialName(value = "secret")
+    val secret: kotlin.String,
 
-    @SerialName(value = "password")
-    val password: kotlin.String,
-
-    @SerialName(value = "device")
-    val device: DeviceInfo,
-
-    /* The authenticator code (or a recovery code) when the account has two-factor sign-in. */
-    @SerialName(value = "totpCode")
-    val totpCode: kotlin.String? = null
+    @SerialName(value = "otpauthUrl")
+    val otpauthUrl: kotlin.String
 
 ) {
 

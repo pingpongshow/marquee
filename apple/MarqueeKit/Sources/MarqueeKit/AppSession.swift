@@ -21,6 +21,11 @@ public struct MarqueeError: LocalizedError, Sendable {
     public var errorDescription: String? { message }
 }
 
+/// Sign-in needs the code from an authenticator app (two-factor, USER-9).
+public struct TwoFactorRequired: LocalizedError, Sendable {
+    public var errorDescription: String? { "Enter the code from your authenticator app." }
+}
+
 /// The signed-in token, readable from the networking threads.
 final class TokenBox: @unchecked Sendable {
     private let lock = NSLock()
@@ -209,11 +214,16 @@ public final class AppSession {
         state = .signedIn
     }
 
-    public func signIn(username: String, password: String) async throws {
+    public func signIn(username: String, password: String, totpCode: String? = nil) async throws {
         guard let client else { throw MarqueeError("Not connected") }
-        switch try await client.login(body: .json(.init(username: username, password: password, device: Self.deviceInfo))) {
+        switch try await client.login(body: .json(.init(username: username, password: password, totpCode: totpCode, device: Self.deviceInfo))) {
         case .ok(let ok): signedIn(try ok.body.json)
-        case .unauthorized: throw MarqueeError("Incorrect username or password.")
+        case .unauthorized(let r):
+            switch try? r.body.json.code {
+            case "totp_required": throw TwoFactorRequired()
+            case "invalid_totp": throw MarqueeError("That code didn't work. Try the newest one.")
+            default: throw MarqueeError("Incorrect username or password.")
+            }
         case .tooManyRequests(let r): throw MarqueeError((try? r.body.json.message) ?? "Too many attempts. Wait a minute.")
         default: throw MarqueeError("Sign-in failed.")
         }
@@ -225,11 +235,13 @@ public final class AppSession {
     }
 
     /// PIN sign-in from the "Who's watching?" picker.
-    public func pinSignIn(userID: Int64, pin: String?, password: String? = nil) async throws {
+    public func pinSignIn(userID: Int64, pin: String?, password: String? = nil, totpCode: String? = nil) async throws {
         guard let client else { throw MarqueeError("Not connected") }
-        switch try await client.pinLogin(body: .json(.init(userId: userID, pin: pin, password: password, device: Self.deviceInfo))) {
+        switch try await client.pinLogin(body: .json(.init(userId: userID, pin: pin, password: password, totpCode: totpCode, device: Self.deviceInfo))) {
         case .ok(let ok): signedIn(try ok.body.json)
-        case .unauthorized(let r): throw MarqueeError((try? r.body.json.message) ?? "Incorrect PIN.")
+        case .unauthorized(let r):
+            if (try? r.body.json.code) == "totp_required" { throw TwoFactorRequired() }
+            throw MarqueeError((try? r.body.json.message) ?? "Incorrect PIN.")
         case .forbidden(let r): throw MarqueeError((try? r.body.json.message) ?? "PIN sign-in isn't allowed here.")
         case .tooManyRequests(let r): throw MarqueeError((try? r.body.json.message) ?? "Too many attempts.")
         default: throw MarqueeError("Sign-in failed.")
