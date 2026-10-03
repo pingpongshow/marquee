@@ -11,6 +11,8 @@ enum Route: Hashable {
     case downloads
     case discover
     case moodStyle(library: Int64, mood: Bool, name: String)
+    /// Muse for movies and shows (USER-15), optionally in one library.
+    case museVideo(library: Int64?)
 }
 
 extension View {
@@ -30,6 +32,7 @@ extension View {
             #endif
             case .discover: DiscoverView()
             case let .moodStyle(library, mood, name): MoodStyleView(libraryID: library, kind: mood ? .mood : .style, name: name)
+            case let .museVideo(library): VideoMuseView(libraryID: library)
             }
         }
     }

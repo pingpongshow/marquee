@@ -16,6 +16,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
@@ -93,7 +94,8 @@ class MarqueeUiTest {
         rule.waitText("Who's watching?")
         shot("02-who-is-watching")
         tap(profile)
-        rule.waitText("Recently Added", 20_000, substring = true)
+        // Home's first rows (recommendations can push Recently Added below the fold).
+        rule.waitUntilAtLeastOneExists(hasText("Recently Added", substring = true) or hasText("Recommended for You") or hasText("Continue Watching"), 20_000)
         shot("03-home")
     }
 
@@ -230,7 +232,7 @@ class MarqueeUiTest {
         key(KeyEvent.KEYCODE_BACK)
         rule.waitText("Seasons")
         key(KeyEvent.KEYCODE_BACK)
-        rule.waitText("Recently Added", substring = true)
+        rule.waitUntilAtLeastOneExists(hasText("Recently Added", substring = true) or hasText("Recommended for You"), 15_000)
     }
 
     private fun key(code: Int) {
@@ -926,7 +928,8 @@ class MarqueeUiTest {
         tap("Reset")
         rule.waitUntilAtLeastOneExists(hasContentDescription("Hide Recently Added Movies"), 10_000)
         tap("Done")
-        rule.waitText("Recently Added Movies")
+        // Below the recommendation rows (USER-16).
+        rule.waitUntil(15_000) { scrollTo(hasText("Recently Added Movies")) }
     }
 
     /** The equaliser (Now Playing → EQ): a preset turns it on and reaches the platform effect. */
@@ -1002,5 +1005,463 @@ class MarqueeUiTest {
         rule.onNode(hasContentDescription("Delete invite $note")).performClick()
         rule.waitUntil(10_000) { rule.onAllNodesWithText(note).fetchSemanticsNodes().isEmpty() }
         assertTrue(!adminApi("GET", "/invites").contains(note))
+    }
+
+    // ---------- Batch 2 ----------
+
+    /** Runs block until it stops throwing (outside waitUntil, which measures off the main thread). */
+    private fun retry(timeout: Long, block: () -> Unit) {
+        val end = System.currentTimeMillis() + timeout
+        while (true) {
+            rule.waitForIdle()
+            val r = runCatching(block)
+            if (r.isSuccess) return
+            if (System.currentTimeMillis() > end) throw r.exceptionOrNull()!!
+            Thread.sleep(500)
+        }
+    }
+
+    /** Scrolls to a node, retrying (outside waitUntil, which measures off the main thread) until it shows. */
+    private fun scrollUntil(m: SemanticsMatcher, timeout: Long = 10_000) {
+        val end = System.currentTimeMillis() + timeout
+        while (true) {
+            rule.waitForIdle()
+            if (scrollTo(m)) return
+            if (System.currentTimeMillis() > end) throw AssertionError("never found $m")
+            Thread.sleep(500)
+        }
+    }
+
+    /** A temporary password account, for flows that change preferences or need two devices of one person. */
+    private class TempUser(val id: Long, val name: String, val pass: String)
+
+    private fun tempUser(prefix: String): TempUser {
+        val name = "$prefix-${(1000..9999).random()}"
+        val pass = "temporary pass ${(1000..9999).random()}"
+        val id = org.json.JSONObject(adminApi("POST", "/users", """{"username":"$name","displayName":"$name","password":"$pass"}""")).getLong("id")
+        return TempUser(id, name, pass)
+    }
+
+    /** Signs the temporary user in through the API as a device of its own. */
+    private fun login(u: TempUser, clientId: String, deviceName: String, platform: String): String =
+        org.json.JSONObject(adminApi("POST", "/auth/login",
+            """{"username":"${u.name}","password":"${u.pass}","device":{"clientId":"$clientId","name":"$deviceName","platform":"$platform"}}""")).getString("token")
+
+    /** Connects and signs the app in with a token. */
+    private fun signInWith(token: String) {
+        rule.waitUntilAtLeastOneExists(hasSetTextAction(), 10_000)
+        rule.onNode(hasSetTextAction()).performTextInput(server)
+        rule.onNodeWithText("Connect").performClick()
+        rule.waitText("Who's watching?")
+        val user = Serializer.kotlinxSerializationJson.decodeFromString(User.serializer(), adminApi("GET", "/me", asToken = token))
+        val app = context.applicationContext as MarqueeApplication
+        kotlinx.coroutines.runBlocking { app.marquee.finish(AuthResult(token, user)) }
+        rule.waitText("Edit Home", 20_000)
+    }
+
+    /** The app's own sign-in token (to tidy up what a test made as that person). */
+    private val appToken get() = (context.applicationContext as MarqueeApplication).marquee.token!!
+
+    /**
+     * Bazarr subtitles (META-12): Find subtitles shows Bazarr first; another language downloads
+     * through Bazarr, a provider search lists candidates and one is picked; the new tracks arrive.
+     * Uses 31 Ocean, which the fake Bazarr manages with nothing wanted (so other tests' wanted lists stay).
+     */
+    @Test fun bazarrSubtitles() {
+        assumeTrue("phones", !isTv)
+        connectAndSignIn()
+        playMovie("31 Ocean", fromStart = true)
+        // It's two seconds long: held paused at the start (through the remote-control hook) so the player stays.
+        val application = context.applicationContext as MarqueeApplication
+        val inst = InstrumentationRegistry.getInstrumentation()
+        rule.waitUntil(15_000) { var on = false; inst.runOnMainSync { on = application.remote.video != null }; on }
+        // Keeps pausing while the stream starts (starting it sets play again).
+        val until = System.currentTimeMillis() + 6_000
+        while (System.currentTimeMillis() < until) {
+            inst.runOnMainSync { application.remote.video?.execute(app.marquee.api.models.RemoteCommand(app.marquee.api.models.RemoteCommand.Type.PAUSE)) }
+            Thread.sleep(40)
+        }
+        openPlayerSettings()
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Find subtitles…"))
+        tap("Find subtitles…")
+        rule.waitText("BAZARR", 15_000)
+        shot("bz1-panel")
+        // The player merges plain text into its own node, so this works on the unmerged tree.
+        fun panel() = rule.onNode(hasContentDescription("Find subtitles panel") and hasScrollToNodeAction(), useUnmergedTree = true)
+        fun click(m: SemanticsMatcher) = rule.onAllNodes(m, useUnmergedTree = true).onLast().performClick() // the chips come after the list
+        retry(10_000) { panel().performScrollToNode(hasText("OPENSUBTITLES")) } // OpenSubtitles follows
+        panel().performScrollToNode(hasText("Another language…"))
+        retry(5_000) { click(hasText("Another language…")) }
+        retry(10_000) { panel().performScrollToNode(hasText("Spanish")) }
+        retry(5_000) { click(hasText("Spanish")) }
+        retry(15_000) { panel().performScrollToNode(hasText("is on its way from Bazarr", substring = true)) }
+        shot("bz2-queued")
+        retry(10_000) { panel().performScrollToNode(hasText("Search all providers")) }
+        retry(5_000) { click(hasText("Search all providers")) }
+        retry(70_000) { panel().performScrollToNode(hasContentDescription("Download from opensubtitlescom", substring = true)) }
+        shot("bz3-candidates")
+        retry(5_000) { click(hasContentDescription("Download from opensubtitlescom", substring = true)) }
+        retry(15_000) { panel().performScrollToNode(hasText("The opensubtitlescom subtitle is on its way", substring = true)) }
+        // Bazarr writes the files and the server picks them up as subtitle tracks.
+        rule.waitUntil(60_000) {
+            Thread.sleep(2_000)
+            val item = adminApi("GET", "/items/6")
+            item.contains("\"language\":\"es") || item.contains("\"language\":\"spa")
+        }
+        back() // the panel
+        back() // the player
+    }
+
+    /**
+     * Two devices of a temporary user, signed in through the API, once they list each other as
+     * remote players (each polls its inbox once). Tries again with new devices if they don't.
+     */
+    private class Devices(val a: String, val b: String, val nameA: String, val nameB: String)
+
+    private fun playerPair(u: TempUser, a: Pair<String, String>, b: Pair<String, String>): Devices {
+        repeat(6) { n ->
+            // Later tries get their own names, so a rejected try's devices can't be mistaken for them.
+            val na = a.first + if (n > 0) " $n" else ""
+            val nb = b.first + if (n > 0) " $n" else ""
+            val ta = login(u, "uitest-${u.name}-a$n", na, a.second)
+            val tb = login(u, "uitest-${u.name}-b$n", nb, b.second)
+            listOf(ta, tb).forEach { t ->
+                Thread { runCatching { adminApi("POST", "/remote/inbox", """{"cursor":0,"capabilities":["video","music"]}""", asToken = t) } }.apply { isDaemon = true; start() }
+            }
+            Thread.sleep(1500)
+            fun lists(t: String, name: String) = adminApi("GET", "/remote/players", asToken = t).contains("\"name\":\"$name\"")
+            if (lists(tb, na) && lists(ta, nb)) return Devices(ta, tb, na, nb)
+        }
+        throw AssertionError("no fresh remote devices")
+    }
+
+    /**
+     * Remote control as a player (USER-14): another device of the same person sends commands with
+     * the API; the app plays a movie, pauses, seeks, stops, then plays an album and skips, and
+     * reports its state each time.
+     */
+    @Test fun remoteControlPlayer() {
+        assumeTrue("phones", !isTv)
+        val u = tempUser("remote-player")
+        val app = context.applicationContext as MarqueeApplication
+        try {
+            val devices = playerPair(u, "UI Remote Phone" to "android", "UI Controller" to "web")
+            val appTok = devices.a
+            val ctl = devices.b
+            signInWith(appTok)
+            var device = 0L
+            rule.waitUntil(30_000) {
+                val list = org.json.JSONArray(adminApi("GET", "/remote/players", asToken = ctl))
+                (0 until list.length()).map { list.getJSONObject(it) }.firstOrNull { it.getString("name") == devices.nameA }?.let { device = it.getLong("deviceId") }
+                device != 0L
+            }
+            fun send(body: String) = adminApi("POST", "/remote/players/$device/commands", body, asToken = ctl)
+            fun state(): org.json.JSONObject = org.json.JSONObject(adminApi("GET", "/remote/players/$device", asToken = ctl)).optJSONObject("state") ?: org.json.JSONObject()
+
+            // A movie: it opens the player at the position asked for.
+            send("""{"type":"play","itemIds":[359],"startMs":5000}""")
+            rule.waitUntilAtLeastOneExists(videoPlaying, 30_000)
+            rule.waitUntil(20_000) { state().let { it.optLong("itemId") == 359L && it.optString("state") == "playing" } }
+            assertEquals("00 Preview Test", state().optString("title"))
+            shot("rc1-playing-from-remote")
+            send("""{"type":"pause"}""")
+            val paused = hasContentDescription("Video player") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Paused")
+            rule.waitUntilAtLeastOneExists(paused, 10_000)
+            rule.waitUntil(15_000) { state().optString("state") == "paused" }
+            send("""{"type":"seek","positionMs":60000}""")
+            rule.waitUntil(10_000) { var at = 0L; onMainPosition { at = it }; at in 58_000..62_000 }
+            rule.waitUntil(15_000) { state().optLong("positionMs") in 58_000..62_000 }
+            send("""{"type":"resume"}""")
+            rule.waitUntilAtLeastOneExists(videoPlaying, 10_000)
+            send("""{"type":"setVolume","volume":0.5}""")
+            rule.waitUntil(15_000) { state().optDouble("volume") == 0.5 }
+            send("""{"type":"stop"}""")
+            rule.waitUntil(10_000) { rule.onAllNodes(hasContentDescription("Video player")).fetchSemanticsNodes().isEmpty() }
+
+            // An album: its tracks play in order; next moves along.
+            send("""{"type":"play","itemIds":[324]}""")
+            rule.waitUntil(20_000) { app.music.now.value != null && app.music.playing.value }
+            rule.waitUntil(15_000) { state().let { it.optString("itemType") == "track" && it.optInt("queueLength") == 4 } }
+            val first = app.music.now.value!!.id
+            send("""{"type":"next"}""")
+            rule.waitUntil(10_000) { app.music.now.value?.id != first }
+            rule.waitUntil(15_000) { state().optInt("queueIndex") == 1 }
+            send("""{"type":"pause"}""")
+            rule.waitUntil(10_000) { !app.music.playing.value }
+            rule.waitUntil(15_000) { state().optString("state") == "paused" }
+            shot("rc2-music-paused-from-remote")
+            send("""{"type":"stop"}""")
+            rule.waitUntil(10_000) { app.music.now.value == null }
+        } finally {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+            adminApi("DELETE", "/users/${u.id}")
+        }
+    }
+
+    /**
+     * The controller (USER-14): a fake TV (an inbox polled with the API) shows in Settings → Remote;
+     * its Remote screen shows what it plays and sends Pause; an item page's Play on… sends it a play.
+     */
+    @Test fun remoteControlController() {
+        assumeTrue("phones", !isTv)
+        val u = tempUser("remote-ctl")
+        val commands = java.util.concurrent.CopyOnWriteArrayList<org.json.JSONObject>()
+        val stop = java.util.concurrent.atomic.AtomicBoolean(false)
+        var poller: Thread? = null
+        try {
+            val devices = playerPair(u, "UI Remote Phone" to "android", "UI Fake TV" to "androidtv")
+            val appTok = devices.a
+            val tv = devices.b
+            val tvName = devices.nameB
+            // The fake TV: polls its inbox, playing 00 Preview Test at 10 s.
+            poller = Thread {
+                var cursor = 0L
+                while (!stop.get()) {
+                    runCatching {
+                        val r = org.json.JSONObject(adminApi("POST", "/remote/inbox",
+                            """{"cursor":$cursor,"capabilities":["video","music"],"state":{"state":"playing","positionMs":10000,"itemId":359,"itemType":"movie","title":"00 Preview Test","artItemId":359,"durationMs":120000,"volume":0.8}}""",
+                            asToken = tv))
+                        cursor = r.getLong("cursor")
+                        val cs = r.getJSONArray("commands")
+                        for (i in 0 until cs.length()) commands.add(cs.getJSONObject(i))
+                    }.onFailure { Thread.sleep(1000) }
+                }
+            }.apply { isDaemon = true; start() }
+            signInWith(appTok)
+            tap("Settings")
+            rule.waitText("Remote")
+            tap("Remote")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Control $tvName"), 30_000)
+            shot("rcc1-players")
+            rule.onNode(hasContentDescription("Control $tvName")).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Remote title") and hasText("00 Preview Test"), 15_000)
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Volume"), 10_000)
+            Thread.sleep(1500)
+            shot("rcc2-remote")
+            rule.onNode(hasContentDescription("Pause")).performClick()
+            // Only ours: admins elsewhere (other test runs) can see this fake TV too.
+            fun mine() = commands.filter { it.optString("from") == devices.nameA }
+            rule.waitUntil(15_000) { mine().any { it.getString("type") == "pause" } }
+            rule.onNode(hasContentDescription("Forward 30 seconds")).performClick()
+            rule.waitUntil(15_000) { mine().any { it.getString("type") == "seek" && it.getLong("positionMs") >= 40_000 } }
+            tap("Disconnect")
+
+            // Play on… from an item page.
+            tap("Home")
+            openLibrary("Movies")
+            rule.waitText("00 Preview Test")
+            tap("00 Preview Test")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Play on…"), 10_000)
+            rule.onNode(hasContentDescription("Play on…")).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Play on $tvName"), 15_000)
+            shot("rcc3-play-on")
+            rule.onNode(hasContentDescription("Play on $tvName")).performClick()
+            rule.waitUntil(15_000) { mine().any { it.getString("type") == "play" && it.getJSONArray("itemIds").getLong(0) == 359L } }
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Remote title"), 10_000)
+            tap("Disconnect")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Play on…"), 10_000)
+        } finally {
+            stop.set(true)
+            poller?.join(30_000)
+            adminApi("DELETE", "/users/${u.id}")
+        }
+    }
+
+    /** Subtitle appearance (PLAY-20): chosen in Settings, previewed, saved to the person's preferences and used by the player. */
+    @Test fun subtitleAppearance() {
+        val u = tempUser("subs")
+        try {
+            val tok = login(u, "uitest-${u.name}", "UI test", "android")
+            signInWith(tok)
+            tap("Settings")
+            rule.waitText("Subtitle appearance")
+            tap("Subtitle appearance")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Subtitle preview"), 10_000)
+            rule.onNode(hasContentDescription("Subtitle preview") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "medium, #FFFFFF, outline, bottom")).assertExists()
+            tap("Large")
+            rule.waitText("Saved")
+            rule.onNode(hasContentDescription("Yellow")).performClick()
+            tap("Opaque")
+            tap("Raised")
+            val chosen = hasContentDescription("Subtitle preview") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "large, #FFFF00, opaque, raised")
+            rule.waitUntilAtLeastOneExists(chosen, 5_000)
+            shot("sa1-appearance")
+            rule.waitUntil(10_000) {
+                val st = org.json.JSONObject(adminApi("GET", "/me", asToken = tok)).getJSONObject("preferences").optJSONObject("subtitleStyle")
+                st != null && st.optString("size") == "large" && st.optString("color") == "#FFFF00" && st.optString("background") == "opaque" && st.optString("position") == "raised"
+            }
+            // Signed in again (as if on another app), it's still there.
+            back()
+            tap("Subtitle appearance")
+            rule.waitUntilAtLeastOneExists(chosen, 5_000)
+            // The player uses it: a movie with an English subtitle track.
+            if (!isTv) {
+                tap("Home")
+                playMovie("00 Preview Test", fromStart = true)
+                rule.waitUntilAtLeastOneExists(videoPlaying, 30_000)
+                // ExoPlayer's subtitle view has the yellow, boxed, raised style (read from its fields).
+                var applied = false
+                rule.waitUntil(10_000) {
+                    scenario.onActivity { a ->
+                        val v = a.window.decorView.findViewsOfType(androidx.media3.ui.SubtitleView::class.java).firstOrNull() ?: return@onActivity
+                        fun field(name: String) = androidx.media3.ui.SubtitleView::class.java.getDeclaredField(name).apply { isAccessible = true }.get(v)
+                        val style = field("style") as androidx.media3.ui.CaptionStyleCompat
+                        val raised = field("bottomPaddingFraction") as Float
+                        applied = style.foregroundColor == android.graphics.Color.YELLOW && style.backgroundColor == android.graphics.Color.BLACK && raised > 0.2f
+                    }
+                    applied
+                }
+                Thread.sleep(3000)
+                shot("sa2-player")
+                back()
+            }
+        } finally {
+            adminApi("DELETE", "/users/${u.id}")
+        }
+    }
+
+    private fun <T : android.view.View> android.view.View.findViewsOfType(type: Class<T>): List<T> {
+        val out = mutableListOf<T>()
+        fun walk(v: android.view.View) {
+            if (type.isInstance(v)) out.add(type.cast(v)!!)
+            if (v is android.view.ViewGroup) for (i in 0 until v.childCount) walk(v.getChildAt(i))
+        }
+        walk(this)
+        return out
+    }
+
+    /** Year in Music (MUSIC-22): the card on the Music page, the story's pages, Save as playlist and Play your top songs. */
+    @Test fun yearInMusic() {
+        connectAndSignIn()
+        val app = context.applicationContext as MarqueeApplication
+        val year = java.time.Year.now().value
+        openLibrary("Music")
+        // At the top of the library (a TV's first focus, the stations, may have scrolled past it).
+        rule.waitUntil(20_000) { scrollTo(hasContentDescription("Your Year in Music $year")) }
+        shot("y1-card")
+        rule.onNode(hasContentDescription("Your Year in Music $year")).performClick()
+        rule.waitText("You listened for", 15_000)
+        shot("y2-minutes")
+        fun page(n: Int) = hasContentDescription("Year in Music") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Page $n of 10")
+        if (isTv) {
+            key(KeyEvent.KEYCODE_DPAD_RIGHT)
+            rule.waitUntilAtLeastOneExists(page(2), 5_000)
+        } else {
+            rule.onAllNodes(hasContentDescription("Next page")).onFirst().performClick()
+            rule.waitUntilAtLeastOneExists(page(2), 5_000)
+        }
+        rule.waitText("YOUR TOP ARTIST")
+        Thread.sleep(800)
+        shot("y3-top-artist")
+        for (n in 3..10) {
+            if (isTv) key(KeyEvent.KEYCODE_DPAD_RIGHT)
+            else rule.onAllNodes(hasContentDescription("Next page")).onFirst().performClick()
+            rule.waitUntilAtLeastOneExists(page(n), 5_000)
+            Thread.sleep(700)
+            if (n == 4) { rule.waitText("YOUR TOP SONGS"); shot("y4-top-songs") }
+            if (n == 7) { rule.waitText("WHEN YOU LISTEN"); shot("y5-when") }
+        }
+        rule.waitText("$year WRAPPED")
+        shot("y6-summary")
+        val before = org.json.JSONArray(adminApi("GET", "/playlists", asToken = appToken)).length()
+        tap("Save as playlist")
+        rule.waitText("Saved “", 15_000, substring = true)
+        shot("y7-saved")
+        val lists = org.json.JSONArray(adminApi("GET", "/playlists", asToken = appToken))
+        val made = (0 until lists.length()).map { lists.getJSONObject(it) }.filter { it.getString("title").contains("$year") }
+        assertTrue("a playlist for $year (had $before, now ${lists.length()})", made.isNotEmpty())
+        made.forEach { adminApi("DELETE", "/playlists/${it.getLong("id")}", asToken = appToken) }
+        tap("Play your top songs")
+        rule.waitUntil(20_000) { app.music.now.value != null }
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+        rule.onNode(hasContentDescription("Close recap")).performClick()
+    }
+
+    /** Muse for movies (USER-15): Search's Muse mode, a prompt, how it was read, results and Save as playlist. */
+    @Test fun museForMovies() {
+        connectAndSignIn()
+        rule.onNode(hasContentDescription("Muse")).assertExists() // the Home button
+        tap("Search")
+        rule.waitText("Muse")
+        tap("Muse")
+        rule.waitText("90s sci-fi with time travel")
+        shot("mv1-muse")
+        rule.onNode(androidx.compose.ui.test.hasTestTag("musePrompt")).performTextInput("movies from the 1980s")
+        tap("Ask Muse")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Muse understood:", substring = true), 30_000)
+        rule.waitText("1980s", substring = true)
+        rule.waitText("titles", substring = true)
+        Thread.sleep(1500)
+        shot("mv2-results")
+        tap("Save as playlist")
+        rule.waitText("Saved · Open", 15_000, substring = true)
+        val lists = org.json.JSONArray(adminApi("GET", "/playlists", asToken = appToken))
+        val made = (0 until lists.length()).map { lists.getJSONObject(it) }.filter { it.getString("title") == "Muse: movies from the 1980s" }
+        assertTrue("the Muse playlist was saved", made.isNotEmpty())
+        assertTrue("with the results", made.first().getInt("itemCount") > 0)
+        made.forEach { adminApi("DELETE", "/playlists/${it.getLong("id")}", asToken = appToken) }
+        // An example chip asks at once.
+        rule.onAllNodes(hasText("90s sci-fi with time travel")).onFirst().performClick()
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Muse understood: 1990s", substring = true), 30_000)
+    }
+
+    /** Recommended for You and Because you watched (USER-16) on Home, and their rows in Edit Home. */
+    @Test fun homeRecommendations() {
+        connectAndSignIn()
+        rule.waitUntil(20_000) { scrollTo(hasText("Recommended for You")) }
+        rule.waitUntil(10_000) { scrollTo(hasText("Because you watched", substring = true)) }
+        shot("hr1-home")
+        // No "see all" on these rows.
+        rule.onAllNodes(hasText("Recommended for You  ›")).fetchSemanticsNodes().let { assertTrue(it.isEmpty()) }
+        rule.waitUntil(10_000) { scrollTo(hasText("Edit Home")) }
+        tap("Edit Home")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Hide Recommended for You") or hasContentDescription("Show Recommended for You"), 10_000)
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Because You Watched"))
+        rule.onNode(hasContentDescription("Move Because You Watched up")).assertExists()
+        shot("hr2-edit-home")
+        scrollTo(hasText("Done"))
+        tap("Done")
+    }
+
+    /**
+     * Library Health (ADM-11), as the admin: the checks, a check's issues, Ignore with Undo, and
+     * Download with Bazarr for missing subtitles. Also the Bazarr settings in Server settings.
+     */
+    @Test fun libraryHealth() {
+        assumeTrue("phones", !isTv)
+        signInAsAdmin()
+        tap("Settings")
+        rule.waitText("Library Health")
+        tap("Library Health")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Missing subtitles:", substring = true), 15_000)
+        shot("lh1-checks")
+        rule.onNode(hasContentDescription("Missing subtitles:", substring = true)).performClick()
+        rule.waitText("15 Thunder", 15_000)
+        rule.waitText("Missing English", substring = true)
+        shot("lh2-issues")
+        rule.onNode(hasContentDescription("Ignore 15 Thunder")).performClick()
+        rule.waitText("Ignored “15 Thunder”", 5_000)
+        rule.waitUntil(5_000) { rule.onAllNodes(hasContentDescription("Ignore 15 Thunder")).fetchSemanticsNodes().isEmpty() }
+        assertTrue(!adminApi("GET", "/library-health/missingSubtitles").contains("15 Thunder"))
+        shot("lh3-ignored")
+        tap("Undo")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Ignore 15 Thunder"), 10_000)
+        rule.waitUntil(10_000) { adminApi("GET", "/library-health/missingSubtitles").contains("15 Thunder") }
+        // Bazarr for one of them: what it wants, without downloading (other tests count on it).
+        rule.onAllNodes(hasText("Download with Bazarr")).onFirst().performClick()
+        rule.waitText("Wanted", 15_000)
+        rule.waitText("Search all providers")
+        shot("lh4-bazarr")
+        tap("Done")
+        back()
+        back()
+        // Bazarr's address and whether its key is set, next to Seerr.
+        rule.waitText("Server settings")
+        tap("Server settings")
+        rule.waitText("Cinema trailers")
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Save integrations"))
+        rule.waitUntilAtLeastOneExists(androidx.compose.ui.test.hasTestTag("bazarrUrl") and hasText("32767", substring = true), 10_000)
+        rule.waitText("Key: set")
+        shot("lh5-bazarr-settings")
     }
 }

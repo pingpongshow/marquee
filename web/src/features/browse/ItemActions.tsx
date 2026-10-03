@@ -19,7 +19,7 @@ function useItemUpdated() {
   };
 }
 
-function FixMatchDialog({ item, onClose }: { item: ItemDetail; onClose: () => void }) {
+export function FixMatchDialog({ item, onClose }: { item: ItemDetail; onClose: () => void }) {
   const updated = useItemUpdated();
   const [title, setTitle] = useState(item.title);
   const [year, setYear] = useState(item.year ? String(item.year) : "");

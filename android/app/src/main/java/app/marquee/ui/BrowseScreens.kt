@@ -36,6 +36,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -96,6 +101,8 @@ fun HomeScreen(nav: NavHostController) {
             item {
                 Row(Modifier.padding(horizontal = sidePadding).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("Home", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    // Muse: describe what to watch (USER-15).
+                    if (!marquee.isOffline) IconButton({ nav.navigate("muse") }, Modifier.focusRing()) { Icon(Icons.Filled.AutoAwesome, "Muse", tint = Gold) }
                     // Rows: order, hide and pinned collections and playlists (USER-12).
                     if (!marquee.isOffline) androidx.compose.material3.TextButton({ nav.navigate("edithome") }, Modifier.focusRing()) {
                         Icon(Icons.Filled.Edit, null)
@@ -229,6 +236,10 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
                 Icon(androidx.compose.material.icons.Icons.Filled.DirectionsCar, null)
                 Text("Car mode", Modifier.padding(start = 6.dp))
             }
+            // Muse for movies and shows (USER-15).
+            if (library?.type in listOf(LibraryType.MOVIES, LibraryType.SHOWS, LibraryType.ANIME)) IconButton({ nav.navigate("muse?lib=$libraryId") }, Modifier.focusRing()) {
+                Icon(Icons.Filled.AutoAwesome, "Muse", tint = Gold)
+            }
             if (library?.type == LibraryType.MOVIES) listOf(false to "All", true to "Collections").forEach { (c, label) ->
                 androidx.compose.material3.FilterChip(collections == c, {
                     if (collections != c) { collections = c; items.clear(); total = -1; loadMore() }
@@ -237,6 +248,8 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
         }
         LazyVerticalGrid(GridCells.Adaptive(min), contentPadding = PaddingValues(sidePadding), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             // Music libraries open with Muse, stations and mixes above the artists.
+            // Your Year in Music (MUSIC-22), when there's a year to show.
+            if (isMusic) item(span = { GridItemSpan(maxLineSpan) }) { app.marquee.music.YearInMusicCard(nav) }
             if (isMusic) item(span = { GridItemSpan(maxLineSpan) }) { app.marquee.music.MusicDiscover(libraryId) { kind, name -> nav.navigate("browse/$libraryId/$kind/${android.net.Uri.encode(name)}") } }
             itemsIndexed(items, key = { _, it -> it.id }) { i, it ->
                 if (i >= items.size - 30) LaunchedEffect(i) { loadMore() }
@@ -306,7 +319,15 @@ fun SearchScreen(nav: NavHostController) {
         delay(250)
         results = withContext(Dispatchers.IO) { runCatching { marquee.search.search(q.trim(), 20) }.getOrNull() }
     }
+    // Muse (USER-15): describe what you want to watch instead of searching by name.
+    var muse by rememberSaveable { mutableStateOf(false) }
     Column {
+        Row(Modifier.padding(start = sidePadding, end = sidePadding, top = sidePadding), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(!muse, { muse = false }, { Text("Search") }, Modifier.focusRing(RoundedCornerShape(8.dp)))
+            FilterChip(muse, { muse = true }, { Text("Muse") }, Modifier.focusRing(RoundedCornerShape(8.dp)),
+                leadingIcon = { Icon(Icons.Filled.AutoAwesome, null, Modifier.size(18.dp)) })
+        }
+        if (muse) { MuseVideoPanel(nav, null); return@Column }
         OutlinedTextField(q, { q = it }, label = { Text("Search movies, shows, music…") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(sidePadding))
         LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
             items(results?.groups ?: emptyList()) { g ->
@@ -339,6 +360,10 @@ fun SettingsScreen(nav: NavHostController) {
         // Buttons wrap onto more lines rather than running off a phone's edge.
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { nav.navigate("stats") }) { Text("Your Stats") }
+            OutlinedButton(onClick = { nav.navigate("subtitles") }) { Text("Subtitle appearance") }
+            // Control Marquee on another screen (USER-14); TVs are players only.
+            if (!marquee.isTv) OutlinedButton(onClick = { nav.navigate("remote") }) { Text("Remote") }
+            if (me?.isAdmin == true && !marquee.isTv) OutlinedButton(onClick = { nav.navigate("health") }) { Text("Library Health") }
             if (me?.isAdmin == true) OutlinedButton(onClick = { nav.navigate("approvals") }) { Text("Requests") }
             if (me?.isAdmin == true) OutlinedButton(onClick = { nav.navigate("users") }) { Text("Users & sharing") }
             if (me?.isAdmin == true) OutlinedButton(onClick = { nav.navigate("serversettings") }) { Text("Server settings") }

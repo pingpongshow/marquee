@@ -242,6 +242,12 @@ struct ItemDetailView: View {
                 }
                 .buttonStyle(.bordered)
             }
+            #if os(iOS)
+            if [.movie, .episode, .video, .season, .show, .album, .artist, .track].contains(d.type) {
+                // Remote control (USER-14): play this on another of your Marquee apps.
+                PlayOnButton(target: { PlayOnTarget(itemIDs: [d.id]) }).buttonStyle(.bordered)
+            }
+            #endif
             Menu { ItemMenuItems(item: d.base) } label: { Image(systemName: "ellipsis").padding(.horizontal, 4) }
                 .buttonStyle(.bordered)
         }
@@ -312,10 +318,10 @@ struct ItemDetailView: View {
             .pickerStyle(.menu)
             .font(.callout)
             .sheet(isPresented: $findingSubs) {
-                SubtitleSearchSheet(itemID: d.id) { stream in
+                SubtitleSearchSheet(itemID: d.id, onAdded: { stream in
                     subtitleID = stream
                     Task { await load() }
-                }
+                }, onBazarr: { Task { await load() } })
             }
             .onChange(of: audioID) { PendingTracks.shared.set(item: d.id, audio: audioID, subtitle: subtitleID, file: fileID) }
             .onChange(of: subtitleID) { PendingTracks.shared.set(item: d.id, audio: audioID, subtitle: subtitleID, file: fileID) }

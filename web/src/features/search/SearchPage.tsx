@@ -1,14 +1,49 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { clsx } from "clsx";
+import { Search, Sparkles } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { searchQuery } from "@/api/queries";
 import { Spinner } from "@/components/ui";
 import { Poster } from "../browse/Poster";
+import { MuseVideo } from "./MuseVideo";
 import { groupLabels, resultSubtitle } from "./SearchBox";
 
+/** Search, with Muse (USER-15) as a second mode: describe what you want to watch. */
 export function SearchPage() {
-  const { q } = useSearch({ from: "/search" });
+  const { q, mode, lib } = useSearch({ from: "/search" });
+  const navigate = useNavigate({ from: "/search" });
+  const tabs = (
+    <div className="mb-6 flex w-fit rounded-md bg-surface-2 p-0.5 text-sm" role="tablist" aria-label="Search mode">
+      {(
+        [
+          [undefined, "Search", Search],
+          ["muse", "Muse", Sparkles],
+        ] as const
+      ).map(([m, label, Icon]) => (
+        <button
+          key={label}
+          role="tab"
+          aria-selected={mode === m}
+          onClick={() => navigate({ search: { q, mode: m, lib: m ? lib : undefined }, replace: true })}
+          className={clsx("flex items-center gap-1.5 rounded px-3 py-1", mode === m ? "bg-surface-3 text-text" : "text-muted hover:text-text")}
+        >
+          <Icon className="size-4" aria-hidden /> {label}
+        </button>
+      ))}
+    </div>
+  );
+  if (mode === "muse")
+    return (
+      <div className="p-6 lg:p-8">
+        {tabs}
+        <MuseVideo libraryId={lib} />
+      </div>
+    );
+  return <TextSearch q={q} tabs={tabs} />;
+}
+
+function TextSearch({ q, tabs }: { q: string; tabs: ReactNode }) {
   const navigate = useNavigate({ from: "/search" });
   const [text, setText] = useState(q);
   // Update the URL (and results) shortly after typing stops.
@@ -20,6 +55,7 @@ export function SearchPage() {
   const results = useQuery({ ...searchQuery(q, 50), enabled: q.length > 0 });
   return (
     <div className="p-6 lg:p-8">
+      {tabs}
       <div className="relative mb-6 max-w-xl">
         <Search className="pointer-events-none absolute top-1/2 left-3 size-5 -translate-y-1/2 text-faint" aria-hidden />
         <input

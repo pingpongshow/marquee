@@ -51,6 +51,16 @@ type Preferences struct {
 	LocalQualityKbps  int    `json:"localQualityKbps,omitempty"`
 	RemoteQualityKbps int    `json:"remoteQualityKbps,omitempty"`
 	CinemaTrailers    *bool  `json:"cinemaTrailers,omitempty"` // nil = on (PLAY-18)
+	// SubtitleStyle is how text subtitles look (PLAY-20); nil = the defaults.
+	SubtitleStyle *SubtitleStyle `json:"subtitleStyle,omitempty"`
+}
+
+// SubtitleStyle holds a person's subtitle look; empty fields mean the default.
+type SubtitleStyle struct {
+	Size       string `json:"size,omitempty"`       // small, medium, large, huge
+	Color      string `json:"color,omitempty"`      // #RRGGBB
+	Background string `json:"background,omitempty"` // none, outline, translucent, opaque
+	Position   string `json:"position,omitempty"`   // bottom, raised
 }
 
 type NewUser struct {

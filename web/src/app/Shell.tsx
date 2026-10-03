@@ -12,6 +12,7 @@ import {
   ListMusic,
   LogOut,
   Menu,
+  MonitorSpeaker,
   Music,
   Settings,
   Sparkles,
@@ -29,6 +30,8 @@ import { SearchBox } from "@/features/search/SearchBox";
 import { Avatar } from "@/features/users/Avatar";
 import { ProfileSwitcher } from "@/features/users/ProfileSwitcher";
 import { useMusicState } from "@/features/player/MusicPlayer";
+import { RemoteHost } from "@/features/remote/RemoteHost";
+import { Toaster } from "@/components/Toast";
 import { useAuth } from "@/lib/auth";
 
 export const libraryIcons: Record<LibraryType, typeof Film> = {
@@ -101,6 +104,9 @@ function UserMenu({
         >
           <Link to="/account" className={item}>
             <UserRound className="size-4" aria-hidden /> Account
+          </Link>
+          <Link to="/remote" search={{ d: undefined }} className={item}>
+            <MonitorSpeaker className="size-4" aria-hidden /> Remote
           </Link>
           {onSwitch && (
             <button onClick={onSwitch} className={item}>
@@ -295,6 +301,8 @@ export function Shell({ children }: { children: ReactNode }) {
         </main>
       </div>
       {switching && <ProfileSwitcher onClose={() => setSwitching(false)} />}
+      <RemoteHost />
+      <Toaster />
     </div>
   );
 }

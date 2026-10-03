@@ -50,6 +50,8 @@ type Request struct {
 	// Timing offsets (PLAY-17), in ms: positive shows subtitles / plays audio later. Nil uses
 	// what this user last chose for the file; a value given is remembered for next time.
 	SubtitleOffsetMS, AudioOffsetMS *int
+	// SubtitleStyle is how this person wants text subtitles to look (PLAY-20), for burn-in.
+	SubtitleStyle SubtitleStyle
 }
 
 // Session is an active playback.
@@ -328,6 +330,7 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 		if sub := s.Media.Subtitle; sub != nil && s.Decision.BurnSubtitle {
 			job.SubIndex, job.SubExternal, job.SubImage = sub.Index, sub.External, sub.IsImage()
 			job.SubRelIndex = m.subtitleRelIndex(ctx, s.FileID, sub.Index)
+			job.SubForceStyle = burnStyle(sub, r.SubtitleStyle)
 		}
 		s.transcoder = &Transcoder{FFmpeg: m.FFmpeg, Job: job, Encoders: m.encodersFor(cfg.Transcoder.EncoderOrder),
 			TotalSegments: len(plan), ThrottleAhead: cfg.Transcoder.ThrottleSegmentsAhead}

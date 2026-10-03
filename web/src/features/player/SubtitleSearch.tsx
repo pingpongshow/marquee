@@ -3,6 +3,7 @@ import { BadgeCheck, Download, Ear } from "lucide-react";
 import { useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { Alert, Button, Dialog, Select, Spinner } from "@/components/ui";
+import { BazarrSection } from "./Bazarr";
 
 const languages: [string, string][] = [
   ["en", "English"],
@@ -51,7 +52,10 @@ const fromPref: Record<string, string> = {
   rus: "ru",
 };
 
-/** Searches OpenSubtitles for the playing item and adds the chosen file (PLAY-7). */
+/**
+ * Searches OpenSubtitles for the playing item and adds the chosen file (PLAY-7). When Bazarr
+ * manages the item, its section comes first (META-12).
+ */
 export function SubtitleSearchDialog({
   itemId,
   preferred,
@@ -94,8 +98,10 @@ export function SubtitleSearchDialog({
     },
   });
   return (
-    <Dialog open onClose={onClose} title="Find subtitles">
+    <Dialog open wide onClose={onClose} title="Find subtitles">
       <div className="space-y-4">
+        <BazarrSection itemId={itemId} />
+        <h3 className="text-sm font-semibold">OpenSubtitles</h3>
         <Select
           aria-label="Language"
           value={lang}

@@ -99,7 +99,7 @@ fun MiniPlayer(onOpen: () -> Unit) {
 /** Full-screen Now Playing: artwork or lyrics or the queue, rating, radio, sleep timer and Guest DJ. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun NowPlayingScreen(onClose: () -> Unit, onCarMode: (() -> Unit)? = null) {
+fun NowPlayingScreen(onClose: () -> Unit, onCarMode: (() -> Unit)? = null, onRemote: ((Long) -> Unit)? = null) {
     val music = LocalMusic.current
     val marquee = LocalMarquee.current
     val now by music.now.collectAsState()
@@ -125,6 +125,13 @@ fun NowPlayingScreen(onClose: () -> Unit, onCarMode: (() -> Unit)? = null) {
                 castDevice?.let { Text("Playing on $it", style = MaterialTheme.typography.labelMedium, color = Gold, maxLines = 1) }
             }
             CastButton(MaterialTheme.colorScheme.onSurface)
+            // Play on another Marquee app (USER-14): the queue, from this track and position; then pauses here.
+            if (onRemote != null) app.marquee.ui.PlayOnButton(tint = MaterialTheme.colorScheme.onSurface, handoff = {
+                val q = music.queue.value
+                if (q.isEmpty()) null
+                else app.marquee.api.models.RemoteCommand(app.marquee.api.models.RemoteCommand.Type.PLAY, itemIds = q.map { it.id },
+                    index = music.index.value.coerceIn(0, q.size - 1), startMs = music.position.value.first)
+            }, onSent = { music.pause() }, onPlayer = onRemote)
             PanelButton(Icons.Filled.Lyrics, "Lyrics", panel == Panel.Lyrics) { panel = if (panel == Panel.Lyrics) Panel.Art else Panel.Lyrics }
             PanelButton(Icons.AutoMirrored.Filled.QueueMusic, "Up Next", panel == Panel.Queue) { panel = if (panel == Panel.Queue) Panel.Art else Panel.Queue }
         }

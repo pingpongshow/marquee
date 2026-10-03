@@ -12,10 +12,23 @@ class MarqueeApplication : Application(), SingletonImageLoader.Factory {
         private set
     val music by lazy { app.marquee.music.MusicController(this, marquee) }
     val downloads by lazy { app.marquee.core.Downloads(this, marquee) }
+    /** Remote control (USER-14): this app as a player other Marquee apps can control. */
+    val remote by lazy { app.marquee.core.RemoteReceiver(this, marquee) { music } }
 
     override fun onCreate() {
         super.onCreate()
         marquee = Marquee(this)
+        // A player for remote control while in the foreground (and while music plays).
+        remote.attach()
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityStarted(activity: android.app.Activity) = remote.activityStarted()
+            override fun onActivityStopped(activity: android.app.Activity) = remote.activityStopped()
+            override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {}
+            override fun onActivityResumed(activity: android.app.Activity) {}
+            override fun onActivityPaused(activity: android.app.Activity) {}
+            override fun onActivitySaveInstanceState(activity: android.app.Activity, outState: android.os.Bundle) {}
+            override fun onActivityDestroyed(activity: android.app.Activity) {}
+        })
         // Back online after being offline: reconnect and send plays made meanwhile.
         getSystemService(android.net.ConnectivityManager::class.java).registerDefaultNetworkCallback(object : android.net.ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: android.net.Network) {

@@ -8,6 +8,7 @@ import {
   Database,
   Download,
   Globe,
+  HeartPulse,
   Library,
   MonitorSmartphone,
   Network,
@@ -33,6 +34,7 @@ import {
 } from "./ServerSections";
 import { StatsView } from "./StatsView";
 import { LiveTvSettings } from "./LiveTvSettings";
+import { LibraryHealthSettings } from "./LibraryHealth";
 import { RequestsSettings } from "./RequestsSettings";
 import { WebhooksSettings } from "./WebhooksSettings";
 import { ScheduledTasksSettings } from "./TasksSettings";
@@ -158,8 +160,9 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] =
           icon: Inbox,
           component: RequestsSettings,
           keywords:
-            "seerr overseerr jellyseerr requests approve decline radarr sonarr discover",
-          description: "Connect Seerr and approve what people request.",
+            "seerr overseerr jellyseerr requests approve decline radarr sonarr discover bazarr subtitles integrations",
+          description:
+            "Connect Seerr and Bazarr, and approve what people request.",
         },
         {
           id: "webhooks",
@@ -185,6 +188,16 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] =
     {
       label: "Manage",
       sections: [
+        {
+          id: "library-health",
+          label: "Library Health",
+          icon: HeartPulse,
+          component: LibraryHealthSettings,
+          keywords:
+            "health duplicates unmatched missing files unavailable unplayable upgrades playback errors artwork posters subtitles bazarr ignore problems",
+          description:
+            "Duplicates, unmatched titles, missing files and other things worth fixing.",
+        },
         {
           id: "users",
           label: "Users",

@@ -16,14 +16,19 @@ func access(ctx context.Context) items.Access {
 	if !ok {
 		return items.Unrestricted
 	}
-	if s.User.IsAdmin {
-		return items.Access{UserID: s.User.ID}
+	return userAccess(s.User)
+}
+
+// userAccess returns the item visibility rules for a user.
+func userAccess(u auth.User) items.Access {
+	acc := items.Access{UserID: u.ID}
+	if u.IsAdmin {
+		return acc
 	}
-	acc := items.Access{UserID: s.User.ID}
-	if r := s.User.Restrictions; r.LibraryIDs != nil {
+	if r := u.Restrictions; r.LibraryIDs != nil {
 		acc.LibraryIDs = append([]int64{}, *r.LibraryIDs...)
 	}
-	if r := s.User.Restrictions.MaxContentRating; r != nil {
+	if r := u.Restrictions.MaxContentRating; r != nil {
 		acc.MaxRating = *r
 	}
 	return acc
@@ -94,10 +99,22 @@ func toAPIPrefs(p auth.Preferences) UserPreferences {
 	if p.SubtitleMode != "" {
 		out.SubtitleMode = ptr(UserPreferencesSubtitleMode(p.SubtitleMode))
 	}
+	if st := p.SubtitleStyle; st != nil {
+		out.SubtitleStyle = &SubtitleStyle{Color: nz(st.Color)}
+		if st.Size != "" {
+			out.SubtitleStyle.Size = ptr(SubtitleStyleSize(st.Size))
+		}
+		if st.Background != "" {
+			out.SubtitleStyle.Background = ptr(SubtitleStyleBackground(st.Background))
+		}
+		if st.Position != "" {
+			out.SubtitleStyle.Position = ptr(SubtitleStylePosition(st.Position))
+		}
+	}
 	return out
 }
 
-func fromAPIPrefs(p UserPreferences) auth.Preferences {
+func fromAPIPrefs(p UserPreferences) (auth.Preferences, error) {
 	out := auth.Preferences{}
 	set(&out.AudioLanguage, p.AudioLanguage)
 	set(&out.SubtitleLanguage, p.SubtitleLanguage)
@@ -109,7 +126,60 @@ func fromAPIPrefs(p UserPreferences) auth.Preferences {
 	if p.SubtitleMode != nil {
 		out.SubtitleMode = string(*p.SubtitleMode)
 	}
-	return out
+	if p.SubtitleStyle != nil {
+		st, err := fromAPISubtitleStyle(*p.SubtitleStyle)
+		if err != nil {
+			return out, err
+		}
+		out.SubtitleStyle = st
+	}
+	return out, nil
+}
+
+// fromAPISubtitleStyle validates a subtitle style (PLAY-20); nil when nothing is set.
+func fromAPISubtitleStyle(p SubtitleStyle) (*auth.SubtitleStyle, error) {
+	var st auth.SubtitleStyle
+	if p.Size != nil && *p.Size != "" {
+		if !p.Size.Valid() {
+			return nil, errors.New("unknown subtitle size " + string(*p.Size))
+		}
+		st.Size = string(*p.Size)
+	}
+	if p.Color != nil && *p.Color != "" {
+		if !validHexColor(*p.Color) {
+			return nil, errors.New("subtitle colour must look like #RRGGBB")
+		}
+		st.Color = strings.ToUpper(*p.Color)
+	}
+	if p.Background != nil && *p.Background != "" {
+		if !p.Background.Valid() {
+			return nil, errors.New("unknown subtitle background " + string(*p.Background))
+		}
+		st.Background = string(*p.Background)
+	}
+	if p.Position != nil && *p.Position != "" {
+		if !p.Position.Valid() {
+			return nil, errors.New("unknown subtitle position " + string(*p.Position))
+		}
+		st.Position = string(*p.Position)
+	}
+	if st == (auth.SubtitleStyle{}) {
+		return nil, nil
+	}
+	return &st, nil
+}
+
+// validHexColor accepts #RRGGBB.
+func validHexColor(c string) bool {
+	if len(c) != 7 || c[0] != '#' {
+		return false
+	}
+	for _, r := range c[1:] {
+		if !(r >= '0' && r <= '9' || r >= 'a' && r <= 'f' || r >= 'A' && r <= 'F') {
+			return false
+		}
+	}
+	return true
 }
 
 func validPIN(p string) bool {
@@ -174,7 +244,10 @@ func (h *Handlers) UpdateMe(ctx context.Context, req UpdateMeRequestObject) (Upd
 		upd.PIN = b.Pin
 	}
 	if b.Preferences != nil {
-		p := fromAPIPrefs(*b.Preferences)
+		p, err := fromAPIPrefs(*b.Preferences)
+		if err != nil {
+			return UpdateMe400JSONResponse{BadRequestJSONResponse(apiErr("invalid", err.Error()))}, nil
+		}
 		upd.Preferences = &p
 	}
 	u, err := h.Auth.Update(ctx, s.User.ID, upd)
@@ -313,6 +386,9 @@ func (h *Handlers) DeleteUser(ctx context.Context, req DeleteUserRequestObject) 
 	}
 	if err := h.Avatars.Remove(ctx, req.UserId); err != nil {
 		slog.WarnContext(ctx, "remove avatar", "user", req.UserId, "err", err)
+	}
+	if h.Remote != nil {
+		h.Remote.DropUser(req.UserId)
 	}
 	return DeleteUser204Response{}, nil
 }

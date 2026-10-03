@@ -939,6 +939,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/items/{itemId}/subtitles/bazarr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        /** Bazarr's view of a movie or episode's subtitles (META-12): what exists and what its language profile still wants. */
+        get: operations["bazarrStatus"];
+        put?: never;
+        /** Ask Bazarr to find and download the best subtitle in a language. Runs in the background; the new subtitle appears on the item when Bazarr has saved it. */
+        post: operations["bazarrDownload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/subtitles/bazarr/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        /** Search Bazarr's providers for this movie or episode (can take up to a minute). */
+        get: operations["bazarrSearch"];
+        put?: never;
+        /** Download one of the search results through Bazarr. */
+        post: operations["bazarrPick"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/items/{itemId}/watchlist": {
         parameters: {
             query?: never;
@@ -1104,6 +1144,220 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/remote/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** For an app that can be controlled (USER-14): waits up to 25 s for commands for this device. Calling it is what lists the device as a player; call again at once with the returned cursor. Send the current state along. */
+        post: operations["remoteInbox"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/remote/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** A controllable app reports what it's playing (on every change, and every 10 s while playing). */
+        put: operations["reportRemoteState"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/remote/players": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Devices you can control: your own signed-in apps that are open (admins: everyone's), except the one asking. */
+        get: operations["listRemotePlayers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/remote/players/{deviceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deviceId: number;
+            };
+            cookie?: never;
+        };
+        /** A player's state; with ?since=<version>, waits up to 25 s for it to change. */
+        get: operations["getRemotePlayer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/remote/players/{deviceId}/commands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deviceId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tell a player what to do. */
+        post: operations["sendRemoteCommand"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/recap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your year in music (MUSIC-22). */
+        get: operations["listeningRecap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/recap/years": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Years with music in your history, newest first. */
+        get: operations["recapYears"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/recap/playlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Make a playlist of your top 50 songs of a year ("Your Top Songs 2026"), or refresh it if it exists. */
+        post: operations["recapPlaylist"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/muse/video": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Muse for movies and shows (USER-15): describe what you'd like to watch and get matches from your libraries. */
+        post: operations["museVideo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library-health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Library health checks with how many items each found (ADM-11, admin only). */
+        get: operations["libraryHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library-health/{checkId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                checkId: string;
+            };
+            cookie?: never;
+        };
+        /** What one check found (admin only). Ignored items are left out. */
+        get: operations["libraryHealthIssues"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library-health/{checkId}/ignored/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                checkId: string;
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Stop reporting this item for this check (admin only). */
+        put: operations["ignoreHealthIssue"];
+        post?: never;
+        /** Report it again (admin only). */
+        delete: operations["unignoreHealthIssue"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1965,7 +2219,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Similar items from the same library ("More like this"), by shared genres and people. */
+        /** Similar items from the same library ("More like this"), by what they're about (Muse's index, USER-16) when it's ready, else shared genres and people. */
         get: operations["relatedItems"];
         put?: never;
         post?: never;
@@ -2521,6 +2775,7 @@ export interface components {
             remoteQualityKbps?: number;
             /** @description Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true. */
             cinemaTrailers?: boolean;
+            subtitleStyle?: components["schemas"]["SubtitleStyle"];
         };
         UserCreate: {
             username: string;
@@ -3053,6 +3308,9 @@ export interface components {
             readonly seerrApiKeySet?: boolean;
             /** @description Last.fm's API key and shared secret are set, so people can connect Last.fm (MUSIC-12). */
             readonly lastFmConfigured?: boolean;
+            /** @description Bazarr's address, e.g. http://127.0.0.1:6767. Empty turns the Bazarr integration off (META-12). */
+            bazarrUrl?: string;
+            readonly bazarrApiKeySet?: boolean;
             /** @description Minutes recordings start early. */
             dvrPaddingBefore?: number;
             /** @description Minutes recordings run late. */
@@ -3067,6 +3325,9 @@ export interface components {
             lastFmApiKey?: string;
             /** @description Last.fm shared secret. Write-only. */
             lastFmSecret?: string;
+            bazarrUrl?: string;
+            /** @description Bazarr's API key (Settings → General in Bazarr). Write-only. */
+            bazarrApiKey?: string;
             dvrPaddingBefore?: number;
             dvrPaddingAfter?: number;
             /** @description Replaces the whole list when sent. */
@@ -3513,6 +3774,246 @@ export interface components {
                 items: number;
             }[];
         };
+        /** @description How text subtitles look (PLAY-20), for this person on every app and in burned-in subtitles. Styled ASS subtitles keep their own look. Absent fields use the defaults. */
+        SubtitleStyle: {
+            /**
+             * @description Default medium.
+             * @enum {string}
+             */
+            size?: "small" | "medium" | "large" | "huge";
+            /** @description Text colour, default #FFFFFF. */
+            color?: string;
+            /**
+             * @description none = drop shadow only; outline = black edge (default); translucent / opaque = a box behind the text.
+             * @enum {string}
+             */
+            background?: "none" | "outline" | "translucent" | "opaque";
+            /**
+             * @description raised lifts subtitles above the player's controls and lower-third captions.
+             * @enum {string}
+             */
+            position?: "bottom" | "raised";
+        };
+        BazarrSubtitleLanguage: {
+            /** @description ISO 639-1, e.g. en */
+            code2: string;
+            code3?: string;
+            name: string;
+            forced: boolean;
+            /** @description Hearing impaired. */
+            hi: boolean;
+            /** @description A subtitle for this language exists (false = wanted by the item's Bazarr language profile). */
+            have: boolean;
+        };
+        BazarrStatus: {
+            /** @description Bazarr is set up on this server. */
+            configured: boolean;
+            /** @description Bazarr knows this movie or episode. */
+            managed: boolean;
+            /** @description Subtitles it has and the ones its language profile still wants. */
+            languages: components["schemas"]["BazarrSubtitleLanguage"][];
+            /** @description Why Bazarr couldn't be asked (e.g. unreachable). */
+            error?: string;
+        };
+        BazarrDownloadRequest: {
+            /** @description ISO 639-1 code, e.g. en */
+            language: string;
+            forced?: boolean;
+            hi?: boolean;
+        };
+        BazarrCandidate: {
+            provider: string;
+            /** @description Bazarr's opaque handle for this result; send it back to download it. */
+            subtitle: string;
+            language: string;
+            /** @description The release names it was made for. */
+            release?: string;
+            /** @description Bazarr's match score (higher is better; hash matches are best). */
+            score: number;
+            hi?: boolean;
+            forced?: boolean;
+            uploader?: string;
+            originalFormat?: boolean;
+        };
+        BazarrPick: {
+            provider: string;
+            subtitle: string;
+            hi?: boolean;
+            forced?: boolean;
+            originalFormat?: boolean;
+        };
+        /** @enum {string} */
+        RemoteCapability: "video" | "music";
+        /** @description What a device is playing, as it reports it (USER-14). */
+        RemotePlayerState: {
+            /** @enum {string} */
+            state: "idle" | "playing" | "paused" | "buffering" | "stopped";
+            /** Format: int64 */
+            itemId?: number;
+            itemType?: components["schemas"]["ItemType"];
+            title?: string;
+            /** @description Artist, or show and episode. */
+            subtitle?: string;
+            /**
+             * Format: int64
+             * @description The item whose poster/cover to show.
+             */
+            artItemId?: number;
+            /** Format: int64 */
+            positionMs: number;
+            /** Format: int64 */
+            durationMs?: number;
+            queueIndex?: number;
+            queueLength?: number;
+            /** @description The app's own volume when it has one. */
+            volume?: number;
+            /** Format: int64 */
+            audioStreamId?: number;
+            /** Format: int64 */
+            subtitleStreamId?: number;
+            shuffle?: boolean;
+        };
+        RemotePlayer: {
+            /** Format: int64 */
+            deviceId: number;
+            name: string;
+            platform: string;
+            /** Format: int64 */
+            userId: number;
+            userName: string;
+            capabilities: components["schemas"]["RemoteCapability"][];
+            state?: components["schemas"]["RemotePlayerState"];
+            /**
+             * Format: int64
+             * @description Changes whenever the state does; pass it as ?since= to wait for the next change.
+             */
+            version: number;
+        };
+        RemoteCommand: {
+            /** @enum {string} */
+            type: "play" | "pause" | "resume" | "seek" | "stop" | "next" | "previous" | "setAudio" | "setSubtitle" | "setVolume";
+            /** @description play: what to play. One item plays it (an album, show, playlist item or track: the device expands it the way its own Play button would); several tracks are played as a queue. */
+            itemIds?: number[];
+            /** @description play: start at this entry of itemIds. */
+            index?: number;
+            /**
+             * Format: int64
+             * @description play: start here (omit to resume).
+             */
+            startMs?: number;
+            shuffle?: boolean;
+            /**
+             * Format: int64
+             * @description seek target.
+             */
+            positionMs?: number;
+            /**
+             * Format: int64
+             * @description setAudio / setSubtitle (-1 = subtitles off).
+             */
+            streamId?: number;
+            volume?: number;
+            /** @description The controlling device's name. */
+            readonly from?: string;
+        };
+        RemoteInboxRequest: {
+            /**
+             * Format: int64
+             * @description The cursor from the last answer; 0 the first time.
+             */
+            cursor?: number;
+            capabilities: components["schemas"]["RemoteCapability"][];
+            state?: components["schemas"]["RemotePlayerState"];
+        };
+        RemoteInbox: {
+            /** Format: int64 */
+            cursor: number;
+            commands: components["schemas"]["RemoteCommand"][];
+        };
+        RecapEntry: {
+            item: components["schemas"]["ItemSummary"];
+            plays: number;
+            minutes: number;
+        };
+        /** @description A person's year in music (MUSIC-22), from their play history. */
+        ListeningRecap: {
+            year: number;
+            minutes: number;
+            plays: number;
+            /** @description Different tracks played. */
+            tracks: number;
+            /** @description Different artists played. */
+            artists: number;
+            /** @description Artists first played this year. */
+            newArtists: number;
+            topArtists: components["schemas"]["RecapEntry"][];
+            topAlbums: components["schemas"]["RecapEntry"][];
+            topTracks: components["schemas"]["RecapEntry"][];
+            topGenres: {
+                name: string;
+                plays: number;
+            }[];
+            /** @description Minutes listened in each month, January first. */
+            byMonth: number[];
+            /** @description Plays started in each hour of the day (server time), 0–23. */
+            byHour: number[];
+            topDay?: {
+                /** Format: date */
+                date: string;
+                minutes: number;
+            };
+            /** @description Most days in a row with music. */
+            longestStreakDays: number;
+            firstTrack?: components["schemas"]["ItemSummary"];
+            /** @description Hours of movies and TV watched the same year. */
+            videoHours?: number;
+        };
+        MuseVideoRequest: {
+            /** @example 90s sci-fi with time travel */
+            prompt: string;
+            /**
+             * Format: int64
+             * @description Only this library.
+             */
+            libraryId?: number;
+            /** @description Default movies and shows. */
+            types?: ("movie" | "show")[];
+            /** @description Default 40. */
+            limit?: number;
+        };
+        MuseVideoResult: {
+            items: components["schemas"]["ItemSummary"][];
+            /** @description How the prompt was read, e.g. "Movies · 1990s · Science Fiction · like 'time travel'". */
+            understood: string;
+            /** @description Share of the library ready for Muse (0–1); below 1 while it's still being indexed. */
+            analysed?: number;
+        };
+        HealthCheck: {
+            /** @enum {string} */
+            id: "duplicates" | "unmatched" | "unavailable" | "unplayable" | "upgrades" | "playbackErrors" | "missingArtwork" | "missingSubtitles";
+            title: string;
+            description: string;
+            count: number;
+            /** @enum {string} */
+            severity: "info" | "warning" | "error";
+            /** @description False when the check can't run (e.g. missingSubtitles without Bazarr). */
+            available?: boolean;
+        };
+        HealthIssue: {
+            item: components["schemas"]["ItemSummary"];
+            /** Format: int64 */
+            fileId?: number;
+            path?: string;
+            /** @example 720p · 2.1 Mbps */
+            detail: string;
+            /** @description duplicates: the other copies. */
+            related?: components["schemas"]["ItemSummary"][];
+        };
+        HealthIssuePage: {
+            items: components["schemas"]["HealthIssue"][];
+            total: number;
+            offset: number;
+        };
         /** @description A smart collection's rules (META-7): its members are the library's movies or shows matching these, kept current. Only on collections that are smart. */
         SmartCollectionRules: {
             /** @enum {string} */
@@ -3548,7 +4049,7 @@ export interface components {
             title?: string;
             rules: components["schemas"]["SmartCollectionRules"];
         };
-        /** @description The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones. */
+        /** @description The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two "Because you watched X" rows with hub ids because-<itemId>; USER-16), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones. */
         HomeLayout: {
             rows: components["schemas"]["HomeLayoutRow"][];
         };
@@ -6043,6 +6544,110 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    bazarrStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BazarrStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    bazarrDownload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BazarrDownloadRequest"];
+            };
+        };
+        responses: {
+            /** @description Started. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            502: components["responses"]["BadGateway"];
+        };
+    };
+    bazarrSearch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Best first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BazarrCandidate"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            502: components["responses"]["BadGateway"];
+        };
+    };
+    bazarrPick: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BazarrPick"];
+            };
+        };
+        responses: {
+            /** @description Started. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            502: components["responses"]["BadGateway"];
+        };
+    };
     addToWatchlist: {
         parameters: {
             query?: never;
@@ -6305,6 +6910,322 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    remoteInbox: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemoteInboxRequest"];
+            };
+        };
+        responses: {
+            /** @description Commands (possibly none). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteInbox"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    reportRemoteState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemotePlayerState"];
+            };
+        };
+        responses: {
+            /** @description Noted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listRemotePlayers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemotePlayer"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getRemotePlayer: {
+        parameters: {
+            query?: {
+                since?: number;
+            };
+            header?: never;
+            path: {
+                deviceId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemotePlayer"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    sendRemoteCommand: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deviceId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemoteCommand"];
+            };
+        };
+        responses: {
+            /** @description Delivered to the device's inbox. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listeningRecap: {
+        parameters: {
+            query?: {
+                /** @description Default this year. */
+                year?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListeningRecap"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    recapYears: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": number[];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    recapPlaylist: {
+        parameters: {
+            query?: {
+                year?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The playlist. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Playlist"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    museVideo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MuseVideoRequest"];
+            };
+        };
+        responses: {
+            /** @description Best matches first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MuseVideoResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    libraryHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthCheck"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    libraryHealthIssues: {
+        parameters: {
+            query?: {
+                offset?: components["parameters"]["Offset"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                checkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthIssuePage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    ignoreHealthIssue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                checkId: string;
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ignored. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    unignoreHealthIssue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                checkId: string;
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reported again. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
