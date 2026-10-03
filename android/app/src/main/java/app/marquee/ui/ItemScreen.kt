@@ -355,6 +355,7 @@ private fun Meta(d: ItemDetail) {
 }
 
 /** TV: the backdrop fills the screen's top with the details and actions over it, in view from the start. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun TvHeader(d: ItemDetail, square: Boolean, actions: @Composable () -> Unit) {
     val marquee = LocalMarquee.current
@@ -368,7 +369,8 @@ private fun TvHeader(d: ItemDetail, square: Boolean, actions: @Composable () -> 
             Column(Modifier.widthIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Meta(d)
                 d.summary?.takeIf { it.isNotBlank() }?.let { Text(it, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium) }
-                Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) { actions() }
+                // Wraps rather than squeezing labels when an album or artist has many actions.
+                FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { actions() }
             }
         }
     }

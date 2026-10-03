@@ -150,6 +150,10 @@ private fun Routes(nav: NavHostController) {
         composable("downloads") { DownloadsScreen(nav) }
         composable("discover") { DiscoverScreen(nav) }
         composable("livetv") { LiveTvScreen(nav) }
+        composable("musicbrowse/{lib}/{kind}?sort={sort}", listOf(navArgument("lib") { type = NavType.LongType }, navArgument("sort") { type = NavType.StringType; nullable = true; defaultValue = null })) {
+            app.marquee.music.MusicBrowseScreen(nav, it.arguments!!.getLong("lib"), it.arguments!!.getString("kind")!!, it.arguments!!.getString("sort"))
+        }
+        composable("musicmuse/{lib}", listOf(navArgument("lib") { type = NavType.LongType })) { app.marquee.music.MusicMuseScreen(nav, it.arguments!!.getLong("lib")) }
         composable("browse/{lib}/{kind}/{name}", listOf(navArgument("lib") { type = NavType.LongType })) {
             app.marquee.music.MoodStyleScreen(nav, it.arguments!!.getLong("lib"), it.arguments!!.getString("kind")!!, it.arguments!!.getString("name")!!)
         }

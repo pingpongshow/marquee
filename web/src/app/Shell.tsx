@@ -157,7 +157,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const requests = useQuery(requestsStatusQuery);
   const live = useQuery(liveStatusQuery);
   const sidebar = (
-    <nav aria-label="Libraries" className="flex h-full flex-col gap-1 p-3">
+    <nav aria-label="Libraries" className="flex h-full flex-col gap-1 overflow-y-auto p-3">
       <Link
         to="/"
         className={navItem}
@@ -231,17 +231,8 @@ export function Shell({ children }: { children: ReactNode }) {
           )}
         </Link>
       )}
-      <div className="mt-auto" />
-      {me.data?.isAdmin && (
-        <Link
-          to="/settings"
-          className={navItem}
-          activeProps={navActive}
-          onClick={() => setNavOpen(false)}
-        >
-          <Settings className="size-5" aria-hidden /> Settings
-        </Link>
-      )}
+      {/* Keep the last entries clear of the player bar while something plays. */}
+      {music.current && <div className="h-20 shrink-0" aria-hidden />}
     </nav>
   );
 
@@ -267,6 +258,17 @@ export function Shell({ children }: { children: ReactNode }) {
           >
             <SearchIcon className="size-5" />
           </Link>
+          {me.data?.isAdmin && (
+            <Link
+              to="/settings"
+              className="rounded p-1.5 text-muted hover:bg-surface-2 hover:text-text"
+              activeProps={{ className: "!text-text bg-surface-2" }}
+              aria-label="Settings"
+              title="Settings"
+            >
+              <Settings className="size-5" aria-hidden />
+            </Link>
+          )}
           {me.data?.isAdmin && <ActivityIndicator />}
           <UserMenu
             name={me.data?.displayName ?? ""}

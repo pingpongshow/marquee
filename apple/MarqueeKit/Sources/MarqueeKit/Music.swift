@@ -72,8 +72,9 @@ public extension AppSession {
     }
 
     /// Playback statistics: your own (ADM-4, "year in music"); days 0 = all time.
-    func stats(days: Int) async throws -> Schemas.Stats {
-        try await musicAPI.getStats(query: .init(days: days, limit: 10)).ok.body.json
+    /// Administrators see everyone's unless `userID` names one person (pass your own id for yours).
+    func stats(days: Int, limit: Int = 10, userID: Int64? = nil) async throws -> Schemas.Stats {
+        try await musicAPI.getStats(query: .init(days: days, userId: userID, limit: limit)).ok.body.json
     }
 
     /// Rates an item 0–10 (half stars; 10 = loved), or clears the rating with nil (MUSIC-11).

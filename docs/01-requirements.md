@@ -65,6 +65,7 @@ Priority key:
 | PLAY-18 | **Cinema trailers:** before a movie started from the beginning, play up to five trailers of other movies in the library (unwatched and recent first), then an optional pre-roll video, with Skip. Server setting; each person can turn it off (D86). | P2 |
 | PLAY-19 | Playback speed 0.5×–2× in the video players (not during watch together). | P2 |
 | PLAY-20 | **Subtitle appearance:** each person picks text size, colour, background and position once; every app applies it, and burned-in subtitles use it too (styled ASS subtitles keep their look) (D87). | P1 |
+| PLAY-21 | **Download to a computer** (web): a movie or episode's original file, or a whole season or show as one uncompressed zip (a folder per season), with the same remote-access rule as streaming. | P2 |
 
 ## 3a. Automatic quality & network awareness
 

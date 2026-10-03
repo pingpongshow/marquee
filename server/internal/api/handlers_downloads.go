@@ -1,10 +1,13 @@
 package api
 
 import (
+	"archive/zip"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -167,8 +170,9 @@ func nullDevice(id int64) any {
 	return id
 }
 
-// DownloadFiles serves downloads under /api/v1/download/: original/<item>?fileId= and
-// job/<id>. Range requests let apps resume interrupted downloads.
+// DownloadFiles serves downloads under /api/v1/download/: original/<item>?fileId=, job/<id>,
+// and zip/<season or show> (every episode's original file, uncompressed). Range requests let
+// apps resume interrupted single-file downloads.
 func (h *Handlers) DownloadFiles() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sess, ok := auth.SessionFrom(r.Context())
@@ -197,6 +201,14 @@ func (h *Handlers) DownloadFiles() http.Handler {
 				return
 			}
 			path, name = p, filepath.Base(p)
+		case strings.HasPrefix(rest, "zip/"):
+			itemID, err := strconv.ParseInt(strings.TrimPrefix(rest, "zip/"), 10, 64)
+			if err != nil || h.Items.Visible(r.Context(), access(r.Context()), itemID) != nil {
+				http.NotFound(w, r)
+				return
+			}
+			h.serveZip(w, r, itemID)
+			return
 		case strings.HasPrefix(rest, "job/"):
 			j, err := h.Downloads.Get(r.Context(), sess.User.ID, strings.TrimPrefix(rest, "job/"))
 			if err != nil || j.Status != "ready" || j.Path == "" {
@@ -222,4 +234,95 @@ func (h *Handlers) DownloadFiles() http.Handler {
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", name))
 		http.ServeContent(w, r, name, st.ModTime(), f)
 	})
+}
+
+// serveZip streams the original files of a season's or show's episodes (that the person may
+// see) as one zip, stored without compression: video doesn't compress, and the download
+// starts at once. Shows get a folder per season.
+func (h *Handlers) serveZip(w http.ResponseWriter, r *http.Request, itemID int64) {
+	ctx := r.Context()
+	var typ, title, parent string
+	if err := h.DB.QueryRowContext(ctx, `SELECT i.type, i.title, COALESCE(p.title, '') FROM items i LEFT JOIN items p ON p.id = i.parent_id
+		WHERE i.id = ?`, itemID).Scan(&typ, &title, &parent); err != nil || (typ != "season" && typ != "show") {
+		http.Error(w, "only seasons and shows download as a zip", http.StatusBadRequest)
+		return
+	}
+	col := "parent_id"
+	if typ == "show" {
+		col = "grandparent_id"
+	}
+	rows, err := h.DB.QueryContext(ctx, `SELECT e.id, COALESCE(s.title, '') FROM items e LEFT JOIN items s ON s.id = e.parent_id
+		WHERE e.`+col+` = ? AND e.type = 'episode' AND e.extra_type IS NULL
+		ORDER BY COALESCE(s.idx, 0), COALESCE(e.idx, 0), e.sort_title`, itemID)
+	if err != nil {
+		http.Error(w, "unreadable", http.StatusInternalServerError)
+		return
+	}
+	type entry struct {
+		id     int64
+		season string
+	}
+	var eps []entry
+	for rows.Next() {
+		var e entry
+		if rows.Scan(&e.id, &e.season) == nil {
+			eps = append(eps, e)
+		}
+	}
+	rows.Close()
+	acc := access(ctx)
+	name := title
+	if typ == "season" && parent != "" {
+		name = parent + " - " + title
+	}
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", safeName(name)+".zip"))
+	zw := zip.NewWriter(w)
+	n := 0
+	for _, e := range eps {
+		if ctx.Err() != nil {
+			return
+		}
+		if h.Items.Visible(ctx, acc, e.id) != nil {
+			continue
+		}
+		_, p, _, err := h.originalFile(ctx, e.id, 0)
+		if err != nil {
+			continue
+		}
+		f, err := os.Open(p)
+		if err != nil {
+			continue
+		}
+		st, _ := f.Stat()
+		inZip := filepath.Base(p)
+		if typ == "show" && e.season != "" {
+			inZip = safeName(e.season) + "/" + inZip
+		}
+		hdr := &zip.FileHeader{Name: inZip, Method: zip.Store}
+		if st != nil {
+			hdr.Modified = st.ModTime()
+		}
+		out, err := zw.CreateHeader(hdr)
+		if err == nil {
+			_, err = io.Copy(out, f)
+		}
+		f.Close()
+		if err != nil {
+			return // the connection went away
+		}
+		n++
+	}
+	zw.Close()
+	slog.InfoContext(ctx, "zip download", "item", name, "files", n)
+}
+
+// safeName keeps a title usable as a file name.
+func safeName(s string) string {
+	return strings.Map(func(r rune) rune {
+		if strings.ContainsRune(`/\:*?"<>|`, r) || r < 32 {
+			return '_'
+		}
+		return r
+	}, strings.TrimSpace(s))
 }

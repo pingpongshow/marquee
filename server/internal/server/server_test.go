@@ -63,16 +63,18 @@ func newHarness(t *testing.T) *harness {
 		t.Fatal(err)
 	}
 	authSvc := auth.NewService(database)
+	handlers := &api.Handlers{DB: database, Auth: authSvc, Settings: store,
+		Libraries: library.NewStore(database), Items: items.NewStore(database), Version: "test",
+		Avatars: &avatars.Store{DB: database, Dir: filepath.Join(dir, "avatars")},
+		Tasks:   &tasks.Scheduler{DB: database, Settings: store},
+		Backups: &tasks.Backups{DB: database, Dir: filepath.Join(dir, "backups"), ConfigDir: dir, Retention: func() int { return 3 }},
+		Remote:  &remote.Hub{},
+		Bazarr: &bazarr.Service{DB: database, Config: func() (string, string) {
+			return store.Get().Integrations.BazarrURL, store.Get().Integrations.BazarrAPIKey
+		}}}
 	h := New(Deps{
-		Handlers: &api.Handlers{DB: database, Auth: authSvc, Settings: store,
-			Libraries: library.NewStore(database), Items: items.NewStore(database), Version: "test",
-			Avatars: &avatars.Store{DB: database, Dir: filepath.Join(dir, "avatars")},
-			Tasks:   &tasks.Scheduler{DB: database, Settings: store},
-			Backups: &tasks.Backups{DB: database, Dir: filepath.Join(dir, "backups"), ConfigDir: dir, Retention: func() int { return 3 }},
-			Remote:  &remote.Hub{},
-			Bazarr: &bazarr.Service{DB: database, Config: func() (string, string) {
-				return store.Get().Integrations.BazarrURL, store.Get().Integrations.BazarrAPIKey
-			}}},
+		Handlers:   handlers,
+		Downloads:  handlers.DownloadFiles(),
 		Auth:       authSvc,
 		Classifier: netclass.New([]string{"127.0.0.0/8"}, ""),
 	})

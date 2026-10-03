@@ -1,15 +1,14 @@
 import MarqueeKit
 import SwiftUI
 
-/// Muse, stations and daily mixes at the top of a music library (M6.5).
-struct MusicDiscoverView: View {
+/// Muse and the stations of a music library (M6.5), opened from its landing page.
+struct MuseStationsView: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
     let libraryID: Int64
     @State private var status: MusicStatus?
-    @State private var mixes: [Station] = []
+    @State private var loaded = false
     @State private var decades: [String] = []
-    @State private var styles: [String] = []
     @State private var prompt = ""
     @State private var busy = false
     @State private var error: String?
@@ -18,40 +17,41 @@ struct MusicDiscoverView: View {
     @State private var saveRequest: SavePlaylistRequest?
 
     var body: some View {
-        if let status, status.enabled {
-            VStack(alignment: .leading, spacing: 24) {
-                if status.analyzed < status.total {
-                    Label(status.available
-                          ? "Listening to your music: \(status.analyzed.formatted()) of \(status.total.formatted()) tracks analysed. Radios and mixes improve as it goes."
-                          : "The Soundprint analysis service isn't running, so radios and Muse are unavailable.",
-                          systemImage: "sparkles")
-                        .font(.footnote).foregroundStyle(.secondary)
-                        .padding(.horizontal, sidePadding)
-                }
-                if let error { ErrorBanner(message: error).padding(.horizontal, sidePadding) }
-                muse
-                stations
-                MoodsAndStyles(libraryID: libraryID, styles: styles)
-                if !mixes.isEmpty {
-                    ShelfRow(title: "Mixes for you") {
-                        ForEach(mixes, id: \.title) { m in MixCard(station: m) { music.playStation(m) } }
+        ScrollView {
+            if let status, status.enabled {
+                VStack(alignment: .leading, spacing: 24) {
+                    if status.analyzed < status.total {
+                        Label(status.available
+                              ? "Listening to your music: \(status.analyzed.formatted()) of \(status.total.formatted()) tracks analysed. Radios and mixes improve as it goes."
+                              : "The Soundprint analysis service isn't running, so radios and Muse are unavailable.",
+                              systemImage: "sparkles")
+                            .font(.footnote).foregroundStyle(.secondary)
+                            .padding(.horizontal, sidePadding)
                     }
+                    if let error { ErrorBanner(message: error).padding(.horizontal, sidePadding) }
+                    muse
+                    stations
                 }
+                .padding(.vertical)
+                .disabled(busy)
+                .savePlaylistFlow($saveRequest)
+            } else if loaded {
+                ContentUnavailableView("Muse is off", systemImage: "wand.and.stars",
+                                       description: Text("Muse and stations need the server's Soundprint analysis."))
+            } else {
+                ProgressView().padding(.top, 80)
             }
-            .disabled(busy)
-            .savePlaylistFlow($saveRequest)
-        } else {
-            Color.clear.frame(height: 0).task { await load() }
         }
+        .navigationTitle("Muse & Stations")
+        .task { await load() }
     }
 
     private func load() async {
+        defer { loaded = true }
         status = try? await app.musicStatus()
         guard status?.enabled == true else { return }
-        mixes = (try? await app.mixes(library: libraryID)) ?? []
         let f = try? await app.filters(library: libraryID, type: .album)
         decades = (f?.decades.map(\.value) ?? []).prefix(6).map { $0 }
-        styles = (f?.genres.sorted { $0.count > $1.count }.map(\.value) ?? []).prefix(18).map { $0 }
     }
 
     private var muse: some View {

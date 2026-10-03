@@ -105,20 +105,22 @@ val musicMoods = listOf("Chill", "Energetic", "Focus", "Melancholy", "Party", "R
 /** Example Muse prompts. */
 val museSuggestions = listOf("Rainy Sunday jazz", "Late-night drive synthwave", "Upbeat 80s pop for cleaning the house", "Acoustic songs for a quiet evening")
 
-/** Muse, stations and daily mixes at the top of a music library (M6.5). */
+/** What the music home and the Muse page need from the server: analysis status, mixes and the library's decades and styles. */
+class MusicDiscoverData(val status: MusicStatus?, val mixes: List<Station>, val decades: List<String>, val styles: List<String> = emptyList()) {
+    /** Soundprint is on, so radios, Muse, moods and mixes work. */
+    val enabled get() = status?.enabled == true
+}
+
 @Composable
-fun MusicDiscover(libraryId: Long, onOpenPlaylist: ((Long) -> Unit)? = null, onBrowse: (kind: String, name: String) -> Unit = { _, _ -> }) {
+fun rememberMusicDiscoverData(libraryId: Long): MusicDiscoverData? {
     val marquee = LocalMarquee.current
-    val music = LocalMusic.current
-    val scope = rememberCoroutineScope()
-    data class Data(val status: MusicStatus?, val mixes: List<Station>, val decades: List<String>, val styles: List<String> = emptyList())
-    val data by produceState<Data?>(null, libraryId) {
+    val data by produceState<MusicDiscoverData?>(null, libraryId) {
         value = withContext(Dispatchers.IO) {
             val st = runCatching { marquee.music.musicStatus() }.getOrNull()
-            if (st?.enabled != true) Data(st, emptyList(), emptyList())
+            if (st?.enabled != true) MusicDiscoverData(st, emptyList(), emptyList())
             else {
                 val f = runCatching { marquee.items.libraryFilters(libraryId, ItemType.ALBUM) }.getOrNull()
-                Data(
+                MusicDiscoverData(
                     st,
                     runCatching { marquee.music.musicMixes(libraryId) }.getOrDefault(emptyList()),
                     f?.decades?.map { it.value }?.take(6).orEmpty(),
@@ -127,6 +129,15 @@ fun MusicDiscover(libraryId: Long, onOpenPlaylist: ((Long) -> Unit)? = null, onB
             }
         }
     }
+    return data
+}
+
+/** Muse and the stations (M6.5): the Muse page opened from the music home. */
+@Composable
+fun MusicDiscover(libraryId: Long, d: MusicDiscoverData, onOpenPlaylist: ((Long) -> Unit)? = null) {
+    val marquee = LocalMarquee.current
+    val music = LocalMusic.current
+    val scope = rememberCoroutineScope()
     var prompt by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -134,9 +145,11 @@ fun MusicDiscover(libraryId: Long, onOpenPlaylist: ((Long) -> Unit)? = null, onB
     var mix by remember { mutableStateOf<Station?>(null) }
     var savingMix by remember { mutableStateOf(false) }
     var savedMix by remember { mutableStateOf<app.marquee.api.models.Playlist?>(null) }
-    val d = data ?: return
-    val st = d.status ?: return
-    if (!st.enabled) return
+    val st = d.status
+    if (st == null || !st.enabled) {
+        Text("Muse and stations need the Soundprint analysis service, which isn't turned on.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
+    }
 
     fun run(work: suspend () -> Unit) {
         if (busy) return
@@ -161,13 +174,7 @@ fun MusicDiscover(libraryId: Long, onOpenPlaylist: ((Long) -> Unit)? = null, onB
     fun radio(req: RadioRequest) = run { music.startRadio(req) }
 
     Column(Modifier.padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        if (st.analyzed < st.total) {
-            Text(
-                if (st.available) "Listening to your music: ${st.analyzed} of ${st.total} tracks analysed. Radios and mixes improve as it goes."
-                else "The Soundprint analysis service isn't running, so radios and Muse are unavailable.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        AnalysisNote(st)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -177,7 +184,7 @@ fun MusicDiscover(libraryId: Long, onOpenPlaylist: ((Long) -> Unit)? = null, onB
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
-                    prompt, { prompt = it }, Modifier.weight(1f), singleLine = true,
+                    prompt, { prompt = it }, Modifier.weight(1f).initialFocus(marquee.isTv), singleLine = true,
                     placeholder = { Text("Describe what you want to hear…") },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
                     keyboardActions = KeyboardActions(onGo = { muse(prompt) }),
@@ -204,24 +211,40 @@ fun MusicDiscover(libraryId: Long, onOpenPlaylist: ((Long) -> Unit)? = null, onB
             Text("Stations", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             ChipRow(
                 listOf(
-                    // TV starts here: the D-pad's first stop in a music library.
-                    Chip("Library Radio", Icons.Filled.Radio, focus = marquee.isTv) { radio(RadioRequest(RadioRequest.Seed.LIBRARY, libraryId = libraryId)) },
+                    Chip("Library Radio", Icons.Filled.Radio) { radio(RadioRequest(RadioRequest.Seed.LIBRARY, libraryId = libraryId)) },
                     Chip("Favourites Radio", Icons.Filled.Favorite) { radio(RadioRequest(RadioRequest.Seed.FAVOURITES, libraryId = libraryId)) },
                 ) + musicMoods.map { m -> Chip(m, Icons.Filled.Waves) { radio(RadioRequest(RadioRequest.Seed.MOOD, value = m.lowercase(), libraryId = libraryId)) } } +
                     d.decades.map { dec -> Chip("${dec}s", Icons.Filled.Radio) { radio(RadioRequest(RadioRequest.Seed.DECADE, value = dec, libraryId = libraryId)) } },
             )
         }
+    }
+}
 
-        // Moods and styles (MUSIC-18): each opens a page with its radio and music.
-        TileRow("Moods", musicMoods) { onBrowse("mood", it) }
-        if (d.styles.isNotEmpty()) TileRow("Styles", d.styles) { onBrowse("style", it) }
+/** How far Soundprint has got, while it's still listening (or that it isn't running). */
+@Composable
+fun AnalysisNote(st: MusicStatus) {
+    if (st.analyzed < st.total) Text(
+        if (st.available) "Listening to your music: ${st.analyzed} of ${st.total} tracks analysed. Radios and mixes improve as it goes."
+        else "The Soundprint analysis service isn't running, so radios and Muse are unavailable.",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
 
-        if (d.mixes.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Mixes for you", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(vertical = 6.dp)) {
-                itemsIndexed(d.mixes) { i, m -> MixCard(m, i) { music.playStation(m) } }
-            }
-        }
+/** The daily mixes as one row; each plays its mix. */
+@Composable
+fun MixesRow(mixes: List<Station>, contentPadding: PaddingValues = PaddingValues(vertical = 6.dp)) {
+    val music = LocalMusic.current
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = contentPadding) {
+        itemsIndexed(mixes) { i, m -> MixCard(m, i) { music.playStation(m) } }
+    }
+}
+
+/** Moods and styles (MUSIC-18): each opens a page with its radio and music. */
+@Composable
+fun MoodStyleTiles(styles: List<String>, contentPadding: PaddingValues, onBrowse: (kind: String, name: String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        TileRow("Moods", musicMoods, contentPadding) { onBrowse("mood", it) }
+        if (styles.isNotEmpty()) TileRow("Styles", styles, contentPadding) { onBrowse("style", it) }
     }
 }
 
@@ -401,10 +424,11 @@ fun LevellingButton() {
 }
 
 @Composable
-private fun TileRow(title: String, names: List<String>, onOpen: (String) -> Unit) {
+private fun TileRow(title: String, names: List<String>, contentPadding: PaddingValues, onOpen: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 6.dp)) {
+        Text(title, Modifier.padding(start = contentPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)),
+            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = contentPadding) {
             items(names) { n ->
                 val h = (n.fold(7) { a, c -> (a * 37 + c.code) % 360 }).toFloat()
                 val tint = Color.hsv(h, 0.6f, 0.55f)
