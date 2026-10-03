@@ -17,11 +17,20 @@ enum Route: Hashable {
     case musicBrowse(library: Int64, MusicBrowse)
     /// Muse and the stations of a music library.
     case musicMuse(library: Int64)
+    /// A screen under Settings.
+    case settings(SettingsPage)
+}
+
+/// Screens opened from Settings (value links, so the stack never re-pushes or pops them).
+enum SettingsPage: Hashable {
+    case stats, requests, users, cinema, librarySettings, libraryHealth, integrations, editHome, subtitleAppearance, remotePlayers
 }
 
 /// The full lists behind a music library's landing page.
 enum MusicBrowse: Hashable {
     case artists, albums, recentAlbums, recentlyPlayed, songs, genres, moodsAndStyles, decades
+    /// What this person rated 4 stars or more (Plex ratings carry over: a favourite is a high rating).
+    case favorites
     /// Albums from the decade starting in this year, with its radio.
     case decade(Int)
 }
@@ -55,10 +64,32 @@ extension View {
                 case let .decade(year): MusicDecadeView(libraryID: library, decade: year)
                 case .songs: MusicSongsView(libraryID: library)
                 case .genres: MusicGenresView(libraryID: library)
+                case .favorites: MusicFavoritesView(libraryID: library)
                 }
             case let .musicMuse(library): MuseStationsView(libraryID: library)
+            case let .settings(page): settingsPage(page)
             }
         }
+    }
+}
+
+@MainActor @ViewBuilder
+private func settingsPage(_ page: SettingsPage) -> some View {
+    switch page {
+    case .stats: StatsView()
+    case .requests: RequestApprovalsView()
+    case .users: UsersView()
+    case .cinema: CinemaSettingsView()
+    case .editHome: HomeEditView()
+    case .subtitleAppearance: SubtitleAppearanceView()
+    #if os(iOS)
+    case .librarySettings: LibrarySettingsView()
+    case .libraryHealth: LibraryHealthView()
+    case .integrations: IntegrationsView()
+    case .remotePlayers: RemotePlayersView()
+    #else
+    case .librarySettings, .libraryHealth, .integrations, .remotePlayers: EmptyView()
+    #endif
     }
 }
 

@@ -27,6 +27,8 @@ struct ItemMenuItems: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
     let item: Item
+    /// Watchlist and Watched entries; off where the page shows its own live buttons for them.
+    var showsLibraryState = true
 
     var body: some View {
         if item.isMusic {
@@ -49,13 +51,13 @@ struct ItemMenuItems: View {
         if item._type == .track || item._type == .album, let artist = item._type == .track ? item.grandparentId : item.parentId {
             NavigationLink(value: Route.item(artist)) { Label("Go to Artist", systemImage: "music.mic") }
         }
-        if [.movie, .show, .episode, .video].contains(item._type) {
+        if showsLibraryState, [.movie, .show, .episode, .video].contains(item._type) {
             let listed = item.watchlisted ?? false
             Button { ActionError.run { try await app.setWatchlist(item.id, !listed) } } label: {
                 Label(listed ? "Remove from Watchlist" : "Add to Watchlist", systemImage: listed ? "bookmark.slash" : "bookmark")
             }
         }
-        if item.isPlayableVideo || item._type == .show || item._type == .season {
+        if showsLibraryState, item.isPlayableVideo || item._type == .show || item._type == .season {
             Button { ActionError.run { try await app.setWatched(item.id, !item.watched) } } label: {
                 Label(item.watched ? "Mark Unwatched" : "Mark Watched", systemImage: item.watched ? "circle" : "checkmark.circle")
             }

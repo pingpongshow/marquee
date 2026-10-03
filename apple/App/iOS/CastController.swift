@@ -63,6 +63,7 @@ final class CastController: NSObject {
 
     private func ended() {
         let at = position
+        let wasPlaying = playing
         device = nil
         playing = false
         ticker?.invalidate()
@@ -70,8 +71,10 @@ final class CastController: NSObject {
         closeSession()
         if castingMusic {
             castingMusic = false
-            music?.remoteUpdate(playing: false, time: at, duration: duration)
-            music?.remote = nil // carries on here
+            // Carries on here, playing only if it was playing there (a paused or finished
+            // queue stays quiet).
+            music?.remoteUpdate(playing: wasPlaying, time: at, duration: duration)
+            music?.remote = nil
         } else {
             onVideoEnded?(at)
         }
@@ -101,7 +104,10 @@ final class CastController: NSObject {
             app.stopCastSession(s.id)
             return "Not connected to a Cast device"
         }
-        guard let url = app.castURL(s.url) else { return "No server address" }
+        guard let url = app.castURL(s.url) else {
+            app.stopCastSession(s.id)
+            return "No server address"
+        }
         let meta = GCKMediaMetadata(metadataType: music ? .musicTrack : .movie)
         meta.setString(title, forKey: kGCKMetadataKeyTitle)
         if let subtitle { meta.setString(subtitle, forKey: music ? kGCKMetadataKeyArtist : kGCKMetadataKeySubtitle) }

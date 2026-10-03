@@ -137,6 +137,13 @@ struct HomeEditView: View {
 }
 
 /// "Pin to Home" / "Unpin from Home" for a collection or playlist (USER-12).
+/// Bumped when Home's rows change elsewhere (a pin), so Home loads again on its next appearance.
+@MainActor @Observable
+final class HomeChanges {
+    static let shared = HomeChanges()
+    var version = 0
+}
+
 struct PinToHomeButton: View {
     @Environment(AppSession.self) private var app
     let rowID: String
@@ -147,7 +154,10 @@ struct PinToHomeButton: View {
             guard let on = pinned else { return }
             pinned = !on
             ActionError.run {
-                do { try await app.setPinned(rowID, !on) } catch { pinned = on; throw error }
+                do {
+                    try await app.setPinned(rowID, !on)
+                    HomeChanges.shared.version += 1
+                } catch { pinned = on; throw error }
             }
         } label: {
             Label(pinned == true ? "Unpin from Home" : "Pin to Home", systemImage: pinned == true ? "pin.slash" : "pin")

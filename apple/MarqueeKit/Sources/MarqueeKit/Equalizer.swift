@@ -94,33 +94,96 @@ public final class Equalizer {
     public static func label(_ hz: Double) -> String { hz >= 1000 ? "\(Int(hz / 1000))k" : "\(Int(hz))" }
 }
 
-/// The equaliser settings, shared with the audio threads. The render callback never waits:
-/// it takes the lock only when it's free and otherwise keeps the settings it had.
+/// The equaliser settings, shared with the audio threads. Coefficients are worked out here,
+/// off the audio thread, for each sample rate a tap has asked for; the render callback only
+/// copies them into its own buffers, and never waits: it takes the lock only when it's free
+/// and otherwise keeps the settings it had.
 final class EQState: @unchecked Sendable {
+    /// Five coefficients (b0, b1, b2, a1, a2) per band; a band left flat passes audio through.
+    static let stride = 5
+    static var coefficientCount: Int { Equalizer.bands.count * stride }
+
     struct Snapshot {
         var enabled = false
         var gains: [Double] = []
         var version = 0
+        /// The preamp (linear) that leaves headroom for boosts.
+        var preamp = 1.0
+        /// Sample rate → coefficients (`coefficientCount` values).
+        var coefficients: [Double: [Double]] = [:]
     }
 
     private let lock = OSAllocatedUnfairLock(initialState: Snapshot())
 
     func update(enabled: Bool, gains: [Double]) {
+        // Worked out on the caller's (main) thread; the render thread never waits for this lock.
         lock.withLock { s in
             s.enabled = enabled
             s.gains = gains
+            s.preamp = Self.preamp(gains)
+            for r in Array(s.coefficients.keys) { s.coefficients[r] = Self.coefficients(gains: gains, sampleRate: r) }
             s.version += 1
         }
     }
 
-    /// The settings, unless another thread is changing them right now.
-    func snapshot(ifNewerThan version: Int) -> Snapshot? {
-        lock.withLockIfAvailable { s in s.version != version ? s : nil } ?? nil
+    /// Makes sure coefficients exist for a tap's sample rate (called when a tap is prepared,
+    /// not on the render thread).
+    func prepare(sampleRate: Double) {
+        lock.withLock { s in
+            guard s.coefficients[sampleRate] == nil else { return }
+            s.coefficients[sampleRate] = Self.coefficients(gains: s.gains, sampleRate: sampleRate)
+            s.version += 1
+        }
+    }
+
+    /// For the render thread: when the settings changed since `version`, copies the
+    /// coefficients for `sampleRate` into `into` (no allocation) and returns the new version,
+    /// whether it's on and the preamp. Nil when nothing changed or the lock is busy.
+    func load(ifNewerThan version: Int, sampleRate: Double, into: UnsafeMutablePointer<Double>) -> (version: Int, enabled: Bool, preamp: Double)? {
+        lock.withLockIfAvailableUnchecked { s -> (version: Int, enabled: Bool, preamp: Double)? in
+            guard s.version != version else { return nil }
+            guard let c = s.coefficients[sampleRate], c.count == Self.coefficientCount else {
+                // Not worked out for this rate yet: pass audio through until it is.
+                return (s.version, false, 1)
+            }
+            c.withUnsafeBufferPointer { into.update(from: $0.baseAddress!, count: c.count) }
+            return (s.version, s.enabled, s.preamp)
+        } ?? nil
+    }
+
+    /// All bands' coefficients for a sample rate; flat bands and bands too high for the rate
+    /// pass audio through (1, 0, 0, 0, 0).
+    static func coefficients(gains: [Double], sampleRate: Double) -> [Double] {
+        var out = [Double](repeating: 0, count: coefficientCount)
+        for i in 0..<Equalizer.bands.count {
+            let g = i < gains.count ? gains[i] : 0
+            let f = Equalizer.bands[i]
+            var c: (Double, Double, Double, Double, Double) = (1, 0, 0, 0, 0)
+            if abs(g) >= 0.05, f < sampleRate * 0.45 {
+                let kind: Biquad = i == 0 ? .lowShelf : i == Equalizer.bands.count - 1 ? .highShelf : .peaking
+                c = kind.coefficients(f: f, gainDB: g, sampleRate: sampleRate)
+            }
+            out[i * stride] = c.0
+            out[i * stride + 1] = c.1
+            out[i * stride + 2] = c.2
+            out[i * stride + 3] = c.3
+            out[i * stride + 4] = c.4
+        }
+        return out
+    }
+
+    /// Headroom for boosts, so a boosted band doesn't clip.
+    static func preamp(_ gains: [Double]) -> Double {
+        pow(10, -max(0, gains.max() ?? 0) * 0.6 / 20)
     }
 }
 
-/// One tap's filters: per band, coefficients and per-channel state (transposed direct form II).
+/// One tap's filters: per band, coefficients and per-channel state (transposed direct form II),
+/// in buffers allocated once. The filter state carries over when the settings change, and the
+/// preamp moves smoothly, so dragging a slider doesn't click.
 private final class EqualizerTap {
+    /// Channels the filter state has room for (more are left untouched).
+    private static let maxChannels = 16
     private let state: EQState
     private var version = -1
     private var enabled = false
@@ -128,13 +191,30 @@ private final class EqualizerTap {
     private var usable = false
     private var interleaved = false
     private var channels = 2
-    /// Active bands only: b0, b1, b2, a1, a2.
-    private var coeffs: [(Double, Double, Double, Double, Double)] = []
-    /// [band][channel] → (z1, z2).
-    private var z: [[(Double, Double)]] = []
+    private let bandCount = Equalizer.bands.count
+    /// `bandCount` × (b0, b1, b2, a1, a2).
+    private let coeffs: UnsafeMutablePointer<Double>
+    /// [band][channel] × (z1, z2).
+    private let z: UnsafeMutablePointer<Double>
     private var preamp = 1.0
+    /// The preamp actually applied, gliding to `preamp` over each buffer.
+    private var appliedPreamp = 1.0
 
-    private init(state: EQState) { self.state = state }
+    private init(state: EQState) {
+        self.state = state
+        coeffs = .allocate(capacity: EQState.coefficientCount)
+        z = .allocate(capacity: Equalizer.bands.count * Self.maxChannels * 2)
+        for b in 0..<bandCount {
+            (coeffs + b * EQState.stride).initialize(repeating: 0, count: EQState.stride)
+            coeffs[b * EQState.stride] = 1
+        }
+        z.initialize(repeating: 0, count: bandCount * Self.maxChannels * 2)
+    }
+
+    deinit {
+        coeffs.deallocate()
+        z.deallocate()
+    }
 
     static func make(_ state: EQState) -> MTAudioProcessingTap? {
         let ctx = EqualizerTap(state: state)
@@ -165,33 +245,34 @@ private final class EqualizerTap {
         sampleRate = f.mSampleRate > 0 ? f.mSampleRate : 44100
         usable = f.mFormatID == kAudioFormatLinearPCM && (f.mFormatFlags & kAudioFormatFlagIsFloat) != 0 && f.mBitsPerChannel == 32
         interleaved = (f.mFormatFlags & kAudioFormatFlagIsNonInterleaved) == 0
-        channels = max(1, Int(f.mChannelsPerFrame))
-        version = -1 // recompute for this rate
+        channels = min(Self.maxChannels, max(1, Int(f.mChannelsPerFrame)))
+        // A new format: fresh filter state, and coefficients for this rate.
+        z.update(repeating: 0, count: bandCount * Self.maxChannels * 2)
+        state.prepare(sampleRate: sampleRate)
+        version = -1
     }
 
+    /// Picks up new settings (copying, never allocating; the filter state is kept).
     private func refresh() {
-        guard let s = state.snapshot(ifNewerThan: version) else { return }
+        guard let s = state.load(ifNewerThan: version, sampleRate: sampleRate, into: coeffs) else { return }
         version = s.version
-        enabled = s.enabled
-        var c: [(Double, Double, Double, Double, Double)] = []
-        for (i, g) in s.gains.enumerated() where abs(g) >= 0.05 && i < Equalizer.bands.count {
-            let f = Equalizer.bands[i]
-            guard f < sampleRate * 0.45 else { continue }
-            let kind: Biquad = i == 0 ? .lowShelf : i == Equalizer.bands.count - 1 ? .highShelf : .peaking
-            c.append(kind.coefficients(f: f, gainDB: g, sampleRate: sampleRate))
+        if s.enabled, !enabled {
+            // Switched on: start from silence in the filters and the current level.
+            z.update(repeating: 0, count: bandCount * Self.maxChannels * 2)
+            appliedPreamp = s.preamp
         }
-        // Headroom for boosts, so a boosted band doesn't clip.
-        let boost = max(0, s.gains.max() ?? 0)
-        preamp = pow(10, -boost * 0.6 / 20)
-        // Fresh filter state for the new settings (changes are rare; this is sized for the format).
-        z = Array(repeating: Array(repeating: (0, 0), count: channels), count: c.count)
-        coeffs = c
+        enabled = s.enabled
+        preamp = s.preamp
     }
 
     private func process(_ buffers: UnsafeMutableAudioBufferListPointer, frames: Int) {
         refresh()
         guard enabled, usable, frames > 0 else { return }
-        let gain = Float(preamp)
+        let from = appliedPreamp, to = preamp
+        appliedPreamp = to
+        let step = (to - from) / Double(frames)
+        let bands = bandCount
+        let stride = EQState.stride
         for (bi, buffer) in buffers.enumerated() {
             guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
             let chans = interleaved ? Int(buffer.mNumberChannels) : 1
@@ -199,18 +280,21 @@ private final class EqualizerTap {
                 let channel = interleaved ? ch : bi
                 guard channel < channels else { continue }
                 var i = ch
+                var frame = 0
                 let end = frames * chans
                 while i < end {
-                    var x = Double(data[i] * gain)
-                    for b in 0..<coeffs.count {
-                        let (b0, b1, b2, a1, a2) = coeffs[b]
-                        let (z1, z2) = z[b][channel]
-                        let y = b0 * x + z1
-                        z[b][channel] = (b1 * x - a1 * y + z2, b2 * x - a2 * y)
+                    var x = Double(data[i]) * (from + step * Double(frame))
+                    for b in 0..<bands {
+                        let c = coeffs + b * stride
+                        let zp = z + (b * Self.maxChannels + channel) * 2
+                        let y = c[0] * x + zp[0]
+                        zp[0] = c[1] * x - c[3] * y + zp[1]
+                        zp[1] = c[2] * x - c[4] * y
                         x = y
                     }
                     data[i] = Float(min(1, max(-1, x)))
                     i += chans
+                    frame += 1
                 }
             }
         }

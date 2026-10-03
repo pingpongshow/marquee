@@ -388,6 +388,12 @@ final class Batch2UITests: XCTestCase {
         waitForExpectations(timeout: 30)
         app.buttons["Forward 30 seconds"].tap()
         try eventually(15, "the TV got seek") { fake.commands.contains { $0["type"] as? String == "seek" } }
+        // Dragging the position slider seeks there, even while state updates arrive mid-drag.
+        let seeks = fake.commands.filter { $0["type"] as? String == "seek" }.count
+        let slider = app.sliders["remoteSlider"]
+        XCTAssertTrue(slider.waitForExistence(timeout: 5))
+        slider.adjust(toNormalizedSliderPosition: 0.6)
+        try eventually(15, "the TV got the slider's seek") { fake.commands.filter { $0["type"] as? String == "seek" }.count > seeks }
         app.buttons["Stop"].tap()
         try eventually(15, "the TV got stop") { fake.commands.contains { $0["type"] as? String == "stop" } }
         shot("po3-stopped")

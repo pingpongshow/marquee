@@ -38,6 +38,8 @@ extension Components {
             case _hyphen_duration = "-duration"
             case _hyphen_viewed = "-viewed"
             case random = "random"
+            case myRating = "myRating"
+            case _hyphen_myRating = "-myRating"
         }
         /// - Remark: Generated from `#/components/parameters/Offset`.
         public typealias Offset = Swift.Int

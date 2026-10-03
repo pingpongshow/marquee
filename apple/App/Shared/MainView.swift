@@ -16,6 +16,8 @@ struct MainView: View {
     @State private var linkedItem: LinkedItem?
     @State private var canDiscover = false
     @State private var hasLiveTV = false
+    /// Why the libraries couldn't be loaded (shown with a retry instead of an empty list).
+    @State private var librariesError: String?
 
     var body: some View {
         TabView {
@@ -25,11 +27,19 @@ struct MainView: View {
             }
             if compact {
                 // iPhone: one Libraries tab so the tab bar doesn't overflow into "More".
-                Tab("Libraries", systemImage: "square.stack") { stack { LibrariesList(libraries: libraries, icon: icon) } }
+                Tab("Libraries", systemImage: "square.stack") {
+                    stack { LibrariesList(libraries: libraries, error: librariesError, icon: icon, reload: { await loadAll() }) }
+                }
             } else {
                 TabSection("Libraries") {
                     ForEach(libraries, id: \.id) { lib in
                         Tab(lib.name, systemImage: icon(lib._type)) { stack { LibraryView(libraryID: lib.id) } }
+                    }
+                    if libraries.isEmpty, librariesError != nil {
+                        // The server wasn't reachable: a way back instead of an empty section.
+                        Tab("Libraries", systemImage: "exclamationmark.triangle") {
+                            stack { LibrariesList(libraries: [], error: librariesError, icon: icon, reload: { await loadAll() }) }
+                        }
                     }
                 }
             }
@@ -60,15 +70,15 @@ struct MainView: View {
         .environment(video)
         .remoteToast()
         // Remote control (USER-14): a player while open, and while music plays in the background.
-        .onChange(of: scenePhase, initial: true) { updateRemote() }
+        .onChange(of: scenePhase, initial: true) { old, new in
+            updateRemote()
+            // Back in the app: anything that failed at launch (server unreachable) loads now.
+            if old != new, new == .active, libraries.isEmpty || librariesError != nil { Task { await loadAll() } }
+        }
         .onChange(of: music.playing) { updateRemote() }
         .onDisappear { RemoteReceiver.shared.stop() }
-        .task { await loadLibraries() }
-        .task {
-            let s = try? await app.requestsStatus()
-            canDiscover = s?.enabled == true && s?.canRequest == true
-            hasLiveTV = (try? await app.liveStatus())?.enabled == true
-        }
+        // Again whenever the connection changes (another address, reconnected, signed in).
+        .task(id: "\(app.baseURL?.absoluteString ?? "")|\(app.state)|\(app.me?.id ?? 0)") { await loadAll() }
         .sheet(item: $playlistPicker.item) { item in AddToPlaylistSheet(item: item) }
         .sheet(item: $journey.from) { item in JourneySheet(from: item) }
         .alert("Something went wrong", isPresented: Binding(get: { actionError.message != nil }, set: { if !$0 { actionError.message = nil } })) {
@@ -133,8 +143,20 @@ struct MainView: View {
         }
     }
 
-    private func loadLibraries() async {
-        if let libs = try? await app.libraries() { libraries = libs }
+    private func loadAll() async {
+        guard app.client != nil else { return }
+        async let requests = try? app.requestsStatus()
+        async let live = try? app.liveStatus()
+        do {
+            libraries = try await app.libraries()
+            librariesError = nil
+        } catch is CancellationError {
+        } catch {
+            librariesError = error.localizedDescription
+        }
+        // A failed check keeps what was known (a tab doesn't vanish on a blip).
+        if let s = await requests { canDiscover = s.enabled && s.canRequest }
+        if let l = await live { hasLiveTV = l.enabled }
     }
 
     private func icon(_ t: Schemas.LibraryType) -> String {
@@ -169,9 +191,18 @@ struct LibrariesList: View {
     @Environment(AppSession.self) private var app
     @State private var canDiscover = false
     let libraries: [Library]
+    var error: String?
     let icon: (Schemas.LibraryType) -> String
+    var reload: () async -> Void = {}
     var body: some View {
         List {
+            if let error, libraries.isEmpty {
+                Section {
+                    Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
+                    Button("Try Again") { Task { await reload() } }
+                        .accessibilityIdentifier("librariesRetry")
+                }
+            }
             ForEach(libraries, id: \.id) { lib in
                 NavigationLink(value: Route.library(lib.id)) {
                     Label {
@@ -203,10 +234,15 @@ struct LibrariesList: View {
             #endif
         }
         .navigationTitle("Libraries")
-        .task {
-            let s = try? await app.requestsStatus()
-            canDiscover = s?.enabled == true && s?.canRequest == true
+        .refreshable {
+            await reload()
+            await loadDiscover()
         }
+        .task { await loadDiscover() }
+    }
+
+    private func loadDiscover() async {
+        if let s = try? await app.requestsStatus() { canDiscover = s.enabled && s.canRequest }
     }
 }
 

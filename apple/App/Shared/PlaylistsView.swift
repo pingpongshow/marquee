@@ -16,7 +16,7 @@ struct PlaylistMosaic: View {
                     GridRow { tile(2); tile(3) }
                 }
             } else if let first = playlist.imageIds.first {
-                AsyncImage(url: app.imageURL(first, width: Int(size))) { $0.image?.resizable().scaledToFill() }
+                CachedImage(fill: app.imageURL(first, width: Int(size)))
             }
         }
         .frame(width: size, height: size)
@@ -24,7 +24,7 @@ struct PlaylistMosaic: View {
     }
 
     private func tile(_ i: Int) -> some View {
-        AsyncImage(url: app.imageURL(playlist.imageIds[i], width: Int(size / 2))) { $0.image?.resizable().scaledToFill() }
+        CachedImage(fill: app.imageURL(playlist.imageIds[i], width: Int(size / 2)))
             .frame(width: size / 2, height: size / 2).clipped()
     }
 }
@@ -66,6 +66,8 @@ struct PlaylistCard: View {
 struct PlaylistsView: View {
     @Environment(AppSession.self) private var app
     @State private var playlists: [Playlist] = []
+    @State private var loaded = false
+    @State private var error: String?
 
     var body: some View {
         ScrollView {
@@ -75,13 +77,34 @@ struct PlaylistsView: View {
                 }
             }
             .padding(sidePadding)
-            if playlists.isEmpty {
+            if let error, playlists.isEmpty {
+                ContentUnavailableView {
+                    Label("Couldn't load playlists", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(error)
+                } actions: {
+                    Button("Try Again") { Task { await load() } }
+                }
+            } else if !loaded {
+                ProgressView().padding(.top, 60)
+            } else if playlists.isEmpty {
                 ContentUnavailableView("No playlists", systemImage: "music.note.list", description: Text("Use “Add to Playlist” on any track, album, movie or episode."))
             }
         }
         .navigationTitle("Playlists")
-        .task { playlists = (try? await app.playlists()) ?? [] }
-        .refreshable { playlists = (try? await app.playlists()) ?? [] }
+        .task { if !loaded { await load() } }
+        .refreshable { await load() }
+    }
+
+    private func load() async {
+        do {
+            playlists = try await app.playlists()
+            error = nil
+        } catch is CancellationError {
+        } catch {
+            self.error = error.localizedDescription
+        }
+        loaded = true
     }
 
     #if os(tvOS)
@@ -101,6 +124,8 @@ struct PlaylistView: View {
     let id: Int64
     @State private var playlist: Playlist?
     @State private var entries: [PlaylistEntry] = []
+    @State private var loaded = false
+    @State private var error: String?
 
     var body: some View {
         List {
@@ -111,24 +136,42 @@ struct PlaylistView: View {
                 #endif
             }
             ForEach(Array(entries.enumerated()), id: \.element.entryId) { i, e in
-                Button { play(i) } label: {
-                    HStack(spacing: 12) {
-                        ArtworkView(item: e.item, shape: e.item._type == .track ? .square : .wide, width: 60).frame(width: e.item._type == .track ? 44 : 80)
-                        VStack(alignment: .leading) {
-                            Text(e.item.title).lineLimit(1)
-                            Text(e.item.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                HStack(spacing: 4) {
+                    Button { play(i) } label: {
+                        HStack(spacing: 12) {
+                            ArtworkView(item: e.item, shape: e.item._type == .track ? .square : .wide, width: 60).frame(width: e.item._type == .track ? 44 : 80)
+                            VStack(alignment: .leading) {
+                                Text(e.item.title).lineLimit(1)
+                                Text(e.item.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            Spacer()
+                            Text(formatTime(seconds: Double(e.item.durationMs ?? 0) / 1000)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                         }
-                        Spacer()
-                        Text(formatTime(seconds: Double(e.item.durationMs ?? 0) / 1000)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .contextMenu { ItemMenuItems(item: e.item) }
+                    if e.item._type == .track { RowRating(item: e.item) }
                 }
-                .buttonStyle(.plain)
-                .contextMenu { ItemMenuItems(item: e.item) }
             }
         }
         .listStyle(.plain)
+        .overlay {
+            if let error, playlist == nil {
+                ContentUnavailableView {
+                    Label("Couldn't load the playlist", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(error)
+                } actions: {
+                    Button("Try Again") { Task { await load() } }
+                }
+            } else if !loaded {
+                ProgressView()
+            }
+        }
         .navigationTitle(playlist?.title ?? "Playlist")
-        .task { await load() }
+        .task { if !loaded { await load() } }
+        .refreshable { await load() }
     }
 
     /// iPhone (any width, either orientation): cover, then the title, then the actions, each
@@ -198,8 +241,17 @@ struct PlaylistView: View {
     #endif
 
     private func load() async {
-        playlist = try? await app.playlists().first { $0.id == id }
-        entries = (try? await app.playlistItems(id)) ?? []
+        do {
+            // The one playlist, not every playlist to find it.
+            async let p = app.playlist(id)
+            async let e = app.playlistItems(id)
+            (playlist, entries) = try await (p, e)
+            error = nil
+        } catch is CancellationError {
+        } catch {
+            self.error = error.localizedDescription
+        }
+        loaded = true
     }
 
     private func play(_ start: Int, shuffle: Bool = false) {

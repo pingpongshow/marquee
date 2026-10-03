@@ -129,6 +129,8 @@ struct RemoteControlView: View {
     /// When the state arrived, to move the position on while it plays.
     @State private var stateAt = Date()
     @State private var scrub: Double?
+    /// The position slider is being dragged: state updates leave `scrub` alone meanwhile.
+    @State private var isScrubbing = false
     @State private var volume: Double?
     @State private var detail: ItemDetail?
     @State private var art: Item?
@@ -222,10 +224,12 @@ struct RemoteControlView: View {
             let pos = scrub ?? livePosition(s, at: ctx.date)
             VStack(spacing: 4) {
                 Slider(value: Binding(get: { pos }, set: { scrub = $0 }), in: 0...max(duration, 1)) { editing in
+                    isScrubbing = editing
                     if !editing, let target = scrub {
                         send(.init(_type: .seek, positionMs: Int64(target * 1000)))
                     }
                 }
+                .accessibilityIdentifier("remoteSlider")
                 .disabled(duration <= 0)
                 .accessibilityLabel("Position")
                 HStack {
@@ -321,7 +325,7 @@ struct RemoteControlView: View {
             } catch {
                 self.error = error.localizedDescription
             }
-            if c._type == .seek { scrub = nil }
+            if c._type == .seek, !isScrubbing { scrub = nil }
             if c._type == .setVolume { volume = nil }
         }
     }
@@ -346,7 +350,8 @@ struct RemoteControlView: View {
     private func update(_ p: RemotePlayer) {
         player = p
         stateAt = Date()
-        if scrub != nil, p.state?.state != .buffering { scrub = nil }
+        // A long-poll answer mid-drag must not throw the drag away (the seek would be lost).
+        if scrub != nil, !isScrubbing, p.state?.state != .buffering { scrub = nil }
     }
 
     private func loadItem() async {
