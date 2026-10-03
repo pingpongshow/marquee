@@ -78,6 +78,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -320,6 +321,55 @@ fun RatingStars(rating: Double?, onRate: (Double?) -> Unit, size: Int = 26) {
                     Box(Modifier.weight(1f).fillMaxHeight().semantics { contentDescription = "${star - 1}.5 stars" }.clickable { pick(star * 2.0 - 1) })
                     Box(Modifier.weight(1f).fillMaxHeight().semantics { contentDescription = "$star star${if (star == 1) "" else "s"}" }.clickable { pick(star * 2.0) })
                 }
+            }
+        }
+    }
+}
+
+/**
+ * A track row's rating you can change right in the row: the small stars when rated, or a faint
+ * outline star when not. Tapping opens a small popover of half-star stars; choosing shows at once,
+ * saves, and reverts if the server refuses (choosing the current value again clears it).
+ */
+@Composable
+fun TrackRating(track: app.marquee.api.models.ItemSummary, modifier: Modifier = Modifier) {
+    val marquee = LocalMarquee.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var rating by remember(track.id, track.userRating) { mutableStateOf(track.userRating?.takeIf { it > 0 }) }
+    var open by remember { mutableStateOf(false) }
+    val music = LocalMusic.current
+    fun rate(r: Double?) {
+        val before = rating
+        rating = r
+        open = false
+        music.ratingChanged(track.id, r)
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) { runCatching { marquee.items.rateItem(track.id, app.marquee.api.models.RateItemRequest(r)) }.isSuccess }
+            if (!ok) {
+                rating = before
+                music.ratingChanged(track.id, before)
+                android.widget.Toast.makeText(context, "Couldn't save the rating", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    Box(modifier) {
+        val r = rating
+        Box(
+            Modifier.clip(RoundedCornerShape(6.dp)).focusRing(RoundedCornerShape(6.dp)).clickable { open = true }
+                .semantics(mergeDescendants = true) {
+                    contentDescription = if (r != null) "Rated ${app.marquee.ui.starsLabel(r)} stars" else "Rate ${track.title}"
+                    role = androidx.compose.ui.semantics.Role.Button
+                }
+                .padding(horizontal = 6.dp, vertical = 10.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (r != null) app.marquee.ui.RatingBadge(r)
+            else Icon(Icons.Filled.StarBorder, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f))
+        }
+        DropdownMenu(open, { open = false }) {
+            Box(Modifier.padding(horizontal = 8.dp).semantics { contentDescription = "Rate ${track.title}" }) {
+                RatingStars(rating, ::rate, size = 24)
             }
         }
     }

@@ -869,6 +869,10 @@ paths:
           in: query
           description: Only titles starting with this letter ("#" for anything else).
           schema: { type: string }
+        - name: minMyRating
+          in: query
+          description: "Only what the person rated at least this (0–10, e.g. 8 = 4 stars: favourites)."
+          schema: { type: integer, minimum: 1, maximum: 10 }
       responses:
         "200":
           description: OK
@@ -3365,6 +3369,57 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /items/{itemId}/reviews:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [items]
+      operationId: itemReviews
+      summary: "The community rating and everyone's ratings and comments for an item (USER-17)."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemReviews" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [items]
+      operationId: setReview
+      summary: "Your comment on an item, shown with your rating to everyone who can see it. An empty comment removes it (your rating stays; set that with PUT /items/{itemId}/rating)."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comment]
+              properties:
+                comment: { type: string, maxLength: 2000 }
+      responses:
+        "204": { description: Saved. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/reviews/{userId}:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+      - name: userId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    delete:
+      tags: [items]
+      operationId: deleteReview
+      summary: Remove a comment (your own, or anyone's for admins). Ratings aren't touched.
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /items/{itemId}/trickplay:
     parameters:
       - $ref: "#/components/parameters/ItemId"
@@ -3468,7 +3523,7 @@ components:
       description: Sort order. Prefix with "-" for descending.
       schema:
         type: string
-        enum: [title, -title, added, -added, year, -year, released, -released, rating, -rating, duration, -duration, -viewed, random]
+        enum: [title, -title, added, -added, year, -year, released, -released, rating, -rating, duration, -duration, -viewed, random, myRating, -myRating]
         default: title
     Offset:
       name: offset
@@ -5355,6 +5410,38 @@ components:
           description: "Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown."
           enum: [album, ep, single, compilation, live, soundtrack, remix, demo, other]
         audioFormat: { $ref: "#/components/schemas/AudioFormat" }
+        communityRating: { $ref: "#/components/schemas/CommunityRating" }
+
+    CommunityRating:
+      type: object
+      description: "Everyone's ratings of an item combined (USER-17): the average of the accounts that rated it, 0–10. Absent when nobody has."
+      required: [average, count]
+      properties:
+        average: { type: number }
+        count: { type: integer, description: How many people rated it. }
+
+    Review:
+      type: object
+      required: [userId, userName, updatedAt, mine]
+      properties:
+        userId: { type: integer, format: int64 }
+        userName: { type: string }
+        avatarUrl: { type: string }
+        rating: { type: number, description: "Their rating, 0–10, if they rated it." }
+        comment: { type: string }
+        updatedAt: { type: string, format: date-time }
+        mine: { type: boolean }
+
+    ItemReviews:
+      type: object
+      required: [count, reviews]
+      properties:
+        average: { type: number, description: Community average (absent when nobody rated it). }
+        count: { type: integer, description: Number of ratings. }
+        reviews:
+          type: array
+          description: Everyone who rated or commented, people with comments first, newest first.
+          items: { $ref: "#/components/schemas/Review" }
 
     AudioFormat:
       type: object

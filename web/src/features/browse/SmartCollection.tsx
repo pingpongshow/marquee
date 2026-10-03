@@ -61,7 +61,7 @@ function RulesForm({ libraryId, value, onChange }: { libraryId: number; value: S
       <Field label="Sort by">
         {(id) => (
           <Select id={id} value={value.sort ?? "title"} onChange={(e) => set({ sort: e.target.value })}>
-            {sortOptions.map((o) => (
+            {sortOptions.filter((o) => !o.personal).map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>

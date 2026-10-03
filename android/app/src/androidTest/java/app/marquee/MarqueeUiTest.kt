@@ -1712,8 +1712,9 @@ class MarqueeUiTest {
             setShowQuality(true)
             shot("aq1-setting")
             openLibrary("Music")
-            rule.waitUntil(20_000) { scrollTo(hasText("Test Artist 1")) }
-            tap("Test Artist 1")
+            // The music home no longer lists every artist: go via Library › Artists.
+            openArtist("Test Artist 1")
+            rule.onAllNodes(hasContentDescription("Test Artist 1") and hasClickAction()).onFirst().performClick()
             rule.waitUntilAtLeastOneExists(hasContentDescription("Album 1 (2001)"), 15_000)
             rule.onAllNodes(hasContentDescription("Album 1 (2001)")).onFirst().performClick()
             rule.waitText("99 Hi-Res Tone")
@@ -1795,6 +1796,7 @@ class MarqueeUiTest {
         val last = artists.sortedBy { it.lowercase() }.last()
         rule.waitUntil(20_000) { scrollTo(hasContentDescription(last)) }
         shot("mh3-artists")
+        rule.waitUntil(5_000) { scrollTo(hasText("Recently added") and hasClickAction()) } // the sort row scrolls
         rule.onNode(hasText("Recently added") and hasClickAction()).performClick()
         rule.waitUntilAtLeastOneExists(hasText("Recently added") and isSelected(), 5_000)
         back()
@@ -1860,5 +1862,224 @@ class MarqueeUiTest {
         rule.waitText("Radio")
         check("album", listOf("Play", "Shuffle", "Radio", "Download"))
         shot("hb3-album")
+    }
+
+    /**
+     * Ratings & favourites (Plex ratings carry over): small read-only stars on rated track rows,
+     * tap-to-rate on item pages, Favorites in the music home (row, shelf and page with Play), and
+     * the My rating sort and Rated 4★+ filter on library grids. Rates test tracks in setup and
+     * clears them after.
+     */
+    @Test fun ratingsAndFavorites() {
+        assumeTrue("phones", !isTv)
+        connectAndSignIn()
+        val favId = 311L // Album 1 / Song 1-2, rated 4.5★
+        val mehId = 314L // Album 2 / Song 2-1, rated 3★: rated, not a favourite
+        val albumId = 309L // Album 1
+        fun rate(id: Long, r: Int?) = adminApi("PUT", "/items/$id/rating", """{"rating":${r ?: "null"}}""", asToken = appToken)
+        fun ratingOf(id: Long) = org.json.JSONObject(adminApi("GET", "/items/$id", asToken = appToken)).optDouble("userRating", 0.0)
+        rate(favId, 9); rate(mehId, 6)
+        val app = context.applicationContext as MarqueeApplication
+        try {
+            openLibrary("Music")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Music home"), 20_000)
+            // The Favorites shelf and the Library row with its count.
+            rule.waitUntil(20_000) { scrollTo(hasContentDescription("Favorites shelf")) }
+            rule.onNode(hasContentDescription("Favorites shelf")).assertExists()
+            rule.waitUntil(15_000) { scrollTo(hasText("Favorites") and hasClickAction()) &&
+                rule.onAllNodes(hasText("Favorites") and hasClickAction()).onFirst().fetchSemanticsNode().config[SemanticsProperties.Text].any { it.text == "1" } }
+            shot("rf1-home")
+            rule.onNode(hasText("Favorites") and hasClickAction()).performClick()
+
+            // The Favorites page: the rated track with its stars, Play and Shuffle.
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Favorite tracks"), 15_000)
+            rule.waitText("Song 1-2")
+            assertTrue(rule.onAllNodesWithText("Song 2-1").fetchSemanticsNodes().isEmpty())
+            rule.onNode(hasContentDescription("Rated 4.5 stars")).assertExists()
+            rule.onNode(hasText("Shuffle") and hasClickAction()).assertExists()
+            shot("rf2-favorites")
+            rule.onNode(hasText("Albums") and hasClickAction()).performClick()
+            rule.waitText("Albums you rate 4 stars or more", substring = true)
+            rule.onNode(hasText("Tracks") and hasClickAction()).performClick()
+            rule.waitText("Song 1-2")
+            rule.onNode(hasText("Play") and hasClickAction()).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Open Now Playing"), 20_000)
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+            back()
+
+            // Songs: My rating puts the rated tracks first; Rated 4★+ keeps only the favourite.
+            rule.waitUntil(10_000) { scrollTo(hasText("Songs") and hasClickAction()) }
+            rule.onNode(hasText("Songs") and hasClickAction()).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Sort"), 10_000)
+            rule.waitUntil(10_000) { scrollTo(hasText("My rating") and hasClickAction()) }
+            rule.onNode(hasText("My rating") and hasClickAction()).performClick()
+            rule.waitUntilAtLeastOneExists(hasText("My rating") and isSelected(), 5_000)
+            rule.waitText("Song 1-2")
+            rule.waitText("Song 2-1")
+            fun top(t: String) = rule.onAllNodesWithText(t).onFirst().fetchSemanticsNode().boundsInRoot.top
+            assertTrue("rated 4.5 above rated 3", top("Song 1-2") < top("Song 2-1"))
+            rule.onNode(hasContentDescription("Rated 4.5 stars")).assertExists()
+            rule.onAllNodes(hasContentDescription("Rated 3 stars")).onFirst().assertExists() // other tests rate tracks too
+            shot("rf3-songs-my-rating")
+            // Rate right in the row: tap the stars, pick in the popover; it shows at once and saves.
+            rule.onNode(hasContentDescription("Rated 3 stars") and hasAnyAncestor(hasText("Song 2-1"))).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("5 stars") and hasAnyAncestor(hasContentDescription("Rate Song 2-1")), 5_000)
+            rule.onNode(hasContentDescription("5 stars") and hasAnyAncestor(hasContentDescription("Rate Song 2-1"))).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Rated 5 stars") and hasAnyAncestor(hasText("Song 2-1")), 5_000)
+            rule.waitUntil(10_000) { ratingOf(mehId) == 10.0 }
+            shot("rf3b-songs-rated-inline")
+            rate(mehId, 6)
+            rule.waitUntil(10_000) { scrollTo(hasText("Rated 4★+") and hasClickAction()) }
+            rule.onNode(hasText("Rated 4★+") and hasClickAction()).performClick()
+            rule.waitUntil(10_000) { rule.onAllNodesWithText("Song 2-1").fetchSemanticsNodes().isEmpty() }
+            rule.waitText("Song 1-2")
+            back()
+
+            // The album page: stars on the rated row only, and tap-to-rate the album.
+            rule.waitUntil(10_000) { scrollTo(hasText("Albums") and hasClickAction()) }
+            rule.onNode(hasText("Albums") and hasClickAction()).performClick()
+            rule.waitUntil(20_000) { scrollTo(hasContentDescription("Album 1")) }
+            rule.onAllNodes(hasContentDescription("Album 1")).onFirst().performClick()
+            rule.waitText("Song 1-1")
+            rule.onNode(hasContentDescription("Rated 4.5 stars")).assertExists()
+            assertEquals(1, rule.onAllNodes(hasContentDescription("Rated", substring = true)).fetchSemanticsNodes().size)
+            // An unrated row: a faint star to rate it; the same value again clears it.
+            rule.onNode(hasContentDescription("Rate Song 1-3") and hasClickAction()).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("4 stars") and hasAnyAncestor(hasContentDescription("Rate Song 1-3")), 5_000)
+            rule.onNode(hasContentDescription("4 stars") and hasAnyAncestor(hasContentDescription("Rate Song 1-3"))).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Rated 4 stars") and hasAnyAncestor(hasText("Song 1-3")), 5_000)
+            rule.waitUntil(10_000) { ratingOf(312L) == 8.0 }
+            rule.onNode(hasContentDescription("Rated 4 stars") and hasAnyAncestor(hasText("Song 1-3"))).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("4 stars") and hasAnyAncestor(hasContentDescription("Rate Song 1-3")), 5_000)
+            rule.onNode(hasContentDescription("4 stars") and hasAnyAncestor(hasContentDescription("Rate Song 1-3"))).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Rate Song 1-3") and hasClickAction(), 5_000)
+            rule.waitUntil(10_000) { ratingOf(312L) == 0.0 }
+            assertEquals(1, rule.onAllNodes(hasContentDescription("Rated", substring = true)).fetchSemanticsNodes().size)
+            // The album itself: tap-to-rate in the header.
+            rule.onNode(hasContentDescription("Rating") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Not rated")).assertExists()
+            rule.onNode(hasContentDescription("4 stars") and !hasAnyAncestor(hasContentDescription("Rate", substring = true))).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Rating") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "4 of 5 stars"), 5_000)
+            rule.waitUntil(10_000) { ratingOf(albumId) == 8.0 }
+            shot("rf4-album")
+
+            // Movie grids: the filter too.
+            back(); back()
+            tap("Libraries")
+            rule.waitText("Movies")
+            tap("Movies")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Sort and filter"), 15_000)
+            rule.onNode(hasText("My rating") and hasClickAction()).assertExists()
+            rule.onNode(hasText("Rated 4★+") and hasClickAction()).performClick()
+            rule.waitText("Nothing rated 4★ or more yet.")
+            shot("rf5-movies-filter")
+        } finally {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+            rate(favId, null); rate(mehId, null); rate(albumId, null); rate(312L, null)
+        }
+    }
+
+    /**
+     * Community ratings and comments (USER-17), as Kiddo with the admin as the other person: the
+     * item page's Community rating opens Ratings & comments; Kiddo adds, edits and deletes a
+     * comment, can't delete the admin's; rating updates the community average and Now Playing;
+     * the Favorites page shows the community score; Songs filter by real genres.
+     */
+    @Test fun communityRatingsAndComments() {
+        assumeTrue("phones", !isTv)
+        connectAndSignIn()
+        val track = 311L // Album 1 / Song 1-2
+        fun kid(method: String, path: String, body: String? = null) = adminApi(method, path, body, asToken = appToken)
+        fun cleanup() {
+            for (t in listOf(appToken, adminToken)) {
+                adminApi("PUT", "/items/$track/rating", """{"rating":null}""", asToken = t)
+                adminApi("PUT", "/items/$track/reviews", """{"comment":""}""", asToken = t)
+            }
+        }
+        fun myComment() = org.json.JSONObject(kid("GET", "/items/$track/reviews")).getJSONArray("reviews").let { a ->
+            (0 until a.length()).map { a.getJSONObject(it) }.firstOrNull { it.getBoolean("mine") }?.optString("comment")?.takeIf { it.isNotEmpty() }
+        }
+        adminApi("GET", "/me") // skips without an admin token
+        cleanup()
+        adminApi("PUT", "/items/$track/rating", """{"rating":10}""")
+        adminApi("PUT", "/items/$track/reviews", """{"comment":"Admin thinks it's great"}""")
+        kid("PUT", "/items/$track/rating", """{"rating":6}""")
+        val app = context.applicationContext as MarqueeApplication
+        try {
+            // Find the track's page through Search.
+            tap("Search")
+            rule.waitUntilAtLeastOneExists(hasSetTextAction(), 10_000)
+            rule.onAllNodes(hasSetTextAction()).onFirst().performTextInput("Song 1-2")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Song 1-2") and hasClickAction(), 15_000)
+            rule.onAllNodes(hasContentDescription("Song 1-2") and hasClickAction()).onFirst().performClick()
+            val community = hasContentDescription("Community rating", substring = true) and hasClickAction()
+            rule.waitUntilAtLeastOneExists(community, 15_000)
+            rule.onNode(hasContentDescription("Community rating 4.0, 2 ratings. Ratings & comments")).assertExists()
+            shot("cr1-item")
+            rule.onNode(community).performClick()
+            rule.waitText("Admin thinks it's great")
+            rule.waitText("You")
+            assertTrue(rule.onAllNodes(hasContentDescription("Delete e2eadmin's comment")).fetchSemanticsNodes().isEmpty())
+            shot("cr2-comments")
+
+            // Add, edit and delete a comment.
+            val box = hasSetTextAction() and hasAnyAncestor(hasContentDescription("Ratings & comments"))
+            rule.onNode(box).performTextInput("Kiddo likes it")
+            rule.onNode(hasText("Post") and hasClickAction()).performClick()
+            rule.waitUntil(10_000) { myComment() == "Kiddo likes it" }
+            rule.waitUntilAtLeastOneExists(hasText("Save") and hasClickAction(), 10_000)
+            rule.onNode(box).performTextReplacement("Kiddo loves it")
+            rule.onNode(hasText("Save") and hasClickAction()).performClick()
+            rule.waitUntil(10_000) { myComment() == "Kiddo loves it" }
+            rule.waitUntil(10_000) { rule.onAllNodesWithText("Kiddo loves it").fetchSemanticsNodes().size >= 2 } // the box and the list
+            shot("cr3-commented")
+            rule.waitUntilAtLeastOneExists(hasText("Delete") and hasClickAction(), 10_000)
+            rule.onNode(hasText("Delete") and hasClickAction()).performClick()
+            rule.waitUntil(10_000) { myComment() == null }
+            rule.waitUntilAtLeastOneExists(hasText("Post") and hasClickAction(), 10_000)
+
+            // Play it, then rate it on the page: the community average and Now Playing follow.
+            rule.waitUntil(10_000) { scrollTo(hasText("Play") and hasClickAction()) }
+            rule.onNode(hasText("Play") and hasClickAction()).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Open Now Playing"), 20_000)
+            rule.waitUntil(10_000) { app.music.now.value?.id == track }
+            rule.waitUntil(10_000) { scrollTo(hasContentDescription("Rating")) }
+            rule.onNode(hasContentDescription("4 stars") and !hasAnyAncestor(hasContentDescription("Rate", substring = true))).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Community rating 4.5, 2 ratings. Ratings & comments"), 10_000)
+            assertEquals(8.0, app.music.rating.value)
+            rule.onNode(hasContentDescription("Open Now Playing")).performClick() // a single track has no "Playing from"
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Close Now Playing"), 10_000)
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Rating") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "4 of 5 stars"), 10_000)
+            shot("cr4-now-playing")
+            rule.onNode(hasContentDescription("Close Now Playing")).performClick()
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+
+            // Favorites shows the community score.
+            back(); back()
+            openLibrary("Music")
+            rule.waitUntil(20_000) { scrollTo(hasText("Favorites") and hasClickAction()) }
+            rule.onNode(hasText("Favorites") and hasClickAction()).performClick()
+            rule.waitText("Song 1-2")
+            rule.onNode(hasContentDescription("Community rating 4.5 from 2 ratings")).assertExists()
+            shot("cr5-favorites")
+            back()
+
+            // Songs filter by the library's genres (a song's are its album's).
+            val lib = 3
+            val inGenre = org.json.JSONObject(kid("GET", "/libraries/$lib/items?type=track&genre=Bossa%20Nova&limit=5")).getJSONArray("items")
+            val title = inGenre.getJSONObject(0).getString("title")
+            rule.waitUntil(10_000) { scrollTo(hasText("Songs") and hasClickAction()) }
+            rule.onNode(hasText("Songs") and hasClickAction()).performClick()
+            rule.waitUntil(10_000) { scrollTo(hasContentDescription("Genre filter")) }
+            rule.onNode(hasContentDescription("Genre filter")).performClick()
+            rule.waitText("Bossa Nova (1)")
+            rule.waitText("Rock (8)")
+            shot("cr6-genres")
+            tap("Bossa Nova (1)")
+            rule.waitText(title)
+            rule.waitUntil(10_000) { rule.onAllNodesWithText("Song 1-1").fetchSemanticsNodes().isEmpty() }
+        } finally {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+            cleanup()
+        }
     }
 }

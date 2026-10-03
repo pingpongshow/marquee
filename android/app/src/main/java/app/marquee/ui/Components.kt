@@ -11,7 +11,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.StarHalf
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -109,13 +116,38 @@ fun subtitleFor(item: ItemSummary): String = when (item.type) {
     else -> item.year?.toString() ?: ""
 }
 
+/** "4.5" for 9, "4" for 8: a 0–10 rating as stars. */
+fun starsLabel(rating: Double): String = "%.1f".format(rating / 2).removeSuffix(".0")
+
+/**
+ * The person's rating as five small read-only stars (halves included), for track rows and
+ * cards. Nothing when unrated, so rows stay tidy.
+ */
+@Composable
+fun RatingBadge(rating: Double?, modifier: Modifier = Modifier, size: Dp = 12.dp) {
+    if (rating == null || rating <= 0) return
+    val stars = rating / 2
+    Row(modifier.semantics { contentDescription = "Rated ${starsLabel(rating)} stars" }, verticalAlignment = Alignment.CenterVertically) {
+        for (star in 1..5) {
+            val icon = when {
+                stars >= star -> Icons.Filled.Star
+                stars >= star - 0.5 -> Icons.AutoMirrored.Filled.StarHalf
+                else -> Icons.Filled.StarBorder
+            }
+            Icon(icon, null, Modifier.size(size), tint = if (stars >= star - 0.5) Gold else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+        }
+    }
+}
+
 /** A poster with its title underneath. */
 @Composable
-fun PosterCard(item: ItemSummary, imageUrl: String?, width: Dp, onClick: () -> Unit, shape: Shape = shapeFor(item), autoFocus: Boolean = false) {
+fun PosterCard(item: ItemSummary, imageUrl: String?, width: Dp, onClick: () -> Unit, shape: Shape = shapeFor(item), autoFocus: Boolean = false,
+    showRating: Boolean = item.type == ItemType.TRACK) {
     Column(Modifier.width(width)) {
         Artwork(imageUrl, item.title, shape, Modifier.fillMaxWidth().initialFocus(autoFocus).focusCard(onClick).semantics { contentDescription = item.title })
         Text(item.title, Modifier.padding(top = 6.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
         Text(subtitleFor(item), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (showRating) RatingBadge(item.userRating, Modifier.padding(top = 2.dp))
     }
 }
 
@@ -148,5 +180,5 @@ fun app.marquee.api.models.ItemDetail.summary() = ItemSummary(
     parentId = parentId, grandparentId = grandparentId, parentTitle = parentTitle, grandparentTitle = grandparentTitle,
     artistCredit = artistCredit, durationMs = durationMs, originallyAvailableAt = originallyAvailableAt, images = images,
     viewOffsetMs = viewOffsetMs, viewCount = viewCount, lastViewedAt = lastViewedAt, watchedLeafCount = watchedLeafCount,
-    userRating = userRating, watchlisted = watchlisted,
+    userRating = userRating, watchlisted = watchlisted, communityRating = communityRating,
 )
