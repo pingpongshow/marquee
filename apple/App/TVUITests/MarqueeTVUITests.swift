@@ -98,8 +98,8 @@ final class MarqueeTVUITests: XCTestCase {
         XCTAssertTrue(musicTab.waitForExistence(timeout: 10))
         focus(musicTab, direction: .right)
         remote.press(.select)
-        // The landing page: a browse row, then the quick actions (MUSIC-15).
-        XCTAssertTrue(app.buttons["musicBrowse.artists"].waitForExistence(timeout: 10))
+        // The landing page: quick actions first, the Library list at the bottom (MUSIC-15).
+        XCTAssertTrue(app.buttons["musicLibrary.artists"].waitForExistence(timeout: 10))
         let radio = app.buttons["Library Radio"]
         XCTAssertTrue(radio.waitForExistence(timeout: 10))
         // Down to the quick actions (focus lands wherever is closest), then left along them.
@@ -390,9 +390,9 @@ final class MarqueeTVUITests: XCTestCase {
         let card = app.buttons["recapCard"]
         XCTAssertTrue(card.waitForExistence(timeout: 15))
         sleep(1)
-        // The card comes after the browse row and the quick actions.
+        // The card comes after the quick actions and the first shelves.
         for _ in 0..<4 { remote.press(.up) }
-        for _ in 0..<5 where !card.hasFocus { remote.press(.down) }
+        for _ in 0..<8 where !card.hasFocus { remote.press(.down) }
         sleep(1)
         shot("tv-ym0-music")
         XCTAssertTrue(card.hasFocus)

@@ -6,6 +6,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
@@ -109,7 +110,8 @@ class MarqueeUiTest {
 
     /** From the music home: the Artists page, scrolled to an artist. */
     private fun openArtist(name: String) {
-        rule.waitUntilAtLeastOneExists(hasContentDescription("Browse music"), 20_000)
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Music home"), 20_000)
+        rule.waitUntil(20_000) { scrollTo(hasText("Artists") and hasClickAction()) }
         rule.onNode(hasText("Artists") and hasClickAction()).performClick()
         rule.waitUntilAtLeastOneExists(hasContentDescription("Sort"), 10_000)
         rule.waitUntil(20_000) { scrollTo(hasText(name, substring = true)) }
@@ -566,6 +568,9 @@ class MarqueeUiTest {
     @Test fun moodsAndStyles() {
         connectAndSignIn()
         openLibrary("Music")
+        // The music home's Library list: Moods & Styles.
+        rule.waitUntil(20_000) { scrollTo(hasText("Moods & Styles") and hasClickAction()) }
+        rule.onNode(hasText("Moods & Styles") and hasClickAction()).performClick()
         rule.waitUntil(20_000) { scrollTo(hasContentDescription("Chill mood")) }
         shot("ms1-tiles")
         rule.onNode(hasContentDescription("Chill mood")).performClick()
@@ -1744,62 +1749,74 @@ class MarqueeUiTest {
     }
 
     /**
-     * The music home (owner's request): a browse row and shelves, not every artist. Artists
-     * opens the full, sortable grid; Albums, Songs and Genres open their own pages.
+     * The music home, organised like Plexamp (owner's request): quick actions, shelves and a
+     * Library list with counts. No artist grid: the only artists on it are the Top Artists
+     * shelf's. Artists opens the full, sortable grid; the other rows open their own pages.
      */
     @Test fun musicHomeOrganised() {
         connectAndSignIn()
-        // Artists this person has never played can't be on the home (only Top artists shows artists).
         val libs = org.json.JSONArray(adminApi("GET", "/libraries", asToken = appToken))
         val lib = (0 until libs.length()).map { libs.getJSONObject(it) }.first { it.getString("type") == "music" }.getLong("id")
+        fun total(type: String) = org.json.JSONObject(adminApi("GET", "/libraries/$lib/items?type=$type&limit=1", asToken = appToken)).getInt("total")
         val page = org.json.JSONObject(adminApi("GET", "/libraries/$lib/items?type=artist&limit=500", asToken = appToken)).getJSONArray("items")
-        val artists = (0 until page.length()).map { page.getJSONObject(it) }
+        val artists = (0 until page.length()).map { page.getJSONObject(it).getString("title") }
         assertTrue("the test library has artists", artists.isNotEmpty())
-        val unplayed = artists.filter { it.optInt("watchedLeafCount", 0) == 0 }.map { it.getString("title") }
 
         openLibrary("Music")
-        rule.waitUntilAtLeastOneExists(hasContentDescription("Browse music"), 20_000)
-        listOf("Artists", "Albums", "Songs", "Playlists", "Genres").forEach { assertTrue("$it in the browse row", scrollTo(hasText(it) and hasClickAction())) }
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Music home"), 20_000)
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Quick actions"), 10_000)
         rule.waitText("Shuffle All")
-        rule.waitUntil(15_000) { scrollTo(hasText("Recently added")) }
         shot("mh1-home")
-        unplayed.take(4).forEach { name ->
-            assertTrue("$name isn't listed on the music home", !scrollTo(hasContentDescription(name) and hasClickAction()))
+
+        // The Library list: rows with counts.
+        fun rowTexts(title: String): List<String> {
+            rule.waitUntil(15_000) { scrollTo(hasText(title) and hasClickAction()) }
+            return rule.onAllNodes(hasText(title) and hasClickAction()).onFirst().fetchSemanticsNode().config[SemanticsProperties.Text].map { it.text }
+        }
+        mapOf("Artists" to "artist", "Albums" to "album", "Songs" to "track").forEach { (title, type) ->
+            val want = total(type).toString()
+            rule.waitUntil(10_000) { rowTexts(title).contains(want) }
+        }
+        val playlists = org.json.JSONArray(adminApi("GET", "/playlists?kind=audio", asToken = appToken)).length()
+        rule.waitUntil(10_000) { rowTexts("Playlists").contains(playlists.toString()) }
+        listOf("Genres", "Moods & Styles", "Muse & Stations").forEach { rowTexts(it) }
+        shot("mh2-library-list")
+
+        // No artist grid: any artist on the home is in the Top Artists shelf.
+        val outsideShelf = !hasAnyAncestor(hasContentDescription("Top Artists shelf"))
+        artists.forEach { name ->
+            assertTrue("$name is only on the home in Top Artists", !scrollTo(hasContentDescription(name) and hasClickAction() and outsideShelf))
         }
 
         // Artists: every artist, sortable.
-        scrollTo(hasContentDescription("Browse music"))
-        scrollTo(hasText("Artists") and hasClickAction())
+        rule.waitUntil(10_000) { scrollTo(hasText("Artists") and hasClickAction()) }
         rule.onNode(hasText("Artists") and hasClickAction()).performClick()
         rule.waitUntilAtLeastOneExists(hasContentDescription("Sort"), 10_000)
-        val last = artists.map { it.getString("title") }.sortedBy { it.lowercase() }.last()
+        val last = artists.sortedBy { it.lowercase() }.last()
         rule.waitUntil(20_000) { scrollTo(hasContentDescription(last)) }
-        shot("mh2-artists")
+        shot("mh3-artists")
         rule.onNode(hasText("Recently added") and hasClickAction()).performClick()
         rule.waitUntilAtLeastOneExists(hasText("Recently added") and isSelected(), 5_000)
-        Thread.sleep(1000)
-        shot("mh2b-artists-recent")
         back()
 
-        // Songs play from the list; Genres open a style page.
-        rule.waitUntilAtLeastOneExists(hasContentDescription("Browse music"), 10_000)
-        scrollTo(hasText("Songs") and hasClickAction())
+        // Songs, Genres and Moods & Styles open their pages.
+        rule.waitUntil(10_000) { scrollTo(hasText("Songs") and hasClickAction()) }
         rule.onNode(hasText("Songs") and hasClickAction()).performClick()
-        rule.waitText("Songs")
-        rule.waitUntil(15_000) { rule.onAllNodesWithText("Floating", substring = true).fetchSemanticsNodes().isNotEmpty() || scrollTo(hasText("Floating", substring = true)) }
-        shot("mh3-songs")
+        rule.waitUntil(15_000) { scrollTo(hasText("Floating", substring = true)) }
+        shot("mh4-songs")
         back()
-        rule.waitUntilAtLeastOneExists(hasContentDescription("Browse music"), 10_000)
-        scrollTo(hasText("Genres") and hasClickAction())
+        rule.waitUntil(10_000) { scrollTo(hasText("Genres") and hasClickAction()) }
         rule.onNode(hasText("Genres") and hasClickAction()).performClick()
         rule.waitText("Most albums")
-        shot("mh4-genres")
+        back()
+        rule.waitUntil(10_000) { scrollTo(hasText("Moods & Styles") and hasClickAction()) }
+        rule.onNode(hasText("Moods & Styles") and hasClickAction()).performClick()
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Chill mood"), 10_000)
         back()
 
-        // "See all" on Recently added opens Albums sorted by date added.
-        rule.waitUntil(15_000) { scrollTo(hasContentDescription("See all: Recently added")) }
-        rule.onNode(hasContentDescription("See all: Recently added")).performClick()
-        rule.waitText("Albums")
+        // "See all" on Recently Added opens Albums sorted by date added.
+        rule.waitUntil(15_000) { scrollTo(hasContentDescription("See all: Recently Added")) }
+        rule.onNode(hasContentDescription("See all: Recently Added")).performClick()
         rule.waitUntilAtLeastOneExists(hasText("Recently added") and isSelected(), 10_000)
     }
 

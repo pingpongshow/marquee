@@ -56,11 +56,20 @@ final class MarqueeUITests: XCTestCase {
         }
     }
 
-    /// From the Music landing page: Artists, then the artist's card in the full grid.
+    /// From the Music landing page to a row of its Library list (Artists, Moods & Styles…).
+    private func openMusicLibraryRow(_ id: String) {
+        let shortcut = app.buttons["musicShowLibrary"]
+        XCTAssertTrue(shortcut.waitForExistence(timeout: 15))
+        shortcut.tap()
+        let row = app.buttons["musicLibrary.\(id)"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !row.isHittable || row.frame.maxY > app.tabBars.firstMatch.frame.minY - 10 { app.swipeUp() }
+        row.tap()
+    }
+
+    /// From the Music landing page: Library › Artists, then the artist's card in the full grid.
     private func openArtist(_ name: String) -> XCUIElement {
-        let artists = app.buttons["musicBrowse.artists"]
-        XCTAssertTrue(artists.waitForExistence(timeout: 15))
-        artists.tap()
+        openMusicLibraryRow("artists")
         XCTAssertTrue(app.navigationBars["Artists"].waitForExistence(timeout: 10))
         let artist = app.scrollViews.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch
         for _ in 0..<5 where !artist.waitForExistence(timeout: 2) { app.swipeUp() }
@@ -335,6 +344,7 @@ final class MarqueeUITests: XCTestCase {
     func testMoodsAndStyles() {
         connectAndSignIn()
         openLibrary("Music")
+        openMusicLibraryRow("moods")
         let chill = app.buttons["Chill mood"]
         XCTAssertTrue(chill.waitForExistence(timeout: 15))
         for _ in 0..<5 where !chill.isHittable { app.swipeUp() }
@@ -347,24 +357,48 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(app.buttons["miniPlayer"].waitForExistence(timeout: 15))
     }
 
-    /// The Music landing page is organised (MUSIC-15): a browse row and shelves, not every
-    /// artist; Artists opens the full grid, and Songs and Genres open their lists.
-    func testMusicLandingPage() {
+    /// The Music landing page is organised like Plexamp (MUSIC-15): quick actions, shelves and
+    /// a Library list with counts. Never every artist: the only artist cards are the Top Artists
+    /// shelf's (at most 20), and Library › Artists opens the full grid.
+    func testMusicLandingPage() throws {
+        let artistNames = try musicArtistNames()
         connectAndSignIn()
         openLibrary("Music")
         XCTAssertTrue(app.navigationBars["Music"].waitForExistence(timeout: 10))
-        for id in ["artists", "albums", "songs", "playlists", "genres"] {
-            XCTAssertTrue(app.buttons["musicBrowse.\(id)"].waitForExistence(timeout: 10), "browse row: \(id)")
-        }
-        XCTAssertTrue(app.buttons["Shuffle All"].exists, "quick actions")
+        XCTAssertTrue(app.buttons["Shuffle All"].waitForExistence(timeout: 10), "quick actions")
         shot("mh1-landing")
-        // Down the whole page: shelves only, never the full grid.
-        for _ in 0..<8 { app.swipeUp() }
-        shot("mh2-landing-bottom")
-        XCTAssertFalse(app.descendants(matching: .any)["libraryGrid"].exists, "no artist grid on the landing page")
-        for _ in 0..<8 { app.swipeDown() }
 
-        app.buttons["musicBrowse.artists"].tap()
+        // Down the whole page, checking every artist card on the way.
+        var topArtistIDs = Set<String>()
+        for step in 0..<10 {
+            // Artist cards read "Name, N albums"; album cards start with the album's title.
+            let outside = app.buttons.matching(NSPredicate(format: "label CONTAINS ' album' AND NOT (identifier BEGINSWITH 'topArtist.')"))
+            for label in outside.allElementsBoundByIndex.map(\.label) {
+                XCTAssertFalse(artistNames.contains { label.hasPrefix($0 + ",") }, "artist card outside Top Artists: \(label)")
+            }
+            let top = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'topArtist.'"))
+            topArtistIDs.formUnion(top.allElementsBoundByIndex.map(\.identifier))
+            XCTAssertFalse(app.descendants(matching: .any)["libraryGrid"].exists, "no artist grid on the landing page")
+            if app.buttons["musicLibrary.muse"].exists && app.buttons["musicLibrary.muse"].isHittable && step > 0 { break }
+            app.swipeUp()
+        }
+        XCTAssertFalse(topArtistIDs.isEmpty, "the Top Artists shelf shows (the profile has plays)")
+        XCTAssertLessThanOrEqual(topArtistIDs.count, 20, "Top Artists is capped")
+        shot("mh2-landing-bottom")
+
+        // The Library list, with counts.
+        for id in ["artists", "albums", "songs", "playlists", "genres"] {
+            XCTAssertTrue(app.buttons["musicLibrary.\(id)"].exists, "Library row: \(id)")
+        }
+        for id in ["artists", "albums", "songs"] {
+            let count = app.descendants(matching: .any)["musicLibrary.\(id).count"]
+            XCTAssertTrue(count.waitForExistence(timeout: 10), "\(id) shows its count")
+            XCTAssertNotNil(Int(count.label.filter(\.isNumber)), "\(id): \(count.label)")
+        }
+        XCTAssertEqual(Int(app.descendants(matching: .any)["musicLibrary.artists.count"].label.filter(\.isNumber)), artistNames.count)
+        XCTAssertGreaterThan(artistNames.count, topArtistIDs.count, "the home shows fewer artists than the library has")
+
+        openMusicLibraryRow("artists")
         XCTAssertTrue(app.navigationBars["Artists"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["libraryGrid"].waitForExistence(timeout: 10), "Artists is the full grid")
         XCTAssertTrue(app.scrollViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calm Pads'")).firstMatch.waitForExistence(timeout: 10))
@@ -372,18 +406,35 @@ final class MarqueeUITests: XCTestCase {
         shot("mh3-artists")
         app.navigationBars.buttons["Music"].firstMatch.tap()
 
-        app.buttons["musicBrowse.songs"].tap()
+        openMusicLibraryRow("songs")
         XCTAssertTrue(app.navigationBars["Songs"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS 'Floating'")).firstMatch.waitForExistence(timeout: 10), "songs are listed")
         app.navigationBars.buttons["Music"].firstMatch.tap()
 
-        app.buttons["musicBrowse.genres"].tap()
-        XCTAssertTrue(app.navigationBars["Genres"].waitForExistence(timeout: 10))
-        app.navigationBars.buttons["Music"].firstMatch.tap()
+        openMusicLibraryRow("moods")
+        XCTAssertTrue(app.navigationBars["Moods & Styles"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Chill mood"].waitForExistence(timeout: 10))
+    }
 
-        app.buttons["musicBrowse.albums"].tap()
-        XCTAssertTrue(app.navigationBars["Albums"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.scrollViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Floating'")).firstMatch.waitForExistence(timeout: 10))
+    /// Every artist in the test server's Music library.
+    private func musicArtistNames() throws -> [String] {
+        guard let admin = adminToken else { throw XCTSkip("MARQUEE_TEST_ADMIN_TOKEN not set") }
+        func get(_ path: String) -> Any? {
+            var req = URLRequest(url: URL(string: "http://\(server)/api/v1\(path)")!)
+            req.setValue("Bearer \(admin)", forHTTPHeaderField: "Authorization")
+            let done = expectation(description: path)
+            var out: Any?
+            URLSession.shared.dataTask(with: req) { data, _, _ in
+                out = data.flatMap { try? JSONSerialization.jsonObject(with: $0) }
+                done.fulfill()
+            }.resume()
+            wait(for: [done], timeout: 30)
+            return out
+        }
+        let libs = get("/libraries") as? [[String: Any]] ?? []
+        let music = try XCTUnwrap(libs.first { $0["type"] as? String == "music" && $0["name"] as? String == "Music" }?["id"] as? Int)
+        let page = get("/libraries/\(music)/items?type=artist&limit=500") as? [String: Any] ?? [:]
+        return (page["items"] as? [[String: Any]] ?? []).compactMap { $0["title"] as? String }
     }
 
     /// Header actions fit on an iPhone in portrait: each is on screen, can be tapped, and is

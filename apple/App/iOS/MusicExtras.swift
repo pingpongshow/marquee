@@ -240,12 +240,19 @@ struct CarModeView: View {
 }
 
 /// Opens car mode full screen.
-struct CarModeButton: View {
+struct CarModeButton<L: View>: View {
     var libraryID: Int64?
+    @ViewBuilder var label: () -> L
     @State private var open = false
 
     var body: some View {
-        Button { open = true } label: { Label("Car Mode", systemImage: "car.fill") }
+        Button { open = true } label: { label() }
             .fullScreenCover(isPresented: $open) { CarModeView(libraryID: libraryID) }
+    }
+}
+
+extension CarModeButton where L == Label<Text, Image> {
+    init(libraryID: Int64? = nil) {
+        self.init(libraryID: libraryID) { Label("Car Mode", systemImage: "car.fill") }
     }
 }
