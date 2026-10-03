@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Disc3,
   Guitar,
+  Heart,
   ListMusic,
   Loader2,
   Mic2,
@@ -35,11 +36,12 @@ import {
   useMixes,
   useMusicStatus,
 } from "./Discover";
+import { RatingStars } from "./Rating";
 import { RecapCard } from "./RecapCard";
 import { useRadio } from "./useRadio";
 
 /** Pages behind the music home's Library list (/library/{id}/{section}). */
-export type MusicSection = "artists" | "albums" | "songs" | "genres" | "decades" | "moods" | "muse";
+export type MusicSection = "artists" | "albums" | "songs" | "genres" | "decades" | "moods" | "muse" | "favorites";
 export const musicSectionTitles: Record<MusicSection, string> = {
   artists: "Artists",
   albums: "Albums",
@@ -48,6 +50,7 @@ export const musicSectionTitles: Record<MusicSection, string> = {
   decades: "Decades",
   moods: "Moods & Styles",
   muse: "Muse & Stations",
+  favorites: "Favorites",
 };
 export const isMusicSection = (s: unknown): s is MusicSection => typeof s === "string" && s in musicSectionTitles;
 
@@ -57,6 +60,28 @@ const countQuery = (libraryId: number, type: "artist" | "album" | "track") => ({
     unwrap(api.GET("/libraries/{libraryId}/items", { params: { path: { libraryId }, query: { type, limit: 1 } } })).then((p) => p.total),
   staleTime: 60_000,
 });
+
+/** A favourite is anything the person rated 4 stars or more (Plex has no separate favourites). */
+export const FAVORITE_RATING = 8;
+
+export type FavoriteKind = "track" | "album" | "artist";
+
+/**
+ * The person's favourites of one type in a library, best first. Keyed under "items" so rating
+ * something anywhere (which invalidates "items") refreshes it.
+ */
+export function favoritesQuery(libraryId: number, type: FavoriteKind, limit = 500) {
+  return {
+    queryKey: ["items", "favorites", libraryId, type, limit],
+    queryFn: () =>
+      unwrap(
+        api.GET("/libraries/{libraryId}/items", {
+          params: { path: { libraryId }, query: { type, sort: "-myRating", minMyRating: FAVORITE_RATING, limit } },
+        }),
+      ),
+    staleTime: 30_000,
+  };
+}
 
 /** A round icon button with a small label, Plexamp style. */
 function QuickAction({ icon, label, onClick, to, busy }: { icon: ReactNode; label: string; onClick?: () => void; to?: { libraryId: number; section: MusicSection }; busy?: boolean }) {
@@ -184,6 +209,9 @@ export function MusicHome({ libraryId, name }: { libraryId: number; name: string
   const artists = useQuery(countQuery(libraryId, "artist"));
   const albums = useQuery(countQuery(libraryId, "album"));
   const songs = useQuery(countQuery(libraryId, "track"));
+  const favTracks = useQuery(favoritesQuery(libraryId, "track", 20));
+  const favAlbums = useQuery(favoritesQuery(libraryId, "album", 12));
+  const favArtists = useQuery(favoritesQuery(libraryId, "artist", 12));
   const error = radio.error ?? shuffle.error;
 
   return (
@@ -234,6 +262,7 @@ export function MusicHome({ libraryId, name }: { libraryId: number; name: string
           ))}
         </Shelf>
       )}
+      <FavoritesShelf libraryId={libraryId} tracks={favTracks.data?.items ?? []} albums={favAlbums.data?.items ?? []} artists={favArtists.data?.items ?? []} />
       {!!top.data?.length && (
         <Shelf title="Top Artists" testId="shelf-top-artists" seeAll={<SeeAll libraryId={libraryId} section="artists" sort="-viewed" />}>
           {top.data.map((it) => <ItemCard key={it.id} it={it} />)}
@@ -248,6 +277,7 @@ export function MusicHome({ libraryId, name }: { libraryId: number; name: string
           <LibraryRow icon={<Mic2 />} title="Artists" count={artists.data} libraryId={libraryId} section="artists" />
           <LibraryRow icon={<Disc3 />} title="Albums" count={albums.data} libraryId={libraryId} section="albums" />
           <LibraryRow icon={<Music2 />} title="Songs" count={songs.data} libraryId={libraryId} section="songs" />
+          <LibraryRow icon={<Heart />} title="Favorites" count={favTracks.data?.total} libraryId={libraryId} section="favorites" />
           <LibraryRow icon={<ListMusic />} title="Playlists" count={playlists.data?.length} libraryId={libraryId} />
           <LibraryRow icon={<Guitar />} title="Genres" libraryId={libraryId} section="genres" />
           {(ready || !!facets.data?.genres.length) && <LibraryRow icon={<Palette />} title="Moods & Styles" libraryId={libraryId} section="moods" />}
@@ -256,6 +286,36 @@ export function MusicHome({ libraryId, name }: { libraryId: number; name: string
         </ul>
       </section>
     </div>
+  );
+}
+
+/** Top-rated albums, artists and tracks (4★+). Albums and artists open; tracks play from there. */
+function FavoritesShelf({ libraryId, tracks, albums, artists }: { libraryId: number; tracks: ItemSummary[]; albums: ItemSummary[]; artists: ItemSummary[] }) {
+  const music = useMusicActions();
+  if (!tracks.length && !albums.length && !artists.length) return null;
+  return (
+    <Shelf title="Favorites" testId="shelf-favorites" seeAll={<SeeAll libraryId={libraryId} section="favorites" />}>
+      {[...albums, ...artists].map((it) => (
+        <li key={it.id} className="w-36 shrink-0">
+          <Link to="/item/$itemId" params={{ itemId: String(it.id) }} className="group block">
+            <Poster item={it} shape="square" width={180} className="group-hover:ring-2 group-hover:ring-accent" />
+            <div className="mt-2 truncate text-sm font-medium">{it.title}</div>
+            <div className="truncate text-xs text-muted">{subtitleFor(it)}</div>
+            <RatingStars value={it.userRating} className="mt-0.5" />
+          </Link>
+        </li>
+      ))}
+      {tracks.map((t, i) => (
+        <li key={t.id} className="w-36 shrink-0">
+          <button type="button" onClick={() => music.play(tracks, i, { source: "Favorites" })} className="group block w-full text-left" aria-label={`Play ${t.title}`}>
+            <Poster item={t} shape="square" width={180} className="group-hover:ring-2 group-hover:ring-accent" />
+            <div className="mt-2 truncate text-sm font-medium">{t.title}</div>
+            <div className="truncate text-xs text-muted">{subtitleFor(t)}</div>
+            <RatingStars value={t.userRating} className="mt-0.5" />
+          </button>
+        </li>
+      ))}
+    </Shelf>
   );
 }
 

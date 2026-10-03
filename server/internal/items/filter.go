@@ -17,12 +17,13 @@ type Filter struct {
 	HDR           bool   `json:"hdr,omitempty"`
 	Letter        string `json:"-"` // "A"–"Z" or "#"
 	// For smart collections (META-7).
-	YearFrom  int     `json:"yearFrom,omitempty"`
-	YearTo    int     `json:"yearTo,omitempty"`
-	AddedDays int     `json:"addedDays,omitempty"` // added in the last N days
-	Studio    string  `json:"studio,omitempty"`
-	PersonID  int64   `json:"personId,omitempty"`  // in the cast or crew
-	MinRating float64 `json:"minRating,omitempty"` // audience or critic rating, 0–10
+	YearFrom    int     `json:"yearFrom,omitempty"`
+	YearTo      int     `json:"yearTo,omitempty"`
+	AddedDays   int     `json:"addedDays,omitempty"` // added in the last N days
+	Studio      string  `json:"studio,omitempty"`
+	PersonID    int64   `json:"personId,omitempty"`    // in the cast or crew
+	MinRating   float64 `json:"minRating,omitempty"`   // audience or critic rating, 0–10
+	MinMyRating float64 `json:"minMyRating,omitempty"` // the person's own rating, 0–10 (favourites: 8)
 }
 
 // letterExpr is the A–Z jump-bar bucket of an item: its sort title's first letter, or "#".
@@ -52,11 +53,11 @@ func (f Filter) clause(uid int64) (string, []any) {
 			ELSE COALESCE(`+offset+`, 0) > 0 AND COALESCE(`+played+`, 0) = 0 END`)
 	}
 	if f.Genre != "" {
-		conds = append(conds, `EXISTS (SELECT 1 FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE it.item_id = i.id AND t.kind = 'genre' AND t.name = ? COLLATE NOCASE)`)
+		conds = append(conds, `EXISTS (SELECT 1 FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE it.item_id IN `+genreOwners+` AND t.kind = 'genre' AND t.name = ? COLLATE NOCASE)`)
 		args = append(args, f.Genre)
 	}
 	if f.Decade > 0 {
-		conds = append(conds, `i.year BETWEEN ? AND ?`)
+		conds = append(conds, yearExpr+` BETWEEN ? AND ?`)
 		args = append(args, f.Decade, f.Decade+9)
 	}
 	if f.ContentRating != "" {
@@ -95,6 +96,10 @@ func (f Filter) clause(uid int64) (string, []any) {
 		conds = append(conds, `EXISTS (SELECT 1 FROM credits c WHERE c.item_id = i.id AND c.person_id = ?)`)
 		args = append(args, f.PersonID)
 	}
+	if f.MinMyRating > 0 {
+		conds = append(conds, `(SELECT rating FROM user_item_state WHERE user_id = `+strconv.FormatInt(uid, 10)+` AND item_id = i.id) >= ?`)
+		args = append(args, f.MinMyRating)
+	}
 	if f.MinRating > 0 {
 		conds = append(conds, `COALESCE(i.audience_rating, i.imdb_rating, i.critic_rating, 0) >= ?`)
 		args = append(args, f.MinRating)
@@ -122,6 +127,13 @@ type Facet struct {
 }
 
 // Facets lists filter values for items of typ in a library that acc can see.
+// Songs carry few tags of their own: their genres are the album's and artist's, and their
+// year the album's.
+const (
+	genreOwners = `(i.id, CASE WHEN i.type = 'track' THEN i.parent_id END, CASE WHEN i.type = 'track' THEN i.grandparent_id END)`
+	yearExpr    = `COALESCE(i.year, CASE WHEN i.type = 'track' THEN p.year END)`
+)
+
 func (s *Store) Facets(ctx context.Context, acc Access, libID int64, typ string) (Facets, error) {
 	ac, aargs := acc.clause()
 	where := ` WHERE i.library_id = ? AND i.type = ? AND i.extra_type IS NULL AND ` + ac
@@ -137,11 +149,18 @@ func (s *Store) Facets(ctx context.Context, acc Access, libID int64, typ string)
 			return nil
 		})
 	}
-	if err := q(`t.name`, ` JOIN item_tags it ON it.item_id = i.id JOIN tags t ON t.id = it.tag_id AND t.kind = 'genre'`+where+
-		` GROUP BY t.name ORDER BY t.name COLLATE NOCASE`, &out.Genres); err != nil {
+	if err := eachRow(ctx, s.db, `SELECT t.name, COUNT(DISTINCT i.id)`+summaryFrom+` JOIN item_tags it ON it.item_id IN `+genreOwners+
+		` JOIN tags t ON t.id = it.tag_id AND t.kind = 'genre'`+where+` GROUP BY t.name ORDER BY t.name COLLATE NOCASE`, args, func(r *sql.Rows) error {
+		var f Facet
+		if err := r.Scan(&f.Value, &f.Count); err != nil {
+			return err
+		}
+		out.Genres = append(out.Genres, f)
+		return nil
+	}); err != nil {
 		return out, err
 	}
-	if err := q(`CAST(i.year / 10 * 10 AS TEXT)`, where+` AND i.year > 0 GROUP BY i.year / 10 ORDER BY i.year / 10 DESC`, &out.Decades); err != nil {
+	if err := q(`CAST(`+yearExpr+` / 10 * 10 AS TEXT)`, where+` AND `+yearExpr+` > 0 GROUP BY `+yearExpr+` / 10 ORDER BY `+yearExpr+` / 10 DESC`, &out.Decades); err != nil {
 		return out, err
 	}
 	if err := q(`i.content_rating`, where+` AND COALESCE(i.content_rating, '') != '' GROUP BY i.content_rating ORDER BY `+ratingCase("i.content_rating")+`, i.content_rating`, &out.ContentRatings); err != nil {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"strings"
 	"time"
@@ -86,6 +87,9 @@ func toAPISummary(s items.Summary) ItemSummary {
 		GrandparentTitle: nz(s.GrandparentTitle), ArtistCredit: nz(s.ArtistCredit),
 		ChildCount: s.ChildCount, LeafCount: s.LeafCount, DurationMs: nz(s.DurationMS),
 		Available: s.Available, MatchState: ItemSummaryMatchState(s.MatchState), AddedAt: s.AddedAt,
+	}
+	if s.CommunityCount > 0 {
+		out.CommunityRating = &CommunityRating{Average: float32(math.Round(s.CommunityRating*10) / 10), Count: s.CommunityCount}
 	}
 	if a := s.Audio; a.Codec != "" {
 		out.AudioFormat = &AudioFormat{Codec: a.Codec, Lossless: losslessCodec(a.Codec), BitrateKbps: nz(a.BitrateKbps),
@@ -172,6 +176,9 @@ func (h *Handlers) ListLibraryItems(ctx context.Context, req ListLibraryItemsReq
 	set(&f.ContentRating, p.ContentRating)
 	set(&f.HDR, p.Hdr)
 	set(&f.Letter, p.Letter)
+	if p.MinMyRating != nil {
+		f.MinMyRating = float64(*p.MinMyRating)
+	}
 	list, total, err := h.Items.List(ctx, access(ctx), lib.ID, typ, sort, f, offset, limit)
 	if err != nil {
 		return nil, internal(ctx, "listItems", err)
@@ -260,6 +267,7 @@ func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 		Summary: nz(d.Plot), Tagline: nz(d.Tagline), ContentRating: nz(d.ContentRating), Studio: nz(d.Studio),
 		Genres: d.Genres, ExternalIds: d.ExternalIDs, LockedFields: d.LockedFields,
 		Versions: make([]MediaVersion, len(d.Versions)), Chapters: make([]Chapter, len(d.Chapters)),
+		CommunityRating: sum.CommunityRating, AudioFormat: sum.AudioFormat,
 	}
 	if xs, err := h.Items.Extras(ctx, access(ctx), id); err == nil && len(xs) > 0 {
 		list := make([]ItemSummary, len(xs))

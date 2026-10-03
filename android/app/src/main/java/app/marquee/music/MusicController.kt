@@ -312,6 +312,9 @@ class MusicController(private val context: Context, private val marquee: Marquee
 
     fun setSleep(s: Sleep?) { _sleep.value = s }
 
+    /** A rating set elsewhere (a track row or an item page): Now Playing follows it when that track is playing. */
+    fun ratingChanged(id: Long, rating: Double?) { if (lastId == id) _rating.value = rating }
+
     /** Rates the current track 0–10, or clears it with null (MUSIC-11). */
     fun rate(rating: Double?) {
         val id = lastId ?: return

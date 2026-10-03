@@ -38,6 +38,9 @@ type Summary struct {
 	ExtraType     string // trailer, featurette… ("" for main content)
 	ReleaseType   string // albums: album, ep, single, compilation, live… ("" = unknown)
 	Audio         AudioFormat
+	// Everyone's ratings combined (USER-17); count 0 = nobody rated it.
+	CommunityRating float64
+	CommunityCount  int
 }
 
 // AudioFormat describes a track's file, for showing its quality (e.g. FLAC 24/96).
@@ -141,6 +144,9 @@ var sorts = map[string]string{
 	"-duration": "COALESCE(i.duration_ms, 0) DESC, i.sort_title COLLATE NOCASE",
 	"-viewed":   "(SELECT MAX(x.last_viewed_at) FROM user_item_state x JOIN items l ON l.id = x.item_id WHERE x.user_id = %UID% AND (l.id = i.id OR l.parent_id = i.id OR l.grandparent_id = i.id)) DESC NULLS LAST, i.sort_title COLLATE NOCASE",
 	"random":    "random()",
+	// The person's own rating (favourites first), unrated last.
+	"-myRating": "(SELECT rating FROM user_item_state WHERE user_id = %UID% AND item_id = i.id) DESC NULLS LAST, i.sort_title COLLATE NOCASE",
+	"myRating":  "(SELECT rating FROM user_item_state WHERE user_id = %UID% AND item_id = i.id) NULLS LAST, i.sort_title COLLATE NOCASE",
 }
 
 var baseCols = `i.id, i.library_id, i.type, i.title, COALESCE(i.original_title, ''), COALESCE(i.year, 0),
@@ -164,7 +170,9 @@ func cols(uid int64) string {
 	COALESCE((SELECT rating FROM user_item_state WHERE user_id = ` + u + ` AND item_id = i.id), 0),
 	COALESCE((SELECT watchlisted_at IS NOT NULL FROM user_item_state WHERE user_id = ` + u + ` AND item_id = i.id), 0),
 	COALESCE(i.extra_type, ''), COALESCE(i.release_type, ''),
-	`+audioFormatCol
+	`+audioFormatCol+`,
+	COALESCE((SELECT AVG(rating) FROM user_item_state WHERE item_id = i.id AND rating > 0), 0),
+	(SELECT COUNT(*) FROM user_item_state WHERE item_id = i.id AND rating > 0)`
 }
 
 // audioFormatCol is a track's audio format (codec|kbps|Hz|bits|channels) from its first
@@ -195,7 +203,7 @@ func scanSummary(row interface{ Scan(...any) error }, extra ...any) (Summary, er
 	err := row.Scan(append([]any{&s.ID, &s.LibraryID, &s.Type, &s.Title, &s.OriginalTitle, &s.Year, &s.Index, &s.AbsIndex, &s.Disc,
 		&s.ParentID, &s.GrandparentID, &s.ParentTitle, &s.GrandparentTitle, &s.ArtistCredit, &s.ChildCount, &s.LeafCount,
 		&s.DurationMS, &s.ReleaseDate, &s.Available, &s.MatchState, &added, &s.Poster, &s.Backdrop, &s.Thumb, &s.Logo,
-		&s.ViewOffsetMS, &s.ViewCount, &s.LastViewedAt, &s.WatchedLeaves, &s.UserRating, &s.Watchlisted, &s.ExtraType, &s.ReleaseType, &audio}, extra...)...)
+		&s.ViewOffsetMS, &s.ViewCount, &s.LastViewedAt, &s.WatchedLeaves, &s.UserRating, &s.Watchlisted, &s.ExtraType, &s.ReleaseType, &audio, &s.CommunityRating, &s.CommunityCount}, extra...)...)
 	s.AddedAt, _ = time.Parse(time.RFC3339Nano, added)
 	s.Audio = parseAudioFormat(audio)
 	return s, err

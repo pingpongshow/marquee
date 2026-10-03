@@ -198,9 +198,18 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
             PlayOnButton(nav, tint = MaterialTheme.colorScheme.onSurface, handoff = { app.marquee.api.models.RemoteCommand(app.marquee.api.models.RemoteCommand.Type.PLAY, itemIds = listOf(d.id)) })
         MoreMenu()
     }
-    LazyColumn(contentPadding = PaddingValues(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
+    // Ratings & comments (USER-17): everyone's, reloaded when yours changes.
+    var reviewsVersion by remember(d.id) { mutableIntStateOf(0) }
+    val reviews by produceState<app.marquee.api.models.ItemReviews?>(null, d.id, reviewsVersion) {
+        value = if (!reviewable(d.type)) null else withContext(Dispatchers.IO) { runCatching { marquee.items.itemReviews(d.id) }.getOrNull() } ?: value
+    }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    @Composable fun Ratings() = ItemRatings(d, reviews?.let { r -> r.average?.let { app.marquee.api.models.CommunityRating(it, r.count) } } ?: d.communityRating.takeIf { reviews == null },
+        onRated = { reviewsVersion++ },
+        onOpen = { scope.launch { listState.animateScrollToItem((listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)) } })
+    LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
         item {
-            if (marquee.isTv) TvHeader(d, square) { Actions() } else {
+            if (marquee.isTv) TvHeader(d, square, { Ratings() }) { Actions() } else {
                 // A backdrop when there is one; otherwise just room under the status bar.
                 val backdrop = marquee.imageUrl(d.images?.backdrop, 1280)
                 Box(Modifier.fillMaxWidth().height(if (backdrop != null) 220.dp else 24.dp)) {
@@ -209,7 +218,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 }
                 Row(Modifier.padding(horizontal = sidePadding), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                     Artwork(marquee.imageUrl(d.images?.poster ?: d.images?.thumb, 300), d.title, if (square) Shape.Square else Shape.Poster, Modifier.width(120.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { Meta(d) }
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { Meta(d); Ratings() }
                 }
             }
         }
@@ -256,6 +265,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                             leadingContent = { Text("${t.index ?: i + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                             trailingContent = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
+                                    app.marquee.music.TrackRating(t, Modifier.padding(end = 4.dp))
                                     Text(t.durationMs?.let { formatTime(it) } ?: "")
                                     if (!marquee.isTv) TrackMenu(t)
                                 }
@@ -326,6 +336,8 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 PosterCard(it, marquee.imageUrl(it.images?.poster, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) })
             }
         }
+        // Last, so the Community rating can scroll here.
+        if (reviewable(d.type)) item { ReviewsSection(d, reviews, me?.isAdmin == true) { reviewsVersion++ } }
     }
 }
 
@@ -357,7 +369,7 @@ private fun Meta(d: ItemDetail) {
 /** TV: the backdrop fills the screen's top with the details and actions over it, in view from the start. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun TvHeader(d: ItemDetail, square: Boolean, actions: @Composable () -> Unit) {
+private fun TvHeader(d: ItemDetail, square: Boolean, ratings: @Composable () -> Unit, actions: @Composable () -> Unit) {
     val marquee = LocalMarquee.current
     val bg = MaterialTheme.colorScheme.background
     Box(Modifier.fillMaxWidth().height(400.dp)) {
@@ -368,6 +380,7 @@ private fun TvHeader(d: ItemDetail, square: Boolean, actions: @Composable () -> 
             Artwork(marquee.imageUrl(d.images?.poster ?: d.images?.thumb, 300), d.title, if (square) Shape.Square else Shape.Poster, Modifier.width(if (square) 200.dp else 160.dp))
             Column(Modifier.widthIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Meta(d)
+                ratings()
                 d.summary?.takeIf { it.isNotBlank() }?.let { Text(it, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium) }
                 // Wraps rather than squeezing labels when an album or artist has many actions.
                 FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { actions() }
@@ -395,7 +408,12 @@ private fun PopularTracks(artist: String, tracks: List<ItemSummary>) {
                 headlineContent = { Text(t.title, maxLines = 1) },
                 supportingContent = { t.parentTitle?.let { Text(it, maxLines = 1) } },
                 leadingContent = { Text("${i + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                trailingContent = { Text(t.durationMs?.let { formatTime(it) } ?: "") },
+                trailingContent = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        app.marquee.music.TrackRating(t, Modifier.padding(end = 4.dp))
+                        Text(t.durationMs?.let { formatTime(it) } ?: "")
+                    }
+                },
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
                 modifier = Modifier.focusCard({ music.play(tracks, i, source = "$artist – Popular") }),
             )

@@ -14,7 +14,8 @@ import { ItemActions } from "./ItemActions";
 import { DownloadOriginal, DownloadZip, EpisodeDownloadLink } from "./Download";
 import { ItemMenu } from "./ItemMenu";
 import { PlayOnButton } from "../remote/PlayOn";
-import { Rating } from "../music/Rating";
+import { RowRating } from "../music/Rating";
+import { ItemRatings, Reviews } from "./Reviews";
 import { PlayButtons } from "./PlayButtons";
 import { Poster } from "./Poster";
 import { formatBytes, formatDuration, formatTrackTime, languageName, subtitleFor } from "./format";
@@ -195,7 +196,7 @@ function Children({ item }: { item: ItemDetail }) {
                     music.play(list.filter((t) => t.type === "track"), list.filter((t) => t.type === "track").indexOf(c), { source: item.title });
                   }
                 }}
-                className={clsx("flex min-w-0 flex-1 items-center gap-4 px-4 py-3 hover:bg-surface-2", music.current?.item.id === c.id && "text-accent")}
+                className={clsx("group flex min-w-0 flex-1 items-center gap-4 px-4 py-3 hover:bg-surface-2", music.current?.item.id === c.id && "text-accent")}
               >
                 <span className="w-8 shrink-0 text-right text-sm text-faint tabular-nums">{c.index ?? ""}</span>
                 {c.type === "episode" && c.images?.thumb && <img src={imageUrl(c.images.thumb, 160)} alt="" loading="lazy" className="aspect-video w-32 shrink-0 rounded object-cover" />}
@@ -203,6 +204,7 @@ function Children({ item }: { item: ItemDetail }) {
                   <span className={c.available ? "block truncate" : "block truncate text-faint line-through"}>{c.title}</span>
                   {c.type === "track" && c.artistCredit && c.artistCredit !== item.artistCredit && <span className="block truncate text-xs text-muted">{c.artistCredit}</span>}
                 </span>
+                {c.type === "track" && <RowRating item={c} />}
                 {showQuality && c.audioFormat && (
                   <span className="hidden shrink-0 text-[11px] text-faint sm:inline" data-testid="track-quality">
                     {audioQualityShort(c.audioFormat)}
@@ -258,19 +260,20 @@ function PopularTracks({ artist }: { artist: ItemDetail }) {
       <h2 className="mb-4 text-lg font-semibold">Popular</h2>
       <ol className="divide-y divide-border rounded-lg border border-border bg-surface">
         {shown.map((t, i) => (
-          <li key={t.id}>
+          <li key={t.id} className={clsx("group flex items-center gap-4 pr-4 hover:bg-surface-2", music.current?.item.id === t.id && "text-accent")}>
             <button
               type="button"
               onClick={() => music.play(tracks, i, { source: `${artist.title} – Popular` })}
-              className={clsx("flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-surface-2", music.current?.item.id === t.id && "text-accent")}
+              className="flex min-w-0 flex-1 items-center gap-4 py-3 pl-4 text-left"
             >
               <span className="w-6 shrink-0 text-right text-sm text-faint tabular-nums">{i + 1}</span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate">{t.title}</span>
                 <span className="block truncate text-xs text-muted">{t.parentTitle}</span>
               </span>
-              <span className="shrink-0 text-sm text-muted tabular-nums">{formatTrackTime(t.durationMs)}</span>
             </button>
+            <RowRating item={t} />
+            <span className="shrink-0 text-sm text-muted tabular-nums">{formatTrackTime(t.durationMs)}</span>
           </li>
         ))}
       </ol>
@@ -442,9 +445,7 @@ export function ItemPage() {
           <div className="mt-2 text-sm text-muted">{meta.join(" · ")}</div>
           {d.genres.length > 0 && <div className="mt-1 text-sm text-faint">{d.genres.join(", ")}</div>}
           <RatingBadges item={d} />
-          <div className="mt-2">
-            <Rating key={d.id} itemId={d.id} value={d.userRating} />
-          </div>
+          <ItemRatings item={d} />
           <PlayButtons key={d.id} item={d} />
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <ItemMenu item={d} />
@@ -485,6 +486,7 @@ export function ItemPage() {
       <CollectionShelves item={d} />
       <Cast credits={d.credits} />
       <Related item={d} />
+      <Reviews key={d.id} item={d} />
       <MediaInfo item={d} isAdmin={!!me.data?.isAdmin} />
     </div>
     </div>

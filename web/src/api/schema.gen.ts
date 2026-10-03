@@ -2611,6 +2611,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/items/{itemId}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        /** The community rating and everyone's ratings and comments for an item (USER-17). */
+        get: operations["itemReviews"];
+        /** Your comment on an item, shown with your rating to everyone who can see it. An empty comment removes it (your rating stays; set that with PUT /items/{itemId}/rating). */
+        put: operations["setReview"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/reviews/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+                userId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a comment (your own, or anyone's for admins). Ratings aren't touched. */
+        delete: operations["deleteReview"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/items/{itemId}/trickplay": {
         parameters: {
             query?: never;
@@ -4511,6 +4551,33 @@ export interface components {
              */
             releaseType?: "album" | "ep" | "single" | "compilation" | "live" | "soundtrack" | "remix" | "demo" | "other";
             audioFormat?: components["schemas"]["AudioFormat"];
+            communityRating?: components["schemas"]["CommunityRating"];
+        };
+        /** @description Everyone's ratings of an item combined (USER-17): the average of the accounts that rated it, 0–10. Absent when nobody has. */
+        CommunityRating: {
+            average: number;
+            /** @description How many people rated it. */
+            count: number;
+        };
+        Review: {
+            /** Format: int64 */
+            userId: number;
+            userName: string;
+            avatarUrl?: string;
+            /** @description Their rating, 0–10, if they rated it. */
+            rating?: number;
+            comment?: string;
+            /** Format: date-time */
+            updatedAt: string;
+            mine: boolean;
+        };
+        ItemReviews: {
+            /** @description Community average (absent when nobody rated it). */
+            average?: number;
+            /** @description Number of ratings. */
+            count: number;
+            /** @description Everyone who rated or commented, people with comments first, newest first. */
+            reviews: components["schemas"]["Review"][];
         };
         /** @description Tracks: the file's audio quality (MUSIC-23), for apps that show it, e.g. FLAC 24/96 or MP3 320. */
         AudioFormat: {
@@ -4771,7 +4838,7 @@ export interface components {
         /** @description Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. */
         ImageWidth: number;
         /** @description Sort order. Prefix with "-" for descending. */
-        Sort: "title" | "-title" | "added" | "-added" | "year" | "-year" | "released" | "-released" | "rating" | "-rating" | "duration" | "-duration" | "-viewed" | "random";
+        Sort: "title" | "-title" | "added" | "-added" | "year" | "-year" | "released" | "-released" | "rating" | "-rating" | "duration" | "-duration" | "-viewed" | "random" | "myRating" | "-myRating";
         Offset: number;
         Limit: number;
         PlaylistId: number;
@@ -5961,6 +6028,8 @@ export interface operations {
                 hdr?: boolean;
                 /** @description Only titles starting with this letter ("#" for anything else). */
                 letter?: string;
+                /** @description Only what the person rated at least this (0–10, e.g. 8 = 4 stars: favourites). */
+                minMyRating?: number;
             };
             header?: never;
             path: {
@@ -9509,6 +9578,83 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    itemReviews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemReviews"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    comment: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
