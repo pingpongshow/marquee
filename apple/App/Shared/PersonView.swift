@@ -5,6 +5,7 @@ struct PersonView: View {
     @Environment(AppSession.self) private var app
     let id: Int64
     @State private var person: Person?
+    @State private var error: String?
 
     var body: some View {
         ScrollView {
@@ -14,7 +15,7 @@ struct PersonView: View {
                         ZStack {
                             Circle().fill(Color.gray.opacity(0.3))
                             Image(systemName: "person.fill").font(.largeTitle).foregroundStyle(.secondary)
-                            if p.hasPhoto { AsyncImage(url: app.personPhotoURL(p.id, width: 140)) { $0.image?.resizable().scaledToFill() } }
+                            if p.hasPhoto { CachedImage(fill: app.personPhotoURL(p.id, width: 140)) }
                         }
                         .frame(width: 120, height: 120).clipShape(Circle())
                         VStack(alignment: .leading) {
@@ -29,11 +30,24 @@ struct PersonView: View {
                     .padding(.horizontal, sidePadding)
                 }
                 .padding(.vertical)
+            } else if let error {
+                ContentUnavailableView {
+                    Label("Couldn't load this person", systemImage: "person.crop.circle.badge.exclamationmark")
+                } description: {
+                    Text(error)
+                } actions: {
+                    Button("Try Again") { Task { await load() } }
+                }
             } else {
                 ProgressView().padding(.top, 80)
             }
         }
         .navigationTitle(person?.name ?? "")
-        .task { person = try? await app.person(id) }
+        .task { if person == nil { await load() } }
+    }
+
+    private func load() async {
+        error = nil
+        do { person = try await app.person(id) } catch is CancellationError {} catch { self.error = error.localizedDescription }
     }
 }

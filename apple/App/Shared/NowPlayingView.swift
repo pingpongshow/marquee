@@ -34,15 +34,50 @@ struct MiniPlayerBar: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
-            .overlay(alignment: .bottom) {
-                GeometryReader { g in
-                    Rectangle().fill(Color.marqueeGold).frame(width: g.size.width * (music.duration > 0 ? music.time / music.duration : 0), height: 2)
-                }
-                .frame(height: 2)
-                .padding(.horizontal, 10)
-            }
+            .overlay(alignment: .bottom) { MiniPlayerProgress().padding(.horizontal, 10) }
             .padding(.horizontal, 10)
             .padding(.bottom, 4)
+        }
+    }
+}
+
+/// The mini player's progress line: its own view, so only it redraws as the time ticks.
+private struct MiniPlayerProgress: View {
+    @Environment(MusicPlayer.self) private var music
+
+    var body: some View {
+        GeometryReader { g in
+            Rectangle().fill(Color.marqueeGold).frame(width: g.size.width * (music.duration > 0 ? min(1, music.time / music.duration) : 0), height: 2)
+        }
+        .frame(height: 2)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Now Playing's position slider and times: its own view, so the time ticking redraws only
+/// this, not the whole screen.
+private struct MusicScrubber: View {
+    @Environment(MusicPlayer.self) private var music
+    @State private var scrub: Double?
+
+    var body: some View {
+        VStack(spacing: 4) {
+            #if os(tvOS)
+            ProgressView(value: music.duration > 0 ? music.time / music.duration : 0)
+            #else
+            Slider(value: Binding(get: { scrub ?? music.time }, set: { scrub = $0 }), in: 0...max(music.duration, 1)) { editing in
+                if !editing, let s = scrub { music.seek(s); scrub = nil }
+            }
+            .accessibilityLabel("Position")
+            .accessibilityValue("\(formatTime(seconds: scrub ?? music.time)) of \(formatTime(seconds: music.duration))")
+            #endif
+            HStack {
+                Text(formatTime(seconds: scrub ?? music.time))
+                Spacer()
+                Text("-" + formatTime(seconds: max(0, music.duration - (scrub ?? music.time))))
+            }
+            .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            .accessibilityHidden(true)
         }
     }
 }
@@ -52,7 +87,6 @@ struct NowPlayingView: View {
     @Environment(MusicPlayer.self) private var music
     @Environment(AppSession.self) private var app
     @State private var panel: Panel = .player
-    @State private var scrub: Double?
     @State private var saveRequest: SavePlaylistRequest?
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSize
@@ -164,7 +198,7 @@ struct NowPlayingView: View {
     private func backdrop(_ t: Item) -> some View {
         Color.black
             .overlay {
-                AsyncImage(url: app.imageURL(t.images?.poster, width: 64)) { $0.image?.resizable().scaledToFill() }
+                CachedImage(fill: app.imageURL(t.images?.poster, width: 64))
                     .blur(radius: 60).opacity(0.55)
             }
             .clipped()
@@ -269,23 +303,7 @@ struct NowPlayingView: View {
         }
     }
 
-    private var scrubber: some View {
-            VStack(spacing: 4) {
-                #if os(tvOS)
-                ProgressView(value: music.duration > 0 ? music.time / music.duration : 0)
-                #else
-                Slider(value: Binding(get: { scrub ?? music.time }, set: { scrub = $0 }), in: 0...max(music.duration, 1)) { editing in
-                    if !editing, let s = scrub { music.seek(s); scrub = nil }
-                }
-                #endif
-                HStack {
-                    Text(formatTime(seconds: scrub ?? music.time))
-                    Spacer()
-                    Text("-" + formatTime(seconds: max(0, music.duration - (scrub ?? music.time))))
-                }
-                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-            }
-    }
+    private var scrubber: some View { MusicScrubber() }
 
     /// Space between the transport buttons: fixed on the TV; on iPhone it shrinks to fit.
     @ViewBuilder private var gap: some View {
@@ -299,21 +317,29 @@ struct NowPlayingView: View {
     private var transport: some View {
             HStack(spacing: 0) {
                 Button { music.toggleShuffle() } label: { Image(systemName: "shuffle").foregroundStyle(music.queue.shuffled ? Color.marqueeGold : .secondary) }
+                    .accessibilityLabel("Shuffle")
+                    .accessibilityValue(music.queue.shuffled ? "On" : "Off")
+                    .accessibilityAddTraits(music.queue.shuffled ? .isSelected : [])
                     .accessibilityIdentifier("np.shuffle")
                 gap
                 Button { music.previous() } label: { Image(systemName: "backward.fill").font(.title) }
+                    .accessibilityLabel("Previous track")
                     .accessibilityIdentifier("np.previous")
                 gap
                 Button { music.toggle() } label: { Image(systemName: music.playing ? "pause.circle.fill" : "play.circle.fill").font(.system(size: playSize)) }
+                    .accessibilityLabel(music.playing ? "Pause" : "Play")
                     .accessibilityIdentifier("np.playPause")
                 gap
                 Button { music.next() } label: { Image(systemName: "forward.fill").font(.title) }
+                    .accessibilityLabel("Next track")
                     .accessibilityIdentifier("np.next")
                 gap
                 Button { music.cycleRepeat() } label: {
                     Image(systemName: music.queue.repeatMode == .one ? "repeat.1" : "repeat")
                         .foregroundStyle(music.queue.repeatMode == .off ? .secondary : Color.marqueeGold)
                 }
+                .accessibilityLabel("Repeat")
+                .accessibilityValue(music.queue.repeatMode == .one ? "One" : music.queue.repeatMode == .off ? "Off" : "All")
                 .accessibilityIdentifier("np.repeat")
             }
             .buttonStyle(.plain)

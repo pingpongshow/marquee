@@ -9,6 +9,8 @@ struct HomeView: View {
     @Environment(VideoPresenter.self) private var video
     @State private var hubs: [Hub] = []
     @State private var loaded = false
+    /// The HomeChanges version this page last loaded.
+    @State private var loadedVersion = -1
     @State private var error: String?
 
     @State private var groups: [WatchGroup] = []
@@ -17,7 +19,13 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: rowSpacing) {
-                if let error { ErrorBanner(message: error).padding(.horizontal, sidePadding) }
+                if let error {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ErrorBanner(message: error)
+                        Button("Try Again") { Task { await load() } }.buttonStyle(.bordered)
+                    }
+                    .padding(.horizontal, sidePadding)
+                }
                 ForEach(groups, id: \.id) { g in
                     Button { video.play(g.itemId, group: g.id) } label: {
                         HStack(spacing: 12) {
@@ -36,7 +44,7 @@ struct HomeView: View {
                     .padding(.horizontal, sidePadding)
                     .accessibilityLabel("Join \(g.title)")
                 }
-                if loaded && hubs.isEmpty {
+                if loaded && hubs.isEmpty && error == nil {
                     ContentUnavailableView("Nothing here yet", systemImage: "film.stack", description: Text("Libraries are still being scanned, or none have been added."))
                 }
                 ForEach(hubs, id: \.id) { hub in
@@ -98,7 +106,11 @@ struct HomeView: View {
                 try? await Task.sleep(for: .seconds(15))
             }
         }
-        .task { await load() }
+        .task(id: HomeChanges.shared.version) {
+            // Once, and again after a pin elsewhere; otherwise Home refreshes when a video closes
+            // (Continue Watching) or on pull.
+            if !loaded || loadedVersion != HomeChanges.shared.version { await load() }
+        }
         .onChange(of: video.request) { if video.request == nil { Task { await load() } } }
     }
 
@@ -118,6 +130,7 @@ struct HomeView: View {
     }
 
     private func load() async {
+        loadedVersion = HomeChanges.shared.version
         do {
             hubs = try await app.hubs()
             error = nil

@@ -8112,6 +8112,8 @@ extension Components {
             public var releaseType: Components.Schemas.ItemSummary.ReleaseTypePayload?
             /// - Remark: Generated from `#/components/schemas/ItemSummary/audioFormat`.
             public var audioFormat: Components.Schemas.AudioFormat?
+            /// - Remark: Generated from `#/components/schemas/ItemSummary/communityRating`.
+            public var communityRating: Components.Schemas.CommunityRating?
             /// Creates a new `ItemSummary`.
             ///
             /// - Parameters:
@@ -8146,6 +8148,7 @@ extension Components {
             ///   - extraType: Set for extras (LIB-8).
             ///   - releaseType: Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
             ///   - audioFormat:
+            ///   - communityRating:
             public init(
                 id: Swift.Int64,
                 libraryId: Swift.Int64,
@@ -8177,7 +8180,8 @@ extension Components {
                 watchlisted: Swift.Bool? = nil,
                 extraType: Components.Schemas.ItemSummary.ExtraTypePayload? = nil,
                 releaseType: Components.Schemas.ItemSummary.ReleaseTypePayload? = nil,
-                audioFormat: Components.Schemas.AudioFormat? = nil
+                audioFormat: Components.Schemas.AudioFormat? = nil,
+                communityRating: Components.Schemas.CommunityRating? = nil
             ) {
                 self.id = id
                 self.libraryId = libraryId
@@ -8210,6 +8214,7 @@ extension Components {
                 self.extraType = extraType
                 self.releaseType = releaseType
                 self.audioFormat = audioFormat
+                self.communityRating = communityRating
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -8243,6 +8248,124 @@ extension Components {
                 case extraType
                 case releaseType
                 case audioFormat
+                case communityRating
+            }
+        }
+        /// Everyone's ratings of an item combined (USER-17): the average of the accounts that rated it, 0–10. Absent when nobody has.
+        ///
+        /// - Remark: Generated from `#/components/schemas/CommunityRating`.
+        public struct CommunityRating: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/CommunityRating/average`.
+            public var average: Swift.Double
+            /// How many people rated it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CommunityRating/count`.
+            public var count: Swift.Int
+            /// Creates a new `CommunityRating`.
+            ///
+            /// - Parameters:
+            ///   - average:
+            ///   - count: How many people rated it.
+            public init(
+                average: Swift.Double,
+                count: Swift.Int
+            ) {
+                self.average = average
+                self.count = count
+            }
+            public enum CodingKeys: String, CodingKey {
+                case average
+                case count
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/Review`.
+        public struct Review: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/Review/userId`.
+            public var userId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/Review/userName`.
+            public var userName: Swift.String
+            /// - Remark: Generated from `#/components/schemas/Review/avatarUrl`.
+            public var avatarUrl: Swift.String?
+            /// Their rating, 0–10, if they rated it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Review/rating`.
+            public var rating: Swift.Double?
+            /// - Remark: Generated from `#/components/schemas/Review/comment`.
+            public var comment: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Review/updatedAt`.
+            public var updatedAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/Review/mine`.
+            public var mine: Swift.Bool
+            /// Creates a new `Review`.
+            ///
+            /// - Parameters:
+            ///   - userId:
+            ///   - userName:
+            ///   - avatarUrl:
+            ///   - rating: Their rating, 0–10, if they rated it.
+            ///   - comment:
+            ///   - updatedAt:
+            ///   - mine:
+            public init(
+                userId: Swift.Int64,
+                userName: Swift.String,
+                avatarUrl: Swift.String? = nil,
+                rating: Swift.Double? = nil,
+                comment: Swift.String? = nil,
+                updatedAt: Foundation.Date,
+                mine: Swift.Bool
+            ) {
+                self.userId = userId
+                self.userName = userName
+                self.avatarUrl = avatarUrl
+                self.rating = rating
+                self.comment = comment
+                self.updatedAt = updatedAt
+                self.mine = mine
+            }
+            public enum CodingKeys: String, CodingKey {
+                case userId
+                case userName
+                case avatarUrl
+                case rating
+                case comment
+                case updatedAt
+                case mine
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ItemReviews`.
+        public struct ItemReviews: Codable, Hashable, Sendable {
+            /// Community average (absent when nobody rated it).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemReviews/average`.
+            public var average: Swift.Double?
+            /// Number of ratings.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemReviews/count`.
+            public var count: Swift.Int
+            /// Everyone who rated or commented, people with comments first, newest first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemReviews/reviews`.
+            public var reviews: [Components.Schemas.Review]
+            /// Creates a new `ItemReviews`.
+            ///
+            /// - Parameters:
+            ///   - average: Community average (absent when nobody rated it).
+            ///   - count: Number of ratings.
+            ///   - reviews: Everyone who rated or commented, people with comments first, newest first.
+            public init(
+                average: Swift.Double? = nil,
+                count: Swift.Int,
+                reviews: [Components.Schemas.Review]
+            ) {
+                self.average = average
+                self.count = count
+                self.reviews = reviews
+            }
+            public enum CodingKeys: String, CodingKey {
+                case average
+                case count
+                case reviews
             }
         }
         /// Tracks: the file's audio quality (MUSIC-23), for apps that show it, e.g. FLAC 24/96 or MP3 320.

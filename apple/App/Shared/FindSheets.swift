@@ -61,6 +61,7 @@ struct SubtitleSearchSheet: View {
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
             .task(id: language) {
                 results = nil
+                error = nil // the last language's error doesn't hide this one's results
                 do { results = try await app.searchSubtitles(itemID, languages: language); error = nil } catch { self.error = error.localizedDescription }
             }
         }
@@ -121,8 +122,16 @@ struct JourneySheet: View {
             .task(id: query) {
                 guard query.count >= 2 else { tracks = []; return }
                 try? await Task.sleep(for: .milliseconds(250))
-                let r = try? await app.search(query, limit: 25)
-                tracks = r?.groups.first { $0._type == .track }?.items.filter { $0.id != from.id } ?? []
+                guard !Task.isCancelled else { return }
+                do {
+                    let r = try await app.search(query, limit: 25)
+                    guard !Task.isCancelled else { return }
+                    tracks = r.groups.first { $0._type == .track }?.items.filter { $0.id != from.id } ?? []
+                    error = nil
+                } catch {
+                    // Overtaken by the next keystroke: keep what's shown.
+                    if !Task.isCancelled, !(error is CancellationError) { self.error = error.localizedDescription }
+                }
             }
         }
     }

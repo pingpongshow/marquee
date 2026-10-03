@@ -8131,6 +8131,8 @@ public enum Operations {
                     case _hyphen_duration = "-duration"
                     case _hyphen_viewed = "-viewed"
                     case random = "random"
+                    case myRating = "myRating"
+                    case _hyphen_myRating = "-myRating"
                 }
                 /// Sort order. Prefix with "-" for descending.
                 ///
@@ -8171,6 +8173,10 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/libraries/{libraryId}/items/GET/query/letter`.
                 public var letter: Swift.String?
+                /// Only what the person rated at least this (0–10, e.g. 8 = 4 stars: favourites).
+                ///
+                /// - Remark: Generated from `#/paths/libraries/{libraryId}/items/GET/query/minMyRating`.
+                public var minMyRating: Swift.Int?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
@@ -8185,6 +8191,7 @@ public enum Operations {
                 ///   - resolution:
                 ///   - hdr:
                 ///   - letter: Only titles starting with this letter ("#" for anything else).
+                ///   - minMyRating: Only what the person rated at least this (0–10, e.g. 8 = 4 stars: favourites).
                 public init(
                     _type: Components.Schemas.ItemType? = nil,
                     sort: Components.Parameters.Sort? = nil,
@@ -8196,7 +8203,8 @@ public enum Operations {
                     contentRating: Swift.String? = nil,
                     resolution: Operations.ListLibraryItems.Input.Query.ResolutionPayload? = nil,
                     hdr: Swift.Bool? = nil,
-                    letter: Swift.String? = nil
+                    letter: Swift.String? = nil,
+                    minMyRating: Swift.Int? = nil
                 ) {
                     self._type = _type
                     self.sort = sort
@@ -8209,6 +8217,7 @@ public enum Operations {
                     self.resolution = resolution
                     self.hdr = hdr
                     self.letter = letter
+                    self.minMyRating = minMyRating
                 }
             }
             public var query: Operations.ListLibraryItems.Input.Query
@@ -33573,6 +33582,573 @@ public enum Operations {
             /// Not found.
             ///
             /// - Remark: Generated from `#/paths//items/{itemId}/rating/put(rateItem)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// The community rating and everyone's ratings and comments for an item (USER-17).
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/reviews`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/reviews/get(itemReviews)`.
+    public enum ItemReviews {
+        public static let id: Swift.String = "itemReviews"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/items/{itemId}/reviews/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/reviews/GET/path/itemId`.
+                public var itemId: Components.Parameters.ItemId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - itemId:
+                public init(itemId: Components.Parameters.ItemId) {
+                    self.itemId = itemId
+                }
+            }
+            public var path: Operations.ItemReviews.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/reviews/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ItemReviews.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ItemReviews.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ItemReviews.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.ItemReviews.Input.Path,
+                headers: Operations.ItemReviews.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/reviews/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{itemId}/reviews/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.ItemReviews)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ItemReviews {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ItemReviews.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ItemReviews.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/reviews/get(itemReviews)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ItemReviews.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ItemReviews.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/reviews/get(itemReviews)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/reviews/get(itemReviews)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Your comment on an item, shown with your rating to everyone who can see it. An empty comment removes it (your rating stays; set that with PUT /items/{itemId}/rating).
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/reviews`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/reviews/put(setReview)`.
+    public enum SetReview {
+        public static let id: Swift.String = "setReview"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/items/{itemId}/reviews/PUT/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/reviews/PUT/path/itemId`.
+                public var itemId: Components.Parameters.ItemId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - itemId:
+                public init(itemId: Components.Parameters.ItemId) {
+                    self.itemId = itemId
+                }
+            }
+            public var path: Operations.SetReview.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/reviews/PUT/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SetReview.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SetReview.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.SetReview.Input.Headers
+            /// - Remark: Generated from `#/paths/items/{itemId}/reviews/PUT/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/reviews/PUT/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// - Remark: Generated from `#/paths/items/{itemId}/reviews/PUT/requestBody/json/comment`.
+                    public var comment: Swift.String
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - comment:
+                    public init(comment: Swift.String) {
+                        self.comment = comment
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case comment
+                    }
+                }
+                /// - Remark: Generated from `#/paths/items/{itemId}/reviews/PUT/requestBody/content/application\/json`.
+                case json(Operations.SetReview.Input.Body.JsonPayload)
+            }
+            public var body: Operations.SetReview.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.SetReview.Input.Path,
+                headers: Operations.SetReview.Input.Headers = .init(),
+                body: Operations.SetReview.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Saved.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/reviews/put(setReview)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.SetReview.Output.NoContent)
+            /// Saved.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/reviews/put(setReview)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.SetReview.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/reviews/put(setReview)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/reviews/put(setReview)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/reviews/put(setReview)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Remove a comment (your own, or anyone's for admins). Ratings aren't touched.
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/reviews/{userId}`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/reviews/{userId}/delete(deleteReview)`.
+    public enum DeleteReview {
+        public static let id: Swift.String = "deleteReview"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/items/{itemId}/reviews/{userId}/DELETE/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/reviews/{userId}/DELETE/path/itemId`.
+                public var itemId: Components.Parameters.ItemId
+                /// - Remark: Generated from `#/paths/items/{itemId}/reviews/{userId}/DELETE/path/userId`.
+                public var userId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - itemId:
+                ///   - userId:
+                public init(
+                    itemId: Components.Parameters.ItemId,
+                    userId: Swift.Int64
+                ) {
+                    self.itemId = itemId
+                    self.userId = userId
+                }
+            }
+            public var path: Operations.DeleteReview.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/reviews/{userId}/DELETE/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteReview.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteReview.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.DeleteReview.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.DeleteReview.Input.Path,
+                headers: Operations.DeleteReview.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Removed.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/reviews/{userId}/delete(deleteReview)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.DeleteReview.Output.NoContent)
+            /// Removed.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/reviews/{userId}/delete(deleteReview)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.DeleteReview.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/reviews/{userId}/delete(deleteReview)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/reviews/{userId}/delete(deleteReview)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/reviews/{userId}/delete(deleteReview)/responses/404`.
             ///
             /// HTTP response code: `404 notFound`.
             case notFound(Components.Responses.NotFound)

@@ -16,8 +16,11 @@ struct MusicHomeView: View {
     @State private var topArtists: [Item] = []
     @State private var decades: [String] = []
     @State private var counts: [MusicBrowse: Int] = [:]
+    /// What this person rated 4 stars or more: albums and artists first, then tracks.
+    @State private var favorites: [Item] = []
     @State private var busy: String?
     @State private var error: String?
+    @State private var loaded = false
 
     private var libraryID: Int64 { library.id }
     private var soundprint: Bool { status?.enabled == true }
@@ -49,6 +52,13 @@ struct MusicHomeView: View {
                             ForEach(playlists, id: \.id) { PlaylistCard(playlist: $0, size: PosterCard.defaultWidth) }
                         }
                     }
+                    if !favorites.isEmpty {
+                        ShelfRow(title: "Favorites", destination: .musicBrowse(library: libraryID, .favorites)) {
+                            ForEach(favorites, id: \.id) { PosterCard(item: $0) }
+                        }
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("favoritesShelf")
+                    }
                     if !topArtists.isEmpty {
                         ShelfRow(title: "Top Artists", destination: .musicBrowse(library: libraryID, .artists)) {
                             ForEach(topArtists, id: \.id) { a in
@@ -62,7 +72,10 @@ struct MusicHomeView: View {
             }
         }
         .navigationTitle(library.name)
-        .task { await load() }
+        .task {
+            // Once per visit to the library, not on every appear (coming back from an album).
+            if !loaded { await load() }
+        }
         .refreshable { await load() }
     }
 
@@ -77,6 +90,7 @@ struct MusicHomeView: View {
                 row("Albums", "square.stack", .musicBrowse(library: libraryID, .albums), count: counts[.albums], id: "albums")
                 row("Songs", "music.note", .musicBrowse(library: libraryID, .songs), count: counts[.songs], id: "songs")
                 row("Playlists", "music.note.list", .playlists, count: playlists.count, id: "playlists")
+                row("Favorites", "heart", .musicBrowse(library: libraryID, .favorites), count: counts[.favorites], id: "favorites")
                 row("Genres", "guitars", .musicBrowse(library: libraryID, .genres), id: "genres")
                 if soundprint {
                     row("Moods & Styles", "theatermasks", .musicBrowse(library: libraryID, .moodsAndStyles), id: "moods")
@@ -174,7 +188,8 @@ struct MusicHomeView: View {
         .scrollClipDisabled()
         .focusSection()
         #endif
-        .disabled(busy != nil)
+        // Not disabled while busy: on the TV that throws focus off the row. Taps are ignored
+        // while an action runs instead.
     }
 
     private func action(_ title: String, _ icon: String, _ work: @escaping () async throws -> Void) -> some View {
@@ -227,22 +242,47 @@ struct MusicHomeView: View {
     // MARK: - Loading
 
     private func load() async {
+        defer { loaded = true }
         async let statusCall = try? app.musicStatus()
         async let playedCall = try? app.hubs().first { $0.id == "played-\(libraryID)" }?.items
         async let addedCall = try? app.items(library: libraryID, sort: ._hyphen_added, limit: 20, type: .album).items
         async let playlistsCall = try? app.playlists(kind: .audio)
         async let topCall = topArtistsForMe()
+        async let decadesCall = try? app.filters(library: libraryID, type: .album)
+        async let countsCall = libraryCounts()
+        async let favoritesCall = favoritesShelf()
         status = await statusCall
+        if soundprint { mixes = (try? await app.mixes(library: libraryID)) ?? [] }
         recentlyPlayed = await playedCall ?? []
         recentlyAdded = await addedCall ?? []
         playlists = await playlistsCall ?? []
         topArtists = await topCall
-        if soundprint { mixes = (try? await app.mixes(library: libraryID)) ?? [] }
-        decades = (try? await app.filters(library: libraryID, type: .album))?.decades.map(\.value) ?? []
-        // The Library list's counts: one tiny page each, reading its total.
-        for (kind, type) in [(MusicBrowse.artists, Schemas.ItemType.artist), (.albums, .album), (.songs, .track)] {
-            if let page = try? await app.items(library: libraryID, limit: 1, type: type) { counts[kind] = page.total }
+        decades = await decadesCall?.decades.map(\.value) ?? []
+        counts = await countsCall
+        favorites = await favoritesCall
+    }
+
+    /// The Library list's counts: one tiny page each, reading its total, all at once.
+    private func libraryCounts() async -> [MusicBrowse: Int] {
+        let app = app
+        let id = libraryID
+        let wanted: [(MusicBrowse, Schemas.ItemType, Int?)] = [(.artists, .artist, nil), (.albums, .album, nil), (.songs, .track, nil), (.favorites, .track, 8)]
+        return await withTaskGroup(of: (MusicBrowse, Int?).self) { group in
+            for (kind, type, min) in wanted {
+                group.addTask { @MainActor in (kind, try? await app.items(library: id, limit: 1, type: type, minMyRating: min).total) }
+            }
+            var out: [MusicBrowse: Int] = [:]
+            for await (kind, total) in group { if let total { out[kind] = total } }
+            return out
         }
+    }
+
+    /// Favourites (rated 4 stars or more): albums, artists, then tracks, best first.
+    private func favoritesShelf() async -> [Item] {
+        async let albums = try? app.items(library: libraryID, sort: ._hyphen_myRating, limit: 10, type: .album, minMyRating: 8).items
+        async let artists = try? app.items(library: libraryID, sort: ._hyphen_myRating, limit: 10, type: .artist, minMyRating: 8).items
+        async let tracks = try? app.items(library: libraryID, sort: ._hyphen_myRating, limit: 20, type: .track, minMyRating: 8).items
+        return Array(((await albums ?? []) + (await artists ?? []) + (await tracks ?? [])).prefix(30))
     }
 
     /// The artists this person plays most (all time), in this library.
@@ -264,6 +304,7 @@ struct MusicSongsView: View {
     @Environment(MusicPlayer.self) private var music
     let libraryID: Int64
     @State private var sort: ItemSort = .title
+    @State private var ratedOnly = false
     @State private var tracks: [Item] = []
     @State private var total = 0
     @State private var loading = false
@@ -276,24 +317,31 @@ struct MusicSongsView: View {
         List {
             if let error { ErrorBanner(message: error) }
             ForEach(Array(tracks.enumerated()), id: \.element.id) { i, t in
-                Button { music.play(tracks, start: i, source: "Songs") } label: {
-                    HStack(spacing: 12) {
-                        ArtworkView(item: t, shape: .square, width: 60).frame(width: 44)
-                        VStack(alignment: .leading) {
-                            Text(t.title).lineLimit(1)
-                            Text([t.artistCredit ?? t.grandparentTitle, t.parentTitle].compactMap { $0 }.joined(separator: " · "))
-                                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                HStack(spacing: 4) {
+                    Button { music.play(tracks, start: i, source: "Songs") } label: {
+                        HStack(spacing: 12) {
+                            ArtworkView(item: t, shape: .square, width: 60).frame(width: 44)
+                            VStack(alignment: .leading) {
+                                Text(t.title).lineLimit(1)
+                                Text([t.artistCredit ?? t.grandparentTitle, t.parentTitle].compactMap { $0 }.joined(separator: " · "))
+                                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            Spacer()
+                            Text(formatTime(seconds: Double(t.durationMs ?? 0) / 1000)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                         }
-                        Spacer()
-                        Text(formatTime(seconds: Double(t.durationMs ?? 0) / 1000)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                        .contentShape(Rectangle())
                     }
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
+                    .contextMenu { ItemMenuItems(item: t) }
+                    .accessibilityIdentifier("songRow.\(t.id)")
+                    RowRating(item: t)
                 }
-                .buttonStyle(.plain)
-                .contextMenu { ItemMenuItems(item: t) }
                 .onAppear { if i >= tracks.count - 40 { Task { await loadMore() } } }
             }
             if loading { ProgressView() }
+            if !loading, error == nil, tracks.isEmpty {
+                ContentUnavailableView(ratedOnly ? "No songs rated 4★ or more" : "No songs", systemImage: "music.note")
+            }
         }
         .listStyle(.plain)
         .navigationTitle("Songs")
@@ -304,15 +352,18 @@ struct MusicSongsView: View {
                         Text("Title").tag(ItemSort.title)
                         Text("Recently added").tag(ItemSort._hyphen_added)
                         Text("Rating").tag(ItemSort._hyphen_rating)
+                        Text("My rating").tag(ItemSort._hyphen_myRating)
                         Text("Recently played").tag(ItemSort._hyphen_viewed)
                         Text("Random").tag(ItemSort.random)
                     }
+                    Toggle("Rated 4★+", isOn: $ratedOnly)
                 } label: {
                     Label("Sort", systemImage: "arrow.up.arrow.down")
                 }
+                .accessibilityIdentifier("sortMenu")
             }
         }
-        .task(id: sort) {
+        .task(id: "\(sort)-\(ratedOnly)") {
             generation += 1
             tracks = []
             total = 0
@@ -327,7 +378,8 @@ struct MusicSongsView: View {
         loading = true
         defer { if gen == generation { loading = false } }
         do {
-            let page = try await app.items(library: libraryID, sort: sort, offset: tracks.count, limit: Self.page, type: .track)
+            let page = try await app.items(library: libraryID, sort: sort, offset: tracks.count, limit: Self.page, type: .track,
+                                           minMyRating: ratedOnly ? 8 : nil)
             guard gen == generation else { return }
             let have = Set(tracks.map(\.id))
             tracks += page.items.filter { !have.contains($0.id) }
@@ -469,6 +521,119 @@ struct MusicDecadeView: View {
         .task {
             radio = (try? await app.musicStatus())?.enabled == true
             albums = (try? await app.items(library: libraryID, sort: .year, limit: 300, type: .album, decade: decade))?.items ?? []
+        }
+    }
+
+    #if os(tvOS)
+    private let minWidth: CGFloat = 230
+    #else
+    private let minWidth: CGFloat = 110
+    #endif
+}
+
+/// Favourites: the tracks, albums and artists this person rated 4 stars or more, best first.
+struct MusicFavoritesView: View {
+    enum Kind: String, CaseIterable, Identifiable {
+        case tracks = "Tracks", albums = "Albums", artists = "Artists"
+        var id: String { rawValue }
+        var type: Schemas.ItemType { self == .tracks ? .track : self == .albums ? .album : .artist }
+    }
+
+    @Environment(AppSession.self) private var app
+    @Environment(MusicPlayer.self) private var music
+    let libraryID: Int64
+    @State private var kind: Kind = .tracks
+    @State private var items: [Kind: [Item]] = [:]
+    @State private var error: String?
+    @State private var busy = false
+
+    private var current: [Item]? { items[kind] }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Picker("Show", selection: $kind) {
+                    ForEach(Kind.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("favoritesKind")
+                .padding(.horizontal, sidePadding)
+                if let error {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ErrorBanner(message: error)
+                        Button("Try Again") { Task { await load(kind, force: true) } }.buttonStyle(.bordered)
+                    }
+                    .padding(.horizontal, sidePadding)
+                }
+                if let list = current {
+                    if list.isEmpty {
+                        ContentUnavailableView("No favorite \(kind.rawValue.lowercased()) yet", systemImage: "heart",
+                                               description: Text("Rate something 4 stars or more and it shows up here."))
+                    } else if kind == .tracks {
+                        tracks(list)
+                    } else {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: minWidth), spacing: 14, alignment: .top)], spacing: 14) {
+                            ForEach(list, id: \.id) { PosterCard(item: $0, width: minWidth) }
+                        }
+                        .padding(.horizontal, sidePadding)
+                    }
+                } else if error == nil {
+                    ProgressView().frame(maxWidth: .infinity).padding(.top, 60)
+                }
+            }
+            .padding(.vertical)
+        }
+        .navigationTitle("Favorites")
+        .task(id: kind) { await load(kind) }
+        .refreshable { await load(kind, force: true) }
+    }
+
+    private func tracks(_ list: [Item]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                Button { music.play(list, source: "Favorites") } label: { Label("Play", systemImage: "play.fill") }
+                    .buttonStyle(.borderedProminent)
+                Button { music.play(list, shuffle: true, source: "Favorites") } label: { Label("Shuffle", systemImage: "shuffle") }
+                    .buttonStyle(.bordered)
+            }
+            .padding(.horizontal, sidePadding)
+            .padding(.bottom, 10)
+            ForEach(Array(list.enumerated()), id: \.element.id) { i, t in
+                HStack(spacing: 4) {
+                    Button { music.play(list, start: i, source: "Favorites") } label: {
+                        HStack(spacing: 12) {
+                            ArtworkView(item: t, shape: .square, width: 60).frame(width: isTV ? 80 : 44)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(t.title).lineLimit(1).foregroundStyle(music.current?.item.id == t.id ? Color.marqueeGold : .primary)
+                                Text([t.artistCredit ?? t.grandparentTitle, t.parentTitle].compactMap { $0 }.joined(separator: " · "))
+                                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            Spacer()
+                        }
+                        .padding(.leading, sidePadding)
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu { ItemMenuItems(item: t) }
+                    .accessibilityIdentifier("favoriteTrack.\(t.id)")
+                    RowRating(item: t)
+                }
+                .padding(.trailing, sidePadding - 6)
+            }
+        }
+    }
+
+    private func load(_ k: Kind, force: Bool = false) async {
+        guard force || items[k] == nil else { return }
+        do {
+            let page = try await app.items(library: libraryID, sort: ._hyphen_myRating, limit: k == .tracks ? 500 : 300,
+                                           type: k.type, minMyRating: 8)
+            items[k] = page.items
+            error = nil
+        } catch is CancellationError {
+        } catch {
+            self.error = error.localizedDescription
         }
     }
 

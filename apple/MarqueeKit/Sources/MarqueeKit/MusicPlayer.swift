@@ -131,6 +131,21 @@ public final class MusicPlayer {
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var lastReport = Date.distantPast
     @ObservationIgnored private var artworkTask: Task<Void, Never>?
+    /// The Now Playing artwork, kept by the item it belongs to (and the item being fetched).
+    @ObservationIgnored private var artworkItem: Int64?
+    @ObservationIgnored private var artworkLoading: Int64?
+    @ObservationIgnored private var artwork: MPMediaItemArtwork?
+    /// A failed preload is retried after a growing pause (while the current track plays).
+    @ObservationIgnored private var preloadFailures = 0
+    @ObservationIgnored private var preloadRetryAt = Date.distantPast
+    /// Tracks in a row that wouldn't start, so a queue of unplayable tracks stops rather than spins.
+    @ObservationIgnored private var startFailures = 0
+    /// Playing when an interruption (a call, Siri, an alarm) began.
+    @ObservationIgnored private var interruptedWhilePlaying = false
+    /// Paused on purpose (not by an interruption or the end of the queue).
+    @ObservationIgnored private var userPaused = false
+    /// The remote device played the queue to its end: nothing to carry on with here.
+    @ObservationIgnored private var remoteQueueEnded = false
     /// The entry whose preload session is being created (avoids preloading it twice).
     @ObservationIgnored private var preloading: Int?
     /// Bumped by every rebuild, so a slow session start for an older track is dropped.
@@ -163,6 +178,7 @@ public final class MusicPlayer {
                 if let d = self.player.currentItem?.duration.seconds, d.isFinite { self.duration = d }
                 if Date().timeIntervalSince(self.lastReport) > 15, self.playing { self.report("playing") }
                 self.maybeCrossfade()
+                self.retryPreloadIfDue()
             }
         }
         NotificationCenter.default.addObserver(forName: AVPlayerItem.failedToPlayToEndTimeNotification, object: nil, queue: .main) { [weak self] n in
@@ -181,6 +197,16 @@ public final class MusicPlayer {
         }
         updateRoute()
         #endif
+        #if os(iOS) || os(tvOS)
+        NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] n in
+            let type = (n.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt).flatMap(AVAudioSession.InterruptionType.init)
+            let options = AVAudioSession.InterruptionOptions(rawValue: (n.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt) ?? 0)
+            MainActor.assumeIsolated { self?.interrupted(type, shouldResume: options.contains(.shouldResume)) }
+        }
+        NotificationCenter.default.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.mediaServicesReset() }
+        }
+        #endif
         // Signing out, switching profile or forgetting the server ends the music.
         app.onUserChange = { [weak self] in self?.stop() }
     }
@@ -193,6 +219,7 @@ public final class MusicPlayer {
         self.source = source.map { Source(title: $0) }
         queue.load(items, start: start, shuffle: shuffle)
         retriedEntry = nil
+        startFailures = 0
         rebuild(at: max(0, seconds))
     }
 
@@ -202,6 +229,7 @@ public final class MusicPlayer {
         source = Source(title: station.title, radio: radio)
         queue.load(station.items, start: 0, shuffle: false)
         retriedEntry = nil
+        startFailures = 0
         rebuild()
     }
 
@@ -219,8 +247,14 @@ public final class MusicPlayer {
 
     public func remove(_ id: Int) {
         let wasCurrent = queue.current?.id == id
-        queue.remove(id)
-        wasCurrent ? rebuild() : refreshFollowing()
+        let ended = queue.remove(id)
+        if ended {
+            // The last track was removed while playing: the queue has ended (the track before
+            // it doesn't start again by itself).
+            rebuild(autoplay: false, load: false)
+        } else {
+            wasCurrent ? rebuild() : refreshFollowing()
+        }
     }
 
     public func move(_ id: Int, to: Int) {
@@ -231,12 +265,25 @@ public final class MusicPlayer {
     public func jump(_ id: Int) {
         queue.jump(id)
         retriedEntry = nil
+        startFailures = 0
         rebuild()
     }
 
     public func next() {
         let i = queue.skipIndex
         guard i >= 0 else { return }
+        // The next track is already preloaded: move on to it rather than start it again.
+        let items = player.items()
+        if remote == nil, items.count >= 2, let cur = player.currentItem, items[0] === cur,
+           sessions[ObjectIdentifier(items[1])]?.entry == queue.entries[i].id, items[1].status != .failed {
+            cancelFade()
+            report("paused")
+            endSession(for: cur) // reports where it was skipped, and isn't counted as finished
+            retriedEntry = nil
+            player.advanceToNextItem()
+            if !playing { resume() }
+            return
+        }
         queue.setIndex(i)
         rebuild()
     }
@@ -248,14 +295,22 @@ public final class MusicPlayer {
     }
 
     public func toggle() {
-        if let remote { remote.toggle(); return }
+        if let remote {
+            // The remote device finished the queue: play it again from the current track.
+            if remoteQueueEnded { rebuild() } else { remote.toggle() }
+            return
+        }
         playing ? pause() : resume()
     }
 
     public func resume() {
-        if let remote { remote.resume(); return }
+        if let remote {
+            if remoteQueueEnded { rebuild() } else { remote.resume() }
+            return
+        }
         // The queue played to the end (or the track failed): start the current entry again.
-        if player.currentItem == nil, queue.current != nil { rebuild(); return }
+        if player.currentItem == nil, queue.current != nil { startFailures = 0; rebuild(); return }
+        userPaused = false
         activateAudioSession()
         player.play()
     }
@@ -263,6 +318,7 @@ public final class MusicPlayer {
     /// Pauses here, or on the Chromecast while casting. Video and live TV call this too.
     public func pause() {
         if let remote { remote.pause(); return }
+        userPaused = true
         cancelFade()
         player.pause()
     }
@@ -383,33 +439,85 @@ public final class MusicPlayer {
     }
 
     /// Replaces everything in the player with the current entry and what follows it.
-    private func rebuild(at start: Double = 0) {
+    /// `autoplay` false loads it paused; `load` false only clears the player (the queue ended).
+    private func rebuild(at start: Double = 0, autoplay: Bool = true, load: Bool = true) {
         cancelFade()
         buildGeneration += 1
         let gen = buildGeneration
+        remoteQueueEnded = false
         report("paused")
         for item in player.items() { endSession(for: item) }
         player.removeAllItems()
         time = start
         duration = Double(queue.current?.item.durationMs ?? 0) / 1000
         guard let entry = queue.current else { playing = false; updateNowPlaying(); return }
+        guard load else {
+            remote?.pause()
+            playing = false
+            time = 0
+            updateNowPlaying()
+            return
+        }
+        if !autoplay { playing = false }
         updateNowPlaying()
         if let remote {
             remote.play(entry.item, at: start)
             return
         }
         Task {
-            guard let item = await makeItem(entry, preload: false) else { return }
+            guard let item = await makeItem(entry, preload: false) else {
+                guard gen == buildGeneration, queue.current?.id == entry.id, remote == nil else { return }
+                startFailed(entry, autoplay: autoplay)
+                return
+            }
             // Skipped again (or casting) while the session started: end it rather than leak it.
             guard gen == buildGeneration, queue.current?.id == entry.id, remote == nil else {
                 endSession(for: item)
                 return
             }
+            startFailures = 0
             player.insert(item, after: nil)
             if start > 0 { await player.seek(to: CMTime(seconds: start, preferredTimescale: 600)) }
-            resume()
+            guard gen == buildGeneration else { return }
+            if autoplay {
+                resume()
+            } else {
+                playing = false
+                updateNowPlaying()
+            }
             refreshFollowing()
         }
+    }
+
+    /// A track wouldn't start (no session, or not downloaded while offline): say so and move
+    /// on to the next track that can play, or stop.
+    private func startFailed(_ entry: PlayQueue.Entry, autoplay: Bool) {
+        showError("Couldn't play \(entry.item.title).")
+        startFailures += 1
+        if startFailures < min(queue.entries.count, 10), let i = nextPlayable() {
+            queue.setIndex(i)
+            rebuild(autoplay: autoplay)
+        } else {
+            startFailures = 0
+            playing = false
+            updateNowPlaying()
+        }
+    }
+
+    /// The next entry worth trying after the current one: while the server can't be reached,
+    /// the next downloaded track; otherwise the next track (wrapping with repeat on).
+    private func nextPlayable() -> Int? {
+        let n = queue.entries.count
+        guard n > 1, queue.index >= 0 else { return nil }
+        let offline = app.client == nil || app.lastError != nil
+        let wrap = queue.repeatMode != .off
+        for step in 1..<n {
+            let i = queue.index + step
+            if i >= n && !wrap { break }
+            let j = i % n
+            if !offline || downloads?.localURL(queue.entries[j].item.id) != nil { return j }
+        }
+        return nil
     }
 
     // MARK: - Remote playback (Chromecast, D82)
@@ -424,8 +532,15 @@ public final class MusicPlayer {
                 cancelFade()
                 player.pause()
                 rebuild(at: at)
+            } else if remoteQueueEnded {
+                // The remote device played the queue to its end: nothing carries on here.
+                remoteQueueEnded = false
+                playing = false
+                time = 0
+                updateNowPlaying()
             } else if queue.current != nil {
-                rebuild(at: at)
+                // Carries on here only if it was playing there.
+                rebuild(at: at, autoplay: playing)
             }
         }
     }
@@ -443,7 +558,13 @@ public final class MusicPlayer {
     public func remoteFinished() {
         guard remote != nil else { return }
         let i = queue.followingIndex
-        guard i >= 0 else { playing = false; return }
+        guard i >= 0 else {
+            playing = false
+            remoteQueueEnded = true
+            if sleep == .endOfTrack { sleep = nil }
+            updateNowPlaying()
+            return
+        }
         queue.setIndex(i)
         rebuild()
     }
@@ -461,21 +582,43 @@ public final class MusicPlayer {
         guard let want, player.items().count == 1, let cur = player.currentItem, preloading != want.id else { return }
         preloading = want.id
         Task {
-            defer { preloading = nil }
-            guard let item = await makeItem(want, preload: true) else { return }
-            guard player.currentItem === cur, player.items().count == 1 else {
-                endSession(for: item)
+            let made = await makeItem(want, preload: true)
+            if preloading == want.id { preloading = nil }
+            guard let item = made else {
+                // Try again later (the current track keeps playing meanwhile): 2, 4, 8… s, up to a minute.
+                preloadFailures += 1
+                preloadRetryAt = Date().addingTimeInterval(min(60, 2 * pow(2, Double(min(preloadFailures, 6) - 1))))
                 return
             }
+            // The queue changed while it loaded (play next, shuffle, a move or a removal): this
+            // track no longer follows, so drop it and preload the one that does.
+            let fi = queue.followingIndex
+            guard remote == nil, player.currentItem === cur, player.items().count == 1,
+                  queue.entries.indices.contains(fi), queue.entries[fi].id == want.id else {
+                endSession(for: item)
+                if remote == nil, player.currentItem === cur { refreshFollowing() }
+                return
+            }
+            preloadFailures = 0
             player.insert(item, after: cur)
         }
     }
 
+    /// Retries a preload that failed, once its pause is up.
+    private func retryPreloadIfDue() {
+        guard remote == nil, preloadFailures > 0, preloading == nil, Date() >= preloadRetryAt,
+              player.currentItem != nil, player.items().count == 1, queue.followingIndex >= 0 else { return }
+        refreshFollowing()
+    }
+
     private func currentItemChanged(previous: ObjectIdentifier?) {
         if let previous { itemObservers.removeValue(forKey: previous) }
+        // A track that played to its end still has its session here: skips, rebuilds and
+        // stops end theirs before the player lets go of the item.
+        let ended = previous.map { sessions[$0] != nil } ?? false
         // Sleep at the end of the track: checked before the crossfade hand-over, and pause()
         // stops the fading tail too.
-        if previous != nil, sleep == .endOfTrack, player.currentItem != nil {
+        if ended, sleep == .endOfTrack, player.currentItem != nil {
             sleep = nil
             pause()
         }
@@ -501,8 +644,23 @@ public final class MusicPlayer {
             }
         }
         guard player.currentItem != nil else {
-            if queue.current != nil, previous != nil, queue.followingIndex < 0 {
-                playing = false // reached the end of the queue
+            guard ended, remote == nil, queue.current != nil else { return }
+            let fi = queue.followingIndex
+            if fi >= 0 {
+                // Nothing was lined up after it (its preload failed or was still loading):
+                // start the next track now rather than stop mid-album.
+                queue.setIndex(fi)
+                if sleep == .endOfTrack {
+                    sleep = nil
+                    rebuild(autoplay: false)
+                } else {
+                    rebuild()
+                }
+            } else {
+                // Reached the end of the queue; a sleep timer for the end of the track is done too.
+                playing = false
+                if sleep == .endOfTrack { sleep = nil }
+                updateNowPlaying()
             }
             return
         }
@@ -514,6 +672,8 @@ public final class MusicPlayer {
         // A preloaded track that failed while waiting its turn.
         if item.status == .failed { itemFailed(ObjectIdentifier(item)); return }
         if let i = queue.entries.firstIndex(where: { $0.id == s.entry }), i != queue.index { queue.setIndex(i) }
+        preloadFailures = 0
+        preloadRetryAt = .distantPast
         time = 0
         duration = Double(queue.current?.item.durationMs ?? 0) / 1000
         report("playing")
@@ -577,7 +737,9 @@ public final class MusicPlayer {
     /// tail and fades it out while the queue moves on and fades in.
     private func maybeCrossfade() {
         let secs = Double(crossfade)
-        guard secs > 0, fadeTask == nil, playing, duration > secs * 3, duration - time <= secs,
+        // Starts a few seconds early: the tail loads, lines up and runs silently in step, then
+        // takes over exactly `secs` before the end (loading can take seconds on a slow server).
+        guard secs > 0, fadeTask == nil, playing, duration > secs * 3, duration - time <= secs + 4, duration - time > 1,
               player.items().count >= 2, let item = player.currentItem, let url = (item.asset as? AVURLAsset)?.url else { return }
         // Consecutive tracks of one album stay gapless.
         if let s = sessions[ObjectIdentifier(item)], let i = queue.entries.firstIndex(where: { $0.id == s.entry }),
@@ -591,15 +753,59 @@ public final class MusicPlayer {
             tail.audioMix = mix(trackID: p.trackID, gain: level, tap: p.audioTapProcessor != nil)
         }
         let f = AVPlayer(playerItem: tail)
-        f.seek(to: CMTime(seconds: time + 0.2, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
-        f.play()
+        f.automaticallyWaitsToMinimizeStalling = false
         fader = f
         fadingFrom = ObjectIdentifier(item)
         fadeTask = Task { [weak self] in
-            // Hand over only once the tail is audibly playing.
-            for _ in 0..<60 where f.timeControlStatus != .playing { try? await Task.sleep(for: .milliseconds(25)) }
+            // Load the tail paused, line it up with where the track is, then start it there.
+            var waits = 0
+            while tail.status == .unknown, waits < 80, !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(25))
+                waits += 1
+            }
             guard let self, !Task.isCancelled else { return }
-            guard f.timeControlStatus == .playing else { self.endFade(); return }
+            guard tail.status == .readyToPlay, self.player.currentItem === item else { self.endFade(); return }
+            // Loading starts seconds ahead, so there's room to line up generously.
+            var lead = 1.0
+            var lined = false
+            for _ in 0..<3 {
+                let target = self.player.currentTime().seconds + lead
+                guard target.isFinite, target < self.duration - 0.5 else { break }
+                _ = await f.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+                // Preroll fills the tail's buffers so it starts the moment it's asked to (only
+                // allowed once the player is ready, or AVFoundation throws).
+                if f.status == .readyToPlay, f.rate == 0 { _ = await f.preroll(atRate: 1) }
+                guard !Task.isCancelled else { return }
+                guard self.player.currentItem === item else { break }
+                let wait = target - self.player.currentTime().seconds
+                if wait >= -0.02 {
+                    if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
+                    lined = true
+                    break
+                }
+                lead *= 2 // the seek took longer than allowed for: try again further ahead
+            }
+            guard !Task.isCancelled else { return }
+            // The track ended while the tail loaded (it has moved on by itself), or the tail
+            // couldn't be lined up: no crossfade this time.
+            guard lined, self.player.currentItem === item else { self.endFade(); return }
+            f.volume = 0 // silent until the hand-over
+            f.play()
+            waits = 0
+            while f.timeControlStatus != .playing, waits < 40, !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(25))
+                waits += 1
+            }
+            guard !Task.isCancelled else { return }
+            // Hand over only once the tail is audibly playing, and only from the track it copies.
+            guard f.timeControlStatus == .playing, self.player.currentItem === item else { self.endFade(); return }
+            // In step and silent: hand over when the fade should begin.
+            while self.duration - self.player.currentTime().seconds > secs, self.player.currentItem === item, !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+            guard !Task.isCancelled else { return }
+            guard self.player.currentItem === item, f.timeControlStatus == .playing else { self.endFade(); return }
+            f.volume = 1
             self.player.volume = 0
             self.player.advanceToNextItem()
             let steps = Int(secs * 25)
@@ -696,6 +902,34 @@ public final class MusicPlayer {
     }
     #endif
 
+    #if os(iOS) || os(tvOS)
+    /// A phone call, Siri or an alarm took the audio: carry on afterwards if the music was
+    /// playing and the system says to.
+    private func interrupted(_ type: AVAudioSession.InterruptionType?, shouldResume: Bool) {
+        guard remote == nil else { return }
+        switch type {
+        case .began:
+            interruptedWhilePlaying = playing || (!userPaused && player.currentItem != nil && player.timeControlStatus != .paused)
+            cancelFade()
+        case .ended:
+            let resume = interruptedWhilePlaying && shouldResume
+            interruptedWhilePlaying = false
+            guard resume, queue.current != nil else { return }
+            activateAudioSession()
+            if player.currentItem == nil { rebuild(at: time) } else { player.play() }
+        default:
+            break
+        }
+    }
+
+    /// The system's media services restarted: every player item is gone, so load the
+    /// current track again where it was.
+    private func mediaServicesReset() {
+        guard remote == nil, queue.current != nil else { return }
+        rebuild(at: time, autoplay: playing)
+    }
+    #endif
+
     private func report(_ state: String) {
         guard let item = player.currentItem, let s = sessions[ObjectIdentifier(item)], !s.session.isEmpty, let client = app.client else { return }
         lastReport = Date()
@@ -746,10 +980,10 @@ public final class MusicPlayer {
             MPNowPlayingInfoPropertyPlaybackRate: playing ? 1.0 : 0.0,
             MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue,
         ]
-        if let old = MPNowPlayingInfoCenter.default().nowPlayingInfo,
-           old[MPMediaItemPropertyTitle] as? String == t.title, let art = old[MPMediaItemPropertyArtwork] {
-            info[MPMediaItemPropertyArtwork] = art
-        } else {
+        // Artwork belongs to an item id; it's fetched once per track, not restarted on every update.
+        if artworkItem == t.id, let artwork {
+            info[MPMediaItemPropertyArtwork] = artwork
+        } else if artworkLoading != t.id {
             loadArtwork(for: t)
         }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
@@ -757,14 +991,26 @@ public final class MusicPlayer {
 
     private func loadArtwork(for t: Item) {
         artworkTask?.cancel()
-        guard let url = app.imageURL(t.images?.poster, width: 512) else { return }
-        artworkTask = Task {
+        artworkLoading = t.id
+        artworkItem = nil
+        artwork = nil
+        guard let url = app.imageURL(t.images?.poster, pixels: 600) else { return }
+        let id = t.id
+        artworkTask = Task { [weak self] in
+            // A failed fetch isn't retried for this track (updates come every second while casting).
             guard let (data, _) = try? await URLSession.shared.data(from: url), !Task.isCancelled else { return }
             #if canImport(UIKit)
-            guard let image = UIImage(data: data) else { return }
+            // Decoded off the main thread.
+            let image = await Task.detached(priority: .utility) { () -> UIImage? in
+                guard let image = UIImage(data: data) else { return nil }
+                return image.preparingForDisplay() ?? image
+            }.value
+            guard let self, let image, !Task.isCancelled, self.artworkLoading == id else { return }
             let art = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+            self.artwork = art
+            self.artworkItem = id
+            guard self.queue.current?.item.id == id else { return }
             var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
-            guard info[MPMediaItemPropertyTitle] as? String == t.title else { return }
             info[MPMediaItemPropertyArtwork] = art
             MPNowPlayingInfoCenter.default().nowPlayingInfo = info
             #endif
