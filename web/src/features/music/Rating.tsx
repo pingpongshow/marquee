@@ -78,18 +78,18 @@ export function Rating({
               rate.mutate(next);
             }}
           >
-            <Star className={clsx(px, "text-faint")} aria-hidden />
-            {(full || half) && (
-              <span
-                className="absolute inset-0.5 overflow-hidden"
-                style={{ width: half ? "50%" : undefined }}
-              >
+            {/* The outline and the fill share one box so a half star is exactly half the glyph. */}
+            <span className={clsx("relative block", px)}>
+              <Star className={clsx(px, "block text-faint")} aria-hidden />
+              {(full || half) && (
                 <Star
-                  className={clsx(px, "fill-accent text-accent")}
+                  data-fill={half ? "half" : "full"}
+                  className={clsx(px, "absolute inset-0 block fill-accent text-accent")}
+                  style={half ? { clipPath: "inset(0 50% 0 0)" } : undefined}
                   aria-hidden
                 />
-              </span>
-            )}
+              )}
+            </span>
           </button>
         );
       })}

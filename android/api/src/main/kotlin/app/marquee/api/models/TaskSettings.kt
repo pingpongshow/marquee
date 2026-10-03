@@ -33,7 +33,7 @@ import kotlinx.serialization.Contextual
  *
  * @param maintenanceWindowStart 
  * @param maintenanceWindowHours 
- * @param backupRetention 
+ * @param backupRetention Days to keep nightly backups before they're deleted (the newest is always kept).
  */
 @Serializable
 
@@ -45,6 +45,7 @@ data class TaskSettings (
     @SerialName(value = "maintenanceWindowHours")
     val maintenanceWindowHours: kotlin.Int? = null,
 
+    /* Days to keep nightly backups before they're deleted (the newest is always kept). */
     @SerialName(value = "backupRetention")
     val backupRetention: kotlin.Int? = null
 

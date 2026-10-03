@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Play, RotateCcw, Save, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { api, session, unwrap } from "@/api/client";
+import { settingsQuery, useUpdateSettings } from "@/api/queries";
 import type { Backup } from "@/api/types";
 import { Alert, Badge, Button, Card, Dialog, Field, Input, Spinner } from "@/components/ui";
 import { timeAgo } from "@/lib/time";
@@ -29,7 +30,8 @@ async function waitForRestart() {
 }
 
 function MaintenanceWindow() {
-  const s = useSectionDraft("tasks");
+  // Backup retention has its own field in the Database backups card, so this only saves the window.
+  const s = useSectionDraft("tasks", (d) => ({ maintenanceWindowStart: d.maintenanceWindowStart, maintenanceWindowHours: d.maintenanceWindowHours }));
   if (!s.draft) return <Spinner />;
   return (
     <>
@@ -42,9 +44,6 @@ function MaintenanceWindow() {
             {(id) => <Input id={id} type="number" min={1} max={12} value={s.draft!.maintenanceWindowHours ?? 4} onChange={(e) => s.update({ maintenanceWindowHours: Number(e.target.value) })} />}
           </Field>
         </div>
-        <Field label="Database backups to keep" help="A backup is taken daily and before every upgrade.">
-          {(id) => <Input id={id} type="number" min={1} max={60} value={s.draft!.backupRetention ?? 7} onChange={(e) => s.update({ backupRetention: Number(e.target.value) })} />}
-        </Field>
       </Card>
       <SaveBar dirty={s.dirty} saving={s.saving} error={s.error} savedAt={s.savedAt} onSave={s.save} onReset={s.reset} />
     </>
@@ -94,6 +93,76 @@ function Tasks() {
   );
 }
 
+/** "Keep nightly backups for N days" with its own save (PATCH /settings {tasks:{backupRetention}}). */
+function BackupRetention() {
+  const settings = useQuery(settingsQuery);
+  const update = useUpdateSettings();
+  const server = settings.data?.tasks?.backupRetention ?? 7;
+  const [text, setText] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const value = text ?? String(server);
+  const n = Number(value);
+  const valid = value.trim() !== "" && Number.isInteger(n) && n >= 1 && n <= 365;
+  const dirty = valid ? n !== server : text !== null;
+  const save = () => {
+    if (!valid) return;
+    update.mutate(
+      { tasks: { backupRetention: n } },
+      {
+        onSuccess: () => {
+          setText(null);
+          setSaved(true);
+        },
+      },
+    );
+  };
+  return (
+    <form
+      className="space-y-1.5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save();
+      }}
+    >
+      <label htmlFor="backup-retention" className="block text-sm font-medium text-text">
+        Keep nightly backups for
+      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          id="backup-retention"
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={365}
+          step={1}
+          className="w-24"
+          value={value}
+          aria-invalid={!valid}
+          onChange={(e) => {
+            setText(e.target.value);
+            setSaved(false);
+          }}
+        />
+        <span className="text-sm text-muted">days</span>
+        <Button type="submit" size="sm" variant="primary" disabled={!dirty || !valid} loading={update.isPending}>
+          Save
+        </Button>
+        {saved && !dirty && (
+          <span className="text-sm text-success" role="status">
+            Saved
+          </span>
+        )}
+      </div>
+      {!valid ? (
+        <p className="text-sm text-danger">Enter a whole number of days from 1 to 365.</p>
+      ) : (
+        <p className="text-sm text-muted">Older nightly backups are deleted. The newest backup is always kept.</p>
+      )}
+      {update.isError && <Alert tone="error">{update.error.message}</Alert>}
+    </form>
+  );
+}
+
 function Backups() {
   const qc = useQueryClient();
   const backups = useQuery({ queryKey: ["backups"], queryFn: () => unwrap(api.GET("/backups")) });
@@ -132,19 +201,20 @@ function Backups() {
         </Button>
       }
     >
+      <BackupRetention />
       {restarting && <Alert tone="info">Restoring the backup. The server is restarting; this page reloads when it's back.</Alert>}
       {(create.isError || del.isError || restore.isError) && <Alert tone="error">{(create.error ?? del.error ?? restore.error)?.message}</Alert>}
       {backups.isPending && <Spinner />}
       {backups.data?.length === 0 && <p className="text-sm text-muted">No backups yet. One is taken every day in the maintenance window.</p>}
       <ul className="-my-2 divide-y divide-border">
         {backups.data?.map((b) => (
-          <li key={b.name} className="flex flex-wrap items-center gap-3 py-2.5">
-            <div className="min-w-0 flex-1">
+          <li key={b.name} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
+            <div className="min-w-0 flex-1 basis-60">
               <div className="flex items-center gap-2 text-sm">
                 <span className="font-medium">{new Date(b.createdAt).toLocaleString()}</span>
                 <Badge>{kindLabel[b.kind]}</Badge>
               </div>
-              <div className="text-xs text-faint">
+              <div className="text-xs break-all text-faint">
                 {b.name} · {formatBytes(b.size)}
               </div>
             </div>

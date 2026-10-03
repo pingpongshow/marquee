@@ -30,6 +30,7 @@ import okhttp3.HttpUrl
 import app.marquee.api.models.Backup
 import app.marquee.api.models.Error
 import app.marquee.api.models.Health
+import app.marquee.api.models.SpeedTestResult
 import app.marquee.api.models.SystemInfo
 import app.marquee.api.models.SystemStatus
 import app.marquee.api.models.TaskInfo
@@ -758,6 +759,76 @@ open class SystemApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/backups/{name}/restore".replace("{"+"name"+"}", encodeURIComponent(name.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /system/speedtest
+     * Measure the server&#39;s internet download and upload speed against Cloudflare&#39;s public speed test (admin only; takes about 20 s). Use the upload result for Remote access&#39;s upload speed.
+     * 
+     * @return SpeedTestResult
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun runSpeedTest() : SpeedTestResult {
+        val localVarResponse = runSpeedTestWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as SpeedTestResult
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /system/speedtest
+     * Measure the server&#39;s internet download and upload speed against Cloudflare&#39;s public speed test (admin only; takes about 20 s). Use the upload result for Remote access&#39;s upload speed.
+     * 
+     * @return ApiResponse<SpeedTestResult?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun runSpeedTestWithHttpInfo() : ApiResponse<SpeedTestResult?> {
+        val localVariableConfig = runSpeedTestRequestConfig()
+
+        return request<Unit, SpeedTestResult>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation runSpeedTest
+     *
+     * @return RequestConfig
+     */
+    fun runSpeedTestRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/system/speedtest",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
