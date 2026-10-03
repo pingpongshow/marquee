@@ -45,6 +45,10 @@ struct LibraryGrid: View {
     @State private var unwatchedOnly = false
     /// Only what this person rated 4 stars or more (favourites).
     @State private var ratedOnly = false
+    @State private var genre: String?
+    @State private var decade: Int?
+    /// This grid's genres and decades (asked for with its type: albums, artists…).
+    @State private var facets: LibraryFilters?
     @State private var showCollections = false
     @State private var error: String?
     /// Each item's place in the grid (for paging) and the duplicate check.
@@ -109,14 +113,18 @@ struct LibraryGrid: View {
                         Text("Random").tag(ItemSort.random)
                     }
                     Toggle(isMusic ? "Unplayed only" : "Unwatched only", isOn: $unwatchedOnly)
-                    if !showCollections { Toggle("Rated 4★+", isOn: $ratedOnly) }
+                    if !showCollections {
+                        Toggle("Rated 4★+", isOn: $ratedOnly)
+                        FacetPickers(facets: facets, genre: $genre, decade: $decade)
+                    }
                 } label: {
                     Label("Sort and filter", systemImage: "line.3.horizontal.decrease.circle")
                 }
                 .accessibilityIdentifier("sortMenu")
             }
         }
-        .task(id: "\(sort)-\(unwatchedOnly)-\(ratedOnly)-\(showCollections)") { await reload() }
+        .task(id: "\(sort)-\(unwatchedOnly)-\(ratedOnly)-\(showCollections)-\(genre ?? "")-\(decade ?? 0)") { await reload() }
+        .task { if facets == nil { facets = try? await app.filters(library: libraryID, type: type) } }
     }
 
     #if os(tvOS)
@@ -143,8 +151,9 @@ struct LibraryGrid: View {
         defer { if gen == generation { loading = false } }
         do {
             let page = try await app.items(library: libraryID, sort: sort, offset: items.count, limit: Self.page,
-                                           watch: unwatchedOnly && !showCollections ? .unwatched : nil, type: showCollections ? .collection : type,
-                                           minMyRating: ratedOnly && !showCollections ? 8 : nil)
+                                           watch: unwatchedOnly && !showCollections ? .unwatched : nil,
+                                           genre: showCollections ? nil : genre, type: showCollections ? .collection : type,
+                                           decade: showCollections ? nil : decade, minMyRating: ratedOnly && !showCollections ? 8 : nil)
             guard gen == generation else { return }
             var fresh: [Item] = []
             for item in page.items where positions[item.id] == nil {

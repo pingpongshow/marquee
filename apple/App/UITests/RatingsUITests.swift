@@ -46,11 +46,15 @@ final class RatingsUITests: XCTestCase {
         return out
     }
 
-    private static func send(_ method: String, _ url: String, token: String?) {
+    private static func send(_ method: String, _ url: String, token: String?, json: String? = nil) {
         guard let token, let u = URL(string: url) else { return }
         var req = URLRequest(url: u)
         req.httpMethod = method
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if let json {
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = Data(json.utf8)
+        }
         let done = DispatchSemaphore(value: 0)
         URLSession.shared.dataTask(with: req) { _, _, _ in done.signal() }.resume()
         _ = done.wait(timeout: .now() + 15)
@@ -214,5 +218,109 @@ final class RatingsUITests: XCTestCase {
         for b in neighbours {
             XCTAssertEqual(more.frame.height, b.frame.height, accuracy: 1, "More \(more.frame) vs \(b.label) \(b.frame)")
         }
+    }
+
+    // MARK: - Community ratings and comments
+
+    private var kidToken: String? {
+        let path = ProcessInfo.processInfo.environment["MARQUEE_TEST_KID_TOKEN_FILE"]
+            ?? "/private/tmp/claude-501/-Users-stephen-Desktop-Media-Server/444e0e4f-966a-4478-8095-b26cddc3cd0c/scratchpad/kid.token"
+        return (try? String(contentsOfFile: path, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Two people rate an album (over the API); Kiddo, signed in on the phone, sees the community
+    /// average and the other's comment, then posts, edits and deletes a comment of their own.
+    func testCommunityRatingsAndComments() throws {
+        guard let kid = kidToken, !kid.isEmpty else { throw XCTSkip("no Kiddo token") }
+        let admin = try XCTUnwrap(adminToken)
+        let libs = try api("GET", "/libraries") as? [[String: Any]] ?? []
+        let music = try XCTUnwrap(libs.first { $0["type"] as? String == "music" && $0["name"] as? String == "Music" }?["id"] as? Int)
+        let albums = (try api("GET", "/libraries/\(music)/items?type=album&limit=100") as? [String: Any])?["items"] as? [[String: Any]] ?? []
+        let album = try XCTUnwrap(albums.first { $0["title"] as? String == "Pulse" }?["id"] as? Int)
+        let adminID = try XCTUnwrap((try api("GET", "/me") as? [String: Any])?["id"] as? Int)
+        let kidID = try XCTUnwrap((try api("GET", "/me", token: kid) as? [String: Any])?["id"] as? Int)
+        let base = "http://\(server)/api/v1/items/\(album)"
+        addTeardownBlock {
+            Self.send("DELETE", "\(base)/reviews/\(adminID)", token: admin)
+            Self.send("DELETE", "\(base)/reviews/\(kidID)", token: admin)
+            // Comments go with the reviews; the ratings are cleared separately.
+            Self.send("PUT", "\(base)/rating", token: admin, json: #"{"rating":null}"#)
+            Self.send("PUT", "\(base)/rating", token: kid, json: #"{"rating":null}"#)
+        }
+        try api("PUT", "/items/\(album)/rating", ["rating": 8], token: admin)
+        try api("PUT", "/items/\(album)/reviews", ["comment": "Admin likes this one"], token: admin)
+        try api("PUT", "/items/\(album)/rating", ["rating": 6], token: kid)
+
+        // Kiddo on the phone.
+        let address = app.textFields["Home address, e.g. 10.1.1.10:32500"]
+        XCTAssertTrue(address.waitForExistence(timeout: 10))
+        address.tap()
+        address.typeText(server)
+        app.buttons["Connect"].tap()
+        let who = app.buttons["Kiddo"].firstMatch
+        XCTAssertTrue(who.waitForExistence(timeout: 15))
+        who.tap()
+        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
+        openLibrary("Music")
+        openMusicRow("albums")
+        let card = app.scrollViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Pulse'")).firstMatch
+        for _ in 0..<4 where !card.waitForExistence(timeout: 2) { app.swipeUp() }
+        card.tap()
+
+        // The page: your rating, and the community's (8 and 6: 3.5 stars from 2).
+        XCTAssertTrue(byID("itemRating").waitForExistence(timeout: 10))
+        let summary = byID("communitySummary")
+        XCTAssertTrue(summary.waitForExistence(timeout: 5))
+        XCTAssertEqual(summary.label, "Community rating 3.5 stars, 2 ratings")
+        shot("cr1-item-community")
+
+        // Ratings & Comments.
+        byID("communityRow").tap()
+        let adminRow = byID("review.\(adminID)")
+        XCTAssertTrue(adminRow.waitForExistence(timeout: 10), "the other person's review is listed")
+        XCTAssertTrue(adminRow.label.contains("Admin likes this one"), adminRow.label)
+        XCTAssertTrue(byID("review.\(kidID)").label.contains("You"), "your own row is tagged You")
+        let field = byID("commentField")
+        field.tap()
+        field.typeText("Great for car rides")
+        byID("postComment").tap()
+        let comment = { () -> String? in
+            let r = (try? self.api("GET", "/items/\(album)/reviews", token: kid)) as? [String: Any]
+            let mine = (r?["reviews"] as? [[String: Any]])?.first { $0["mine"] as? Bool == true }
+            return mine?["comment"] as? String
+        }
+        var c: String?
+        for _ in 0..<10 { c = comment(); if c == "Great for car rides" { break }; sleep(1) }
+        XCTAssertEqual(c, "Great for car rides", "the comment was posted")
+        XCTAssertTrue(byID("review.\(kidID)").label.contains("Great for car rides"))
+        shot("cr2-posted")
+
+        // Edit, then delete.
+        field.tap()
+        field.typeText(" and long walks")
+        byID("postComment").tap()
+        for _ in 0..<10 { c = comment(); if c == "Great for car rides and long walks" { break }; sleep(1) }
+        XCTAssertEqual(c, "Great for car rides and long walks", "the comment was edited")
+        byID("deleteComment").tap()
+        for _ in 0..<10 { c = comment(); if c == nil || c == "" { break }; sleep(1) }
+        XCTAssertTrue(c == nil || c == "", "the comment was deleted")
+        XCTAssertFalse(byID("deleteComment").waitForExistence(timeout: 3))
+
+        // Rating from the sheet updates the average shown on the page.
+        app.buttons["Rate 5 stars"].firstMatch.tap()
+        var kidRating: Double?
+        for _ in 0..<10 {
+            kidRating = (try api("GET", "/items/\(album)", token: kid) as? [String: Any])?["userRating"] as? Double
+            if let r = kidRating, r != 6 { break }
+            sleep(1)
+        }
+        let k = try XCTUnwrap(kidRating, "the sheet's rating reached the server")
+        XCTAssertNotEqual(k, 6)
+        app.buttons["Done"].tap()
+        let want = "Community rating \(((8 + k) / 4).formatted(.number.precision(.fractionLength(1)))) stars, 2 ratings"
+        let deadline = Date().addingTimeInterval(10)
+        while summary.label != want, Date() < deadline { sleep(1) }
+        XCTAssertEqual(summary.label, want)
+        shot("cr3-updated-average")
     }
 }

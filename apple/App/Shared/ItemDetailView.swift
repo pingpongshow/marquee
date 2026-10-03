@@ -81,6 +81,8 @@ struct ItemDetailView: View {
         } message: {
             Text(actionError ?? "")
         }
+        // A rating saved (here or in the comments): the community average changes.
+        .onChange(of: RatingStore.shared.saves[id]) { Task { await refresh() } }
         .onChange(of: video.request) {
             if let r = video.request {
                 playingID = r.itemID
@@ -219,11 +221,10 @@ struct ItemDetailView: View {
                     if !d.info.genres.isEmpty { Text(d.info.genres.joined(separator: ", ")).font(.caption).foregroundStyle(.tertiary) }
                     ratings(d)
                     if [.album, .artist, .track, .movie, .show, .episode].contains(d.type) {
-                        // The person's own rating; tap a star (or half) to change it (MUSIC-11).
-                        RatingStars(itemID: d.id, rating: d.base.userRating, labelPrefix: "Rate ")
-                            .id(d.id)
-                            .font(isTV ? .title3 : .body)
-                            .accessibilityIdentifier("itemRating")
+                        // Your rating (tap a star or half; MUSIC-11) and everyone's, which opens
+                        // the ratings and comments.
+                        ItemRatingsHeader(item: d.base) { await refresh() }
+                            .padding(.top, 4)
                     }
                 }
             }

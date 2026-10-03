@@ -163,7 +163,7 @@ final class MarqueeTVUITests: XCTestCase {
 
         // Open the first poster (below the row title) and play it. A Continue Watching tile
         // plays at once; anything else opens its page first.
-        let before = try activeSessions()
+        let before = try activeSessionIDs()
         let poster = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Preview Test' OR label CONTAINS[c] 'Long Test'")).firstMatch
         if poster.waitForExistence(timeout: 5) { focus(poster) } else { remote.press(.down) }
         remote.press(.select)
@@ -176,23 +176,31 @@ final class MarqueeTVUITests: XCTestCase {
         }
         sleep(6)
         shot("tv-06-playing")
-        XCTAssertGreaterThan(try activeSessions(), before, "nothing started playing")
+        // A new session, not a higher count: another session (an earlier test's, timing out)
+        // can end meanwhile and leave the count where it was.
+        var fresh = try activeSessionIDs().subtracting(before)
+        for _ in 0..<10 where fresh.isEmpty {
+            sleep(1)
+            fresh = try activeSessionIDs().subtracting(before)
+        }
+        XCTAssertFalse(fresh.isEmpty, "nothing started playing")
         remote.press(.menu)
     }
 
     /// How many playback sessions the server has (admin view).
-    private func activeSessions() throws -> Int {
+    private func activeSessionIDs() throws -> Set<String> {
         guard let admin = adminToken else { throw XCTSkip("MARQUEE_TEST_ADMIN_TOKEN not set") }
         var req = URLRequest(url: URL(string: server + "/api/v1/playback/sessions")!)
         req.setValue("Bearer \(admin)", forHTTPHeaderField: "Authorization")
         let done = expectation(description: "sessions")
-        var count = 0
+        var ids = Set<String>()
         URLSession.shared.dataTask(with: req) { data, _, _ in
-            count = ((try? JSONSerialization.jsonObject(with: data ?? Data())) as? [Any])?.count ?? 0
+            let list = ((try? JSONSerialization.jsonObject(with: data ?? Data())) as? [[String: Any]]) ?? []
+            ids = Set(list.compactMap { ($0["id"] ?? $0["sessionId"]).map { "\($0)" } })
             done.fulfill()
         }.resume()
         wait(for: [done], timeout: 10)
-        return count
+        return ids
     }
 
     /// Top Shelf links (marquee://item/<id>) open the item's page.

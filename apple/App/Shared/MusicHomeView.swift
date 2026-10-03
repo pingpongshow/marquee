@@ -305,6 +305,10 @@ struct MusicSongsView: View {
     let libraryID: Int64
     @State private var sort: ItemSort = .title
     @State private var ratedOnly = false
+    @State private var genre: String?
+    @State private var decade: Int?
+    /// The songs' own genres and decades (asked for with type=track).
+    @State private var facets: LibraryFilters?
     @State private var tracks: [Item] = []
     @State private var total = 0
     @State private var loading = false
@@ -340,7 +344,7 @@ struct MusicSongsView: View {
             }
             if loading { ProgressView() }
             if !loading, error == nil, tracks.isEmpty {
-                ContentUnavailableView(ratedOnly ? "No songs rated 4★ or more" : "No songs", systemImage: "music.note")
+                ContentUnavailableView(ratedOnly ? "No songs rated 4★ or more" : genre != nil || decade != nil ? "No songs match" : "No songs", systemImage: "music.note")
             }
         }
         .listStyle(.plain)
@@ -357,13 +361,15 @@ struct MusicSongsView: View {
                         Text("Random").tag(ItemSort.random)
                     }
                     Toggle("Rated 4★+", isOn: $ratedOnly)
+                    FacetPickers(facets: facets, genre: $genre, decade: $decade)
                 } label: {
                     Label("Sort", systemImage: "arrow.up.arrow.down")
                 }
                 .accessibilityIdentifier("sortMenu")
             }
         }
-        .task(id: "\(sort)-\(ratedOnly)") {
+        .task { if facets == nil { facets = try? await app.filters(library: libraryID, type: .track) } }
+        .task(id: "\(sort)-\(ratedOnly)-\(genre ?? "")-\(decade ?? 0)") {
             generation += 1
             tracks = []
             total = 0
@@ -378,8 +384,8 @@ struct MusicSongsView: View {
         loading = true
         defer { if gen == generation { loading = false } }
         do {
-            let page = try await app.items(library: libraryID, sort: sort, offset: tracks.count, limit: Self.page, type: .track,
-                                           minMyRating: ratedOnly ? 8 : nil)
+            let page = try await app.items(library: libraryID, sort: sort, offset: tracks.count, limit: Self.page, genre: genre, type: .track,
+                                           decade: decade, minMyRating: ratedOnly ? 8 : nil)
             guard gen == generation else { return }
             let have = Set(tracks.map(\.id))
             tracks += page.items.filter { !have.contains($0.id) }
@@ -573,7 +579,12 @@ struct MusicFavoritesView: View {
                         tracks(list)
                     } else {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: minWidth), spacing: 14, alignment: .top)], spacing: 14) {
-                            ForEach(list, id: \.id) { PosterCard(item: $0, width: minWidth) }
+                            ForEach(list, id: \.id) { a in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    PosterCard(item: a, width: minWidth)
+                                    CommunityBadge(rating: a.communityRating) // everyone's average
+                                }
+                            }
                         }
                         .padding(.horizontal, sidePadding)
                     }
@@ -609,6 +620,7 @@ struct MusicFavoritesView: View {
                                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             }
                             Spacer()
+                            CommunityBadge(rating: t.communityRating)
                         }
                         .padding(.leading, sidePadding)
                         .padding(.vertical, 6)
@@ -642,4 +654,32 @@ struct MusicFavoritesView: View {
     #else
     private let minWidth: CGFloat = 110
     #endif
+}
+
+/// Genre and decade choices from a library's filters (for the type being listed).
+struct FacetPickers: View {
+    let facets: LibraryFilters?
+    @Binding var genre: String?
+    @Binding var decade: Int?
+
+    var body: some View {
+        if let g = facets?.genres, !g.isEmpty {
+            Picker("Genre", selection: $genre) {
+                Text("Any genre").tag(String?.none)
+                ForEach(g.sorted { $0.value.localizedCaseInsensitiveCompare($1.value) == .orderedAscending }, id: \.value) {
+                    Text("\($0.value) (\($0.count))").tag(String?.some($0.value))
+                }
+            }
+            .pickerStyle(.menu)
+        }
+        if let d = facets?.decades, !d.isEmpty {
+            Picker("Decade", selection: $decade) {
+                Text("Any decade").tag(Int?.none)
+                ForEach(d.sorted { $0.value > $1.value }, id: \.value) { f in
+                    if let y = Int(f.value) { Text("\(f.value)s (\(f.count))").tag(Int?.some(y)) }
+                }
+            }
+            .pickerStyle(.menu)
+        }
+    }
 }

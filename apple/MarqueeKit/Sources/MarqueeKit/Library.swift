@@ -11,6 +11,9 @@ public typealias PlaybackSession = Components.Schemas.PlaybackSession
 public typealias Marker = Components.Schemas.Marker
 public typealias LibraryFilters = Components.Schemas.LibraryFilters
 public typealias ItemSort = Components.Parameters.Sort
+public typealias Review = Components.Schemas.Review
+public typealias ItemReviews = Components.Schemas.ItemReviews
+public typealias CommunityRating = Components.Schemas.CommunityRating
 
 /// Data access used by the app screens.
 @MainActor
@@ -81,6 +84,29 @@ public extension AppSession {
 
     func playlists(kind: Schemas.PlaylistKind? = nil) async throws -> [Playlist] {
         try await api.listPlaylists(query: .init(kind: kind)).ok.body.json
+    }
+
+    /// Everyone's ratings and comments on an item, with the average.
+    func reviews(_ id: Int64) async throws -> ItemReviews {
+        try await api.itemReviews(path: .init(itemId: id)).ok.body.json
+    }
+
+    /// Sets your comment on an item (up to 2000 characters); an empty one removes it.
+    func setComment(_ id: Int64, _ comment: String) async throws {
+        switch try await api.setReview(path: .init(itemId: id), body: .json(.init(comment: comment))) {
+        case .noContent: return
+        case let .badRequest(r): throw MarqueeError((try? r.body.json.message) ?? "That comment can't be saved.")
+        default: throw MarqueeError("Couldn't save the comment.")
+        }
+    }
+
+    /// Removes a person's comment and rating (your own, or anyone's for an administrator).
+    func deleteReview(_ id: Int64, userID: Int64) async throws {
+        switch try await api.deleteReview(path: .init(itemId: id, userId: userID)) {
+        case .noContent: return
+        case .forbidden: throw MarqueeError("Only an administrator can remove someone else's comment.")
+        default: throw MarqueeError("Couldn't delete the comment.")
+        }
     }
 
     func playlist(_ id: Int64) async throws -> Playlist {

@@ -174,6 +174,8 @@ final class RatingStore {
     static let shared = RatingStore()
     /// 0 = cleared.
     private var overrides: [Int64: Double] = [:]
+    /// Bumped per item each time a rating reaches the server (community averages reload then).
+    private(set) var saves: [Int64: Int] = [:]
 
     /// The rating to show: this session's change, or the one the server sent.
     func rating(_ id: Int64, _ fallback: Double?) -> Double? {
@@ -188,7 +190,10 @@ final class RatingStore {
     func rate(_ id: Int64, _ rating: Double?, was old: Double?, app: AppSession) {
         set(id, rating)
         Task {
-            do { try await app.rate(id, rating) } catch {
+            do {
+                try await app.rate(id, rating)
+                saves[id, default: 0] += 1
+            } catch {
                 set(id, old)
                 ActionError.shared.message = "Couldn't save the rating: \(error.localizedDescription)"
             }
@@ -243,6 +248,20 @@ struct RowRating: View {
         let full = Int(r) / 2, half = Int(r) % 2 == 1
         let n = full == 0 ? "½" : half ? "\(full)½" : "\(full)"
         return "\(n) star\(full == 1 && !half ? "" : "s")"
+    }
+}
+
+/// Everyone's average as "★ 4.2 (7)", or nothing when nobody has rated it.
+struct CommunityBadge: View {
+    let rating: CommunityRating?
+
+    var body: some View {
+        if let r = rating, r.count > 0 {
+            Text("★ \((r.average / 2).formatted(.number.precision(.fractionLength(1)))) (\(r.count))")
+                .font(.caption2.monospacedDigit()).foregroundStyle(.secondary).lineLimit(1).fixedSize()
+                .accessibilityLabel("Community rating \((r.average / 2).formatted(.number.precision(.fractionLength(1)))) stars from \(r.count) \(r.count == 1 ? "rating" : "ratings")")
+                .accessibilityIdentifier("communityBadge")
+        }
     }
 }
 
