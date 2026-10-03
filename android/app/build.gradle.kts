@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -13,16 +15,32 @@ android {
         applicationId = "app.marquee"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.19.0"
+        versionCode = 36
+        versionName = "0.36.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // Release signing: a keystore.properties outside the repo (MARQUEE_KEYSTORE_PROPERTIES, else
+    // ~/.marquee-release/keystore.properties) with storeFile, storePassword, keyAlias, keyPassword.
+    // Without one, release builds use the debug key.
+    val keystoreProps = file(System.getenv("MARQUEE_KEYSTORE_PROPERTIES") ?: "${System.getProperty("user.home")}/.marquee-release/keystore.properties")
+    signingConfigs {
+        if (keystoreProps.exists()) {
+            val p = Properties().apply { keystoreProps.inputStream().use { load(it) } }
+            create("release") {
+                storeFile = file(p.getProperty("storeFile"))
+                storePassword = p.getProperty("storePassword")
+                keyAlias = p.getProperty("keyAlias")
+                keyPassword = p.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug") // until there is a release key
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     compileOptions {

@@ -18,6 +18,7 @@ import (
 	"marquee/internal/livetv"
 	"marquee/internal/logbuf"
 	"marquee/internal/lyrics"
+	"marquee/internal/mediatrash"
 	"marquee/internal/metadata"
 	"marquee/internal/netclass"
 	"marquee/internal/playback"
@@ -26,7 +27,7 @@ import (
 	"marquee/internal/requests"
 	"marquee/internal/scrobble"
 	"marquee/internal/settings"
-	"marquee/internal/sonic"
+	"marquee/internal/soundprint"
 	"marquee/internal/subtitles"
 	"marquee/internal/syncplay"
 	"marquee/internal/tasks"
@@ -56,7 +57,7 @@ type Handlers struct {
 	Subtitles        *subtitles.Service
 	Downloads        *downloads.Service
 	QuickConnect     auth.QuickConnect
-	Sonic            *sonic.Service
+	Soundprint       *soundprint.Service
 	Lyrics           *lyrics.Service
 	Backups          *tasks.Backups
 	Requests         *requests.Service
@@ -70,13 +71,15 @@ type Handlers struct {
 	// Remote is remote control (USER-14).
 	Remote *remote.Hub
 	// Embeddings indexes movies and shows for Muse for movies, recommendations and related
-	// items (USER-15, USER-16); nil without the sonic sidecar.
+	// items (USER-15, USER-16); nil without the Soundprint sidecar.
 	Embeddings *items.Embedder
 	// Bazarr finds subtitles for movies and episodes (META-12); not set up when its
 	// address or key is empty.
 	Bazarr *bazarr.Service
 	// Health runs the library health checks (ADM-11); made on demand when nil.
 	Health *health.Service
+	// Trash deletes media files to the library's trash (ADM-11); made on demand when nil.
+	Trash *mediatrash.Service
 }
 
 var _ StrictServerInterface = (*Handlers)(nil)

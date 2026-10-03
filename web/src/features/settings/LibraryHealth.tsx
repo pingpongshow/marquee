@@ -10,6 +10,7 @@ import { toast } from "@/components/Toast";
 import { FixMatchDialog } from "../browse/ItemActions";
 import { Poster } from "../browse/Poster";
 import { BazarrDialog } from "../player/Bazarr";
+import { DuplicateCompare } from "./DuplicateCompare";
 
 const PAGE = 50;
 
@@ -198,6 +199,7 @@ function IssueRow({
   const it = issue.item;
   const matchable = it.type === "movie" || it.type === "show";
   const square = it.type === "album" || it.type === "artist" || it.type === "track";
+  const compare = checkId === "duplicates" && !!issue.files?.length;
   return (
     <li className="flex gap-4 p-3" data-testid={`issue-${it.id}`}>
       <div className={clsx("shrink-0", square ? "w-14" : "w-12")}>
@@ -207,7 +209,7 @@ function IssueRow({
         <div className="truncate font-medium">{it.title}</div>
         <div className="truncate text-xs text-faint">{issueSubtitle(it)}</div>
         <div className="text-sm text-text/90">{issue.detail}</div>
-        {issue.path && (
+        {issue.path && !compare && (
           <div className="truncate font-mono text-[11px] text-faint" title={issue.path}>
             {issue.path}
           </div>
@@ -226,6 +228,7 @@ function IssueRow({
             ))}
           </div>
         )}
+        {compare && <DuplicateCompare files={issue.files!} />}
         <div className="flex flex-wrap gap-1 pt-1.5">
           <Link to="/item/$itemId" params={{ itemId: String(it.id) }} className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted hover:bg-surface-2 hover:text-text">
             <ExternalLink className="size-4" /> Open

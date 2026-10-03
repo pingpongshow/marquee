@@ -171,7 +171,7 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /invitations/{token}/accept`.
     /// - Remark: Generated from `#/paths//invitations/{token}/accept/post(acceptInvitation)`.
     func acceptInvitation(_ input: Operations.AcceptInvitation.Input) async throws -> Operations.AcceptInvitation.Output
-    /// Profiles that can be switched to from this device (Plex Home equivalent).
+    /// Profiles that can be switched to from this device.
     ///
     /// - Remark: HTTP `GET /profiles`.
     /// - Remark: Generated from `#/paths//profiles/get(listProfiles)`.
@@ -500,6 +500,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /library-health/{checkId}/ignored/{itemId}`.
     /// - Remark: Generated from `#/paths//library-health/{checkId}/ignored/{itemId}/delete(unignoreHealthIssue)`.
     func unignoreHealthIssue(_ input: Operations.UnignoreHealthIssue.Input) async throws -> Operations.UnignoreHealthIssue.Output
+    /// Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
+    ///
+    /// The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item's last file the item goes too, along with a season or show left empty.
+    ///
+    /// - Remark: HTTP `DELETE /files/{fileId}`.
+    /// - Remark: Generated from `#/paths//files/{fileId}/delete(deleteMediaFile)`.
+    func deleteMediaFile(_ input: Operations.DeleteMediaFile.Input) async throws -> Operations.DeleteMediaFile.Output
     /// The person's Home rows, every available row included, in order (USER-12).
     ///
     /// - Remark: HTTP `GET /me/home-layout`.
@@ -854,16 +861,16 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /system/restart`.
     /// - Remark: Generated from `#/paths//system/restart/post(restartServer)`.
     func restartServer(_ input: Operations.RestartServer.Input) async throws -> Operations.RestartServer.Output
-    /// Sonic analysis progress and whether the analysis service is running.
+    /// Soundprint analysis progress and whether the analysis service is running.
     ///
     /// - Remark: HTTP `GET /music/status`.
     /// - Remark: Generated from `#/paths//music/status/get(musicStatus)`.
     func musicStatus(_ input: Operations.MusicStatus.Input) async throws -> Operations.MusicStatus.Output
-    /// Tracks, albums or artists (matching the item's type) that sound like it (MUSIC-2).
+    /// Sounds like this (MUSIC-2) — tracks, albums or artists (matching the item's type) that sound like it.
     ///
-    /// - Remark: HTTP `GET /items/{itemId}/sonic-similar`.
-    /// - Remark: Generated from `#/paths//items/{itemId}/sonic-similar/get(sonicSimilar)`.
-    func sonicSimilar(_ input: Operations.SonicSimilar.Input) async throws -> Operations.SonicSimilar.Output
+    /// - Remark: HTTP `GET /items/{itemId}/sounds-like`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/sounds-like/get(soundsLike)`.
+    func soundsLike(_ input: Operations.SoundsLike.Input) async throws -> Operations.SoundsLike.Output
     /// A station (MUSIC-3) from a track, album or artist, a genre, a decade, a mood, your favourites or the whole library. Ask again with exclude to continue it.
     ///
     /// - Remark: HTTP `POST /music/radio`.
@@ -874,14 +881,14 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /music/muse`.
     /// - Remark: Generated from `#/paths//music/muse/post(musicMuse)`.
     func musicMuse(_ input: Operations.MusicMuse.Input) async throws -> Operations.MusicMuse.Output
-    /// Sonic Adventure (MUSIC-4) — a path from one track to another through tracks that sound in between.
+    /// Sound Journey (MUSIC-4) — a path from one track to another through tracks that sound in between.
     ///
-    /// - Remark: HTTP `POST /music/adventure`.
-    /// - Remark: Generated from `#/paths//music/adventure/post(musicAdventure)`.
-    func musicAdventure(_ input: Operations.MusicAdventure.Input) async throws -> Operations.MusicAdventure.Output
-    /// Guest DJ (MUSIC-6) — one track to weave in after the one playing.
+    /// - Remark: HTTP `POST /music/journey`.
+    /// - Remark: Generated from `#/paths//music/journey/post(musicJourney)`.
+    func musicJourney(_ input: Operations.MusicJourney.Input) async throws -> Operations.MusicJourney.Output
+    /// DJ (MUSIC-6) — one track to weave in after the one playing.
     ///
-    /// stretch: sounds like it, by another artist. groupie: the artist's other albums. deep_cuts: the artist's least-played tracks. contempo: a similar sound from the same era.
+    /// wander: sounds like it, by another artist. superfan: the artist's other albums. deep_cuts: the artist's least-played tracks. same_era: a similar sound from the same years.
     ///
     /// - Remark: HTTP `POST /music/dj`.
     /// - Remark: Generated from `#/paths//music/dj/post(musicDJ)`.
@@ -1272,7 +1279,7 @@ extension APIProtocol {
             body: body
         ))
     }
-    /// Profiles that can be switched to from this device (Plex Home equivalent).
+    /// Profiles that can be switched to from this device.
     ///
     /// - Remark: HTTP `GET /profiles`.
     /// - Remark: Generated from `#/paths//profiles/get(listProfiles)`.
@@ -2103,6 +2110,21 @@ extension APIProtocol {
         headers: Operations.UnignoreHealthIssue.Input.Headers = .init()
     ) async throws -> Operations.UnignoreHealthIssue.Output {
         try await unignoreHealthIssue(Operations.UnignoreHealthIssue.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
+    ///
+    /// The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item's last file the item goes too, along with a season or show left empty.
+    ///
+    /// - Remark: HTTP `DELETE /files/{fileId}`.
+    /// - Remark: Generated from `#/paths//files/{fileId}/delete(deleteMediaFile)`.
+    public func deleteMediaFile(
+        path: Operations.DeleteMediaFile.Input.Path,
+        headers: Operations.DeleteMediaFile.Input.Headers = .init()
+    ) async throws -> Operations.DeleteMediaFile.Output {
+        try await deleteMediaFile(Operations.DeleteMediaFile.Input(
             path: path,
             headers: headers
         ))
@@ -2963,23 +2985,23 @@ extension APIProtocol {
     public func restartServer(headers: Operations.RestartServer.Input.Headers = .init()) async throws -> Operations.RestartServer.Output {
         try await restartServer(Operations.RestartServer.Input(headers: headers))
     }
-    /// Sonic analysis progress and whether the analysis service is running.
+    /// Soundprint analysis progress and whether the analysis service is running.
     ///
     /// - Remark: HTTP `GET /music/status`.
     /// - Remark: Generated from `#/paths//music/status/get(musicStatus)`.
     public func musicStatus(headers: Operations.MusicStatus.Input.Headers = .init()) async throws -> Operations.MusicStatus.Output {
         try await musicStatus(Operations.MusicStatus.Input(headers: headers))
     }
-    /// Tracks, albums or artists (matching the item's type) that sound like it (MUSIC-2).
+    /// Sounds like this (MUSIC-2) — tracks, albums or artists (matching the item's type) that sound like it.
     ///
-    /// - Remark: HTTP `GET /items/{itemId}/sonic-similar`.
-    /// - Remark: Generated from `#/paths//items/{itemId}/sonic-similar/get(sonicSimilar)`.
-    public func sonicSimilar(
-        path: Operations.SonicSimilar.Input.Path,
-        query: Operations.SonicSimilar.Input.Query = .init(),
-        headers: Operations.SonicSimilar.Input.Headers = .init()
-    ) async throws -> Operations.SonicSimilar.Output {
-        try await sonicSimilar(Operations.SonicSimilar.Input(
+    /// - Remark: HTTP `GET /items/{itemId}/sounds-like`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/sounds-like/get(soundsLike)`.
+    public func soundsLike(
+        path: Operations.SoundsLike.Input.Path,
+        query: Operations.SoundsLike.Input.Query = .init(),
+        headers: Operations.SoundsLike.Input.Headers = .init()
+    ) async throws -> Operations.SoundsLike.Output {
+        try await soundsLike(Operations.SoundsLike.Input(
             path: path,
             query: query,
             headers: headers
@@ -3011,22 +3033,22 @@ extension APIProtocol {
             body: body
         ))
     }
-    /// Sonic Adventure (MUSIC-4) — a path from one track to another through tracks that sound in between.
+    /// Sound Journey (MUSIC-4) — a path from one track to another through tracks that sound in between.
     ///
-    /// - Remark: HTTP `POST /music/adventure`.
-    /// - Remark: Generated from `#/paths//music/adventure/post(musicAdventure)`.
-    public func musicAdventure(
-        headers: Operations.MusicAdventure.Input.Headers = .init(),
-        body: Operations.MusicAdventure.Input.Body
-    ) async throws -> Operations.MusicAdventure.Output {
-        try await musicAdventure(Operations.MusicAdventure.Input(
+    /// - Remark: HTTP `POST /music/journey`.
+    /// - Remark: Generated from `#/paths//music/journey/post(musicJourney)`.
+    public func musicJourney(
+        headers: Operations.MusicJourney.Input.Headers = .init(),
+        body: Operations.MusicJourney.Input.Body
+    ) async throws -> Operations.MusicJourney.Output {
+        try await musicJourney(Operations.MusicJourney.Input(
             headers: headers,
             body: body
         ))
     }
-    /// Guest DJ (MUSIC-6) — one track to weave in after the one playing.
+    /// DJ (MUSIC-6) — one track to weave in after the one playing.
     ///
-    /// stretch: sounds like it, by another artist. groupie: the artist's other albums. deep_cuts: the artist's least-played tracks. contempo: a similar sound from the same era.
+    /// wander: sounds like it, by another artist. superfan: the artist's other albums. deep_cuts: the artist's least-played tracks. same_era: a similar sound from the same years.
     ///
     /// - Remark: HTTP `POST /music/dj`.
     /// - Remark: Generated from `#/paths//music/dj/post(musicDJ)`.

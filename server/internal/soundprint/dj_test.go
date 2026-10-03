@@ -1,4 +1,4 @@
-package sonic
+package soundprint
 
 import (
 	"math/rand/v2"
@@ -21,20 +21,20 @@ func TestDJPick(t *testing.T) {
 	o := Options{Rand: rand.New(rand.NewPCG(1, 1))}
 	plays := func(ids []int64) map[int64]int { return map[int64]int{2: 9, 3: 0} }
 
-	if p := x.DJPick(now, DJGroupie, o, plays); p == nil || p.ItemID != 3 {
-		t.Errorf("groupie picked %+v, want track 3", p)
+	if p := x.DJPick(now, DJSuperfan, o, plays); p == nil || p.ItemID != 3 {
+		t.Errorf("superfan picked %+v, want track 3", p)
 	}
-	if p := x.DJPick(now, DJStretch, o, plays); p == nil || p.ArtistID == 10 {
-		t.Errorf("stretch picked %+v, want another artist", p)
+	if p := x.DJPick(now, DJWander, o, plays); p == nil || p.ArtistID == 10 {
+		t.Errorf("wander picked %+v, want another artist", p)
 	}
-	if p := x.DJPick(now, DJContempo, o, plays); p == nil || p.ItemID != 4 {
-		t.Errorf("contempo picked %+v, want track 4 (same era)", p)
+	if p := x.DJPick(now, DJSameEra, o, plays); p == nil || p.ItemID != 4 {
+		t.Errorf("same_era picked %+v, want track 4 (same era)", p)
 	}
 	if p := x.DJPick(now, DJDeepCuts, o, plays); p == nil || p.ItemID != 3 {
 		t.Errorf("deep cuts picked %+v, want the unplayed track 3", p)
 	}
 	o.Exclude = map[int64]bool{3: true}
-	if p := x.DJPick(now, DJGroupie, o, plays); p != nil {
-		t.Errorf("groupie should find nothing once track 3 is queued, got %+v", p)
+	if p := x.DJPick(now, DJSuperfan, o, plays); p != nil {
+		t.Errorf("superfan should find nothing once track 3 is queued, got %+v", p)
 	}
 }

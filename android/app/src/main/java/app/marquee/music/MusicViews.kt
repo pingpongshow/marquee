@@ -1,5 +1,13 @@
 package app.marquee.music
 
+import androidx.compose.ui.text.style.TextOverflow
+
+import androidx.compose.material3.TextButton
+
+import androidx.compose.material3.OutlinedButton
+
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.key
@@ -99,7 +107,7 @@ val museSuggestions = listOf("Rainy Sunday jazz", "Late-night drive synthwave", 
 
 /** Muse, stations and daily mixes at the top of a music library (M6.5). */
 @Composable
-fun MusicDiscover(libraryId: Long, onBrowse: (kind: String, name: String) -> Unit = { _, _ -> }) {
+fun MusicDiscover(libraryId: Long, onOpenPlaylist: ((Long) -> Unit)? = null, onBrowse: (kind: String, name: String) -> Unit = { _, _ -> }) {
     val marquee = LocalMarquee.current
     val music = LocalMusic.current
     val scope = rememberCoroutineScope()
@@ -122,6 +130,10 @@ fun MusicDiscover(libraryId: Long, onBrowse: (kind: String, name: String) -> Uni
     var prompt by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    // The last Muse mix started here, to save as a playlist; then the saved playlist.
+    var mix by remember { mutableStateOf<Station?>(null) }
+    var savingMix by remember { mutableStateOf(false) }
+    var savedMix by remember { mutableStateOf<app.marquee.api.models.Playlist?>(null) }
     val d = data ?: return
     val st = d.status ?: return
     if (!st.enabled) return
@@ -142,6 +154,8 @@ fun MusicDiscover(libraryId: Long, onBrowse: (kind: String, name: String) -> Uni
             val station = withContext(Dispatchers.IO) { marquee.music.musicMuse(MusicMuseRequest(p, 40, libraryId)) }
             if (station.items.isEmpty()) throw IllegalStateException("Muse found nothing for that.")
             music.playStation(station)
+            mix = station
+            savedMix = null
         }
     }
     fun radio(req: RadioRequest) = run { music.startRadio(req) }
@@ -150,7 +164,7 @@ fun MusicDiscover(libraryId: Long, onBrowse: (kind: String, name: String) -> Uni
         if (st.analyzed < st.total) {
             Text(
                 if (st.available) "Listening to your music: ${st.analyzed} of ${st.total} tracks analysed. Radios and mixes improve as it goes."
-                else "The sonic analysis service isn't running, so radios and Muse are unavailable.",
+                else "The Soundprint analysis service isn't running, so radios and Muse are unavailable.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -173,6 +187,17 @@ fun MusicDiscover(libraryId: Long, onBrowse: (kind: String, name: String) -> Uni
                 }
             }
             ChipRow(museSuggestions.map { s -> Chip(s, null) { prompt = s; muse(s) } })
+            mix?.let { m ->
+                val sv = savedMix
+                if (sv == null) OutlinedButton({ savingMix = true }, Modifier.focusRing()) {
+                    Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null)
+                    Text("Save “${m.title}” as playlist", Modifier.padding(start = 6.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                } else TextButton({ onOpenPlaylist?.invoke(sv.id) }, Modifier.focusRing(), enabled = onOpenPlaylist != null) { Text("Saved · Open “${sv.title}”") }
+                if (savingMix) SaveAsPlaylistDialog(defaultPlaylistTitle(m.title), m.items.map { it.id }) { pl ->
+                    savingMix = false
+                    if (pl != null) savedMix = pl
+                }
+            }
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -316,7 +341,7 @@ fun LyricsPanel(trackId: Long, positionMs: Long, onSeek: (Long) -> Unit, modifie
 
 private val sleepMinutes = listOf(15, 30, 45, 60, 90)
 
-/** Sleep timer and Guest DJ choices for Now Playing. */
+/** Sleep timer and DJ choices for Now Playing. */
 @Composable
 fun SleepButton() {
     val music = LocalMusic.current
@@ -343,10 +368,10 @@ fun DJButton() {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton({ open = true }, Modifier.focusRing()) {
-            Icon(Icons.Filled.RecordVoiceOver, dj?.label ?: "Guest DJ", tint = if (dj == null) MaterialTheme.colorScheme.onSurfaceVariant else Gold)
+            Icon(Icons.Filled.RecordVoiceOver, dj?.label ?: "DJ", tint = if (dj == null) MaterialTheme.colorScheme.onSurfaceVariant else Gold)
         }
         DropdownMenu(open, { open = false }) {
-            DropdownMenuItem({ Text("Guest DJ off") }, { music.setDJ(null); open = false })
+            DropdownMenuItem({ Text("DJ off") }, { music.setDJ(null); open = false })
             MusicController.DJ.entries.forEach { d ->
                 DropdownMenuItem(
                     { Column { Text(d.label, fontWeight = if (d == dj) FontWeight.Bold else FontWeight.Normal); Text(d.blurb, style = MaterialTheme.typography.bodySmall) } },

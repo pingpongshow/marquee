@@ -1,6 +1,6 @@
 // Package trickplay makes seek-bar preview thumbnails (PLAY-13). Every video gets one
 // small frame per Interval, packed into JPEG sprite sheets of Columns×Rows tiles, the
-// way Jellyfin and Plex do it. Only keyframes are decoded, which makes generation fast
+// a common layout for seek previews. Only keyframes are decoded, which makes generation fast
 // enough to run over a whole library in the maintenance window.
 package trickplay
 

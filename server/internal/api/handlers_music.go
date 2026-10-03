@@ -9,12 +9,12 @@ import (
 
 	"marquee/internal/items"
 	"marquee/internal/lyrics"
-	"marquee/internal/sonic"
+	"marquee/internal/soundprint"
 )
 
-// keepFor limits sonic results to libraries the user can see (and optionally one library).
-func keepFor(acc items.Access, libraryID *int64) sonic.Filter {
-	return func(t *sonic.Track) bool {
+// keepFor limits Soundprint results to libraries the user can see (and optionally one library).
+func keepFor(acc items.Access, libraryID *int64) soundprint.Filter {
+	return func(t *soundprint.Track) bool {
 		if libraryID != nil && t.LibraryID != *libraryID {
 			return false
 		}
@@ -22,7 +22,7 @@ func keepFor(acc items.Access, libraryID *int64) sonic.Filter {
 	}
 }
 
-func (h *Handlers) station(ctx context.Context, st sonic.Station) (Station, error) {
+func (h *Handlers) station(ctx context.Context, st soundprint.Station) (Station, error) {
 	list, err := h.Items.ByIDs(ctx, access(ctx), st.IDs)
 	if err != nil {
 		return Station{}, err
@@ -30,12 +30,12 @@ func (h *Handlers) station(ctx context.Context, st sonic.Station) (Station, erro
 	return Station{Title: st.Title, Items: summaries(list)}, nil
 }
 
-func sonicErr(err error) (code string, msg string, status int) {
+func soundprintErr(err error) (code string, msg string, status int) {
 	switch {
-	case errors.Is(err, sonic.ErrUnavailable):
-		return "sonic_unavailable", "Sonic analysis isn't running on the server.", 503
-	case errors.Is(err, sonic.ErrNotAnalyzed):
-		return "not_analyzed", "This music hasn't been sonically analysed yet.", 409
+	case errors.Is(err, soundprint.ErrUnavailable):
+		return "soundprint_unavailable", "Soundprint analysis isn't running on the server.", 503
+	case errors.Is(err, soundprint.ErrNotAnalyzed):
+		return "not_analyzed", "This music hasn't had its Soundprint analysis yet.", 409
 	}
 	return "", "", 0
 }
@@ -44,20 +44,20 @@ func (h *Handlers) MusicStatus(ctx context.Context, _ MusicStatusRequestObject) 
 	if _, ok := session(ctx); !ok {
 		return MusicStatus401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	st := h.Sonic.Status(ctx)
+	st := h.Soundprint.Status(ctx)
 	return MusicStatus200JSONResponse{Enabled: st.Enabled, Available: st.Available, Running: st.Running, Model: nz(st.Model),
 		Device: nz(st.Device), Analyzed: st.Analyzed, Total: st.Total, Failed: nz(st.Failed), Progress: nz(st.Progress), RunTotal: nz(st.RunTotal)}, nil
 }
 
-func (h *Handlers) SonicSimilar(ctx context.Context, req SonicSimilarRequestObject) (SonicSimilarResponseObject, error) {
+func (h *Handlers) SoundsLike(ctx context.Context, req SoundsLikeRequestObject) (SoundsLikeResponseObject, error) {
 	s, ok := session(ctx)
 	if !ok {
-		return SonicSimilar401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+		return SoundsLike401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	acc := access(ctx)
 	d, err := h.Items.Get(ctx, acc, req.ItemId, false)
 	if errors.Is(err, items.ErrNotFound) {
-		return SonicSimilar404JSONResponse{NotFoundJSONResponse(apiErr("not_found", err.Error()))}, nil
+		return SoundsLike404JSONResponse{NotFoundJSONResponse(apiErr("not_found", err.Error()))}, nil
 	} else if err != nil {
 		return nil, internal(ctx, "similar", err)
 	}
@@ -67,29 +67,29 @@ func (h *Handlers) SonicSimilar(ctx context.Context, req SonicSimilarRequestObje
 	var ids []int64
 	switch d.Type {
 	case "track":
-		t := h.Sonic.Index.Get(d.ID)
+		t := h.Soundprint.Index.Get(d.ID)
 		if t == nil {
-			return SonicSimilar409JSONResponse{ConflictJSONResponse(apiErr("not_analyzed", sonic.ErrNotAnalyzed.Error()))}, nil
+			return SoundsLike409JSONResponse{ConflictJSONResponse(apiErr("not_analyzed", soundprint.ErrNotAnalyzed.Error()))}, nil
 		}
-		ids = sonic.TrackIDs(h.Sonic.Index.Similar(t, limit, keep))
+		ids = soundprint.TrackIDs(h.Soundprint.Index.Similar(t, limit, keep))
 	case "album", "artist":
-		col := map[string]func(*sonic.Track) int64{"album": func(t *sonic.Track) int64 { return t.AlbumID }, "artist": func(t *sonic.Track) int64 { return t.ArtistID }}[d.Type]
-		members := h.Sonic.Index.Where(func(t *sonic.Track) bool { return col(t) == d.ID })
+		col := map[string]func(*soundprint.Track) int64{"album": func(t *soundprint.Track) int64 { return t.AlbumID }, "artist": func(t *soundprint.Track) int64 { return t.ArtistID }}[d.Type]
+		members := h.Soundprint.Index.Where(func(t *soundprint.Track) bool { return col(t) == d.ID })
 		if len(members) == 0 {
-			return SonicSimilar409JSONResponse{ConflictJSONResponse(apiErr("not_analyzed", sonic.ErrNotAnalyzed.Error()))}, nil
+			return SoundsLike409JSONResponse{ConflictJSONResponse(apiErr("not_analyzed", soundprint.ErrNotAnalyzed.Error()))}, nil
 		}
-		for _, g := range h.Sonic.Index.SimilarGroups(sonic.Mean(members), d.Type == "album", d.ID, limit, keep) {
+		for _, g := range h.Soundprint.Index.SimilarGroups(soundprint.Mean(members), d.Type == "album", d.ID, limit, keep) {
 			ids = append(ids, g.ID)
 		}
 	default:
-		return SonicSimilar200JSONResponse{}, nil
+		return SoundsLike200JSONResponse{}, nil
 	}
 	_ = s
 	list, err := h.Items.ByIDs(ctx, acc, ids)
 	if err != nil {
 		return nil, internal(ctx, "similar", err)
 	}
-	return SonicSimilar200JSONResponse(summaries(list)), nil
+	return SoundsLike200JSONResponse(summaries(list)), nil
 }
 
 func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) (MusicRadioResponseObject, error) {
@@ -99,7 +99,7 @@ func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) 
 	}
 	b := req.Body
 	acc := access(ctx)
-	o := sonic.Options{Length: 50, Keep: keepFor(acc, b.LibraryId), Avoid: h.Sonic.Avoid(ctx, s.User.ID), Exclude: map[int64]bool{}}
+	o := soundprint.Options{Length: 50, Keep: keepFor(acc, b.LibraryId), Avoid: h.Soundprint.Avoid(ctx, s.User.ID), Exclude: map[int64]bool{}}
 	set(&o.Length, b.Limit)
 	if b.Exclude != nil {
 		for _, id := range *b.Exclude {
@@ -111,7 +111,7 @@ func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) 
 	}
 	value := ""
 	set(&value, b.Value)
-	var st sonic.Station
+	var st soundprint.Station
 	var err error
 	switch b.Seed {
 	case RadioRequestSeedItem:
@@ -122,61 +122,61 @@ func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) 
 		if gerr != nil {
 			return MusicRadio400JSONResponse{BadRequestJSONResponse(apiErr("not_found", "item not found"))}, nil
 		}
-		st, err = h.Sonic.RadioFromItem(ctx, d.ID, d.Title, o)
+		st, err = h.Soundprint.RadioFromItem(ctx, d.ID, d.Title, o)
 	case RadioRequestSeedGenre:
 		ids, gerr := h.Items.TrackIDsByGenre(ctx, acc, value)
 		if gerr != nil {
 			return nil, internal(ctx, "radio", gerr)
 		}
-		v := h.Sonic.MeanOf(ids)
+		v := h.Soundprint.MeanOf(ids)
 		if v == nil {
 			return MusicRadio409JSONResponse{ConflictJSONResponse(apiErr("not_analyzed", "no analysed tracks in "+value))}, nil
 		}
-		st = h.Sonic.RadioFromVector(v, value+" Radio", o)
+		st = h.Soundprint.RadioFromVector(v, value+" Radio", o)
 	case RadioRequestSeedDecade:
 		dec, perr := strconv.Atoi(strings.TrimSuffix(value, "s"))
 		if perr != nil {
 			return bad("decade must be a year like 1990")
 		}
 		inner := o.Keep
-		o.Keep = func(t *sonic.Track) bool { return t.Year >= dec && t.Year < dec+10 && inner(t) }
-		members := h.Sonic.Index.Where(o.Keep)
+		o.Keep = func(t *soundprint.Track) bool { return t.Year >= dec && t.Year < dec+10 && inner(t) }
+		members := h.Soundprint.Index.Where(o.Keep)
 		if len(members) == 0 {
 			return MusicRadio409JSONResponse{ConflictJSONResponse(apiErr("not_analyzed", "no analysed tracks from the "+value))}, nil
 		}
-		st = h.Sonic.RadioFromVector(sonic.Mean(members), strconv.Itoa(dec)+"s Radio", o)
+		st = h.Soundprint.RadioFromVector(soundprint.Mean(members), strconv.Itoa(dec)+"s Radio", o)
 	case RadioRequestSeedMood:
 		if value == "" {
 			return bad("value (the mood) is required")
 		}
-		v, verr := h.Sonic.TextVector(ctx, value+" music")
+		v, verr := h.Soundprint.TextVector(ctx, value+" music")
 		if verr != nil {
 			err = verr
 			break
 		}
-		st = h.Sonic.RadioFromVector(v, strings.ToUpper(value[:1])+value[1:]+" Radio", o)
+		st = h.Soundprint.RadioFromVector(v, strings.ToUpper(value[:1])+value[1:]+" Radio", o)
 	case RadioRequestSeedFavourites:
-		liked := h.Sonic.Liked(ctx, s.User.ID)
+		liked := h.Soundprint.Liked(ctx, s.User.ID)
 		if len(liked) == 0 {
 			return MusicRadio409JSONResponse{ConflictJSONResponse(apiErr("no_history", "Play or rate some music first."))}, nil
 		}
-		st = h.Sonic.RadioFromVector(sonic.Mean(liked), "Your Favourites Radio", o)
+		st = h.Soundprint.RadioFromVector(soundprint.Mean(liked), "Your Favourites Radio", o)
 	case RadioRequestSeedLibrary:
-		all := h.Sonic.Index.Where(o.Keep)
+		all := h.Soundprint.Index.Where(o.Keep)
 		if len(all) == 0 {
-			return MusicRadio409JSONResponse{ConflictJSONResponse(apiErr("not_analyzed", sonic.ErrNotAnalyzed.Error()))}, nil
+			return MusicRadio409JSONResponse{ConflictJSONResponse(apiErr("not_analyzed", soundprint.ErrNotAnalyzed.Error()))}, nil
 		}
 		// Library radio wanders: re-anchor on a random track every run.
 		first := all[len(o.Exclude)%len(all)]
 		if len(o.Exclude) == 0 {
 			first = all[int(s.User.ID+int64(len(all)))%len(all)]
 		}
-		st = sonic.Station{Title: "Library Radio", IDs: sonic.TrackIDs(h.Sonic.Index.Flow(first.Vec, first, o))}
+		st = soundprint.Station{Title: "Library Radio", IDs: soundprint.TrackIDs(h.Soundprint.Index.Flow(first.Vec, first, o))}
 	default:
 		return bad("unknown seed")
 	}
 	if err != nil {
-		if code, msg, status := sonicErr(err); status == 503 {
+		if code, msg, status := soundprintErr(err); status == 503 {
 			return MusicRadio503JSONResponse{ServiceUnavailableJSONResponse(apiErr(code, msg))}, nil
 		} else if status == 409 {
 			return MusicRadio409JSONResponse{ConflictJSONResponse(apiErr(code, msg))}, nil
@@ -201,10 +201,10 @@ func (h *Handlers) MusicMuse(ctx context.Context, req MusicMuseRequestObject) (M
 	}
 	n := 30
 	set(&n, req.Body.Limit)
-	o := sonic.Options{Keep: keepFor(access(ctx), req.Body.LibraryId), Avoid: h.Sonic.Avoid(ctx, s.User.ID)}
-	st, err := h.Sonic.Muse(ctx, prompt, n, o)
+	o := soundprint.Options{Keep: keepFor(access(ctx), req.Body.LibraryId), Avoid: h.Soundprint.Avoid(ctx, s.User.ID)}
+	st, err := h.Soundprint.Muse(ctx, prompt, n, o)
 	if err != nil {
-		if code, msg, status := sonicErr(err); status == 503 {
+		if code, msg, status := soundprintErr(err); status == 503 {
 			return MusicMuse503JSONResponse{ServiceUnavailableJSONResponse(apiErr(code, msg))}, nil
 		}
 		return nil, internal(ctx, "muse", err)
@@ -216,29 +216,29 @@ func (h *Handlers) MusicMuse(ctx context.Context, req MusicMuseRequestObject) (M
 	return MusicMuse200JSONResponse(out), nil
 }
 
-func (h *Handlers) MusicAdventure(ctx context.Context, req MusicAdventureRequestObject) (MusicAdventureResponseObject, error) {
+func (h *Handlers) MusicJourney(ctx context.Context, req MusicJourneyRequestObject) (MusicJourneyResponseObject, error) {
 	if _, ok := session(ctx); !ok {
-		return MusicAdventure401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+		return MusicJourney401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	acc := access(ctx)
 	b := req.Body
 	for _, id := range []int64{b.FromId, b.ToId} {
 		if err := h.Items.Visible(ctx, acc, id); err != nil {
-			return MusicAdventure404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "track not found"))}, nil
+			return MusicJourney404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "track not found"))}, nil
 		}
 	}
-	from, to := h.Sonic.Index.Get(b.FromId), h.Sonic.Index.Get(b.ToId)
+	from, to := h.Soundprint.Index.Get(b.FromId), h.Soundprint.Index.Get(b.ToId)
 	if from == nil || to == nil {
-		return MusicAdventure409JSONResponse{ConflictJSONResponse(apiErr("not_analyzed", sonic.ErrNotAnalyzed.Error()))}, nil
+		return MusicJourney409JSONResponse{ConflictJSONResponse(apiErr("not_analyzed", soundprint.ErrNotAnalyzed.Error()))}, nil
 	}
 	n := 15
 	set(&n, b.Length)
-	ts := h.Sonic.Index.Adventure(from, to, n, sonic.Options{Keep: keepFor(acc, nil)})
-	out, err := h.station(ctx, sonic.Station{Title: "Sonic Adventure", IDs: sonic.TrackIDs(ts)})
+	ts := h.Soundprint.Index.Journey(from, to, n, soundprint.Options{Keep: keepFor(acc, nil)})
+	out, err := h.station(ctx, soundprint.Station{Title: "Sound Journey", IDs: soundprint.TrackIDs(ts)})
 	if err != nil {
-		return nil, internal(ctx, "adventure", err)
+		return nil, internal(ctx, "journey", err)
 	}
-	return MusicAdventure200JSONResponse(out), nil
+	return MusicJourney200JSONResponse(out), nil
 }
 
 func (h *Handlers) MusicMixes(ctx context.Context, req MusicMixesRequestObject) (MusicMixesResponseObject, error) {
@@ -247,7 +247,7 @@ func (h *Handlers) MusicMixes(ctx context.Context, req MusicMixesRequestObject) 
 		return MusicMixes401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	out := MusicMixes200JSONResponse{}
-	for i, m := range h.Sonic.DailyMixes(ctx, s.User.ID, mixScope(req.Params.LibraryId), keepFor(access(ctx), req.Params.LibraryId)) {
+	for i, m := range h.Soundprint.DailyMixes(ctx, s.User.ID, mixScope(req.Params.LibraryId), keepFor(access(ctx), req.Params.LibraryId)) {
 		st, err := h.station(ctx, m.Station)
 		if err != nil {
 			return nil, internal(ctx, "mixes", err)
@@ -334,7 +334,7 @@ func (h *Handlers) GetLyrics(ctx context.Context, req GetLyricsRequestObject) (G
 	return GetLyrics200JSONResponse(out), nil
 }
 
-// MusicDJ picks a Guest DJ track (MUSIC-6).
+// MusicDJ picks a DJ track (MUSIC-6).
 func (h *Handlers) MusicDJ(ctx context.Context, req MusicDJRequestObject) (MusicDJResponseObject, error) {
 	s, ok := session(ctx)
 	if !ok {
@@ -343,11 +343,11 @@ func (h *Handlers) MusicDJ(ctx context.Context, req MusicDJRequestObject) (Music
 	none := MusicDJ404JSONResponse{NotFoundJSONResponse(apiErr("nothing", "nothing fits right now"))}
 	b := req.Body
 	acc := access(ctx)
-	t := h.Sonic.Index.Get(b.TrackId)
+	t := h.Soundprint.Index.Get(b.TrackId)
 	if t == nil || h.Items.Visible(ctx, acc, b.TrackId) != nil {
 		return none, nil
 	}
-	o := sonic.Options{Keep: keepFor(acc, &t.LibraryID), Avoid: h.Sonic.Avoid(ctx, s.User.ID), Exclude: map[int64]bool{}}
+	o := soundprint.Options{Keep: keepFor(acc, &t.LibraryID), Avoid: h.Soundprint.Avoid(ctx, s.User.ID), Exclude: map[int64]bool{}}
 	if b.Exclude != nil {
 		for _, id := range *b.Exclude {
 			o.Exclude[id] = true
@@ -362,7 +362,7 @@ func (h *Handlers) MusicDJ(ctx context.Context, req MusicDJRequestObject) (Music
 		}
 		return out
 	}
-	pick := h.Sonic.Index.DJPick(t, string(b.Mode), o, plays)
+	pick := h.Soundprint.Index.DJPick(t, string(b.Mode), o, plays)
 	if pick == nil {
 		return none, nil
 	}

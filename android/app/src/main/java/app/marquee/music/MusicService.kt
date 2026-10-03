@@ -73,6 +73,8 @@ class MusicService : MediaLibraryService() {
                 // Preloaded sessions take over the device's playback when they first report "playing".
                 val s = marquee.playback.startPlayback(PlaybackRequest(id, AndroidProfile.profile, startMs = 0, preload = true))
                 gains[id] = s.trackGainDb to s.albumGainDb
+                // What's streamed when it isn't the original (Show audio quality).
+                streamed.value = streamed.value + (id to AudioQuality.streamed(s))
                 mainHandler.post { mediaSession?.player?.let { p -> if (p.currentMediaItem?.mediaId == id.toString()) level(p) } }
                 s.id to marquee.absolute(s.url)!!
             }
@@ -151,7 +153,7 @@ class MusicService : MediaLibraryService() {
             }
         }
         mediaSession = MediaLibrarySession.Builder(this, player, MusicLibrary(marquee, packageName) { app.music }).build()
-        // Stations and the Guest DJ live in the app's controller; make sure it's listening.
+        // Stations and the DJ live in the app's controller; make sure it's listening.
         app.music.attach()
     }
 
@@ -311,6 +313,8 @@ class MusicService : MediaLibraryService() {
     companion object {
         /** Bands of the platform equaliser in use: -1 before the service starts, 0 when the device has none. */
         @Volatile var equalizerBands = -1
+        /** Per track, what its session streams when it isn't the original file (null: direct play). */
+        val streamed = kotlinx.coroutines.flow.MutableStateFlow<Map<Long, String?>>(emptyMap())
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = mediaSession

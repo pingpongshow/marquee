@@ -60,7 +60,7 @@ func severityColor(_ s: HealthCheck.SeverityPayload) -> Color {
 }
 
 /// What one check found, a page at a time, with Open, Refresh Metadata, Fix Match, Bazarr and
-/// Ignore (with undo).
+/// Ignore (with undo). Duplicates open a side-by-side comparison of their files.
 struct HealthIssuesView: View {
     @Environment(AppSession.self) private var app
     let check: HealthCheck
@@ -75,6 +75,7 @@ struct HealthIssuesView: View {
     @State private var open: Int64?
     @State private var matching: Item?
     @State private var bazarr: Item?
+    @State private var comparing: HealthIssue?
 
     var body: some View {
         List {
@@ -97,6 +98,7 @@ struct HealthIssuesView: View {
         .navigationDestination(item: $open) { ItemDetailView(id: $0) }
         .sheet(item: $matching) { FixMatchSheet(item: $0) }
         .sheet(item: $bazarr) { BazarrSheet(item: $0) }
+        .navigationDestination(item: $comparing) { DuplicateCompareView(issue: $0, onDeleted: { await reload() }) }
         .task { await loadMore() }
         .refreshable { await reload() }
     }
@@ -113,6 +115,12 @@ struct HealthIssuesView: View {
                 if let others = issue.related, !others.isEmpty {
                     Text("Other copies: " + others.map { [$0.title, $0.year.map(String.init)].compactMap { $0 }.joined(separator: " ") }.joined(separator: ", "))
                         .font(.caption).foregroundStyle(.secondary)
+                }
+                if check.id == .duplicates, let files = issue.files, files.count > 1 {
+                    Button("Compare \(files.count) Files", systemImage: "rectangle.split.3x1") { comparing = issue }
+                        .buttonStyle(.borderless).font(.callout.weight(.semibold))
+                        .accessibilityIdentifier("compare-\(it.id)")
+                        .padding(.top, 2)
                 }
             }
             Spacer(minLength: 0)
@@ -227,10 +235,17 @@ struct FixMatchSheet: View {
     @State private var results: [MatchCandidate]?
     @State private var busy = false
     @State private var error: String?
+    /// The item's files (admins get paths), with the version label when there are several.
+    @State private var files: [(path: String, version: String?)] = []
 
     var body: some View {
         NavigationStack {
             List {
+                if !files.isEmpty {
+                    Section(files.count == 1 ? "File" : "Files") {
+                        ForEach(files, id: \.path) { f in FilePathLabel(path: f.path, caption: f.version) }
+                    }
+                }
                 Section {
                     TextField("Title", text: $title).autocorrectionDisabled()
                     TextField("Year", text: $year).keyboardType(.numberPad)
@@ -265,7 +280,12 @@ struct FixMatchSheet: View {
             .task {
                 title = item.title
                 year = item.year.map(String.init) ?? ""
+                async let detail = try? app.item(item.id)
                 await search()
+                if let versions = await detail?.info.versions {
+                    let many = versions.count > 1
+                    files = versions.flatMap { v in v.files.compactMap { f in f.path.map { ($0, many ? v.label : nil) } } }
+                }
             }
         }
     }

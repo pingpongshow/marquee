@@ -3,7 +3,7 @@ import { ListMusic, ListVideo } from "lucide-react";
 import { imageUrl } from "@/api/client";
 import type { Playlist } from "@/api/types";
 
-/** The 2×2 cover mosaic Plex uses for playlists (one image fills the tile when that's all there is). */
+/** A 2×2 cover mosaic for playlists (one image fills the tile when that's all there is). */
 export function PlaylistMosaic({ playlist, className, size = 120 }: { playlist: Pick<Playlist, "imageIds" | "kind">; className?: string; size?: number }) {
   const ids = playlist.imageIds;
   const Icon = playlist.kind === "audio" ? ListMusic : ListVideo;

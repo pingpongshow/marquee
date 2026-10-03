@@ -1,7 +1,7 @@
-// Package sonic is Marquee's music intelligence (M6.5): it has the sonic analysis sidecar
+// Package soundprint is Marquee's music intelligence (M6.5): it has the Soundprint analysis sidecar
 // embed every track, keeps the embeddings in memory, and builds similar tracks, radios,
-// Sonic Adventure, Muse playlists and mixes from them (D56).
-package sonic
+// Sound Journey, Muse playlists and mixes from them (D56).
+package soundprint
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// Client talks to the analysis sidecar (sonic/app.py).
+// Client talks to the analysis sidecar (soundprint/app.py).
 type Client struct {
 	BaseURL string
 	HTTP    *http.Client
@@ -55,7 +55,7 @@ func (c *Client) post(ctx context.Context, path string, in, out any) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("sonic %s: HTTP %d", path, resp.StatusCode)
+		return fmt.Errorf("soundprint %s: HTTP %d", path, resp.StatusCode)
 	}
 	return json.NewDecoder(resp.Body).Decode(out)
 }
@@ -75,7 +75,7 @@ func (c *Client) Health(ctx context.Context) (Health, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return h, fmt.Errorf("sonic health: HTTP %d", resp.StatusCode)
+		return h, fmt.Errorf("soundprint health: HTTP %d", resp.StatusCode)
 	}
 	return h, json.NewDecoder(resp.Body).Decode(&h)
 }
@@ -116,7 +116,7 @@ func (c *Client) EmbedDocs(ctx context.Context, texts []string, kind string) (st
 	defer cancel()
 	err := c.post(ctx, "/embed_docs", map[string]any{"texts": texts, "kind": kind}, &out)
 	if err == nil && len(out.Embeddings) != len(texts) {
-		err = fmt.Errorf("sonic /embed_docs: %d embeddings for %d texts", len(out.Embeddings), len(texts))
+		err = fmt.Errorf("soundprint /embed_docs: %d embeddings for %d texts", len(out.Embeddings), len(texts))
 	}
 	return out.Model, out.Embeddings, err
 }

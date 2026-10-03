@@ -36,6 +36,7 @@ import (
 	"marquee/internal/logbuf"
 	"marquee/internal/loudness"
 	"marquee/internal/lyrics"
+	"marquee/internal/mediatrash"
 	"marquee/internal/metadata"
 	"marquee/internal/netclass"
 	"marquee/internal/playback"
@@ -47,7 +48,7 @@ import (
 	"marquee/internal/scrobble"
 	"marquee/internal/server"
 	"marquee/internal/settings"
-	"marquee/internal/sonic"
+	"marquee/internal/soundprint"
 	"marquee/internal/subtitles"
 	"marquee/internal/syncplay"
 	"marquee/internal/tasks"
@@ -256,6 +257,10 @@ func run() error {
 			_, err := database.ExecContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`)
 			return "Done", err
 		}})
+	mediaTrash := &mediatrash.Service{DB: database}
+	scheduler.Register(tasks.Task{ID: "empty-trash", Name: "Empty media trash", Window: true,
+		Description: "Removes files deleted from Library Health more than 30 days ago from the .marquee-trash folders in library folders.",
+		Run:         mediaTrash.Empty})
 	scheduler.Register(tasks.Task{ID: "scan-all", Name: "Scan all libraries",
 		Description: "Looks for new, changed and removed files in every library now. Libraries also rescan on their own schedule, and the file watcher catches most changes as they happen.",
 		Run: func(ctx context.Context) (string, error) {
@@ -281,19 +286,19 @@ func run() error {
 	scheduler.Register(tasks.Task{ID: "collections", Name: "Update collections", Every: 7 * 24 * time.Hour,
 		Description: "Groups movies into their film series (TMDB collections), including movies matched before collections existed.",
 		Run:         meta.SyncCollections})
-	// Music intelligence (M6.5): the sonic sidecar embeds tracks; the index serves radios etc.
-	sonicSvc := &sonic.Service{DB: database, Client: &sonic.Client{BaseURL: envOr("MARQUEE_SONIC_URL", "http://127.0.0.1:32501")},
-		Index: sonic.NewIndex(), Enabled: func() bool { return store.Get().Music.SonicAnalysis }}
-	if err := sonicSvc.Index.Load(ctx, database); err != nil {
-		slog.Warn("sonic index", "err", err)
+	// Music intelligence (M6.5): the Soundprint sidecar embeds tracks; the index serves radios etc.
+	soundprintSvc := &soundprint.Service{DB: database, Client: &soundprint.Client{BaseURL: envOr("MARQUEE_SOUNDPRINT_URL", envOr("MARQUEE_SONIC_URL", "http://127.0.0.1:32501"))},
+		Index: soundprint.NewIndex(), Enabled: func() bool { return store.Get().Music.SoundprintAnalysis }}
+	if err := soundprintSvc.Index.Load(ctx, database); err != nil {
+		slog.Warn("soundprint index", "err", err)
 	}
-	scheduler.Register(tasks.Task{ID: "sonic", Name: "Analyse music", Every: time.Hour,
+	scheduler.Register(tasks.Task{ID: "soundprint", Name: "Soundprint analysis", Every: time.Hour,
 		Description: "Listens to new tracks on the GPU so radios, similar music, mixes and Muse include them.",
-		Run:         sonicSvc.Analyze})
-	runSonic := func() { scheduler.RunNow(ctx, "sonic") }
-	afterMusicScan.Store(&runSonic)
+		Run:         soundprintSvc.Analyze})
+	runSoundprint := func() { scheduler.RunNow(ctx, "soundprint") }
+	afterMusicScan.Store(&runSoundprint)
 	// Muse for movies and recommendations (USER-15, USER-16): text embeddings of movies and shows.
-	embedder := &items.Embedder{DB: database, Index: items.NewVideoIndex(), Client: sonicSvc.Client}
+	embedder := &items.Embedder{DB: database, Index: items.NewVideoIndex(), Client: soundprintSvc.Client}
 	if err := embedder.Index.Load(ctx, database); err != nil {
 		slog.Warn("video embeddings", "err", err)
 	}
@@ -416,7 +421,7 @@ func run() error {
 	apiHandlers := &api.Handlers{
 		DB: database, Auth: authSvc, Settings: store, Libraries: libraries,
 		Items: items.NewStore(database), Scans: scans, Version: config.Version,
-		Tasks: scheduler, Trickplay: trick, Webhooks: hooks, Subtitles: subs, Downloads: dl, Backups: backups, Restart: stop, Sonic: sonicSvc, Lyrics: lyricsSvc,
+		Tasks: scheduler, Trickplay: trick, Webhooks: hooks, Subtitles: subs, Downloads: dl, Backups: backups, Restart: stop, Soundprint: soundprintSvc, Lyrics: lyricsSvc,
 		Requests:   &requests.Service{DB: database, Settings: store},
 		LiveTV:     live,
 		Scrobble:   scrobbler,
@@ -424,6 +429,7 @@ func run() error {
 		SyncPlay:   watchTogether,
 		Remote:     remoteHub,
 		Embeddings: embedder,
+		Trash:      mediaTrash,
 		Avatars:    &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
 		Images:     images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
 		Logs:       logs,

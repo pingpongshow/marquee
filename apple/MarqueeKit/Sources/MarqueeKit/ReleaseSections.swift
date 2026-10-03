@@ -1,6 +1,6 @@
 import Foundation
 
-/// An artist's releases in Plexamp-style sections by release type (MusicBrainz, META-3):
+/// An artist's releases in sections by release type (MusicBrainz, META-3):
 /// Albums (and releases of unknown type), Singles & EPs, Live Albums, Compilations… Empty
 /// sections are left out.
 public struct ReleaseSection: Sendable {

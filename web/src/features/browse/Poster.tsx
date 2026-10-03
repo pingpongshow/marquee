@@ -59,7 +59,7 @@ export function Poster({
   );
 }
 
-/** Plex-style overlays: resume progress, a watched tick, and unwatched-episode counts. */
+/** Overlays: resume progress, a watched tick, and unwatched-episode counts. */
 function WatchBadges({ item }: { item: Parameters<typeof Poster>[0]["item"] }) {
   const leaf = item.type === "movie" || item.type === "episode" || item.type === "video";
   const unwatched = (item.type === "show" || item.type === "season") && item.leafCount ? item.leafCount - (item.watchedLeafCount ?? 0) : 0;

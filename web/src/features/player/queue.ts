@@ -1,13 +1,13 @@
 import type { ItemSummary } from "@/api/types";
 
 /** One queue slot. The key keeps duplicates of the same track distinct. */
-/** dj marks a track the Guest DJ wove in (MUSIC-6). */
+/** dj marks a track the DJ wove in (MUSIC-6). */
 export type Entry = { key: number; item: ItemSummary; dj?: string };
 export type Repeat = "off" | "all" | "one";
 
 /**
  * The play queue. `entries` is the play order; while shuffled, `original` keeps the
- * unshuffled order so turning shuffle off restores it (Plexamp behaviour).
+ * unshuffled order so turning shuffle off restores it.
  */
 export type Queue = {
   entries: Entry[];

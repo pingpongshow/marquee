@@ -37,6 +37,25 @@ type Summary struct {
 	Watchlisted   bool
 	ExtraType     string // trailer, featurette… ("" for main content)
 	ReleaseType   string // albums: album, ep, single, compilation, live… ("" = unknown)
+	Audio         AudioFormat
+}
+
+// AudioFormat describes a track's file, for showing its quality (e.g. FLAC 24/96).
+type AudioFormat struct {
+	Codec                                    string
+	BitrateKbps, SampleRate, BitDepth, Chans int
+}
+
+func parseAudioFormat(v string) AudioFormat {
+	if v == "" {
+		return AudioFormat{}
+	}
+	p := strings.Split(v, "|")
+	if len(p) != 5 {
+		return AudioFormat{}
+	}
+	n := func(x string) int { i, _ := strconv.Atoi(x); return i }
+	return AudioFormat{Codec: p[0], BitrateKbps: n(p[1]), SampleRate: n(p[2]), BitDepth: n(p[3]), Chans: n(p[4])}
 }
 
 type Detail struct {
@@ -144,8 +163,16 @@ func cols(uid int64) string {
 		WHERE (l.parent_id = i.id OR l.grandparent_id = i.id) AND l.type IN ('episode', 'track')) ELSE 0 END,
 	COALESCE((SELECT rating FROM user_item_state WHERE user_id = ` + u + ` AND item_id = i.id), 0),
 	COALESCE((SELECT watchlisted_at IS NOT NULL FROM user_item_state WHERE user_id = ` + u + ` AND item_id = i.id), 0),
-	COALESCE(i.extra_type, ''), COALESCE(i.release_type, '')`
+	COALESCE(i.extra_type, ''), COALESCE(i.release_type, ''),
+	`+audioFormatCol
 }
+
+// audioFormatCol is a track's audio format (codec|kbps|Hz|bits|channels) from its first
+// available file; empty for everything else.
+const audioFormatCol = `CASE WHEN i.type = 'track' THEN COALESCE((SELECT s.codec || '|' || COALESCE(s.bitrate_kbps, f.bitrate_kbps, 0) || '|' ||
+		COALESCE(s.sample_rate, 0) || '|' || COALESCE(s.bit_depth, 0) || '|' || COALESCE(s.channels, 0)
+		FROM media_versions v JOIN media_files f ON f.version_id = v.id JOIN streams s ON s.file_id = f.id AND s.kind = 'audio'
+		WHERE v.item_id = i.id ORDER BY f.available DESC, s.id LIMIT 1), '') ELSE '' END`
 
 // art builds a COALESCE over the selected artwork of kind for each aliased item, so
 // episodes fall back to the season's/show's art and tracks to the album's.
@@ -164,12 +191,13 @@ const summaryFrom = ` FROM items i LEFT JOIN items p ON p.id = i.parent_id LEFT 
 
 func scanSummary(row interface{ Scan(...any) error }, extra ...any) (Summary, error) {
 	var s Summary
-	var added string
+	var added, audio string
 	err := row.Scan(append([]any{&s.ID, &s.LibraryID, &s.Type, &s.Title, &s.OriginalTitle, &s.Year, &s.Index, &s.AbsIndex, &s.Disc,
 		&s.ParentID, &s.GrandparentID, &s.ParentTitle, &s.GrandparentTitle, &s.ArtistCredit, &s.ChildCount, &s.LeafCount,
 		&s.DurationMS, &s.ReleaseDate, &s.Available, &s.MatchState, &added, &s.Poster, &s.Backdrop, &s.Thumb, &s.Logo,
-		&s.ViewOffsetMS, &s.ViewCount, &s.LastViewedAt, &s.WatchedLeaves, &s.UserRating, &s.Watchlisted, &s.ExtraType, &s.ReleaseType}, extra...)...)
+		&s.ViewOffsetMS, &s.ViewCount, &s.LastViewedAt, &s.WatchedLeaves, &s.UserRating, &s.Watchlisted, &s.ExtraType, &s.ReleaseType, &audio}, extra...)...)
 	s.AddedAt, _ = time.Parse(time.RFC3339Nano, added)
+	s.Audio = parseAudioFormat(audio)
 	return s, err
 }
 
@@ -411,32 +439,8 @@ func (s *Store) Get(ctx context.Context, acc Access, id int64, withPaths bool) (
 			fileIdx[f.ID] = f
 		}
 	}
-	if len(fileIdx) > 0 {
-		ids := make([]any, 0, len(fileIdx))
-		for id := range fileIdx {
-			ids = append(ids, id)
-		}
-		in := "?" + strings.Repeat(",?", len(ids)-1)
-		if err := eachRow(ctx, s.db, `SELECT id, file_id, kind, codec, COALESCE(profile, ''), COALESCE(language, ''), COALESCE(title, ''),
-				is_default, is_forced, is_hearing_impaired, external_path IS NOT NULL, COALESCE(channels, 0), COALESCE(channel_layout, ''),
-				COALESCE(sample_rate, 0), COALESCE(bitrate_kbps, 0), COALESCE(width, 0), COALESCE(height, 0), COALESCE(frame_rate, 0),
-				COALESCE(bit_depth, 0)
-			FROM streams WHERE file_id IN (`+in+`)
-			ORDER BY CASE kind WHEN 'video' THEN 0 WHEN 'audio' THEN 1 ELSE 2 END, external_path IS NOT NULL, stream_index, id`,
-			ids, func(r *sql.Rows) error {
-				var st Stream
-				var fileID int64
-				if err := r.Scan(&st.ID, &fileID, &st.Kind, &st.Codec, &st.Profile, &st.Language, &st.Title, &st.Default, &st.Forced,
-					&st.HearingImpaired, &st.External, &st.Channels, &st.ChannelLayout, &st.SampleRate, &st.BitrateKbps,
-					&st.Width, &st.Height, &st.FrameRate, &st.Depth); err != nil {
-					return err
-				}
-				f := fileIdx[fileID]
-				f.Streams = append(f.Streams, st)
-				return nil
-			}); err != nil {
-			return d, err
-		}
+	if err := s.loadStreams(ctx, fileIdx); err != nil {
+		return d, err
 	}
 
 	d.Chapters = []Chapter{}
@@ -452,6 +456,65 @@ func (s *Store) Get(ctx context.Context, acc Access, id int64, withPaths bool) (
 		}
 	}
 	return d, nil
+}
+
+// loadStreams fills in the streams of the files in idx.
+func (s *Store) loadStreams(ctx context.Context, idx map[int64]*File) error {
+	if len(idx) == 0 {
+		return nil
+	}
+	ids := make([]any, 0, len(idx))
+	for id := range idx {
+		ids = append(ids, id)
+	}
+	in := "?" + strings.Repeat(",?", len(ids)-1)
+	return eachRow(ctx, s.db, `SELECT id, file_id, kind, codec, COALESCE(profile, ''), COALESCE(language, ''), COALESCE(title, ''),
+			is_default, is_forced, is_hearing_impaired, external_path IS NOT NULL, COALESCE(channels, 0), COALESCE(channel_layout, ''),
+			COALESCE(sample_rate, 0), COALESCE(bitrate_kbps, 0), COALESCE(width, 0), COALESCE(height, 0), COALESCE(frame_rate, 0),
+			COALESCE(bit_depth, 0)
+		FROM streams WHERE file_id IN (`+in+`)
+		ORDER BY CASE kind WHEN 'video' THEN 0 WHEN 'audio' THEN 1 ELSE 2 END, external_path IS NOT NULL, stream_index, id`,
+		ids, func(r *sql.Rows) error {
+			var st Stream
+			var fileID int64
+			if err := r.Scan(&st.ID, &fileID, &st.Kind, &st.Codec, &st.Profile, &st.Language, &st.Title, &st.Default, &st.Forced,
+				&st.HearingImpaired, &st.External, &st.Channels, &st.ChannelLayout, &st.SampleRate, &st.BitrateKbps,
+				&st.Width, &st.Height, &st.FrameRate, &st.Depth); err != nil {
+				return err
+			}
+			f := idx[fileID]
+			f.Streams = append(f.Streams, st)
+			return nil
+		})
+}
+
+// Files loads media files by id, with paths and streams (for administrators: Library
+// Health compares them). Unknown ids are left out.
+func (s *Store) Files(ctx context.Context, ids []int64) (map[int64]*File, error) {
+	out := map[int64]*File{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	in := "?" + strings.Repeat(",?", len(ids)-1)
+	if err := eachRow(ctx, s.db, `SELECT f.id, f.path, f.size, COALESCE(f.duration_ms, 0), COALESCE(f.container, ''),
+			COALESCE(f.video_codec, ''), COALESCE(f.audio_codec, ''), COALESCE(f.hdr_format, ''), COALESCE(f.bitrate_kbps, 0),
+			COALESCE(f.width, 0), COALESCE(f.height, 0), COALESCE(f.dv_profile, 0), f.part_index, f.available
+		FROM media_files f WHERE f.id IN (`+in+`)`, args, func(r *sql.Rows) error {
+		f := &File{Streams: []Stream{}}
+		if err := r.Scan(&f.ID, &f.Path, &f.Size, &f.DurationMS, &f.Container, &f.VideoCodec, &f.AudioCodec,
+			&f.HDRFormat, &f.BitrateKbps, &f.Width, &f.Height, &f.DVProfile, &f.PartIndex, &f.Available); err != nil {
+			return err
+		}
+		out[f.ID] = f
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return out, s.loadStreams(ctx, out)
 }
 
 func eachRow(ctx context.Context, db *sql.DB, q string, args []any, fn func(*sql.Rows) error) error {

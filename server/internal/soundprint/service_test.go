@@ -1,4 +1,4 @@
-package sonic
+package soundprint
 
 import (
 	"context"

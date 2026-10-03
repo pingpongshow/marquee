@@ -20,7 +20,7 @@ import (
 	"marquee/internal/library"
 	"marquee/internal/netclass"
 	"marquee/internal/settings"
-	"marquee/internal/sonic"
+	"marquee/internal/soundprint"
 	"marquee/internal/tasks"
 )
 
@@ -80,7 +80,7 @@ func newDiscoveryHarness(t *testing.T, sidecarURL string) (*harness, *items.Embe
 		s.Library.BrowseRoots = []string{media}
 		return nil
 	})
-	emb := &items.Embedder{DB: database, Index: items.NewVideoIndex(), Client: &sonic.Client{BaseURL: sidecarURL, HTTP: &http.Client{Timeout: 5 * time.Second}}}
+	emb := &items.Embedder{DB: database, Index: items.NewVideoIndex(), Client: &soundprint.Client{BaseURL: sidecarURL, HTTP: &http.Client{Timeout: 5 * time.Second}}}
 	authSvc := auth.NewService(database)
 	h := New(Deps{
 		Handlers: &api.Handlers{DB: database, Auth: authSvc, Settings: store,

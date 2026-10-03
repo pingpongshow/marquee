@@ -36,23 +36,23 @@ public final class MusicPlayer {
         }
     }
 
-    /// Guest DJ modes (MUSIC-6): a DJ weaves a track in every few songs.
+    /// DJ modes (MUSIC-6): a DJ weaves a track in every few songs.
     public enum DJ: String, CaseIterable, Sendable {
-        case stretch, groupie, deepCuts = "deep_cuts", contempo
+        case wander, superfan, deepCuts = "deep_cuts", sameEra = "same_era"
         public var label: String {
             switch self {
-            case .stretch: "DJ Stretch"
-            case .groupie: "DJ Groupie"
-            case .deepCuts: "DJ Deep Cuts"
-            case .contempo: "DJ Contempo"
+            case .wander: "Wander"
+            case .superfan: "Superfan"
+            case .deepCuts: "Deep Cuts"
+            case .sameEra: "Same Era"
             }
         }
         public var help: String {
             switch self {
-            case .stretch: "Tracks that sound like what's playing, by other artists"
-            case .groupie: "More from the artist's other albums"
+            case .wander: "Similar sound, other artists"
+            case .superfan: "More from the same artists"
             case .deepCuts: "The artist's tracks you play least"
-            case .contempo: "A similar sound from the same era"
+            case .sameEra: "Similar sound from the same years"
             }
         }
     }
@@ -66,6 +66,16 @@ public final class MusicPlayer {
     public private(set) var source: Source?
     /// Sleep timer: pause at a time or when the current track ends.
     public var sleep: Sleep? { didSet { scheduleSleep() } }
+    /// Show the audio quality in Now Playing and track lists (MUSIC-23); per device, off by
+    /// default.
+    public var showAudioQuality = UserDefaults.standard.bool(forKey: "marquee.showAudioQuality") {
+        didSet { UserDefaults.standard.set(showAudioQuality, forKey: "marquee.showAudioQuality") }
+    }
+    /// What the server streams for each queue entry when it isn't the original file.
+    public private(set) var streamed: [Int: StreamedAudio] = [:]
+    /// The current track's stream when it isn't the original (a transcode for the remote
+    /// quality limit, say).
+    public var currentStreamed: StreamedAudio? { current.flatMap { streamed[$0.id] } }
     public var dj: DJ? = DJ(rawValue: UserDefaults.standard.string(forKey: "marquee.dj") ?? "") {
         didSet {
             UserDefaults.standard.set(dj?.rawValue, forKey: "marquee.dj")
@@ -306,6 +316,7 @@ public final class MusicPlayer {
     private func makeItem(_ entry: PlayQueue.Entry, preload: Bool) async -> AVPlayerItem? {
         if let local = downloads?.localURL(entry.item.id) {
             let item = AVPlayerItem(url: local)
+            streamed[entry.id] = nil
             sessions[ObjectIdentifier(item)] = Loaded(entry: entry.id, session: "", trackGain: nil, albumGain: nil, peak: nil)
             applyLevel(item) // no loudness data, but the equaliser's tap
             watch(item)
@@ -316,6 +327,7 @@ public final class MusicPlayer {
                                                                          profile: AppleDeviceProfile.current()))).ok.body.json,
               let url = app.absolute(s.url) else { return nil }
         let item = AVPlayerItem(url: url)
+        streamed[entry.id] = StreamedAudio(s.decision)
         sessions[ObjectIdentifier(item)] = Loaded(entry: entry.id, session: s.id, trackGain: s.trackGainDb, albumGain: s.albumGainDb, peak: s.peak,
                                                   hls: url.path().hasSuffix(".m3u8"))
         applyLevel(item)
@@ -511,7 +523,7 @@ public final class MusicPlayer {
         guestDJ()
     }
 
-    /// After every third of your own tracks, asks the Guest DJ for one to play next.
+    /// After every third of your own tracks, asks the DJ for one to play next.
     private func guestDJ() {
         guard let dj, !djBusy, let cur = queue.current else { return }
         if cur.dj != nil { djCount = 0; return }

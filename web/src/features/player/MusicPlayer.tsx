@@ -21,9 +21,12 @@ import {
 } from "./eqDsp";
 import { MiniPlayer, NowPlaying } from "./NowPlaying";
 import * as Q from "./queue";
+import type { StreamInfo } from "./audioQuality";
 
 export type Levelling = "off" | "track" | "album" | "auto";
-export type DJMode = "stretch" | "groupie" | "deep_cuts" | "contempo";
+export type DJMode = "wander" | "superfan" | "deep_cuts" | "same_era";
+/** Older stored DJ mode names, carried over to the current ones. */
+const legacyDJ: Record<string, DJMode> = { stretch: "wander", groupie: "superfan", contempo: "same_era" };
 export type Source = { title: string; radio?: RadioRequest };
 
 /** Player state that changes on track/queue/setting changes, not with the playhead. */
@@ -32,7 +35,7 @@ type State = {
   levelling: Levelling;
   /** Crossfade between tracks in seconds (0 = off); never within an album played in order. */
   crossfade: number;
-  /** Guest DJ (MUSIC-6): weaves a track in every few songs. */
+  /** DJ (MUSIC-6): weaves a track in every few songs. */
   dj: DJMode | null;
   /** Sleep timer: an epoch time to pause at, "track" (end of this track), or null. */
   sleep: number | "track" | null;
@@ -45,6 +48,8 @@ type State = {
   eq: EqSettings;
   /** False when this browser has no Web Audio, so the equaliser can't work. */
   eqSupported: boolean;
+  /** What is streamed for the current track (direct play or a transcode), for the quality badge. */
+  stream?: StreamInfo;
 };
 
 /** The playhead, which updates several times a second while playing. */
@@ -145,6 +150,14 @@ function levelGain(
   return Math.min(g, 4);
 }
 
+/** Moves an audio parameter to `value` over a few milliseconds, without clicks. */
+function glide(ctx: AudioContext, p: AudioParam, value: number) {
+  const now = ctx.currentTime;
+  p.cancelScheduledValues(now);
+  p.setValueAtTime(p.value, now);
+  p.setTargetAtTime(value, now, 0.015);
+}
+
 const PRELOAD_SECONDS = 15;
 const DJ_EVERY = 3; // a DJ pick after this many of your own tracks
 
@@ -232,6 +245,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(storedVolume);
   const [expanded, setExpanded] = useState(false);
+  // Playback decisions by queue entry key (the last few), for the audio quality badge.
+  const [streams, setStreams] = useState<Record<number, StreamInfo>>({});
   const [source, setSource] = useState<Source | undefined>();
   const [levelling, setLevellingState] = useState<Levelling>(storedLevelling);
   const [sleep, setSleep] = useState<number | "track" | null>(null);
@@ -244,9 +259,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   );
   const [dj, setDJState] = useState<DJMode | null>(
     () =>
-      (stored<string>("marquee.dj", "", (v) =>
-        ["stretch", "groupie", "deep_cuts", "contempo"].includes(v),
-      ) as DJMode) || null,
+      (() => {
+        const v = stored<string>("marquee.dj", "", (v) =>
+          ["wander", "superfan", "deep_cuts", "same_era", ...Object.keys(legacyDJ)].includes(v),
+        );
+        return (legacyDJ[v] ?? v) as DJMode;
+      })() || null,
   );
   const crossfadeRef = useRef(crossfade);
   const fading = useRef(false);
@@ -256,21 +274,33 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const eqRef = useRef(eq);
 
   // Web Audio graph for levelling: element → per-element gain → master (volume) →
-  // equaliser (when on) → speakers. Created on the first play (browsers require a user gesture).
+  // equaliser (when on) → limiter → speakers. Created on the first play (browsers require a
+  // user gesture).
   const graph = useRef<{
     ctx: AudioContext;
     master: GainNode;
     gains: GainNode[];
     eq: EqChain;
+    limiter: DynamicsCompressorNode;
   } | null>(null);
   const ensureGraph = useCallback(() => {
     if (graph.current || typeof AudioContext === "undefined")
       return graph.current;
     try {
-      const ctx = new AudioContext();
+      // "playback" asks for a larger output buffer: with the default low-latency one, a busy
+      // page (Now Playing redrawing) can starve the audio thread, which is heard as pops.
+      const ctx = new AudioContext({ latencyHint: "playback" });
       const master = ctx.createGain();
       const chain = createEqChain(ctx);
-      routeEq(chain, master, ctx.destination, eqRef.current);
+      // A brick-wall limiter just under full scale: equaliser boosts can't hard-clip.
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -1;
+      limiter.knee.value = 0;
+      limiter.ratio.value = 20;
+      limiter.attack.value = 0.002;
+      limiter.release.value = 0.1;
+      limiter.connect(ctx.destination);
+      routeEq(chain, master, limiter, eqRef.current);
       const gains = audios.current.map((a) => {
         const g = ctx.createGain();
         if (a) {
@@ -280,7 +310,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         g.connect(master);
         return g;
       });
-      graph.current = { ctx, master, gains, eq: chain };
+      graph.current = { ctx, master, gains, eq: chain, limiter };
     } catch {
       graph.current = null;
     }
@@ -294,7 +324,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     crossfadeRef.current = crossfade;
   });
   /** Applies volume and levelling to element i (album gain when the previous track was from the same album). */
-  const applyGain = useCallback((i: number) => {
+  /** `starting`: element i hasn't begun playing yet, so its gain is set at once, not glided. */
+  const applyGain = useCallback((i: number, starting = false) => {
     const g = graph.current;
     const a = audios.current[i];
     const q = queueRef.current;
@@ -310,8 +341,14 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       albumRun,
     );
     if (g) {
-      g.master.gain.value = volumeRef.current;
-      g.gains[i]!.gain.value = gain;
+      // A short glide rather than a jump: stepping a gain mid-waveform clicks.
+      glide(g.ctx, g.master.gain, volumeRef.current);
+      // A crossfade schedules the elements' gains itself; leave them alone meanwhile.
+      if (starting) {
+        const p = g.gains[i]!.gain;
+        p.cancelScheduledValues(g.ctx.currentTime);
+        p.setValueAtTime(gain, g.ctx.currentTime);
+      } else if (!fading.current) glide(g.ctx, g.gains[i]!.gain, gain);
       if (g.ctx.state === "suspended") g.ctx.resume().catch(() => {});
     } else if (a) {
       a.volume = Math.min(1, volumeRef.current * gain);
@@ -378,6 +415,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         albumGain: s.albumGainDb,
         peak: s.peak,
       };
+      const info: StreamInfo = { decision: s.decision, limitKbps: s.limitKbps };
+      setStreams((m) => Object.fromEntries([...Object.entries(m).slice(-7), [entry.key, info]]));
       const a = audios.current[i]!;
       a.src = s.url;
       a.preload = "auto";
@@ -419,7 +458,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
       const a = activeEl()!;
       ensureGraph();
-      applyGain(active.current);
+      applyGain(active.current, true);
       if (isFinite(a.duration)) setDuration(a.duration);
       a.play().catch(() => setPlaying(false));
     })();
@@ -450,7 +489,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       .finally(() => (refilling.current = false));
   }, [queue, source]);
 
-  // Guest DJ: after every few of your tracks, weave one in from the DJ.
+  // DJ: after every few of your tracks, weave one in from the DJ.
   const djCount = useRef(0);
   const djBusy = useRef(false);
   useEffect(() => {
@@ -589,7 +628,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       });
     }
     // Crossfade into what follows, except within an album played in order (gapless albums
-    // stay gapless, like Plexamp's sweet fades) and when the sleep timer ends this track.
+    // stay gapless) and when the sleep timer ends this track.
     const cf = crossfadeRef.current;
     const g = graph.current;
     const pre = loaded.current[idle];
@@ -663,19 +702,22 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     }
     const idle = (1 - i) as 0 | 1;
     const pre = loaded.current[idle];
+    // Levelling for the new track (album gain if it continues the album).
+    queueRef.current = { ...q, index: fi };
     if (pre?.ready && pre.key === q.entries[fi]?.key) {
-      // Gapless switch: start the preloaded element now, then let state catch up.
+      // Gapless switch: set the preloaded element's level before it starts (a jump just
+      // after the first samples is heard as a click), start it, then let state catch up.
       active.current = idle;
+      applyGain(idle, true);
       const b = el(idle);
       b.play().catch(() => {});
       setDuration(b.duration);
       setTime(0);
       unload(i);
+    } else {
+      applyGain(active.current);
     }
     setQueue({ ...q, index: fi });
-    // Levelling for the new track (album gain if it continues the album).
-    queueRef.current = { ...q, index: fi };
-    applyGain(active.current);
   };
 
   const actions = useMemo<Actions>(
@@ -712,7 +754,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         storeEq(next);
         const g = graph.current;
         if (g) {
-          routeEq(g.eq, g.master, g.ctx.destination, next);
+          routeEq(g.eq, g.master, g.limiter, next);
           // Changing it is a user gesture, the moment a suspended context may resume.
           if (g.ctx.state === "suspended") g.ctx.resume().catch(() => {});
         }
@@ -782,6 +824,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       expanded,
       eq,
       eqSupported: typeof AudioContext !== "undefined",
+      stream: cur ? streams[cur.key] : undefined,
     }),
     [
       actions,
@@ -796,6 +839,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       volume,
       expanded,
       eq,
+      streams,
     ],
   );
   const timeValue = useMemo(() => ({ time, duration }), [time, duration]);

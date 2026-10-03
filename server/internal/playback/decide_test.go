@@ -114,3 +114,17 @@ func TestHLSSubtitlesForceRepackaging(t *testing.T) {
 		t.Fatalf("text subtitle should repackage into HLS: %+v", d)
 	}
 }
+
+func TestMusicAudioKbps(t *testing.T) {
+	flac := Media{Container: "flac", Audio: &AudioStream{Codec: "flac", Channels: 2}}
+	opus := DeviceProfile{AudioCodecs: []string{"aac", "mp3", "opus"}}
+	if d := Decide(flac, opus, Limits{}); d.Method != Transcode || d.AudioKbps != 256 {
+		t.Errorf("no limit: %+v", d)
+	}
+	if d := Decide(flac, opus, Limits{MaxKbps: 128}); d.AudioKbps != 128 {
+		t.Errorf("128 kbps limit: %d", d.AudioKbps)
+	}
+	if d := Decide(flac, DeviceProfile{AudioCodecs: []string{"flac"}}, Limits{}); d.Method != DirectPlay || d.AudioKbps != 0 {
+		t.Errorf("direct play: %+v", d)
+	}
+}

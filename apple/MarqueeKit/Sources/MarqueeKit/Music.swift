@@ -28,9 +28,9 @@ public extension AppSession {
         try await musicAPI.musicMuse(body: .json(.init(prompt: prompt, limit: limit, libraryId: library))).ok.body.json
     }
 
-    /// A path between two tracks (Sonic Adventure, MUSIC-4).
-    func adventure(from: Int64, to: Int64, length: Int = 15) async throws -> Station {
-        try await musicAPI.musicAdventure(body: .json(.init(fromId: from, toId: to, length: length))).ok.body.json
+    /// A path between two tracks (Sound Journey, MUSIC-4).
+    func journey(from: Int64, to: Int64, length: Int = 15) async throws -> Station {
+        try await musicAPI.musicJourney(body: .json(.init(fromId: from, toId: to, length: length))).ok.body.json
     }
 
     /// Daily mixes (MUSIC-7).
@@ -39,8 +39,8 @@ public extension AppSession {
     }
 
     /// Tracks, albums or artists that sound like the item (MUSIC-2).
-    func sonicSimilar(_ id: Int64, limit: Int = 20) async throws -> [Item] {
-        try await musicAPI.sonicSimilar(path: .init(itemId: id), query: .init(limit: limit)).ok.body.json
+    func soundsLike(_ id: Int64, limit: Int = 20) async throws -> [Item] {
+        try await musicAPI.soundsLike(path: .init(itemId: id), query: .init(limit: limit)).ok.body.json
     }
 
     /// The track's lyrics, or nil when it has none.

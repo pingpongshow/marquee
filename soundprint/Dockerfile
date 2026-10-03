@@ -1,4 +1,4 @@
-# Marquee sonic analysis sidecar (D56). CUDA 12.8 PyTorch supports the RTX 50 series (sm_120).
+# Marquee Soundprint analysis sidecar (D56). CUDA 12.8 PyTorch supports the RTX 50 series (sm_120).
 FROM pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 WORKDIR /app

@@ -243,3 +243,22 @@ func TestScanMusic(t *testing.T) {
 		t.Errorf("album art = %d", n)
 	}
 }
+
+// Files deleted to the media trash (ADM-11) are never scanned back in, even with no ignore
+// patterns at all.
+func TestScanIgnoresMediaTrash(t *testing.T) {
+	e := newEnv(t)
+	e.touch("movies/Heat (1995)/Heat (1995).mkv")
+	e.touch("movies/" + library.TrashDir + "/2026-10-01/Heat copy/Heat (1995).mkv")
+	l := e.lib("Movies", library.Movies, "movies")
+	st, err := e.sc.Scan(context.Background(), l, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Found != 1 || st.Added != 1 {
+		t.Fatalf("stats: %s", st)
+	}
+	if n := e.count(`SELECT COUNT(*) FROM media_files WHERE path LIKE '%' || ? || '%'`, library.TrashDir); n != 0 {
+		t.Errorf("trashed files scanned: %d", n)
+	}
+}

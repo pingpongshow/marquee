@@ -1247,10 +1247,10 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/MusicSettings`.
         public struct MusicSettings: Codable, Hashable, Sendable {
-            /// Analyse how tracks sound (on this server's GPU) for radios, similar music and Muse.
+            /// Soundprint: analyse how tracks sound (on this server's GPU) for radios, similar music and Muse.
             ///
-            /// - Remark: Generated from `#/components/schemas/MusicSettings/sonicAnalysis`.
-            public var sonicAnalysis: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/MusicSettings/soundprintAnalysis`.
+            public var soundprintAnalysis: Swift.Bool?
             /// Look up lyrics on LRCLIB when a track has none (sends artist and title).
             ///
             /// - Remark: Generated from `#/components/schemas/MusicSettings/onlineLyrics`.
@@ -1262,20 +1262,20 @@ extension Components {
             /// Creates a new `MusicSettings`.
             ///
             /// - Parameters:
-            ///   - sonicAnalysis: Analyse how tracks sound (on this server's GPU) for radios, similar music and Muse.
+            ///   - soundprintAnalysis: Soundprint: analyse how tracks sound (on this server's GPU) for radios, similar music and Muse.
             ///   - onlineLyrics: Look up lyrics on LRCLIB when a track has none (sends artist and title).
             ///   - loudnessAnalysis: Measure loudness of tracks without ReplayGain tags so volume levelling works for everything.
             public init(
-                sonicAnalysis: Swift.Bool? = nil,
+                soundprintAnalysis: Swift.Bool? = nil,
                 onlineLyrics: Swift.Bool? = nil,
                 loudnessAnalysis: Swift.Bool? = nil
             ) {
-                self.sonicAnalysis = sonicAnalysis
+                self.soundprintAnalysis = soundprintAnalysis
                 self.onlineLyrics = onlineLyrics
                 self.loudnessAnalysis = loudnessAnalysis
             }
             public enum CodingKeys: String, CodingKey {
-                case sonicAnalysis
+                case soundprintAnalysis
                 case onlineLyrics
                 case loudnessAnalysis
             }
@@ -1543,6 +1543,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/LibraryGlobalSettings/trickplay`.
             public var trickplay: Swift.Bool?
+            /// Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good after 30 days.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LibraryGlobalSettings/allowMediaDeletion`.
+            public var allowMediaDeletion: Swift.Bool?
             /// Creates a new `LibraryGlobalSettings`.
             ///
             /// - Parameters:
@@ -1553,6 +1557,7 @@ extension Components {
             ///   - watchedThresholdPercent:
             ///   - detectIntros: Find intros and end credits in TV episodes by comparing their audio, for Skip Intro and Skip Credits (PLAY-12). Markers from Plex or the files take precedence.
             ///   - trickplay: Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie.
+            ///   - allowMediaDeletion: Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good after 30 days.
             public init(
                 watchFilesystem: Swift.Bool? = nil,
                 scanOnStartup: Swift.Bool? = nil,
@@ -1560,7 +1565,8 @@ extension Components {
                 browseRoots: [Swift.String]? = nil,
                 watchedThresholdPercent: Swift.Int? = nil,
                 detectIntros: Swift.Bool? = nil,
-                trickplay: Swift.Bool? = nil
+                trickplay: Swift.Bool? = nil,
+                allowMediaDeletion: Swift.Bool? = nil
             ) {
                 self.watchFilesystem = watchFilesystem
                 self.scanOnStartup = scanOnStartup
@@ -1569,6 +1575,7 @@ extension Components {
                 self.watchedThresholdPercent = watchedThresholdPercent
                 self.detectIntros = detectIntros
                 self.trickplay = trickplay
+                self.allowMediaDeletion = allowMediaDeletion
             }
             public enum CodingKeys: String, CodingKey {
                 case watchFilesystem
@@ -1578,6 +1585,7 @@ extension Components {
                 case watchedThresholdPercent
                 case detectIntros
                 case trickplay
+                case allowMediaDeletion
             }
         }
         /// - Remark: Generated from `#/components/schemas/WatchGroup`.
@@ -4377,6 +4385,10 @@ extension Components {
             public var audioCodec: Swift.String?
             /// - Remark: Generated from `#/components/schemas/PlaybackDecision/audioChannels`.
             public var audioChannels: Swift.Int?
+            /// Bitrate of the converted audio (MUSIC-23); absent when the audio is sent as it is.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaybackDecision/audioKbps`.
+            public var audioKbps: Swift.Int?
             /// - Remark: Generated from `#/components/schemas/PlaybackDecision/burnSubtitle`.
             public var burnSubtitle: Swift.Bool
             /// - Remark: Generated from `#/components/schemas/PlaybackDecision/toneMap`.
@@ -4394,6 +4406,7 @@ extension Components {
             ///   - audioCopy:
             ///   - audioCodec:
             ///   - audioChannels:
+            ///   - audioKbps: Bitrate of the converted audio (MUSIC-23); absent when the audio is sent as it is.
             ///   - burnSubtitle:
             ///   - toneMap:
             public init(
@@ -4407,6 +4420,7 @@ extension Components {
                 audioCopy: Swift.Bool,
                 audioCodec: Swift.String? = nil,
                 audioChannels: Swift.Int? = nil,
+                audioKbps: Swift.Int? = nil,
                 burnSubtitle: Swift.Bool,
                 toneMap: Swift.Bool
             ) {
@@ -4420,6 +4434,7 @@ extension Components {
                 self.audioCopy = audioCopy
                 self.audioCodec = audioCodec
                 self.audioChannels = audioChannels
+                self.audioKbps = audioKbps
                 self.burnSubtitle = burnSubtitle
                 self.toneMap = toneMap
             }
@@ -4434,6 +4449,7 @@ extension Components {
                 case audioCopy
                 case audioCodec
                 case audioChannels
+                case audioKbps
                 case burnSubtitle
                 case toneMap
             }
@@ -6038,6 +6054,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/HealthIssue/related`.
             public var related: [Components.Schemas.ItemSummary]?
+            /// The files involved, to compare. duplicates: every file of every copy (this item and the related ones).
+            ///
+            /// - Remark: Generated from `#/components/schemas/HealthIssue/files`.
+            public var files: [Components.Schemas.IssueFile]?
             /// Creates a new `HealthIssue`.
             ///
             /// - Parameters:
@@ -6046,18 +6066,21 @@ extension Components {
             ///   - path:
             ///   - detail:
             ///   - related: duplicates: the other copies.
+            ///   - files: The files involved, to compare. duplicates: every file of every copy (this item and the related ones).
             public init(
                 item: Components.Schemas.ItemSummary,
                 fileId: Swift.Int64? = nil,
                 path: Swift.String? = nil,
                 detail: Swift.String,
-                related: [Components.Schemas.ItemSummary]? = nil
+                related: [Components.Schemas.ItemSummary]? = nil,
+                files: [Components.Schemas.IssueFile]? = nil
             ) {
                 self.item = item
                 self.fileId = fileId
                 self.path = path
                 self.detail = detail
                 self.related = related
+                self.files = files
             }
             public enum CodingKeys: String, CodingKey {
                 case item
@@ -6065,6 +6088,48 @@ extension Components {
                 case path
                 case detail
                 case related
+                case files
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/IssueFile`.
+        public struct IssueFile: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/IssueFile/itemId`.
+            public var itemId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/IssueFile/itemTitle`.
+            public var itemTitle: Swift.String
+            /// - Remark: Generated from `#/components/schemas/IssueFile/versionLabel`.
+            public var versionLabel: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/IssueFile/file`.
+            public var file: Components.Schemas.MediaFile
+            /// - Remark: Generated from `#/components/schemas/IssueFile/addedAt`.
+            public var addedAt: Foundation.Date
+            /// Creates a new `IssueFile`.
+            ///
+            /// - Parameters:
+            ///   - itemId:
+            ///   - itemTitle:
+            ///   - versionLabel:
+            ///   - file:
+            ///   - addedAt:
+            public init(
+                itemId: Swift.Int64,
+                itemTitle: Swift.String,
+                versionLabel: Swift.String? = nil,
+                file: Components.Schemas.MediaFile,
+                addedAt: Foundation.Date
+            ) {
+                self.itemId = itemId
+                self.itemTitle = itemTitle
+                self.versionLabel = versionLabel
+                self.file = file
+                self.addedAt = addedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case itemId
+                case itemTitle
+                case versionLabel
+                case file
+                case addedAt
             }
         }
         /// - Remark: Generated from `#/components/schemas/HealthIssuePage`.
@@ -8000,6 +8065,8 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ItemSummary/releaseType`.
             public var releaseType: Components.Schemas.ItemSummary.ReleaseTypePayload?
+            /// - Remark: Generated from `#/components/schemas/ItemSummary/audioFormat`.
+            public var audioFormat: Components.Schemas.AudioFormat?
             /// Creates a new `ItemSummary`.
             ///
             /// - Parameters:
@@ -8033,6 +8100,7 @@ extension Components {
             ///   - watchlisted: On the user's watchlist (USER-8).
             ///   - extraType: Set for extras (LIB-8).
             ///   - releaseType: Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
+            ///   - audioFormat:
             public init(
                 id: Swift.Int64,
                 libraryId: Swift.Int64,
@@ -8063,7 +8131,8 @@ extension Components {
                 userRating: Swift.Double? = nil,
                 watchlisted: Swift.Bool? = nil,
                 extraType: Components.Schemas.ItemSummary.ExtraTypePayload? = nil,
-                releaseType: Components.Schemas.ItemSummary.ReleaseTypePayload? = nil
+                releaseType: Components.Schemas.ItemSummary.ReleaseTypePayload? = nil,
+                audioFormat: Components.Schemas.AudioFormat? = nil
             ) {
                 self.id = id
                 self.libraryId = libraryId
@@ -8095,6 +8164,7 @@ extension Components {
                 self.watchlisted = watchlisted
                 self.extraType = extraType
                 self.releaseType = releaseType
+                self.audioFormat = audioFormat
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -8127,6 +8197,62 @@ extension Components {
                 case watchlisted
                 case extraType
                 case releaseType
+                case audioFormat
+            }
+        }
+        /// Tracks: the file's audio quality (MUSIC-23), for apps that show it, e.g. FLAC 24/96 or MP3 320.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AudioFormat`.
+        public struct AudioFormat: Codable, Hashable, Sendable {
+            /// ffprobe codec name: flac, alac, mp3, aac, opus, vorbis, pcm_s16le…
+            ///
+            /// - Remark: Generated from `#/components/schemas/AudioFormat/codec`.
+            public var codec: Swift.String
+            /// - Remark: Generated from `#/components/schemas/AudioFormat/lossless`.
+            public var lossless: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/AudioFormat/bitrateKbps`.
+            public var bitrateKbps: Swift.Int?
+            /// Hz, e.g. 96000
+            ///
+            /// - Remark: Generated from `#/components/schemas/AudioFormat/sampleRate`.
+            public var sampleRate: Swift.Int?
+            /// Bits per sample, for lossless formats (16, 24).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AudioFormat/bitDepth`.
+            public var bitDepth: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/AudioFormat/channels`.
+            public var channels: Swift.Int?
+            /// Creates a new `AudioFormat`.
+            ///
+            /// - Parameters:
+            ///   - codec: ffprobe codec name: flac, alac, mp3, aac, opus, vorbis, pcm_s16le…
+            ///   - lossless:
+            ///   - bitrateKbps:
+            ///   - sampleRate: Hz, e.g. 96000
+            ///   - bitDepth: Bits per sample, for lossless formats (16, 24).
+            ///   - channels:
+            public init(
+                codec: Swift.String,
+                lossless: Swift.Bool,
+                bitrateKbps: Swift.Int? = nil,
+                sampleRate: Swift.Int? = nil,
+                bitDepth: Swift.Int? = nil,
+                channels: Swift.Int? = nil
+            ) {
+                self.codec = codec
+                self.lossless = lossless
+                self.bitrateKbps = bitrateKbps
+                self.sampleRate = sampleRate
+                self.bitDepth = bitDepth
+                self.channels = channels
+            }
+            public enum CodingKeys: String, CodingKey {
+                case codec
+                case lossless
+                case bitrateKbps
+                case sampleRate
+                case bitDepth
+                case channels
             }
         }
         /// Artwork ids for /images/{artworkId}. Seasons and episodes fall back to the show's art, tracks to the album's.

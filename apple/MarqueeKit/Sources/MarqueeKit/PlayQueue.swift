@@ -7,7 +7,7 @@ public struct PlayQueue: Sendable, Equatable {
     public struct Entry: Identifiable, Sendable, Equatable {
         public let id: Int   // unique per slot, so duplicates of a track stay distinct
         public let item: Item
-        /// Set for tracks the Guest DJ wove in (MUSIC-6).
+        /// Set for tracks the DJ wove in (MUSIC-6).
         public var dj: String? = nil
         public static func == (a: Entry, b: Entry) -> Bool { a.id == b.id }
     }
