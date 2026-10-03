@@ -28,7 +28,10 @@ final class MarqueeUITests: XCTestCase {
         shot("01-connect")
         address.tap()
         address.typeText(server)
-        app.buttons["Connect"].tap()
+        // At large text sizes the button sits under the keyboard: scroll it into view.
+        let connect = app.buttons["Connect"]
+        for _ in 0..<4 where !connect.isHittable { app.swipeUp() }
+        connect.tap()
         let who = app.staticTexts["Who's watching?"]
         XCTAssertTrue(who.waitForExistence(timeout: 15))
         shot("02-who-is-watching")
@@ -60,8 +63,10 @@ final class MarqueeUITests: XCTestCase {
     private func openMusicLibraryRow(_ id: String) {
         let shortcut = app.buttons["musicShowLibrary"]
         XCTAssertTrue(shortcut.waitForExistence(timeout: 15))
-        shortcut.tap()
+        // At large text sizes the shortcut can be scrolled off the quick actions: then scroll.
+        if app.windows.firstMatch.frame.contains(shortcut.frame) { shortcut.tap() }
         let row = app.buttons["musicLibrary.\(id)"]
+        for _ in 0..<12 where !row.exists { app.swipeUp() }
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         for _ in 0..<6 where !row.isHittable || row.frame.maxY > app.tabBars.firstMatch.frame.minY - 10 { app.swipeUp() }
         row.tap()
@@ -437,37 +442,124 @@ final class MarqueeUITests: XCTestCase {
         return (page["items"] as? [[String: Any]] ?? []).compactMap { $0["title"] as? String }
     }
 
-    /// Header actions fit on an iPhone in portrait: each is on screen, can be tapped, and is
-    /// a normal button shape (labels never wrap letter by letter), on a playlist and an album.
+    /// The text sizes the layout tests run at: the default and a large accessibility size.
+    private let textSizes: [String?] = [nil, "UICTContentSizeCategoryAccessibilityL"]
+
+    /// Starts the app again (signed out) at a text size, and signs in.
+    private func relaunch(textSize: String?) {
+        app.terminate()
+        app.launchArguments = ["-marquee-reset"] + (textSize.map { ["-UIPreferredContentSizeCategoryName", $0] } ?? [])
+        app.launch()
+        connectAndSignIn()
+    }
+
+    /// Header actions fit on any iPhone (standard and Pro Max), at the default and a large text
+    /// size, in portrait and landscape: each is on screen, can be tapped, and is a normal button
+    /// shape (labels never wrap letter by letter), on a playlist, an album and a collection.
     func testHeaderButtonsFit() {
         XCUIDevice.shared.orientation = .portrait
-        connectAndSignIn()
-        app.buttons["Libraries"].firstMatch.tap()
-        let back = app.navigationBars.buttons["Libraries"]
-        if back.waitForExistence(timeout: 2) { back.tap() }
-        app.buttons["Playlists"].firstMatch.tap()
-        let trip = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Road Trip'")).firstMatch
-        XCTAssertTrue(trip.waitForExistence(timeout: 10))
-        trip.tap()
-        let download = app.buttons.matching(NSPredicate(format: "label == 'Download' OR label == 'Downloaded' OR label MATCHES '[0-9]+/[0-9]+'")).firstMatch
-        let pin = app.buttons.matching(NSPredicate(format: "label == 'Pin to Home' OR label == 'Unpin from Home'")).firstMatch
-        XCTAssertTrue(app.buttons["Shuffle"].waitForExistence(timeout: 10))
-        sleep(1)
-        shot("hb1-playlist")
-        checkFits([app.buttons["Play"].firstMatch, app.buttons["Shuffle"].firstMatch, download, pin], "playlist")
-        XCTAssertGreaterThan(app.buttons["Play"].firstMatch.frame.width, 70, "Play keeps its word, not just the icon")
+        addTeardownBlock { XCUIDevice.shared.orientation = .portrait }
+        for size in textSizes {
+            let tag = size == nil ? "default" : "large"
+            relaunch(textSize: size)
+            app.buttons["Libraries"].firstMatch.tap()
+            let back = app.navigationBars.buttons["Libraries"]
+            if back.waitForExistence(timeout: 2) { back.tap() }
+            let playlists = app.buttons["Playlists"].firstMatch
+            for _ in 0..<4 where !playlists.isHittable { app.swipeUp() }
+            playlists.tap()
+            let trip = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Road Trip'")).firstMatch
+            XCTAssertTrue(trip.waitForExistence(timeout: 10))
+            trip.tap()
+            let download = app.buttons.matching(NSPredicate(format: "label == 'Download' OR label == 'Downloaded' OR label MATCHES '[0-9]+/[0-9]+'")).firstMatch
+            let pin = app.buttons.matching(NSPredicate(format: "label == 'Pin to Home' OR label == 'Unpin from Home'")).firstMatch
+            let play = app.buttons["Play"].firstMatch, shuffle = app.buttons["Shuffle"].firstMatch
+            XCTAssertTrue(shuffle.waitForExistence(timeout: 10))
+            sleep(1)
+            shot("hb1-playlist-\(tag)")
+            checkFits([play, shuffle, download, pin], "playlist (\(tag))")
+            // Stacked on a phone: the actions start under the cover, at the left edge.
+            XCTAssertLessThan(play.frame.minX, 40, "playlist (\(tag)): actions are full width, not in a column beside the cover")
+            if size == nil {
+                XCTAssertGreaterThan(play.frame.width, 70, "Play keeps its word, not just the icon")
+                XCUIDevice.shared.orientation = .landscapeLeft
+                sleep(2)
+                shot("hb1-playlist-landscape")
+                checkFits([play, shuffle, download, pin], "playlist (landscape)")
+                XCUIDevice.shared.orientation = .portrait
+                sleep(2)
+            }
 
-        // An album page.
-        openLibrary("Music")
-        openArtist("Calm Pads").tap()
-        let album = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Floating'")).firstMatch
-        XCTAssertTrue(album.waitForExistence(timeout: 10))
-        album.tap()
-        XCTAssertTrue(app.buttons["Radio"].waitForExistence(timeout: 10))
-        sleep(1)
-        shot("hb2-album")
-        checkFits([app.buttons["Play"].firstMatch, app.buttons["Shuffle"].firstMatch, app.buttons["Radio"].firstMatch, app.buttons["More"].firstMatch], "album")
-        XCTAssertGreaterThan(app.buttons["Play"].firstMatch.frame.width, 70, "the album's Play keeps its word")
+            // An album page.
+            openLibrary("Music")
+            openArtist("Calm Pads").tap()
+            let album = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Floating'")).firstMatch
+            XCTAssertTrue(album.waitForExistence(timeout: 10))
+            album.tap()
+            XCTAssertTrue(app.buttons["Radio"].waitForExistence(timeout: 10))
+            sleep(1)
+            shot("hb2-album-\(tag)")
+            checkFits([play, shuffle, app.buttons["Radio"].firstMatch, app.buttons["More"].firstMatch], "album (\(tag))")
+            if size == nil { XCTAssertGreaterThan(play.frame.width, 70, "the album's Play keeps its word") }
+
+            // A collection page.
+            openLibrary("Movies")
+            XCTAssertTrue(app.navigationBars["Movies"].waitForExistence(timeout: 10))
+            app.buttons["Sort and filter"].tap()
+            app.buttons["Collections"].tap()
+            let saga = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Test Saga'")).firstMatch
+            if saga.waitForExistence(timeout: 10) {
+                saga.tap()
+                let pinCollection = app.buttons.matching(NSPredicate(format: "label == 'Pin to Home' OR label == 'Unpin from Home'")).firstMatch
+                XCTAssertTrue(pinCollection.waitForExistence(timeout: 10))
+                sleep(1)
+                shot("hb3-collection-\(tag)")
+                checkFits([pinCollection, app.buttons["More"].firstMatch], "collection (\(tag))")
+            }
+        }
+    }
+
+    /// The year-in-music row on the Music home is one compact line, and a movie's track
+    /// choices are uniform one-line chips, at the default and a large text size.
+    func testYearRowAndTrackChips() {
+        for size in textSizes {
+            let tag = size == nil ? "default" : "large"
+            relaunch(textSize: size)
+            openLibrary("Music")
+            let row = app.descendants(matching: .any)["recapRow"]
+            for _ in 0..<5 where !(row.exists && row.isHittable) { app.swipeUp() }
+            XCTAssertTrue(row.waitForExistence(timeout: 15), "the Music home has the year row")
+            shot("yr1-row-\(tag)")
+            let window = app.windows.firstMatch.frame
+            XCTAssertLessThan(row.frame.height, 60, "\(tag): the year row is compact: \(row.frame)")
+            XCTAssertTrue(window.contains(row.frame), "\(tag): the year row is on screen")
+            XCTAssertTrue(app.buttons["recapCard"].exists)
+
+            openLibrary("Movies")
+            XCTAssertTrue(app.navigationBars["Movies"].waitForExistence(timeout: 10))
+            var movie = app.scrollViews.buttons.matching(NSPredicate(format: "label BEGINSWITH '31 Ocean'")).firstMatch
+            if !movie.waitForExistence(timeout: 5) { movie = app.scrollViews.buttons.firstMatch }
+            for _ in 0..<5 where !movie.isHittable { app.swipeUp() }
+            movie.tap()
+            let find = app.buttons["trackChip.find"]
+            for _ in 0..<5 where !(find.exists && find.isHittable) { app.swipeUp() }
+            XCTAssertTrue(find.waitForExistence(timeout: 10))
+            sleep(1)
+            shot("tc1-chips-\(tag)")
+            let chips = ["trackChip.version", "trackChip.audio", "trackChip.subtitles", "trackChip.find"]
+                .map { app.buttons[$0] }.filter(\.exists)
+            let heights = chips.map(\.frame.height)
+            for c in chips {
+                let f = c.frame
+                XCTAssertFalse(c.label.isEmpty, "\(tag): a chip without a label")
+                XCTAssertLessThan(f.height, 60, "\(tag): \(c.label) is one line: \(f)")
+                XCTAssertGreaterThanOrEqual(f.width, f.height, "\(tag): \(c.label) isn't squeezed: \(f)")
+                XCTAssertTrue(window.contains(f) || !c.isHittable, "\(tag): \(c.label) \(f)")
+            }
+            if let lo = heights.min(), let hi = heights.max() {
+                XCTAssertLessThanOrEqual(hi - lo, 1, "\(tag): chips are the same height: \(heights)")
+            }
+        }
     }
 
     private func checkFits(_ buttons: [XCUIElement], _ page: String) {

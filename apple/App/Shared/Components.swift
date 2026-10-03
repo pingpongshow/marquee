@@ -324,10 +324,21 @@ struct AdaptiveLabelStyle: LabelStyle {
 /// icon-only, then they move to a second line, then everything is icon-only, and only then
 /// does the row scroll.
 struct HeaderActions<Primary: View, Secondary: View>: View {
+    /// Only the all-labelled row, never a fallback: for layouts that try something else
+    /// (stacking) when it doesn't fit.
+    var labelledOnly = false
     @ViewBuilder var primary: () -> Primary
     @ViewBuilder var secondary: () -> Secondary
 
     var body: some View {
+        if labelledOnly {
+            row(primaryIcons: false, secondaryIcons: false)
+        } else {
+            fitted
+        }
+    }
+
+    private var fitted: some View {
         ViewThatFits(in: .horizontal) {
             row(primaryIcons: false, secondaryIcons: false)
             row(primaryIcons: false, secondaryIcons: true)

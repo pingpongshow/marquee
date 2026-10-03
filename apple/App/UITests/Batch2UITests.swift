@@ -178,7 +178,7 @@ final class Batch2UITests: XCTestCase {
         let user = try temporaryUser()
         signIn(username: user.name, password: user.password)
         openMovie("31 Ocean")
-        let find = app.buttons["Find Subtitles…"]
+        let find = app.buttons["trackChip.find"]
         XCTAssertTrue(find.waitForExistence(timeout: 10))
         find.tap()
         let another = app.buttons["Download Another Language…"]
