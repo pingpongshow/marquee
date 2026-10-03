@@ -1,8 +1,9 @@
 import MarqueeKit
 import SwiftUI
 
-/// A music library's landing page: a browse row into the full lists, quick actions, then
-/// shelves of what's yours (MUSIC-15). The full artist grid lives on the Artists screen.
+/// A music library's landing page, organised like Plexamp (MUSIC-15): quick actions, shelves
+/// of what's yours, then the Library list into the full pages. Never every artist: the full
+/// artist grid lives only behind Library › Artists.
 struct MusicHomeView: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
@@ -11,9 +12,10 @@ struct MusicHomeView: View {
     @State private var mixes: [Station] = []
     @State private var recentlyPlayed: [Item] = []
     @State private var recentlyAdded: [Item] = []
-    @State private var styles: [String] = []
     @State private var playlists: [Playlist] = []
     @State private var topArtists: [Item] = []
+    @State private var decades: [String] = []
+    @State private var counts: [MusicBrowse: Int] = [:]
     @State private var busy: String?
     @State private var error: String?
 
@@ -21,117 +23,148 @@ struct MusicHomeView: View {
     private var soundprint: Bool { status?.enabled == true }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
-                browseRow
-                quickActions
-                if let error { ErrorBanner(message: error).padding(.horizontal, sidePadding) }
-                RecapCard() // MUSIC-22
-                if !mixes.isEmpty {
-                    ShelfRow(title: "Mixes for you") {
-                        ForEach(mixes, id: \.title) { m in MixCard(station: m) { music.playStation(m) } }
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 26) {
+                    quickActions { withAnimation { proxy.scrollTo("musicLibraryList", anchor: .top) } }
+                    if let error { ErrorBanner(message: error).padding(.horizontal, sidePadding) }
+                    if !recentlyPlayed.isEmpty {
+                        ShelfRow(title: "Recently Played", destination: .musicBrowse(library: libraryID, .recentlyPlayed)) {
+                            ForEach(recentlyPlayed, id: \.id) { PosterCard(item: $0) }
+                        }
                     }
-                }
-                if !recentlyPlayed.isEmpty {
-                    ShelfRow(title: "Recently Played") {
-                        ForEach(recentlyPlayed, id: \.id) { PosterCard(item: $0) }
+                    if !mixes.isEmpty {
+                        ShelfRow(title: "Mixes for You", destination: soundprint ? .musicMuse(library: libraryID) : nil) {
+                            ForEach(mixes, id: \.title) { m in MixCard(station: m) { music.playStation(m) } }
+                        }
                     }
-                }
-                if !recentlyAdded.isEmpty {
-                    ShelfRow(title: "Recently Added", destination: .musicBrowse(library: libraryID, .recentAlbums)) {
-                        ForEach(recentlyAdded, id: \.id) { PosterCard(item: $0) }
+                    RecapCard() // MUSIC-22
+                    if !recentlyAdded.isEmpty {
+                        ShelfRow(title: "Recently Added", destination: .musicBrowse(library: libraryID, .recentAlbums)) {
+                            ForEach(recentlyAdded, id: \.id) { PosterCard(item: $0) }
+                        }
                     }
-                }
-                if soundprint { MoodsAndStyles(libraryID: libraryID, styles: styles) }
-                if !playlists.isEmpty {
-                    ShelfRow(title: "Your Playlists", destination: .playlists) {
-                        ForEach(playlists, id: \.id) { PlaylistCard(playlist: $0, size: PosterCard.defaultWidth) }
+                    if !playlists.isEmpty {
+                        ShelfRow(title: "Your Playlists", destination: .playlists) {
+                            ForEach(playlists, id: \.id) { PlaylistCard(playlist: $0, size: PosterCard.defaultWidth) }
+                        }
                     }
-                }
-                if !topArtists.isEmpty {
-                    ShelfRow(title: "Top Artists", destination: .musicBrowse(library: libraryID, .artists)) {
-                        ForEach(topArtists, id: \.id) { PosterCard(item: $0) }
+                    if !topArtists.isEmpty {
+                        ShelfRow(title: "Top Artists", destination: .musicBrowse(library: libraryID, .artists)) {
+                            ForEach(topArtists, id: \.id) { a in
+                                PosterCard(item: a).accessibilityIdentifier("topArtist.\(a.id)")
+                            }
+                        }
                     }
-                    .accessibilityIdentifier("topArtists")
+                    libraryList.id("musicLibraryList")
                 }
+                .padding(.vertical)
             }
-            .padding(.vertical)
         }
         .navigationTitle(library.name)
         .task { await load() }
         .refreshable { await load() }
     }
 
-    // MARK: - Browse and quick actions
+    // MARK: - Library list
 
-    private var browseRow: some View {
-        #if os(tvOS)
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: chipSpacing) { browseLinks }
-                .padding(.horizontal, sidePadding)
-                .padding(.vertical, 20)
-        }
-        .scrollClipDisabled()
-        .focusSection()
-        #else
-        // Five equal tiles, icon over word, so all of them fit across a phone.
-        HStack(spacing: 8) { browseLinks }
-            .padding(.horizontal, sidePadding)
-        #endif
-    }
-
-    @ViewBuilder private var browseLinks: some View {
-        browse("Artists", "music.mic", .musicBrowse(library: libraryID, .artists), id: "artists")
-        browse("Albums", "square.stack", .musicBrowse(library: libraryID, .albums), id: "albums")
-        browse("Songs", "music.note", .musicBrowse(library: libraryID, .songs), id: "songs")
-        browse("Playlists", "music.note.list", .playlists, id: "playlists")
-        browse("Genres", "guitars", .musicBrowse(library: libraryID, .genres), id: "genres")
-    }
-
-    private func browse(_ title: String, _ icon: String, _ route: Route, id: String) -> some View {
-        NavigationLink(value: route) {
-            #if os(tvOS)
-            Label(title, systemImage: icon).lineLimit(1).fixedSize()
-            #else
-            VStack(spacing: 4) {
-                Image(systemName: icon).font(.title3).frame(height: 26)
-                Text(title).font(.caption.weight(.medium)).lineLimit(1).minimumScaleFactor(0.8)
+    /// Plexamp's Library tab: one row per full page, with its count.
+    private var libraryList: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Library").font(.title3.bold()).padding(.horizontal, sidePadding)
+            VStack(spacing: 0) {
+                row("Artists", "music.mic", .musicBrowse(library: libraryID, .artists), count: counts[.artists], id: "artists")
+                row("Albums", "square.stack", .musicBrowse(library: libraryID, .albums), count: counts[.albums], id: "albums")
+                row("Songs", "music.note", .musicBrowse(library: libraryID, .songs), count: counts[.songs], id: "songs")
+                row("Playlists", "music.note.list", .playlists, count: playlists.count, id: "playlists")
+                row("Genres", "guitars", .musicBrowse(library: libraryID, .genres), id: "genres")
+                if soundprint {
+                    row("Moods & Styles", "theatermasks", .musicBrowse(library: libraryID, .moodsAndStyles), id: "moods")
+                }
+                if !decades.isEmpty {
+                    row("Decades", "calendar", .musicBrowse(library: libraryID, .decades), id: "decades")
+                }
+                if soundprint {
+                    row("Muse & Stations", "wand.and.stars", .musicMuse(library: libraryID), id: "muse", last: true)
+                }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 4)
+            #if os(iOS)
+            .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+            #endif
+            .padding(.horizontal, sidePadding)
+            #if os(tvOS)
+            .focusSection()
             #endif
         }
-        .buttonStyle(.bordered)
-        .accessibilityLabel(title)
-        .accessibilityIdentifier("musicBrowse.\(id)")
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("musicLibraryList")
     }
 
-    private var quickActions: some View {
+    private func row(_ title: String, _ icon: String, _ route: Route, count: Int? = nil, id: String, last: Bool = false) -> some View {
+        NavigationLink(value: route) {
+            HStack(spacing: 14) {
+                Image(systemName: icon).foregroundStyle(Color.marqueeGold).frame(width: iconWidth)
+                Text(title).foregroundStyle(.primary).lineLimit(1)
+                Spacer(minLength: 8)
+                if let count {
+                    Text(count.formatted()).foregroundStyle(.secondary).monospacedDigit()
+                        .accessibilityIdentifier("musicLibrary.\(id).count")
+                }
+                Image(systemName: "chevron.right").font(.footnote.bold()).foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, rowPadding)
+            .padding(.vertical, rowVertical)
+            .contentShape(Rectangle())
+            #if os(iOS)
+            .overlay(alignment: .bottom) {
+                if !last { Divider().padding(.leading, rowPadding + iconWidth + 14) }
+            }
+            #endif
+        }
+        #if os(tvOS)
+        .buttonStyle(.bordered)
+        .padding(.vertical, 6)
+        #else
+        .buttonStyle(.plain)
+        #endif
+        .accessibilityLabel(count.map { "\(title), \($0)" } ?? title)
+        .accessibilityIdentifier("musicLibrary.\(id)")
+    }
+
+    // MARK: - Quick actions
+
+    /// Round icon buttons with small labels.
+    private func quickActions(showLibrary: @escaping () -> Void) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: chipSpacing) {
+            HStack(alignment: .top, spacing: actionSpacing) {
                 if soundprint {
-                    pill("Library Radio", "dot.radiowaves.left.and.right") {
+                    action("Library Radio", "dot.radiowaves.left.and.right") {
                         let r = RadioRequest(seed: .library, libraryId: libraryID, limit: 50)
                         music.playStation(try await app.radio(r), radio: r)
                     }
                 }
-                pill("Shuffle All", "shuffle") {
+                action("Shuffle All", "shuffle") {
                     let tracks = try await app.items(library: libraryID, sort: .random, limit: 200, type: .track).items
                     guard !tracks.isEmpty else { throw MarqueeError("There's no music here yet.") }
                     music.play(tracks, source: "Shuffle All")
                 }
                 if soundprint {
-                    NavigationLink(value: Route.musicMuse(library: libraryID)) {
-                        Label("Muse", systemImage: "wand.and.stars").lineLimit(1).fixedSize()
-                    }
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier("musicMuse")
+                    NavigationLink(value: Route.musicMuse(library: libraryID)) { roundLabel("Muse", "wand.and.stars") }
+                        .buttonStyle(roundStyle)
+                        .accessibilityLabel("Muse")
+                        .accessibilityIdentifier("musicMuse")
                 }
                 #if os(iOS)
-                CarModeButton(libraryID: libraryID).buttonStyle(.bordered).lineLimit(1).fixedSize()
+                CarModeButton(libraryID: libraryID) { roundLabel("Car Mode", "car.fill") }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Car Mode")
+                // The Library list is far down on a phone: a shortcut to it.
+                Button(action: showLibrary) { roundLabel("Library", "books.vertical") }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Library")
+                    .accessibilityIdentifier("musicShowLibrary")
                 #endif
             }
-            .font(.subheadline)
             .padding(.horizontal, sidePadding)
             #if os(tvOS)
             .padding(.vertical, 20)
@@ -144,7 +177,7 @@ struct MusicHomeView: View {
         .disabled(busy != nil)
     }
 
-    private func pill(_ title: String, _ icon: String, _ work: @escaping () async throws -> Void) -> some View {
+    private func action(_ title: String, _ icon: String, _ work: @escaping () async throws -> Void) -> some View {
         Button {
             guard busy == nil else { return }
             busy = title
@@ -154,15 +187,42 @@ struct MusicHomeView: View {
                 do { try await work() } catch is CancellationError {} catch { self.error = error.localizedDescription }
             }
         } label: {
-            if busy == title {
-                HStack(spacing: 6) { ProgressView(); Text(title) }.lineLimit(1).fixedSize()
-            } else {
-                Label(title, systemImage: icon).lineLimit(1).fixedSize()
-            }
+            roundLabel(title, icon, busy: busy == title)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(roundStyle)
         .accessibilityLabel(title)
     }
+
+    private func roundLabel(_ title: String, _ icon: String, busy: Bool = false) -> some View {
+        VStack(spacing: 6) {
+            ZStack {
+                Circle().fill(Color.marqueeGold.opacity(0.18))
+                if busy { ProgressView() } else { Image(systemName: icon).font(iconFont).foregroundStyle(Color.marqueeGold) }
+            }
+            .frame(width: circle, height: circle)
+            Text(title).font(.caption2.weight(.medium)).foregroundStyle(.secondary).lineLimit(1).fixedSize()
+        }
+        .frame(minWidth: circle + 8)
+        .contentShape(Rectangle())
+    }
+
+    #if os(tvOS)
+    private var roundStyle: some PrimitiveButtonStyle { .borderless }
+    private let circle: CGFloat = 90
+    private let iconFont = Font.title2
+    private let actionSpacing: CGFloat = 40
+    private let iconWidth: CGFloat = 44
+    private let rowPadding: CGFloat = 12
+    private let rowVertical: CGFloat = 6
+    #else
+    private var roundStyle: some PrimitiveButtonStyle { .plain }
+    private let circle: CGFloat = 50
+    private let iconFont = Font.title3
+    private let actionSpacing: CGFloat = 18
+    private let iconWidth: CGFloat = 26
+    private let rowPadding: CGFloat = 14
+    private let rowVertical: CGFloat = 13
+    #endif
 
     // MARK: - Loading
 
@@ -177,10 +237,11 @@ struct MusicHomeView: View {
         recentlyAdded = await addedCall ?? []
         playlists = await playlistsCall ?? []
         topArtists = await topCall
-        if soundprint {
-            mixes = (try? await app.mixes(library: libraryID)) ?? []
-            let f = try? await app.filters(library: libraryID, type: .album)
-            styles = (f?.genres.sorted { $0.count > $1.count }.map(\.value) ?? []).prefix(18).map { $0 }
+        if soundprint { mixes = (try? await app.mixes(library: libraryID)) ?? [] }
+        decades = (try? await app.filters(library: libraryID, type: .album))?.decades.map(\.value) ?? []
+        // The Library list's counts: one tiny page each, reading its total.
+        for (kind, type) in [(MusicBrowse.artists, Schemas.ItemType.artist), (.albums, .album), (.songs, .track)] {
+            if let page = try? await app.items(library: libraryID, limit: 1, type: type) { counts[kind] = page.total }
         }
     }
 
@@ -195,11 +256,6 @@ struct MusicHomeView: View {
         return Array(ids.compactMap { byID[$0] }.prefix(20))
     }
 
-    #if os(tvOS)
-    private let chipSpacing: CGFloat = 24
-    #else
-    private let chipSpacing: CGFloat = 8
-    #endif
 }
 
 /// Every song in a music library, sortable; a tap plays the list from there.
@@ -329,4 +385,96 @@ struct MusicGenresView: View {
             loaded = true
         }
     }
+}
+
+/// Moods and styles as tiles, on their own page from the Library list (MUSIC-18).
+struct MoodsAndStylesPage: View {
+    @Environment(AppSession.self) private var app
+    let libraryID: Int64
+    @State private var styles: [String] = []
+
+    var body: some View {
+        ScrollView {
+            MoodsAndStyles(libraryID: libraryID, styles: styles).padding(.vertical)
+        }
+        .navigationTitle("Moods & Styles")
+        .task {
+            let f = try? await app.filters(library: libraryID, type: .album)
+            styles = (f?.genres.sorted { $0.count > $1.count }.map(\.value) ?? []).prefix(30).map { $0 }
+        }
+    }
+}
+
+/// The decades a music library spans; each opens its albums and radio.
+struct MusicDecadesView: View {
+    @Environment(AppSession.self) private var app
+    let libraryID: Int64
+    @State private var decades: [Schemas.Facet] = []
+
+    var body: some View {
+        List {
+            ForEach(decades, id: \.value) { d in
+                if let year = Int(d.value) {
+                    NavigationLink(value: Route.musicBrowse(library: libraryID, .decade(year))) {
+                        HStack {
+                            Text("\(d.value)s")
+                            Spacer()
+                            Text("\(d.count)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Decades")
+        .task {
+            decades = ((try? await app.filters(library: libraryID, type: .album))?.decades ?? []).sorted { $0.value > $1.value }
+        }
+    }
+}
+
+/// One decade: its radio (with Soundprint) and its albums.
+struct MusicDecadeView: View {
+    @Environment(AppSession.self) private var app
+    @Environment(MusicPlayer.self) private var music
+    let libraryID: Int64
+    let decade: Int
+    @State private var albums: [Item] = []
+    @State private var radio = false
+    @State private var error: String?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                if radio {
+                    Button {
+                        Task {
+                            do {
+                                let r = RadioRequest(seed: .decade, value: String(decade), libraryId: libraryID, limit: 50)
+                                music.playStation(try await app.radio(r), radio: r)
+                            } catch { self.error = error.localizedDescription }
+                        }
+                    } label: { Label("Play \(String(decade))s Radio", systemImage: "radio") }
+                        .buttonStyle(.borderedProminent)
+                        .padding(.horizontal, sidePadding)
+                }
+                if let error { ErrorBanner(message: error).padding(.horizontal, sidePadding) }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: minWidth), spacing: 14, alignment: .top)], spacing: 14) {
+                    ForEach(albums, id: \.id) { PosterCard(item: $0, width: minWidth) }
+                }
+                .padding(.horizontal, sidePadding)
+            }
+            .padding(.vertical)
+        }
+        .navigationTitle("\(String(decade))s")
+        .task {
+            radio = (try? await app.musicStatus())?.enabled == true
+            albums = (try? await app.items(library: libraryID, sort: .year, limit: 300, type: .album, decade: decade))?.items ?? []
+        }
+    }
+
+    #if os(tvOS)
+    private let minWidth: CGFloat = 230
+    #else
+    private let minWidth: CGFloat = 110
+    #endif
 }
