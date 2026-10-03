@@ -76,24 +76,20 @@ function MixArt({
   );
 }
 
-/** The top of a music library: Muse, stations and daily mixes (M6.5). */
-export function MusicDiscover({ libraryId }: { libraryId: number }) {
-  const music = useMusicActions();
-  const radio = useRadio();
-  const muse = useMuse();
-  const [prompt, setPrompt] = useState("");
-  const [saving, setSaving] = useState(false);
+/** Soundprint status for the music home: whether radios, Muse and mixes can run. */
+export function useMusicStatus() {
   const status = useQuery({
     queryKey: ["music", "status"],
     queryFn: () => unwrap(api.GET("/music/status")),
     staleTime: 60_000,
   });
-  const mixes = useQuery({
-    queryKey: ["music", "mixes", libraryId],
-    queryFn: () =>
-      unwrap(api.GET("/music/mixes", { params: { query: { libraryId } } })),
-  });
-  const decades = useQuery({
+  const st = status.data;
+  return { status: st, ready: !!st?.enabled && st.analyzed > 0 };
+}
+
+/** The library's album genres and decades, for style tiles and decade stations. */
+export function useAlbumFacets(libraryId: number) {
+  return useQuery({
     queryKey: ["libraries", libraryId, "filters", "album"],
     queryFn: () =>
       unwrap(
@@ -102,183 +98,187 @@ export function MusicDiscover({ libraryId }: { libraryId: number }) {
         }),
       ),
   });
-  const playMix = useMutation({
-    mutationFn: async (st: Station) => music.playStation(st),
-  });
-  const st = status.data;
-  const ready = !!st?.enabled && st.analyzed > 0;
+}
+
+/** "Listening to your music: n of m tracks analysed" while Soundprint catches up. */
+export function AnalysisNote() {
+  const { status: st } = useMusicStatus();
+  if (!st?.enabled || st.analyzed >= st.total) return null;
+  return (
+    <p className="flex items-center gap-2 text-sm text-muted">
+      <Sparkles className="size-4 text-accent" aria-hidden />
+      {st.available
+        ? `Listening to your music: ${st.analyzed.toLocaleString()} of ${st.total.toLocaleString()} tracks analysed. Radios and mixes improve as it goes.`
+        : "The Soundprint analysis service isn't running, so radios and Muse are unavailable."}
+    </p>
+  );
+}
+
+/** Muse (MUSIC-5): describe a mood or moment and it plays; the result saves as a playlist. */
+export function MusePanel({ libraryId }: { libraryId: number }) {
+  const muse = useMuse();
+  const { ready } = useMusicStatus();
+  const [prompt, setPrompt] = useState("");
+  const [saving, setSaving] = useState(false);
+  if (!ready) return null;
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (prompt.trim().length > 1)
       muse.mutate({ prompt: prompt.trim(), libraryId });
   };
-  const busy = radio.isPending || muse.isPending;
-  const error = radio.error ?? muse.error;
-
-  if (st && !st.enabled) return null;
   return (
-    <section className="mb-10 space-y-6">
-      {st && st.analyzed < st.total && (
-        <p className="flex items-center gap-2 text-sm text-muted">
-          <Sparkles className="size-4 text-accent" aria-hidden />
-          {st.available
-            ? `Listening to your music: ${st.analyzed.toLocaleString()} of ${st.total.toLocaleString()} tracks analysed. Radios and mixes improve as it goes.`
-            : "The Soundprint analysis service isn't running, so radios and Muse are unavailable."}
-        </p>
-      )}
-      {error && <Alert tone="error">{error.message}</Alert>}
-
-      {ready && (
-        <form
-          onSubmit={submit}
-          className="rounded-xl border border-border bg-gradient-to-br from-accent/10 via-surface to-surface p-5"
+    <>
+      <form
+        onSubmit={submit}
+        className="rounded-xl border border-border bg-gradient-to-br from-accent/10 via-surface to-surface p-5"
+      >
+        <label
+          htmlFor="muse"
+          className="mb-2 flex items-center gap-2 text-sm font-semibold"
         >
-          <label
-            htmlFor="muse"
-            className="mb-2 flex items-center gap-2 text-sm font-semibold"
+          <Sparkles className="size-4 text-accent" aria-hidden /> Muse
+        </label>
+        <div className="flex gap-2">
+          <input
+            id="muse"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Describe a mood or moment…"
+            maxLength={300}
+            className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-surface-2 px-4 placeholder:text-faint focus:border-accent focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={muse.isPending || prompt.trim().length < 2}
+            className="flex h-11 shrink-0 items-center gap-2 rounded-lg bg-accent px-4 font-medium text-black disabled:opacity-50 sm:px-5"
           >
-            <Sparkles className="size-4 text-accent" aria-hidden /> Muse
-          </label>
-          <div className="flex gap-2">
-            <input
-              id="muse"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe a mood or moment…"
-              maxLength={300}
-              className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-surface-2 px-4 placeholder:text-faint focus:border-accent focus:outline-none"
-            />
+            {muse.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Play className="size-4 fill-current" />
+            )}{" "}
+            Play
+          </button>
+        </div>
+        {muse.error && <div className="mt-3"><Alert tone="error">{muse.error.message}</Alert></div>}
+        {muse.isSuccess && muse.data.items.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-sm" data-testid="muse-playing">
+            <span className="min-w-0 truncate text-muted">
+              Playing <strong className="text-text">{muse.data.title}</strong> · {muse.data.items.length} tracks
+            </span>
             <button
-              type="submit"
-              disabled={busy || prompt.trim().length < 2}
-              className="flex h-11 shrink-0 items-center gap-2 rounded-lg bg-accent px-4 font-medium text-black disabled:opacity-50 sm:px-5"
+              type="button"
+              onClick={() => setSaving(true)}
+              className="flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1 text-xs font-medium hover:bg-surface-3"
             >
-              {muse.isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Play className="size-4 fill-current" />
-              )}{" "}
-              Play
+              <ListPlus className="size-4" /> Save as playlist
             </button>
           </div>
-          {muse.isSuccess && muse.data.items.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm" data-testid="muse-playing">
-              <span className="min-w-0 truncate text-muted">
-                Playing <strong className="text-text">{muse.data.title}</strong> · {muse.data.items.length} tracks
-              </span>
-              <button
-                type="button"
-                onClick={() => setSaving(true)}
-                className="flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1 text-xs font-medium hover:bg-surface-3"
-              >
-                <ListPlus className="size-4" /> Save as playlist
-              </button>
-            </div>
-          )}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {musePrompts.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => muse.mutate({ prompt: p, libraryId })}
-                disabled={busy}
-                className="rounded-full bg-surface-2 px-3 py-1 text-xs text-muted hover:text-text"
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-        </form>
-      )}
+        )}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {musePrompts.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => muse.mutate({ prompt: p, libraryId })}
+              disabled={muse.isPending}
+              className="rounded-full bg-surface-2 px-3 py-1 text-xs text-muted hover:text-text"
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </form>
       {saving && muse.data && (
         <SaveAsPlaylistDialog defaultTitle={muse.data.title} itemIds={muse.data.items.map((i) => i.id)} onClose={() => setSaving(false)} />
       )}
+    </>
+  );
+}
 
-      {ready && (
-        <div>
-          <h2 className="mb-3 text-lg font-semibold">Stations</h2>
-          <div className="flex flex-wrap gap-2">
-            <StationChip
-              icon={<LibraryIcon className="size-4" />}
-              label="Library Radio"
-              disabled={busy}
-              onClick={() => radio.mutate({ seed: "library", libraryId })}
-            />
-            <StationChip
-              icon={<Heart className="size-4" />}
-              label="Favourites Radio"
-              disabled={busy}
-              onClick={() => radio.mutate({ seed: "favourites", libraryId })}
-            />
-            {moods.map((m) => (
-              <StationChip
-                key={m}
-                icon={<Radio className="size-4" />}
-                label={m}
-                disabled={busy}
-                onClick={() =>
-                  radio.mutate({
-                    seed: "mood",
-                    value: m.toLowerCase(),
-                    libraryId,
-                  })
-                }
-              />
-            ))}
-            {decades.data?.decades.slice(0, 6).map((d) => (
-              <StationChip
-                key={d.value}
-                icon={<Radio className="size-4" />}
-                label={`${d.value}s`}
-                disabled={busy}
-                onClick={() =>
-                  radio.mutate({ seed: "decade", value: d.value, libraryId })
-                }
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {ready && (
-        <BrowseMoodsAndStyles
-          libraryId={libraryId}
-          genres={decades.data?.genres ?? []}
+/** Station chips: library, favourites, moods and decades (MUSIC-3). */
+export function StationChips({ libraryId }: { libraryId: number }) {
+  const radio = useRadio();
+  const { ready } = useMusicStatus();
+  const decades = useAlbumFacets(libraryId);
+  if (!ready) return null;
+  const busy = radio.isPending;
+  return (
+    <div className="space-y-3">
+      {radio.error && <Alert tone="error">{radio.error.message}</Alert>}
+      <div className="flex flex-wrap gap-2">
+        <StationChip
+          icon={<LibraryIcon className="size-4" />}
+          label="Library Radio"
+          disabled={busy}
+          onClick={() => radio.mutate({ seed: "library", libraryId })}
         />
-      )}
+        <StationChip
+          icon={<Heart className="size-4" />}
+          label="Favourites Radio"
+          disabled={busy}
+          onClick={() => radio.mutate({ seed: "favourites", libraryId })}
+        />
+        {moods.map((m) => (
+          <StationChip
+            key={m}
+            icon={<Radio className="size-4" />}
+            label={m}
+            disabled={busy}
+            onClick={() =>
+              radio.mutate({ seed: "mood", value: m.toLowerCase(), libraryId })
+            }
+          />
+        ))}
+        {decades.data?.decades.slice(0, 6).map((d) => (
+          <StationChip
+            key={d.value}
+            icon={<Radio className="size-4" />}
+            label={`${d.value}s`}
+            disabled={busy}
+            onClick={() =>
+              radio.mutate({ seed: "decade", value: d.value, libraryId })
+            }
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
-      {mixes.data && mixes.data.length > 0 && (
-        <div>
-          <h2 className="mb-3 text-lg font-semibold">Mixes for you</h2>
-          <ul className="flex gap-4 overflow-x-auto pb-2">
-            {mixes.data.map((m) => (
-              <li key={m.id} className="w-44 shrink-0">
-                <button
-                  onClick={() => playMix.mutate(m)}
-                  className="group block w-full text-left"
-                >
-                  <div className="relative">
-                    <MixArt
-                      station={m}
-                      className="group-hover:ring-2 group-hover:ring-accent"
-                    />
-                    <span className="absolute right-2 bottom-2 rounded-full bg-accent p-2 text-black opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                      <Play className="size-4 fill-current" />
-                    </span>
-                  </div>
-                  <div className="mt-2 truncate text-sm font-medium">
-                    {m.title}
-                  </div>
-                  <div className="line-clamp-2 text-xs text-muted">
-                    {m.description}
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
+/** Daily mixes as cards for a shelf (MUSIC-4); empty until there are mixes. */
+export function useMixes(libraryId: number) {
+  return useQuery({
+    queryKey: ["music", "mixes", libraryId],
+    queryFn: () =>
+      unwrap(api.GET("/music/mixes", { params: { query: { libraryId } } })),
+  });
+}
+
+export function MixCard({ mix }: { mix: Station }) {
+  const music = useMusicActions();
+  const playMix = useMutation({
+    mutationFn: async (st: Station) => music.playStation(st),
+  });
+  return (
+    <li className="w-44 shrink-0">
+      <button
+        onClick={() => playMix.mutate(mix)}
+        className="group block w-full text-left"
+      >
+        <div className="relative">
+          <MixArt
+            station={mix}
+            className="group-hover:ring-2 group-hover:ring-accent"
+          />
+          <span className="absolute right-2 bottom-2 rounded-full bg-accent p-2 text-black opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+            <Play className="size-4 fill-current" />
+          </span>
         </div>
-      )}
-    </section>
+        <div className="mt-2 truncate text-sm font-medium">{mix.title}</div>
+        <div className="line-clamp-2 text-xs text-muted">{mix.description}</div>
+      </button>
+    </li>
   );
 }
 
@@ -317,7 +317,7 @@ const moodColours: Record<string, string> = {
 };
 
 /** Mood and style tiles (MUSIC-18); each opens a page with its radio and music. */
-function BrowseMoodsAndStyles({
+export function BrowseMoodsAndStyles({
   libraryId,
   genres,
 }: {

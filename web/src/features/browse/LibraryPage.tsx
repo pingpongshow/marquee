@@ -2,7 +2,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { clsx } from "clsx";
-import { Filter, LayoutGrid, List, Sparkles, X } from "lucide-react";
+import { ChevronLeft, Filter, LayoutGrid, List, Sparkles, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { librariesQuery, meQuery } from "@/api/queries";
@@ -10,8 +10,8 @@ import type { ItemSummary } from "@/api/types";
 import type { operations } from "@/api/schema.gen";
 import { Alert, Button, Select, Spinner } from "@/components/ui";
 import { ItemMenu } from "./ItemMenu";
-import { MusicDiscover } from "../music/Discover";
-import { RecapCard } from "../music/RecapCard";
+import { isMusicSection, MusicHome, MusicSectionPage, musicSectionTitles } from "../music/MusicHome";
+import { useMusicActions } from "../player/MusicPlayer";
 import { MuseButton } from "../search/MuseVideo";
 import { Poster } from "./Poster";
 import { formatDuration, subtitleFor } from "./format";
@@ -74,17 +74,37 @@ function Chip({ label, onClear }: { label: string; onClear: () => void }) {
   );
 }
 
+/**
+ * A library's page. Music libraries open on a curated home (MUSIC-15); their full grids live
+ * at /library/{id}/artists, /albums and /songs, and the other Library pages beside them.
+ */
 export function LibraryPage() {
-  const { libraryId } = useParams({ from: "/library/$libraryId" });
-  const search = useSearch({ from: "/library/$libraryId" });
-  const navigate = useNavigate({ from: "/library/$libraryId" });
-  const id = Number(libraryId);
+  const params = useParams({ strict: false }) as { libraryId: string; section?: string };
+  const search = useSearch({ strict: false }) as LibrarySearch;
+  const id = Number(params.libraryId);
+  const lib = useQuery(librariesQuery).data?.find((l) => l.id === id);
+  const filtered = !!(search.watch || search.genre || search.decade || search.rating || search.res);
+  const section = lib?.type === "music" && isMusicSection(params.section) ? params.section : undefined;
+  if (lib?.type === "music") {
+    if (section === "genres" || section === "decades" || section === "moods" || section === "muse")
+      return <MusicSectionPage key={section} libraryId={id} name={lib.name} section={section} />;
+    // Old links with filters on the library itself still show the (artist) grid.
+    if (!section && !filtered) return <MusicHome libraryId={id} name={lib.name} />;
+  }
+  const grid = section === "artists" || section === "albums" || section === "songs" ? section : undefined;
+  return <LibraryGrid key={`${id}-${grid ?? ""}`} id={id} section={grid} search={search} filtered={filtered} />;
+}
+
+function LibraryGrid({ id, section, search, filtered }: { id: number; section?: "artists" | "albums" | "songs"; search: LibrarySearch; filtered: boolean }) {
+  const navigate = useNavigate();
+  const music = useMusicActions();
   const lib = useQuery(librariesQuery).data?.find((l) => l.id === id);
   const isMusic = lib?.type === "music";
+  const itemType = section === "albums" ? "album" : section === "songs" ? "track" : undefined;
   const isVideo = !isMusic;
   const shape = isMusic ? "square" : lib?.type === "videos" ? "wide" : "poster";
   const sort = search.sort ?? "title";
-  const view = search.view ?? "grid";
+  const view = search.view ?? (section === "songs" ? "list" : "grid");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [savingSmart, setSavingSmart] = useState(false);
   const isAdmin = !!useQuery(meQuery).data?.isAdmin;
@@ -93,16 +113,15 @@ export function LibraryPage() {
   // A random sort gets a fresh seed each time it's chosen, but stays stable while scrolling.
   const [seed] = useState(() => Date.now());
 
-  const set = (patch: Partial<LibrarySearch>) => navigate({ search: (s: LibrarySearch) => ({ ...s, ...patch }), replace: true });
+  const set = (patch: Partial<LibrarySearch>) => void navigate({ to: ".", search: (s: LibrarySearch) => ({ ...s, ...patch }), replace: true });
   const collections = lib?.type === "movies" && search.show === "collections";
   const query: ListQuery = collections
     ? { sort, type: "collection" }
-    : { sort, watch: search.watch, genre: search.genre, decade: search.decade, contentRating: search.rating, resolution: search.res };
-  const filtered = !!(search.watch || search.genre || search.decade || search.rating || search.res);
+    : { sort, type: itemType, watch: search.watch, genre: search.genre, decade: search.decade, contentRating: search.rating, resolution: search.res };
 
   const filters = useQuery({
-    queryKey: ["libraries", id, "filters"],
-    queryFn: () => unwrap(api.GET("/libraries/{libraryId}/filters", { params: { path: { libraryId: id } } })),
+    queryKey: ["libraries", id, "filters", itemType ?? ""],
+    queryFn: () => unwrap(api.GET("/libraries/{libraryId}/filters", { params: { path: { libraryId: id }, query: itemType ? { type: itemType } : {} } })),
   });
 
   const fetchPage = (page: number) => unwrap(api.GET("/libraries/{libraryId}/items", { params: { path: { libraryId: id }, query: { ...query, offset: page * PAGE, limit: PAGE } } }));
@@ -160,8 +179,13 @@ export function LibraryPage() {
   return (
     <div className="flex">
       <div className="min-w-0 flex-1 p-6 lg:p-8">
+        {section && (
+          <Link to="/library/$libraryId" params={{ libraryId: String(id) }} className="mb-1 inline-flex items-center gap-1 text-sm text-muted hover:text-text">
+            <ChevronLeft className="size-4" aria-hidden /> {lib?.name}
+          </Link>
+        )}
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-bold">{lib?.name ?? "Library"}</h1>
+          <h1 className="text-2xl font-bold">{section ? musicSectionTitles[section] : (lib?.name ?? "Library")}</h1>
           {lib?.type === "movies" && (
             <div className="flex rounded-md bg-surface-2 p-0.5 text-sm" role="tablist" aria-label="Show">
               {(
@@ -286,8 +310,6 @@ export function LibraryPage() {
           </div>
         )}
 
-        {isMusic && !filtered && <RecapCard className="mb-8" />}
-        {isMusic && !filtered && <MusicDiscover libraryId={id} />}
         {first.isPending && <Spinner />}
         {first.isError && <Alert tone="error">{first.error.message}</Alert>}
         {first.data?.total === 0 &&
@@ -309,7 +331,8 @@ export function LibraryPage() {
                   const i = row.index * cols + c;
                   if (i >= total) return <div key={c} />;
                   const it = itemAt(i);
-                  if (view === "list") return <ListRow key={c} item={it} shape={shape} />;
+                  if (view === "list")
+                    return <ListRow key={c} item={it} shape={shape} onPlay={it?.type === "track" ? () => music.play([it], 0, { source: musicSectionTitles.songs }) : undefined} />;
                   return (
                     <div key={c} className="min-w-0">
                       {it ? (
@@ -344,12 +367,21 @@ export function LibraryPage() {
   );
 }
 
-function ListRow({ item, shape }: { item?: ItemSummary; shape: "poster" | "square" | "wide" }) {
+function ListRow({ item, shape, onPlay }: { item?: ItemSummary; shape: "poster" | "square" | "wide"; onPlay?: () => void }) {
   if (!item) return <div className="h-14 animate-pulse rounded bg-surface-2" />;
   const watched = item.type === "show" ? item.leafCount > 0 && item.watchedLeafCount === item.leafCount : (item.viewCount ?? 0) > 0;
   return (
     <div className="flex h-14 items-center gap-4 border-b border-border">
-      <Link to="/item/$itemId" params={{ itemId: String(item.id) }} className="flex min-w-0 flex-1 items-center gap-4 hover:text-accent">
+      <Link
+        to="/item/$itemId"
+        params={{ itemId: String(item.id) }}
+        onClick={(e) => {
+          if (!onPlay) return;
+          e.preventDefault(); // songs play instead of opening a page
+          onPlay();
+        }}
+        className="flex min-w-0 flex-1 items-center gap-4 hover:text-accent"
+      >
         <div className={clsx("shrink-0", shape === "wide" ? "w-20" : shape === "square" ? "w-12" : "w-9")}>
           <Poster item={item} shape={shape} width={80} compact />
         </div>
