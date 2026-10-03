@@ -28,9 +28,9 @@ public extension AppSession {
 
     func items(library: Int64, sort: ItemSort = .title, offset: Int = 0, limit: Int = 100,
                watch: Operations.ListLibraryItems.Input.Query.WatchPayload? = nil, genre: String? = nil,
-               type: Schemas.ItemType? = nil) async throws -> Schemas.ItemPage {
+               type: Schemas.ItemType? = nil, decade: Int? = nil) async throws -> Schemas.ItemPage {
         try await api.listLibraryItems(path: .init(libraryId: library),
-                                       query: .init(_type: type, sort: sort, offset: offset, limit: limit, watch: watch, genre: genre)).ok.body.json
+                                       query: .init(_type: type, sort: sort, offset: offset, limit: limit, watch: watch, genre: genre, decade: decade)).ok.body.json
     }
 
     func filters(library: Int64, type: Schemas.ItemType? = nil) async throws -> LibraryFilters {

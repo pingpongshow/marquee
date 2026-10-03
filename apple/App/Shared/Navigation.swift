@@ -21,7 +21,9 @@ enum Route: Hashable {
 
 /// The full lists behind a music library's landing page.
 enum MusicBrowse: Hashable {
-    case artists, albums, recentAlbums, songs, genres
+    case artists, albums, recentAlbums, recentlyPlayed, songs, genres, moodsAndStyles, decades
+    /// Albums from the decade starting in this year, with its radio.
+    case decade(Int)
 }
 
 extension View {
@@ -47,6 +49,10 @@ extension View {
                 case .artists: LibraryView(libraryID: library, type: .artist)
                 case .albums: LibraryView(libraryID: library, type: .album)
                 case .recentAlbums: LibraryView(libraryID: library, type: .album, initialSort: ._hyphen_added)
+                case .recentlyPlayed: LibraryView(libraryID: library, type: .album, initialSort: ._hyphen_viewed)
+                case .moodsAndStyles: MoodsAndStylesPage(libraryID: library)
+                case .decades: MusicDecadesView(libraryID: library)
+                case let .decade(year): MusicDecadeView(libraryID: library, decade: year)
                 case .songs: MusicSongsView(libraryID: library)
                 case .genres: MusicGenresView(libraryID: library)
                 }

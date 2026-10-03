@@ -325,8 +325,12 @@ final class Batch3UITests: XCTestCase {
         let user = try temporaryUser()
         signIn(username: user.name, password: user.password)
         openLibrary("Music")
-        let artists = app.buttons["musicBrowse.artists"]
-        XCTAssertTrue(artists.waitForExistence(timeout: 15))
+        let shortcut = app.buttons["musicShowLibrary"]
+        XCTAssertTrue(shortcut.waitForExistence(timeout: 15))
+        shortcut.tap()
+        let artists = app.buttons["musicLibrary.artists"]
+        XCTAssertTrue(artists.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !artists.isHittable || artists.frame.maxY > app.tabBars.firstMatch.frame.minY - 10 { app.swipeUp() }
         artists.tap()
         let artist = app.scrollViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calm Pads'")).firstMatch
         for _ in 0..<5 where !artist.waitForExistence(timeout: 2) { app.swipeUp() }
