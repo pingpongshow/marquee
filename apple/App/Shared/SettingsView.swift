@@ -21,21 +21,21 @@ struct SettingsView: View {
                         Text("@\(app.me?.username ?? "")").font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                NavigationLink("Your Stats") { StatsView() }
+                NavigationLink("Your Stats", value: Route.settings(.stats))
                 if app.me?.isAdmin == true {
-                    NavigationLink("Requests") { RequestApprovalsView() }
-                    NavigationLink("Users and Friends") { UsersView() }
-                    NavigationLink("Cinema Trailers") { CinemaSettingsView() }
+                    NavigationLink("Requests", value: Route.settings(.requests))
+                    NavigationLink("Users and Friends", value: Route.settings(.users))
+                    NavigationLink("Cinema Trailers", value: Route.settings(.cinema))
                     #if os(iOS)
-                    NavigationLink("Library Settings") { LibrarySettingsView() }
-                    NavigationLink("Library Health") { LibraryHealthView() }
-                    NavigationLink("Integrations") { IntegrationsView() }
+                    NavigationLink("Library Settings", value: Route.settings(.librarySettings))
+                    NavigationLink("Library Health", value: Route.settings(.libraryHealth))
+                    NavigationLink("Integrations", value: Route.settings(.integrations))
                     #endif
                 }
-                NavigationLink("Edit Home") { HomeEditView() }
-                NavigationLink("Subtitle Appearance") { SubtitleAppearanceView() }
+                NavigationLink("Edit Home", value: Route.settings(.editHome))
+                NavigationLink("Subtitle Appearance", value: Route.settings(.subtitleAppearance))
                 #if os(iOS)
-                NavigationLink("Remote Control") { RemotePlayersView() }
+                NavigationLink("Remote Control", value: Route.settings(.remotePlayers))
                 #endif
                 Button("Switch Profile") { switching = true }
                 Button("Sign Out", role: .destructive) { Task { await app.signOut() } }

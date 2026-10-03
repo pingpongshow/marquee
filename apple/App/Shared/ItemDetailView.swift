@@ -25,6 +25,12 @@ struct ItemDetailView: View {
     @State private var findingSubs = false
     /// A Play, Shuffle or Radio that failed, shown as an alert.
     @State private var actionError: String?
+    /// The id this page last loaded (it loads once, not on every appear).
+    @State private var loadedID: Int64?
+    /// The video playing (to refresh this page when it was this item, or one of its episodes).
+    @State private var playingID: Int64?
+    /// Continue on a show or season started an episode from this page.
+    @State private var startedHere = false
 
     var body: some View {
         ScrollView {
@@ -66,32 +72,73 @@ struct ItemDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .navigationTitle(detail?.title ?? "")
-        .task { await load() }
+        .task(id: id) {
+            guard loadedID != id else { return }
+            await load()
+        }
         .alert("Couldn't play", isPresented: Binding(get: { actionError != nil }, set: { if !$0 { actionError = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(actionError ?? "")
         }
-        .onChange(of: video.request) { if video.request == nil { Task { await load() } } }
+        .onChange(of: video.request) {
+            if let r = video.request {
+                playingID = r.itemID
+                return
+            }
+            // Closing the player refreshes only the page whose progress changed.
+            let played = playingID
+            playingID = nil
+            let mine = played == id || children.contains { $0.id == played } || startedHere
+            startedHere = false
+            if mine { Task { await refresh() } }
+        }
     }
 
     private func load() async {
         do {
             let d = try await app.item(id)
             detail = d
-            if d.base.childCount > 0 { children = try await app.children(id) }
-            if [.movie, .show, .artist, .album].contains(d.type) { related = (try? await app.related(id)) ?? [] }
-            if d.type == .artist { popular = (try? await app.popularTracks(id)) ?? [] }
-            if d.type == .artist || d.type == .album { soundsLike = (try? await app.soundsLike(id, limit: 15)) ?? [] }
+            error = nil
+            loadedID = id
             watchlisted = d.base.watchlisted ?? false
-            var found: [(collection: Item, members: [Item])] = []
-            for c in d.info.collections ?? [] {
-                let members = ((try? await app.children(c.id)) ?? []).filter { $0.id != id }
-                if !members.isEmpty { found.append((c, members)) }
-            }
-            series = found
+            let wantsRelated = [.movie, .show, .artist, .album].contains(d.type)
+            // Everything else in parallel.
+            async let kids: [Item] = d.base.childCount > 0 ? app.children(id) : []
+            async let rel: [Item]? = wantsRelated ? try? app.related(id) : []
+            async let pop: [Item]? = d.type == .artist ? try? app.popularTracks(id) : []
+            async let sounds: [Item]? = d.type == .artist || d.type == .album ? try? app.soundsLike(id, limit: 15) : []
+            async let found = collectionMembers(d.info.collections ?? [])
+            children = try await kids
+            related = await rel ?? []
+            popular = await pop ?? []
+            soundsLike = await sounds ?? []
+            series = await found
+        } catch is CancellationError {
         } catch {
-            self.error = error.localizedDescription
+            if detail == nil { self.error = error.localizedDescription }
+        }
+    }
+
+    /// The item and its children again (progress, watched state), without the shelves.
+    private func refresh() async {
+        guard let d = try? await app.item(id) else { return }
+        detail = d
+        watchlisted = d.base.watchlisted ?? false
+        if d.base.childCount > 0, let kids = try? await app.children(id) { children = kids }
+    }
+
+    /// The other members of each collection this item is in, fetched together.
+    private func collectionMembers(_ collections: [Item]) async -> [(collection: Item, members: [Item])] {
+        let me = id
+        let app = app
+        return await withTaskGroup(of: (Int, Item, [Item]).self) { group in
+            for (i, c) in collections.enumerated() {
+                group.addTask { @MainActor in (i, c, ((try? await app.children(c.id)) ?? []).filter { $0.id != me }) }
+            }
+            var out: [(Int, Item, [Item])] = []
+            for await r in group where !r.2.isEmpty { out.append(r) }
+            return out.sorted { $0.0 < $1.0 }.map { ($0.1, $0.2) }
         }
     }
 
@@ -99,7 +146,7 @@ struct ItemDetailView: View {
 
     @ViewBuilder private var backdrop: some View {
         if let art = detail?.base.images?.backdrop {
-            AsyncImage(url: app.imageURL(art, width: 1280)) { phase in
+            CachedImage(url: app.imageURL(art, width: backdropWidth)) { phase in
                 if let image = phase.image {
                     image.resizable().scaledToFill()
                         .frame(height: backdropHeight).clipped()
@@ -110,6 +157,15 @@ struct ItemDetailView: View {
             .frame(height: backdropHeight)
             .ignoresSafeArea()
         }
+    }
+
+    /// The backdrop's requested width: about the screen's on a phone, not a 4K frame.
+    private var backdropWidth: Int {
+        #if os(tvOS)
+        1920
+        #else
+        compact ? 800 : 1280
+        #endif
     }
 
     private var compact: Bool {
@@ -131,20 +187,23 @@ struct ItemDetailView: View {
 
     private func header(_ d: ItemDetail) -> some View {
         let shape: PosterShape = d.type == .episode ? .wide : (d.type == .album || d.type == .artist || d.type == .track) ? .square : .poster
-        // iPhone portrait: music and collections stack the art above the title, so neither is
-        // squeezed into a narrow column.
-        let stacked = compact && [.album, .artist, .collection].contains(d.type)
+        // iPhone (any type, either orientation): the art stacks above the title, so the title
+        // is never squeezed into a narrow column and broken mid-word.
+        let stacked = compact
         let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 14)) : AnyLayout(HStackLayout(alignment: .bottom, spacing: 20))
+        // A stacked episode still is smaller than full width.
+        let artWidth = shape == .wide ? (stacked ? posterWidth * 1.4 : posterWidth * 1.6) : posterWidth
         return VStack(alignment: .leading, spacing: 16) {
             layout {
-                ArtworkView(item: d.base, shape: shape, width: shape == .wide ? posterWidth * 1.6 : posterWidth)
-                    .frame(width: shape == .wide ? posterWidth * 1.6 : posterWidth)
+                ArtworkView(item: d.base, shape: shape, width: artWidth)
+                    .frame(width: artWidth)
                     .shadow(radius: 10)
                 VStack(alignment: .leading, spacing: 6) {
                     if d.type == .episode, let show = d.base.grandparentTitle, let showID = d.base.grandparentId {
                         NavigationLink(value: Route.item(showID)) { Text(show).font(.headline).foregroundStyle(.secondary) }.buttonStyle(.plain)
                     }
-                    Text(d.title).font(.largeTitle.bold()).lineLimit(3)
+                    Text(d.title).font(.largeTitle.bold()).lineLimit(3).minimumScaleFactor(0.7)
+                        .accessibilityIdentifier("itemTitle")
                     if d.info.smartRules != nil {
                         // Members follow rules set on the web (META-7).
                         Label("Smart collection", systemImage: "sparkles").font(.caption.weight(.semibold)).foregroundStyle(Color.marqueeGold)
@@ -159,8 +218,17 @@ struct ItemDetailView: View {
                     }
                     if !d.info.genres.isEmpty { Text(d.info.genres.joined(separator: ", ")).font(.caption).foregroundStyle(.tertiary) }
                     ratings(d)
+                    if [.album, .artist, .track, .movie, .show, .episode].contains(d.type) {
+                        // The person's own rating; tap a star (or half) to change it (MUSIC-11).
+                        RatingStars(itemID: d.id, rating: d.base.userRating, labelPrefix: "Rate ")
+                            .id(d.id)
+                            .font(isTV ? .title3 : .body)
+                            .accessibilityIdentifier("itemRating")
+                    }
                 }
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(stacked ? "itemHeader.stacked" : "itemHeader.beside")
             // Labels stay on one line; when they don't fit, the secondary actions go icon-only.
             HeaderActions { primaryButtons(d) } secondary: { secondaryButtons(d) }
                 .accessibilityIdentifier("itemActions")
@@ -226,6 +294,7 @@ struct ItemDetailView: View {
             Button {
                 run {
                     guard let ep = try await app.leaves(d.id, unwatched: true).first else { throw MarqueeError("There are no unwatched episodes.") }
+                    startedHere = true
                     video.play(ep.id)
                 }
             } label: {
@@ -268,7 +337,7 @@ struct ItemDetailView: View {
             Button {
                 Task {
                     try? await app.setWatched(d.id, !d.base.watched)
-                    await load()
+                    await refresh()
                 }
             } label: {
                 Label(d.base.watched ? "Watched" : "Mark watched", systemImage: d.base.watched ? "checkmark.circle.fill" : "checkmark.circle")
@@ -281,9 +350,11 @@ struct ItemDetailView: View {
             PlayOnButton(target: { PlayOnTarget(itemIDs: [d.id]) }).buttonStyle(.bordered)
         }
         #endif
-        Menu { ItemMenuItems(item: d.base) } label: { Image(systemName: "ellipsis").padding(.horizontal, 4) }
+        // Watchlist and Watched are buttons above (always current), so the menu leaves them out.
+        Menu { ItemMenuItems(item: d.base, showsLibraryState: false) } label: { Label("More", systemImage: "ellipsis") }
             .buttonStyle(.bordered)
             .accessibilityLabel("More")
+            .accessibilityIdentifier("itemMore")
     }
 
     private func radioButton(_ d: ItemDetail) -> some View {
@@ -330,8 +401,8 @@ struct ItemDetailView: View {
             .sheet(isPresented: $findingSubs) {
                 SubtitleSearchSheet(itemID: d.id, onAdded: { stream in
                     subtitleID = stream
-                    Task { await load() }
-                }, onBazarr: { Task { await load() } })
+                    Task { await refresh() }
+                }, onBazarr: { Task { await refresh() } })
             }
             .onChange(of: fileID) {
                 audioID = nil
@@ -486,19 +557,23 @@ struct ItemDetailView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Popular").font(.title3.bold()).padding(.horizontal, sidePadding).padding(.bottom, 6)
             ForEach(Array((allPopular ? popular : Array(popular.prefix(5))).enumerated()), id: \.element.id) { i, t in
-                Button { music.play(popular, start: i, source: "\(d.title) – Popular") } label: {
-                    HStack(spacing: 14) {
-                        Text("\(i + 1)").font(.callout.monospacedDigit()).foregroundStyle(.secondary).frame(width: 28, alignment: .trailing)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(t.title).lineLimit(1).foregroundStyle(music.current?.item.id == t.id ? Color.marqueeGold : .primary)
-                            if let album = t.parentTitle { Text(album).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                HStack(spacing: 4) {
+                    Button { music.play(popular, start: i, source: "\(d.title) – Popular") } label: {
+                        HStack(spacing: 14) {
+                            Text("\(i + 1)").font(.callout.monospacedDigit()).foregroundStyle(.secondary).frame(width: 28, alignment: .trailing)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(t.title).lineLimit(1).foregroundStyle(music.current?.item.id == t.id ? Color.marqueeGold : .primary)
+                                if let album = t.parentTitle { Text(album).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                            }
+                            Spacer()
                         }
-                        Spacer()
+                        .padding(.leading, sidePadding).padding(.vertical, 8)
+                        .contentShape(Rectangle())
                     }
-                    .padding(.horizontal, sidePadding).padding(.vertical, 8)
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
+                    RowRating(item: t)
                 }
-                .buttonStyle(.plain)
+                .padding(.trailing, sidePadding - 6)
             }
             if popular.count > 5 {
                 Button(allPopular ? "Show Fewer" : "Show All \(popular.count)") { allPopular.toggle() }
@@ -518,7 +593,7 @@ struct ItemDetailView: View {
                                 Circle().fill(Color.gray.opacity(0.3))
                                 Image(systemName: "person.fill").foregroundStyle(.secondary)
                                 if c.hasPhoto == true {
-                                    AsyncImage(url: app.personPhotoURL(c.personId, width: Int(castSize))) { $0.image?.resizable().scaledToFill() }
+                                    CachedImage(fill: app.personPhotoURL(c.personId, width: Int(castSize)))
                                 }
                             }
                             .frame(width: castSize, height: castSize).clipShape(Circle())
@@ -593,26 +668,31 @@ struct TrackRow: View {
     let play: () -> Void
 
     var body: some View {
-        Button(action: play) {
-            HStack(spacing: 14) {
-                Text(track.index.map(String.init) ?? "").font(.callout.monospacedDigit()).foregroundStyle(.secondary).frame(width: 28, alignment: .trailing)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(track.title).lineLimit(1).foregroundStyle(music.current?.item.id == track.id ? Color.marqueeGold : .primary)
-                    if let credit = track.artistCredit, credit != album?.artistCredit { Text(credit).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+        // The rating sits beside the play button, not inside it, so it can be tapped alone.
+        HStack(spacing: 4) {
+            Button(action: play) {
+                HStack(spacing: 14) {
+                    Text(track.index.map(String.init) ?? "").font(.callout.monospacedDigit()).foregroundStyle(.secondary).frame(width: 28, alignment: .trailing)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(track.title).lineLimit(1).foregroundStyle(music.current?.item.id == track.id ? Color.marqueeGold : .primary)
+                        if let credit = track.artistCredit, credit != album?.artistCredit { Text(credit).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                    }
+                    Spacer()
+                    if music.showAudioQuality, let f = track.audioFormat {
+                        Text(f.shortLabel).font(.caption2).foregroundStyle(.tertiary).lineLimit(1).fixedSize()
+                            .accessibilityIdentifier("trackQuality")
+                    }
+                    Text(formatTime(seconds: Double(track.durationMs ?? 0) / 1000)).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
                 }
-                Spacer()
-                if music.showAudioQuality, let f = track.audioFormat {
-                    Text(f.shortLabel).font(.caption2).foregroundStyle(.tertiary).lineLimit(1).fixedSize()
-                        .accessibilityIdentifier("trackQuality")
-                }
-                Text(formatTime(seconds: Double(track.durationMs ?? 0) / 1000)).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+                .padding(.leading, sidePadding)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, sidePadding)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .contextMenu { ItemMenuItems(item: track) }
+            RowRating(item: track)
         }
-        .buttonStyle(.plain)
-        .contextMenu { ItemMenuItems(item: track) }
+        .padding(.trailing, sidePadding - 6)
     }
 }
 

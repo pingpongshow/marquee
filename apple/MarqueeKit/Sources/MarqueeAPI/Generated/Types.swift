@@ -908,6 +908,21 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `PUT /items/{itemId}/rating`.
     /// - Remark: Generated from `#/paths//items/{itemId}/rating/put(rateItem)`.
     func rateItem(_ input: Operations.RateItem.Input) async throws -> Operations.RateItem.Output
+    /// The community rating and everyone's ratings and comments for an item (USER-17).
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/reviews`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/reviews/get(itemReviews)`.
+    func itemReviews(_ input: Operations.ItemReviews.Input) async throws -> Operations.ItemReviews.Output
+    /// Your comment on an item, shown with your rating to everyone who can see it. An empty comment removes it (your rating stays; set that with PUT /items/{itemId}/rating).
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/reviews`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/reviews/put(setReview)`.
+    func setReview(_ input: Operations.SetReview.Input) async throws -> Operations.SetReview.Output
+    /// Remove a comment (your own, or anyone's for admins). Ratings aren't touched.
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/reviews/{userId}`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/reviews/{userId}/delete(deleteReview)`.
+    func deleteReview(_ input: Operations.DeleteReview.Input) async throws -> Operations.DeleteReview.Output
     /// Seek-bar preview thumbnails for a video (PLAY-13), as sprite sheets of columns × rows tiles.
     ///
     /// - Remark: HTTP `GET /items/{itemId}/trickplay`.
@@ -3099,6 +3114,47 @@ extension APIProtocol {
             path: path,
             headers: headers,
             body: body
+        ))
+    }
+    /// The community rating and everyone's ratings and comments for an item (USER-17).
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/reviews`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/reviews/get(itemReviews)`.
+    public func itemReviews(
+        path: Operations.ItemReviews.Input.Path,
+        headers: Operations.ItemReviews.Input.Headers = .init()
+    ) async throws -> Operations.ItemReviews.Output {
+        try await itemReviews(Operations.ItemReviews.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Your comment on an item, shown with your rating to everyone who can see it. An empty comment removes it (your rating stays; set that with PUT /items/{itemId}/rating).
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/reviews`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/reviews/put(setReview)`.
+    public func setReview(
+        path: Operations.SetReview.Input.Path,
+        headers: Operations.SetReview.Input.Headers = .init(),
+        body: Operations.SetReview.Input.Body
+    ) async throws -> Operations.SetReview.Output {
+        try await setReview(Operations.SetReview.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Remove a comment (your own, or anyone's for admins). Ratings aren't touched.
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/reviews/{userId}`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/reviews/{userId}/delete(deleteReview)`.
+    public func deleteReview(
+        path: Operations.DeleteReview.Input.Path,
+        headers: Operations.DeleteReview.Input.Headers = .init()
+    ) async throws -> Operations.DeleteReview.Output {
+        try await deleteReview(Operations.DeleteReview.Input(
+            path: path,
+            headers: headers
         ))
     }
     /// Seek-bar preview thumbnails for a video (PLAY-13), as sprite sheets of columns × rows tiles.

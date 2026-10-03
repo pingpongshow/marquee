@@ -31,6 +31,12 @@ public final class VideoPlayback {
     public private(set) var errorMessage: String?
     public private(set) var finished = false
     public private(set) var position: Double = 0
+    /// True once less than `nearEndWindow` seconds of the current video remain (its duration
+    /// known). It changes only when it crosses that line, so views can watch it instead of
+    /// `position` (which changes every second).
+    public private(set) var nearEnd = false
+    /// How close to the end `nearEnd` turns on (the Next Episode offer).
+    public static let nearEndWindow: Double = 60
     /// Playback speed (PLAY-19); each video starts at 1×.
     public var speed: Float = 1 {
         didSet {
@@ -56,6 +62,8 @@ public final class VideoPlayback {
     @ObservationIgnored public var onRestart: (() -> Void)?
     @ObservationIgnored private var lastReport = Date.distantPast
     @ObservationIgnored private var fallback = 0
+    /// The item `fallback` applies to (a failing trailer mustn't downgrade the feature).
+    @ObservationIgnored private var fallbackItemID: Int64?
     /// The version being played (nil = the server's best).
     @ObservationIgnored private var fileID: Int64?
     @ObservationIgnored private var selection: (audio: Int64?, subtitle: Int64?) = (nil, nil)
@@ -113,7 +121,12 @@ public final class VideoPlayback {
     public func start(itemID: Int64, startMs: Int64? = nil, audio: Int64? = nil, subtitle: Int64? = nil, fileID: Int64? = nil) async {
         errorMessage = nil
         finished = false
+        setNearEnd(false)
         guard let client = app.client else { return }
+        if fallbackItemID != itemID {
+            fallback = 0
+            fallbackItemID = itemID
+        }
         if player.currentItem != nil || session != nil { onRestart?() }
         if item?.id != itemID {
             item = try? await app.item(itemID)
@@ -181,6 +194,7 @@ public final class VideoPlayback {
     public func startLocal(itemID: Int64, file: URL, downloads: Downloads) async {
         errorMessage = nil
         finished = false
+        setNearEnd(false)
         offline = (itemID, downloads)
         offlineTitle = downloads.entries[itemID]?.item.title
         if app.client != nil { item = try? await app.item(itemID) }
@@ -247,10 +261,11 @@ public final class VideoPlayback {
 
     private func observe(_ playerItem: AVPlayerItem) {
         itemStatus?.invalidate()
+        let id = ObjectIdentifier(playerItem)
         itemStatus = playerItem.observe(\.status) { [weak self] it, _ in
             guard it.status == .failed else { return }
             let message = it.error?.localizedDescription ?? "unknown error"
-            Task { @MainActor in await self?.failed(message) }
+            Task { @MainActor in await self?.failed(message, item: id) }
         }
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         endObserver = NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: playerItem, queue: .main) { [weak self] _ in
@@ -262,7 +277,9 @@ public final class VideoPlayback {
     }
 
     /// Reports the error to the server log and retries with a more conservative profile.
-    private func failed(_ message: String) async {
+    private func failed(_ message: String, item: ObjectIdentifier) async {
+        // A stream that has since been replaced (a restart, the next video) failing late.
+        guard player.currentItem.map(ObjectIdentifier.init) == item else { return }
         if let s = session, let client = app.client {
             let pos = Int64(max(0, player.currentTime().seconds) * 1000)
             _ = try? await client.reportPlayback(path: .init(sessionId: s.id), body: .json(.init(positionMs: pos, state: .error, error: "AVPlayer: \(message)")))
@@ -279,9 +296,18 @@ public final class VideoPlayback {
     private func tick(_ seconds: Double) {
         guard seconds.isFinite else { return }
         position = seconds
+        if let d = player.currentItem?.duration, d.isNumeric {
+            setNearEnd(d.seconds - seconds < Self.nearEndWindow)
+        } else {
+            setNearEnd(false)
+        }
         let ms = Int64(seconds * 1000)
         activeMarker = session?.markers.first { ms >= $0.startMs && ms < $0.endMs - 1000 }
         if Date().timeIntervalSince(lastReport) >= 10, player.timeControlStatus == .playing { report(.playing) }
+    }
+
+    private func setNearEnd(_ value: Bool) {
+        if nearEnd != value { nearEnd = value }
     }
 
     /// Sends the position; returns the request so callers can wait for it.

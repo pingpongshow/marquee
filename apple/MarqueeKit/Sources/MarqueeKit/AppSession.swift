@@ -67,7 +67,17 @@ public final class AppSession {
     /// The address in use (LAN or Tailscale).
     public private(set) var baseURL: URL?
     public private(set) var info: Schemas.SystemInfo?
-    public private(set) var me: User?
+    public private(set) var me: User? {
+        didSet {
+            // Keep the image key, so image URLs use it from the start next time.
+            if let key = me?.imageKey, !key.isEmpty, key != imageKey {
+                imageKey = key
+                if let id = server?.id { ServerStore.setImageKey(key, for: id) }
+            }
+        }
+    }
+    /// The image key (D85) for the signed-in person, remembered across launches.
+    private var imageKey: String?
     public private(set) var lastError: String?
     public private(set) var client: Client?
     /// For requests the server holds open (remote control's long polls, USER-14).
@@ -88,11 +98,14 @@ public final class AppSession {
     @ObservationIgnored private var lastPath: String?
     @ObservationIgnored private var pathDebounce: Task<Void, Never>?
     @ObservationIgnored private var reconnectTask: Task<Void, Never>?
+    /// The URL sessions behind `client` and `longPollClient`, invalidated when they're replaced.
+    @ObservationIgnored private var urlSessions: [URLSession] = []
 
     public init() {
         if let id = ServerStore.currentServerID, let s = ServerStore.servers.first(where: { $0.id == id }) {
             server = s
             token = ServerStore.token(for: s.id)
+            imageKey = token == nil ? nil : ServerStore.imageKey(for: s.id)
             state = .connecting
             Task { await reconnect() }
         }
@@ -140,14 +153,36 @@ public final class AppSession {
 
     // MARK: - Connecting
 
-    private func makeClient(_ base: URL, timeout: TimeInterval = 20) -> Client {
+    private func makeClient(_ base: URL, timeout: TimeInterval = 20) -> (Client, URLSession) {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = timeout
         config.waitsForConnectivity = false
-        return Client(serverURL: base.appending(path: "api/v1"),
-                      configuration: .init(dateTranscoder: FlexibleDateTranscoder()),
-                      transport: URLSessionTransport(configuration: .init(session: URLSession(configuration: config))),
-                      middlewares: [AuthMiddleware(token: { [box = tokenBox] in box.token })])
+        let session = URLSession(configuration: config)
+        let client = Client(serverURL: base.appending(path: "api/v1"),
+                            configuration: .init(dateTranscoder: FlexibleDateTranscoder()),
+                            transport: URLSessionTransport(configuration: .init(session: session)),
+                            middlewares: [AuthMiddleware(token: { [box = tokenBox] in box.token })])
+        return (client, session)
+    }
+
+    /// Uses `url` for the API clients: the current ones stay when the address hasn't changed;
+    /// otherwise new ones replace them and the old sessions finish what they're doing and go.
+    private func setClients(for url: URL) {
+        if client != nil, longPollClient != nil, baseURL == url { return }
+        dropClients()
+        let (c, s) = makeClient(url)
+        let (lp, ls) = makeClient(url, timeout: 45) // the server waits up to 25 s
+        urlSessions = [s, ls]
+        baseURL = url
+        client = c
+        longPollClient = lp
+    }
+
+    private func dropClients() {
+        for s in urlSessions { s.finishTasksAndInvalidate() }
+        urlSessions = []
+        client = nil
+        longPollClient = nil
     }
 
     /// Fetches /system/info from a URL with a short timeout.
@@ -196,6 +231,7 @@ public final class AppSession {
         ServerStore.currentServerID = record.id
         server = record
         token = ServerStore.token(for: record.id)
+        imageKey = token == nil ? nil : ServerStore.imageKey(for: record.id)
     }
 
     /// Picks the best address for the current network and checks the session. Calls while
@@ -233,16 +269,21 @@ public final class AppSession {
             server = record
         }
         lastError = nil
-        baseURL = url
+        setClients(for: url)
         self.info = info
-        client = makeClient(url)
-        longPollClient = makeClient(url, timeout: 45) // the server waits up to 25 s
-        guard token != nil else { state = .signedOut; return }
-        do {
-            me = try await client!.getMe().ok.body.json
+        guard let c = client, let sentToken = token else { state = .signedOut; return }
+        let response = try? await c.getMe()
+        // The server, the person or the connection may have changed while /me was asked
+        // (forgetting the server, signing out, a newer reconnect): this answer is stale then.
+        guard server?.id == record.id, let current = token, current == sentToken else { return }
+        switch response {
+        case .ok(let ok):
+            if let user = try? ok.body.json { me = user }
             state = .signedIn
-        } catch {
-            if case .unauthorized = (try? await client!.getMe()) { signOutLocally() } else { state = .signedIn }
+        case .unauthorized:
+            signOutLocally()
+        default:
+            state = .signedIn // unreachable or a server error: stay signed in with what's known
         }
     }
 
@@ -250,6 +291,7 @@ public final class AppSession {
 
     private func signedIn(_ auth: Schemas.AuthResult) {
         if let old = me?.id, old != auth.user.id { onUserChange?() }
+        if me?.id != auth.user.id { forgetImageKey() } // another person's key; theirs comes with /me
         token = auth.token
         if let id = server?.id { ServerStore.setToken(auth.token, for: id) }
         me = auth.user
@@ -331,6 +373,7 @@ public final class AppSession {
         onUserChange?()
         token = nil
         me = nil
+        forgetImageKey()
         if let id = server?.id { ServerStore.setToken(nil, for: id) }
         state = server == nil ? .noServer : .signedOut
     }
@@ -339,11 +382,18 @@ public final class AppSession {
         onUserChange?()
         if let id = server?.id { ServerStore.forget(id) }
         server = nil
-        client = nil
-        longPollClient = nil
+        dropClients()
+        baseURL = nil
+        info = nil
         token = nil
         me = nil
+        imageKey = nil
         state = .noServer
+    }
+
+    private func forgetImageKey() {
+        imageKey = nil
+        if let id = server?.id { ServerStore.setImageKey(nil, for: id) }
     }
 
     public func refreshMe() async {
@@ -356,21 +406,43 @@ public final class AppSession {
     /// which grants those images and nothing else, or the token until the key is known.
     private var imageAuth: URLQueryItem {
         if let key = me?.imageKey, !key.isEmpty { return .init(name: "key", value: key) }
+        if let imageKey { return .init(name: "key", value: imageKey) }
         return .init(name: "token", value: token)
     }
 
-    /// Artwork URL usable directly (images authenticate with the image key).
-    public func imageURL(_ artworkID: Int64?, width: Int) -> URL? {
-        guard let artworkID, let baseURL else { return nil }
+    private static var displayScale: Int {
         #if canImport(UIKit)
-        let scale = Int(UITraitCollection.current.displayScale.rounded())
+        max(1, Int(UITraitCollection.current.displayScale.rounded()))
         #else
-        let scale = 2
+        2
         #endif
+    }
+
+    /// Artwork URL usable directly (images authenticate with the image key). `width` is in
+    /// points; the URL asks for that many pixels times the screen scale.
+    public func imageURL(_ artworkID: Int64?, width: Int) -> URL? {
+        imageURL(artworkID, pixels: width * Self.displayScale)
+    }
+
+    /// Artwork URL for an exact pixel width.
+    public func imageURL(_ artworkID: Int64?, pixels: Int) -> URL? {
+        guard let artworkID, let baseURL else { return nil }
         var c = URLComponents(url: baseURL.appending(path: "api/v1/images/\(artworkID)"), resolvingAgainstBaseURL: false)!
-        c.queryItems = [.init(name: "w", value: String(width * max(scale, 1))), imageAuth]
+        c.queryItems = [.init(name: "w", value: String(max(1, pixels))), imageAuth]
         return c.url
     }
+
+    /// A stable cache key for an artwork image at a width (points): the same on every address
+    /// (LAN or Tailscale) and whether the URL carries the token or the image key, so switching
+    /// networks or learning the key doesn't download everything again.
+    public func imageCacheKey(_ artworkID: Int64?, width: Int) -> String? {
+        guard let artworkID else { return nil }
+        return "\(server?.id ?? "-")/art/\(artworkID)/w\(width * Self.displayScale)"
+    }
+
+    /// Whether image URLs authenticate with the image key (true) or still with the bearer
+    /// token (false: /me hasn't answered yet). Token URLs shouldn't go into a disk cache.
+    public var imageURLsUseKey: Bool { !(me?.imageKey ?? "").isEmpty || imageKey != nil }
 
     public func personPhotoURL(_ personID: Int64, width: Int) -> URL? {
         guard let baseURL else { return nil }

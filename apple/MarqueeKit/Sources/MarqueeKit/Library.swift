@@ -28,9 +28,11 @@ public extension AppSession {
 
     func items(library: Int64, sort: ItemSort = .title, offset: Int = 0, limit: Int = 100,
                watch: Operations.ListLibraryItems.Input.Query.WatchPayload? = nil, genre: String? = nil,
-               type: Schemas.ItemType? = nil, decade: Int? = nil) async throws -> Schemas.ItemPage {
+               type: Schemas.ItemType? = nil, decade: Int? = nil, minMyRating: Int? = nil) async throws -> Schemas.ItemPage {
+        // minMyRating: only what this person rated at least that (0–10; 8 = 4 stars, favourites).
         try await api.listLibraryItems(path: .init(libraryId: library),
-                                       query: .init(_type: type, sort: sort, offset: offset, limit: limit, watch: watch, genre: genre, decade: decade)).ok.body.json
+                                       query: .init(_type: type, sort: sort, offset: offset, limit: limit, watch: watch, genre: genre,
+                                                    decade: decade, minMyRating: minMyRating)).ok.body.json
     }
 
     func filters(library: Int64, type: Schemas.ItemType? = nil) async throws -> LibraryFilters {
@@ -79,6 +81,14 @@ public extension AppSession {
 
     func playlists(kind: Schemas.PlaylistKind? = nil) async throws -> [Playlist] {
         try await api.listPlaylists(query: .init(kind: kind)).ok.body.json
+    }
+
+    func playlist(_ id: Int64) async throws -> Playlist {
+        switch try await api.getPlaylist(path: .init(playlistId: id)) {
+        case let .ok(ok): return try ok.body.json
+        case .notFound: throw MarqueeError("This playlist is gone.")
+        default: throw MarqueeError("Couldn't load the playlist.")
+        }
     }
 
     func playlistItems(_ id: Int64) async throws -> [PlaylistEntry] {

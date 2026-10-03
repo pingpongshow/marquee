@@ -204,7 +204,12 @@ struct MixCard: View {
 struct RatingStars: View {
     @Environment(AppSession.self) private var app
     let itemID: Int64
-    @State var rating: Double?
+    /// The rating the server sent; this session's changes (here or on a row) win.
+    let rating: Double?
+    /// Put before each star's spoken name ("Rate 3 stars" on item pages).
+    var labelPrefix = ""
+
+    private var current: Double? { RatingStore.shared.rating(itemID, rating) }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -212,7 +217,7 @@ struct RatingStars: View {
                 #if os(tvOS)
                 Button { set(star) } label: { image(star) }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("\(star) star\(star == 1 ? "" : "s")")
+                    .accessibilityLabel("\(labelPrefix)\(star) star\(star == 1 ? "" : "s")")
                 #else
                 // The left half of a star gives a half star.
                 image(star)
@@ -226,16 +231,16 @@ struct RatingStars: View {
                         }
                     }
                     .accessibilityAddTraits(.isButton)
-                    .accessibilityLabel("\(star) star\(star == 1 ? "" : "s")")
+                    .accessibilityLabel("\(labelPrefix)\(star) star\(star == 1 ? "" : "s")")
                     .accessibilityAction { pick(Double(star * 2)) }
                 #endif
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Rating")
-        .accessibilityValue(rating.map { String(format: "%.1f stars", $0 / 2) } ?? "Not rated")
+        .accessibilityValue(current.map { String(format: "%.1f stars", $0 / 2) } ?? "Not rated")
         .accessibilityAdjustableAction { dir in
-            let r = rating ?? 0
+            let r = current ?? 0
             pick(min(10, max(0, r + (dir == .increment ? 1 : -1))))
         }
     }
@@ -246,13 +251,13 @@ struct RatingStars: View {
 
     /// Sets a rating (0–10); choosing the current value again clears it.
     private func pick(_ v: Double) {
-        let next: Double? = (v == rating || v == 0) ? nil : v
-        rating = next
-        Task { try? await app.rate(itemID, next) }
+        let old = current
+        let next: Double? = (v == old || v == 0) ? nil : v
+        RatingStore.shared.rate(itemID, next, was: old, app: app)
     }
 
     private func symbol(_ star: Int) -> String {
-        let r = rating ?? 0
+        let r = current ?? 0
         if r >= Double(star * 2) { return "star.fill" }
         if r >= Double(star * 2 - 1) { return "star.leadinghalf.filled" }
         return "star"
@@ -262,9 +267,9 @@ struct RatingStars: View {
     /// makes it a half; pressing the half clears the rating.
     private func set(_ star: Int) {
         let full = Double(star * 2)
-        let next: Double? = rating == full ? full - 1 : rating == full - 1 ? nil : full
-        rating = next
-        Task { try? await app.rate(itemID, next) }
+        let old = current
+        let next: Double? = old == full ? full - 1 : old == full - 1 ? nil : full
+        RatingStore.shared.rate(itemID, next, was: old, app: app)
     }
 }
 
@@ -310,6 +315,7 @@ struct LyricsView: View {
         }
         .task(id: itemID) {
             loaded = false
+            lyrics = nil // the last track's lyrics don't linger
             lyrics = try? await app.lyrics(itemID)
             loaded = true
         }
@@ -484,40 +490,49 @@ struct MoodStyleView: View {
                 if let error { Text(error).foregroundStyle(.red).padding(.horizontal, sidePadding) }
                 if !albums.isEmpty {
                     ShelfRow(title: kind == .mood ? "Albums with This Feel" : "Albums") {
-                        ForEach(albums, id: \.id) { a in
-                            NavigationLink(value: Route.item(a.id)) { PosterCard(item: a) }.buttonStyle(.plain)
-                        }
+                        ForEach(albums, id: \.id) { PosterCard(item: $0) }
                     }
                 }
                 if !tracks.isEmpty {
                     VStack(alignment: .leading, spacing: 0) {
                         Text("Tracks").font(.title3.bold()).padding(.bottom, 8)
                         ForEach(Array(tracks.enumerated()), id: \.element.id) { i, t in
-                            Button { music.play(tracks, start: i, source: name) } label: {
-                                HStack {
-                                    Text("\(i + 1)").font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 24, alignment: .trailing)
-                                    VStack(alignment: .leading) {
-                                        Text(t.title).lineLimit(1)
-                                        Text([t.artistCredit ?? t.grandparentTitle, t.parentTitle].compactMap { $0 }.joined(separator: " · "))
-                                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            HStack(spacing: 4) {
+                                Button { music.play(tracks, start: i, source: name) } label: {
+                                    HStack {
+                                        Text("\(i + 1)").font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 24, alignment: .trailing)
+                                        VStack(alignment: .leading) {
+                                            Text(t.title).lineLimit(1)
+                                            Text([t.artistCredit ?? t.grandparentTitle, t.parentTitle].compactMap { $0 }.joined(separator: " · "))
+                                                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                        }
+                                        Spacer()
                                     }
-                                    Spacer()
+                                    .padding(.vertical, 6)
+                                    .contentShape(Rectangle())
                                 }
-                                .padding(.vertical, 6)
-                                .contentShape(Rectangle())
+                                .buttonStyle(.plain)
+                                RowRating(item: t)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal, sidePadding)
                 } else if !loaded {
-                    ProgressView().padding()
+                    ProgressView().frame(maxWidth: .infinity).padding()
+                } else if albums.isEmpty, error == nil {
+                    ContentUnavailableView("Nothing here yet", systemImage: kind == .mood ? "theatermasks" : "guitars",
+                                           description: Text(kind == .mood ? "No tracks have this feel yet. Analysis may still be running."
+                                                                           : "No tracks have this style."))
+                }
+                if loaded, error != nil {
+                    Button("Try Again") { Task { await load() } }.buttonStyle(.bordered).padding(.horizontal, sidePadding)
                 }
             }
             .padding(.vertical)
         }
         .navigationTitle(name)
-        .task { await load() }
+        // Once: coming back from an album doesn't reshuffle the station.
+        .task { if !loaded { await load() } }
     }
 
     private func startRadio() {
@@ -534,6 +549,7 @@ struct MoodStyleView: View {
 
     private func load() async {
         defer { loaded = true }
+        error = nil
         do {
             tracks = try await app.radio(request).items
             if kind == .style {

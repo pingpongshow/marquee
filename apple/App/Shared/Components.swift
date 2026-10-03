@@ -74,11 +74,13 @@ struct ArtworkView: View {
 }
 
 /// Decoded artwork kept in memory, so scrolling back to a poster shows it at once instead of
-/// decoding it again (and flashing the placeholder). The bytes also stay in URLCache.
+/// decoding it again (and flashing the placeholder). Keyed by the image's path and width, so
+/// the same artwork is found again after switching address (LAN or Tailscale) or from the
+/// token to the image key.
 @MainActor
 enum ImageMemory {
-    static let cache: NSCache<NSURL, UIImage> = {
-        let c = NSCache<NSURL, UIImage>()
+    static let cache: NSCache<NSString, UIImage> = {
+        let c = NSCache<NSString, UIImage>()
         c.totalCostLimit = 96 << 20
         return c
     }()
@@ -86,6 +88,19 @@ enum ImageMemory {
     static func cost(_ image: UIImage) -> Int {
         Int(image.size.width * image.scale * image.size.height * image.scale * 4)
     }
+
+    /// The cache key: the path and its parameters (the width), without the host or the
+    /// credentials (token or image key).
+    static func key(_ url: URL) -> NSString {
+        guard let c = URLComponents(url: url, resolvingAgainstBaseURL: false), c.path.hasPrefix("/api/") else {
+            return url.absoluteString as NSString // not the server's (TMDB posters): the whole URL
+        }
+        let params = (c.queryItems ?? []).filter { $0.name != "token" && $0.name != "key" }
+            .map { "\($0.name)=\($0.value ?? "")" }.sorted().joined(separator: "&")
+        return (params.isEmpty ? c.path : "\(c.path)?\(params)") as NSString
+    }
+
+    static func image(_ url: URL) -> UIImage? { cache.object(forKey: key(url)) }
 }
 
 /// AsyncImage with the in-memory cache above. Loading stops when the view goes away or the
@@ -94,29 +109,41 @@ struct CachedImage<Content: View>: View {
     let url: URL?
     @ViewBuilder let content: (AsyncImagePhase) -> Content
     @State private var loaded: UIImage?
-    @State private var loadedURL: URL?
-    @State private var failedURL: URL?
+    @State private var loadedKey: NSString?
+    @State private var failedKey: NSString?
+
+    init(url: URL?, @ViewBuilder content: @escaping (AsyncImagePhase) -> Content) {
+        self.url = url
+        self.content = content
+    }
 
     var body: some View {
         // The task hangs off a view that is always there: while nothing has loaded, the content
         // is empty, and SwiftUI never starts tasks on empty views (the image never loaded).
         Color.clear
             .overlay { content(phase) }
-            .task(id: url) { await load() }
+            .task(id: url.map(ImageMemory.key)) { await load() }
     }
 
     private var phase: AsyncImagePhase {
         guard let url else { return .empty }
-        if let image = ImageMemory.cache.object(forKey: url as NSURL) { return .success(Image(uiImage: image)) }
-        if loadedURL == url, let loaded { return .success(Image(uiImage: loaded)) }
-        if failedURL == url { return .failure(URLError(.cannotDecodeContentData)) }
+        let key = ImageMemory.key(url)
+        if let image = ImageMemory.cache.object(forKey: key) { return .success(Image(uiImage: image)) }
+        if loadedKey == key, let loaded { return .success(Image(uiImage: loaded)) }
+        if failedKey == key { return .failure(URLError(.cannotDecodeContentData)) }
         return .empty
     }
 
     private func load() async {
-        guard let url, ImageMemory.cache.object(forKey: url as NSURL) == nil else { return }
+        guard let url else { return }
+        let key = ImageMemory.key(url)
+        guard ImageMemory.cache.object(forKey: key) == nil else { return }
+        let request = URLRequest(url: url)
+        // A URL carrying the bearer token (before the image key is known) never stays in URLCache.
+        let carriesToken = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains { $0.name == "token" } == true
+        defer { if carriesToken { URLCache.shared.removeCachedResponse(for: request) } }
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await URLSession.shared.data(for: request)
             try Task.checkCancellation()
             guard (response as? HTTPURLResponse)?.statusCode ?? 200 == 200 else { throw URLError(.badServerResponse) }
             // Decoded off the main thread, ready to draw.
@@ -124,11 +151,129 @@ struct CachedImage<Content: View>: View {
                 throw URLError(.cannotDecodeContentData)
             }
             try Task.checkCancellation()
-            ImageMemory.cache.setObject(image, forKey: url as NSURL, cost: ImageMemory.cost(image))
+            ImageMemory.cache.setObject(image, forKey: key, cost: ImageMemory.cost(image))
             loaded = image
-            loadedURL = url
+            loadedKey = key
         } catch {
-            if !Task.isCancelled { failedURL = url }
+            if !Task.isCancelled { failedKey = key }
+        }
+    }
+}
+
+extension CachedImage where Content == AnyView {
+    /// An image filling its frame, or nothing until it loads.
+    init(fill url: URL?) {
+        self.init(url: url) { phase in AnyView(phase.image?.resizable().scaledToFill()) }
+    }
+}
+
+/// Ratings changed in this session, so every row and page showing an item agrees before
+/// its list is fetched again.
+@MainActor @Observable
+final class RatingStore {
+    static let shared = RatingStore()
+    /// 0 = cleared.
+    private var overrides: [Int64: Double] = [:]
+
+    /// The rating to show: this session's change, or the one the server sent.
+    func rating(_ id: Int64, _ fallback: Double?) -> Double? {
+        if let o = overrides[id] { return o > 0 ? o : nil }
+        return fallback
+    }
+
+    func set(_ id: Int64, _ rating: Double?) { overrides[id] = rating ?? 0 }
+
+    /// Rates (0–10, half stars; nil clears) at once, and puts the old value back if the server
+    /// refuses.
+    func rate(_ id: Int64, _ rating: Double?, was old: Double?, app: AppSession) {
+        set(id, rating)
+        Task {
+            do { try await app.rate(id, rating) } catch {
+                set(id, old)
+                ActionError.shared.message = "Couldn't save the rating: \(error.localizedDescription)"
+            }
+        }
+    }
+}
+
+/// A row's own rating that can be changed in place: small stars when rated, a faint outline
+/// star when not; tapping opens a menu of ratings (half stars) and No rating.
+struct RowRating: View {
+    @Environment(AppSession.self) private var app
+    let item: Item
+
+    var body: some View {
+        let current = RatingStore.shared.rating(item.id, item.userRating)
+        Menu {
+            Picker("Rating", selection: Binding(get: { current ?? 0 }, set: { choose($0, current) })) {
+                ForEach((1...10).reversed(), id: \.self) { v in Text(Self.label(Double(v))).tag(Double(v)) }
+                Text("No rating").tag(0.0)
+            }
+        } label: {
+            Group {
+                if let r = current, r > 0 {
+                    RatingGlyphs(rating: r)
+                } else {
+                    Image(systemName: "star").font(.system(size: isTV ? 18 : 11, weight: .regular)).foregroundStyle(.tertiary)
+                }
+            }
+            // One width rated or not, so durations beside it line up down a list.
+            .frame(width: isTV ? 110 : 50, alignment: .trailing)
+            .frame(minHeight: isTV ? 50 : 30)
+            .contentShape(Rectangle())
+        }
+        .menuIndicator(.hidden)
+        #if os(iOS)
+        .buttonStyle(.plain)
+        #endif
+        .fixedSize()
+        .accessibilityLabel("Rating")
+        .accessibilityValue(current.map { Self.label($0) } ?? "Not rated")
+        .accessibilityIdentifier("rowRating.\(item.id)")
+    }
+
+    private func choose(_ v: Double, _ old: Double?) {
+        let next: Double? = v > 0 ? v : nil
+        guard next != old else { return }
+        RatingStore.shared.rate(item.id, next, was: old, app: app)
+    }
+
+    /// "4½ stars", "1 star", "½ star".
+    static func label(_ r: Double) -> String {
+        let full = Int(r) / 2, half = Int(r) % 2 == 1
+        let n = full == 0 ? "½" : half ? "\(full)½" : "\(full)"
+        return "\(n) star\(full == 1 && !half ? "" : "s")"
+    }
+}
+
+/// Five small stars for a rating (0–10, half stars).
+struct RatingGlyphs: View {
+    let rating: Double
+
+    var body: some View {
+        HStack(spacing: 1) {
+            ForEach(1...5, id: \.self) { star in
+                Image(systemName: rating >= Double(star * 2) ? "star.fill" : rating >= Double(star * 2 - 1) ? "star.leadinghalf.filled" : "star")
+            }
+        }
+        .font(.system(size: isTV ? 16 : 8, weight: .semibold))
+        .foregroundStyle(Color.marqueeGold)
+        .fixedSize()
+    }
+}
+
+/// A person's own rating (0–10, half stars) as five small stars, read-only: shown on rows
+/// when the track or title is rated.
+struct RatingBadge: View {
+    let itemID: Int64
+    let rating: Double?
+
+    var body: some View {
+        if let r = RatingStore.shared.rating(itemID, rating), r > 0 {
+            RatingGlyphs(rating: r)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Rated \(RowRating.label(r))")
+                .accessibilityIdentifier("ratingBadge")
         }
     }
 }
@@ -156,18 +301,22 @@ struct PosterCard: View {
             .contextMenu { ItemMenuItems(item: item) }
             .accessibilityLabel(item.title)
             titles
+            trackRating
         }
         .frame(width: width)
         #else
-        NavigationLink(value: Route.item(item.id)) {
-            VStack(alignment: .leading, spacing: 6) {
-                ArtworkView(item: item, shape: shape ?? .for(item), width: width)
-                titles
+        VStack(alignment: .leading, spacing: 0) {
+            NavigationLink(value: Route.item(item.id)) {
+                VStack(alignment: .leading, spacing: 6) {
+                    ArtworkView(item: item, shape: shape ?? .for(item), width: width)
+                    titles
+                }
+                .frame(width: width)
             }
-            .frame(width: width)
+            .buttonStyle(.plain)
+            .contextMenu { ItemMenuItems(item: item) }
+            trackRating
         }
-        .buttonStyle(.plain)
-        .contextMenu { ItemMenuItems(item: item) }
         #endif
     }
 
@@ -175,6 +324,17 @@ struct PosterCard: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(item._type == .episode ? (item.grandparentTitle ?? item.title) : item.title).font(.subheadline.weight(.medium)).lineLimit(1)
             Text(item._type == .episode ? item.subtitle + " · " + item.title : item.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+        }
+    }
+
+    /// A track's rating under its titles: changeable on iPhone and iPad, shown on the TV.
+    @ViewBuilder private var trackRating: some View {
+        if item._type == .track {
+            #if os(tvOS)
+            RatingBadge(itemID: item.id, rating: item.userRating)
+            #else
+            RowRating(item: item).padding(.top, -6)
+            #endif
         }
     }
 }
@@ -307,22 +467,36 @@ let isTV = true
 let isTV = false
 #endif
 
-/// A label with its title, or only its icon (the title stays its accessibility label).
+/// A label with its title, or only its icon (the title stays its accessibility label). An
+/// icon alone is as tall as a line of text, so icon-only buttons match labelled ones.
 struct AdaptiveLabelStyle: LabelStyle {
     var iconOnly: Bool
     func makeBody(configuration: Configuration) -> some View {
         if iconOnly {
-            Label(configuration).labelStyle(.iconOnly)
+            Label {
+                configuration.title
+            } icon: {
+                LineHeight { configuration.icon }
+            }
+            .labelStyle(.iconOnly)
         } else {
             Label(configuration).labelStyle(.titleAndIcon)
         }
     }
 }
 
+/// Content at least as tall as a line of body text (it scales with the text size).
+private struct LineHeight<Content: View>: View {
+    @ScaledMetric(relativeTo: .body) private var line: CGFloat = 22
+    @ViewBuilder var content: Content
+    var body: some View { content.frame(minHeight: line) }
+}
+
 /// A header's action buttons on one line (item, playlist and collection pages). Every label
 /// stays on one line: when the labelled row doesn't fit, the secondary actions become
-/// icon-only, then they move to a second line, then everything is icon-only, and only then
-/// does the row scroll.
+/// icon-only, then they move to a second line, then everything is icon-only (one line, then two), and only then
+/// does the row scroll. The buttons are built once and only their label style and layout
+/// change, so their state (a pin, a download, an open alert) survives the change.
 struct HeaderActions<Primary: View, Secondary: View>: View {
     /// Only the all-labelled row, never a fallback: for layouts that try something else
     /// (stacking) when it doesn't fit.
@@ -330,41 +504,53 @@ struct HeaderActions<Primary: View, Secondary: View>: View {
     @ViewBuilder var primary: () -> Primary
     @ViewBuilder var secondary: () -> Secondary
 
+    /// 0 everything labelled, 1 secondary icon-only, 2 secondary on a second line,
+    /// 3 everything icon-only, 4 icon-only on two lines, 5 icon-only and scrolling.
+    @State private var mode = 0
+    /// The width each mode needed when it was last shown.
+    @State private var needed: [Int: CGFloat] = [:]
+    @State private var available: CGFloat = 0
+
     var body: some View {
         if labelledOnly {
-            row(primaryIcons: false, secondaryIcons: false)
+            content(mode: 0)
         } else {
-            fitted
-        }
-    }
-
-    private var fitted: some View {
-        ViewThatFits(in: .horizontal) {
-            row(primaryIcons: false, secondaryIcons: false)
-            row(primaryIcons: false, secondaryIcons: true)
-            // Play and Shuffle keep their words on one line; the rest go icon-only beneath.
-            VStack(alignment: .leading, spacing: spacing) {
-                group(primary().labelStyle(AdaptiveLabelStyle(iconOnly: false)))
-                group(secondary().labelStyle(AdaptiveLabelStyle(iconOnly: true)))
-            }
-            row(primaryIcons: true, secondaryIcons: true)
             ScrollView(.horizontal, showsIndicators: false) {
-                row(primaryIcons: true, secondaryIcons: true).padding(.vertical, 2)
+                content(mode: mode)
+                    .padding(.vertical, 2)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { w in
+                        needed[mode] = w
+                        settle()
+                    }
             }
-            #if os(iOS)
+            .scrollDisabled(mode < 5)
             .scrollClipDisabled()
-            #endif
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { w in
+                available = w
+                settle()
+            }
         }
     }
 
-    private func group(_ content: some View) -> some View {
-        HStack(spacing: spacing) { content }.lineLimit(1).fixedSize()
+    /// Moves to the roomiest mode that fits: one step on when the current one overflows, or
+    /// back to an earlier one whose last measured width fits (after a rotation, or a passing
+    /// narrow layout during a push).
+    private func settle() {
+        guard available > 0 else { return }
+        if let n = needed[mode], n > available + 0.5 {
+            if mode < 5 { mode += 1 }
+            return
+        }
+        if let best = (0..<mode).first(where: { (needed[$0] ?? .infinity) <= available + 0.5 }) { mode = best }
     }
 
-    private func row(primaryIcons: Bool, secondaryIcons: Bool) -> some View {
-        HStack(spacing: spacing) {
-            primary().labelStyle(AdaptiveLabelStyle(iconOnly: primaryIcons))
-            secondary().labelStyle(AdaptiveLabelStyle(iconOnly: secondaryIcons))
+    private func content(mode: Int) -> some View {
+        let layout = mode == 2 || mode == 4 ? AnyLayout(VStackLayout(alignment: .leading, spacing: spacing)) : AnyLayout(HStackLayout(spacing: spacing))
+        return layout {
+            HStack(spacing: spacing) { primary() }
+                .labelStyle(AdaptiveLabelStyle(iconOnly: mode >= 3))
+            HStack(spacing: spacing) { secondary() }
+                .labelStyle(AdaptiveLabelStyle(iconOnly: mode >= 1))
         }
         .lineLimit(1)
         .fixedSize()

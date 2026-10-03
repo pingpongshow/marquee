@@ -258,7 +258,7 @@ struct FixMatchSheet: View {
                         ForEach(results, id: \.id) { c in
                             Button { apply(c) } label: {
                                 HStack(alignment: .top, spacing: 12) {
-                                    AsyncImage(url: c.posterUrl.flatMap(URL.init(string:))) { $0.image?.resizable().scaledToFill() }
+                                    CachedImage(fill: c.posterUrl.flatMap(URL.init(string:)))
                                         .frame(width: 44, height: 66).background(Color.secondary.opacity(0.2)).clipShape(RoundedRectangle(cornerRadius: 4))
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text([c.title, c.year.map { "(\($0))" }].compactMap { $0 }.joined(separator: " ")).foregroundStyle(.primary)

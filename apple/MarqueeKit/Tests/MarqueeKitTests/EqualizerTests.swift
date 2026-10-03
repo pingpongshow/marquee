@@ -37,3 +37,44 @@ struct EqualizerTests {
         }
     }
 }
+
+/// Coefficients are worked out ahead of the audio thread, one set per sample rate.
+struct EqualizerStateTests {
+    @Test func flatBandsPassThrough() {
+        let c = EQState.coefficients(gains: Array(repeating: 0, count: Equalizer.bands.count), sampleRate: 48000)
+        #expect(c.count == EQState.coefficientCount)
+        for b in 0..<Equalizer.bands.count {
+            #expect(Array(c[(b * 5)..<(b * 5 + 5)]) == [1, 0, 0, 0, 0])
+        }
+    }
+
+    @Test func bandsAboveTheRateAreSkipped() {
+        var gains = Array(repeating: 0.0, count: Equalizer.bands.count)
+        gains[9] = 6 // 16 kHz: too high for 22.05 kHz audio
+        let c = EQState.coefficients(gains: gains, sampleRate: 22050)
+        #expect(Array(c[45..<50]) == [1, 0, 0, 0, 0])
+    }
+
+    @Test func tapsGetCoefficientsForTheirRateWithoutAllocating() {
+        let state = EQState()
+        var gains = Array(repeating: 0.0, count: Equalizer.bands.count)
+        gains[5] = 6
+        state.update(enabled: true, gains: gains)
+        state.prepare(sampleRate: 44100)
+        let buffer = UnsafeMutablePointer<Double>.allocate(capacity: EQState.coefficientCount)
+        defer { buffer.deallocate() }
+        let first = state.load(ifNewerThan: -1, sampleRate: 44100, into: buffer)
+        #expect(first?.enabled == true)
+        #expect(abs((first?.preamp ?? 1) - pow(10, -6 * 0.6 / 20)) < 1e-9)
+        let peak = Biquad.peaking.coefficients(f: 1000, gainDB: 6, sampleRate: 44100)
+        #expect(buffer[25] == peak.0)
+        // Nothing new: nothing copied.
+        #expect(state.load(ifNewerThan: first!.version, sampleRate: 44100, into: buffer) == nil)
+        // A change reaches the prepared rate.
+        gains[5] = -6
+        state.update(enabled: true, gains: gains)
+        let second = state.load(ifNewerThan: first!.version, sampleRate: 44100, into: buffer)
+        #expect(second != nil)
+        #expect(buffer[25] == Biquad.peaking.coefficients(f: 1000, gainDB: -6, sampleRate: 44100).0)
+    }
+}

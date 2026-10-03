@@ -368,14 +368,37 @@ struct PlayerController: UIViewControllerRepresentable {
         } else if let m = playback.activeMarker {
             actions.append(UIAction(title: m.kind == .intro ? "Skip Intro" : "Skip Credits") { _ in playback.skipMarker() })
         }
-        if trailer == nil, playback.nextUp != nil, let item = playback.player.currentItem, item.duration.isNumeric,
-           item.duration.seconds - playback.position < 60 {
+        // nearEnd flips once in the last minute; reading the position here rebuilt the menus
+        // every second and closed any that were open.
+        if trailer == nil, playback.nextUp != nil, playback.nearEnd {
             actions.append(UIAction(title: "Next Episode", image: UIImage(systemName: "forward.end.fill")) { _ in onNext() })
         }
         if vc.contextualActions.map(\.title) != actions.map(\.title) { vc.contextualActions = actions }
-        vc.transportBarCustomMenuItems = trailer != nil ? [] : speedMenu() + timingMenus() + audioMenu() + togetherMenu()
+        // The transport bar menus are replaced only when what they show changes.
+        let signature = menuSignature
+        if context.coordinator.menuSignature != signature {
+            context.coordinator.menuSignature = signature
+            vc.transportBarCustomMenuItems = trailer != nil ? [] : speedMenu() + timingMenus() + audioMenu() + togetherMenu()
+        }
         #endif
     }
+
+    final class Coordinator {
+        var menuSignature: String?
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    #if os(tvOS)
+    /// Everything the transport bar menus depend on.
+    private var menuSignature: String {
+        let audio = playback.item?.info.versions.first?.files.first?.streams.filter { $0.kind == .audio }.map { String($0.id) } ?? []
+        let group = together?.group.map { g in "\(g.id):" + g.members.map(\.name).joined(separator: ",") } ?? "-"
+        return [trailer != nil ? "T" : "", "\(playback.speed)", "\(playback.subtitleOffsetMs)", "\(playback.audioOffsetMs)",
+                playback.offlineTitle == nil ? "" : "off", audio.joined(separator: ","), "\(playback.session?.audioStreamId ?? -1)",
+                together == nil ? "" : "t", group].joined(separator: "|")
+    }
+    #endif
 
     #if os(tvOS)
     /// Watch together from the Siri Remote's transport bar.

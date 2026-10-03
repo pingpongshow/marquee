@@ -5,6 +5,7 @@ struct SearchView: View {
     @Environment(AppSession.self) private var app
     @State private var query = ""
     @State private var results: SearchResults?
+    @State private var error: String?
     /// Search the library, or describe what you want to watch (Muse, USER-15).
     @State private var mode: Mode = .library
     @State private var muse = VideoMuse()
@@ -46,14 +47,25 @@ struct SearchView: View {
         .task(id: "\(mode)|\(query)") {
             guard mode == .library else { return }
             let q = query.trimmingCharacters(in: .whitespaces)
-            guard !q.isEmpty else { results = nil; return }
+            guard !q.isEmpty else { results = nil; error = nil; return }
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
-            results = try? await app.search(q)
+            do {
+                let r = try await app.search(q)
+                guard !Task.isCancelled else { return }
+                results = r
+                error = nil
+            } catch {
+                // A search overtaken by the next keystroke keeps the results on screen.
+                if !Task.isCancelled, !(error is CancellationError) { self.error = error.localizedDescription }
+            }
         }
     }
 
     @ViewBuilder private var libraryResults: some View {
+        if let error {
+            ErrorBanner(message: error).padding(.horizontal, sidePadding).accessibilityIdentifier("searchError")
+        }
         ForEach(results?.groups ?? [], id: \._type) { g in
             ShelfRow(title: title(g._type)) {
                 ForEach(g.items, id: \.id) { PosterCard(item: $0) }

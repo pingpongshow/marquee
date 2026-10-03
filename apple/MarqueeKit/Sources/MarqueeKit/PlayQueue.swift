@@ -83,20 +83,47 @@ public struct PlayQueue: Sendable, Equatable {
         original? += add
     }
 
-    public mutating func remove(_ id: Int) {
-        guard let i = entries.firstIndex(where: { $0.id == id }) else { return }
+    /// Removes an entry. Removing the current track moves on to the one that took its place;
+    /// returns true when the current track was the last one, so nothing took its place (the
+    /// queue has ended: with repeat-all it wraps to the start, otherwise the last remaining
+    /// track becomes current but shouldn't play by itself).
+    @discardableResult
+    public mutating func remove(_ id: Int) -> Bool {
+        guard let i = entries.firstIndex(where: { $0.id == id }) else { return false }
+        let wasCurrent = i == index
         entries.remove(at: i)
         original?.removeAll { $0.id == id }
-        if entries.isEmpty { index = -1; return }
-        if i < index { index -= 1 } else { index = min(index, entries.count - 1) }
+        if entries.isEmpty { index = -1; return wasCurrent }
+        if i < index {
+            index -= 1
+        } else if wasCurrent, index >= entries.count {
+            // The current track was the last one.
+            index = repeatMode == .all ? 0 : entries.count - 1
+            return repeatMode != .all
+        }
+        return false
     }
 
     public mutating func move(_ id: Int, to: Int) {
         guard let from = entries.firstIndex(where: { $0.id == id }) else { return }
         let cur = current
         let e = entries.remove(at: from)
-        entries.insert(e, at: min(max(to, 0), entries.count))
+        let at = min(max(to, 0), entries.count)
+        entries.insert(e, at: at)
         if let cur { index = entries.firstIndex(of: cur) ?? index }
+        // While shuffled, mirror the move into the unshuffled order: the entry goes after the
+        // one it now follows (or first), so turning shuffle off keeps it there.
+        if var o = original, let oi = o.firstIndex(of: e) {
+            o.remove(at: oi)
+            if at == 0 {
+                o.insert(e, at: 0)
+            } else if let p = o.firstIndex(of: entries[at - 1]) {
+                o.insert(e, at: p + 1)
+            } else {
+                o.append(e)
+            }
+            original = o
+        }
     }
 
     public mutating func jump(_ id: Int) {

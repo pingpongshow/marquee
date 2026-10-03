@@ -49,12 +49,20 @@ public enum ServerStore {
     public static func forget(_ id: String) {
         servers = servers.filter { $0.id != id }
         Keychain.delete(account: "token.\(id)")
+        Keychain.delete(account: "imageKey.\(id)")
         if currentServerID == id { currentServerID = nil }
     }
 
     public static func token(for id: String) -> String? { Keychain.read(account: "token.\(id)") }
     public static func setToken(_ token: String?, for id: String) {
         if let token { Keychain.write(token, account: "token.\(id)") } else { Keychain.delete(account: "token.\(id)") }
+    }
+
+    /// The image key (D85) last seen for a server, so image URLs never need the token, even
+    /// before /me answers or while the server can't be reached.
+    public static func imageKey(for id: String) -> String? { Keychain.read(account: "imageKey.\(id)") }
+    public static func setImageKey(_ key: String?, for id: String) {
+        if let key, !key.isEmpty { Keychain.write(key, account: "imageKey.\(id)") } else { Keychain.delete(account: "imageKey.\(id)") }
     }
 
     /// A stable identifier for this install, so the server lists it as one device.

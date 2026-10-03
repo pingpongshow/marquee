@@ -18,6 +18,10 @@ struct LiveTVView: View {
     @State private var error: String?
     @State private var enabled: Bool?
     @State private var canRecord = false
+    /// Why the Live TV status couldn't be read (not the same as "not set up").
+    @State private var statusError: String?
+    /// Bumped by pull-to-refresh on the Recordings tab.
+    @State private var recordingsRefresh = 0
 
     enum Tab: String, CaseIterable { case guide = "Guide", now = "What's On", recordings = "Recordings" }
     private var tabs: [Tab] { canRecord ? Tab.allCases : [.guide, .now] }
@@ -31,19 +35,22 @@ struct LiveTVView: View {
 
     var body: some View {
         Group {
-            if enabled == false {
+            if let statusError, enabled == nil {
+                ContentUnavailableView {
+                    Label("Couldn't reach Live TV", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(statusError)
+                } actions: {
+                    Button("Try Again") { Task { await loadStatus() } }
+                }
+            } else if enabled == false {
                 ContentUnavailableView("Live TV isn't set up", systemImage: "tv", description: Text("An admin can add Dispatcharr or an M3U playlist in the web app's Settings → Live TV."))
             } else {
                 content
             }
         }
         .navigationTitle("Live TV")
-        .task {
-            let status = try? await app.liveStatus()
-            enabled = status?.enabled ?? false
-            canRecord = status?.canRecord ?? false
-            groups = (try? await app.liveGroups()) ?? []
-        }
+        .task { if enabled == nil { await loadStatus() } }
         .task(id: "\(filter)|\(start.timeIntervalSince1970)") { await load() }
         #if os(iOS)
         .fullScreenCover(item: $watching) { LiveWatchView(channels: channels, start: $0.id) }
@@ -57,6 +64,20 @@ struct LiveTVView: View {
         }
     }
 
+    private func loadStatus() async {
+        do {
+            let status = try await app.liveStatus()
+            enabled = status.enabled
+            canRecord = status.canRecord ?? false
+            statusError = nil
+            groups = (try? await app.liveGroups()) ?? []
+            if enabled == true, channels.isEmpty { await load() }
+        } catch is CancellationError {
+        } catch {
+            statusError = error.localizedDescription
+        }
+    }
+
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -66,7 +87,7 @@ struct LiveTVView: View {
                 #endif
                 if let error { Text(error).foregroundStyle(.red).padding(.horizontal, sidePadding) }
                 if tab == .recordings {
-                    RecordingsList().padding(.horizontal, sidePadding)
+                    RecordingsList(refresh: recordingsRefresh).padding(.horizontal, sidePadding)
                 } else if channels.isEmpty, enabled == true {
                     Text(filter == "favorites" ? "No favourites yet. Add some with the heart next to a channel."
                         : filter == "recent" ? "Channels you watch will appear here."
@@ -84,6 +105,10 @@ struct LiveTVView: View {
                 }
             }
             .padding(.vertical)
+        }
+        // On the scroll view, where pull-to-refresh works (it did nothing on the VStack inside).
+        .refreshable {
+            if tab == .recordings { recordingsRefresh += 1 } else { await load() }
         }
     }
 
@@ -250,22 +275,26 @@ struct GuideGrid: View {
     private func x(_ d: Date) -> CGFloat { CGFloat(d.timeIntervalSince(start) / 60) * perMinute }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
-            VStack(spacing: 0) {
-                Color.clear.frame(height: 28)
-                ForEach(channels, id: \.id) { c in channelCell(c).frame(height: row) }
-            }
-            .frame(width: column)
-            ScrollView(.horizontal, showsIndicators: false) {
-                ZStack(alignment: .topLeading) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        timeline
-                        ForEach(channels, id: \.id) { c in programmes(c).frame(width: width, height: row, alignment: .leading) }
-                    }
-                    let now = x(.now)
-                    if now > 0 && now < width {
-                        Rectangle().fill(Color.marqueeGold).frame(width: 2).offset(x: now).allowsHitTesting(false)
-                            .accessibilityHidden(true)
+        // Redrawn once a minute: the now line and "…m left" move on.
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            HStack(alignment: .top, spacing: 0) {
+                // Lazy: only the channels on screen are built (hundreds of channels).
+                LazyVStack(spacing: 0) {
+                    Color.clear.frame(height: 28)
+                    ForEach(channels, id: \.id) { c in channelCell(c).frame(height: row) }
+                }
+                .frame(width: column)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    ZStack(alignment: .topLeading) {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            timeline
+                            ForEach(channels, id: \.id) { c in programmes(c, now: context.date).frame(width: width, height: row, alignment: .leading) }
+                        }
+                        let now = x(context.date)
+                        if now > 0 && now < width {
+                            Rectangle().fill(Color.marqueeGold).frame(width: 2).offset(x: now).allowsHitTesting(false)
+                                .accessibilityHidden(true)
+                        }
                     }
                 }
             }
@@ -310,7 +339,7 @@ struct GuideGrid: View {
         }
     }
 
-    private func programmes(_ c: LiveChannel) -> some View {
+    private func programmes(_ c: LiveChannel, now: Date) -> some View {
         ZStack(alignment: .leading) {
             ForEach(guide[c.id] ?? [], id: \.id) { p in
                 let left = max(0, x(p.start))
@@ -351,7 +380,7 @@ struct ChannelLogo: View {
     @Environment(AppSession.self) private var app
     let channel: LiveChannel
     var body: some View {
-        AsyncImage(url: app.logoURL(channel)) { phase in
+        CachedImage(url: app.logoURL(channel)) { phase in
             if let img = phase.image {
                 img.resizable().scaledToFit()
             } else {
@@ -598,6 +627,8 @@ struct ProgrammeSheet: View {
 /// The DVR (LIVE-5): recording now, upcoming, series and finished recordings.
 struct RecordingsList: View {
     @Environment(AppSession.self) private var app
+    /// Changed by the page's pull-to-refresh.
+    var refresh = 0
     @State private var recordings: [Recording] = []
     @State private var rules: [RecordingRule] = []
     @State private var loaded = false
@@ -642,8 +673,7 @@ struct RecordingsList: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .task { await load() }
-        .refreshable { await load() }
+        .task(id: refresh) { await load() }
         .confirmationDialog("Delete this recording?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), presenting: deleting) { r in
             Button("Delete \(r.title)", role: .destructive) { act { try await app.cancelRecording(r.id, deleteFile: true) } }
         }

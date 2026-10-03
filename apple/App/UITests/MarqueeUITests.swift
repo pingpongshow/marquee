@@ -640,7 +640,8 @@ final class MarqueeUITests: XCTestCase {
         expectation(for: changed, evaluatedWith: titleText)
         waitForExpectations(timeout: remaining + 5)
         let took = Date().timeIntervalSince(start)
-        XCTAssertLessThan(took, remaining - 2, "next track should take over ~4 s before the end (took \(took)s of \(remaining)s)")
+        // The hand-over is exactly 4 s before the end; the title check polls about once a second.
+        XCTAssertLessThan(took, remaining - 1, "next track should take over ~4 s before the end (took \(took)s of \(remaining)s)")
         shot("cf1-after-crossfade")
         app.buttons["Crossfade 4 seconds"].tap()
         app.buttons["Off"].tap()

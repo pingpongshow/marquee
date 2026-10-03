@@ -61,8 +61,12 @@ struct DiscoverView: View {
     @ViewBuilder private func card(_ it: DiscoverItem) -> some View {
         let label = VStack(alignment: .leading, spacing: 4) {
             ZStack(alignment: .topLeading) {
-                AsyncImage(url: it.posterUrl.flatMap(URL.init(string:))) { img in img.resizable().scaledToFill() } placeholder: {
-                    Rectangle().fill(.secondary.opacity(0.2)).overlay(Text(it.title).font(.caption).padding(6), alignment: .bottomLeading)
+                CachedImage(url: it.posterUrl.flatMap(URL.init(string:))) { phase in
+                    if let img = phase.image {
+                        img.resizable().scaledToFill()
+                    } else {
+                        Rectangle().fill(.secondary.opacity(0.2)).overlay(Text(it.title).font(.caption).padding(6), alignment: .bottomLeading)
+                    }
                 }
                 .aspectRatio(2 / 3, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -97,7 +101,7 @@ struct DiscoverView: View {
             Text("My Requests").font(.title3.bold())
             ForEach(mine, id: \.id) { r in
                 HStack(spacing: 12) {
-                    AsyncImage(url: r.posterUrl.flatMap(URL.init(string:))) { $0.resizable().scaledToFill() } placeholder: { Color.secondary.opacity(0.2) }
+                    CachedImage(fill: r.posterUrl.flatMap(URL.init(string:))).background(Color.secondary.opacity(0.2))
                         .frame(width: 40, height: 60).clipShape(RoundedRectangle(cornerRadius: 4))
                     VStack(alignment: .leading) {
                         Text(r.title).lineLimit(1)
@@ -281,7 +285,7 @@ struct RequestSheet: View {
     private var header: some View {
         Section {
             HStack(alignment: .top, spacing: 14) {
-                AsyncImage(url: item.posterUrl.flatMap(URL.init(string:))) { $0.resizable().scaledToFill() } placeholder: { Color.secondary.opacity(0.2) }
+                CachedImage(fill: item.posterUrl.flatMap(URL.init(string:))).background(Color.secondary.opacity(0.2))
                     .frame(width: 90, height: 135)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 VStack(alignment: .leading, spacing: 6) {

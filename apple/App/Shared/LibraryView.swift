@@ -43,6 +43,8 @@ struct LibraryGrid: View {
     @State private var total = 0
     @State private var loading = false
     @State private var unwatchedOnly = false
+    /// Only what this person rated 4 stars or more (favourites).
+    @State private var ratedOnly = false
     @State private var showCollections = false
     @State private var error: String?
     /// Each item's place in the grid (for paging) and the duplicate check.
@@ -75,6 +77,11 @@ struct LibraryGrid: View {
             .padding(.vertical)
             .accessibilityIdentifier("libraryGrid")
             if loading { ProgressView().padding() }
+            if !loading, error == nil, items.isEmpty, generation > 0 {
+                ContentUnavailableView(ratedOnly ? "Nothing rated 4★ or more" : unwatchedOnly ? "Nothing left to watch" : "Nothing here yet",
+                                       systemImage: ratedOnly ? "star" : "square.grid.2x2",
+                                       description: Text(ratedOnly || unwatchedOnly ? "Try turning the filter off." : "This library is empty, or still being scanned."))
+            }
         }
         .navigationTitle(title)
         .toolbar {
@@ -97,16 +104,19 @@ struct LibraryGrid: View {
                         Text("Recently added").tag(ItemSort._hyphen_added)
                         Text("Release date").tag(ItemSort._hyphen_released)
                         Text("Rating").tag(ItemSort._hyphen_rating)
+                        if !showCollections { Text("My rating").tag(ItemSort._hyphen_myRating) }
                         Text(isMusic ? "Recently played" : "Last watched").tag(ItemSort._hyphen_viewed)
                         Text("Random").tag(ItemSort.random)
                     }
                     Toggle(isMusic ? "Unplayed only" : "Unwatched only", isOn: $unwatchedOnly)
+                    if !showCollections { Toggle("Rated 4★+", isOn: $ratedOnly) }
                 } label: {
                     Label("Sort and filter", systemImage: "line.3.horizontal.decrease.circle")
                 }
+                .accessibilityIdentifier("sortMenu")
             }
         }
-        .task(id: "\(sort)-\(unwatchedOnly)-\(showCollections)") { await reload() }
+        .task(id: "\(sort)-\(unwatchedOnly)-\(ratedOnly)-\(showCollections)") { await reload() }
     }
 
     #if os(tvOS)
@@ -133,7 +143,8 @@ struct LibraryGrid: View {
         defer { if gen == generation { loading = false } }
         do {
             let page = try await app.items(library: libraryID, sort: sort, offset: items.count, limit: Self.page,
-                                           watch: unwatchedOnly && !showCollections ? .unwatched : nil, type: showCollections ? .collection : type)
+                                           watch: unwatchedOnly && !showCollections ? .unwatched : nil, type: showCollections ? .collection : type,
+                                           minMyRating: ratedOnly && !showCollections ? 8 : nil)
             guard gen == generation else { return }
             var fresh: [Item] = []
             for item in page.items where positions[item.id] == nil {

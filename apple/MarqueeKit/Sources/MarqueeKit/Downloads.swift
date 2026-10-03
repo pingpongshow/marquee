@@ -42,14 +42,58 @@ public final class Downloads {
         public var resumeMs: Int64?
         /// Downloaded because a synced playlist has it (removed when no synced playlist does).
         public var viaPlaylist: Bool?
+        /// The transfer failed for want of the network (leaving home, say): it's tried again,
+        /// at the address then in use, when the server is reachable.
+        public var networkFailure: Bool?
     }
 
-    /// A play made while offline, waiting to be sent.
+    /// A play made while offline, waiting to be sent. Tagged with the server and person it
+    /// belongs to (records from before the tags go to whoever is signed in).
     struct PendingProgress: Codable, Equatable {
         let itemID: Int64
         let positionMs: Int64
         let watched: Bool
         let at: Date
+        var server: String? = nil
+        var user: Int64? = nil
+    }
+
+    /// What to do with an offline play after sending it.
+    enum SyncOutcome: Equatable { case sent, drop, keep }
+
+    /// The records that belong to this server and person.
+    nonisolated static func flushable(_ pending: [PendingProgress], server: String, user: Int64) -> [PendingProgress] {
+        pending.filter { ($0.server == nil || $0.server == server) && ($0.user == nil || $0.user == user) }
+    }
+
+    /// From the server's answer (nil = no answer): sent, rejected for good (a 4xx other than
+    /// sign-in, timeout or rate limiting: the item is gone, say), or worth trying again.
+    nonisolated static func outcome(status: Int?) -> SyncOutcome {
+        guard let status else { return .keep }
+        switch status {
+        case 200..<300: return .sent
+        case 401, 408, 429: return .keep
+        case 400..<500: return .drop
+        default: return .keep
+        }
+    }
+
+    /// Transfer errors that come from the network (worth retrying at another address), not
+    /// from the server or the file.
+    nonisolated static func isNetworkError(_ error: Error) -> Bool {
+        let e = error as NSError
+        guard e.domain == NSURLErrorDomain else { return false }
+        return [NSURLErrorTimedOut, NSURLErrorCannotFindHost, NSURLErrorCannotConnectToHost, NSURLErrorNetworkConnectionLost,
+                NSURLErrorDNSLookupFailed, NSURLErrorNotConnectedToInternet, NSURLErrorInternationalRoamingOff,
+                NSURLErrorCallIsActive, NSURLErrorDataNotAllowed, NSURLErrorSecureConnectionFailed,
+                NSURLErrorBackgroundSessionWasDisconnected].contains(e.code)
+    }
+
+    /// Resume data kept from a failed transfer, with the URL it belongs to (it only resumes
+    /// against that same address).
+    private struct ResumeRecord: Codable {
+        let url: String
+        let data: Data
     }
 
     public private(set) var entries: [Int64: Entry] = [:]
@@ -65,6 +109,11 @@ public final class Downloads {
     @ObservationIgnored private var flushAgain = false
     /// When each transfer last updated its progress (updates are throttled).
     @ObservationIgnored private var lastProgress: [Int64: (at: Date, fraction: Double)] = [:]
+    /// A save of the index waiting to happen (saves are coalesced and written off the main thread).
+    @ObservationIgnored private var saveTask: Task<Void, Never>?
+    private static let io = DispatchQueue(label: "app.marquee.downloads.io", qos: .utility)
+    /// The person last signed in, for tagging plays made while /me can't be asked.
+    private static let lastUserKey = "marquee.downloads.lastUser"
 
     public static let directory: URL = {
         let d = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appending(path: "Downloads", directoryHint: .isDirectory)
@@ -106,6 +155,7 @@ public final class Downloads {
         self.app = app
         resumeTransfers()
         pollConversions()
+        if let user = app.me?.id { UserDefaults.standard.set(user, forKey: Self.lastUserKey) }
         Task {
             await flushProgress()
             // Playlists kept on the device follow their changes.
@@ -113,15 +163,21 @@ public final class Downloads {
             syncing = true
             defer { syncing = false }
             for id in syncedPlaylists.keys { await syncPlaylist(id) }
+            saveNow()
         }
     }
 
     /// Restarts downloads interrupted mid-transfer, skipping any the background session is
-    /// still running (it carries on across launches by itself).
+    /// still running (it carries on across launches by itself), and those that failed for want
+    /// of the network, at the address now in use.
     private func resumeTransfers() {
         let wanted = entries.values.compactMap { e -> (Int64, String)? in
-            guard case .downloading = e.state, let path = e.url else { return nil }
-            return (e.id, path)
+            guard let path = e.url else { return nil }
+            switch e.state {
+            case .downloading: return (e.id, path)
+            case .failed where e.networkFailure == true: return (e.id, path)
+            default: return nil
+            }
         }
         guard !resuming, !wanted.isEmpty else { return }
         resuming = true
@@ -130,9 +186,17 @@ public final class Downloads {
             Task { @MainActor in
                 self.resuming = false
                 for (id, path) in wanted where !live.contains(id) {
-                    guard case .downloading = self.entries[id]?.state else { continue }
+                    guard let e = self.entries[id] else { continue }
+                    switch e.state {
+                    case .downloading: break
+                    case .failed where e.networkFailure == true:
+                        self.entries[id]?.state = .downloading(0)
+                        self.entries[id]?.networkFailure = nil
+                    default: continue
+                    }
                     self.fetch(itemID: id, path: path)
                 }
+                self.save()
             }
         }
     }
@@ -219,6 +283,7 @@ public final class Downloads {
         for name in [e.file, e.poster].compactMap({ $0 }) {
             try? FileManager.default.removeItem(at: Self.directory.appending(path: name))
         }
+        deleteResume(itemID)
         if let job = e.jobID, let client = app?.client {
             Task { _ = try? await client.deleteDownload(path: .init(downloadId: job)) }
         }
@@ -248,32 +313,53 @@ public final class Downloads {
     public func recordProgress(itemID: Int64, positionMs: Int64, watched: Bool) {
         entries[itemID]?.resumeMs = watched ? 0 : positionMs
         save()
-        pending.removeAll { $0.itemID == itemID && !$0.watched }
-        pending.append(PendingProgress(itemID: itemID, positionMs: positionMs, watched: watched, at: Date()))
-        if let data = try? JSONEncoder().encode(pending) { try? data.write(to: Self.pendingURL, options: .atomic) }
+        let server = app?.server?.id ?? ServerStore.currentServerID
+        let user = app?.me?.id ?? (UserDefaults.standard.object(forKey: Self.lastUserKey) as? NSNumber)?.int64Value
+        pending.removeAll { $0.itemID == itemID && !$0.watched && $0.server == server && $0.user == user }
+        pending.append(PendingProgress(itemID: itemID, positionMs: positionMs, watched: watched, at: Date(), server: server, user: user))
+        savePending()
         Task { await flushProgress() }
     }
 
-    /// Sends offline plays. One flush at a time (a play sent twice counts twice); records
-    /// added meanwhile go in a follow-up, and only the ones the server took are removed.
+    /// Sends offline plays that belong to the signed-in person on this server. One flush at a
+    /// time (a play sent twice counts twice); records added meanwhile go in a follow-up. Plays
+    /// the server took, and ones it rejected for good, are removed; the rest wait.
     public func flushProgress() async {
         guard !flushing else { flushAgain = true; return }
         flushing = true
         defer { flushing = false }
         repeat {
             flushAgain = false
-            guard let client = app?.client, !pending.isEmpty else { return }
-            var sent: [PendingProgress] = []
-            for p in pending {
+            guard let app, app.client != nil, !pending.isEmpty else { return }
+            if app.me == nil { await app.refreshMe() }
+            guard let client = app.client, let server = app.server?.id, let user = app.me?.id else { return }
+            UserDefaults.standard.set(user, forKey: Self.lastUserKey)
+            var done: [PendingProgress] = []
+            for p in Self.flushable(pending, server: server, user: user) {
+                let status: Int?
                 do {
-                    _ = try await client.syncProgress(path: .init(itemId: p.itemID),
-                                                      body: .json(.init(positionMs: p.positionMs, watched: p.watched, playedAt: p.at))).noContent
-                    sent.append(p)
-                } catch {}
+                    switch try await client.syncProgress(path: .init(itemId: p.itemID),
+                                                         body: .json(.init(positionMs: p.positionMs, watched: p.watched, playedAt: p.at))) {
+                    case .noContent: status = 204
+                    case .unauthorized: status = 401
+                    case .notFound: status = 404
+                    case .undocumented(let code, _): status = code
+                    }
+                } catch {
+                    status = nil
+                }
+                if Self.outcome(status: status) != .keep { done.append(p) }
             }
-            pending.removeAll { sent.contains($0) }
-            if let data = try? JSONEncoder().encode(pending) { try? data.write(to: Self.pendingURL, options: .atomic) }
+            pending.removeAll { done.contains($0) }
+            savePending()
         } while flushAgain
+    }
+
+    private func savePending() {
+        let list = pending, url = Self.pendingURL
+        Self.io.async {
+            if let data = try? JSONEncoder().encode(list) { try? data.write(to: url, options: .atomic) }
+        }
     }
 
     // MARK: - Conversions
@@ -282,7 +368,8 @@ public final class Downloads {
         guard polling == nil, entries.values.contains(where: { if case .preparing = $0.state { return true }; return false }) else { return }
         polling = Task { [weak self] in
             while let self, !Task.isCancelled {
-                await self.checkConversions()
+                // The server can't be reached: stop, and start again when it can (attach).
+                guard await self.checkConversions() else { break }
                 let waiting = self.entries.values.contains { if case .preparing = $0.state { return true }; return false }
                 if !waiting { break }
                 try? await Task.sleep(for: .seconds(5))
@@ -291,11 +378,17 @@ public final class Downloads {
         }
     }
 
-    private func checkConversions() async {
-        guard let client = app?.client else { return }
+    /// Checks the conversions under way; false when the server couldn't be reached.
+    private func checkConversions() async -> Bool {
+        guard let client = app?.client else { return false }
+        var asked = false, reached = false
         for e in entries.values {
             guard case .preparing = e.state, let job = e.jobID else { continue }
-            guard let info = try? await client.getDownload(path: .init(downloadId: job)).ok.body.json else { continue }
+            asked = true
+            let response: Operations.GetDownload.Output
+            do { response = try await client.getDownload(path: .init(downloadId: job)) } catch { continue }
+            reached = true
+            guard let info = try? response.ok.body.json else { continue }
             switch info.status {
             case .ready:
                 entries[e.id]?.url = info.url
@@ -309,15 +402,36 @@ public final class Downloads {
             }
         }
         save()
+        return reached || !asked
     }
 
     // MARK: - Transfers
 
     private func fetch(itemID: Int64, path: String) {
         guard let url = app?.authorizedURL(path) else { return }
-        let task = session.downloadTask(with: url)
+        let task: URLSessionDownloadTask
+        if let r = loadResume(itemID), r.url == url.absoluteString {
+            // Carries on where it stopped (same address).
+            task = session.downloadTask(withResumeData: r.data)
+            deleteResume(itemID)
+        } else {
+            // Another address: resume data only works where it came from, so it's kept (for
+            // coming back) and this transfer starts over.
+            task = session.downloadTask(with: url)
+        }
         task.taskDescription = String(itemID)
         task.resume()
+    }
+
+    private static func resumeURL(_ itemID: Int64) -> URL { directory.appending(path: "\(itemID).resume") }
+
+    private func loadResume(_ itemID: Int64) -> ResumeRecord? {
+        guard let data = try? Data(contentsOf: Self.resumeURL(itemID)) else { return nil }
+        return try? JSONDecoder().decode(ResumeRecord.self, from: data)
+    }
+
+    private func deleteResume(_ itemID: Int64) {
+        try? FileManager.default.removeItem(at: Self.resumeURL(itemID))
     }
 
     /// Progress comes many times a second; the list redraws about twice a second, or per 1%.
@@ -331,7 +445,11 @@ public final class Downloads {
 
     fileprivate func finished(itemID: Int64, temp: URL, suggested: String?) {
         lastProgress[itemID] = nil
-        guard var e = entries[itemID] else { return }
+        guard var e = entries[itemID] else {
+            // Removed while it downloaded: the file isn't wanted.
+            try? FileManager.default.removeItem(at: temp)
+            return
+        }
         let ext = (suggested as NSString?)?.pathExtension.nilIfEmpty ?? (e.quality == .original ? "mkv" : "mp4")
         let name = "\(itemID).\(ext)"
         let dest = Self.directory.appending(path: name)
@@ -344,17 +462,23 @@ public final class Downloads {
         } catch {
             e.state = .failed(error.localizedDescription)
         }
+        e.networkFailure = nil
         entries[itemID] = e
-        save()
+        deleteResume(itemID)
+        saveNow()
         // The converted copy on the server is no longer needed.
         if let job = e.jobID, let client = app?.client {
             Task { _ = try? await client.deleteDownload(path: .init(downloadId: job)) }
         }
     }
 
-    fileprivate func failed(itemID: Int64, message: String) {
+    fileprivate func failed(itemID: Int64, message: String, network: Bool = false, resumeData: Data? = nil, url: URL? = nil) {
         guard entries[itemID] != nil, entries[itemID]?.state != .done else { return }
         entries[itemID]?.state = .failed(message)
+        entries[itemID]?.networkFailure = network ? true : nil
+        if let resumeData, let url, let data = try? JSONEncoder().encode(ResumeRecord(url: url.absoluteString, data: resumeData)) {
+            try? data.write(to: Self.resumeURL(itemID), options: .atomic)
+        }
         save()
     }
 
@@ -367,9 +491,29 @@ public final class Downloads {
         save()
     }
 
+    /// Saves the index soon: changes in quick succession (a playlist sync, progress) are
+    /// written once, encoded off the main thread.
     private func save() {
-        if let data = try? JSONEncoder().encode(Array(entries.values)) {
-            try? data.write(to: Self.indexURL, options: .atomic)
+        guard saveTask == nil else { return }
+        saveTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard let self, !Task.isCancelled else { return }
+            self.saveTask = nil
+            self.writeIndex()
+        }
+    }
+
+    /// Saves the index now (a finished download, the end of a sync).
+    private func saveNow() {
+        saveTask?.cancel()
+        saveTask = nil
+        writeIndex()
+    }
+
+    private func writeIndex() {
+        let list = Array(entries.values), url = Self.indexURL
+        Self.io.async {
+            if let data = try? JSONEncoder().encode(list) { try? data.write(to: url, options: .atomic) }
         }
     }
 
@@ -410,7 +554,11 @@ private final class SessionBridge: NSObject, URLSessionDownloadDelegate, @unchec
         guard let error, let id = task.taskDescription.flatMap(Int64.init) else { return }
         if (error as NSError).code == NSURLErrorCancelled { return }
         let msg = error.localizedDescription
-        Task { @MainActor in self.owner?.failed(itemID: id, message: msg) }
+        let network = Downloads.isNetworkError(error)
+        // Kept so the transfer can carry on rather than start over.
+        let resume = (error as NSError).userInfo[NSURLSessionDownloadTaskResumeData] as? Data
+        let url = task.originalRequest?.url
+        Task { @MainActor in self.owner?.failed(itemID: id, message: msg, network: network, resumeData: resume, url: url) }
     }
 
     func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
