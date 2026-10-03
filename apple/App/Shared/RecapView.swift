@@ -1,8 +1,8 @@
 import MarqueeKit
 import SwiftUI
 
-/// "Your Year in Music" (MUSIC-22): a card that opens the recap, with a year picker when
-/// there's more than one year. Hidden when there's no music history.
+/// "Your Year in Music" (MUSIC-22): one compact row that opens the recap, with a small year
+/// menu folded in when there's more than one year. Hidden when there's no music history.
 struct RecapCard: View {
     @Environment(AppSession.self) private var app
     @State private var years: [Int] = []
@@ -11,26 +11,69 @@ struct RecapCard: View {
 
     var body: some View {
         if let year {
-            HStack(spacing: 12) {
-                Button { showing = year } label: { card(year) }
-                    #if os(tvOS)
-                    .buttonStyle(.card)
-                    #else
-                    .buttonStyle(.plain)
-                    #endif
-                    .accessibilityLabel("Your \(String(year)) in Music")
-                    .accessibilityIdentifier("recapCard")
+            HStack(spacing: 10) {
+                Button { showing = year } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "sparkles").font(iconFont).foregroundStyle(accent)
+                        Text("Your \(String(year)) in Music").font(titleFont).lineLimit(1).minimumScaleFactor(0.85)
+                        Spacer(minLength: 4)
+                        #if os(tvOS)
+                        Text("View").font(.callout).foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right").font(.callout.bold()).foregroundStyle(.secondary)
+                        #endif
+                    }
+                    .contentShape(Rectangle())
+                }
+                #if os(tvOS)
+                .buttonStyle(.bordered)
+                #else
+                .buttonStyle(.plain)
+                #endif
+                .accessibilityLabel("Your \(String(year)) in Music")
+                .accessibilityIdentifier("recapCard")
                 if years.count > 1 {
                     Menu {
                         Picker("Year", selection: Binding(get: { year }, set: { self.year = $0 })) {
                             ForEach(years, id: \.self) { Text(String($0)).tag($0) }
                         }
                     } label: {
-                        Label("Year", systemImage: "calendar")
+                        HStack(spacing: 3) {
+                            Text(String(year)).monospacedDigit()
+                            Image(systemName: "chevron.up.chevron.down").font(.caption2)
+                        }
+                        .font(.footnote.weight(.medium))
+                        .lineLimit(1)
+                        .fixedSize()
                     }
-                    .accessibilityLabel("Choose the year")
+                    .accessibilityLabel("Choose the year, \(String(year))")
+                    .accessibilityIdentifier("recapYear")
                 }
+                #if os(iOS)
+                Button { showing = year } label: {
+                    HStack(spacing: 2) {
+                        Text("View")
+                        Image(systemName: "chevron.right").font(.caption.bold())
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(accent)
+                    .lineLimit(1)
+                    .fixedSize()
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("View your \(String(year)) in Music")
+                #endif
             }
+            #if os(iOS)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(alignment: .leading) {
+                // A thin accent down the leading edge.
+                UnevenRoundedRectangle(topLeadingRadius: 12, bottomLeadingRadius: 12).fill(accent).frame(width: 3)
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("recapRow")
+            #endif
             .padding(.horizontal, sidePadding)
             #if os(tvOS)
             .focusSection()
@@ -46,23 +89,15 @@ struct RecapCard: View {
         }
     }
 
-    private func card(_ year: Int) -> some View {
-        HStack(spacing: 16) {
-            Image(systemName: "sparkles").font(.system(size: isTV ? 54 : 30, weight: .bold))
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Your Year in Music").font(isTV ? .title2.bold() : .headline.weight(.heavy))
-                Text("Your \(String(year)), in songs, artists and minutes").font(.caption).opacity(0.85)
-            }
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.right").font(.headline)
-        }
-        .foregroundStyle(.white)
-        .padding(isTV ? 30 : 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(LinearGradient(colors: [Color(red: 0.95, green: 0.3, blue: 0.45), Color(red: 0.45, green: 0.2, blue: 0.85)],
-                                   startPoint: .topLeading, endPoint: .bottomTrailing),
-                    in: RoundedRectangle(cornerRadius: 16))
-    }
+    private var accent: Color { Color(red: 0.85, green: 0.35, blue: 0.75) }
+
+    #if os(tvOS)
+    private let iconFont = Font.title3
+    private let titleFont = Font.headline
+    #else
+    private let iconFont = Font.subheadline
+    private let titleFont = Font.subheadline.weight(.semibold)
+    #endif
 }
 
 struct RecapYear: Identifiable { let id: Int }
