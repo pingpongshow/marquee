@@ -166,3 +166,7 @@ public extension Components.Schemas.ItemDetail {
 
 extension Components.Schemas.ItemSummary: Identifiable {}
 extension Components.Schemas.Profile: Identifiable {}
+extension Components.Schemas.Playlist: Identifiable {}
+extension Components.Schemas.RemotePlayer: Identifiable {
+    public var id: Int64 { deviceId }
+}

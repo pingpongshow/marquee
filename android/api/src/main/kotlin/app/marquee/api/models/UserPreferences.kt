@@ -23,6 +23,7 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.SubtitleStyle
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -37,6 +38,7 @@ import kotlinx.serialization.Contextual
  * @param localQualityKbps 0 = original
  * @param remoteQualityKbps 0 = automatic
  * @param cinemaTrailers Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true.
+ * @param subtitleStyle 
  */
 @Serializable
 
@@ -62,7 +64,10 @@ data class UserPreferences (
 
     /* Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true. */
     @SerialName(value = "cinemaTrailers")
-    val cinemaTrailers: kotlin.Boolean? = null
+    val cinemaTrailers: kotlin.Boolean? = null,
+
+    @SerialName(value = "subtitleStyle")
+    val subtitleStyle: SubtitleStyle? = null
 
 ) {
 

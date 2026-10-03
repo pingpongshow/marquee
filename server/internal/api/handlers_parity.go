@@ -124,6 +124,8 @@ type homeRow struct {
 	hidden    bool
 	pinned    bool
 	fill      func() ([]items.Summary, error)
+	// expand, when set, makes the row several hubs (because-you-watched; USER-16).
+	expand func() ([]homeRow, error)
 }
 
 func (h *Handlers) savedLayout(ctx context.Context, uid int64) []savedRow {
@@ -188,6 +190,33 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow) ([
 		{id: "continue-watching", title: "Continue Watching", fill: func() ([]items.Summary, error) { return h.Items.ContinueWatching(ctx, acc, home, 20) }},
 		{id: "watchlist", title: "Your Watchlist", fill: func() ([]items.Summary, error) { return h.Items.Watchlist(ctx, acc, 30) }},
 	}
+	// Recommendations (USER-16). Always offered, so a saved layout keeps their place; they
+	// stay empty until movies and shows are embedded.
+	{
+		home := append([]int64{}, home...) // none means none, not all
+		defaults = append(defaults,
+			homeRow{id: "recommended", title: "Recommended for You", fill: func() ([]items.Summary, error) {
+				idx := h.videoIndex()
+				if idx.Len() == 0 {
+					return nil, nil
+				}
+				return h.Items.Recommended(ctx, acc, idx, home, 20)
+			}},
+			homeRow{id: "because-you-watched", title: "Because You Watched", expand: func() ([]homeRow, error) {
+				idx := h.videoIndex()
+				if idx.Len() == 0 {
+					return nil, nil
+				}
+				rows, err := h.Items.BecauseYouWatched(ctx, acc, idx, home, 2, 20)
+				out := make([]homeRow, len(rows))
+				for i, b := range rows {
+					list := b.Items
+					out[i] = homeRow{id: fmt.Sprintf("because-%d", b.Seed.ID), title: "Because you watched " + b.Seed.Title,
+						fill: func() ([]items.Summary, error) { return list, nil }}
+				}
+				return out, err
+			}})
+	}
 	for _, l := range libs {
 		if !canSeeLibrary(ctx, l.ID) || (l.Options.IncludeInHome != nil && !*l.Options.IncludeInHome) {
 			continue
@@ -249,18 +278,26 @@ func (h *Handlers) HomeHubs(ctx context.Context, _ HomeHubsRequestObject) (HomeH
 		if r.hidden {
 			continue
 		}
-		list, err := r.fill()
-		if err != nil {
-			return nil, internal(ctx, "hubs", err)
+		subs := []homeRow{r}
+		if r.expand != nil {
+			if subs, err = r.expand(); err != nil {
+				return nil, internal(ctx, "hubs", err)
+			}
 		}
-		if len(list) == 0 {
-			continue
+		for _, r := range subs {
+			list, err := r.fill()
+			if err != nil {
+				return nil, internal(ctx, "hubs", err)
+			}
+			if len(list) == 0 {
+				continue
+			}
+			hub := Hub{Id: r.id, Title: r.title, LibraryId: nz(r.lib), Items: make([]ItemSummary, len(list))}
+			for i, it := range list {
+				hub.Items[i] = toAPISummary(it)
+			}
+			out = append(out, hub)
 		}
-		hub := Hub{Id: r.id, Title: r.title, LibraryId: nz(r.lib), Items: make([]ItemSummary, len(list))}
-		for i, it := range list {
-			hub.Items[i] = toAPISummary(it)
-		}
-		out = append(out, hub)
 	}
 	return out, nil
 }

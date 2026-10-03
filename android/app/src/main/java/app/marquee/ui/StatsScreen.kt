@@ -29,7 +29,7 @@ import kotlinx.coroutines.withContext
 
 /** Your Stats (ADM-4, the "year in music"): what you've watched and listened to. */
 @Composable
-fun StatsScreen() {
+fun StatsScreen(nav: androidx.navigation.NavHostController? = null) {
     val marquee = LocalMarquee.current
     var days by remember { mutableIntStateOf(30) }
     val stats by produceState<Result<Stats>?>(null, days) {
@@ -38,6 +38,8 @@ fun StatsScreen() {
     }
     LazyColumn(contentPadding = PaddingValues(sidePadding), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("Your Stats", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+        // Your Year in Music (MUSIC-22), once there's a year of listening.
+        if (nav != null) item { app.marquee.music.YearInMusicCard(nav) }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(7 to "7 days", 30 to "30 days", 365 to "Year", 0 to "All time").forEach { (d, label) ->

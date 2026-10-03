@@ -58,7 +58,7 @@ func TestSmartCollectionsHomeLayoutCinema(t *testing.T) {
 	pin := fmt.Sprintf("collection-%d", sc.Id)
 	var layout api.HomeLayout
 	h.do("GET", "/me/home-layout", nil, &layout)
-	if len(layout.Rows) != 3 || layout.Rows[0].Id != "continue-watching" {
+	if len(layout.Rows) != 5 || layout.Rows[0].Id != "continue-watching" || layout.Rows[2].Id != "recommended" {
 		t.Fatalf("default layout: %+v", layout)
 	}
 	h.do("PUT", "/me/home-layout", map[string]any{"rows": []map[string]any{{"id": recent}, {"id": pin}, {"id": "watchlist", "hidden": true}, {"id": "nope"}}}, &layout)
@@ -66,7 +66,7 @@ func TestSmartCollectionsHomeLayoutCinema(t *testing.T) {
 	for _, r := range layout.Rows {
 		ids = append(ids, r.Id)
 	}
-	if fmt.Sprint(ids) != fmt.Sprintf("[%s %s watchlist continue-watching]", recent, pin) || !*layout.Rows[1].Pinned || *layout.Rows[1].Title != "90s" || !*layout.Rows[2].Hidden {
+	if fmt.Sprint(ids) != fmt.Sprintf("[%s %s watchlist continue-watching recommended because-you-watched]", recent, pin) || !*layout.Rows[1].Pinned || *layout.Rows[1].Title != "90s" || !*layout.Rows[2].Hidden {
 		t.Fatalf("saved layout: %v %+v", ids, layout.Rows)
 	}
 	var hubs []api.Hub
@@ -75,7 +75,7 @@ func TestSmartCollectionsHomeLayoutCinema(t *testing.T) {
 		t.Fatalf("hubs: %+v", hubs)
 	}
 	h.do("PUT", "/me/home-layout", map[string]any{"rows": []any{}}, &layout)
-	if layout.Rows[0].Id != "continue-watching" || len(layout.Rows) != 3 {
+	if layout.Rows[0].Id != "continue-watching" || len(layout.Rows) != 5 {
 		t.Fatalf("reset: %+v", layout)
 	}
 

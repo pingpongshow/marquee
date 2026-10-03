@@ -18,6 +18,8 @@ import {
 import { StatsView } from "../settings/StatsView";
 import { AvatarPicker } from "./Avatar";
 import { LinkDeviceCard } from "./LinkDevice";
+import { SubtitleAppearanceCard } from "./SubtitleAppearance";
+import { RecapCard } from "../music/RecapCard";
 import {
   languageOptions,
   localQualityOptions,
@@ -313,10 +315,12 @@ export function AccountPage() {
           </Button>
         </div>
       </Card>
+      <SubtitleAppearanceCard />
       <Card
         title="Your stats"
         description="What you've watched and listened to."
       >
+        <RecapCard />
         <StatsView admin={false} />
       </Card>
     </div>

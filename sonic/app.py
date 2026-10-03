@@ -5,7 +5,9 @@ Runs next to the Marquee server on the same host and is only reachable from it
 
 - a CLAP embedding (LAION larger_clap_general, 512-d, unit length) that captures how a
   track sounds; text prompts embed into the same space, which powers Muse;
-- tempo (BPM), musical key, and an energy estimate (librosa).
+- tempo (BPM), musical key, and an energy estimate (librosa);
+- text embeddings of movie and show descriptions (BAAI/bge-base-en-v1.5, 768-d, unit
+  length) for Muse for movies, recommendations and related items (USER-15, USER-16).
 
 Nothing leaves the machine except the one-time model download from Hugging Face.
 """
@@ -21,7 +23,7 @@ import numpy as np
 import torch
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from transformers import ClapModel, ClapProcessor
+from transformers import AutoModel, AutoTokenizer, ClapModel, ClapProcessor
 
 MODEL_ID = os.environ.get("SONIC_MODEL", "laion/larger_clap_general")
 # Reported to the server as the analysis version: bumping the suffix re-analyses the library.
@@ -29,6 +31,9 @@ ANALYSIS_ID = f"{MODEL_ID}#2"
 SR = 48_000          # CLAP's sample rate
 WINDOW = 10.0        # seconds per CLAP window
 FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
+DOC_MODEL_ID = os.environ.get("SONIC_DOC_MODEL", "BAAI/bge-base-en-v1.5")
+# bge wants this instruction on short queries (not on the documents they search).
+DOC_QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 
 log = logging.getLogger("sonic")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -183,3 +188,45 @@ def embed_text(req: TextRequest):
         inputs = {k: v.to(device) for k, v in inputs.items()}
         e = torch.nn.functional.normalize(model.get_text_features(**inputs).float(), dim=-1)
     return {"model": ANALYSIS_ID, "embeddings": [[round(float(x), 6) for x in v] for v in e.cpu().numpy()]}
+
+
+class DocsRequest(BaseModel):
+    texts: list[str]
+    kind: str = "doc"  # "query" (a Muse prompt) or "doc" (a movie's or show's description)
+
+
+doc_model = None
+doc_tokenizer = None
+doc_load_lock = threading.Lock()
+
+
+def load_doc_model():
+    """Loads the text model on first use, so a music-only server never pays for it."""
+    global doc_model, doc_tokenizer
+    with doc_load_lock:
+        if doc_model is None:
+            log.info("loading %s on %s", DOC_MODEL_ID, device)
+            doc_tokenizer = AutoTokenizer.from_pretrained(DOC_MODEL_ID)
+            m = AutoModel.from_pretrained(DOC_MODEL_ID).to(device).eval()
+            doc_model = m.half() if device == "cuda" else m
+    return doc_model, doc_tokenizer
+
+
+@app.post("/embed_docs")
+def embed_docs(req: DocsRequest):
+    """Embeds descriptions or queries with bge (CLS pooling, unit length). An empty list
+    just reports the model id, which the server stores so a model change re-embeds."""
+    if len(req.texts) > 64:
+        raise HTTPException(400, "at most 64 texts per request")
+    if req.kind not in ("query", "doc"):
+        raise HTTPException(400, 'kind must be "query" or "doc"')
+    if not req.texts:
+        return {"model": DOC_MODEL_ID, "embeddings": []}
+    texts = [DOC_QUERY_PREFIX + t if req.kind == "query" else t for t in req.texts]
+    m, tok = load_doc_model()
+    with gpu_lock, torch.inference_mode():
+        inputs = tok(texts, padding=True, truncation=True, max_length=512, return_tensors="pt")
+        inputs = {k: v.to(device) for k, v in inputs.items()}
+        e = m(**inputs).last_hidden_state[:, 0].float()
+        e = torch.nn.functional.normalize(e, dim=-1)
+    return {"model": DOC_MODEL_ID, "embeddings": [[round(float(x), 6) for x in v] for v in e.cpu().numpy()]}

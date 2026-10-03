@@ -24,6 +24,7 @@ struct LibraryView: View {
         ScrollView {
             if let error { ErrorBanner(message: error).padding() }
             if library?._type == .music {
+                RecapCard().padding(.top) // MUSIC-22
                 MusicDiscoverView(libraryID: libraryID).padding(.top)
             }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: minWidth, maximum: minWidth * 1.4), spacing: gap, alignment: .top)], spacing: gap) {
@@ -43,6 +44,12 @@ struct LibraryView: View {
                 ToolbarItem { CarModeButton(libraryID: libraryID) }
             }
             #endif
+            if let t = library?._type, [.movies, .shows, .anime, .videos].contains(t) {
+                // Muse for this library (USER-15).
+                ToolbarItem {
+                    NavigationLink(value: Route.museVideo(library: libraryID)) { Label("Muse", systemImage: "sparkles") }
+                }
+            }
             ToolbarItem {
                 Menu {
                     if library?._type == .movies {

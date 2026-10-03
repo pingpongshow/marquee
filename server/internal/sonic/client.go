@@ -100,3 +100,23 @@ func (c *Client) EmbedText(ctx context.Context, texts []string) ([][]float32, er
 	err := c.post(ctx, "/embed_text", map[string]any{"texts": texts}, &out)
 	return out.Embeddings, err
 }
+
+// EmbedDocs embeds movie and show descriptions (kind "doc") or Muse prompts (kind "query")
+// with the sidecar's text model (USER-15, USER-16). It returns the model id, which an
+// empty texts list also reports without loading the model.
+func (c *Client) EmbedDocs(ctx context.Context, texts []string, kind string) (string, [][]float32, error) {
+	var out struct {
+		Model      string      `json:"model"`
+		Embeddings [][]float32 `json:"embeddings"`
+	}
+	if texts == nil {
+		texts = []string{}
+	}
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute) // the first call downloads and loads the model
+	defer cancel()
+	err := c.post(ctx, "/embed_docs", map[string]any{"texts": texts, "kind": kind}, &out)
+	if err == nil && len(out.Embeddings) != len(texts) {
+		err = fmt.Errorf("sonic /embed_docs: %d embeddings for %d texts", len(out.Embeddings), len(texts))
+	}
+	return out.Model, out.Embeddings, err
+}

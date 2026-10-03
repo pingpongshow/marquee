@@ -101,7 +101,7 @@ fun TrailersPreference() {
 private fun SectionTitle(t: String) =
     Text(t, Modifier.padding(horizontal = sidePadding).padding(top = 20.dp, bottom = 6.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Gold)
 
-/** Admin server settings on Android: cinema trailers (PLAY-18). The full set lives on the web. */
+/** Admin server settings on Android: cinema trailers (PLAY-18) and integrations (Seerr, Bazarr). The full set lives on the web. */
 @Composable
 fun ServerSettingsScreen() {
     val marquee = LocalMarquee.current
@@ -114,13 +114,41 @@ fun ServerSettingsScreen() {
     var idText by remember { mutableStateOf("") }
     var results by remember { mutableStateOf(emptyList<ItemSummary>()) }
     var status by remember { mutableStateOf<String?>(null) }
+    // Integrations: addresses, and API keys that are write-only (the server only says they're set).
+    var seerrUrl by remember { mutableStateOf("") }
+    var seerrKey by remember { mutableStateOf("") }
+    var seerrKeySet by remember { mutableStateOf(false) }
+    var bazarrUrl by remember { mutableStateOf("") }
+    var bazarrKey by remember { mutableStateOf("") }
+    var bazarrKeySet by remember { mutableStateOf(false) }
+    var integrationStatus by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) { runCatching { marquee.settings.getSettings().cinema } }
-            .onSuccess { c ->
+        withContext(Dispatchers.IO) { runCatching { marquee.settings.getSettings() } }
+            .onSuccess { st ->
+                val c = st.cinema
                 trailers = c?.trailers ?: 0
                 prerollId = c?.prerollItemId
+                st.integrations?.let { i ->
+                    seerrUrl = i.seerrUrl.orEmpty(); seerrKeySet = i.seerrApiKeySet == true
+                    bazarrUrl = i.bazarrUrl.orEmpty(); bazarrKeySet = i.bazarrApiKeySet == true
+                }
                 loaded = true
             }.onFailure { status = "Couldn't load the settings: ${it.message}" }
+    }
+    fun saveIntegrations() {
+        scope.launch {
+            val update = app.marquee.api.models.IntegrationSettingsUpdate(
+                seerrUrl = seerrUrl.trim(), seerrApiKey = seerrKey.trim().ifBlank { null },
+                bazarrUrl = bazarrUrl.trim(), bazarrApiKey = bazarrKey.trim().ifBlank { null },
+            )
+            integrationStatus = withContext(Dispatchers.IO) { runCatching { marquee.settings.updateSettings(ServerSettingsUpdate(integrations = update)) } }
+                .fold({ st ->
+                    seerrKey = ""; bazarrKey = ""
+                    seerrKeySet = st.integrations?.seerrApiKeySet == true
+                    bazarrKeySet = st.integrations?.bazarrApiKeySet == true
+                    "Saved."
+                }, { "Couldn't save: ${it.message}" })
+        }
     }
     // The picked pre-roll's title.
     LaunchedEffect(prerollId) {
@@ -185,6 +213,27 @@ fun ServerSettingsScreen() {
                 }
                 Button(::save, Modifier.focusRing(), enabled = loaded) { Text("Save") }
                 status?.let { Text(it, color = if (it == "Saved.") Gold else MaterialTheme.colorScheme.error) }
+            }
+        }
+        item { SectionTitle("Integrations") }
+        item {
+            Column(Modifier.padding(horizontal = sidePadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Seerr for requests, and Bazarr for subtitles (META-12). API keys are never shown; leave a key empty to keep it.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Seerr", fontWeight = FontWeight.SemiBold)
+                OutlinedTextField(seerrUrl, { seerrUrl = it }, Modifier.fillMaxWidth().semantics { testTag = "seerrUrl" }, singleLine = true, label = { Text("Seerr URL") })
+                OutlinedTextField(seerrKey, { seerrKey = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Seerr API key") },
+                    placeholder = { Text(if (seerrKeySet) "set" else "not set") },
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
+                Text("Bazarr", fontWeight = FontWeight.SemiBold)
+                OutlinedTextField(bazarrUrl, { bazarrUrl = it }, Modifier.fillMaxWidth().semantics { testTag = "bazarrUrl" }, singleLine = true,
+                    label = { Text("Bazarr URL") }, placeholder = { Text("http://192.168.1.10:6767") })
+                OutlinedTextField(bazarrKey, { bazarrKey = it }, Modifier.fillMaxWidth().semantics { testTag = "bazarrKey" }, singleLine = true,
+                    label = { Text("Bazarr API key") }, placeholder = { Text(if (bazarrKeySet) "set" else "not set") },
+                    supportingText = { Text(if (bazarrKeySet) "Key: set" else "Key: not set") },
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
+                Button(::saveIntegrations, Modifier.focusRing(), enabled = loaded) { Text("Save integrations") }
+                integrationStatus?.let { Text(it, color = if (it == "Saved.") Gold else MaterialTheme.colorScheme.error) }
             }
         }
     }

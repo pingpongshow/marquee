@@ -248,8 +248,10 @@ final class MarqueeTVUITests: XCTestCase {
         let token = try signInTemporaryUser()
         // At the bottom of Home (rows load as they come into view).
         let edit = app.buttons["Edit Home"]
-        for _ in 0..<20 where !(edit.exists && edit.hasFocus) { remote.press(.down) }
-        XCTAssertTrue(edit.hasFocus)
+        // Edit Home sits at the left of the last line, beside Muse.
+        let focusedNow = app.descendants(matching: .any).element(matching: NSPredicate(format: "hasFocus == true"))
+        for _ in 0..<20 where !(edit.exists && edit.hasFocus) { remote.press(focusedNow.label == "Muse" ? .left : .down) }
+        XCTAssertTrue(edit.hasFocus, "focus is on \(focusedNow.label)")
         remote.press(.select)
         let hide = app.buttons["Hide Recently Added Movies"]
         XCTAssertTrue(hide.waitForExistence(timeout: 10))
@@ -317,6 +319,101 @@ final class MarqueeTVUITests: XCTestCase {
         XCTAssertEqual(app.state, .runningForeground)
         remote.press(.menu)
         remote.press(.menu)
+    }
+
+    // MARK: - Batch 2 (USER-14, MUSIC-22, PLAY-20)
+
+    private func list(_ path: String, token: String) throws -> [[String: Any]] {
+        var req = URLRequest(url: URL(string: server + "/api/v1" + path)!)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let done = expectation(description: path)
+        var out: [[String: Any]] = []
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            out = (data.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [[String: Any]]) ?? []
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 30)
+        return out
+    }
+
+    private func eventually(_ timeout: TimeInterval, _ what: String, _ check: () throws -> Bool) rethrows {
+        let end = Date().addingTimeInterval(timeout)
+        while Date() < end {
+            if try check() { return }
+            Thread.sleep(forTimeInterval: 1)
+        }
+        XCTFail("timed out: \(what)")
+    }
+
+    /// The Apple TV as a remote-controlled player (USER-14): another device of the same person
+    /// sends play, pause, seek and stop, and sees the state the TV reports.
+    func testRemoteControlledTV() throws {
+        let controller = try signInTemporaryUser() // the token that approved Quick Connect: another device
+        let tvID = try XCTUnwrap(try list("/devices", token: controller).first { $0["current"] as? Bool != true && $0["platform"] as? String == "tvos" }?["id"] as? Int)
+        try eventually(60, "the TV listed as a player") {
+            try list("/remote/players", token: controller).contains { $0["deviceId"] as? Int == tvID }
+        }
+        func state() throws -> [String: Any] {
+            try api("GET", "/remote/players/\(tvID)", token: controller)["state"] as? [String: Any] ?? [:]
+        }
+        func command(_ body: [String: Any]) throws { try api("POST", "/remote/players/\(tvID)/commands", body, token: controller) }
+        try command(["type": "play", "itemIds": [322], "startMs": 5000])
+        try eventually(30, "playing 00 Long Test") {
+            let s = try state()
+            if s["itemId"] as? Int != 322 { return false } // a cinema trailer may play first
+            return s["state"] as? String == "playing"
+        }
+        sleep(2)
+        shot("tv-rc1-playing")
+        try command(["type": "pause"])
+        try eventually(15, "paused") { try state()["state"] as? String == "paused" }
+        try command(["type": "seek", "positionMs": 30000])
+        try eventually(15, "at 30 s") {
+            let p = try state()["positionMs"] as? Int ?? 0
+            return p >= 28000 && p <= 33000
+        }
+        shot("tv-rc2-paused")
+        try command(["type": "stop"])
+        try eventually(15, "stopped") { (try state()["itemId"] as? Int) == nil }
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
+    /// The year-in-music recap on the TV (MUSIC-22): Kiddo's, page by page with Next.
+    func testRecapTV() throws {
+        let kid = try api("POST", "/auth/pin", ["userId": 2, "device": ["clientId": "uitest-\(UUID().uuidString)", "name": "UI test", "platform": "tvos"]])
+        try signIn(as: try XCTUnwrap(kid["token"] as? String))
+        let musicTab = app.buttons["Music"].firstMatch
+        XCTAssertTrue(musicTab.waitForExistence(timeout: 10))
+        focus(musicTab, direction: .right)
+        remote.press(.select)
+        let card = app.buttons["recapCard"]
+        XCTAssertTrue(card.waitForExistence(timeout: 15))
+        sleep(1)
+        // The card is the first thing under the tab bar and the sort button.
+        for _ in 0..<4 { remote.press(.up) }
+        for _ in 0..<3 where !card.hasFocus { remote.press(.down) }
+        sleep(1)
+        shot("tv-ym0-music")
+        XCTAssertTrue(card.hasFocus)
+        remote.press(.select)
+        XCTAssertTrue(app.descendants(matching: .any)["recap-minutes"].waitForExistence(timeout: 15))
+        sleep(1)
+        shot("tv-ym1-minutes")
+        let next = app.buttons["Next"]
+        XCTAssertTrue(next.waitForExistence(timeout: 5))
+        focus(next, direction: .right, tries: 4)
+        var pages = 1
+        for _ in 0..<12 where !app.descendants(matching: .any)["recap-summary"].exists {
+            remote.press(.select)
+            sleep(1)
+            pages += 1
+            if !next.hasFocus { focus(next, direction: .right, tries: 4) }
+        }
+        XCTAssertTrue(app.descendants(matching: .any)["recap-summary"].exists)
+        XCTAssertGreaterThanOrEqual(pages, 9)
+        shot("tv-ym2-summary")
+        remote.press(.menu)
+        XCTAssertTrue(card.waitForExistence(timeout: 10))
     }
 
     /// A request that doesn't need an expectation, for teardown blocks (which run even when a

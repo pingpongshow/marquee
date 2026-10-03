@@ -104,6 +104,8 @@ import app.marquee.api.models.MediaStream
 import app.marquee.api.models.PlaybackProgress
 import app.marquee.api.models.PlaybackRequest
 import app.marquee.api.models.PlaybackSession
+import app.marquee.api.models.RemoteCommand
+import app.marquee.api.models.RemotePlayerState
 import app.marquee.core.AndroidProfile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -391,6 +393,59 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
         // Only clears its own hand-off: the next episode's player may have set one already.
         onDispose { if (marquee.cast.onFinished === onCastFinished) marquee.cast.onFinished = null }
     }
+    // Remote control (USER-14): this player obeys the person's other apps while it's showing.
+    val remote = LocalRemote.current
+    DisposableEffect(Unit) {
+        val target = object : app.marquee.core.RemoteVideo {
+            override fun state(): RemotePlayerState {
+                val d = detail
+                val st = when {
+                    error != null -> RemotePlayerState.State.STOPPED
+                    player.isPlaying -> RemotePlayerState.State.PLAYING
+                    player.playWhenReady && player.playbackState == Player.STATE_BUFFERING -> RemotePlayerState.State.BUFFERING
+                    else -> RemotePlayerState.State.PAUSED
+                }
+                val sub = choice.subtitle ?: session?.subtitleStreamId
+                return RemotePlayerState(
+                    state = st, positionMs = player.currentPosition.coerceAtLeast(0), itemId = itemId, itemType = d?.type,
+                    title = d?.title,
+                    subtitle = d?.let { if (it.type == ItemType.EPISODE) listOfNotNull(it.grandparentTitle, it.parentTitle, it.index?.let { i -> "E$i" }).joinToString(" · ") else it.year?.toString() },
+                    artItemId = if (d?.type == ItemType.EPISODE) d.grandparentId ?: itemId else itemId,
+                    durationMs = player.duration.takeIf { it > 0 },
+                    volume = player.volume.toDouble(),
+                    audioStreamId = choice.audio ?: session?.audioStreamId,
+                    subtitleStreamId = if (sub == null || sub == -1L) -1L else sub,
+                )
+            }
+
+            override fun execute(c: RemoteCommand) {
+                when (c.type) {
+                    RemoteCommand.Type.PAUSE -> player.pause()
+                    RemoteCommand.Type.RESUME -> player.play()
+                    RemoteCommand.Type.SEEK -> c.positionMs?.let { player.seekTo(it) }
+                    RemoteCommand.Type.STOP -> if (stillShowing()) nav.popBackStack()
+                    RemoteCommand.Type.PREVIOUS -> player.seekTo(0)
+                    RemoteCommand.Type.NEXT -> marquee.scope.launch(Dispatchers.Main) {
+                        val next = withContext(Dispatchers.IO) { runCatching { marquee.items.nextItem(itemId) }.getOrNull() }
+                        if (next != null && stillShowing()) nav.navigate("player/${next.id}?start=0") { popUpTo("player/{id}?start={start}&group={group}") { inclusive = true } }
+                    }
+                    RemoteCommand.Type.SET_VOLUME -> c.volume?.let { player.volume = it.toFloat().coerceIn(0f, 1f) }
+                    RemoteCommand.Type.SET_AUDIO, RemoteCommand.Type.SET_SUBTITLE -> if (local == null) {
+                        val id = c.streamId ?: return
+                        val next = if (c.type == RemoteCommand.Type.SET_AUDIO) choice.copy(audio = id) else choice.copy(subtitle = if (id < 0) -1 else id)
+                        choice = next
+                        val at = player.currentPosition
+                        scope.launch { start(at, next) }
+                    }
+                    else -> {}
+                }
+                poke()
+            }
+        }
+        remote.video = target
+        onDispose { if (remote.video === target) remote.video = null }
+    }
+
     fun seekBy(ms: Long) {
         val target = ((scrub ?: player.currentPosition) + ms).coerceIn(0, duration.coerceAtLeast(1))
         scrub = target
@@ -429,6 +484,9 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             .focusable()
             .clickable(remember { MutableInteractionSource() }, indication = null) { if (controls) controls = false else poke() },
     ) {
+        // Subtitle appearance (PLAY-20) follows the person to every app.
+        val me by marquee.me.collectAsState()
+        val subStyle = me?.preferences?.subtitleStyle
         AndroidView({
             PlayerView(it).apply {
                 this.player = player
@@ -436,7 +494,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                 keepScreenOn = true
                 resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
             }
-        }, Modifier.fillMaxSize())
+        }, Modifier.fillMaxSize(), update = { v -> v.subtitleView?.let { applySubtitleStyle(it, subStyle) } })
         if ((buffering && error == null) || (session == null && local == null && error == null)) CircularProgressIndicator(Modifier.align(Alignment.Center))
         error?.let { Text(it, Modifier.align(Alignment.Center).padding(24.dp), color = MaterialTheme.colorScheme.error) }
 
@@ -466,6 +524,10 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                         }
                     }
                     if (local == null && roll < 0) CastButton()
+                    // Play on another Marquee app (USER-14): hands over at this position, then pauses here.
+                    if (local == null && roll < 0) PlayOnButton(nav, handoff = {
+                        RemoteCommand(RemoteCommand.Type.PLAY, itemIds = listOf(itemId), startMs = player.currentPosition)
+                    }, onSent = { player.pause() })
                     if (local == null && roll < 0) IconButton({ settings = true; poke() }, Modifier.focusRing()) { Icon(Icons.Filled.Settings, "Playback settings", tint = Color.White) }
                 }
                 // Middle: back 10, play/pause, forward 30.
@@ -541,7 +603,16 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             onClose = { settings = false; poke() },
             onFind = { settings = false; finding = true },
         )
-        if (finding) FindSubtitles(itemId, onClose = { finding = false; poke() }) { streamId ->
+        if (finding) FindSubtitles(itemId, bazarr = detail?.type == ItemType.MOVIE || detail?.type == ItemType.EPISODE, onClose = { finding = false; poke() },
+            onQueued = {
+                // Bazarr fetches it in the background (META-12): pick up the new track when it lands.
+                scope.launch {
+                    for (wait in listOf(15_000L, 15_000L, 30_000L)) {
+                        delay(wait)
+                        withContext(Dispatchers.IO) { runCatching { marquee.items.getItem(itemId) }.getOrNull() }?.let { detail = it }
+                    }
+                }
+            }) { streamId ->
             finding = false
             val c = choice.copy(subtitle = streamId)
             choice = c
@@ -688,7 +759,7 @@ private fun streamLabel(s: MediaStream): String {
 
 /** Find subtitles on OpenSubtitles (PLAY-7): hash matches first; picking one downloads it. */
 @Composable
-private fun FindSubtitles(itemId: Long, onClose: () -> Unit, onDownloaded: (Long) -> Unit) {
+private fun FindSubtitles(itemId: Long, bazarr: Boolean, onClose: () -> Unit, onQueued: () -> Unit, onDownloaded: (Long) -> Unit) {
     val marquee = LocalMarquee.current
     val scope = rememberCoroutineScope()
     val lang = remember { java.util.Locale.getDefault().language.ifBlank { "en" } }
@@ -702,9 +773,13 @@ private fun FindSubtitles(itemId: Long, onClose: () -> Unit, onDownloaded: (Long
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)).clickable(remember { MutableInteractionSource() }, null, onClick = onClose)) {
         LazyColumn(
             Modifier.align(Alignment.CenterEnd).width(380.dp).fillMaxSize().background(MaterialTheme.colorScheme.surface).padding(vertical = 16.dp)
+                .semantics { contentDescription = "Find subtitles panel" }
                 .clickable(remember { MutableInteractionSource() }, null) {},
         ) {
             item { Text("Find subtitles", Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            // Bazarr first, when it manages this title (META-12).
+            if (bazarr) item { BazarrSection(itemId, Modifier.padding(horizontal = 16.dp), onQueued = onQueued, heading = { Heading(it) }) }
+            if (bazarr) item { Heading("OpenSubtitles") }
             error?.let { e -> item { Text(e, Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error) } }
             val list = results
             if (list == null) item { CircularProgressIndicator(Modifier.padding(16.dp)) }

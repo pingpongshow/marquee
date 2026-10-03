@@ -11,6 +11,7 @@ import { subtitleFor } from "../browse/format";
 import { EditHomeDialog } from "./EditHome";
 import { GettingStarted } from "./GettingStarted";
 import { pinnedTarget } from "./layout";
+import { MuseButton } from "../search/MuseVideo";
 
 function HubItem({ it, wide }: { it: ItemSummary; wide: boolean }) {
   // Continue Watching episodes open the player directly, like Plex.
@@ -96,6 +97,9 @@ export function HomePage() {
 
   return (
     <div className="space-y-10 py-6 lg:py-8">
+      <div className="-mb-6 flex justify-end px-6 lg:px-8">
+        <MuseButton />
+      </div>
       {me.data?.isAdmin && <GettingStarted />}
       <WatchTogetherBanner myId={me.data?.id} />
       {hubs.data?.map((hub) => {

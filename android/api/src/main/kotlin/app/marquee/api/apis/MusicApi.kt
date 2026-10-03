@@ -29,11 +29,13 @@ import okhttp3.HttpUrl
 
 import app.marquee.api.models.Error
 import app.marquee.api.models.ItemSummary
+import app.marquee.api.models.ListeningRecap
 import app.marquee.api.models.Lyrics
 import app.marquee.api.models.MusicAdventureRequest
 import app.marquee.api.models.MusicDJRequest
 import app.marquee.api.models.MusicMuseRequest
 import app.marquee.api.models.MusicStatus
+import app.marquee.api.models.Playlist
 import app.marquee.api.models.RadioRequest
 import app.marquee.api.models.Station
 
@@ -129,6 +131,84 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/items/{itemId}/lyrics".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /me/recap
+     * Your year in music (MUSIC-22).
+     * 
+     * @param year Default this year. (optional)
+     * @return ListeningRecap
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listeningRecap(year: kotlin.Int? = null) : ListeningRecap {
+        val localVarResponse = listeningRecapWithHttpInfo(year = year)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ListeningRecap
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /me/recap
+     * Your year in music (MUSIC-22).
+     * 
+     * @param year Default this year. (optional)
+     * @return ApiResponse<ListeningRecap?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listeningRecapWithHttpInfo(year: kotlin.Int?) : ApiResponse<ListeningRecap?> {
+        val localVariableConfig = listeningRecapRequestConfig(year = year)
+
+        return request<Unit, ListeningRecap>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listeningRecap
+     *
+     * @param year Default this year. (optional)
+     * @return RequestConfig
+     */
+    fun listeningRecapRequestConfig(year: kotlin.Int?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (year != null) {
+                    put("year", listOf(year.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/me/recap",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -573,6 +653,154 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/music/status",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /me/recap/playlist
+     * Make a playlist of your top 50 songs of a year (\&quot;Your Top Songs 2026\&quot;), or refresh it if it exists.
+     * 
+     * @param year  (optional)
+     * @return Playlist
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun recapPlaylist(year: kotlin.Int? = null) : Playlist {
+        val localVarResponse = recapPlaylistWithHttpInfo(year = year)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as Playlist
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /me/recap/playlist
+     * Make a playlist of your top 50 songs of a year (\&quot;Your Top Songs 2026\&quot;), or refresh it if it exists.
+     * 
+     * @param year  (optional)
+     * @return ApiResponse<Playlist?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun recapPlaylistWithHttpInfo(year: kotlin.Int?) : ApiResponse<Playlist?> {
+        val localVariableConfig = recapPlaylistRequestConfig(year = year)
+
+        return request<Unit, Playlist>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation recapPlaylist
+     *
+     * @param year  (optional)
+     * @return RequestConfig
+     */
+    fun recapPlaylistRequestConfig(year: kotlin.Int?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (year != null) {
+                    put("year", listOf(year.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/me/recap/playlist",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /me/recap/years
+     * Years with music in your history, newest first.
+     * 
+     * @return kotlin.collections.List<kotlin.Int>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun recapYears() : kotlin.collections.List<kotlin.Int> {
+        val localVarResponse = recapYearsWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<kotlin.Int>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /me/recap/years
+     * Years with music in your history, newest first.
+     * 
+     * @return ApiResponse<kotlin.collections.List<kotlin.Int>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun recapYearsWithHttpInfo() : ApiResponse<kotlin.collections.List<kotlin.Int>?> {
+        val localVariableConfig = recapYearsRequestConfig()
+
+        return request<Unit, kotlin.collections.List<kotlin.Int>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation recapYears
+     *
+     * @return RequestConfig
+     */
+    fun recapYearsRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/me/recap/years",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

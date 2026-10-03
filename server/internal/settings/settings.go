@@ -41,6 +41,9 @@ type Integrations struct {
 	// Last.fm scrobbling (MUSIC-12): the owner's API account (www.last.fm/api/account/create).
 	LastFMAPIKey string `json:"lastFmApiKey"`
 	LastFMSecret string `json:"lastFmSecret"`
+	// Bazarr finds and downloads subtitles for movies and episodes (META-12).
+	BazarrURL    string `json:"bazarrUrl"`
+	BazarrAPIKey string `json:"bazarrApiKey"`
 	// LiveTVSources feed Live TV (LIVE-1).
 	LiveTVSources []LiveTVSource `json:"liveTvSources"`
 	// DVR padding in minutes (LIVE-5).

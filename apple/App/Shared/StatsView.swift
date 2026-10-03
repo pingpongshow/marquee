@@ -17,6 +17,8 @@ struct StatsView: View {
                 Text("All time").tag(0)
             }
             .pickerStyle(.segmented)
+            // Year in music (MUSIC-22).
+            RecapCard().listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
             if let error { Text(error).foregroundStyle(.red) }
             if let s = stats {
                 if s.plays == 0 {

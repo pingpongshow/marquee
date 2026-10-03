@@ -28,6 +28,10 @@ import okhttp3.Call
 import okhttp3.HttpUrl
 
 import app.marquee.api.models.AddToCollectionRequest
+import app.marquee.api.models.BazarrCandidate
+import app.marquee.api.models.BazarrDownloadRequest
+import app.marquee.api.models.BazarrPick
+import app.marquee.api.models.BazarrStatus
 import app.marquee.api.models.CreateCollectionRequest
 import app.marquee.api.models.Error
 import app.marquee.api.models.ItemDetail
@@ -38,6 +42,8 @@ import app.marquee.api.models.ItemType
 import app.marquee.api.models.LibraryFilters
 import app.marquee.api.models.MatchCandidate
 import app.marquee.api.models.MatchRequest
+import app.marquee.api.models.MuseVideoRequest
+import app.marquee.api.models.MuseVideoResult
 import app.marquee.api.models.PersonDetail
 import app.marquee.api.models.RateItemRequest
 import app.marquee.api.models.SmartCollectionSave
@@ -284,6 +290,302 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.PUT,
             path = "/items/{itemId}/match".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /items/{itemId}/subtitles/bazarr
+     * Ask Bazarr to find and download the best subtitle in a language. Runs in the background; the new subtitle appears on the item when Bazarr has saved it.
+     * 
+     * @param itemId 
+     * @param bazarrDownloadRequest 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun bazarrDownload(itemId: kotlin.Long, bazarrDownloadRequest: BazarrDownloadRequest) : Unit {
+        val localVarResponse = bazarrDownloadWithHttpInfo(itemId = itemId, bazarrDownloadRequest = bazarrDownloadRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /items/{itemId}/subtitles/bazarr
+     * Ask Bazarr to find and download the best subtitle in a language. Runs in the background; the new subtitle appears on the item when Bazarr has saved it.
+     * 
+     * @param itemId 
+     * @param bazarrDownloadRequest 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun bazarrDownloadWithHttpInfo(itemId: kotlin.Long, bazarrDownloadRequest: BazarrDownloadRequest) : ApiResponse<Unit?> {
+        val localVariableConfig = bazarrDownloadRequestConfig(itemId = itemId, bazarrDownloadRequest = bazarrDownloadRequest)
+
+        return request<BazarrDownloadRequest, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation bazarrDownload
+     *
+     * @param itemId 
+     * @param bazarrDownloadRequest 
+     * @return RequestConfig
+     */
+    fun bazarrDownloadRequestConfig(itemId: kotlin.Long, bazarrDownloadRequest: BazarrDownloadRequest) : RequestConfig<BazarrDownloadRequest> {
+        val localVariableBody = bazarrDownloadRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/items/{itemId}/subtitles/bazarr".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /items/{itemId}/subtitles/bazarr/search
+     * Download one of the search results through Bazarr.
+     * 
+     * @param itemId 
+     * @param bazarrPick 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun bazarrPick(itemId: kotlin.Long, bazarrPick: BazarrPick) : Unit {
+        val localVarResponse = bazarrPickWithHttpInfo(itemId = itemId, bazarrPick = bazarrPick)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /items/{itemId}/subtitles/bazarr/search
+     * Download one of the search results through Bazarr.
+     * 
+     * @param itemId 
+     * @param bazarrPick 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun bazarrPickWithHttpInfo(itemId: kotlin.Long, bazarrPick: BazarrPick) : ApiResponse<Unit?> {
+        val localVariableConfig = bazarrPickRequestConfig(itemId = itemId, bazarrPick = bazarrPick)
+
+        return request<BazarrPick, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation bazarrPick
+     *
+     * @param itemId 
+     * @param bazarrPick 
+     * @return RequestConfig
+     */
+    fun bazarrPickRequestConfig(itemId: kotlin.Long, bazarrPick: BazarrPick) : RequestConfig<BazarrPick> {
+        val localVariableBody = bazarrPick
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/items/{itemId}/subtitles/bazarr/search".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /items/{itemId}/subtitles/bazarr/search
+     * Search Bazarr&#39;s providers for this movie or episode (can take up to a minute).
+     * 
+     * @param itemId 
+     * @return kotlin.collections.List<BazarrCandidate>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun bazarrSearch(itemId: kotlin.Long) : kotlin.collections.List<BazarrCandidate> {
+        val localVarResponse = bazarrSearchWithHttpInfo(itemId = itemId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<BazarrCandidate>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /items/{itemId}/subtitles/bazarr/search
+     * Search Bazarr&#39;s providers for this movie or episode (can take up to a minute).
+     * 
+     * @param itemId 
+     * @return ApiResponse<kotlin.collections.List<BazarrCandidate>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun bazarrSearchWithHttpInfo(itemId: kotlin.Long) : ApiResponse<kotlin.collections.List<BazarrCandidate>?> {
+        val localVariableConfig = bazarrSearchRequestConfig(itemId = itemId)
+
+        return request<Unit, kotlin.collections.List<BazarrCandidate>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation bazarrSearch
+     *
+     * @param itemId 
+     * @return RequestConfig
+     */
+    fun bazarrSearchRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/items/{itemId}/subtitles/bazarr/search".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /items/{itemId}/subtitles/bazarr
+     * Bazarr&#39;s view of a movie or episode&#39;s subtitles (META-12): what exists and what its language profile still wants.
+     * 
+     * @param itemId 
+     * @return BazarrStatus
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun bazarrStatus(itemId: kotlin.Long) : BazarrStatus {
+        val localVarResponse = bazarrStatusWithHttpInfo(itemId = itemId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as BazarrStatus
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /items/{itemId}/subtitles/bazarr
+     * Bazarr&#39;s view of a movie or episode&#39;s subtitles (META-12): what exists and what its language profile still wants.
+     * 
+     * @param itemId 
+     * @return ApiResponse<BazarrStatus?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun bazarrStatusWithHttpInfo(itemId: kotlin.Long) : ApiResponse<BazarrStatus?> {
+        val localVariableConfig = bazarrStatusRequestConfig(itemId = itemId)
+
+        return request<Unit, BazarrStatus>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation bazarrStatus
+     *
+     * @param itemId 
+     * @return RequestConfig
+     */
+    fun bazarrStatusRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/items/{itemId}/subtitles/bazarr".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -1487,6 +1789,80 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
+     * POST /muse/video
+     * Muse for movies and shows (USER-15): describe what you&#39;d like to watch and get matches from your libraries.
+     * 
+     * @param museVideoRequest 
+     * @return MuseVideoResult
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun museVideo(museVideoRequest: MuseVideoRequest) : MuseVideoResult {
+        val localVarResponse = museVideoWithHttpInfo(museVideoRequest = museVideoRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as MuseVideoResult
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /muse/video
+     * Muse for movies and shows (USER-15): describe what you&#39;d like to watch and get matches from your libraries.
+     * 
+     * @param museVideoRequest 
+     * @return ApiResponse<MuseVideoResult?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun museVideoWithHttpInfo(museVideoRequest: MuseVideoRequest) : ApiResponse<MuseVideoResult?> {
+        val localVariableConfig = museVideoRequestConfig(museVideoRequest = museVideoRequest)
+
+        return request<MuseVideoRequest, MuseVideoResult>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation museVideo
+     *
+     * @param museVideoRequest 
+     * @return RequestConfig
+     */
+    fun museVideoRequestConfig(museVideoRequest: MuseVideoRequest) : RequestConfig<MuseVideoRequest> {
+        val localVariableBody = museVideoRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/muse/video",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * GET /items/{itemId}/next
      * The episode after this one (Up Next), if any.
      * 
@@ -1709,7 +2085,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
 
     /**
      * GET /items/{itemId}/related
-     * Similar items from the same library (\&quot;More like this\&quot;), by shared genres and people.
+     * Similar items from the same library (\&quot;More like this\&quot;), by what they&#39;re about (Muse&#39;s index, USER-16) when it&#39;s ready, else shared genres and people.
      * 
      * @param itemId 
      * @return kotlin.collections.List<ItemSummary>
@@ -1741,7 +2117,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
 
     /**
      * GET /items/{itemId}/related
-     * Similar items from the same library (\&quot;More like this\&quot;), by shared genres and people.
+     * Similar items from the same library (\&quot;More like this\&quot;), by what they&#39;re about (Muse&#39;s index, USER-16) when it&#39;s ready, else shared genres and people.
      * 
      * @param itemId 
      * @return ApiResponse<kotlin.collections.List<ItemSummary>?>

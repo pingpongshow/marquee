@@ -85,6 +85,9 @@ type Job struct {
 	// OutputFile, when set, writes one fast-start MP4 there (offline downloads) instead of
 	// streaming fragments to stdout; progress is reported on stdout.
 	OutputFile string
+	// SubForceStyle restyles burned-in text subtitles (PLAY-20): a libass style override list
+	// (see SubtitleStyle.ForceStyle); "" keeps FFmpeg's defaults.
+	SubForceStyle string
 }
 
 func presetFor(encoder, p string) string {
@@ -97,10 +100,22 @@ func presetFor(encoder, p string) string {
 	return map[string]string{"speed": "superfast", "balanced": "veryfast", "quality": "fast"}[p]
 }
 
-// escapeFilterPath quotes a path for use inside an FFmpeg filter argument.
+// escapeFilterPath quotes a path (or any value) for use as a filter option inside an
+// -filter_complex graph. FFmpeg unescapes twice: the graph parser first (where quoting keeps
+// , [ ] ; literal, and a quote can only be written outside the quotes, as \'), then the
+// option parser (where \ ' and : need a backslash).
 func escapeFilterPath(p string) string {
-	r := strings.NewReplacer(`\`, `\\`, `'`, `\'`, `:`, `\:`, `,`, `\,`, `[`, `\[`, `]`, `\]`, `;`, `\;`)
-	return "'" + r.Replace(p) + "'"
+	opt := strings.NewReplacer(`\`, `\\`, `'`, `\'`, `:`, `\:`).Replace(p)
+	return "'" + strings.ReplaceAll(opt, `'`, `'\''`) + "'"
+}
+
+// forceStyle is the subtitles filter's force_style option, or "". Its commas separate
+// style fields, so it's quoted like any other filter argument.
+func (j Job) forceStyle() string {
+	if j.SubForceStyle == "" {
+		return ""
+	}
+	return ":force_style=" + escapeFilterPath(j.SubForceStyle)
 }
 
 // SegmentStart is where segment k begins, in seconds.
@@ -194,11 +209,11 @@ func (j Job) Args() []string {
 					case imageExternal:
 						overlay = "[1:0]"
 					case j.SubExternal != "":
-						chain = append(chain, "subtitles=f="+escapeFilterPath(j.SubExternal))
+						chain = append(chain, "subtitles=f="+escapeFilterPath(j.SubExternal)+j.forceStyle())
 					case j.SubImage:
 						overlay = fmt.Sprintf("[0:%d]", j.SubIndex)
 					default:
-						chain = append(chain, fmt.Sprintf("subtitles=f=%s:si=%d", escapeFilterPath(j.Input), j.SubRelIndex))
+						chain = append(chain, fmt.Sprintf("subtitles=f=%s:si=%d", escapeFilterPath(j.Input), j.SubRelIndex)+j.forceStyle())
 					}
 				}
 				if burn && subShift {

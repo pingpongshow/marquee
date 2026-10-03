@@ -36,6 +36,8 @@ import kotlinx.serialization.Contextual
  * @param seerrApiKey Write-only.
  * @param lastFmApiKey Last.fm API key. Write-only; empty turns Last.fm off.
  * @param lastFmSecret Last.fm shared secret. Write-only.
+ * @param bazarrUrl 
+ * @param bazarrApiKey Bazarr's API key (Settings → General in Bazarr). Write-only.
  * @param dvrPaddingBefore 
  * @param dvrPaddingAfter 
  * @param liveTvSources Replaces the whole list when sent.
@@ -58,6 +60,13 @@ data class IntegrationSettingsUpdate (
     /* Last.fm shared secret. Write-only. */
     @SerialName(value = "lastFmSecret")
     val lastFmSecret: kotlin.String? = null,
+
+    @SerialName(value = "bazarrUrl")
+    val bazarrUrl: kotlin.String? = null,
+
+    /* Bazarr's API key (Settings → General in Bazarr). Write-only. */
+    @SerialName(value = "bazarrApiKey")
+    val bazarrApiKey: kotlin.String? = null,
 
     @SerialName(value = "dvrPaddingBefore")
     val dvrPaddingBefore: kotlin.Int? = null,

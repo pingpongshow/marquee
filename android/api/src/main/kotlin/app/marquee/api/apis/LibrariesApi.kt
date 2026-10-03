@@ -28,6 +28,8 @@ import okhttp3.Call
 import okhttp3.HttpUrl
 
 import app.marquee.api.models.Error
+import app.marquee.api.models.HealthCheck
+import app.marquee.api.models.HealthIssuePage
 import app.marquee.api.models.Library
 import app.marquee.api.models.LibraryCreate
 import app.marquee.api.models.LibraryUpdate
@@ -348,6 +350,237 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
     }
 
     /**
+     * PUT /library-health/{checkId}/ignored/{itemId}
+     * Stop reporting this item for this check (admin only).
+     * 
+     * @param checkId 
+     * @param itemId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun ignoreHealthIssue(checkId: kotlin.String, itemId: kotlin.Long) : Unit {
+        val localVarResponse = ignoreHealthIssueWithHttpInfo(checkId = checkId, itemId = itemId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /library-health/{checkId}/ignored/{itemId}
+     * Stop reporting this item for this check (admin only).
+     * 
+     * @param checkId 
+     * @param itemId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun ignoreHealthIssueWithHttpInfo(checkId: kotlin.String, itemId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = ignoreHealthIssueRequestConfig(checkId = checkId, itemId = itemId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation ignoreHealthIssue
+     *
+     * @param checkId 
+     * @param itemId 
+     * @return RequestConfig
+     */
+    fun ignoreHealthIssueRequestConfig(checkId: kotlin.String, itemId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/library-health/{checkId}/ignored/{itemId}".replace("{"+"checkId"+"}", encodeURIComponent(checkId.toString())).replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /library-health
+     * Library health checks with how many items each found (ADM-11, admin only).
+     * 
+     * @return kotlin.collections.List<HealthCheck>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun libraryHealth() : kotlin.collections.List<HealthCheck> {
+        val localVarResponse = libraryHealthWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<HealthCheck>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /library-health
+     * Library health checks with how many items each found (ADM-11, admin only).
+     * 
+     * @return ApiResponse<kotlin.collections.List<HealthCheck>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun libraryHealthWithHttpInfo() : ApiResponse<kotlin.collections.List<HealthCheck>?> {
+        val localVariableConfig = libraryHealthRequestConfig()
+
+        return request<Unit, kotlin.collections.List<HealthCheck>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation libraryHealth
+     *
+     * @return RequestConfig
+     */
+    fun libraryHealthRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/library-health",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /library-health/{checkId}
+     * What one check found (admin only). Ignored items are left out.
+     * 
+     * @param checkId 
+     * @param offset  (optional, default to 0)
+     * @param limit  (optional, default to 100)
+     * @return HealthIssuePage
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun libraryHealthIssues(checkId: kotlin.String, offset: kotlin.Int? = 0, limit: kotlin.Int? = 100) : HealthIssuePage {
+        val localVarResponse = libraryHealthIssuesWithHttpInfo(checkId = checkId, offset = offset, limit = limit)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as HealthIssuePage
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /library-health/{checkId}
+     * What one check found (admin only). Ignored items are left out.
+     * 
+     * @param checkId 
+     * @param offset  (optional, default to 0)
+     * @param limit  (optional, default to 100)
+     * @return ApiResponse<HealthIssuePage?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun libraryHealthIssuesWithHttpInfo(checkId: kotlin.String, offset: kotlin.Int?, limit: kotlin.Int?) : ApiResponse<HealthIssuePage?> {
+        val localVariableConfig = libraryHealthIssuesRequestConfig(checkId = checkId, offset = offset, limit = limit)
+
+        return request<Unit, HealthIssuePage>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation libraryHealthIssues
+     *
+     * @param checkId 
+     * @param offset  (optional, default to 0)
+     * @param limit  (optional, default to 100)
+     * @return RequestConfig
+     */
+    fun libraryHealthIssuesRequestConfig(checkId: kotlin.String, offset: kotlin.Int?, limit: kotlin.Int?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (offset != null) {
+                    put("offset", listOf(offset.toString()))
+                }
+                if (limit != null) {
+                    put("limit", listOf(limit.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/library-health/{checkId}".replace("{"+"checkId"+"}", encodeURIComponent(checkId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * GET /libraries
      * Libraries visible to the current user.
      * 
@@ -551,6 +784,80 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/libraries/{libraryId}/scan".replace("{"+"libraryId"+"}", encodeURIComponent(libraryId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /library-health/{checkId}/ignored/{itemId}
+     * Report it again (admin only).
+     * 
+     * @param checkId 
+     * @param itemId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun unignoreHealthIssue(checkId: kotlin.String, itemId: kotlin.Long) : Unit {
+        val localVarResponse = unignoreHealthIssueWithHttpInfo(checkId = checkId, itemId = itemId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /library-health/{checkId}/ignored/{itemId}
+     * Report it again (admin only).
+     * 
+     * @param checkId 
+     * @param itemId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun unignoreHealthIssueWithHttpInfo(checkId: kotlin.String, itemId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = unignoreHealthIssueRequestConfig(checkId = checkId, itemId = itemId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation unignoreHealthIssue
+     *
+     * @param checkId 
+     * @param itemId 
+     * @return RequestConfig
+     */
+    fun unignoreHealthIssueRequestConfig(checkId: kotlin.String, itemId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/library-health/{checkId}/ignored/{itemId}".replace("{"+"checkId"+"}", encodeURIComponent(checkId.toString())).replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
