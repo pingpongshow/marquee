@@ -113,6 +113,13 @@ const libraryRoute = createRoute({
   validateSearch: validateLibrarySearch,
   component: LibraryPage,
 });
+// Music libraries' Library pages: artists, albums, songs, genres, decades, moods, muse (MUSIC-15).
+const librarySectionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/library/$libraryId/$section",
+  validateSearch: validateLibrarySearch,
+  component: LibraryPage,
+});
 const itemRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/item/$itemId",
@@ -243,6 +250,7 @@ const routeTree = rootRoute.addChildren([
   homeRoute,
   playRoute,
   libraryRoute,
+  librarySectionRoute,
   itemRoute,
   searchRoute,
   accountRoute,
