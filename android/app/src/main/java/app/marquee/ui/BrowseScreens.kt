@@ -10,6 +10,10 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -225,17 +229,14 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
     }
     LaunchedEffect(libraryId) {
         library = withContext(Dispatchers.IO) { runCatching { marquee.libraries.getLibrary(libraryId) }.getOrNull() }
-        loadMore()
+        if (library?.type != LibraryType.MUSIC) loadMore()
     }
     val min = if (marquee.isTv) 130.dp else 110.dp
-    val isMusic = library?.type == LibraryType.MUSIC
+    // Music libraries open on an organised home; the full artist grid is its Artists page.
+    library?.takeIf { it.type == LibraryType.MUSIC }?.let { app.marquee.music.MusicHome(nav, it); return }
     Column {
         Row(Modifier.padding(horizontal = sidePadding, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(library?.name ?: "", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            if (isMusic && !marquee.isTv) OutlinedButton({ nav.navigate("carmode?lib=$libraryId") }) {
-                Icon(androidx.compose.material.icons.Icons.Filled.DirectionsCar, null)
-                Text("Car mode", Modifier.padding(start = 6.dp))
-            }
             // Muse for movies and shows (USER-15).
             if (library?.type in listOf(LibraryType.MOVIES, LibraryType.SHOWS, LibraryType.ANIME)) IconButton({ nav.navigate("muse?lib=$libraryId") }, Modifier.focusRing()) {
                 Icon(Icons.Filled.AutoAwesome, "Muse", tint = Gold)
@@ -247,13 +248,9 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
             }
         }
         LazyVerticalGrid(GridCells.Adaptive(min), contentPadding = PaddingValues(sidePadding), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            // Music libraries open with Muse, stations and mixes above the artists.
-            // Your Year in Music (MUSIC-22), when there's a year to show.
-            if (isMusic) item(span = { GridItemSpan(maxLineSpan) }) { app.marquee.music.YearInMusicCard(nav) }
-            if (isMusic) item(span = { GridItemSpan(maxLineSpan) }) { app.marquee.music.MusicDiscover(libraryId, onOpenPlaylist = { nav.navigate("playlist/$it") }) { kind, name -> nav.navigate("browse/$libraryId/$kind/${android.net.Uri.encode(name)}") } }
             itemsIndexed(items, key = { _, it -> it.id }) { i, it ->
                 if (i >= items.size - 30) LaunchedEffect(i) { loadMore() }
-                PosterCard(it, marquee.imageUrl(it.images?.poster, 240), min, { openItem(nav, it) }, autoFocus = marquee.isTv && i == 0 && !isMusic)
+                PosterCard(it, marquee.imageUrl(it.images?.poster, 240), min, { openItem(nav, it) }, autoFocus = marquee.isTv && i == 0)
             }
         }
     }
@@ -278,6 +275,7 @@ fun PlaylistsScreen(nav: NavHostController) {
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
     val marquee = LocalMarquee.current
@@ -289,12 +287,19 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
         item {
             Column(Modifier.padding(horizontal = sidePadding)) {
                 Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                if (tracks.any { it.type == ItemType.TRACK }) Row(Modifier.padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = { music.play(tracks, 0, source = title) }) { Text("Play") }
-                    OutlinedButton(onClick = { music.play(tracks.shuffled(), 0, source = title) }) { Text("Shuffle") }
-                    if (!marquee.isTv) PlaylistDownloadButton(playlistId)
+                // Full width, wrapping onto another line rather than squeezing a button's label.
+                FlowRow(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (tracks.any { it.type == ItemType.TRACK }) {
+                        Button(onClick = { music.play(tracks, 0, source = title) }, modifier = Modifier.focusRing().initialFocus(marquee.isTv)) {
+                            Icon(Icons.Filled.PlayArrow, null); Text("Play", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
+                        }
+                        OutlinedButton(onClick = { music.play(tracks.shuffled(), 0, source = title) }, modifier = Modifier.focusRing()) {
+                            Icon(Icons.Filled.Shuffle, null); Text("Shuffle", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
+                        }
+                        if (!marquee.isTv) PlaylistDownloadButton(playlistId)
+                    }
+                    PinToHomeButton("playlist-$playlistId")
                 }
-                PinToHomeButton("playlist-$playlistId")
             }
         }
         items(entries.size) { i ->
@@ -383,11 +388,13 @@ private fun PlaylistDownloadButton(id: Long) {
     val entries by downloads.entries.collectAsState()
     val ids = synced[id]
     if (ids == null) {
-        OutlinedButton({ downloads.scope.launch { runCatching { downloads.syncPlaylist(id) } } }) { Text("Download") }
+        OutlinedButton({ downloads.scope.launch { runCatching { downloads.syncPlaylist(id) } } }, Modifier.focusRing()) {
+            Icon(Icons.Filled.Download, null); Text("Download", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
+        }
     } else {
         val done = ids.count { entries[it]?.state == app.marquee.core.Downloads.State.Done }
-        OutlinedButton({ downloads.unsyncPlaylist(id) }, Modifier.semantics { stateDescription = if (done == ids.size) "Downloaded" else "$done of ${ids.size}" }) {
-            Text(if (done == ids.size) "Downloaded · Remove" else "$done/${ids.size} · Remove")
+        OutlinedButton({ downloads.unsyncPlaylist(id) }, Modifier.focusRing().semantics { stateDescription = if (done == ids.size) "Downloaded" else "$done of ${ids.size}" }) {
+            Text(if (done == ids.size) "Downloaded · Remove" else "$done/${ids.size} · Remove", maxLines = 1, softWrap = false)
         }
     }
 }

@@ -56,6 +56,27 @@ final class MarqueeUITests: XCTestCase {
         }
     }
 
+    /// From the Music landing page: Artists, then the artist's card in the full grid.
+    private func openArtist(_ name: String) -> XCUIElement {
+        let artists = app.buttons["musicBrowse.artists"]
+        XCTAssertTrue(artists.waitForExistence(timeout: 15))
+        artists.tap()
+        XCTAssertTrue(app.navigationBars["Artists"].waitForExistence(timeout: 10))
+        let artist = app.scrollViews.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch
+        for _ in 0..<5 where !artist.waitForExistence(timeout: 2) { app.swipeUp() }
+        XCTAssertTrue(artist.waitForExistence(timeout: 10))
+        for _ in 0..<4 where artist.frame.maxY > app.tabBars.firstMatch.frame.minY - 10 { app.swipeUp() }
+        return artist
+    }
+
+    /// From the Music landing page to Muse and the stations.
+    private func openMuse() {
+        let muse = app.buttons["musicMuse"]
+        XCTAssertTrue(muse.waitForExistence(timeout: 15))
+        muse.tap()
+        XCTAssertTrue(app.navigationBars["Muse & Stations"].waitForExistence(timeout: 10))
+    }
+
     func testBrowseAndPlay() {
         connectAndSignIn()
         openLibrary("Movies")
@@ -77,10 +98,7 @@ final class MarqueeUITests: XCTestCase {
         // Music: play an artist and open Now Playing.
         openLibrary("Music")
         XCTAssertTrue(app.navigationBars["Music"].waitForExistence(timeout: 10))
-        let artist = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calm Pads'")).firstMatch
-        // The grid is lazy and sits below the year-in-music card and Muse: scroll to it.
-        for _ in 0..<5 where !artist.waitForExistence(timeout: 2) { app.swipeUp() }
-        XCTAssertTrue(artist.waitForExistence(timeout: 10))
+        let artist = openArtist("Calm Pads")
         artist.tap()
         let playMusic = app.buttons["Play"].firstMatch
         XCTAssertTrue(playMusic.waitForExistence(timeout: 10))
@@ -97,6 +115,7 @@ final class MarqueeUITests: XCTestCase {
     func testMusicFeatures() {
         connectAndSignIn()
         openLibrary("Music")
+        openMuse()
         XCTAssertTrue(app.staticTexts["Muse"].waitForExistence(timeout: 10))
         shot("m1-discover")
 
@@ -114,14 +133,10 @@ final class MarqueeUITests: XCTestCase {
         shot("m3-up-next")
         app.buttons["Now Playing"].firstMatch.tap()
         app.swipeDown(velocity: .fast)
+        app.navigationBars.buttons["Music"].firstMatch.tap() // back to the landing page
 
         // An album with an .lrc sidecar: synced lyrics.
-        let artist = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calm Pads'")).firstMatch
-        // The grid is lazy and sits below the year-in-music card and Muse: scroll to it.
-        for _ in 0..<5 where !artist.waitForExistence(timeout: 2) { app.swipeUp() }
-        XCTAssertTrue(artist.waitForExistence(timeout: 10))
-        // The Music page has grown (mixes, moods, styles): bring the card clear of the tab bar.
-        for _ in 0..<4 where artist.frame.maxY > app.tabBars.firstMatch.frame.minY - 10 { app.swipeUp() }
+        let artist = openArtist("Calm Pads")
         artist.tap()
         let album = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Floating'")).firstMatch
         XCTAssertTrue(album.waitForExistence(timeout: 10))
@@ -332,6 +347,94 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(app.buttons["miniPlayer"].waitForExistence(timeout: 15))
     }
 
+    /// The Music landing page is organised (MUSIC-15): a browse row and shelves, not every
+    /// artist; Artists opens the full grid, and Songs and Genres open their lists.
+    func testMusicLandingPage() {
+        connectAndSignIn()
+        openLibrary("Music")
+        XCTAssertTrue(app.navigationBars["Music"].waitForExistence(timeout: 10))
+        for id in ["artists", "albums", "songs", "playlists", "genres"] {
+            XCTAssertTrue(app.buttons["musicBrowse.\(id)"].waitForExistence(timeout: 10), "browse row: \(id)")
+        }
+        XCTAssertTrue(app.buttons["Shuffle All"].exists, "quick actions")
+        shot("mh1-landing")
+        // Down the whole page: shelves only, never the full grid.
+        for _ in 0..<8 { app.swipeUp() }
+        shot("mh2-landing-bottom")
+        XCTAssertFalse(app.descendants(matching: .any)["libraryGrid"].exists, "no artist grid on the landing page")
+        for _ in 0..<8 { app.swipeDown() }
+
+        app.buttons["musicBrowse.artists"].tap()
+        XCTAssertTrue(app.navigationBars["Artists"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["libraryGrid"].waitForExistence(timeout: 10), "Artists is the full grid")
+        XCTAssertTrue(app.scrollViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calm Pads'")).firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Sort and filter"].exists, "the grid sorts")
+        shot("mh3-artists")
+        app.navigationBars.buttons["Music"].firstMatch.tap()
+
+        app.buttons["musicBrowse.songs"].tap()
+        XCTAssertTrue(app.navigationBars["Songs"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS 'Floating'")).firstMatch.waitForExistence(timeout: 10), "songs are listed")
+        app.navigationBars.buttons["Music"].firstMatch.tap()
+
+        app.buttons["musicBrowse.genres"].tap()
+        XCTAssertTrue(app.navigationBars["Genres"].waitForExistence(timeout: 10))
+        app.navigationBars.buttons["Music"].firstMatch.tap()
+
+        app.buttons["musicBrowse.albums"].tap()
+        XCTAssertTrue(app.navigationBars["Albums"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.scrollViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Floating'")).firstMatch.waitForExistence(timeout: 10))
+    }
+
+    /// Header actions fit on an iPhone in portrait: each is on screen, can be tapped, and is
+    /// a normal button shape (labels never wrap letter by letter), on a playlist and an album.
+    func testHeaderButtonsFit() {
+        XCUIDevice.shared.orientation = .portrait
+        connectAndSignIn()
+        app.buttons["Libraries"].firstMatch.tap()
+        let back = app.navigationBars.buttons["Libraries"]
+        if back.waitForExistence(timeout: 2) { back.tap() }
+        app.buttons["Playlists"].firstMatch.tap()
+        let trip = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Road Trip'")).firstMatch
+        XCTAssertTrue(trip.waitForExistence(timeout: 10))
+        trip.tap()
+        let download = app.buttons.matching(NSPredicate(format: "label == 'Download' OR label == 'Downloaded' OR label MATCHES '[0-9]+/[0-9]+'")).firstMatch
+        let pin = app.buttons.matching(NSPredicate(format: "label == 'Pin to Home' OR label == 'Unpin from Home'")).firstMatch
+        XCTAssertTrue(app.buttons["Shuffle"].waitForExistence(timeout: 10))
+        sleep(1)
+        shot("hb1-playlist")
+        checkFits([app.buttons["Play"].firstMatch, app.buttons["Shuffle"].firstMatch, download, pin], "playlist")
+        XCTAssertGreaterThan(app.buttons["Play"].firstMatch.frame.width, 70, "Play keeps its word, not just the icon")
+
+        // An album page.
+        openLibrary("Music")
+        openArtist("Calm Pads").tap()
+        let album = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Floating'")).firstMatch
+        XCTAssertTrue(album.waitForExistence(timeout: 10))
+        album.tap()
+        XCTAssertTrue(app.buttons["Radio"].waitForExistence(timeout: 10))
+        sleep(1)
+        shot("hb2-album")
+        checkFits([app.buttons["Play"].firstMatch, app.buttons["Shuffle"].firstMatch, app.buttons["Radio"].firstMatch, app.buttons["More"].firstMatch], "album")
+        XCTAssertGreaterThan(app.buttons["Play"].firstMatch.frame.width, 70, "the album's Play keeps its word")
+    }
+
+    private func checkFits(_ buttons: [XCUIElement], _ page: String) {
+        let window = app.windows.firstMatch.frame
+        for b in buttons {
+            XCTAssertTrue(b.waitForExistence(timeout: 5), "\(page): \(b)")
+            let f = b.frame
+            XCTAssertFalse(b.label.isEmpty, "\(page): a button without a label")
+            XCTAssertTrue(window.contains(f), "\(page): \(b.label) \(f) is outside \(window)")
+            XCTAssertLessThan(f.height, 60, "\(page): \(b.label) is a tall bubble \(f)")
+            XCTAssertGreaterThanOrEqual(f.width, f.height * 0.9, "\(page): \(b.label) is squeezed \(f)")
+            // SwiftUI menus report not hittable while on screen.
+            if !["Downloaded", "More"].contains(b.label), !b.label.contains("/") {
+                XCTAssertTrue(b.isHittable, "\(page): \(b.label) can be tapped")
+            }
+        }
+    }
+
     /// Playlist downloads (MUSIC-19): keep the profile's "Road Trip" playlist on the device.
     func testPlaylistDownload() {
         connectAndSignIn()
@@ -414,10 +517,7 @@ final class MarqueeUITests: XCTestCase {
 
         // A track's menu → Sound Journey → pick a destination.
         openLibrary("Music")
-        let artist = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calm Pads'")).firstMatch
-        // The grid is lazy and sits below the year-in-music card and Muse: scroll to it.
-        for _ in 0..<5 where !artist.waitForExistence(timeout: 2) { app.swipeUp() }
-        XCTAssertTrue(artist.waitForExistence(timeout: 10))
+        let artist = openArtist("Calm Pads")
         artist.tap()
         let album = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Floating'")).firstMatch
         XCTAssertTrue(album.waitForExistence(timeout: 10))

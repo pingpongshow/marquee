@@ -16,6 +16,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
@@ -106,6 +107,14 @@ class MarqueeUiTest {
         tap(name)
     }
 
+    /** From the music home: the Artists page, scrolled to an artist. */
+    private fun openArtist(name: String) {
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Browse music"), 20_000)
+        rule.onNode(hasText("Artists") and hasClickAction()).performClick()
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Sort"), 10_000)
+        rule.waitUntil(20_000) { scrollTo(hasText(name, substring = true)) }
+    }
+
     @Test fun browseAndPlay() {
         connectAndSignIn()
         openLibrary("Movies")
@@ -126,7 +135,7 @@ class MarqueeUiTest {
         // Music: play an artist; the mini player appears and pauses. Reselecting the
         // Libraries tab goes back to the list.
         openLibrary("Music")
-        rule.waitUntil(20_000) { scrollTo(hasText("Calm Pads", substring = true)) }
+        openArtist("Calm Pads")
         tap("Calm Pads", substring = true)
         rule.waitText("Play")
         shot("07-artist")
@@ -159,6 +168,9 @@ class MarqueeUiTest {
         connectAndSignIn()
         openLibrary("Music")
         rule.waitText("Muse", 20_000)
+        tap("Muse")
+        rule.waitText("Muse & Stations")
+        rule.waitUntilAtLeastOneExists(hasSetTextAction(), 10_000)
         shot("m1-discover")
         rule.onNode(hasSetTextAction()).performTextInput("white noise and static hiss")
         rule.onNode(hasText("Play") and hasClickAction() and !hasContentDescription("Play")).performClick()
@@ -172,7 +184,9 @@ class MarqueeUiTest {
         rule.onNode(hasContentDescription("Close Now Playing")).performClick()
 
         // An album with an .lrc sidecar: synced lyrics, then a rating.
-        scrollTo(hasText("Calm Pads", substring = true))
+        rule.waitText("Muse & Stations")
+        back()
+        openArtist("Calm Pads")
         tap("Calm Pads", substring = true)
         rule.waitText("Floating")
         rule.onAllNodes(hasContentDescription("Floating")).onFirst().performClick()
@@ -318,7 +332,7 @@ class MarqueeUiTest {
         back()
         rule.waitText("00 Preview Test")
         openLibrary("Music")
-        rule.waitUntil(20_000) { scrollTo(hasText("Calm Pads", substring = true)) }
+        openArtist("Calm Pads")
         tap("Calm Pads", substring = true)
         rule.onAllNodes(hasContentDescription("Floating")).onFirst().performClick()
         rule.waitText("Radio")
@@ -355,7 +369,7 @@ class MarqueeUiTest {
         assumeTrue("phones and tablets only", !isTv)
         connectAndSignIn()
         openLibrary("Music")
-        rule.waitUntil(20_000) { scrollTo(hasText("Calm Pads", substring = true)) }
+        openArtist("Calm Pads")
         tap("Calm Pads", substring = true)
         rule.onAllNodes(hasContentDescription("Floating")).onFirst().performClick()
         rule.waitText("Radio")
@@ -1573,7 +1587,7 @@ class MarqueeUiTest {
         assumeTrue("phones", !isTv)
         connectAndSignIn()
         openLibrary("Music")
-        rule.waitUntil(20_000) { scrollTo(hasText("Calm Pads", substring = true)) }
+        openArtist("Calm Pads")
         tap("Calm Pads", substring = true)
         rule.waitText("Floating")
         rule.onAllNodes(hasContentDescription("Floating")).onFirst().performClick()
@@ -1727,5 +1741,107 @@ class MarqueeUiTest {
         } finally {
             InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.setShowQuality(false); app.music.stop() }
         }
+    }
+
+    /**
+     * The music home (owner's request): a browse row and shelves, not every artist. Artists
+     * opens the full, sortable grid; Albums, Songs and Genres open their own pages.
+     */
+    @Test fun musicHomeOrganised() {
+        connectAndSignIn()
+        // Artists this person has never played can't be on the home (only Top artists shows artists).
+        val libs = org.json.JSONArray(adminApi("GET", "/libraries", asToken = appToken))
+        val lib = (0 until libs.length()).map { libs.getJSONObject(it) }.first { it.getString("type") == "music" }.getLong("id")
+        val page = org.json.JSONObject(adminApi("GET", "/libraries/$lib/items?type=artist&limit=500", asToken = appToken)).getJSONArray("items")
+        val artists = (0 until page.length()).map { page.getJSONObject(it) }
+        assertTrue("the test library has artists", artists.isNotEmpty())
+        val unplayed = artists.filter { it.optInt("watchedLeafCount", 0) == 0 }.map { it.getString("title") }
+
+        openLibrary("Music")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Browse music"), 20_000)
+        listOf("Artists", "Albums", "Songs", "Playlists", "Genres").forEach { assertTrue("$it in the browse row", scrollTo(hasText(it) and hasClickAction())) }
+        rule.waitText("Shuffle All")
+        rule.waitUntil(15_000) { scrollTo(hasText("Recently added")) }
+        shot("mh1-home")
+        unplayed.take(4).forEach { name ->
+            assertTrue("$name isn't listed on the music home", !scrollTo(hasContentDescription(name) and hasClickAction()))
+        }
+
+        // Artists: every artist, sortable.
+        scrollTo(hasContentDescription("Browse music"))
+        scrollTo(hasText("Artists") and hasClickAction())
+        rule.onNode(hasText("Artists") and hasClickAction()).performClick()
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Sort"), 10_000)
+        val last = artists.map { it.getString("title") }.sortedBy { it.lowercase() }.last()
+        rule.waitUntil(20_000) { scrollTo(hasContentDescription(last)) }
+        shot("mh2-artists")
+        rule.onNode(hasText("Recently added") and hasClickAction()).performClick()
+        rule.waitUntilAtLeastOneExists(hasText("Recently added") and isSelected(), 5_000)
+        Thread.sleep(1000)
+        shot("mh2b-artists-recent")
+        back()
+
+        // Songs play from the list; Genres open a style page.
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Browse music"), 10_000)
+        scrollTo(hasText("Songs") and hasClickAction())
+        rule.onNode(hasText("Songs") and hasClickAction()).performClick()
+        rule.waitText("Songs")
+        rule.waitUntil(15_000) { rule.onAllNodesWithText("Floating", substring = true).fetchSemanticsNodes().isNotEmpty() || scrollTo(hasText("Floating", substring = true)) }
+        shot("mh3-songs")
+        back()
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Browse music"), 10_000)
+        scrollTo(hasText("Genres") and hasClickAction())
+        rule.onNode(hasText("Genres") and hasClickAction()).performClick()
+        rule.waitText("Most albums")
+        shot("mh4-genres")
+        back()
+
+        // "See all" on Recently added opens Albums sorted by date added.
+        rule.waitUntil(15_000) { scrollTo(hasContentDescription("See all: Recently added")) }
+        rule.onNode(hasContentDescription("See all: Recently added")).performClick()
+        rule.waitText("Albums")
+        rule.waitUntilAtLeastOneExists(hasText("Recently added") and isSelected(), 10_000)
+    }
+
+    /** Header buttons (playlist, album, artist) fit the phone's width with readable one-line labels. */
+    @Test fun headerButtonsFit() {
+        assumeTrue("phones", !isTv)
+        connectAndSignIn()
+        val width = rule.onRoot().fetchSemanticsNode().boundsInRoot.width
+        val density = context.resources.displayMetrics.density
+        fun check(where: String, labels: List<String>) {
+            labels.forEach { label ->
+                // "Download" also matches its other states; Pin to Home may already be pinned.
+                val m = when (label) {
+                    "Download" -> hasText("Download", substring = true) or hasText("Remove", substring = true) or hasText("%", substring = true)
+                    "Pin to Home" -> hasText("Pin to Home") or hasText("Unpin from Home")
+                    else -> hasText(label)
+                } and hasClickAction()
+                rule.waitUntilAtLeastOneExists(m, 15_000)
+                val b = rule.onAllNodes(m).onFirst().fetchSemanticsNode().boundsInRoot
+                assertTrue("$where: $label is inside the screen ($b, width $width)", b.left >= 0f && b.right <= width + 1f)
+                // One line: no taller than a Material button, and wider than tall.
+                assertTrue("$where: $label is one line (${b.height / density} dp tall)", b.height / density <= 60f && b.width > b.height)
+            }
+        }
+        tap("Libraries")
+        rule.waitText("Playlists")
+        rule.onAllNodesWithText("Playlists").onFirst().performClick()
+        rule.waitText("Road Trip")
+        tap("Road Trip")
+        rule.waitText("Shuffle")
+        check("playlist", listOf("Play", "Shuffle", "Download", "Pin to Home"))
+        shot("hb1-playlist")
+        back()
+        back()
+        openLibrary("Music")
+        openArtist("Calm Pads")
+        tap("Calm Pads", substring = true)
+        check("artist", listOf("Play", "Shuffle", "Radio"))
+        shot("hb2-artist")
+        rule.onAllNodes(hasContentDescription("Floating")).onFirst().performClick()
+        rule.waitText("Radio")
+        check("album", listOf("Play", "Shuffle", "Radio", "Download"))
+        shot("hb3-album")
     }
 }

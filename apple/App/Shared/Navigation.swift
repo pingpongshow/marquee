@@ -13,6 +13,15 @@ enum Route: Hashable {
     case moodStyle(library: Int64, mood: Bool, name: String)
     /// Muse for movies and shows (USER-15), optionally in one library.
     case museVideo(library: Int64?)
+    /// A music library's full lists, opened from its landing page's browse row (MUSIC-15).
+    case musicBrowse(library: Int64, MusicBrowse)
+    /// Muse and the stations of a music library.
+    case musicMuse(library: Int64)
+}
+
+/// The full lists behind a music library's landing page.
+enum MusicBrowse: Hashable {
+    case artists, albums, recentAlbums, songs, genres
 }
 
 extension View {
@@ -33,6 +42,15 @@ extension View {
             case .discover: DiscoverView()
             case let .moodStyle(library, mood, name): MoodStyleView(libraryID: library, kind: mood ? .mood : .style, name: name)
             case let .museVideo(library): VideoMuseView(libraryID: library)
+            case let .musicBrowse(library, kind):
+                switch kind {
+                case .artists: LibraryView(libraryID: library, type: .artist)
+                case .albums: LibraryView(libraryID: library, type: .album)
+                case .recentAlbums: LibraryView(libraryID: library, type: .album, initialSort: ._hyphen_added)
+                case .songs: MusicSongsView(libraryID: library)
+                case .genres: MusicGenresView(libraryID: library)
+                }
+            case let .musicMuse(library): MuseStationsView(libraryID: library)
             }
         }
     }

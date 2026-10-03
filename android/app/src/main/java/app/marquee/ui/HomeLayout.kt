@@ -161,6 +161,6 @@ fun PinToHomeButton(rowId: String) {
         Modifier.focusRing().semantics { contentDescription = if (on) "Unpin from Home" else "Pin to Home" },
     ) {
         Icon(if (on) Icons.Filled.PushPin else Icons.Outlined.PushPin, null)
-        Text(if (on) "Unpin from Home" else "Pin to Home", Modifier.padding(start = 6.dp))
+        Text(if (on) "Unpin from Home" else "Pin to Home", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
     }
 }

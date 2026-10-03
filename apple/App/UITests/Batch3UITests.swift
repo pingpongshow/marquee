@@ -325,7 +325,10 @@ final class Batch3UITests: XCTestCase {
         let user = try temporaryUser()
         signIn(username: user.name, password: user.password)
         openLibrary("Music")
-        let artist = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calm Pads'")).firstMatch
+        let artists = app.buttons["musicBrowse.artists"]
+        XCTAssertTrue(artists.waitForExistence(timeout: 15))
+        artists.tap()
+        let artist = app.scrollViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calm Pads'")).firstMatch
         for _ in 0..<5 where !artist.waitForExistence(timeout: 2) { app.swipeUp() }
         XCTAssertTrue(artist.waitForExistence(timeout: 10))
         for _ in 0..<4 where artist.frame.maxY > app.tabBars.firstMatch.frame.minY - 10 { app.swipeUp() }
@@ -498,6 +501,9 @@ final class Batch3UITests: XCTestCase {
         }
         signIn(username: user.name, password: user.password)
         openLibrary("Music")
+        let muse = app.buttons["musicMuse"]
+        XCTAssertTrue(muse.waitForExistence(timeout: 15))
+        muse.tap()
         let prompt = app.textFields["Describe what you want to hear…"]
         XCTAssertTrue(prompt.waitForExistence(timeout: 10))
         prompt.tap()
