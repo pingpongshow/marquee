@@ -306,3 +306,62 @@ let isTV = true
 #else
 let isTV = false
 #endif
+
+/// A label with its title, or only its icon (the title stays its accessibility label).
+struct AdaptiveLabelStyle: LabelStyle {
+    var iconOnly: Bool
+    func makeBody(configuration: Configuration) -> some View {
+        if iconOnly {
+            Label(configuration).labelStyle(.iconOnly)
+        } else {
+            Label(configuration).labelStyle(.titleAndIcon)
+        }
+    }
+}
+
+/// A header's action buttons on one line (item, playlist and collection pages). Every label
+/// stays on one line: when the labelled row doesn't fit, the secondary actions become
+/// icon-only, then they move to a second line, then everything is icon-only, and only then
+/// does the row scroll.
+struct HeaderActions<Primary: View, Secondary: View>: View {
+    @ViewBuilder var primary: () -> Primary
+    @ViewBuilder var secondary: () -> Secondary
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            row(primaryIcons: false, secondaryIcons: false)
+            row(primaryIcons: false, secondaryIcons: true)
+            // Play and Shuffle keep their words on one line; the rest go icon-only beneath.
+            VStack(alignment: .leading, spacing: spacing) {
+                group(primary().labelStyle(AdaptiveLabelStyle(iconOnly: false)))
+                group(secondary().labelStyle(AdaptiveLabelStyle(iconOnly: true)))
+            }
+            row(primaryIcons: true, secondaryIcons: true)
+            ScrollView(.horizontal, showsIndicators: false) {
+                row(primaryIcons: true, secondaryIcons: true).padding(.vertical, 2)
+            }
+            #if os(iOS)
+            .scrollClipDisabled()
+            #endif
+        }
+    }
+
+    private func group(_ content: some View) -> some View {
+        HStack(spacing: spacing) { content }.lineLimit(1).fixedSize()
+    }
+
+    private func row(primaryIcons: Bool, secondaryIcons: Bool) -> some View {
+        HStack(spacing: spacing) {
+            primary().labelStyle(AdaptiveLabelStyle(iconOnly: primaryIcons))
+            secondary().labelStyle(AdaptiveLabelStyle(iconOnly: secondaryIcons))
+        }
+        .lineLimit(1)
+        .fixedSize()
+    }
+
+    #if os(tvOS)
+    private let spacing: CGFloat = 24
+    #else
+    private let spacing: CGFloat = 10
+    #endif
+}

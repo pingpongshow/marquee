@@ -29,6 +29,40 @@ struct PlaylistMosaic: View {
     }
 }
 
+/// A playlist's cover, title and length; opens it.
+struct PlaylistCard: View {
+    let playlist: Playlist
+    var size: CGFloat
+
+    var body: some View {
+        #if os(tvOS)
+        VStack(alignment: .leading, spacing: 14) {
+            NavigationLink(value: Route.playlist(playlist.id)) { PlaylistMosaic(playlist: playlist, size: size) }
+                .buttonStyle(.card)
+                .accessibilityLabel(playlist.title)
+            titles
+        }
+        .frame(width: size)
+        #else
+        NavigationLink(value: Route.playlist(playlist.id)) {
+            VStack(alignment: .leading, spacing: 6) {
+                PlaylistMosaic(playlist: playlist, size: size)
+                titles
+            }
+            .frame(width: size)
+        }
+        .buttonStyle(.plain)
+        #endif
+    }
+
+    private var titles: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(playlist.title).font(.subheadline.weight(.medium)).lineLimit(1)
+            Text("\(playlist.itemCount) \(playlist.kind == .audio ? "tracks" : "items")").font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
 struct PlaylistsView: View {
     @Environment(AppSession.self) private var app
     @State private var playlists: [Playlist] = []
@@ -37,14 +71,7 @@ struct PlaylistsView: View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: cell), spacing: 16, alignment: .top)], spacing: 20) {
                 ForEach(playlists, id: \.id) { p in
-                    NavigationLink(value: Route.playlist(p.id)) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            PlaylistMosaic(playlist: p, size: cell)
-                            Text(p.title).font(.subheadline.weight(.medium)).lineLimit(1)
-                            Text("\(p.itemCount) \(p.kind == .audio ? "tracks" : "items")").font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .buttonStyle(.plain)
+                    PlaylistCard(playlist: p, size: cell)
                 }
             }
             .padding(sidePadding)
@@ -68,6 +95,9 @@ struct PlaylistView: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
     @Environment(VideoPresenter.self) private var video
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
     let id: Int64
     @State private var playlist: Playlist?
     @State private var entries: [PlaylistEntry] = []
@@ -75,21 +105,7 @@ struct PlaylistView: View {
     var body: some View {
         List {
             if let p = playlist {
-                HStack(spacing: 16) {
-                    PlaylistMosaic(playlist: p, size: 120)
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(p.title).font(.title2.bold())
-                        Text("\(p.itemCount) items · \(formatDuration(ms: p.durationMs))").foregroundStyle(.secondary)
-                        HStack {
-                            Button { play(0) } label: { Label("Play", systemImage: "play.fill") }.buttonStyle(.borderedProminent)
-                            Button { play(0, shuffle: true) } label: { Label("Shuffle", systemImage: "shuffle") }.buttonStyle(.bordered)
-                            #if os(iOS)
-                            PlaylistDownloadButton(id: id)
-                            #endif
-                        }
-                        PinToHomeButton(rowID: AppSession.pinnedRowID(playlist: id))
-                    }
-                }
+                header(p)
                 #if os(iOS)
                 .listRowSeparator(.hidden)
                 #endif
@@ -114,6 +130,62 @@ struct PlaylistView: View {
         .navigationTitle(playlist?.title ?? "Playlist")
         .task { await load() }
     }
+
+    /// iPhone portrait: cover, then the title, then the actions, each full width. Wider: the
+    /// cover beside the title and actions.
+    @ViewBuilder private func header(_ p: Playlist) -> some View {
+        if compact {
+            VStack(alignment: .leading, spacing: 12) {
+                PlaylistMosaic(playlist: p, size: 160)
+                titles(p)
+                actions
+            }
+            .accessibilityIdentifier("playlistHeader")
+        } else {
+            HStack(alignment: .bottom, spacing: 16) {
+                PlaylistMosaic(playlist: p, size: coverSize)
+                VStack(alignment: .leading, spacing: 8) {
+                    titles(p)
+                    actions
+                }
+            }
+            .accessibilityIdentifier("playlistHeader")
+        }
+    }
+
+    private func titles(_ p: Playlist) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(p.title).font(.title2.bold()).lineLimit(3)
+            Text("\(p.itemCount) items · \(formatDuration(ms: p.durationMs))").foregroundStyle(.secondary).lineLimit(1)
+        }
+    }
+
+    /// Play and Shuffle first; Download and Pin to Home turn icon-only when there's no room.
+    private var actions: some View {
+        HeaderActions {
+            Button { play(0) } label: { Label("Play", systemImage: "play.fill") }.buttonStyle(.borderedProminent)
+            Button { play(0, shuffle: true) } label: { Label("Shuffle", systemImage: "shuffle") }.buttonStyle(.bordered)
+        } secondary: {
+            #if os(iOS)
+            PlaylistDownloadButton(id: id)
+            #endif
+            PinToHomeButton(rowID: AppSession.pinnedRowID(playlist: id))
+        }
+    }
+
+    private var compact: Bool {
+        #if os(iOS)
+        sizeClass == .compact
+        #else
+        false
+        #endif
+    }
+
+    #if os(tvOS)
+    private let coverSize: CGFloat = 260
+    #else
+    private let coverSize: CGFloat = 140
+    #endif
 
     private func load() async {
         playlist = try? await app.playlists().first { $0.id == id }

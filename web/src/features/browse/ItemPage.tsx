@@ -11,6 +11,7 @@ import { PinToHomeButton } from "../home/EditHome";
 import { describeRules, SmartRulesDialog } from "./SmartCollection";
 import { useMusicState } from "../player/MusicPlayer";
 import { ItemActions } from "./ItemActions";
+import { DownloadOriginal, DownloadZip, EpisodeDownloadLink } from "./Download";
 import { ItemMenu } from "./ItemMenu";
 import { PlayOnButton } from "../remote/PlayOn";
 import { Rating } from "../music/Rating";
@@ -184,7 +185,7 @@ function Children({ item }: { item: ItemDetail }) {
       {rows ? (
         <ol className="divide-y divide-border rounded-lg border border-border bg-surface">
           {list.map((c: ItemSummary) => (
-            <li key={c.id}>
+            <li key={c.id} className="flex items-center">
               <Link
                 to="/item/$itemId"
                 params={{ itemId: String(c.id) }}
@@ -194,7 +195,7 @@ function Children({ item }: { item: ItemDetail }) {
                     music.play(list.filter((t) => t.type === "track"), list.filter((t) => t.type === "track").indexOf(c), { source: item.title });
                   }
                 }}
-                className={music.current?.item.id === c.id ? "flex items-center gap-4 px-4 py-3 text-accent hover:bg-surface-2" : "flex items-center gap-4 px-4 py-3 hover:bg-surface-2"}
+                className={clsx("flex min-w-0 flex-1 items-center gap-4 px-4 py-3 hover:bg-surface-2", music.current?.item.id === c.id && "text-accent")}
               >
                 <span className="w-8 shrink-0 text-right text-sm text-faint tabular-nums">{c.index ?? ""}</span>
                 {c.type === "episode" && c.images?.thumb && <img src={imageUrl(c.images.thumb, 160)} alt="" loading="lazy" className="aspect-video w-32 shrink-0 rounded object-cover" />}
@@ -210,6 +211,11 @@ function Children({ item }: { item: ItemDetail }) {
                 <span className="shrink-0 text-sm text-muted tabular-nums">{c.type === "track" ? formatTrackTime(c.durationMs) : formatDuration(c.durationMs)}</span>
                 {c.type === "track" && <ItemMenu item={c} className="-my-1" />}
               </Link>
+              {c.type === "episode" && c.available && (
+                <span className="pr-2">
+                  <EpisodeDownloadLink itemId={c.id} title={c.title} />
+                </span>
+              )}
             </li>
           ))}
         </ol>
@@ -445,6 +451,8 @@ export function ItemPage() {
             {d.type !== "collection" && (
               <PlayOnButton itemIds={[d.id]} className="rounded-full p-1.5 text-muted hover:bg-surface-3 hover:text-text" />
             )}
+            {(d.type === "movie" || d.type === "episode") && <DownloadOriginal item={d} />}
+            {(d.type === "season" || d.type === "show") && <DownloadZip item={d} />}
             {me.data?.isAdmin && <ItemActions item={d} />}
             {d.type === "collection" && <PinToHomeButton kind="collection" id={d.id} />}
             {d.smartRules && me.data?.isAdmin && (

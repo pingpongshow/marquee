@@ -6,6 +6,9 @@ struct ItemDetailView: View {
     @Environment(AppSession.self) private var app
     @Environment(VideoPresenter.self) private var video
     @Environment(MusicPlayer.self) private var music
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
     let id: Int64
     @State private var detail: ItemDetail?
     @State private var children: [Item] = []
@@ -109,6 +112,14 @@ struct ItemDetailView: View {
         }
     }
 
+    private var compact: Bool {
+        #if os(iOS)
+        sizeClass == .compact
+        #else
+        false
+        #endif
+    }
+
     #if os(tvOS)
     private let backdropHeight: CGFloat = 700
     private let posterWidth: CGFloat = 340
@@ -119,8 +130,12 @@ struct ItemDetailView: View {
 
     private func header(_ d: ItemDetail) -> some View {
         let shape: PosterShape = d.type == .episode ? .wide : (d.type == .album || d.type == .artist || d.type == .track) ? .square : .poster
+        // iPhone portrait: music and collections stack the art above the title, so neither is
+        // squeezed into a narrow column.
+        let stacked = compact && [.album, .artist, .collection].contains(d.type)
+        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 14)) : AnyLayout(HStackLayout(alignment: .bottom, spacing: 20))
         return VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .bottom, spacing: 20) {
+            layout {
                 ArtworkView(item: d.base, shape: shape, width: shape == .wide ? posterWidth * 1.6 : posterWidth)
                     .frame(width: shape == .wide ? posterWidth * 1.6 : posterWidth)
                     .shadow(radius: 10)
@@ -145,15 +160,9 @@ struct ItemDetailView: View {
                     ratings(d)
                 }
             }
-            #if os(iOS)
-            // Phones are too narrow for every action: the row scrolls, buttons keep their size.
-            ScrollView(.horizontal, showsIndicators: false) {
-                buttons(d).fixedSize().padding(.vertical, 2)
-            }
-            .scrollClipDisabled()
-            #else
-            buttons(d)
-            #endif
+            // Labels stay on one line; when they don't fit, the secondary actions go icon-only.
+            HeaderActions { primaryButtons(d) } secondary: { secondaryButtons(d) }
+                .accessibilityIdentifier("itemActions")
             if let tagline = d.info.tagline, !tagline.isEmpty { Text(tagline).italic().foregroundStyle(.secondary) }
             if let summary = d.info.summary, !summary.isEmpty {
                 Text(summary).font(.body).foregroundStyle(.primary.opacity(0.9)).frame(maxWidth: 900, alignment: .leading)
@@ -204,75 +213,76 @@ struct ItemDetailView: View {
         }
     }
 
-    @ViewBuilder private func buttons(_ d: ItemDetail) -> some View {
-        HStack(spacing: 12) {
-            switch d.type {
-            case .movie, .episode, .video:
-                let resume = (d.base.viewOffsetMs ?? 0) > 0
-                Button { video.play(d.id) } label: {
-                    Label(resume ? "Resume" : "Play", systemImage: "play.fill")
+    @ViewBuilder private func primaryButtons(_ d: ItemDetail) -> some View {
+        switch d.type {
+        case .movie, .episode, .video:
+            let resume = (d.base.viewOffsetMs ?? 0) > 0
+            Button { video.play(d.id) } label: {
+                Label(resume ? "Resume" : "Play", systemImage: "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+        case .show, .season:
+            Button {
+                run {
+                    guard let ep = try await app.leaves(d.id, unwatched: true).first else { throw MarqueeError("There are no unwatched episodes.") }
+                    video.play(ep.id)
                 }
+            } label: {
+                Label((d.base.watchedLeafCount ?? 0) > 0 ? "Continue" : "Play", systemImage: "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+        case .album, .artist:
+            Button { run { music.play(try await app.leaves(d.id), source: d.title) } } label: { Label("Play", systemImage: "play.fill") }
                 .buttonStyle(.borderedProminent)
-                if resume {
-                    Button { video.play(d.id, startMs: 0) } label: { Label("From start", systemImage: "arrow.counterclockwise") }.buttonStyle(.bordered)
-                }
-            case .show, .season:
-                Button {
-                    run {
-                        guard let ep = try await app.leaves(d.id, unwatched: true).first else { throw MarqueeError("There are no unwatched episodes.") }
-                        video.play(ep.id)
-                    }
-                } label: {
-                    Label((d.base.watchedLeafCount ?? 0) > 0 ? "Continue" : "Play", systemImage: "play.fill")
-                }
-                .buttonStyle(.borderedProminent)
-            case .album, .artist:
-                Button { run { music.play(try await app.leaves(d.id), source: d.title) } } label: { Label("Play", systemImage: "play.fill") }
-                    .buttonStyle(.borderedProminent)
-                Button { run { music.play(try await app.leaves(d.id), shuffle: true, source: d.title) } } label: { Label("Shuffle", systemImage: "shuffle") }
-                    .buttonStyle(.bordered)
-                radioButton(d)
-            case .track:
-                Button { music.play([d.base]) } label: { Label("Play", systemImage: "play.fill") }.buttonStyle(.borderedProminent)
-                radioButton(d)
-            case .collection:
-                PinToHomeButton(rowID: AppSession.pinnedRowID(collection: d.id))
-            }
-            #if os(iOS)
-            if [.movie, .episode, .video, .season, .show, .album, .artist, .track].contains(d.type) {
-                DownloadButton(item: d.base)
-            }
-            #endif
-            if [.movie, .show, .episode, .video].contains(d.type) {
-                Button {
-                    watchlisted.toggle()
-                    let on = watchlisted
-                    Task { do { try await app.setWatchlist(d.id, on) } catch { watchlisted = !on } }
-                } label: {
-                    Label(watchlisted ? "On Watchlist" : "Watchlist", systemImage: watchlisted ? "bookmark.fill" : "bookmark")
-                }
+            Button { run { music.play(try await app.leaves(d.id), shuffle: true, source: d.title) } } label: { Label("Shuffle", systemImage: "shuffle") }
                 .buttonStyle(.bordered)
-            }
-            if d.base.isPlayableVideo || d.type == .show || d.type == .season {
-                Button {
-                    Task {
-                        try? await app.setWatched(d.id, !d.base.watched)
-                        await load()
-                    }
-                } label: {
-                    Label(d.base.watched ? "Watched" : "Mark watched", systemImage: d.base.watched ? "checkmark.circle.fill" : "checkmark.circle")
-                }
-                .buttonStyle(.bordered)
-            }
-            #if os(iOS)
-            if [.movie, .episode, .video, .season, .show, .album, .artist, .track].contains(d.type) {
-                // Remote control (USER-14): play this on another of your Marquee apps.
-                PlayOnButton(target: { PlayOnTarget(itemIDs: [d.id]) }).buttonStyle(.bordered)
-            }
-            #endif
-            Menu { ItemMenuItems(item: d.base) } label: { Image(systemName: "ellipsis").padding(.horizontal, 4) }
-                .buttonStyle(.bordered)
+        case .track:
+            Button { music.play([d.base]) } label: { Label("Play", systemImage: "play.fill") }.buttonStyle(.borderedProminent)
+        case .collection:
+            PinToHomeButton(rowID: AppSession.pinnedRowID(collection: d.id))
         }
+    }
+
+    @ViewBuilder private func secondaryButtons(_ d: ItemDetail) -> some View {
+        if [.movie, .episode, .video].contains(d.type), (d.base.viewOffsetMs ?? 0) > 0 {
+            Button { video.play(d.id, startMs: 0) } label: { Label("From start", systemImage: "arrow.counterclockwise") }.buttonStyle(.bordered)
+        }
+        if [.album, .artist, .track].contains(d.type) { radioButton(d) }
+        #if os(iOS)
+        if [.movie, .episode, .video, .season, .show, .album, .artist, .track].contains(d.type) {
+            DownloadButton(item: d.base)
+        }
+        #endif
+        if [.movie, .show, .episode, .video].contains(d.type) {
+            Button {
+                watchlisted.toggle()
+                let on = watchlisted
+                Task { do { try await app.setWatchlist(d.id, on) } catch { watchlisted = !on } }
+            } label: {
+                Label(watchlisted ? "On Watchlist" : "Watchlist", systemImage: watchlisted ? "bookmark.fill" : "bookmark")
+            }
+            .buttonStyle(.bordered)
+        }
+        if d.base.isPlayableVideo || d.type == .show || d.type == .season {
+            Button {
+                Task {
+                    try? await app.setWatched(d.id, !d.base.watched)
+                    await load()
+                }
+            } label: {
+                Label(d.base.watched ? "Watched" : "Mark watched", systemImage: d.base.watched ? "checkmark.circle.fill" : "checkmark.circle")
+            }
+            .buttonStyle(.bordered)
+        }
+        #if os(iOS)
+        if [.movie, .episode, .video, .season, .show, .album, .artist, .track].contains(d.type) {
+            // Remote control (USER-14): play this on another of your Marquee apps.
+            PlayOnButton(target: { PlayOnTarget(itemIDs: [d.id]) }).buttonStyle(.bordered)
+        }
+        #endif
+        Menu { ItemMenuItems(item: d.base) } label: { Image(systemName: "ellipsis").padding(.horizontal, 4) }
+            .buttonStyle(.bordered)
+            .accessibilityLabel("More")
     }
 
     private func radioButton(_ d: ItemDetail) -> some View {

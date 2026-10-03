@@ -12,8 +12,8 @@ packages:
     path: MarqueeKit
 settings:
   base:
-    MARKETING_VERSION: "0.36.0"
-    CURRENT_PROJECT_VERSION: "36"
+    MARKETING_VERSION: "0.37.0"
+    CURRENT_PROJECT_VERSION: "37"
     SWIFT_VERSION: "5.0"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
@@ -41,6 +41,8 @@ targets:
       path: App/iOS/Info.plist
       properties:
         CFBundleDisplayName: Marquee
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         UIBackgroundModes: [audio]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
@@ -101,6 +103,8 @@ targets:
       path: App/tvOS/Info.plist
       properties:
         CFBundleDisplayName: Marquee
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         UIBackgroundModes: [audio]
         NSLocalNetworkUsageDescription: Marquee looks for your Marquee server on your home network.
@@ -125,6 +129,8 @@ targets:
       path: App/TopShelf/Info.plist
       properties:
         CFBundleDisplayName: Marquee
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.tv-top-shelf
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ContentProvider
