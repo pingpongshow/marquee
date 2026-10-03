@@ -63,6 +63,9 @@ func (h *Handlers) StartPlayback(ctx context.Context, req StartPlaybackRequestOb
 		RemoteAllowed: u.IsAdmin || u.Restrictions.RemoteAllowed(),
 		UserAudioLang: u.Preferences.AudioLanguage, UserSubLang: u.Preferences.SubtitleLanguage, UserSubMode: u.Preferences.SubtitleMode,
 	}
+	if st := u.Preferences.SubtitleStyle; st != nil {
+		r.SubtitleStyle = playback.SubtitleStyle{Size: st.Size, Color: st.Color, Background: st.Background, Position: st.Position}
+	}
 	set(&r.FileID, b.FileId)
 	set(&r.AudioStreamID, b.AudioStreamId)
 	set(&r.SubtitleStreamID, b.SubtitleStreamId)
@@ -157,6 +160,7 @@ func (h *Handlers) ReportPlayback(ctx context.Context, req ReportPlaybackRequest
 		set(&msg, req.Body.Error)
 		slog.WarnContext(ctx, "client playback error", "title", s.Title, "method", s.Decision.Method, "device", s.DeviceName,
 			"position", req.Body.PositionMs, "error", msg)
+		h.recordPlaybackError(ctx, s.ItemID, s.FileID, msg) // ADM-11
 		return ReportPlayback204Response{}, nil
 	}
 	if err := h.Playback.Progress(ctx, req.SessionId, req.Body.PositionMs, string(req.Body.State)); err != nil {

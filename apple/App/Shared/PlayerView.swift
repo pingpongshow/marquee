@@ -45,6 +45,7 @@ struct PlayerView: View {
             music.pause() // a video takes over from the music
             let p = VideoPlayback(app: app, playlistID: request.playlistID)
             playback = p
+            RemoteReceiver.shared.video = RemoteVideoTarget(playback: p, next: playNext, close: close)
             let t = WatchTogether(app: app, player: p.player, itemID: request.itemID)
             together = t
             p.onRestart = { [weak t] in t?.restarting() }
@@ -73,6 +74,7 @@ struct PlayerView: View {
             cast.onVideoFinished = nil
             #endif
             together?.leave()
+            if let p = playback, RemoteReceiver.shared.video?.playback === p { RemoteReceiver.shared.video = nil }
             Task { await playback?.stop() }
         }
         .onChange(of: playback?.finished) { _, done in
@@ -88,6 +90,7 @@ struct PlayerView: View {
         #if os(tvOS)
         .onExitCommand { close() }
         #endif
+        .remoteToast()
     }
 
     @ViewBuilder private func overlays(_ p: VideoPlayback) -> some View {
@@ -101,6 +104,14 @@ struct PlayerView: View {
                 Spacer()
                 if trailerIndex == nil {
                     if together?.group == nil { optionsMenu(p) }
+                    if p.offlineTitle == nil {
+                        // Another Marquee app (USER-14): carries on there from here.
+                        PlayOnButton(target: {
+                            guard let id = p.item?.id else { return nil }
+                            return PlayOnTarget(itemIDs: [id], startMs: Int64(p.position * 1000), pauseHere: { p.player.pause() })
+                        }, compact: true)
+                        .font(.headline).frame(width: 44, height: 44).background(.ultraThinMaterial, in: Circle())
+                    }
                     CastButton(tint: .white).frame(width: 44, height: 44).background(.ultraThinMaterial, in: Circle())
                     if let t = together { togetherButton(t) }
                 }

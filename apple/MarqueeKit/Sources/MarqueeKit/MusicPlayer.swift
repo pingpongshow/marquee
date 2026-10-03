@@ -178,11 +178,12 @@ public final class MusicPlayer {
     // MARK: - Queue actions
 
     /// Plays items; `source` names what they are (an album or playlist) for Now Playing.
-    public func play(_ items: [Item], start: Int = 0, shuffle: Bool = false, source: String? = nil) {
+    /// `at` starts the first track part-way (a queue handed over from another device).
+    public func play(_ items: [Item], start: Int = 0, shuffle: Bool = false, source: String? = nil, at seconds: Double = 0) {
         self.source = source.map { Source(title: $0) }
         queue.load(items, start: start, shuffle: shuffle)
         retriedEntry = nil
-        rebuild()
+        rebuild(at: max(0, seconds))
     }
 
     /// Plays a generated station; with a radio request it keeps topping itself up.

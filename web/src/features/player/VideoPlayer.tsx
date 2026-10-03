@@ -40,8 +40,11 @@ import type {
 import { Spinner } from "@/components/ui";
 import { languageName, versionLabel } from "../browse/format";
 import { ignoreShortcut } from "@/lib/keys";
+import { cueCss, placeCues, resolveSubtitleStyle } from "@/lib/subtitleStyle";
 import { deviceProfile } from "./deviceProfile";
 import { SubtitleSearchDialog } from "./SubtitleSearch";
+import { remoteStateChanged, setVideoTarget, type RemoteTarget } from "../remote/bus";
+import { PlayOnButton } from "../remote/PlayOn";
 
 type PlaybackSession = components["schemas"]["PlaybackSession"];
 
@@ -239,6 +242,17 @@ export function VideoPlayer({
   useEffect(() => {
     menuRef.current = menu;
   }, [menu]);
+  // Raised subtitles (PLAY-20) are placed per cue, once the track has loaded.
+  const trackRef = useRef<HTMLTrackElement | null>(null);
+  const cuePosition = useRef<"bottom" | "raised">("bottom");
+  const subPosition = resolveSubtitleStyle(
+    me.data?.preferences?.subtitleStyle,
+  ).position;
+  useEffect(() => {
+    cuePosition.current = subPosition;
+    const t = trackRef.current;
+    if (t?.isConnected) placeCues(t.track, subPosition);
+  }, [subPosition]);
   // Show the controls, then hide them after 3 s of no mouse/keyboard activity while playing.
   const poke = useCallback(() => {
     setChrome(true);
@@ -636,7 +650,77 @@ export function VideoPlayer({
     };
   });
 
+  // Remote control (USER-14): this player obeys commands and reports what it's playing.
+  const remoteRef = useRef<RemoteTarget | null>(null);
+  useEffect(() => {
+    const d = item.data;
+    const episode = d?.type === "episode";
+    remoteRef.current = {
+      state: () => {
+        const v = videoRef.current;
+        return {
+          state: !sess || buffering ? "buffering" : !v || v.paused ? "paused" : "playing",
+          itemId,
+          itemType: d?.type,
+          title: preroll ? preroll.label : episode ? (d?.grandparentTitle ?? d.title) : (d?.title ?? ""),
+          subtitle: episode ? `${d?.parentTitle ?? ""} · Episode ${d?.index ?? ""} · ${d?.title ?? ""}` : d?.year ? String(d.year) : undefined,
+          artItemId: episode ? (d?.grandparentId ?? itemId) : itemId,
+          positionMs: Math.round((v?.currentTime ?? 0) * 1000),
+          durationMs: Math.round(duration * 1000),
+          volume: v ? (v.muted ? 0 : v.volume) : undefined,
+          audioStreamId: sess?.audioStreamId,
+          subtitleStreamId: sess?.subtitleStreamId,
+        };
+      },
+      pause: () => videoRef.current?.pause(),
+      resume: () => void videoRef.current?.play().catch(() => {}),
+      seek: (ms) => {
+        const v = videoRef.current;
+        if (v) v.currentTime = Math.max(0, ms / 1000);
+      },
+      stop: () =>
+        navigate({
+          to: "/item/$itemId",
+          params: { itemId: String(preroll?.movieId ?? itemId) },
+        }),
+      next: () => (preroll ? preroll.onDone() : playNext()),
+      previous: () => {
+        const v = videoRef.current;
+        if (v) v.currentTime = 0;
+      },
+      setAudio: (id) => restart({ audio: id }),
+      setSubtitle: (id) => restart({ subtitle: id }),
+      setVolume: (vol) => {
+        const v = videoRef.current;
+        if (!v) return;
+        v.volume = vol;
+        v.muted = vol === 0;
+      },
+    };
+  });
+  useEffect(() => {
+    const proxy: RemoteTarget = {
+      state: () => remoteRef.current!.state(),
+      pause: () => remoteRef.current?.pause(),
+      resume: () => remoteRef.current?.resume(),
+      seek: (ms) => remoteRef.current?.seek(ms),
+      stop: () => remoteRef.current?.stop(),
+      next: () => remoteRef.current?.next(),
+      previous: () => remoteRef.current?.previous(),
+      setAudio: (id) => remoteRef.current?.setAudio?.(id),
+      setSubtitle: (id) => remoteRef.current?.setSubtitle?.(id),
+      setVolume: (v) => remoteRef.current?.setVolume?.(v),
+    };
+    setVideoTarget(proxy);
+    return () => setVideoTarget(null);
+  }, []);
+  useEffect(() => {
+    remoteStateChanged();
+  }, [sess, item.data?.id]);
+
   const d = item.data;
+  // Subtitle appearance (PLAY-20) for text subtitles; styled ASS keeps its own look.
+  const subStyle = resolveSubtitleStyle(me.data?.preferences?.subtitleStyle);
   const marker = sess?.markers.find(
     (m) => time * 1000 >= m.startMs && time * 1000 < m.endMs - 1000,
   );
@@ -655,6 +739,7 @@ export function VideoPlayer({
       onMouseMove={poke}
       onClick={(e) => e.target === e.currentTarget && setMenu(null)}
     >
+      <style>{cueCss("#player-root video", subStyle)}</style>
       <video
         ref={videoRef}
         className="size-full"
@@ -664,14 +749,19 @@ export function VideoPlayer({
         onPlay={() => {
           setPlaying(true);
           report("playing");
+          remoteStateChanged();
           poke();
         }}
         onPause={() => {
           setPlaying(false);
           setChrome(true);
           report("paused");
+          remoteStateChanged();
         }}
-        onSeeked={() => report(videoRef.current?.paused ? "paused" : "playing")}
+        onSeeked={() => {
+          report(videoRef.current?.paused ? "paused" : "playing");
+          remoteStateChanged();
+        }}
         onTimeUpdate={(e) => {
           setTime(e.currentTarget.currentTime);
           updateBuffered(e.currentTarget);
@@ -681,6 +771,7 @@ export function VideoPlayer({
         onPlaying={() => {
           startedRef.current = true;
           setBuffering(false);
+          remoteStateChanged();
         }}
         onError={(e) => {
           const err = e.currentTarget.error;
@@ -709,7 +800,11 @@ export function VideoPlayer({
             default
             // A swapped-in track isn't always shown on its own.
             ref={(t) => {
-              if (t) t.track.mode = "showing";
+              if (!t) return;
+              t.track.mode = "showing";
+              trackRef.current = t;
+              placeCues(t.track, cuePosition.current);
+              t.onload = () => placeCues(t.track, cuePosition.current);
             }}
           />
         )}
@@ -938,6 +1033,16 @@ export function VideoPlayer({
                 </span>
               )}
             </button>
+            )}
+            {!preroll && !syncing && (
+              <PlayOnButton
+                itemIds={[itemId]}
+                startMs={() =>
+                  Math.round((videoRef.current?.currentTime ?? 0) * 1000)
+                }
+                onHandoff={() => videoRef.current?.pause()}
+                className="rounded-full p-2 text-white hover:bg-white/10"
+              />
             )}
             <button
               onClick={() => setMenu(menu === "info" ? null : "info")}

@@ -77,7 +77,11 @@ func (h *Handlers) RelatedItems(ctx context.Context, req RelatedItemsRequestObje
 	} else if err != nil {
 		return nil, internal(ctx, "related", err)
 	}
-	list, err := h.Items.Related(ctx, access(ctx), req.ItemId, 20)
+	// By meaning when the item is embedded (USER-16), else shared genres and people.
+	list, ok, err := h.Items.RelatedByEmbedding(ctx, access(ctx), h.videoIndex(), req.ItemId, 20)
+	if err == nil && !ok {
+		list, err = h.Items.Related(ctx, access(ctx), req.ItemId, 20)
+	}
 	if err != nil {
 		return nil, internal(ctx, "related", err)
 	}

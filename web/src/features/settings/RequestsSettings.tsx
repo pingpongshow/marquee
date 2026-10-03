@@ -27,6 +27,7 @@ export function RequestsSettings() {
     <div className="space-y-6">
       <Approvals />
       <Connection />
+      <BazarrConnection />
     </div>
   );
 }
@@ -116,6 +117,88 @@ function Connection() {
           save.mutate(
             {
               integrations: { seerrUrl: value, seerrApiKey: key || undefined },
+            },
+            {
+              onSuccess: () => {
+                setUrl(null);
+                setKey("");
+                setSavedAt(Date.now());
+              },
+            },
+          )
+        }
+        onReset={() => {
+          setUrl(null);
+          setKey("");
+        }}
+      />
+    </Card>
+  );
+}
+
+/** Bazarr (META-12): finds subtitles for movies and episodes, and powers Library Health's missing subtitles. */
+function BazarrConnection() {
+  const query = useQuery(settingsQuery);
+  const save = useUpdateSettings();
+  const saved = query.data?.integrations;
+  const [url, setUrl] = useState<string | null>(null);
+  const [key, setKey] = useState("");
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  if (query.isPending) return null;
+  const value = url ?? saved?.bazarrUrl ?? "";
+  const dirty =
+    (url !== null && url !== (saved?.bazarrUrl ?? "")) || key !== "";
+  return (
+    <Card
+      title="Bazarr"
+      description="Download subtitles for movies and episodes through Bazarr, from the player's Find subtitles and from Library Health."
+    >
+      <div className="space-y-4">
+        <Field
+          label="Bazarr address"
+          help="For example http://10.1.1.10:6767. Leave empty to turn Bazarr off."
+        >
+          {(id) => (
+            <Input
+              id={id}
+              value={value}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="http://10.1.1.10:6767"
+            />
+          )}
+        </Field>
+        <Field
+          label="Bazarr API key"
+          help={
+            saved?.bazarrApiKeySet
+              ? "Set. Enter a new key to replace it."
+              : "Bazarr → Settings → General → API Key."
+          }
+        >
+          {(id) => (
+            <Input
+              id={id}
+              type="password"
+              autoComplete="off"
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              placeholder={saved?.bazarrApiKeySet ? "••••••••" : ""}
+            />
+          )}
+        </Field>
+      </div>
+      <SaveBar
+        dirty={dirty}
+        saving={save.isPending}
+        error={save.error}
+        savedAt={savedAt}
+        onSave={() =>
+          save.mutate(
+            {
+              integrations: {
+                bazarrUrl: value,
+                bazarrApiKey: key || undefined,
+              },
             },
             {
               onSuccess: () => {

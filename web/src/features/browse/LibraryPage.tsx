@@ -11,6 +11,8 @@ import type { operations } from "@/api/schema.gen";
 import { Alert, Button, Select, Spinner } from "@/components/ui";
 import { ItemMenu } from "./ItemMenu";
 import { MusicDiscover } from "../music/Discover";
+import { RecapCard } from "../music/RecapCard";
+import { MuseButton } from "../search/MuseVideo";
 import { Poster } from "./Poster";
 import { formatDuration, subtitleFor } from "./format";
 import { sortOptions } from "./sorts";
@@ -182,6 +184,7 @@ export function LibraryPage() {
           )}
           {first.data && <span className="text-sm text-muted">{total.toLocaleString()} {filtered ? "matching" : collections ? "collections" : "items"}</span>}
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            {isVideo && lib && lib.type !== "photos" && <MuseButton libraryId={id} />}
             {!collections && (
               <Button size="sm" variant={filtersOpen || filtered ? "primary" : "secondary"} onClick={() => setFiltersOpen((v) => !v)} aria-expanded={filtersOpen}>
                 <Filter className="size-4" /> Filter
@@ -283,6 +286,7 @@ export function LibraryPage() {
           </div>
         )}
 
+        {isMusic && !filtered && <RecapCard className="mb-8" />}
         {isMusic && !filtered && <MusicDiscover libraryId={id} />}
         {first.isPending && <Spinner />}
         {first.isError && <Alert tone="error">{first.error.message}</Alert>}

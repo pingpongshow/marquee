@@ -45,7 +45,7 @@ func (s Settings) Validate() error {
 			return invalid("invalid LAN subnet %q", c)
 		}
 	}
-	for _, u := range []string{s.Network.LANURL, s.RemoteAccess.RemoteURL} {
+	for _, u := range []string{s.Network.LANURL, s.RemoteAccess.RemoteURL, s.Integrations.BazarrURL} {
 		if u == "" {
 			continue
 		}

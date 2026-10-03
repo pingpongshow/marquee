@@ -111,10 +111,20 @@ func (s *Scanner) Scan(ctx context.Context, lib library.Library, ignore []string
 	seen := make(map[string]bool, len(wr.Media))
 	var work []candidate
 	var restore []int64
+	var subsChanged []int64 // unchanged videos whose sidecar subtitles came or went
+	var sidecars map[int64]map[string]bool
+	if lib.Type != library.Music {
+		if sidecars, err = s.loadSidecars(ctx, lib.ID); err != nil {
+			return st, err
+		}
+	}
 	for _, c := range wr.Media {
 		seen[c.Path] = true
 		if e, ok := existing[c.Path]; ok && e.Size == c.Size && e.MTime == c.MTime {
 			st.Unchanged++
+			if sidecars != nil && !sameSidecars(sidecars[e.ID], findSubtitles(c.Path, wr.Dirs[filepath.Dir(c.Path)])) {
+				subsChanged = append(subsChanged, e.ID)
+			}
 			if !e.Available {
 				restore = append(restore, e.ID)
 			}
@@ -246,6 +256,12 @@ func (s *Scanner) Scan(ctx context.Context, lib library.Library, ignore []string
 	if err := w.finish(ctx); err != nil {
 		return st, err
 	}
+	// Subtitles saved or removed next to videos that didn't change (Bazarr, by hand).
+	for _, id := range subsChanged {
+		if _, err := RefreshSubtitles(ctx, s.DB, id); err != nil {
+			slog.Warn("scan: refresh subtitles", "file", id, "err", err)
+		}
+	}
 	if lib.Type == library.Movies || lib.Type == library.Shows || lib.Type == library.Anime {
 		if err := s.linkExtras(ctx, lib.ID); err != nil {
 			slog.Warn("scan: link extras", "err", err)
@@ -253,6 +269,42 @@ func (s *Scanner) Scan(ctx context.Context, lib library.Library, ignore []string
 	}
 	st.Duration = time.Since(start)
 	return st, nil
+}
+
+// loadSidecars lists each file's sidecar subtitle paths (not ones downloaded into the config folder).
+func (s *Scanner) loadSidecars(ctx context.Context, libID int64) (map[int64]map[string]bool, error) {
+	rows, err := s.DB.QueryContext(ctx, `SELECT st.file_id, st.external_path FROM media_files f
+		CROSS JOIN streams st ON st.file_id = f.id AND st.external_path IS NOT NULL
+		WHERE f.library_id = ? AND st.external_path NOT IN (SELECT path FROM downloaded_subtitles WHERE file_id = f.id)`, libID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]map[string]bool{}
+	for rows.Next() {
+		var id int64
+		var p string
+		if err := rows.Scan(&id, &p); err != nil {
+			return nil, err
+		}
+		if out[id] == nil {
+			out[id] = map[string]bool{}
+		}
+		out[id][p] = true
+	}
+	return out, rows.Err()
+}
+
+func sameSidecars(have map[string]bool, found []subtitleFile) bool {
+	if len(have) != len(found) {
+		return false
+	}
+	for _, f := range found {
+		if !have[f.Path] {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Scanner) loadExisting(ctx context.Context, libID int64) (map[string]existingFile, error) {

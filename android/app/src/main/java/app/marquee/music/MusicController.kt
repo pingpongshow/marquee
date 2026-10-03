@@ -33,7 +33,7 @@ import kotlinx.coroutines.withContext
  */
 class MusicController(private val context: Context, private val marquee: Marquee) {
     /** A queued track; dj names the Guest DJ that wove it in. */
-    data class Now(val id: Long, val title: String, val artist: String, val album: String, val artwork: Uri?, val dj: String? = null)
+    data class Now(val id: Long, val title: String, val artist: String, val album: String, val artwork: Uri?, val dj: String? = null, val albumId: Long? = null)
 
     /** Guest DJ modes (MUSIC-6): a pick every few of your own tracks. */
     enum class DJ(val label: String, val mode: MusicDJRequest.Mode, val blurb: String) {
@@ -134,7 +134,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
     private fun meta(item: MediaItem): Now {
         val m = item.mediaMetadata
         return Now(item.mediaId.toLongOrNull() ?: 0, m.title?.toString() ?: "", m.artist?.toString() ?: "", m.albumTitle?.toString() ?: "", m.artworkUri,
-            m.extras?.getString("dj"))
+            m.extras?.getString("dj"), m.extras?.getLong("album", 0L)?.takeIf { it > 0 })
     }
 
     private fun sync(p: Player, queueChanged: Boolean) {
@@ -173,13 +173,13 @@ class MusicController(private val context: Context, private val marquee: Marquee
 
     private fun mediaItem(t: ItemSummary, dj: String? = null): MediaItem = trackItem(marquee, t, dj)
 
-    /** Plays tracks from start; source names what's playing (an album or playlist). */
-    fun play(tracks: List<ItemSummary>, start: Int, source: String? = null) = start(tracks, start, source, null)
+    /** Plays tracks from start (at startMs into it); source names what's playing (an album or playlist). */
+    fun play(tracks: List<ItemSummary>, start: Int, source: String? = null, startMs: Long = 0) = start(tracks, start, source, null, startMs)
 
     /** Plays a generated station; with a radio request it keeps topping itself up. */
     fun playStation(station: Station, radio: RadioRequest? = null) = start(station.items, 0, station.title, radio)
 
-    private fun start(tracks: List<ItemSummary>, start: Int, source: String?, radio: RadioRequest?) {
+    private fun start(tracks: List<ItemSummary>, start: Int, source: String?, radio: RadioRequest?, startMs: Long = 0) {
         if (tracks.isEmpty()) return
         _source.value = source
         this.radio = radio
@@ -187,9 +187,9 @@ class MusicController(private val context: Context, private val marquee: Marquee
         scope.launch(Dispatchers.Main) {
             val c = connect()
             val index = start.coerceIn(0, tracks.size - 1)
-            c.setMediaItems(tracks.map { mediaItem(it) }, index, 0)
+            c.setMediaItems(tracks.map { mediaItem(it) }, index, startMs.coerceAtLeast(0))
             // While casting (or with a device connected and idle) the new queue plays there.
-            if (casting || beginCasting()) castTrack(index, 0)
+            if (casting || beginCasting()) castTrack(index, startMs.coerceAtLeast(0))
             else { c.prepare(); c.play() }
         }
     }
@@ -316,6 +316,12 @@ class MusicController(private val context: Context, private val marquee: Marquee
     }
 
     private fun with(block: (MediaController) -> Unit) { scope.launch { block(connect()) } }
+    /** Remote control (USER-14): explicit pause and resume, and the player's own volume (0–1). */
+    fun pause() = with { if (casting) marquee.cast.pause() else it.pause() }
+    fun resume() = with { if (casting) { if (!marquee.cast.playing.value) marquee.cast.toggle() } else it.play() }
+    fun setVolume(v: Float) = with { it.volume = v.coerceIn(0f, 1f) }
+    /** The player's volume, once connected. */
+    val volume: Float? get() = controller?.volume
     fun toggle() = with { if (casting) marquee.cast.toggle() else if (it.isPlaying) it.pause() else it.play() }
     fun next() = with { if (casting) castNext() else it.seekToNextMediaItem() }
     fun previous() = with {

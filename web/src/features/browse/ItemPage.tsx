@@ -12,6 +12,7 @@ import { describeRules, SmartRulesDialog } from "./SmartCollection";
 import { useMusicState } from "../player/MusicPlayer";
 import { ItemActions } from "./ItemActions";
 import { ItemMenu } from "./ItemMenu";
+import { PlayOnButton } from "../remote/PlayOn";
 import { Rating } from "../music/Rating";
 import { PlayButtons } from "./PlayButtons";
 import { Poster } from "./Poster";
@@ -424,6 +425,9 @@ export function ItemPage() {
           <PlayButtons key={d.id} item={d} />
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <ItemMenu item={d} />
+            {d.type !== "collection" && (
+              <PlayOnButton itemIds={[d.id]} className="rounded-full p-1.5 text-muted hover:bg-surface-3 hover:text-text" />
+            )}
             {me.data?.isAdmin && <ItemActions item={d} />}
             {d.type === "collection" && <PinToHomeButton kind="collection" id={d.id} />}
             {d.smartRules && me.data?.isAdmin && (

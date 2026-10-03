@@ -6,6 +6,7 @@ import SwiftUI
 struct MainView: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
+    @Environment(\.scenePhase) private var scenePhase
     @State private var libraries: [Library] = []
     @State private var video = VideoPresenter()
     @State private var showNowPlaying = false
@@ -57,6 +58,11 @@ struct MainView: View {
         .tabViewStyle(.sidebarAdaptable)
         #endif
         .environment(video)
+        .remoteToast()
+        // Remote control (USER-14): a player while open, and while music plays in the background.
+        .onChange(of: scenePhase, initial: true) { updateRemote() }
+        .onChange(of: music.playing) { updateRemote() }
+        .onDisappear { RemoteReceiver.shared.stop() }
         .task { await loadLibraries() }
         .task {
             let s = try? await app.requestsStatus()
@@ -116,6 +122,15 @@ struct MainView: View {
         #if os(iOS)
         .safeAreaInset(edge: .bottom) { MiniPlayerBar() }
         #endif
+    }
+
+    private func updateRemote() {
+        let remote = RemoteReceiver.shared
+        if scenePhase == .background && !music.playing {
+            remote.stop()
+        } else {
+            remote.start(app: app, music: music, presenter: video)
+        }
     }
 
     private func loadLibraries() async {

@@ -23,6 +23,7 @@ import (
 	"marquee/internal/api"
 	"marquee/internal/auth"
 	"marquee/internal/avatars"
+	"marquee/internal/bazarr"
 	"marquee/internal/config"
 	"marquee/internal/db"
 	"marquee/internal/discovery"
@@ -40,6 +41,7 @@ import (
 	"marquee/internal/playback"
 	"marquee/internal/plex"
 	"marquee/internal/probe"
+	"marquee/internal/remote"
 	"marquee/internal/requests"
 	"marquee/internal/scanner"
 	"marquee/internal/scrobble"
@@ -175,6 +177,7 @@ func run() error {
 	}
 	meta := &metadata.Service{DB: database, Settings: store, CacheDir: filepath.Join(cfg.ConfigDir, "cache")}
 	var afterMusicScan atomic.Pointer[func()] // set once the scheduler exists
+	var afterVideoScan atomic.Pointer[func()]
 	scans.AfterScan = func(ctx context.Context, lib library.Library, report func(scanner.Progress)) error {
 		lang := ""
 		if lib.Options.Language != nil {
@@ -199,7 +202,11 @@ func run() error {
 		if lib.Type == library.Anime {
 			go meta.EnrichAnime(ctx) // AniList titles and details for new shows (META-2)
 		}
-		return meta.RefreshRatings(ctx, lib.ID)
+		err := meta.RefreshRatings(ctx, lib.ID)
+		if f := afterVideoScan.Load(); f != nil {
+			(*f)() // index new movies and shows for Muse and recommendations
+		}
+		return err
 	}
 	// Adding a TMDB key starts matching everything that was scanned without one.
 	store.Subscribe(func(s settings.Settings) {
@@ -285,6 +292,16 @@ func run() error {
 		Run:         sonicSvc.Analyze})
 	runSonic := func() { scheduler.RunNow(ctx, "sonic") }
 	afterMusicScan.Store(&runSonic)
+	// Muse for movies and recommendations (USER-15, USER-16): text embeddings of movies and shows.
+	embedder := &items.Embedder{DB: database, Index: items.NewVideoIndex(), Client: sonicSvc.Client}
+	if err := embedder.Index.Load(ctx, database); err != nil {
+		slog.Warn("video embeddings", "err", err)
+	}
+	scheduler.Register(tasks.Task{ID: "embeddings", Name: "Index movies and shows", Window: true, Bounded: true,
+		Description: "Reads the descriptions of new and changed movies and shows so Muse, recommendations and related items include them.",
+		Run:         embedder.Run, Progress: embedder.Progress})
+	runEmbed := func() { scheduler.RunNow(ctx, "embeddings") }
+	afterVideoScan.Store(&runEmbed)
 	loud := &loudness.Service{DB: database, FFmpeg: cfg.FFmpegPath, Workers: 4, Analyse: func() bool { return store.Get().Music.LoudnessAnalysis }}
 	scheduler.Register(tasks.Task{ID: "loudness", Name: "Measure music loudness", Window: true,
 		Description: "Reads ReplayGain tags and measures loudness of tracks without them, so volume levelling works for everything.",
@@ -381,6 +398,8 @@ func run() error {
 
 	watchTogether := &syncplay.Service{}
 	go watchTogether.Run(ctx)
+	remoteHub := &remote.Hub{}
+	go remoteHub.Run(ctx)
 	lyricsSvc := &lyrics.Service{DB: database, Online: func() bool { return store.Get().Music.OnlineLyrics }}
 	go scheduler.Run(ctx)
 
@@ -398,20 +417,26 @@ func run() error {
 		DB: database, Auth: authSvc, Settings: store, Libraries: libraries,
 		Items: items.NewStore(database), Scans: scans, Version: config.Version,
 		Tasks: scheduler, Trickplay: trick, Webhooks: hooks, Subtitles: subs, Downloads: dl, Backups: backups, Restart: stop, Sonic: sonicSvc, Lyrics: lyricsSvc,
-		Requests: &requests.Service{DB: database, Settings: store},
-		LiveTV:   live,
-		Scrobble: scrobbler,
-		DVR:      dvr,
-		SyncPlay: watchTogether,
-		Avatars:  &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
-		Images:   images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
-		Logs:     logs,
-		Metadata: meta,
-		Playback: player,
+		Requests:   &requests.Service{DB: database, Settings: store},
+		LiveTV:     live,
+		Scrobble:   scrobbler,
+		DVR:        dvr,
+		SyncPlay:   watchTogether,
+		Remote:     remoteHub,
+		Embeddings: embedder,
+		Avatars:    &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
+		Images:     images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
+		Logs:       logs,
+		Metadata:   meta,
+		Playback:   player,
 		Plex: &plex.Importer{DB: database, Auth: authSvc, Libraries: libraries, Matcher: meta,
 			PlexRoot: cfg.PlexDir, WorkDir: filepath.Join(cfg.ConfigDir, "plex-import"),
 			ArtDir: filepath.Join(cfg.ConfigDir, "cache", "plex-artwork")},
 		LibrariesChanged: func() { watch.Sync(ctx, store.Get().Library.WatchFilesystem) },
+		Bazarr: &bazarr.Service{DB: database, Config: func() (string, string) {
+			i := store.Get().Integrations
+			return i.BazarrURL, i.BazarrAPIKey
+		}},
 	}
 	handler := server.New(server.Deps{
 		Handlers:   apiHandlers,

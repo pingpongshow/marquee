@@ -39,6 +39,7 @@ Priority key:
 | META-9 | Lyrics: embedded, `.lrc` sidecar and LRCLIB, with timed lyrics. | P1 |
 | META-10 | Local artwork (`poster.jpg`, `fanart.jpg`, `folder.jpg`) takes precedence. | P0 |
 | META-11 | Metadata language preference, with per-library overrides. | P1 |
+| META-12 | **Bazarr subtitles:** see what subtitles Bazarr has and wants for a movie or episode, and have it download the best one or a chosen search result, from any app; new subtitle files are picked up straight away (D87). | P1 |
 
 ## 3. Playback & streaming (server)
 
@@ -63,6 +64,7 @@ Priority key:
 | PLAY-17 | **Subtitle and audio timing:** per-viewer offsets (±30 s) from the player, remembered per person and file. Subtitles shift when served (sidecar, HLS rendition, ASS, burn-in); audio shifts by repackaging, so it isn't direct played (D86). | P1 |
 | PLAY-18 | **Cinema trailers:** before a movie started from the beginning, play up to five trailers of other movies in the library (unwatched and recent first), then an optional pre-roll video, with Skip. Server setting; each person can turn it off (D86). | P2 |
 | PLAY-19 | Playback speed 0.5×–2× in the video players (not during watch together). | P2 |
+| PLAY-20 | **Subtitle appearance:** each person picks text size, colour, background and position once; every app applies it, and burned-in subtitles use it too (styled ASS subtitles keep their look) (D87). | P1 |
 
 ## 3a. Automatic quality & network awareness
 
@@ -114,6 +116,7 @@ The owner wants the best music experience possible: everything Plexamp and Plex'
 | MUSIC-19 | **Playlist downloads:** download whole playlists (including smart playlists and mixes) for offline playback on Apple and Android, kept in sync as they change. | P1 |
 | MUSIC-20 | **Equaliser:** presets and custom bands for music, per device (web, iPhone/iPad, Android) (D86). | P2 |
 | MUSIC-21 | **Car mode:** a Plexamp-style full-screen music screen with large controls and one-tap stations on iPhone and Android phones (D86). | P2 |
+| MUSIC-22 | **Your year in music:** a Wrapped-style recap of each year (minutes, top artists, albums, songs and genres, when you listen, streaks, new artists) with a playlist of your top 50 songs (D87). | P1 |
 
 ## 3b-2. Watch together
 
@@ -157,6 +160,9 @@ Plex-style Live TV on every client (see the owner's reference screenshot: Guide 
 | USER-9 | TOTP two-factor auth for admin/WAN logins. ✅ Any password account can turn it on (D75). | P2 |
 | USER-12 | **Customisable Home:** each person reorders and hides Home rows and pins collections and playlists as rows (D86). | P1 |
 | USER-13 | **Sharing with friends:** admins make one-time invite links with library, rating and remote restrictions; friends pick a username and password, aren't on the household's profile picker and can't switch into household profiles. Friends reach the server over an address they can use (for example a shared Tailscale node; Tailscale itself isn't changed) (D86). | P1 |
+| USER-14 | **Remote control (Plex companion):** "Play on…" another of your open Marquee apps (Apple TV, Android TV, web, phones) and control it from your phone: play, pause, seek, skip, tracks, volume. Admins can control the household's devices (D87). | P1 |
+| USER-15 | **Muse for movies:** describe what you want to watch ("90s sci-fi with time travel") and get matches from the library: decade, genre, length, rating, watched and kid-friendly rules plus meaning-based ranking of plots, on the server's GPU (D87). | P1 |
+| USER-16 | **Recommendations:** "Recommended for You" and "Because you watched X" rows on Home, and "More like this" ranked by what titles are about (D87). | P1 |
 
 ## 5. Remote access (WAN)
 
@@ -208,6 +214,7 @@ Plex-style Live TV on every client (see the owner's reference screenshot: Guide 
 | ADM-8 | **Settings area organized like Plex**, with a left-hand settings nav grouped into sections (see §7a), search across settings, inline help text, and safe defaults. Changes apply live where possible, with a clear "restart required" notice otherwise. | P0 |
 | ADM-9 | **Library management in the web dashboard:** add/edit/delete libraries, a server-side folder browser for picking paths, per-library agent/language/ordering, scan, refresh metadata, empty trash and scan status/progress. | P0 |
 | ADM-10 | **Dashboard:** now playing (user, device, local/remote, decision, bitrate, encoder), bandwidth graphs (local vs remote), active transcodes and GPU/CPU encoder usage, recently added, alerts. | P0 |
+| ADM-11 | **Library health:** duplicates, unmatched items, missing files, unplayable files, upgrade candidates (SD/720p, low bitrate), playback errors, missing artwork and missing subtitles (from Bazarr), each with fixes and an Ignore (D87). | P1 |
 | ADM-2 | Scheduled tasks: scans, metadata refresh, DB optimize/backup, trickplay/intro generation and transcode cleanup. | P0 |
 | ADM-3 | Automatic DB backups with retention, and restore. | P0 |
 | ADM-4 | Activity/history log and playback statistics (Tautulli-like). | P1 |

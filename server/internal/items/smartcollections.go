@@ -91,4 +91,3 @@ func (s *Store) SaveSmart(ctx context.Context, sc SmartCollection, title string)
 	}
 	return id, nil
 }
-

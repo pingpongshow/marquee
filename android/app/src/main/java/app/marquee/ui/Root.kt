@@ -21,15 +21,16 @@ import app.marquee.core.Marquee
 val LocalMarquee = staticCompositionLocalOf<Marquee> { error("no Marquee") }
 val LocalMusic = staticCompositionLocalOf<app.marquee.music.MusicController> { error("no music") }
 val LocalDownloads = staticCompositionLocalOf<app.marquee.core.Downloads> { error("no downloads") }
+val LocalRemote = staticCompositionLocalOf<app.marquee.core.RemoteReceiver> { error("no remote") }
 
 /** Server → sign-in → app. */
 @Composable
-fun MarqueeRoot(marquee: Marquee, music: app.marquee.music.MusicController, downloads: app.marquee.core.Downloads) {
+fun MarqueeRoot(marquee: Marquee, music: app.marquee.music.MusicController, downloads: app.marquee.core.Downloads, remote: app.marquee.core.RemoteReceiver) {
     val state by marquee.state.collectAsState()
     LaunchedEffect(Unit) { if (marquee.server != null) marquee.reconnect() }
     // Signed in (even offline): resume downloads and send plays made offline.
     LaunchedEffect(state) { if (state == Marquee.State.SignedIn) downloads.attach() }
-    CompositionLocalProvider(LocalMarquee provides marquee, LocalMusic provides music, LocalDownloads provides downloads) {
+    CompositionLocalProvider(LocalMarquee provides marquee, LocalMusic provides music, LocalDownloads provides downloads, LocalRemote provides remote) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             when (state) {
                 Marquee.State.NoServer -> ConnectScreen()

@@ -34,6 +34,7 @@ import {
 } from "./MusicPlayer";
 import type { Entry } from "./queue";
 import { EqualizerSheet } from "./Equalizer";
+import { PlayOnButton } from "../remote/PlayOn";
 
 export function fmtTime(s: number) {
   if (!isFinite(s) || s < 0) return "0:00";
@@ -447,6 +448,16 @@ export function NowPlaying() {
           )}
         </div>
         <SleepMenu />
+        <PlayOnButton
+          itemIds={m.queue.entries.map((e) => e.item.id)}
+          index={m.queue.index}
+          startMs={() => Math.round(m.time * 1000)}
+          onHandoff={() => {
+            if (m.playing) m.toggle();
+            m.setExpanded(false);
+          }}
+          className="rounded-full p-2 hover:bg-white/10"
+        />
         <button
           onClick={() => setEqOpen(true)}
           className={clsx(

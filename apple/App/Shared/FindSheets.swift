@@ -7,6 +7,8 @@ struct SubtitleSearchSheet: View {
     @Environment(\.dismiss) private var dismiss
     let itemID: Int64
     let onAdded: (Int64) -> Void
+    /// A Bazarr subtitle has had time to arrive (META-12).
+    var onBazarr: () -> Void = {}
     @State private var language = "en"
     @State private var results: [Schemas.SubtitleResult]?
     @State private var error: String?
@@ -20,33 +22,39 @@ struct SubtitleSearchSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Picker("Language", selection: $language) {
-                    ForEach(languages, id: \.0) { Text($0.1).tag($0.0) }
-                }
-                if let error { Text(error).foregroundStyle(.red) }
-                if let results {
-                    if results.isEmpty { Text("No subtitles found in this language.").foregroundStyle(.secondary) }
-                    ForEach(results, id: \.fileId) { r in
-                        Button { download(r) } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(r.release.isEmpty ? (r.fileName ?? "Subtitle") : r.release).lineLimit(2)
-                                    HStack(spacing: 10) {
-                                        Text("\(r.downloads.formatted()) downloads")
-                                        if r.hashMatch { Label("Made for this file", systemImage: "checkmark.seal.fill").foregroundStyle(.green) }
-                                        if r.hearingImpaired { Text("SDH") }
-                                        if r.aiTranslated { Text("Machine translated").foregroundStyle(.orange) }
-                                    }
-                                    .font(.caption).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                if busy == r.fileId { ProgressView() } else { Image(systemName: "arrow.down.circle") }
-                            }
-                        }
-                        .disabled(busy != nil)
+                #if os(iOS)
+                // Bazarr first, when it manages this title (META-12).
+                BazarrPanel(itemID: itemID, onArrived: onBazarr)
+                #endif
+                Section("OpenSubtitles") {
+                    Picker("Language", selection: $language) {
+                        ForEach(languages, id: \.0) { Text($0.1).tag($0.0) }
                     }
-                } else if error == nil {
-                    ProgressView()
+                    if let error { Text(error).foregroundStyle(.red) }
+                    if let results {
+                        if results.isEmpty { Text("No subtitles found in this language.").foregroundStyle(.secondary) }
+                        ForEach(results, id: \.fileId) { r in
+                            Button { download(r) } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(r.release.isEmpty ? (r.fileName ?? "Subtitle") : r.release).lineLimit(2)
+                                        HStack(spacing: 10) {
+                                            Text("\(r.downloads.formatted()) downloads")
+                                            if r.hashMatch { Label("Made for this file", systemImage: "checkmark.seal.fill").foregroundStyle(.green) }
+                                            if r.hearingImpaired { Text("SDH") }
+                                            if r.aiTranslated { Text("Machine translated").foregroundStyle(.orange) }
+                                        }
+                                        .font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    if busy == r.fileId { ProgressView() } else { Image(systemName: "arrow.down.circle") }
+                                }
+                            }
+                            .disabled(busy != nil)
+                        }
+                    } else if error == nil {
+                        ProgressView()
+                    }
                 }
             }
             .navigationTitle("Find Subtitles")

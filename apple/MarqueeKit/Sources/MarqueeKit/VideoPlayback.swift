@@ -138,6 +138,7 @@ public final class VideoPlayback {
             guard let url = app.absolute(s.url) else { throw MarqueeError("Bad stream address") }
             let playerItem = AVPlayerItem(url: url)
             playerItem.preferredForwardBufferDuration = app.isRemote ? 30 : 10
+            playerItem.textStyleRules = app.subtitleStyle.textStyleRules // PLAY-20
             observe(playerItem)
             player.replaceCurrentItem(with: playerItem)
             if s.startMs > 0 { await player.seek(to: CMTime(seconds: Double(s.startMs) / 1000, preferredTimescale: 600)) }
@@ -184,6 +185,7 @@ public final class VideoPlayback {
         offlineTitle = downloads.entries[itemID]?.item.title
         if app.client != nil { item = try? await app.item(itemID) }
         let playerItem = AVPlayerItem(url: file)
+        playerItem.textStyleRules = app.subtitleStyle.textStyleRules
         observe(playerItem)
         player.replaceCurrentItem(with: playerItem)
         let resume = downloads.resumePosition(itemID)

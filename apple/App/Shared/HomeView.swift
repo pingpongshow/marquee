@@ -53,8 +53,11 @@ struct HomeView: View {
                 }
                 #if os(tvOS)
                 if loaded {
-                    Button { editing = true } label: { Label("Edit Home", systemImage: "slider.horizontal.3") }
-                        .padding(.horizontal, sidePadding)
+                    HStack(spacing: 30) {
+                        Button { editing = true } label: { Label("Edit Home", systemImage: "slider.horizontal.3") }
+                        NavigationLink(value: Route.museVideo(library: nil)) { Label("Muse", systemImage: "sparkles") }
+                    }
+                    .padding(.horizontal, sidePadding)
                 }
                 #endif
             }
@@ -63,6 +66,10 @@ struct HomeView: View {
         .navigationTitle("Home")
         #if os(iOS)
         .toolbar {
+            // Muse for movies and shows (USER-15).
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink(value: Route.museVideo(library: nil)) { Label("Muse", systemImage: "sparkles") }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { editing = true } label: { Label("Edit Home", systemImage: "slider.horizontal.3") }
             }
@@ -102,7 +109,9 @@ struct HomeView: View {
     #endif
 
     /// Where a row's title leads: its library, or a pinned collection or playlist (USER-12).
+    /// Recommendations (USER-16) have no "see all".
     private func destination(_ hub: Hub) -> Route? {
+        if hub.id == "recommended" || hub.id.hasPrefix("because-") { return nil }
         if hub.id.hasPrefix("collection-"), let id = Int64(hub.id.dropFirst("collection-".count)) { return .item(id) }
         if hub.id.hasPrefix("playlist-"), let id = Int64(hub.id.dropFirst("playlist-".count)) { return .playlist(id) }
         return hub.libraryId.map { .library($0) }

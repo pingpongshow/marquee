@@ -26,8 +26,16 @@ struct SettingsView: View {
                     NavigationLink("Requests") { RequestApprovalsView() }
                     NavigationLink("Users and Friends") { UsersView() }
                     NavigationLink("Cinema Trailers") { CinemaSettingsView() }
+                    #if os(iOS)
+                    NavigationLink("Library Health") { LibraryHealthView() }
+                    NavigationLink("Integrations") { IntegrationsView() }
+                    #endif
                 }
                 NavigationLink("Edit Home") { HomeEditView() }
+                NavigationLink("Subtitle Appearance") { SubtitleAppearanceView() }
+                #if os(iOS)
+                NavigationLink("Remote Control") { RemotePlayersView() }
+                #endif
                 Button("Switch Profile") { switching = true }
                 Button("Sign Out", role: .destructive) { Task { await app.signOut() } }
             }

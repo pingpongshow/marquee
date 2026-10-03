@@ -47,6 +47,14 @@ const AccountPage = lazyRouteComponent(
   () => import("@/features/users/AccountPage"),
   "AccountPage",
 );
+const RemotePage = lazyRouteComponent(
+  () => import("@/features/remote/RemotePage"),
+  "RemotePage",
+);
+const RecapPage = lazyRouteComponent(
+  () => import("@/features/music/Recap"),
+  "RecapPage",
+);
 const SettingsLayout = lazyRouteComponent(
   () => import("@/features/settings/SettingsLayout"),
   "SettingsLayout",
@@ -114,8 +122,12 @@ const itemRoute = createRoute({
 const searchRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/search",
-  validateSearch: (s: Record<string, unknown>) => ({
+  validateSearch: (
+    s: Record<string, unknown>,
+  ): { q: string; mode?: "muse"; lib?: number } => ({
     q: typeof s.q === "string" ? s.q : "",
+    mode: s.mode === "muse" ? "muse" : undefined, // Muse for movies and shows (USER-15)
+    lib: typeof s.lib === "number" ? s.lib : undefined,
   }),
   component: SearchPage,
 });
@@ -186,6 +198,25 @@ const accountRoute = createRoute({
   component: AccountPage,
 });
 
+// Remote control (USER-14): the player list, or one player's controls (?d=deviceId).
+const remoteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/remote",
+  validateSearch: (s: Record<string, unknown>): { d?: number } => ({
+    d: typeof s.d === "number" ? s.d : undefined,
+  }),
+  component: RemotePage,
+});
+// Year in Music (MUSIC-22).
+const recapRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/recap",
+  validateSearch: (s: Record<string, unknown>): { year?: number } => ({
+    year: typeof s.year === "number" ? s.year : undefined,
+  }),
+  component: RecapPage,
+});
+
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
@@ -215,6 +246,8 @@ const routeTree = rootRoute.addChildren([
   itemRoute,
   searchRoute,
   accountRoute,
+  remoteRoute,
+  recapRoute,
   playlistsRoute,
   playlistRoute,
   personRoute,

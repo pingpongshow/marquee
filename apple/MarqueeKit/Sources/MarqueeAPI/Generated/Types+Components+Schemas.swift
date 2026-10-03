@@ -550,6 +550,8 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/UserPreferences/cinemaTrailers`.
             public var cinemaTrailers: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/UserPreferences/subtitleStyle`.
+            public var subtitleStyle: Components.Schemas.SubtitleStyle?
             /// Creates a new `UserPreferences`.
             ///
             /// - Parameters:
@@ -559,13 +561,15 @@ extension Components {
             ///   - localQualityKbps: 0 = original
             ///   - remoteQualityKbps: 0 = automatic
             ///   - cinemaTrailers: Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true.
+            ///   - subtitleStyle:
             public init(
                 audioLanguage: Swift.String? = nil,
                 subtitleLanguage: Swift.String? = nil,
                 subtitleMode: Components.Schemas.UserPreferences.SubtitleModePayload? = nil,
                 localQualityKbps: Swift.Int? = nil,
                 remoteQualityKbps: Swift.Int? = nil,
-                cinemaTrailers: Swift.Bool? = nil
+                cinemaTrailers: Swift.Bool? = nil,
+                subtitleStyle: Components.Schemas.SubtitleStyle? = nil
             ) {
                 self.audioLanguage = audioLanguage
                 self.subtitleLanguage = subtitleLanguage
@@ -573,6 +577,7 @@ extension Components {
                 self.localQualityKbps = localQualityKbps
                 self.remoteQualityKbps = remoteQualityKbps
                 self.cinemaTrailers = cinemaTrailers
+                self.subtitleStyle = subtitleStyle
             }
             public enum CodingKeys: String, CodingKey {
                 case audioLanguage
@@ -581,6 +586,7 @@ extension Components {
                 case localQualityKbps
                 case remoteQualityKbps
                 case cinemaTrailers
+                case subtitleStyle
             }
         }
         /// - Remark: Generated from `#/components/schemas/UserCreate`.
@@ -2854,6 +2860,12 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/IntegrationSettings/lastFmConfigured`.
             public var lastFmConfigured: Swift.Bool?
+            /// Bazarr's address, e.g. http://127.0.0.1:6767. Empty turns the Bazarr integration off (META-12).
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/bazarrUrl`.
+            public var bazarrUrl: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/bazarrApiKeySet`.
+            public var bazarrApiKeySet: Swift.Bool?
             /// Minutes recordings start early.
             ///
             /// - Remark: Generated from `#/components/schemas/IntegrationSettings/dvrPaddingBefore`.
@@ -2870,6 +2882,8 @@ extension Components {
             ///   - seerrUrl: Seerr's address, e.g. http://10.1.1.10:5055. Empty turns requests off.
             ///   - seerrApiKeySet:
             ///   - lastFmConfigured: Last.fm's API key and shared secret are set, so people can connect Last.fm (MUSIC-12).
+            ///   - bazarrUrl: Bazarr's address, e.g. http://127.0.0.1:6767. Empty turns the Bazarr integration off (META-12).
+            ///   - bazarrApiKeySet:
             ///   - dvrPaddingBefore: Minutes recordings start early.
             ///   - dvrPaddingAfter: Minutes recordings run late.
             ///   - liveTvSources:
@@ -2877,6 +2891,8 @@ extension Components {
                 seerrUrl: Swift.String? = nil,
                 seerrApiKeySet: Swift.Bool? = nil,
                 lastFmConfigured: Swift.Bool? = nil,
+                bazarrUrl: Swift.String? = nil,
+                bazarrApiKeySet: Swift.Bool? = nil,
                 dvrPaddingBefore: Swift.Int? = nil,
                 dvrPaddingAfter: Swift.Int? = nil,
                 liveTvSources: [Components.Schemas.LiveTvSource]? = nil
@@ -2884,6 +2900,8 @@ extension Components {
                 self.seerrUrl = seerrUrl
                 self.seerrApiKeySet = seerrApiKeySet
                 self.lastFmConfigured = lastFmConfigured
+                self.bazarrUrl = bazarrUrl
+                self.bazarrApiKeySet = bazarrApiKeySet
                 self.dvrPaddingBefore = dvrPaddingBefore
                 self.dvrPaddingAfter = dvrPaddingAfter
                 self.liveTvSources = liveTvSources
@@ -2892,6 +2910,8 @@ extension Components {
                 case seerrUrl
                 case seerrApiKeySet
                 case lastFmConfigured
+                case bazarrUrl
+                case bazarrApiKeySet
                 case dvrPaddingBefore
                 case dvrPaddingAfter
                 case liveTvSources
@@ -2913,6 +2933,12 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/lastFmSecret`.
             public var lastFmSecret: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/bazarrUrl`.
+            public var bazarrUrl: Swift.String?
+            /// Bazarr's API key (Settings → General in Bazarr). Write-only.
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/bazarrApiKey`.
+            public var bazarrApiKey: Swift.String?
             /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/dvrPaddingBefore`.
             public var dvrPaddingBefore: Swift.Int?
             /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/dvrPaddingAfter`.
@@ -2928,6 +2954,8 @@ extension Components {
             ///   - seerrApiKey: Write-only.
             ///   - lastFmApiKey: Last.fm API key. Write-only; empty turns Last.fm off.
             ///   - lastFmSecret: Last.fm shared secret. Write-only.
+            ///   - bazarrUrl:
+            ///   - bazarrApiKey: Bazarr's API key (Settings → General in Bazarr). Write-only.
             ///   - dvrPaddingBefore:
             ///   - dvrPaddingAfter:
             ///   - liveTvSources: Replaces the whole list when sent.
@@ -2936,6 +2964,8 @@ extension Components {
                 seerrApiKey: Swift.String? = nil,
                 lastFmApiKey: Swift.String? = nil,
                 lastFmSecret: Swift.String? = nil,
+                bazarrUrl: Swift.String? = nil,
+                bazarrApiKey: Swift.String? = nil,
                 dvrPaddingBefore: Swift.Int? = nil,
                 dvrPaddingAfter: Swift.Int? = nil,
                 liveTvSources: [Components.Schemas.LiveTvSource]? = nil
@@ -2944,6 +2974,8 @@ extension Components {
                 self.seerrApiKey = seerrApiKey
                 self.lastFmApiKey = lastFmApiKey
                 self.lastFmSecret = lastFmSecret
+                self.bazarrUrl = bazarrUrl
+                self.bazarrApiKey = bazarrApiKey
                 self.dvrPaddingBefore = dvrPaddingBefore
                 self.dvrPaddingAfter = dvrPaddingAfter
                 self.liveTvSources = liveTvSources
@@ -2953,6 +2985,8 @@ extension Components {
                 case seerrApiKey
                 case lastFmApiKey
                 case lastFmSecret
+                case bazarrUrl
+                case bazarrApiKey
                 case dvrPaddingBefore
                 case dvrPaddingAfter
                 case liveTvSources
@@ -5011,6 +5045,1057 @@ extension Components {
                 case libraries
             }
         }
+        /// How text subtitles look (PLAY-20), for this person on every app and in burned-in subtitles. Styled ASS subtitles keep their own look. Absent fields use the defaults.
+        ///
+        /// - Remark: Generated from `#/components/schemas/SubtitleStyle`.
+        public struct SubtitleStyle: Codable, Hashable, Sendable {
+            /// Default medium.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitleStyle/size`.
+            @frozen public enum SizePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case small = "small"
+                case medium = "medium"
+                case large = "large"
+                case huge = "huge"
+            }
+            /// Default medium.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitleStyle/size`.
+            public var size: Components.Schemas.SubtitleStyle.SizePayload?
+            /// Text colour, default #FFFFFF.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitleStyle/color`.
+            public var color: Swift.String?
+            /// none = drop shadow only; outline = black edge (default); translucent / opaque = a box behind the text.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitleStyle/background`.
+            @frozen public enum BackgroundPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case none = "none"
+                case outline = "outline"
+                case translucent = "translucent"
+                case opaque = "opaque"
+            }
+            /// none = drop shadow only; outline = black edge (default); translucent / opaque = a box behind the text.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitleStyle/background`.
+            public var background: Components.Schemas.SubtitleStyle.BackgroundPayload?
+            /// raised lifts subtitles above the player's controls and lower-third captions.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitleStyle/position`.
+            @frozen public enum PositionPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case bottom = "bottom"
+                case raised = "raised"
+            }
+            /// raised lifts subtitles above the player's controls and lower-third captions.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitleStyle/position`.
+            public var position: Components.Schemas.SubtitleStyle.PositionPayload?
+            /// Creates a new `SubtitleStyle`.
+            ///
+            /// - Parameters:
+            ///   - size: Default medium.
+            ///   - color: Text colour, default #FFFFFF.
+            ///   - background: none = drop shadow only; outline = black edge (default); translucent / opaque = a box behind the text.
+            ///   - position: raised lifts subtitles above the player's controls and lower-third captions.
+            public init(
+                size: Components.Schemas.SubtitleStyle.SizePayload? = nil,
+                color: Swift.String? = nil,
+                background: Components.Schemas.SubtitleStyle.BackgroundPayload? = nil,
+                position: Components.Schemas.SubtitleStyle.PositionPayload? = nil
+            ) {
+                self.size = size
+                self.color = color
+                self.background = background
+                self.position = position
+            }
+            public enum CodingKeys: String, CodingKey {
+                case size
+                case color
+                case background
+                case position
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/BazarrSubtitleLanguage`.
+        public struct BazarrSubtitleLanguage: Codable, Hashable, Sendable {
+            /// ISO 639-1, e.g. en
+            ///
+            /// - Remark: Generated from `#/components/schemas/BazarrSubtitleLanguage/code2`.
+            public var code2: Swift.String
+            /// - Remark: Generated from `#/components/schemas/BazarrSubtitleLanguage/code3`.
+            public var code3: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/BazarrSubtitleLanguage/name`.
+            public var name: Swift.String
+            /// - Remark: Generated from `#/components/schemas/BazarrSubtitleLanguage/forced`.
+            public var forced: Swift.Bool
+            /// Hearing impaired.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BazarrSubtitleLanguage/hi`.
+            public var hi: Swift.Bool
+            /// A subtitle for this language exists (false = wanted by the item's Bazarr language profile).
+            ///
+            /// - Remark: Generated from `#/components/schemas/BazarrSubtitleLanguage/have`.
+            public var have: Swift.Bool
+            /// Creates a new `BazarrSubtitleLanguage`.
+            ///
+            /// - Parameters:
+            ///   - code2: ISO 639-1, e.g. en
+            ///   - code3:
+            ///   - name:
+            ///   - forced:
+            ///   - hi: Hearing impaired.
+            ///   - have: A subtitle for this language exists (false = wanted by the item's Bazarr language profile).
+            public init(
+                code2: Swift.String,
+                code3: Swift.String? = nil,
+                name: Swift.String,
+                forced: Swift.Bool,
+                hi: Swift.Bool,
+                have: Swift.Bool
+            ) {
+                self.code2 = code2
+                self.code3 = code3
+                self.name = name
+                self.forced = forced
+                self.hi = hi
+                self.have = have
+            }
+            public enum CodingKeys: String, CodingKey {
+                case code2
+                case code3
+                case name
+                case forced
+                case hi
+                case have
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/BazarrStatus`.
+        public struct BazarrStatus: Codable, Hashable, Sendable {
+            /// Bazarr is set up on this server.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BazarrStatus/configured`.
+            public var configured: Swift.Bool
+            /// Bazarr knows this movie or episode.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BazarrStatus/managed`.
+            public var managed: Swift.Bool
+            /// Subtitles it has and the ones its language profile still wants.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BazarrStatus/languages`.
+            public var languages: [Components.Schemas.BazarrSubtitleLanguage]
+            /// Why Bazarr couldn't be asked (e.g. unreachable).
+            ///
+            /// - Remark: Generated from `#/components/schemas/BazarrStatus/error`.
+            public var error: Swift.String?
+            /// Creates a new `BazarrStatus`.
+            ///
+            /// - Parameters:
+            ///   - configured: Bazarr is set up on this server.
+            ///   - managed: Bazarr knows this movie or episode.
+            ///   - languages: Subtitles it has and the ones its language profile still wants.
+            ///   - error: Why Bazarr couldn't be asked (e.g. unreachable).
+            public init(
+                configured: Swift.Bool,
+                managed: Swift.Bool,
+                languages: [Components.Schemas.BazarrSubtitleLanguage],
+                error: Swift.String? = nil
+            ) {
+                self.configured = configured
+                self.managed = managed
+                self.languages = languages
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case configured
+                case managed
+                case languages
+                case error
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/BazarrDownloadRequest`.
+        public struct BazarrDownloadRequest: Codable, Hashable, Sendable {
+            /// ISO 639-1 code, e.g. en
+            ///
+            /// - Remark: Generated from `#/components/schemas/BazarrDownloadRequest/language`.
+            public var language: Swift.String
+            /// - Remark: Generated from `#/components/schemas/BazarrDownloadRequest/forced`.
+            public var forced: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/BazarrDownloadRequest/hi`.
+            public var hi: Swift.Bool?
+            /// Creates a new `BazarrDownloadRequest`.
+            ///
+            /// - Parameters:
+            ///   - language: ISO 639-1 code, e.g. en
+            ///   - forced:
+            ///   - hi:
+            public init(
+                language: Swift.String,
+                forced: Swift.Bool? = nil,
+                hi: Swift.Bool? = nil
+            ) {
+                self.language = language
+                self.forced = forced
+                self.hi = hi
+            }
+            public enum CodingKeys: String, CodingKey {
+                case language
+                case forced
+                case hi
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/BazarrCandidate`.
+        public struct BazarrCandidate: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/BazarrCandidate/provider`.
+            public var provider: Swift.String
+            /// Bazarr's opaque handle for this result; send it back to download it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BazarrCandidate/subtitle`.
+            public var subtitle: Swift.String
+            /// - Remark: Generated from `#/components/schemas/BazarrCandidate/language`.
+            public var language: Swift.String
+            /// The release names it was made for.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BazarrCandidate/release`.
+            public var release: Swift.String?
+            /// Bazarr's match score (higher is better; hash matches are best).
+            ///
+            /// - Remark: Generated from `#/components/schemas/BazarrCandidate/score`.
+            public var score: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/BazarrCandidate/hi`.
+            public var hi: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/BazarrCandidate/forced`.
+            public var forced: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/BazarrCandidate/uploader`.
+            public var uploader: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/BazarrCandidate/originalFormat`.
+            public var originalFormat: Swift.Bool?
+            /// Creates a new `BazarrCandidate`.
+            ///
+            /// - Parameters:
+            ///   - provider:
+            ///   - subtitle: Bazarr's opaque handle for this result; send it back to download it.
+            ///   - language:
+            ///   - release: The release names it was made for.
+            ///   - score: Bazarr's match score (higher is better; hash matches are best).
+            ///   - hi:
+            ///   - forced:
+            ///   - uploader:
+            ///   - originalFormat:
+            public init(
+                provider: Swift.String,
+                subtitle: Swift.String,
+                language: Swift.String,
+                release: Swift.String? = nil,
+                score: Swift.Int,
+                hi: Swift.Bool? = nil,
+                forced: Swift.Bool? = nil,
+                uploader: Swift.String? = nil,
+                originalFormat: Swift.Bool? = nil
+            ) {
+                self.provider = provider
+                self.subtitle = subtitle
+                self.language = language
+                self.release = release
+                self.score = score
+                self.hi = hi
+                self.forced = forced
+                self.uploader = uploader
+                self.originalFormat = originalFormat
+            }
+            public enum CodingKeys: String, CodingKey {
+                case provider
+                case subtitle
+                case language
+                case release
+                case score
+                case hi
+                case forced
+                case uploader
+                case originalFormat
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/BazarrPick`.
+        public struct BazarrPick: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/BazarrPick/provider`.
+            public var provider: Swift.String
+            /// - Remark: Generated from `#/components/schemas/BazarrPick/subtitle`.
+            public var subtitle: Swift.String
+            /// - Remark: Generated from `#/components/schemas/BazarrPick/hi`.
+            public var hi: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/BazarrPick/forced`.
+            public var forced: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/BazarrPick/originalFormat`.
+            public var originalFormat: Swift.Bool?
+            /// Creates a new `BazarrPick`.
+            ///
+            /// - Parameters:
+            ///   - provider:
+            ///   - subtitle:
+            ///   - hi:
+            ///   - forced:
+            ///   - originalFormat:
+            public init(
+                provider: Swift.String,
+                subtitle: Swift.String,
+                hi: Swift.Bool? = nil,
+                forced: Swift.Bool? = nil,
+                originalFormat: Swift.Bool? = nil
+            ) {
+                self.provider = provider
+                self.subtitle = subtitle
+                self.hi = hi
+                self.forced = forced
+                self.originalFormat = originalFormat
+            }
+            public enum CodingKeys: String, CodingKey {
+                case provider
+                case subtitle
+                case hi
+                case forced
+                case originalFormat
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RemoteCapability`.
+        @frozen public enum RemoteCapability: String, Codable, Hashable, Sendable, CaseIterable {
+            case video = "video"
+            case music = "music"
+        }
+        /// What a device is playing, as it reports it (USER-14).
+        ///
+        /// - Remark: Generated from `#/components/schemas/RemotePlayerState`.
+        public struct RemotePlayerState: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/RemotePlayerState/state`.
+            @frozen public enum StatePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case idle = "idle"
+                case playing = "playing"
+                case paused = "paused"
+                case buffering = "buffering"
+                case stopped = "stopped"
+            }
+            /// - Remark: Generated from `#/components/schemas/RemotePlayerState/state`.
+            public var state: Components.Schemas.RemotePlayerState.StatePayload
+            /// - Remark: Generated from `#/components/schemas/RemotePlayerState/itemId`.
+            public var itemId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/RemotePlayerState/itemType`.
+            public var itemType: Components.Schemas.ItemType?
+            /// - Remark: Generated from `#/components/schemas/RemotePlayerState/title`.
+            public var title: Swift.String?
+            /// Artist, or show and episode.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RemotePlayerState/subtitle`.
+            public var subtitle: Swift.String?
+            /// The item whose poster/cover to show.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RemotePlayerState/artItemId`.
+            public var artItemId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/RemotePlayerState/positionMs`.
+            public var positionMs: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/RemotePlayerState/durationMs`.
+            public var durationMs: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/RemotePlayerState/queueIndex`.
+            public var queueIndex: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/RemotePlayerState/queueLength`.
+            public var queueLength: Swift.Int?
+            /// The app's own volume when it has one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RemotePlayerState/volume`.
+            public var volume: Swift.Double?
+            /// - Remark: Generated from `#/components/schemas/RemotePlayerState/audioStreamId`.
+            public var audioStreamId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/RemotePlayerState/subtitleStreamId`.
+            public var subtitleStreamId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/RemotePlayerState/shuffle`.
+            public var shuffle: Swift.Bool?
+            /// Creates a new `RemotePlayerState`.
+            ///
+            /// - Parameters:
+            ///   - state:
+            ///   - itemId:
+            ///   - itemType:
+            ///   - title:
+            ///   - subtitle: Artist, or show and episode.
+            ///   - artItemId: The item whose poster/cover to show.
+            ///   - positionMs:
+            ///   - durationMs:
+            ///   - queueIndex:
+            ///   - queueLength:
+            ///   - volume: The app's own volume when it has one.
+            ///   - audioStreamId:
+            ///   - subtitleStreamId:
+            ///   - shuffle:
+            public init(
+                state: Components.Schemas.RemotePlayerState.StatePayload,
+                itemId: Swift.Int64? = nil,
+                itemType: Components.Schemas.ItemType? = nil,
+                title: Swift.String? = nil,
+                subtitle: Swift.String? = nil,
+                artItemId: Swift.Int64? = nil,
+                positionMs: Swift.Int64,
+                durationMs: Swift.Int64? = nil,
+                queueIndex: Swift.Int? = nil,
+                queueLength: Swift.Int? = nil,
+                volume: Swift.Double? = nil,
+                audioStreamId: Swift.Int64? = nil,
+                subtitleStreamId: Swift.Int64? = nil,
+                shuffle: Swift.Bool? = nil
+            ) {
+                self.state = state
+                self.itemId = itemId
+                self.itemType = itemType
+                self.title = title
+                self.subtitle = subtitle
+                self.artItemId = artItemId
+                self.positionMs = positionMs
+                self.durationMs = durationMs
+                self.queueIndex = queueIndex
+                self.queueLength = queueLength
+                self.volume = volume
+                self.audioStreamId = audioStreamId
+                self.subtitleStreamId = subtitleStreamId
+                self.shuffle = shuffle
+            }
+            public enum CodingKeys: String, CodingKey {
+                case state
+                case itemId
+                case itemType
+                case title
+                case subtitle
+                case artItemId
+                case positionMs
+                case durationMs
+                case queueIndex
+                case queueLength
+                case volume
+                case audioStreamId
+                case subtitleStreamId
+                case shuffle
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RemotePlayer`.
+        public struct RemotePlayer: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/RemotePlayer/deviceId`.
+            public var deviceId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/RemotePlayer/name`.
+            public var name: Swift.String
+            /// - Remark: Generated from `#/components/schemas/RemotePlayer/platform`.
+            public var platform: Swift.String
+            /// - Remark: Generated from `#/components/schemas/RemotePlayer/userId`.
+            public var userId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/RemotePlayer/userName`.
+            public var userName: Swift.String
+            /// - Remark: Generated from `#/components/schemas/RemotePlayer/capabilities`.
+            public var capabilities: [Components.Schemas.RemoteCapability]
+            /// - Remark: Generated from `#/components/schemas/RemotePlayer/state`.
+            public var state: Components.Schemas.RemotePlayerState?
+            /// Changes whenever the state does; pass it as ?since= to wait for the next change.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RemotePlayer/version`.
+            public var version: Swift.Int64
+            /// Creates a new `RemotePlayer`.
+            ///
+            /// - Parameters:
+            ///   - deviceId:
+            ///   - name:
+            ///   - platform:
+            ///   - userId:
+            ///   - userName:
+            ///   - capabilities:
+            ///   - state:
+            ///   - version: Changes whenever the state does; pass it as ?since= to wait for the next change.
+            public init(
+                deviceId: Swift.Int64,
+                name: Swift.String,
+                platform: Swift.String,
+                userId: Swift.Int64,
+                userName: Swift.String,
+                capabilities: [Components.Schemas.RemoteCapability],
+                state: Components.Schemas.RemotePlayerState? = nil,
+                version: Swift.Int64
+            ) {
+                self.deviceId = deviceId
+                self.name = name
+                self.platform = platform
+                self.userId = userId
+                self.userName = userName
+                self.capabilities = capabilities
+                self.state = state
+                self.version = version
+            }
+            public enum CodingKeys: String, CodingKey {
+                case deviceId
+                case name
+                case platform
+                case userId
+                case userName
+                case capabilities
+                case state
+                case version
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RemoteCommand`.
+        public struct RemoteCommand: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/RemoteCommand/type`.
+            @frozen public enum _TypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case play = "play"
+                case pause = "pause"
+                case resume = "resume"
+                case seek = "seek"
+                case stop = "stop"
+                case next = "next"
+                case previous = "previous"
+                case setAudio = "setAudio"
+                case setSubtitle = "setSubtitle"
+                case setVolume = "setVolume"
+            }
+            /// - Remark: Generated from `#/components/schemas/RemoteCommand/type`.
+            public var _type: Components.Schemas.RemoteCommand._TypePayload
+            /// play: what to play. One item plays it (an album, show, playlist item or track: the device expands it the way its own Play button would); several tracks are played as a queue.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RemoteCommand/itemIds`.
+            public var itemIds: [Swift.Int64]?
+            /// play: start at this entry of itemIds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RemoteCommand/index`.
+            public var index: Swift.Int?
+            /// play: start here (omit to resume).
+            ///
+            /// - Remark: Generated from `#/components/schemas/RemoteCommand/startMs`.
+            public var startMs: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/RemoteCommand/shuffle`.
+            public var shuffle: Swift.Bool?
+            /// seek target.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RemoteCommand/positionMs`.
+            public var positionMs: Swift.Int64?
+            /// setAudio / setSubtitle (-1 = subtitles off).
+            ///
+            /// - Remark: Generated from `#/components/schemas/RemoteCommand/streamId`.
+            public var streamId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/RemoteCommand/volume`.
+            public var volume: Swift.Double?
+            /// The controlling device's name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RemoteCommand/from`.
+            public var from: Swift.String?
+            /// Creates a new `RemoteCommand`.
+            ///
+            /// - Parameters:
+            ///   - _type:
+            ///   - itemIds: play: what to play. One item plays it (an album, show, playlist item or track: the device expands it the way its own Play button would); several tracks are played as a queue.
+            ///   - index: play: start at this entry of itemIds.
+            ///   - startMs: play: start here (omit to resume).
+            ///   - shuffle:
+            ///   - positionMs: seek target.
+            ///   - streamId: setAudio / setSubtitle (-1 = subtitles off).
+            ///   - volume:
+            ///   - from: The controlling device's name.
+            public init(
+                _type: Components.Schemas.RemoteCommand._TypePayload,
+                itemIds: [Swift.Int64]? = nil,
+                index: Swift.Int? = nil,
+                startMs: Swift.Int64? = nil,
+                shuffle: Swift.Bool? = nil,
+                positionMs: Swift.Int64? = nil,
+                streamId: Swift.Int64? = nil,
+                volume: Swift.Double? = nil,
+                from: Swift.String? = nil
+            ) {
+                self._type = _type
+                self.itemIds = itemIds
+                self.index = index
+                self.startMs = startMs
+                self.shuffle = shuffle
+                self.positionMs = positionMs
+                self.streamId = streamId
+                self.volume = volume
+                self.from = from
+            }
+            public enum CodingKeys: String, CodingKey {
+                case _type = "type"
+                case itemIds
+                case index
+                case startMs
+                case shuffle
+                case positionMs
+                case streamId
+                case volume
+                case from
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RemoteInboxRequest`.
+        public struct RemoteInboxRequest: Codable, Hashable, Sendable {
+            /// The cursor from the last answer; 0 the first time.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RemoteInboxRequest/cursor`.
+            public var cursor: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/RemoteInboxRequest/capabilities`.
+            public var capabilities: [Components.Schemas.RemoteCapability]
+            /// - Remark: Generated from `#/components/schemas/RemoteInboxRequest/state`.
+            public var state: Components.Schemas.RemotePlayerState?
+            /// Creates a new `RemoteInboxRequest`.
+            ///
+            /// - Parameters:
+            ///   - cursor: The cursor from the last answer; 0 the first time.
+            ///   - capabilities:
+            ///   - state:
+            public init(
+                cursor: Swift.Int64? = nil,
+                capabilities: [Components.Schemas.RemoteCapability],
+                state: Components.Schemas.RemotePlayerState? = nil
+            ) {
+                self.cursor = cursor
+                self.capabilities = capabilities
+                self.state = state
+            }
+            public enum CodingKeys: String, CodingKey {
+                case cursor
+                case capabilities
+                case state
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RemoteInbox`.
+        public struct RemoteInbox: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/RemoteInbox/cursor`.
+            public var cursor: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/RemoteInbox/commands`.
+            public var commands: [Components.Schemas.RemoteCommand]
+            /// Creates a new `RemoteInbox`.
+            ///
+            /// - Parameters:
+            ///   - cursor:
+            ///   - commands:
+            public init(
+                cursor: Swift.Int64,
+                commands: [Components.Schemas.RemoteCommand]
+            ) {
+                self.cursor = cursor
+                self.commands = commands
+            }
+            public enum CodingKeys: String, CodingKey {
+                case cursor
+                case commands
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RecapEntry`.
+        public struct RecapEntry: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/RecapEntry/item`.
+            public var item: Components.Schemas.ItemSummary
+            /// - Remark: Generated from `#/components/schemas/RecapEntry/plays`.
+            public var plays: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/RecapEntry/minutes`.
+            public var minutes: Swift.Int
+            /// Creates a new `RecapEntry`.
+            ///
+            /// - Parameters:
+            ///   - item:
+            ///   - plays:
+            ///   - minutes:
+            public init(
+                item: Components.Schemas.ItemSummary,
+                plays: Swift.Int,
+                minutes: Swift.Int
+            ) {
+                self.item = item
+                self.plays = plays
+                self.minutes = minutes
+            }
+            public enum CodingKeys: String, CodingKey {
+                case item
+                case plays
+                case minutes
+            }
+        }
+        /// A person's year in music (MUSIC-22), from their play history.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ListeningRecap`.
+        public struct ListeningRecap: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/year`.
+            public var year: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/minutes`.
+            public var minutes: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/plays`.
+            public var plays: Swift.Int
+            /// Different tracks played.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/tracks`.
+            public var tracks: Swift.Int
+            /// Different artists played.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/artists`.
+            public var artists: Swift.Int
+            /// Artists first played this year.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/newArtists`.
+            public var newArtists: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/topArtists`.
+            public var topArtists: [Components.Schemas.RecapEntry]
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/topAlbums`.
+            public var topAlbums: [Components.Schemas.RecapEntry]
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/topTracks`.
+            public var topTracks: [Components.Schemas.RecapEntry]
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/TopGenresPayload`.
+            public struct TopGenresPayloadPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/ListeningRecap/TopGenresPayload/name`.
+                public var name: Swift.String
+                /// - Remark: Generated from `#/components/schemas/ListeningRecap/TopGenresPayload/plays`.
+                public var plays: Swift.Int
+                /// Creates a new `TopGenresPayloadPayload`.
+                ///
+                /// - Parameters:
+                ///   - name:
+                ///   - plays:
+                public init(
+                    name: Swift.String,
+                    plays: Swift.Int
+                ) {
+                    self.name = name
+                    self.plays = plays
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case name
+                    case plays
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/topGenres`.
+            public typealias TopGenresPayload = [Components.Schemas.ListeningRecap.TopGenresPayloadPayload]
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/topGenres`.
+            public var topGenres: Components.Schemas.ListeningRecap.TopGenresPayload
+            /// Minutes listened in each month, January first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/byMonth`.
+            public var byMonth: [Swift.Int]
+            /// Plays started in each hour of the day (server time), 0–23.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/byHour`.
+            public var byHour: [Swift.Int]
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/topDay`.
+            public struct TopDayPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/ListeningRecap/topDay/date`.
+                public var date: Swift.String
+                /// - Remark: Generated from `#/components/schemas/ListeningRecap/topDay/minutes`.
+                public var minutes: Swift.Int
+                /// Creates a new `TopDayPayload`.
+                ///
+                /// - Parameters:
+                ///   - date:
+                ///   - minutes:
+                public init(
+                    date: Swift.String,
+                    minutes: Swift.Int
+                ) {
+                    self.date = date
+                    self.minutes = minutes
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case date
+                    case minutes
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/topDay`.
+            public var topDay: Components.Schemas.ListeningRecap.TopDayPayload?
+            /// Most days in a row with music.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/longestStreakDays`.
+            public var longestStreakDays: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/firstTrack`.
+            public var firstTrack: Components.Schemas.ItemSummary?
+            /// Hours of movies and TV watched the same year.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ListeningRecap/videoHours`.
+            public var videoHours: Swift.Double?
+            /// Creates a new `ListeningRecap`.
+            ///
+            /// - Parameters:
+            ///   - year:
+            ///   - minutes:
+            ///   - plays:
+            ///   - tracks: Different tracks played.
+            ///   - artists: Different artists played.
+            ///   - newArtists: Artists first played this year.
+            ///   - topArtists:
+            ///   - topAlbums:
+            ///   - topTracks:
+            ///   - topGenres:
+            ///   - byMonth: Minutes listened in each month, January first.
+            ///   - byHour: Plays started in each hour of the day (server time), 0–23.
+            ///   - topDay:
+            ///   - longestStreakDays: Most days in a row with music.
+            ///   - firstTrack:
+            ///   - videoHours: Hours of movies and TV watched the same year.
+            public init(
+                year: Swift.Int,
+                minutes: Swift.Int,
+                plays: Swift.Int,
+                tracks: Swift.Int,
+                artists: Swift.Int,
+                newArtists: Swift.Int,
+                topArtists: [Components.Schemas.RecapEntry],
+                topAlbums: [Components.Schemas.RecapEntry],
+                topTracks: [Components.Schemas.RecapEntry],
+                topGenres: Components.Schemas.ListeningRecap.TopGenresPayload,
+                byMonth: [Swift.Int],
+                byHour: [Swift.Int],
+                topDay: Components.Schemas.ListeningRecap.TopDayPayload? = nil,
+                longestStreakDays: Swift.Int,
+                firstTrack: Components.Schemas.ItemSummary? = nil,
+                videoHours: Swift.Double? = nil
+            ) {
+                self.year = year
+                self.minutes = minutes
+                self.plays = plays
+                self.tracks = tracks
+                self.artists = artists
+                self.newArtists = newArtists
+                self.topArtists = topArtists
+                self.topAlbums = topAlbums
+                self.topTracks = topTracks
+                self.topGenres = topGenres
+                self.byMonth = byMonth
+                self.byHour = byHour
+                self.topDay = topDay
+                self.longestStreakDays = longestStreakDays
+                self.firstTrack = firstTrack
+                self.videoHours = videoHours
+            }
+            public enum CodingKeys: String, CodingKey {
+                case year
+                case minutes
+                case plays
+                case tracks
+                case artists
+                case newArtists
+                case topArtists
+                case topAlbums
+                case topTracks
+                case topGenres
+                case byMonth
+                case byHour
+                case topDay
+                case longestStreakDays
+                case firstTrack
+                case videoHours
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/MuseVideoRequest`.
+        public struct MuseVideoRequest: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/MuseVideoRequest/prompt`.
+            public var prompt: Swift.String
+            /// Only this library.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MuseVideoRequest/libraryId`.
+            public var libraryId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/MuseVideoRequest/TypesPayload`.
+            @frozen public enum TypesPayloadPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case movie = "movie"
+                case show = "show"
+            }
+            /// Default movies and shows.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MuseVideoRequest/types`.
+            public typealias TypesPayload = [Components.Schemas.MuseVideoRequest.TypesPayloadPayload]
+            /// Default movies and shows.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MuseVideoRequest/types`.
+            public var types: Components.Schemas.MuseVideoRequest.TypesPayload?
+            /// Default 40.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MuseVideoRequest/limit`.
+            public var limit: Swift.Int?
+            /// Creates a new `MuseVideoRequest`.
+            ///
+            /// - Parameters:
+            ///   - prompt:
+            ///   - libraryId: Only this library.
+            ///   - types: Default movies and shows.
+            ///   - limit: Default 40.
+            public init(
+                prompt: Swift.String,
+                libraryId: Swift.Int64? = nil,
+                types: Components.Schemas.MuseVideoRequest.TypesPayload? = nil,
+                limit: Swift.Int? = nil
+            ) {
+                self.prompt = prompt
+                self.libraryId = libraryId
+                self.types = types
+                self.limit = limit
+            }
+            public enum CodingKeys: String, CodingKey {
+                case prompt
+                case libraryId
+                case types
+                case limit
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/MuseVideoResult`.
+        public struct MuseVideoResult: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/MuseVideoResult/items`.
+            public var items: [Components.Schemas.ItemSummary]
+            /// How the prompt was read, e.g. "Movies · 1990s · Science Fiction · like 'time travel'".
+            ///
+            /// - Remark: Generated from `#/components/schemas/MuseVideoResult/understood`.
+            public var understood: Swift.String
+            /// Share of the library ready for Muse (0–1); below 1 while it's still being indexed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MuseVideoResult/analysed`.
+            public var analysed: Swift.Double?
+            /// Creates a new `MuseVideoResult`.
+            ///
+            /// - Parameters:
+            ///   - items:
+            ///   - understood: How the prompt was read, e.g. "Movies · 1990s · Science Fiction · like 'time travel'".
+            ///   - analysed: Share of the library ready for Muse (0–1); below 1 while it's still being indexed.
+            public init(
+                items: [Components.Schemas.ItemSummary],
+                understood: Swift.String,
+                analysed: Swift.Double? = nil
+            ) {
+                self.items = items
+                self.understood = understood
+                self.analysed = analysed
+            }
+            public enum CodingKeys: String, CodingKey {
+                case items
+                case understood
+                case analysed
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/HealthCheck`.
+        public struct HealthCheck: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/HealthCheck/id`.
+            @frozen public enum IdPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case duplicates = "duplicates"
+                case unmatched = "unmatched"
+                case unavailable = "unavailable"
+                case unplayable = "unplayable"
+                case upgrades = "upgrades"
+                case playbackErrors = "playbackErrors"
+                case missingArtwork = "missingArtwork"
+                case missingSubtitles = "missingSubtitles"
+            }
+            /// - Remark: Generated from `#/components/schemas/HealthCheck/id`.
+            public var id: Components.Schemas.HealthCheck.IdPayload
+            /// - Remark: Generated from `#/components/schemas/HealthCheck/title`.
+            public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/HealthCheck/description`.
+            public var description: Swift.String
+            /// - Remark: Generated from `#/components/schemas/HealthCheck/count`.
+            public var count: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/HealthCheck/severity`.
+            @frozen public enum SeverityPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case info = "info"
+                case warning = "warning"
+                case error = "error"
+            }
+            /// - Remark: Generated from `#/components/schemas/HealthCheck/severity`.
+            public var severity: Components.Schemas.HealthCheck.SeverityPayload
+            /// False when the check can't run (e.g. missingSubtitles without Bazarr).
+            ///
+            /// - Remark: Generated from `#/components/schemas/HealthCheck/available`.
+            public var available: Swift.Bool?
+            /// Creates a new `HealthCheck`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - title:
+            ///   - description:
+            ///   - count:
+            ///   - severity:
+            ///   - available: False when the check can't run (e.g. missingSubtitles without Bazarr).
+            public init(
+                id: Components.Schemas.HealthCheck.IdPayload,
+                title: Swift.String,
+                description: Swift.String,
+                count: Swift.Int,
+                severity: Components.Schemas.HealthCheck.SeverityPayload,
+                available: Swift.Bool? = nil
+            ) {
+                self.id = id
+                self.title = title
+                self.description = description
+                self.count = count
+                self.severity = severity
+                self.available = available
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case title
+                case description
+                case count
+                case severity
+                case available
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/HealthIssue`.
+        public struct HealthIssue: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/HealthIssue/item`.
+            public var item: Components.Schemas.ItemSummary
+            /// - Remark: Generated from `#/components/schemas/HealthIssue/fileId`.
+            public var fileId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/HealthIssue/path`.
+            public var path: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/HealthIssue/detail`.
+            public var detail: Swift.String
+            /// duplicates: the other copies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/HealthIssue/related`.
+            public var related: [Components.Schemas.ItemSummary]?
+            /// Creates a new `HealthIssue`.
+            ///
+            /// - Parameters:
+            ///   - item:
+            ///   - fileId:
+            ///   - path:
+            ///   - detail:
+            ///   - related: duplicates: the other copies.
+            public init(
+                item: Components.Schemas.ItemSummary,
+                fileId: Swift.Int64? = nil,
+                path: Swift.String? = nil,
+                detail: Swift.String,
+                related: [Components.Schemas.ItemSummary]? = nil
+            ) {
+                self.item = item
+                self.fileId = fileId
+                self.path = path
+                self.detail = detail
+                self.related = related
+            }
+            public enum CodingKeys: String, CodingKey {
+                case item
+                case fileId
+                case path
+                case detail
+                case related
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/HealthIssuePage`.
+        public struct HealthIssuePage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/HealthIssuePage/items`.
+            public var items: [Components.Schemas.HealthIssue]
+            /// - Remark: Generated from `#/components/schemas/HealthIssuePage/total`.
+            public var total: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/HealthIssuePage/offset`.
+            public var offset: Swift.Int
+            /// Creates a new `HealthIssuePage`.
+            ///
+            /// - Parameters:
+            ///   - items:
+            ///   - total:
+            ///   - offset:
+            public init(
+                items: [Components.Schemas.HealthIssue],
+                total: Swift.Int,
+                offset: Swift.Int
+            ) {
+                self.items = items
+                self.total = total
+                self.offset = offset
+            }
+            public enum CodingKeys: String, CodingKey {
+                case items
+                case total
+                case offset
+            }
+        }
         /// A smart collection's rules (META-7): its members are the library's movies or shows matching these, kept current. Only on collections that are smart.
         ///
         /// - Remark: Generated from `#/components/schemas/SmartCollectionRules`.
@@ -5169,7 +6254,7 @@ extension Components {
                 case rules
             }
         }
-        /// The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones.
+        /// The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two "Because you watched X" rows with hub ids because-<itemId>; USER-16), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones.
         ///
         /// - Remark: Generated from `#/components/schemas/HomeLayout`.
         public struct HomeLayout: Codable, Hashable, Sendable {

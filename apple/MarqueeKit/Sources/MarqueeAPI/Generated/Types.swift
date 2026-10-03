@@ -367,6 +367,26 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /items/{itemId}/subtitles/{streamId}`.
     /// - Remark: Generated from `#/paths//items/{itemId}/subtitles/{streamId}/delete(removeSubtitle)`.
     func removeSubtitle(_ input: Operations.RemoveSubtitle.Input) async throws -> Operations.RemoveSubtitle.Output
+    /// Bazarr's view of a movie or episode's subtitles (META-12): what exists and what its language profile still wants.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/subtitles/bazarr`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/subtitles/bazarr/get(bazarrStatus)`.
+    func bazarrStatus(_ input: Operations.BazarrStatus.Input) async throws -> Operations.BazarrStatus.Output
+    /// Ask Bazarr to find and download the best subtitle in a language. Runs in the background; the new subtitle appears on the item when Bazarr has saved it.
+    ///
+    /// - Remark: HTTP `POST /items/{itemId}/subtitles/bazarr`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/subtitles/bazarr/post(bazarrDownload)`.
+    func bazarrDownload(_ input: Operations.BazarrDownload.Input) async throws -> Operations.BazarrDownload.Output
+    /// Search Bazarr's providers for this movie or episode (can take up to a minute).
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/subtitles/bazarr/search`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/subtitles/bazarr/search/get(bazarrSearch)`.
+    func bazarrSearch(_ input: Operations.BazarrSearch.Input) async throws -> Operations.BazarrSearch.Output
+    /// Download one of the search results through Bazarr.
+    ///
+    /// - Remark: HTTP `POST /items/{itemId}/subtitles/bazarr/search`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/subtitles/bazarr/search/post(bazarrPick)`.
+    func bazarrPick(_ input: Operations.BazarrPick.Input) async throws -> Operations.BazarrPick.Output
     /// Save to your watchlist (USER-8). Movies and episodes leave it once watched.
     ///
     /// - Remark: HTTP `PUT /items/{itemId}/watchlist`.
@@ -415,6 +435,71 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /items/{itemId}/next`.
     /// - Remark: Generated from `#/paths//items/{itemId}/next/get(nextItem)`.
     func nextItem(_ input: Operations.NextItem.Input) async throws -> Operations.NextItem.Output
+    /// For an app that can be controlled (USER-14): waits up to 25 s for commands for this device. Calling it is what lists the device as a player; call again at once with the returned cursor. Send the current state along.
+    ///
+    /// - Remark: HTTP `POST /remote/inbox`.
+    /// - Remark: Generated from `#/paths//remote/inbox/post(remoteInbox)`.
+    func remoteInbox(_ input: Operations.RemoteInbox.Input) async throws -> Operations.RemoteInbox.Output
+    /// A controllable app reports what it's playing (on every change, and every 10 s while playing).
+    ///
+    /// - Remark: HTTP `PUT /remote/state`.
+    /// - Remark: Generated from `#/paths//remote/state/put(reportRemoteState)`.
+    func reportRemoteState(_ input: Operations.ReportRemoteState.Input) async throws -> Operations.ReportRemoteState.Output
+    /// Devices you can control: your own signed-in apps that are open (admins: everyone's), except the one asking.
+    ///
+    /// - Remark: HTTP `GET /remote/players`.
+    /// - Remark: Generated from `#/paths//remote/players/get(listRemotePlayers)`.
+    func listRemotePlayers(_ input: Operations.ListRemotePlayers.Input) async throws -> Operations.ListRemotePlayers.Output
+    /// A player's state; with ?since=<version>, waits up to 25 s for it to change.
+    ///
+    /// - Remark: HTTP `GET /remote/players/{deviceId}`.
+    /// - Remark: Generated from `#/paths//remote/players/{deviceId}/get(getRemotePlayer)`.
+    func getRemotePlayer(_ input: Operations.GetRemotePlayer.Input) async throws -> Operations.GetRemotePlayer.Output
+    /// Tell a player what to do.
+    ///
+    /// - Remark: HTTP `POST /remote/players/{deviceId}/commands`.
+    /// - Remark: Generated from `#/paths//remote/players/{deviceId}/commands/post(sendRemoteCommand)`.
+    func sendRemoteCommand(_ input: Operations.SendRemoteCommand.Input) async throws -> Operations.SendRemoteCommand.Output
+    /// Your year in music (MUSIC-22).
+    ///
+    /// - Remark: HTTP `GET /me/recap`.
+    /// - Remark: Generated from `#/paths//me/recap/get(listeningRecap)`.
+    func listeningRecap(_ input: Operations.ListeningRecap.Input) async throws -> Operations.ListeningRecap.Output
+    /// Years with music in your history, newest first.
+    ///
+    /// - Remark: HTTP `GET /me/recap/years`.
+    /// - Remark: Generated from `#/paths//me/recap/years/get(recapYears)`.
+    func recapYears(_ input: Operations.RecapYears.Input) async throws -> Operations.RecapYears.Output
+    /// Make a playlist of your top 50 songs of a year ("Your Top Songs 2026"), or refresh it if it exists.
+    ///
+    /// - Remark: HTTP `POST /me/recap/playlist`.
+    /// - Remark: Generated from `#/paths//me/recap/playlist/post(recapPlaylist)`.
+    func recapPlaylist(_ input: Operations.RecapPlaylist.Input) async throws -> Operations.RecapPlaylist.Output
+    /// Muse for movies and shows (USER-15): describe what you'd like to watch and get matches from your libraries.
+    ///
+    /// - Remark: HTTP `POST /muse/video`.
+    /// - Remark: Generated from `#/paths//muse/video/post(museVideo)`.
+    func museVideo(_ input: Operations.MuseVideo.Input) async throws -> Operations.MuseVideo.Output
+    /// Library health checks with how many items each found (ADM-11, admin only).
+    ///
+    /// - Remark: HTTP `GET /library-health`.
+    /// - Remark: Generated from `#/paths//library-health/get(libraryHealth)`.
+    func libraryHealth(_ input: Operations.LibraryHealth.Input) async throws -> Operations.LibraryHealth.Output
+    /// What one check found (admin only). Ignored items are left out.
+    ///
+    /// - Remark: HTTP `GET /library-health/{checkId}`.
+    /// - Remark: Generated from `#/paths//library-health/{checkId}/get(libraryHealthIssues)`.
+    func libraryHealthIssues(_ input: Operations.LibraryHealthIssues.Input) async throws -> Operations.LibraryHealthIssues.Output
+    /// Stop reporting this item for this check (admin only).
+    ///
+    /// - Remark: HTTP `PUT /library-health/{checkId}/ignored/{itemId}`.
+    /// - Remark: Generated from `#/paths//library-health/{checkId}/ignored/{itemId}/put(ignoreHealthIssue)`.
+    func ignoreHealthIssue(_ input: Operations.IgnoreHealthIssue.Input) async throws -> Operations.IgnoreHealthIssue.Output
+    /// Report it again (admin only).
+    ///
+    /// - Remark: HTTP `DELETE /library-health/{checkId}/ignored/{itemId}`.
+    /// - Remark: Generated from `#/paths//library-health/{checkId}/ignored/{itemId}/delete(unignoreHealthIssue)`.
+    func unignoreHealthIssue(_ input: Operations.UnignoreHealthIssue.Input) async throws -> Operations.UnignoreHealthIssue.Output
     /// The person's Home rows, every available row included, in order (USER-12).
     ///
     /// - Remark: HTTP `GET /me/home-layout`.
@@ -688,7 +773,7 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /people/{personId}`.
     /// - Remark: Generated from `#/paths//people/{personId}/get(getPerson)`.
     func getPerson(_ input: Operations.GetPerson.Input) async throws -> Operations.GetPerson.Output
-    /// Similar items from the same library ("More like this"), by shared genres and people.
+    /// Similar items from the same library ("More like this"), by what they're about (Muse's index, USER-16) when it's ready, else shared genres and people.
     ///
     /// - Remark: HTTP `GET /items/{itemId}/related`.
     /// - Remark: Generated from `#/paths//items/{itemId}/related/get(relatedItems)`.
@@ -1679,6 +1764,62 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// Bazarr's view of a movie or episode's subtitles (META-12): what exists and what its language profile still wants.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/subtitles/bazarr`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/subtitles/bazarr/get(bazarrStatus)`.
+    public func bazarrStatus(
+        path: Operations.BazarrStatus.Input.Path,
+        headers: Operations.BazarrStatus.Input.Headers = .init()
+    ) async throws -> Operations.BazarrStatus.Output {
+        try await bazarrStatus(Operations.BazarrStatus.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Ask Bazarr to find and download the best subtitle in a language. Runs in the background; the new subtitle appears on the item when Bazarr has saved it.
+    ///
+    /// - Remark: HTTP `POST /items/{itemId}/subtitles/bazarr`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/subtitles/bazarr/post(bazarrDownload)`.
+    public func bazarrDownload(
+        path: Operations.BazarrDownload.Input.Path,
+        headers: Operations.BazarrDownload.Input.Headers = .init(),
+        body: Operations.BazarrDownload.Input.Body
+    ) async throws -> Operations.BazarrDownload.Output {
+        try await bazarrDownload(Operations.BazarrDownload.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Search Bazarr's providers for this movie or episode (can take up to a minute).
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/subtitles/bazarr/search`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/subtitles/bazarr/search/get(bazarrSearch)`.
+    public func bazarrSearch(
+        path: Operations.BazarrSearch.Input.Path,
+        headers: Operations.BazarrSearch.Input.Headers = .init()
+    ) async throws -> Operations.BazarrSearch.Output {
+        try await bazarrSearch(Operations.BazarrSearch.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Download one of the search results through Bazarr.
+    ///
+    /// - Remark: HTTP `POST /items/{itemId}/subtitles/bazarr/search`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/subtitles/bazarr/search/post(bazarrPick)`.
+    public func bazarrPick(
+        path: Operations.BazarrPick.Input.Path,
+        headers: Operations.BazarrPick.Input.Headers = .init(),
+        body: Operations.BazarrPick.Input.Body
+    ) async throws -> Operations.BazarrPick.Output {
+        try await bazarrPick(Operations.BazarrPick.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
     /// Save to your watchlist (USER-8). Movies and episodes leave it once watched.
     ///
     /// - Remark: HTTP `PUT /items/{itemId}/watchlist`.
@@ -1805,6 +1946,163 @@ extension APIProtocol {
         headers: Operations.NextItem.Input.Headers = .init()
     ) async throws -> Operations.NextItem.Output {
         try await nextItem(Operations.NextItem.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// For an app that can be controlled (USER-14): waits up to 25 s for commands for this device. Calling it is what lists the device as a player; call again at once with the returned cursor. Send the current state along.
+    ///
+    /// - Remark: HTTP `POST /remote/inbox`.
+    /// - Remark: Generated from `#/paths//remote/inbox/post(remoteInbox)`.
+    public func remoteInbox(
+        headers: Operations.RemoteInbox.Input.Headers = .init(),
+        body: Operations.RemoteInbox.Input.Body
+    ) async throws -> Operations.RemoteInbox.Output {
+        try await remoteInbox(Operations.RemoteInbox.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// A controllable app reports what it's playing (on every change, and every 10 s while playing).
+    ///
+    /// - Remark: HTTP `PUT /remote/state`.
+    /// - Remark: Generated from `#/paths//remote/state/put(reportRemoteState)`.
+    public func reportRemoteState(
+        headers: Operations.ReportRemoteState.Input.Headers = .init(),
+        body: Operations.ReportRemoteState.Input.Body
+    ) async throws -> Operations.ReportRemoteState.Output {
+        try await reportRemoteState(Operations.ReportRemoteState.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Devices you can control: your own signed-in apps that are open (admins: everyone's), except the one asking.
+    ///
+    /// - Remark: HTTP `GET /remote/players`.
+    /// - Remark: Generated from `#/paths//remote/players/get(listRemotePlayers)`.
+    public func listRemotePlayers(headers: Operations.ListRemotePlayers.Input.Headers = .init()) async throws -> Operations.ListRemotePlayers.Output {
+        try await listRemotePlayers(Operations.ListRemotePlayers.Input(headers: headers))
+    }
+    /// A player's state; with ?since=<version>, waits up to 25 s for it to change.
+    ///
+    /// - Remark: HTTP `GET /remote/players/{deviceId}`.
+    /// - Remark: Generated from `#/paths//remote/players/{deviceId}/get(getRemotePlayer)`.
+    public func getRemotePlayer(
+        path: Operations.GetRemotePlayer.Input.Path,
+        query: Operations.GetRemotePlayer.Input.Query = .init(),
+        headers: Operations.GetRemotePlayer.Input.Headers = .init()
+    ) async throws -> Operations.GetRemotePlayer.Output {
+        try await getRemotePlayer(Operations.GetRemotePlayer.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Tell a player what to do.
+    ///
+    /// - Remark: HTTP `POST /remote/players/{deviceId}/commands`.
+    /// - Remark: Generated from `#/paths//remote/players/{deviceId}/commands/post(sendRemoteCommand)`.
+    public func sendRemoteCommand(
+        path: Operations.SendRemoteCommand.Input.Path,
+        headers: Operations.SendRemoteCommand.Input.Headers = .init(),
+        body: Operations.SendRemoteCommand.Input.Body
+    ) async throws -> Operations.SendRemoteCommand.Output {
+        try await sendRemoteCommand(Operations.SendRemoteCommand.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Your year in music (MUSIC-22).
+    ///
+    /// - Remark: HTTP `GET /me/recap`.
+    /// - Remark: Generated from `#/paths//me/recap/get(listeningRecap)`.
+    public func listeningRecap(
+        query: Operations.ListeningRecap.Input.Query = .init(),
+        headers: Operations.ListeningRecap.Input.Headers = .init()
+    ) async throws -> Operations.ListeningRecap.Output {
+        try await listeningRecap(Operations.ListeningRecap.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Years with music in your history, newest first.
+    ///
+    /// - Remark: HTTP `GET /me/recap/years`.
+    /// - Remark: Generated from `#/paths//me/recap/years/get(recapYears)`.
+    public func recapYears(headers: Operations.RecapYears.Input.Headers = .init()) async throws -> Operations.RecapYears.Output {
+        try await recapYears(Operations.RecapYears.Input(headers: headers))
+    }
+    /// Make a playlist of your top 50 songs of a year ("Your Top Songs 2026"), or refresh it if it exists.
+    ///
+    /// - Remark: HTTP `POST /me/recap/playlist`.
+    /// - Remark: Generated from `#/paths//me/recap/playlist/post(recapPlaylist)`.
+    public func recapPlaylist(
+        query: Operations.RecapPlaylist.Input.Query = .init(),
+        headers: Operations.RecapPlaylist.Input.Headers = .init()
+    ) async throws -> Operations.RecapPlaylist.Output {
+        try await recapPlaylist(Operations.RecapPlaylist.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Muse for movies and shows (USER-15): describe what you'd like to watch and get matches from your libraries.
+    ///
+    /// - Remark: HTTP `POST /muse/video`.
+    /// - Remark: Generated from `#/paths//muse/video/post(museVideo)`.
+    public func museVideo(
+        headers: Operations.MuseVideo.Input.Headers = .init(),
+        body: Operations.MuseVideo.Input.Body
+    ) async throws -> Operations.MuseVideo.Output {
+        try await museVideo(Operations.MuseVideo.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Library health checks with how many items each found (ADM-11, admin only).
+    ///
+    /// - Remark: HTTP `GET /library-health`.
+    /// - Remark: Generated from `#/paths//library-health/get(libraryHealth)`.
+    public func libraryHealth(headers: Operations.LibraryHealth.Input.Headers = .init()) async throws -> Operations.LibraryHealth.Output {
+        try await libraryHealth(Operations.LibraryHealth.Input(headers: headers))
+    }
+    /// What one check found (admin only). Ignored items are left out.
+    ///
+    /// - Remark: HTTP `GET /library-health/{checkId}`.
+    /// - Remark: Generated from `#/paths//library-health/{checkId}/get(libraryHealthIssues)`.
+    public func libraryHealthIssues(
+        path: Operations.LibraryHealthIssues.Input.Path,
+        query: Operations.LibraryHealthIssues.Input.Query = .init(),
+        headers: Operations.LibraryHealthIssues.Input.Headers = .init()
+    ) async throws -> Operations.LibraryHealthIssues.Output {
+        try await libraryHealthIssues(Operations.LibraryHealthIssues.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Stop reporting this item for this check (admin only).
+    ///
+    /// - Remark: HTTP `PUT /library-health/{checkId}/ignored/{itemId}`.
+    /// - Remark: Generated from `#/paths//library-health/{checkId}/ignored/{itemId}/put(ignoreHealthIssue)`.
+    public func ignoreHealthIssue(
+        path: Operations.IgnoreHealthIssue.Input.Path,
+        headers: Operations.IgnoreHealthIssue.Input.Headers = .init()
+    ) async throws -> Operations.IgnoreHealthIssue.Output {
+        try await ignoreHealthIssue(Operations.IgnoreHealthIssue.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Report it again (admin only).
+    ///
+    /// - Remark: HTTP `DELETE /library-health/{checkId}/ignored/{itemId}`.
+    /// - Remark: Generated from `#/paths//library-health/{checkId}/ignored/{itemId}/delete(unignoreHealthIssue)`.
+    public func unignoreHealthIssue(
+        path: Operations.UnignoreHealthIssue.Input.Path,
+        headers: Operations.UnignoreHealthIssue.Input.Headers = .init()
+    ) async throws -> Operations.UnignoreHealthIssue.Output {
+        try await unignoreHealthIssue(Operations.UnignoreHealthIssue.Input(
             path: path,
             headers: headers
         ))
@@ -2446,7 +2744,7 @@ extension APIProtocol {
             headers: headers
         ))
     }
-    /// Similar items from the same library ("More like this"), by shared genres and people.
+    /// Similar items from the same library ("More like this"), by what they're about (Muse's index, USER-16) when it's ready, else shared genres and people.
     ///
     /// - Remark: HTTP `GET /items/{itemId}/related`.
     /// - Remark: Generated from `#/paths//items/{itemId}/related/get(relatedItems)`.

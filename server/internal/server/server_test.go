@@ -21,10 +21,12 @@ import (
 	"marquee/internal/api"
 	"marquee/internal/auth"
 	"marquee/internal/avatars"
+	"marquee/internal/bazarr"
 	"marquee/internal/db"
 	"marquee/internal/items"
 	"marquee/internal/library"
 	"marquee/internal/netclass"
+	"marquee/internal/remote"
 	"marquee/internal/settings"
 	"marquee/internal/tasks"
 )
@@ -66,7 +68,11 @@ func newHarness(t *testing.T) *harness {
 			Libraries: library.NewStore(database), Items: items.NewStore(database), Version: "test",
 			Avatars: &avatars.Store{DB: database, Dir: filepath.Join(dir, "avatars")},
 			Tasks:   &tasks.Scheduler{DB: database, Settings: store},
-			Backups: &tasks.Backups{DB: database, Dir: filepath.Join(dir, "backups"), ConfigDir: dir, Retention: func() int { return 3 }}},
+			Backups: &tasks.Backups{DB: database, Dir: filepath.Join(dir, "backups"), ConfigDir: dir, Retention: func() int { return 3 }},
+			Remote:  &remote.Hub{},
+			Bazarr: &bazarr.Service{DB: database, Config: func() (string, string) {
+				return store.Get().Integrations.BazarrURL, store.Get().Integrations.BazarrAPIKey
+			}}},
 		Auth:       authSvc,
 		Classifier: netclass.New([]string{"127.0.0.0/8"}, ""),
 	})

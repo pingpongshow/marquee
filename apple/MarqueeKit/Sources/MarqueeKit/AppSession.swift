@@ -70,6 +70,8 @@ public final class AppSession {
     public private(set) var me: User?
     public private(set) var lastError: String?
     public private(set) var client: Client?
+    /// For requests the server holds open (remote control's long polls, USER-14).
+    public private(set) var longPollClient: Client?
     /// True while the address is being re-checked in the background (the app stays usable).
     public private(set) var isReconnecting = false
     /// Called when the signed-in person goes away or changes (sign out, profile switch,
@@ -138,9 +140,9 @@ public final class AppSession {
 
     // MARK: - Connecting
 
-    private func makeClient(_ base: URL) -> Client {
+    private func makeClient(_ base: URL, timeout: TimeInterval = 20) -> Client {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 20
+        config.timeoutIntervalForRequest = timeout
         config.waitsForConnectivity = false
         return Client(serverURL: base.appending(path: "api/v1"),
                       configuration: .init(dateTranscoder: FlexibleDateTranscoder()),
@@ -234,6 +236,7 @@ public final class AppSession {
         baseURL = url
         self.info = info
         client = makeClient(url)
+        longPollClient = makeClient(url, timeout: 45) // the server waits up to 25 s
         guard token != nil else { state = .signedOut; return }
         do {
             me = try await client!.getMe().ok.body.json
@@ -337,6 +340,7 @@ public final class AppSession {
         if let id = server?.id { ServerStore.forget(id) }
         server = nil
         client = nil
+        longPollClient = nil
         token = nil
         me = nil
         state = .noServer

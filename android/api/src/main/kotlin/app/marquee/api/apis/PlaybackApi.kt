@@ -35,6 +35,11 @@ import app.marquee.api.models.PlaybackProgress
 import app.marquee.api.models.PlaybackRequest
 import app.marquee.api.models.PlaybackSession
 import app.marquee.api.models.PlaybackSessionInfo
+import app.marquee.api.models.RemoteCommand
+import app.marquee.api.models.RemoteInbox
+import app.marquee.api.models.RemoteInboxRequest
+import app.marquee.api.models.RemotePlayer
+import app.marquee.api.models.RemotePlayerState
 import app.marquee.api.models.SubtitleResult
 import app.marquee.api.models.SyncProgressRequest
 import app.marquee.api.models.Trickplay
@@ -213,6 +218,87 @@ open class PlaybackApi(basePath: kotlin.String = defaultBasePath, client: Call.F
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/items/{itemId}/subtitles".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /remote/players/{deviceId}
+     * A player&#39;s state; with ?since&#x3D;&lt;version&gt;, waits up to 25 s for it to change.
+     * 
+     * @param deviceId 
+     * @param since  (optional)
+     * @return RemotePlayer
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getRemotePlayer(deviceId: kotlin.Long, since: kotlin.Long? = null) : RemotePlayer {
+        val localVarResponse = getRemotePlayerWithHttpInfo(deviceId = deviceId, since = since)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as RemotePlayer
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /remote/players/{deviceId}
+     * A player&#39;s state; with ?since&#x3D;&lt;version&gt;, waits up to 25 s for it to change.
+     * 
+     * @param deviceId 
+     * @param since  (optional)
+     * @return ApiResponse<RemotePlayer?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getRemotePlayerWithHttpInfo(deviceId: kotlin.Long, since: kotlin.Long?) : ApiResponse<RemotePlayer?> {
+        val localVariableConfig = getRemotePlayerRequestConfig(deviceId = deviceId, since = since)
+
+        return request<Unit, RemotePlayer>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getRemotePlayer
+     *
+     * @param deviceId 
+     * @param since  (optional)
+     * @return RequestConfig
+     */
+    fun getRemotePlayerRequestConfig(deviceId: kotlin.Long, since: kotlin.Long?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (since != null) {
+                    put("since", listOf(since.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/remote/players/{deviceId}".replace("{"+"deviceId"+"}", encodeURIComponent(deviceId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -513,6 +599,150 @@ open class PlaybackApi(basePath: kotlin.String = defaultBasePath, client: Call.F
     }
 
     /**
+     * GET /remote/players
+     * Devices you can control: your own signed-in apps that are open (admins: everyone&#39;s), except the one asking.
+     * 
+     * @return kotlin.collections.List<RemotePlayer>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listRemotePlayers() : kotlin.collections.List<RemotePlayer> {
+        val localVarResponse = listRemotePlayersWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<RemotePlayer>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /remote/players
+     * Devices you can control: your own signed-in apps that are open (admins: everyone&#39;s), except the one asking.
+     * 
+     * @return ApiResponse<kotlin.collections.List<RemotePlayer>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listRemotePlayersWithHttpInfo() : ApiResponse<kotlin.collections.List<RemotePlayer>?> {
+        val localVariableConfig = listRemotePlayersRequestConfig()
+
+        return request<Unit, kotlin.collections.List<RemotePlayer>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listRemotePlayers
+     *
+     * @return RequestConfig
+     */
+    fun listRemotePlayersRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/remote/players",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /remote/inbox
+     * For an app that can be controlled (USER-14): waits up to 25 s for commands for this device. Calling it is what lists the device as a player; call again at once with the returned cursor. Send the current state along.
+     * 
+     * @param remoteInboxRequest 
+     * @return RemoteInbox
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun remoteInbox(remoteInboxRequest: RemoteInboxRequest) : RemoteInbox {
+        val localVarResponse = remoteInboxWithHttpInfo(remoteInboxRequest = remoteInboxRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as RemoteInbox
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /remote/inbox
+     * For an app that can be controlled (USER-14): waits up to 25 s for commands for this device. Calling it is what lists the device as a player; call again at once with the returned cursor. Send the current state along.
+     * 
+     * @param remoteInboxRequest 
+     * @return ApiResponse<RemoteInbox?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun remoteInboxWithHttpInfo(remoteInboxRequest: RemoteInboxRequest) : ApiResponse<RemoteInbox?> {
+        val localVariableConfig = remoteInboxRequestConfig(remoteInboxRequest = remoteInboxRequest)
+
+        return request<RemoteInboxRequest, RemoteInbox>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation remoteInbox
+     *
+     * @param remoteInboxRequest 
+     * @return RequestConfig
+     */
+    fun remoteInboxRequestConfig(remoteInboxRequest: RemoteInboxRequest) : RequestConfig<RemoteInboxRequest> {
+        val localVariableBody = remoteInboxRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/remote/inbox",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * DELETE /items/{itemId}/subtitles/{streamId}
      * Remove a downloaded subtitle (admin only).
      * 
@@ -662,6 +892,78 @@ open class PlaybackApi(basePath: kotlin.String = defaultBasePath, client: Call.F
     }
 
     /**
+     * PUT /remote/state
+     * A controllable app reports what it&#39;s playing (on every change, and every 10 s while playing).
+     * 
+     * @param remotePlayerState 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun reportRemoteState(remotePlayerState: RemotePlayerState) : Unit {
+        val localVarResponse = reportRemoteStateWithHttpInfo(remotePlayerState = remotePlayerState)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /remote/state
+     * A controllable app reports what it&#39;s playing (on every change, and every 10 s while playing).
+     * 
+     * @param remotePlayerState 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun reportRemoteStateWithHttpInfo(remotePlayerState: RemotePlayerState) : ApiResponse<Unit?> {
+        val localVariableConfig = reportRemoteStateRequestConfig(remotePlayerState = remotePlayerState)
+
+        return request<RemotePlayerState, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation reportRemoteState
+     *
+     * @param remotePlayerState 
+     * @return RequestConfig
+     */
+    fun reportRemoteStateRequestConfig(remotePlayerState: RemotePlayerState) : RequestConfig<RemotePlayerState> {
+        val localVariableBody = remotePlayerState
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/remote/state",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * GET /items/{itemId}/subtitles/search
      * Search OpenSubtitles for a movie&#39;s or episode&#39;s subtitles (PLAY-7). Results made for this exact file come first.
      * 
@@ -735,6 +1037,81 @@ open class PlaybackApi(basePath: kotlin.String = defaultBasePath, client: Call.F
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/items/{itemId}/subtitles/search".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /remote/players/{deviceId}/commands
+     * Tell a player what to do.
+     * 
+     * @param deviceId 
+     * @param remoteCommand 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun sendRemoteCommand(deviceId: kotlin.Long, remoteCommand: RemoteCommand) : Unit {
+        val localVarResponse = sendRemoteCommandWithHttpInfo(deviceId = deviceId, remoteCommand = remoteCommand)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /remote/players/{deviceId}/commands
+     * Tell a player what to do.
+     * 
+     * @param deviceId 
+     * @param remoteCommand 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun sendRemoteCommandWithHttpInfo(deviceId: kotlin.Long, remoteCommand: RemoteCommand) : ApiResponse<Unit?> {
+        val localVariableConfig = sendRemoteCommandRequestConfig(deviceId = deviceId, remoteCommand = remoteCommand)
+
+        return request<RemoteCommand, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation sendRemoteCommand
+     *
+     * @param deviceId 
+     * @param remoteCommand 
+     * @return RequestConfig
+     */
+    fun sendRemoteCommandRequestConfig(deviceId: kotlin.Long, remoteCommand: RemoteCommand) : RequestConfig<RemoteCommand> {
+        val localVariableBody = remoteCommand
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/remote/players/{deviceId}/commands".replace("{"+"deviceId"+"}", encodeURIComponent(deviceId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

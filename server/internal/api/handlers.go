@@ -9,19 +9,22 @@ import (
 
 	"marquee/internal/auth"
 	"marquee/internal/avatars"
+	"marquee/internal/bazarr"
 	"marquee/internal/downloads"
+	"marquee/internal/health"
 	"marquee/internal/images"
 	"marquee/internal/items"
 	"marquee/internal/library"
 	"marquee/internal/livetv"
-	"marquee/internal/scrobble"
 	"marquee/internal/logbuf"
 	"marquee/internal/lyrics"
 	"marquee/internal/metadata"
 	"marquee/internal/netclass"
 	"marquee/internal/playback"
 	"marquee/internal/plex"
+	"marquee/internal/remote"
 	"marquee/internal/requests"
+	"marquee/internal/scrobble"
 	"marquee/internal/settings"
 	"marquee/internal/sonic"
 	"marquee/internal/subtitles"
@@ -64,6 +67,16 @@ type Handlers struct {
 	// Restart stops the server gracefully; Docker starts it again.
 	Restart func()
 	Version string
+	// Remote is remote control (USER-14).
+	Remote *remote.Hub
+	// Embeddings indexes movies and shows for Muse for movies, recommendations and related
+	// items (USER-15, USER-16); nil without the sonic sidecar.
+	Embeddings *items.Embedder
+	// Bazarr finds subtitles for movies and episodes (META-12); not set up when its
+	// address or key is empty.
+	Bazarr *bazarr.Service
+	// Health runs the library health checks (ADM-11); made on demand when nil.
+	Health *health.Service
 }
 
 var _ StrictServerInterface = (*Handlers)(nil)

@@ -78,6 +78,8 @@ final class MarqueeUITests: XCTestCase {
         openLibrary("Music")
         XCTAssertTrue(app.navigationBars["Music"].waitForExistence(timeout: 10))
         let artist = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calm Pads'")).firstMatch
+        // The grid is lazy and sits below the year-in-music card and Muse: scroll to it.
+        for _ in 0..<5 where !artist.waitForExistence(timeout: 2) { app.swipeUp() }
         XCTAssertTrue(artist.waitForExistence(timeout: 10))
         artist.tap()
         let playMusic = app.buttons["Play"].firstMatch
@@ -115,6 +117,8 @@ final class MarqueeUITests: XCTestCase {
 
         // An album with an .lrc sidecar: synced lyrics.
         let artist = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calm Pads'")).firstMatch
+        // The grid is lazy and sits below the year-in-music card and Muse: scroll to it.
+        for _ in 0..<5 where !artist.waitForExistence(timeout: 2) { app.swipeUp() }
         XCTAssertTrue(artist.waitForExistence(timeout: 10))
         // The Music page has grown (mixes, moods, styles): bring the card clear of the tab bar.
         for _ in 0..<4 where artist.frame.maxY > app.tabBars.firstMatch.frame.minY - 10 { app.swipeUp() }
@@ -153,7 +157,7 @@ final class MarqueeUITests: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH '20 Valley'")).firstMatch.tap()
         let add = app.buttons["Watchlist"]
         XCTAssertTrue(add.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Test Saga"].exists, "the movie shows its collection")
+        XCTAssertTrue(app.staticTexts["Test Saga"].waitForExistence(timeout: 10), "the movie shows its collection")
         add.tap()
         XCTAssertTrue(app.buttons["On Watchlist"].waitForExistence(timeout: 5))
         shot("c2-watchlisted")
@@ -411,6 +415,8 @@ final class MarqueeUITests: XCTestCase {
         // A track's menu → Sonic Adventure → pick a destination.
         openLibrary("Music")
         let artist = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calm Pads'")).firstMatch
+        // The grid is lazy and sits below the year-in-music card and Muse: scroll to it.
+        for _ in 0..<5 where !artist.waitForExistence(timeout: 2) { app.swipeUp() }
         XCTAssertTrue(artist.waitForExistence(timeout: 10))
         artist.tap()
         let album = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Floating'")).firstMatch

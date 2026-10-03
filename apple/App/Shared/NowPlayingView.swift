@@ -111,20 +111,35 @@ struct NowPlayingView: View {
                 CarModeButton().labelStyle(.iconOnly).font(.callout).foregroundStyle(.secondary).frame(width: 32, height: 32)
                 EqualizerButton().frame(width: 32, height: 32)
             }
-            .frame(width: 72, alignment: .leading)
+            .frame(width: 106, alignment: .leading)
             Spacer(minLength: 0)
             sourceTitle
             Spacer(minLength: 0)
             HStack(spacing: 6) {
+                // Another Marquee app (USER-14): the queue carries on there from here.
+                PlayOnButton(target: handOff, compact: true).font(.callout).foregroundStyle(.secondary).frame(width: 32, height: 32)
                 AirPlayButton().frame(width: 32, height: 32)
                 CastButton(tint: .secondaryLabel).frame(width: 32, height: 32)
             }
-            .frame(width: 72, alignment: .trailing)
+            .frame(width: 106, alignment: .trailing)
         }
         #else
         sourceTitle
         #endif
     }
+
+    #if os(iOS)
+    /// The queue from the current track, at the current position.
+    private func handOff() -> PlayOnTarget? {
+        let entries = music.queue.entries
+        guard music.current != nil, !entries.isEmpty else { return nil }
+        let i = max(0, min(music.queue.index, entries.count - 1))
+        // The server takes up to 1000 items; keep the part around what's playing.
+        let from = max(0, i - 200), to = min(entries.count, from + 1000)
+        return PlayOnTarget(itemIDs: entries[from..<to].map(\.item.id), index: i - from,
+                            startMs: Int64(music.time * 1000), pauseHere: { music.pause() })
+    }
+    #endif
 
     @ViewBuilder private var sourceTitle: some View {
         VStack(spacing: 2) {
