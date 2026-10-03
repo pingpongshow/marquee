@@ -114,7 +114,8 @@ struct ItemDetailView: View {
 
     private var compact: Bool {
         #if os(iOS)
-        sizeClass == .compact
+        // Every iPhone, at any width or orientation (a Pro Max in landscape is "regular").
+        UIDevice.current.userInterfaceIdiom == .phone || sizeClass == .compact
         #else
         false
         #endif
@@ -315,50 +316,114 @@ struct ItemDetailView: View {
         let audio = streams.filter { $0.kind == .audio }
         let subs = streams.filter { $0.kind == .subtitle }
         if audio.count > 1 || !subs.isEmpty || versions.count > 1 || (!isTV && (d.type == .movie || d.type == .episode)) {
-            HStack(spacing: 16) {
-                if versions.count > 1 {
-                    // 4K and 1080p, or a director's cut (LIB-7); streams differ per file.
-                    Picker("Version", selection: $fileID) {
-                        Text("Best version").tag(Int64?.none)
-                        ForEach(versions, id: \.id) { v in Text(versionLabel(v)).tag(v.files.first.map { Int64?.some($0.id) } ?? nil) }
-                    }
-                    .onChange(of: fileID) {
-                        audioID = nil
-                        subtitleID = nil
-                        PendingTracks.shared.set(item: d.id, audio: nil, subtitle: nil, file: fileID)
-                    }
+            // Uniform one-line chips; when the row is too narrow, each shows its icon and a
+            // short value; never a word broken over two lines.
+            ViewThatFits(in: .horizontal) {
+                chipRow(d, versions: versions, chosen: chosen, audio: audio, subs: subs, short: false)
+                chipRow(d, versions: versions, chosen: chosen, audio: audio, subs: subs, short: true)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    chipRow(d, versions: versions, chosen: chosen, audio: audio, subs: subs, short: true)
                 }
-                if audio.count > 1 {
-                    Picker("Audio", selection: $audioID) {
-                        Text("Automatic").tag(Int64?.none)
-                        ForEach(audio, id: \.id) { s in Text(streamLabel(s)).tag(Int64?.some(s.id)) }
-                    }
-                }
-                if !subs.isEmpty {
-                    Picker("Subtitles", selection: $subtitleID) {
-                        Text("Automatic").tag(Int64?.none)
-                        Text("Off").tag(Int64?.some(-1))
-                        ForEach(subs, id: \.id) { s in Text(streamLabel(s)).tag(Int64?.some(s.id)) }
-                    }
-                }
-                #if os(iOS)
-                if d.type == .movie || d.type == .episode {
-                    Button("Find Subtitles…", systemImage: "captions.bubble") { findingSubs = true }
-                }
-                #endif
             }
-            .pickerStyle(.menu)
-            .font(.callout)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("trackChips")
             .sheet(isPresented: $findingSubs) {
                 SubtitleSearchSheet(itemID: d.id, onAdded: { stream in
                     subtitleID = stream
                     Task { await load() }
                 }, onBazarr: { Task { await load() } })
             }
+            .onChange(of: fileID) {
+                audioID = nil
+                subtitleID = nil
+                PendingTracks.shared.set(item: d.id, audio: nil, subtitle: nil, file: fileID)
+            }
             .onChange(of: audioID) { PendingTracks.shared.set(item: d.id, audio: audioID, subtitle: subtitleID, file: fileID) }
             .onChange(of: subtitleID) { PendingTracks.shared.set(item: d.id, audio: audioID, subtitle: subtitleID, file: fileID) }
         }
     }
+
+    private func chipRow(_ d: ItemDetail, versions: [Schemas.MediaVersion], chosen: Schemas.MediaVersion?,
+                         audio: [Schemas.MediaStream], subs: [Schemas.MediaStream], short: Bool) -> some View {
+        HStack(spacing: 8) {
+            if versions.count > 1 {
+                // 4K and 1080p, or a director's cut (LIB-7); streams differ per file.
+                Menu {
+                    Picker("Version", selection: $fileID) {
+                        Text("Best version").tag(Int64?.none)
+                        ForEach(versions, id: \.id) { v in Text(versionLabel(v)).tag(v.files.first.map { Int64?.some($0.id) } ?? nil) }
+                    }
+                } label: {
+                    trackChip("Version", "square.stack.3d.up", fileID == nil ? (short ? "Best" : "Best version") : (chosen.map(versionLabel) ?? "Version"), short: short)
+                }
+                .accessibilityIdentifier("trackChip.version")
+            }
+            if audio.count > 1 {
+                Menu {
+                    Picker("Audio", selection: $audioID) {
+                        Text("Automatic").tag(Int64?.none)
+                        ForEach(audio, id: \.id) { s in Text(streamLabel(s)).tag(Int64?.some(s.id)) }
+                    }
+                } label: {
+                    trackChip("Audio", "speaker.wave.2", audio.first { $0.id == audioID }.map { languageName($0.language) } ?? (short ? "Auto" : "Automatic"), short: short)
+                }
+                .accessibilityIdentifier("trackChip.audio")
+            }
+            if !subs.isEmpty {
+                Menu {
+                    Picker("Subtitles", selection: $subtitleID) {
+                        Text("Automatic").tag(Int64?.none)
+                        Text("Off").tag(Int64?.some(-1))
+                        ForEach(subs, id: \.id) { s in Text(streamLabel(s)).tag(Int64?.some(s.id)) }
+                    }
+                } label: {
+                    trackChip("Subtitles", "captions.bubble",
+                              subtitleID == -1 ? "Off" : subs.first { $0.id == subtitleID }.map { languageName($0.language) } ?? (short ? "Auto" : "Automatic"),
+                              short: short)
+                }
+                .accessibilityIdentifier("trackChip.subtitles")
+            }
+            #if os(iOS)
+            if d.type == .movie || d.type == .episode {
+                Button { findingSubs = true } label: {
+                    trackChip(nil, "magnifyingglass", short ? "Find" : "Find subtitles", short: short)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Find subtitles")
+                .accessibilityIdentifier("trackChip.find")
+            }
+            #endif
+        }
+        .fixedSize()
+    }
+
+    /// A one-line chip: icon, then "Name: value" (or just the value when short).
+    private func trackChip(_ name: String?, _ icon: String, _ value: String, short: Bool) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon).imageScale(.small)
+            if let name, !short {
+                Text(name + ":").foregroundStyle(.secondary)
+            }
+            Text(value).truncationMode(.tail)
+        }
+        .font(.footnote.weight(.medium))
+        .lineLimit(1)
+        .frame(maxWidth: short ? 140 : 240)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .frame(minHeight: chipHeight)
+        .background(Color.secondary.opacity(0.16), in: Capsule())
+        .contentShape(Capsule())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(name.map { "\($0): \(value)" } ?? value)
+    }
+
+    #if os(tvOS)
+    private let chipHeight: CGFloat = 50
+    #else
+    private let chipHeight: CGFloat = 32
+    #endif
 
     private func versionLabel(_ v: Schemas.MediaVersion) -> String {
         let f = v.files.first

@@ -131,26 +131,35 @@ struct PlaylistView: View {
         .task { await load() }
     }
 
-    /// iPhone portrait: cover, then the title, then the actions, each full width. Wider: the
-    /// cover beside the title and actions.
+    /// iPhone (any width, either orientation): cover, then the title, then the actions, each
+    /// full width. iPad: the cover beside the title, but only while every action fits there
+    /// with its words; otherwise stacked too.
     @ViewBuilder private func header(_ p: Playlist) -> some View {
         if compact {
-            VStack(alignment: .leading, spacing: 12) {
-                PlaylistMosaic(playlist: p, size: 160)
-                titles(p)
-                actions
-            }
-            .accessibilityIdentifier("playlistHeader")
+            stacked(p)
         } else {
-            HStack(alignment: .bottom, spacing: 16) {
-                PlaylistMosaic(playlist: p, size: coverSize)
-                VStack(alignment: .leading, spacing: 8) {
-                    titles(p)
-                    actions
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .bottom, spacing: 16) {
+                    PlaylistMosaic(playlist: p, size: coverSize)
+                    VStack(alignment: .leading, spacing: 8) {
+                        titles(p)
+                        actions(labelledOnly: true)
+                    }
                 }
+                .accessibilityIdentifier("playlistHeader")
+                stacked(p)
             }
-            .accessibilityIdentifier("playlistHeader")
         }
+    }
+
+    private func stacked(_ p: Playlist) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            PlaylistMosaic(playlist: p, size: 160)
+            titles(p)
+            actions(labelledOnly: false)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("playlistHeader")
     }
 
     private func titles(_ p: Playlist) -> some View {
@@ -161,8 +170,8 @@ struct PlaylistView: View {
     }
 
     /// Play and Shuffle first; Download and Pin to Home turn icon-only when there's no room.
-    private var actions: some View {
-        HeaderActions {
+    private func actions(labelledOnly: Bool) -> some View {
+        HeaderActions(labelledOnly: labelledOnly) {
             Button { play(0) } label: { Label("Play", systemImage: "play.fill") }.buttonStyle(.borderedProminent)
             Button { play(0, shuffle: true) } label: { Label("Shuffle", systemImage: "shuffle") }.buttonStyle(.bordered)
         } secondary: {
@@ -175,7 +184,8 @@ struct PlaylistView: View {
 
     private var compact: Bool {
         #if os(iOS)
-        sizeClass == .compact
+        // Every iPhone, at any width or orientation (a Pro Max in landscape is "regular").
+        UIDevice.current.userInterfaceIdiom == .phone || sizeClass == .compact
         #else
         false
         #endif
