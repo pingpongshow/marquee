@@ -11,7 +11,10 @@ export const recapYearsQuery = {
   staleTime: 5 * 60_000,
 };
 
-/** "Your Year in Music" (MUSIC-22): an entry card with a year picker; nothing until there's music history. */
+/**
+ * "Your Year in Music" (MUSIC-22): one compact row with a year picker (only when there's
+ * more than one year) and a View link; nothing until there's music history.
+ */
 export function RecapCard({ className }: { className?: string }) {
   const years = useQuery(recapYearsQuery);
   const [year, setYear] = useState<number | null>(null);
@@ -20,25 +23,20 @@ export function RecapCard({ className }: { className?: string }) {
   const y = year ?? list[0]!;
   return (
     <div
-      className={clsx(
-        "flex flex-wrap items-center gap-4 overflow-hidden rounded-xl bg-gradient-to-br from-fuchsia-600 via-violet-700 to-indigo-900 p-5 text-white shadow-lg",
-        className,
-      )}
+      data-testid="recap-card"
+      className={clsx("flex items-center gap-3 rounded-lg border border-border border-l-2 border-l-accent bg-surface px-3 py-2", className)}
     >
-      <Sparkles className="size-8 shrink-0 text-amber-300" aria-hidden />
-      <div className="min-w-0 flex-1">
-        <div className="text-lg font-extrabold tracking-tight">Your Year in Music</div>
-        <div className="text-sm text-white/80">Your top artists, songs and listening habits of {y}.</div>
-      </div>
+      <Sparkles className="size-4 shrink-0 text-accent" aria-hidden />
+      <div className="min-w-0 flex-1 truncate text-sm font-medium">Your {y} in Music</div>
       {list.length > 1 && (
         <select
           aria-label="Recap year"
           value={y}
           onChange={(e) => setYear(Number(e.target.value))}
-          className="rounded-md border border-white/30 bg-black/20 px-2 py-1.5 text-sm text-white"
+          className="h-7 shrink-0 rounded border border-border bg-surface-2 px-1.5 text-xs text-text"
         >
           {list.map((v) => (
-            <option key={v} value={v} className="text-black">
+            <option key={v} value={v}>
               {v}
             </option>
           ))}
@@ -47,9 +45,10 @@ export function RecapCard({ className }: { className?: string }) {
       <Link
         to="/recap"
         search={{ year: y }}
-        className="rounded-full bg-white px-5 py-2 text-sm font-bold text-black hover:bg-amber-200"
+        aria-label={`View your ${y} in Music`}
+        className="shrink-0 rounded-md bg-surface-3 px-3 py-1 text-xs font-medium whitespace-nowrap text-text hover:bg-border"
       >
-        See your {y}
+        View
       </Link>
     </div>
   );

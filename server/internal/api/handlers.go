@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"marquee/internal/speedtest"
 	"strings"
 
 	"marquee/internal/auth"
@@ -80,6 +81,8 @@ type Handlers struct {
 	Health *health.Service
 	// Trash deletes media files to the library's trash (ADM-11); made on demand when nil.
 	Trash *mediatrash.Service
+	// SpeedTest measures the internet speed (tests use a fake server).
+	SpeedTest *speedtest.Tester
 }
 
 var _ StrictServerInterface = (*Handlers)(nil)

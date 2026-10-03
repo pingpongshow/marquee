@@ -1,6 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Gauge } from "lucide-react";
 import { useState } from "react";
-import { systemInfoQuery } from "@/api/queries";
+import { api, unwrap } from "@/api/client";
+import { systemInfoQuery, useUpdateSettings } from "@/api/queries";
+import type { ServerSettings, ServerSettingsUpdate } from "@/api/types";
 import { Alert, Button, Card, Field, Input, Select, Spinner, StringListEditor, Toggle } from "@/components/ui";
 import { SaveBar } from "./SaveBar";
 import { RestartServer } from "./TasksSettings";
@@ -120,6 +123,7 @@ export function RemoteAccessSettings() {
           <Field label="Internet upload speed" help="Your server’s upload speed. Shared fairly between remote streams. Leave empty if unknown.">
             {(id) => <MbpsInput id={id} kbps={d.uploadSpeedKbps} onChange={(v) => s.update({ uploadSpeedKbps: v })} placeholder="e.g. 40" />}
           </Field>
+          <SpeedTest draft={d} onUse={(kbps) => s.update({ uploadSpeedKbps: kbps })} />
           <div className="grid gap-5 sm:grid-cols-2">
             <Field label="Total remote limit" help="Across all remote streams. Empty = no limit.">
               {(id) => <MbpsInput id={id} kbps={d.totalRemoteLimitKbps} onChange={(v) => s.update({ totalRemoteLimitKbps: v })} placeholder="Unlimited" />}
@@ -233,3 +237,65 @@ export function MetadataSettings() {
   );
 }
 
+
+const fmtMbps = (v: number) => (v >= 100 ? Math.round(v).toString() : v.toFixed(1));
+
+/**
+ * "Test internet speed": the server measures against Cloudflare's speed test (~20 s),
+ * then "Use as upload speed" fills and saves 90% of the measured upload.
+ */
+function SpeedTest({ draft, onUse }: { draft: ServerSettings["remoteAccess"]; onUse: (kbps: number) => void }) {
+  const test = useMutation({ mutationFn: () => unwrap(api.POST("/system/speedtest")) });
+  const update = useUpdateSettings();
+  const [savedKbps, setSavedKbps] = useState<number | null>(null);
+  const r = test.data;
+  const suggested = r ? Math.round(r.uploadMbps * 1000 * 0.9) : 0;
+  const use = () => {
+    onUse(suggested);
+    // Saves the section as shown, with the new upload speed.
+    update.mutate({ remoteAccess: { ...draft, uploadSpeedKbps: suggested } as ServerSettingsUpdate["remoteAccess"] }, { onSuccess: () => setSavedKbps(suggested) });
+  };
+  return (
+    <div className="space-y-2 rounded-md border border-border bg-surface-2/50 p-3" data-testid="speed-test">
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          size="sm"
+          type="button"
+          loading={test.isPending}
+          onClick={() => {
+            setSavedKbps(null);
+            test.mutate();
+          }}
+        >
+          {!test.isPending && <Gauge className="size-4" />} {r ? "Test again" : "Test internet speed"}
+        </Button>
+        {test.isPending && (
+          <span className="text-sm text-muted" role="status">
+            Testing… about 20 seconds
+          </span>
+        )}
+      </div>
+      {test.isError && <Alert tone="error">{test.error.message}</Alert>}
+      {r && !test.isPending && (
+        <div className="space-y-2">
+          <p className="text-sm text-text" data-testid="speed-result">
+            Download {fmtMbps(r.downloadMbps)} Mbps · Upload {fmtMbps(r.uploadMbps)} Mbps · Latency {Math.round(r.latencyMs)} ms{r.server ? ` · via ${r.server}` : ""}
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button size="sm" variant="primary" type="button" onClick={use} loading={update.isPending} disabled={suggested <= 0}>
+              Use as upload speed
+            </Button>
+            {savedKbps !== null && !update.isPending && (
+              <span className="text-sm text-success" role="status">
+                Saved {fmtMbps(savedKbps / 1000)} Mbps
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted">Uses {fmtMbps(suggested / 1000)} Mbps, 90% of the measured upload, to leave headroom for everything else on your connection.</p>
+          {update.isError && <Alert tone="error">{update.error.message}</Alert>}
+        </div>
+      )}
+      <p className="text-xs text-faint">The test runs from the server against Cloudflare’s speed test, so it measures the server’s own connection.</p>
+    </div>
+  );
+}

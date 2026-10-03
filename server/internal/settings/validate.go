@@ -112,8 +112,8 @@ func (s Settings) Validate() error {
 	if h := s.Tasks.MaintenanceWindowHours; h < 1 || h > 12 {
 		return invalid("maintenance window must be 1–12 hours")
 	}
-	if r := s.Tasks.BackupRetention; r < 1 || r > 60 {
-		return invalid("backup retention must be 1–60")
+	if r := s.Tasks.BackupRetention; r < 1 || r > 365 {
+		return invalid("backup retention must be 1–365 days")
 	}
 	if len(s.Webhooks) > 20 {
 		return invalid("at most 20 webhooks")

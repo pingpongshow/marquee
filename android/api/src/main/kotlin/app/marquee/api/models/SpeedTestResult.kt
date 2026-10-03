@@ -31,23 +31,31 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param maintenanceWindowStart 
- * @param maintenanceWindowHours 
- * @param backupRetention Days to keep nightly backups before they're deleted (the newest is always kept).
+ * @param downloadMbps 
+ * @param uploadMbps 
+ * @param latencyMs Median round trip to the test server.
+ * @param testedAt 
+ * @param server 
  */
 @Serializable
 
-data class TaskSettings (
+data class SpeedTestResult (
 
-    @SerialName(value = "maintenanceWindowStart")
-    val maintenanceWindowStart: kotlin.String? = null,
+    @SerialName(value = "downloadMbps")
+    val downloadMbps: kotlin.Double,
 
-    @SerialName(value = "maintenanceWindowHours")
-    val maintenanceWindowHours: kotlin.Int? = null,
+    @SerialName(value = "uploadMbps")
+    val uploadMbps: kotlin.Double,
 
-    /* Days to keep nightly backups before they're deleted (the newest is always kept). */
-    @SerialName(value = "backupRetention")
-    val backupRetention: kotlin.Int? = null
+    /* Median round trip to the test server. */
+    @SerialName(value = "latencyMs")
+    val latencyMs: kotlin.Double,
+
+    @Contextual @SerialName(value = "testedAt")
+    val testedAt: java.time.OffsetDateTime,
+
+    @SerialName(value = "server")
+    val server: kotlin.String? = null
 
 ) {
 

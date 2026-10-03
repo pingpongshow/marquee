@@ -3140,6 +3140,8 @@ extension Components {
             public var maintenanceWindowStart: Swift.String?
             /// - Remark: Generated from `#/components/schemas/TaskSettings/maintenanceWindowHours`.
             public var maintenanceWindowHours: Swift.Int?
+            /// Days to keep nightly backups before they're deleted (the newest is always kept).
+            ///
             /// - Remark: Generated from `#/components/schemas/TaskSettings/backupRetention`.
             public var backupRetention: Swift.Int?
             /// Creates a new `TaskSettings`.
@@ -3147,7 +3149,7 @@ extension Components {
             /// - Parameters:
             ///   - maintenanceWindowStart:
             ///   - maintenanceWindowHours:
-            ///   - backupRetention:
+            ///   - backupRetention: Days to keep nightly backups before they're deleted (the newest is always kept).
             public init(
                 maintenanceWindowStart: Swift.String? = nil,
                 maintenanceWindowHours: Swift.Int? = nil,
@@ -5059,6 +5061,49 @@ extension Components {
                 case uploadSpeedKbps
                 case bandwidthHistory
                 case libraries
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/SpeedTestResult`.
+        public struct SpeedTestResult: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/SpeedTestResult/downloadMbps`.
+            public var downloadMbps: Swift.Double
+            /// - Remark: Generated from `#/components/schemas/SpeedTestResult/uploadMbps`.
+            public var uploadMbps: Swift.Double
+            /// Median round trip to the test server.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SpeedTestResult/latencyMs`.
+            public var latencyMs: Swift.Double
+            /// - Remark: Generated from `#/components/schemas/SpeedTestResult/testedAt`.
+            public var testedAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/SpeedTestResult/server`.
+            public var server: Swift.String?
+            /// Creates a new `SpeedTestResult`.
+            ///
+            /// - Parameters:
+            ///   - downloadMbps:
+            ///   - uploadMbps:
+            ///   - latencyMs: Median round trip to the test server.
+            ///   - testedAt:
+            ///   - server:
+            public init(
+                downloadMbps: Swift.Double,
+                uploadMbps: Swift.Double,
+                latencyMs: Swift.Double,
+                testedAt: Foundation.Date,
+                server: Swift.String? = nil
+            ) {
+                self.downloadMbps = downloadMbps
+                self.uploadMbps = uploadMbps
+                self.latencyMs = latencyMs
+                self.testedAt = testedAt
+                self.server = server
+            }
+            public enum CodingKeys: String, CodingKey {
+                case downloadMbps
+                case uploadMbps
+                case latencyMs
+                case testedAt
+                case server
             }
         }
         /// How text subtitles look (PLAY-20), for this person on every app and in burned-in subtitles. Styled ASS subtitles keep their own look. Absent fields use the defaults.

@@ -2179,6 +2179,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/speedtest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Measure the server's internet download and upload speed against Cloudflare's public speed test (admin only; takes about 20 s). Use the upload result for Remote access's upload speed. */
+        post: operations["runSpeedTest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/system/status": {
         parameters: {
             query?: never;
@@ -3389,6 +3406,7 @@ export interface components {
             /** @example 03:00 */
             maintenanceWindowStart?: string;
             maintenanceWindowHours?: number;
+            /** @description Days to keep nightly backups before they're deleted (the newest is always kept). */
             backupRetention?: number;
         };
         /** @enum {string} */
@@ -3802,6 +3820,16 @@ export interface components {
                 type: components["schemas"]["LibraryType"];
                 items: number;
             }[];
+        };
+        SpeedTestResult: {
+            downloadMbps: number;
+            uploadMbps: number;
+            /** @description Median round trip to the test server. */
+            latencyMs: number;
+            /** Format: date-time */
+            testedAt: string;
+            /** @example Cloudflare */
+            server?: string;
         };
         /** @description How text subtitles look (PLAY-20), for this person on every app and in burned-in subtitles. Styled ASS subtitles keep their own look. Absent fields use the defaults. */
         SubtitleStyle: {
@@ -8687,6 +8715,29 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    runSpeedTest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Measured. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpeedTestResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            502: components["responses"]["BadGateway"];
         };
     };
     systemStatus: {

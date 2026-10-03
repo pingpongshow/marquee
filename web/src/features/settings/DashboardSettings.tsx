@@ -93,32 +93,86 @@ function SessionCard({ s }: { s: Session }) {
 type Sample = components["schemas"]["BandwidthSample"];
 
 /** Local and remote bandwidth over the last hour, stacked (ADM-10). */
-function BandwidthChart({ samples, uploadKbps }: { samples: Sample[]; uploadKbps?: number }) {
+/** A round axis maximum (1, 2, 5 × 10ⁿ Mbps) at or above the value. */
+function niceMaxKbps(kbps: number) {
+  const m = Math.max(kbps, 1000) / 1000;
+  const p = 10 ** Math.floor(Math.log10(m));
+  const step = [1, 2, 2.5, 5, 10].find((f) => f * p >= m) ?? 10;
+  return step * p * 1000;
+}
+
+const axisMbps = (kbps: number) => `${+(kbps / 1000).toFixed(1)} Mbps`;
+
+/**
+ * Estimated stream bitrate over the last hour, one sample a minute (kept in memory,
+ * so it starts empty after a restart). Labels are HTML over the SVG so they don't stretch.
+ */
+export function BandwidthChart({ samples, uploadKbps }: { samples: Sample[]; uploadKbps?: number }) {
   const W = 600;
   const H = 140;
-  const max = Math.max(1000, uploadKbps ?? 0, ...samples.map((x) => x.localKbps + x.remoteKbps)) * 1.1;
+  const total = (p: Sample) => p.localKbps + p.remoteKbps;
+  const peak = Math.max(0, ...samples.map(total));
+  if (samples.length < 2 || peak <= 0) {
+    return (
+      <div className="flex h-36 flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border text-center" data-testid="bandwidth-empty">
+        <p className="text-sm font-medium text-muted">No streaming in the last hour</p>
+        <p className="text-xs text-faint">{uploadKbps ? `Upload speed ${mbps(uploadKbps)}. ` : ""}The chart fills in a minute at a time while something plays.</p>
+      </div>
+    );
+  }
+  const max = niceMaxKbps(Math.max(peak, uploadKbps ?? 0) * 1.05);
   // The newest sample is "now" on the server, so the window ends there.
-  const last = samples.at(-1);
-  const start = (last ? new Date(last.at).getTime() : 0) - 60 * 60 * 1000;
-  const x = (iso: string) => ((new Date(iso).getTime() - start) / (60 * 60 * 1000)) * W;
+  const end = new Date(samples.at(-1)!.at).getTime();
+  const start = end - 60 * 60 * 1000;
+  const x = (iso: string) => Math.max(0, ((new Date(iso).getTime() - start) / (60 * 60 * 1000)) * W);
   const y = (kbps: number) => H - (kbps / max) * H;
+  const pct = (kbps: number) => `${(1 - kbps / max) * 100}%`;
   const area = (top: (x: Sample) => number, bottom: (x: Sample) => number) => {
-    if (samples.length < 2) return "";
     const upper = samples.map((p) => `${x(p.at).toFixed(1)},${y(top(p)).toFixed(1)}`);
     const lower = [...samples].reverse().map((p) => `${x(p.at).toFixed(1)},${y(bottom(p)).toFixed(1)}`);
     return `M${upper.join("L")}L${lower.join("L")}Z`;
   };
-  const peak = Math.max(0, ...samples.map((p) => p.localKbps + p.remoteKbps));
   return (
-    <figure>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-36 w-full" role="img" aria-label={`Bandwidth over the last hour, peak ${mbps(peak)}`}>
-        {[0.25, 0.5, 0.75].map((f) => (
-          <line key={f} x1={0} x2={W} y1={H * f} y2={H * f} className="stroke-border" strokeWidth={1} vectorEffect="non-scaling-stroke" />
-        ))}
-        {uploadKbps ? <line x1={0} x2={W} y1={y(uploadKbps)} y2={y(uploadKbps)} className="stroke-danger" strokeDasharray="4 4" strokeWidth={1} vectorEffect="non-scaling-stroke" /> : null}
-        <path d={area((p) => p.localKbps, () => 0)} className="fill-accent/50" />
-        <path d={area((p) => p.localKbps + p.remoteKbps, (p) => p.localKbps)} className="fill-sky-400/50" />
-      </svg>
+    <figure data-testid="bandwidth-chart">
+      <div className="flex gap-2">
+        {/* Y axis */}
+        <div className="relative h-36 w-16 shrink-0 text-right text-[10px] text-faint tabular-nums" aria-hidden>
+          <span className="absolute right-0 -translate-y-1/2" style={{ top: 0 }}>
+            {axisMbps(max)}
+          </span>
+          <span className="absolute right-0 -translate-y-1/2" style={{ top: "50%" }}>
+            {axisMbps(max / 2)}
+          </span>
+          <span className="absolute right-0 -translate-y-full" style={{ top: "100%" }}>
+            0
+          </span>
+        </div>
+        <div className="relative h-36 min-w-0 flex-1">
+          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible" role="img" aria-label={`Bandwidth over the last hour, peak ${mbps(peak)}`}>
+            {[0, 0.5, 1].map((f) => (
+              <line key={f} x1={0} x2={W} y1={H * f} y2={H * f} className="stroke-border" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+            ))}
+            <path d={area((p) => p.localKbps, () => 0)} className="fill-accent/50" />
+            <path d={area(total, (p) => p.localKbps)} className="fill-sky-400/50" />
+            <line x1={0} x2={W} y1={y(peak)} y2={y(peak)} className="stroke-muted" strokeDasharray="2 3" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+            {uploadKbps ? <line x1={0} x2={W} y1={y(uploadKbps)} y2={y(uploadKbps)} className="stroke-danger" strokeDasharray="4 4" strokeWidth={1.5} vectorEffect="non-scaling-stroke" /> : null}
+          </svg>
+          <span className="pointer-events-none absolute left-1 -translate-y-full rounded bg-surface/80 px-1 text-[10px] text-muted tabular-nums" style={{ top: pct(peak) }}>
+            Peak {mbps(peak)}
+          </span>
+          {uploadKbps ? (
+            <span className="pointer-events-none absolute right-1 -translate-y-full rounded bg-surface/80 px-1 text-[10px] text-danger tabular-nums" style={{ top: pct(uploadKbps) }}>
+              Upload speed {mbps(uploadKbps)}
+            </span>
+          ) : null}
+        </div>
+      </div>
+      {/* X axis */}
+      <div className="mt-1 ml-18 flex justify-between text-[10px] text-faint" aria-hidden>
+        <span>60 min ago</span>
+        <span>30 min ago</span>
+        <span>Now</span>
+      </div>
       <figcaption className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
         <span className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-sm bg-accent/70" /> Local
@@ -131,7 +185,7 @@ function BandwidthChart({ samples, uploadKbps }: { samples: Sample[]; uploadKbps
             <span className="h-px w-3 border-t border-dashed border-danger" /> Upload speed
           </span>
         ) : null}
-        <span className="ml-auto">Peak {mbps(peak)} · last 60 minutes</span>
+        <span className="ml-auto">Estimated stream bitrate, sampled each minute</span>
       </figcaption>
     </figure>
   );
@@ -152,9 +206,9 @@ export function DashboardSettings() {
           <Stat label="Remote" value={mbps(st.remoteKbps)} hint={st.uploadSpeedKbps ? `of ${mbps(st.uploadSpeedKbps)} upload` : "Set upload speed in Remote Access"} />
         </div>
       )}
-      {st?.bandwidthHistory && (
-        <Card title="Bandwidth">
-          <BandwidthChart samples={st.bandwidthHistory} uploadKbps={st.uploadSpeedKbps} />
+      {st && (
+        <Card title="Bandwidth" description="The last hour. Starts empty after the server restarts.">
+          <BandwidthChart samples={st.bandwidthHistory ?? []} uploadKbps={st.uploadSpeedKbps} />
         </Card>
       )}
       <Card title="Now playing">

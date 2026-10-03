@@ -156,7 +156,7 @@ type Metadata struct {
 type Tasks struct {
 	MaintenanceWindowStart string `json:"maintenanceWindowStart"`
 	MaintenanceWindowHours int    `json:"maintenanceWindowHours"`
-	BackupRetention        int    `json:"backupRetention"`
+	BackupRetention        int    `json:"backupRetention"` // days to keep nightly backups
 }
 
 // Defaults are applied first; stored JSON is unmarshalled over them, so new settings

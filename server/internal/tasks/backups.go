@@ -105,21 +105,23 @@ func (b *Backups) Delete(name string) error {
 	return os.Remove(p)
 }
 
-// Prune keeps the newest Retention scheduled backups, and the five newest of every other kind.
+// Prune deletes scheduled backups older than Retention days (always keeping the newest) and
+// keeps the five newest of every other kind. List is newest first.
 func (b *Backups) Prune() (int, error) {
 	list, err := b.List()
 	if err != nil {
 		return 0, err
 	}
+	cutoff := time.Now().Add(-time.Duration(b.Retention()) * 24 * time.Hour)
 	seen := map[string]int{}
 	removed := 0
 	for _, bk := range list {
-		keep := 5
-		if bk.Kind == "scheduled" {
-			keep = b.Retention()
-		}
 		seen[bk.Kind]++
-		if seen[bk.Kind] > keep {
+		old := seen[bk.Kind] > 5
+		if bk.Kind == "scheduled" {
+			old = seen[bk.Kind] > 1 && bk.CreatedAt.Before(cutoff)
+		}
+		if old {
 			if os.Remove(filepath.Join(b.Dir, bk.Name)) == nil {
 				removed++
 			}
