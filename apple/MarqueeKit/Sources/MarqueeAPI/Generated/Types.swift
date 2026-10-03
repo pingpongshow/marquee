@@ -765,6 +765,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /stats`.
     /// - Remark: Generated from `#/paths//stats/get(getStats)`.
     func getStats(_ input: Operations.GetStats.Input) async throws -> Operations.GetStats.Output
+    /// Measure the server's internet download and upload speed against Cloudflare's public speed test (admin only; takes about 20 s). Use the upload result for Remote access's upload speed.
+    ///
+    /// - Remark: HTTP `POST /system/speedtest`.
+    /// - Remark: Generated from `#/paths//system/speedtest/post(runSpeedTest)`.
+    func runSpeedTest(_ input: Operations.RunSpeedTest.Input) async throws -> Operations.RunSpeedTest.Output
     /// Server health for the dashboard (admin only).
     ///
     /// - Remark: HTTP `GET /system/status`.
@@ -2730,6 +2735,13 @@ extension APIProtocol {
             query: query,
             headers: headers
         ))
+    }
+    /// Measure the server's internet download and upload speed against Cloudflare's public speed test (admin only; takes about 20 s). Use the upload result for Remote access's upload speed.
+    ///
+    /// - Remark: HTTP `POST /system/speedtest`.
+    /// - Remark: Generated from `#/paths//system/speedtest/post(runSpeedTest)`.
+    public func runSpeedTest(headers: Operations.RunSpeedTest.Input.Headers = .init()) async throws -> Operations.RunSpeedTest.Output {
+        try await runSpeedTest(Operations.RunSpeedTest.Input(headers: headers))
     }
     /// Server health for the dashboard (admin only).
     ///

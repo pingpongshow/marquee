@@ -2810,6 +2810,21 @@ paths:
               schema: { $ref: "#/components/schemas/Stats" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+  /system/speedtest:
+    post:
+      tags: [system]
+      operationId: runSpeedTest
+      summary: "Measure the server's internet download and upload speed against Cloudflare's public speed test (admin only; takes about 20 s). Use the upload result for Remote access's upload speed."
+      responses:
+        "200":
+          description: Measured.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SpeedTestResult" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
   /system/status:
     get:
       tags: [system]
@@ -4223,7 +4238,7 @@ components:
       properties:
         maintenanceWindowStart: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", example: "03:00" }
         maintenanceWindowHours: { type: integer, minimum: 1, maximum: 12 }
-        backupRetention: { type: integer, minimum: 1, maximum: 60 }
+        backupRetention: { type: integer, minimum: 1, maximum: 365, description: "Days to keep nightly backups before they're deleted (the newest is always kept)." }
 
     # ---------- Libraries ----------
     LibraryType:
@@ -4628,6 +4643,16 @@ components:
               name: { type: string }
               type: { $ref: "#/components/schemas/LibraryType" }
               items: { type: integer }
+
+    SpeedTestResult:
+      type: object
+      required: [downloadMbps, uploadMbps, latencyMs, testedAt]
+      properties:
+        downloadMbps: { type: number }
+        uploadMbps: { type: number }
+        latencyMs: { type: number, description: Median round trip to the test server. }
+        testedAt: { type: string, format: date-time }
+        server: { type: string, example: Cloudflare }
 
     SubtitleStyle:
       type: object

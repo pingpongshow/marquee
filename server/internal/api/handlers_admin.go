@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"log/slog"
+	"marquee/internal/speedtest"
 	"strings"
 
 	"marquee/internal/library"
@@ -494,4 +496,26 @@ func toAPILiveSources(in []settings.LiveTVSource) []LiveTvSource {
 		out[i] = LiveTvSource{Id: ptr(s.ID), Name: s.Name, Kind: LiveTvSourceKind(s.Kind), Url: s.URL, EpgUrl: nz(s.EPGURL), UserAgent: nz(s.UserAgent), Enabled: ptr(s.Enabled)}
 	}
 	return out
+}
+
+// RunSpeedTest measures the server's internet speed (admin only).
+func (h *Handlers) RunSpeedTest(ctx context.Context, _ RunSpeedTestRequestObject) (RunSpeedTestResponseObject, error) {
+	switch authed, admin := isAdmin(ctx); {
+	case !authed:
+		return RunSpeedTest401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !admin:
+		return RunSpeedTest403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	t := h.SpeedTest
+	if t == nil {
+		t = &speedtest.Tester{}
+	}
+	r, err := t.Run(ctx)
+	if err != nil {
+		slog.WarnContext(ctx, "speed test failed", "err", err)
+		return RunSpeedTest502JSONResponse{BadGatewayJSONResponse(apiErr("speedtest_failed", "The speed test couldn't reach Cloudflare: "+err.Error()))}, nil
+	}
+	slog.InfoContext(ctx, "speed test", "downMbps", int(r.DownloadMbps), "upMbps", int(r.UploadMbps), "latencyMs", int(r.LatencyMs))
+	return RunSpeedTest200JSONResponse{DownloadMbps: float32(r.DownloadMbps), UploadMbps: float32(r.UploadMbps),
+		LatencyMs: float32(r.LatencyMs), TestedAt: r.TestedAt, Server: ptr("Cloudflare")}, nil
 }

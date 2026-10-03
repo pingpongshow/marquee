@@ -18,7 +18,7 @@ export function Button({
       {...rest}
       disabled={disabled || loading}
       className={clsx(
-        "inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors [&>svg]:shrink-0 disabled:cursor-not-allowed disabled:opacity-50",
         size === "sm" ? "h-8 px-3 text-sm" : "h-10 px-4 text-sm",
         variant === "primary" && "bg-accent text-black hover:bg-accent-strong",
         variant === "secondary" && "bg-surface-3 text-text hover:bg-border",
@@ -98,12 +98,12 @@ export function Card({ title, description, children, actions }: { title?: string
   return (
     <section className="rounded-lg border border-border bg-surface">
       {(title || actions) && (
-        <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
-          <div>
+        <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b border-border px-5 py-4">
+          <div className="min-w-0 flex-1 basis-56">
             {title && <h2 className="text-base font-semibold">{title}</h2>}
             {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
           </div>
-          {actions}
+          {actions && <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{actions}</div>}
         </header>
       )}
       <div className="space-y-5 px-5 py-5">{children}</div>
