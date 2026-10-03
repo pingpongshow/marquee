@@ -37,6 +37,7 @@ import app.marquee.api.models.Error
 import app.marquee.api.models.ItemDetail
 import app.marquee.api.models.ItemEdit
 import app.marquee.api.models.ItemPage
+import app.marquee.api.models.ItemReviews
 import app.marquee.api.models.ItemSummary
 import app.marquee.api.models.ItemType
 import app.marquee.api.models.LibraryFilters
@@ -46,6 +47,7 @@ import app.marquee.api.models.MuseVideoRequest
 import app.marquee.api.models.MuseVideoResult
 import app.marquee.api.models.PersonDetail
 import app.marquee.api.models.RateItemRequest
+import app.marquee.api.models.SetReviewRequest
 import app.marquee.api.models.SmartCollectionSave
 
 import kotlinx.serialization.SerialName
@@ -819,6 +821,80 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
+     * DELETE /items/{itemId}/reviews/{userId}
+     * Remove a comment (your own, or anyone&#39;s for admins). Ratings aren&#39;t touched.
+     * 
+     * @param itemId 
+     * @param userId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun deleteReview(itemId: kotlin.Long, userId: kotlin.Long) : Unit {
+        val localVarResponse = deleteReviewWithHttpInfo(itemId = itemId, userId = userId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /items/{itemId}/reviews/{userId}
+     * Remove a comment (your own, or anyone&#39;s for admins). Ratings aren&#39;t touched.
+     * 
+     * @param itemId 
+     * @param userId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun deleteReviewWithHttpInfo(itemId: kotlin.Long, userId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = deleteReviewRequestConfig(itemId = itemId, userId = userId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation deleteReview
+     *
+     * @param itemId 
+     * @param userId 
+     * @return RequestConfig
+     */
+    fun deleteReviewRequestConfig(itemId: kotlin.Long, userId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/items/{itemId}/reviews/{userId}".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())).replace("{"+"userId"+"}", encodeURIComponent(userId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * PATCH /items/{itemId}/metadata
      * Edit metadata fields (admin only). Edited fields are locked so agents won&#39;t overwrite them.
      * 
@@ -1199,6 +1275,79 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
+     * GET /items/{itemId}/reviews
+     * The community rating and everyone&#39;s ratings and comments for an item (USER-17).
+     * 
+     * @param itemId 
+     * @return ItemReviews
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun itemReviews(itemId: kotlin.Long) : ItemReviews {
+        val localVarResponse = itemReviewsWithHttpInfo(itemId = itemId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ItemReviews
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /items/{itemId}/reviews
+     * The community rating and everyone&#39;s ratings and comments for an item (USER-17).
+     * 
+     * @param itemId 
+     * @return ApiResponse<ItemReviews?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun itemReviewsWithHttpInfo(itemId: kotlin.Long) : ApiResponse<ItemReviews?> {
+        val localVariableConfig = itemReviewsRequestConfig(itemId = itemId)
+
+        return request<Unit, ItemReviews>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation itemReviews
+     *
+     * @param itemId 
+     * @return RequestConfig
+     */
+    fun itemReviewsRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/items/{itemId}/reviews".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * GET /libraries/{libraryId}/filters
      * Values for the library filter bar, and where each letter starts for the A–Z jump bar (title sort).
      * 
@@ -1383,7 +1532,9 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
          @SerialName(value = "duration") DURATION("duration"),
          @SerialName(value = "-duration") _DURATION("-duration"),
          @SerialName(value = "-viewed") _VIEWED("-viewed"),
-         @SerialName(value = "random") RANDOM("random");
+         @SerialName(value = "random") RANDOM("random"),
+         @SerialName(value = "myRating") MY_RATING("myRating"),
+         @SerialName(value = "-myRating") _MY_RATING("-myRating");
 
         /**
          * Override [toString()] to avoid using the enum variable name as the value, and instead use
@@ -1448,6 +1599,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param resolution  (optional)
      * @param hdr  (optional)
      * @param letter Only titles starting with this letter (\&quot;#\&quot; for anything else). (optional)
+     * @param minMyRating Only what the person rated at least this (0–10, e.g. 8 &#x3D; 4 stars: favourites). (optional)
      * @return ItemPage
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -1457,8 +1609,8 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun listLibraryItems(libraryId: kotlin.Long, type: ItemType? = null, sort: SortListLibraryItems? = SortListLibraryItems.TITLE, offset: kotlin.Int? = 0, limit: kotlin.Int? = 100, watch: WatchListLibraryItems? = null, genre: kotlin.String? = null, decade: kotlin.Int? = null, contentRating: kotlin.String? = null, resolution: ResolutionListLibraryItems? = null, hdr: kotlin.Boolean? = null, letter: kotlin.String? = null) : ItemPage {
-        val localVarResponse = listLibraryItemsWithHttpInfo(libraryId = libraryId, type = type, sort = sort, offset = offset, limit = limit, watch = watch, genre = genre, decade = decade, contentRating = contentRating, resolution = resolution, hdr = hdr, letter = letter)
+    fun listLibraryItems(libraryId: kotlin.Long, type: ItemType? = null, sort: SortListLibraryItems? = SortListLibraryItems.TITLE, offset: kotlin.Int? = 0, limit: kotlin.Int? = 100, watch: WatchListLibraryItems? = null, genre: kotlin.String? = null, decade: kotlin.Int? = null, contentRating: kotlin.String? = null, resolution: ResolutionListLibraryItems? = null, hdr: kotlin.Boolean? = null, letter: kotlin.String? = null, minMyRating: kotlin.Int? = null) : ItemPage {
+        val localVarResponse = listLibraryItemsWithHttpInfo(libraryId = libraryId, type = type, sort = sort, offset = offset, limit = limit, watch = watch, genre = genre, decade = decade, contentRating = contentRating, resolution = resolution, hdr = hdr, letter = letter, minMyRating = minMyRating)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as ItemPage
@@ -1491,14 +1643,15 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param resolution  (optional)
      * @param hdr  (optional)
      * @param letter Only titles starting with this letter (\&quot;#\&quot; for anything else). (optional)
+     * @param minMyRating Only what the person rated at least this (0–10, e.g. 8 &#x3D; 4 stars: favourites). (optional)
      * @return ApiResponse<ItemPage?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun listLibraryItemsWithHttpInfo(libraryId: kotlin.Long, type: ItemType?, sort: SortListLibraryItems?, offset: kotlin.Int?, limit: kotlin.Int?, watch: WatchListLibraryItems?, genre: kotlin.String?, decade: kotlin.Int?, contentRating: kotlin.String?, resolution: ResolutionListLibraryItems?, hdr: kotlin.Boolean?, letter: kotlin.String?) : ApiResponse<ItemPage?> {
-        val localVariableConfig = listLibraryItemsRequestConfig(libraryId = libraryId, type = type, sort = sort, offset = offset, limit = limit, watch = watch, genre = genre, decade = decade, contentRating = contentRating, resolution = resolution, hdr = hdr, letter = letter)
+    fun listLibraryItemsWithHttpInfo(libraryId: kotlin.Long, type: ItemType?, sort: SortListLibraryItems?, offset: kotlin.Int?, limit: kotlin.Int?, watch: WatchListLibraryItems?, genre: kotlin.String?, decade: kotlin.Int?, contentRating: kotlin.String?, resolution: ResolutionListLibraryItems?, hdr: kotlin.Boolean?, letter: kotlin.String?, minMyRating: kotlin.Int?) : ApiResponse<ItemPage?> {
+        val localVariableConfig = listLibraryItemsRequestConfig(libraryId = libraryId, type = type, sort = sort, offset = offset, limit = limit, watch = watch, genre = genre, decade = decade, contentRating = contentRating, resolution = resolution, hdr = hdr, letter = letter, minMyRating = minMyRating)
 
         return request<Unit, ItemPage>(
             localVariableConfig
@@ -1520,9 +1673,10 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param resolution  (optional)
      * @param hdr  (optional)
      * @param letter Only titles starting with this letter (\&quot;#\&quot; for anything else). (optional)
+     * @param minMyRating Only what the person rated at least this (0–10, e.g. 8 &#x3D; 4 stars: favourites). (optional)
      * @return RequestConfig
      */
-    fun listLibraryItemsRequestConfig(libraryId: kotlin.Long, type: ItemType?, sort: SortListLibraryItems?, offset: kotlin.Int?, limit: kotlin.Int?, watch: WatchListLibraryItems?, genre: kotlin.String?, decade: kotlin.Int?, contentRating: kotlin.String?, resolution: ResolutionListLibraryItems?, hdr: kotlin.Boolean?, letter: kotlin.String?) : RequestConfig<Unit> {
+    fun listLibraryItemsRequestConfig(libraryId: kotlin.Long, type: ItemType?, sort: SortListLibraryItems?, offset: kotlin.Int?, limit: kotlin.Int?, watch: WatchListLibraryItems?, genre: kotlin.String?, decade: kotlin.Int?, contentRating: kotlin.String?, resolution: ResolutionListLibraryItems?, hdr: kotlin.Boolean?, letter: kotlin.String?, minMyRating: kotlin.Int?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -1558,6 +1712,9 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
                 }
                 if (letter != null) {
                     put("letter", listOf(letter.toString()))
+                }
+                if (minMyRating != null) {
+                    put("minMyRating", listOf(minMyRating.toString()))
                 }
             }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
@@ -2381,6 +2538,81 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/items/{itemId}/match".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /items/{itemId}/reviews
+     * Your comment on an item, shown with your rating to everyone who can see it. An empty comment removes it (your rating stays; set that with PUT /items/{itemId}/rating).
+     * 
+     * @param itemId 
+     * @param setReviewRequest 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun setReview(itemId: kotlin.Long, setReviewRequest: SetReviewRequest) : Unit {
+        val localVarResponse = setReviewWithHttpInfo(itemId = itemId, setReviewRequest = setReviewRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /items/{itemId}/reviews
+     * Your comment on an item, shown with your rating to everyone who can see it. An empty comment removes it (your rating stays; set that with PUT /items/{itemId}/rating).
+     * 
+     * @param itemId 
+     * @param setReviewRequest 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun setReviewWithHttpInfo(itemId: kotlin.Long, setReviewRequest: SetReviewRequest) : ApiResponse<Unit?> {
+        val localVariableConfig = setReviewRequestConfig(itemId = itemId, setReviewRequest = setReviewRequest)
+
+        return request<SetReviewRequest, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation setReview
+     *
+     * @param itemId 
+     * @param setReviewRequest 
+     * @return RequestConfig
+     */
+    fun setReviewRequestConfig(itemId: kotlin.Long, setReviewRequest: SetReviewRequest) : RequestConfig<SetReviewRequest> {
+        val localVariableBody = setReviewRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/items/{itemId}/reviews".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

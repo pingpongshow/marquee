@@ -42,6 +42,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.size
@@ -217,16 +218,25 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
     var library by remember { mutableStateOf<Library?>(null) }
     // Movie libraries also browse by collection (META-7).
     var collections by remember { mutableStateOf(false) }
+    // Sort by the person's own rating, and only what they rated 4★ or more.
+    var byMyRating by rememberSaveable { mutableStateOf(false) }
+    var fav by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    // Bumped when the sort, filter or collections view changes, so a page still loading for the old one is dropped.
+    var generation by remember { mutableIntStateOf(0) }
     fun loadMore() {
         if (loading || (total >= 0 && items.size >= total)) return
         loading = true
+        val gen = generation
         scope.launch {
-            withContext(Dispatchers.IO) { runCatching { marquee.items.listLibraryItems(libraryId, if (collections) ItemType.COLLECTION else null, offset = items.size, limit = 120) } }
-                .onSuccess { page -> items.addAll(page.items.filter { n -> items.none { it.id == n.id } }); total = page.total }
-            loading = false
+            withContext(Dispatchers.IO) { runCatching { marquee.items.listLibraryItems(libraryId, if (collections) ItemType.COLLECTION else null,
+                if (byMyRating && !collections) app.marquee.api.apis.ItemsApi.SortListLibraryItems._MY_RATING else app.marquee.api.apis.ItemsApi.SortListLibraryItems.TITLE,
+                offset = items.size, limit = 120, minMyRating = if (fav && !collections) app.marquee.music.FAVORITE_RATING else null) } }
+                .onSuccess { page -> if (gen == generation) { items.addAll(page.items.filter { n -> items.none { it.id == n.id } }); total = page.total } }
+            if (gen == generation) loading = false
         }
     }
+    fun reload() { generation++; loading = false; items.clear(); total = -1; loadMore() }
     LaunchedEffect(libraryId) {
         library = withContext(Dispatchers.IO) { runCatching { marquee.libraries.getLibrary(libraryId) }.getOrNull() }
         if (library?.type != LibraryType.MUSIC) loadMore()
@@ -243,14 +253,26 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
             }
             if (library?.type == LibraryType.MOVIES) listOf(false to "All", true to "Collections").forEach { (c, label) ->
                 androidx.compose.material3.FilterChip(collections == c, {
-                    if (collections != c) { collections = c; items.clear(); total = -1; loadMore() }
+                    if (collections != c) { collections = c; reload() }
                 }, { Text(label) }, Modifier.focusRing(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)))
             }
         }
+        if (!collections) androidx.compose.foundation.lazy.LazyRow(Modifier.semantics { contentDescription = "Sort and filter" },
+            contentPadding = PaddingValues(horizontal = sidePadding), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            item { FilterChip(!byMyRating, { if (byMyRating) { byMyRating = false; reload() } }, { Text("Title", maxLines = 1) }, Modifier.focusRing(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))) }
+            item { FilterChip(byMyRating, { if (!byMyRating) { byMyRating = true; reload() } }, { Text("My rating", maxLines = 1) }, Modifier.focusRing(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))) }
+            item {
+                FilterChip(fav, { fav = !fav; reload() }, { Text("Rated 4★+", maxLines = 1) }, Modifier.focusRing(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+                    leadingIcon = { Icon(Icons.Filled.Star, null, Modifier.size(18.dp), tint = Gold) })
+            }
+        }
+        if (total == 0) Text(if (fav && !collections) "Nothing rated 4★ or more yet." else "Nothing here yet.", Modifier.padding(sidePadding),
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
         LazyVerticalGrid(GridCells.Adaptive(min), contentPadding = PaddingValues(sidePadding), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             itemsIndexed(items, key = { _, it -> it.id }) { i, it ->
                 if (i >= items.size - 30) LaunchedEffect(i) { loadMore() }
-                PosterCard(it, marquee.imageUrl(it.images?.poster, 240), min, { openItem(nav, it) }, autoFocus = marquee.isTv && i == 0)
+                PosterCard(it, marquee.imageUrl(it.images?.poster, 240), min, { openItem(nav, it) }, autoFocus = marquee.isTv && i == 0,
+                    showRating = byMyRating || fav)
             }
         }
     }
@@ -307,6 +329,7 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
             ListItem(
                 headlineContent = { Text(it.title) },
                 supportingContent = { Text(subtitleFor(it)) },
+                trailingContent = if (it.type == ItemType.TRACK) { { app.marquee.music.TrackRating(it) } } else null,
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
                 modifier = Modifier.focusCard({ if (it.type == ItemType.TRACK) music.play(tracks, i, source = title) else openItem(nav, it, play = true) }),
             )

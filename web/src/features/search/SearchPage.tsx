@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { searchQuery } from "@/api/queries";
 import { Spinner } from "@/components/ui";
 import { Poster } from "../browse/Poster";
+import { RowRating } from "../music/Rating";
 import { MuseVideo } from "./MuseVideo";
 import { groupLabels, resultSubtitle } from "./SearchBox";
 
@@ -81,6 +82,7 @@ function TextSearch({ q, tabs }: { q: string; tabs: ReactNode }) {
                   <Poster item={it} shape={it.type === "episode" ? "wide" : it.type === "artist" || it.type === "album" || it.type === "track" ? "square" : "poster"} className="group-hover:ring-2 group-hover:ring-accent" />
                   <div className="mt-2 truncate text-sm font-medium">{it.title}</div>
                   <div className="truncate text-xs text-muted">{resultSubtitle(it)}</div>
+                  {it.type === "track" && <RowRating item={it} className="mt-0.5" />}
                 </Link>
               </li>
             ))}

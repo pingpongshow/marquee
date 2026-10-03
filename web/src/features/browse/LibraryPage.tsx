@@ -2,7 +2,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { clsx } from "clsx";
-import { ChevronLeft, Filter, LayoutGrid, List, Sparkles, X } from "lucide-react";
+import { ChevronLeft, Filter, LayoutGrid, List, Sparkles, Star, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { librariesQuery, meQuery } from "@/api/queries";
@@ -13,6 +13,8 @@ import { ItemMenu } from "./ItemMenu";
 import { isMusicSection, MusicHome, MusicSectionPage, musicSectionTitles } from "../music/MusicHome";
 import { useMusicActions } from "../player/MusicPlayer";
 import { MuseButton } from "../search/MuseVideo";
+import { RowRating } from "../music/Rating";
+import { FavoritesPage } from "../music/Favorites";
 import { Poster } from "./Poster";
 import { formatDuration, subtitleFor } from "./format";
 import { sortOptions } from "./sorts";
@@ -26,6 +28,8 @@ export type LibrarySearch = {
   decade?: number;
   rating?: string;
   res?: ListQuery["resolution"];
+  /** Only what the person rated 4 stars or more (favourites). */
+  fav?: boolean;
   view?: "grid" | "list";
   /** Movie libraries: browse collections instead of movies. */
   show?: "collections";
@@ -44,6 +48,7 @@ export function validateLibrarySearch(s: Record<string, unknown>): LibrarySearch
     decade: typeof s.decade === "number" ? s.decade : undefined,
     rating: str(s.rating),
     res: str(s.res) as LibrarySearch["res"],
+    fav: s.fav === true || s.fav === "1" ? true : undefined,
     view: s.view === "list" ? "list" : undefined,
     show: s.show === "collections" ? "collections" : undefined,
   };
@@ -83,9 +88,10 @@ export function LibraryPage() {
   const search = useSearch({ strict: false }) as LibrarySearch;
   const id = Number(params.libraryId);
   const lib = useQuery(librariesQuery).data?.find((l) => l.id === id);
-  const filtered = !!(search.watch || search.genre || search.decade || search.rating || search.res);
+  const filtered = !!(search.watch || search.genre || search.decade || search.rating || search.res || search.fav);
   const section = lib?.type === "music" && isMusicSection(params.section) ? params.section : undefined;
   if (lib?.type === "music") {
+    if (section === "favorites") return <FavoritesPage libraryId={id} name={lib.name} />;
     if (section === "genres" || section === "decades" || section === "moods" || section === "muse")
       return <MusicSectionPage key={section} libraryId={id} name={lib.name} section={section} />;
     // Old links with filters on the library itself still show the (artist) grid.
@@ -117,7 +123,7 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
   const collections = lib?.type === "movies" && search.show === "collections";
   const query: ListQuery = collections
     ? { sort, type: "collection" }
-    : { sort, type: itemType, watch: search.watch, genre: search.genre, decade: search.decade, contentRating: search.rating, resolution: search.res };
+    : { sort, type: itemType, watch: search.watch, genre: search.genre, decade: search.decade, contentRating: search.rating, resolution: search.res, minMyRating: search.fav ? 8 : undefined };
 
   const filters = useQuery({
     queryKey: ["libraries", id, "filters", itemType ?? ""],
@@ -198,7 +204,7 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
                   key={label}
                   role="tab"
                   aria-selected={search.show === v}
-                  onClick={() => set({ show: v, watch: undefined, genre: undefined, decade: undefined, rating: undefined, res: undefined })}
+                  onClick={() => set({ show: v, watch: undefined, genre: undefined, decade: undefined, rating: undefined, res: undefined, fav: undefined })}
                   className={clsx("rounded px-3 py-1", search.show === v ? "bg-surface-3 text-text" : "text-muted hover:text-text")}
                 >
                   {label}
@@ -214,10 +220,15 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
                 <Filter className="size-4" /> Filter
               </Button>
             )}
+            {!collections && (
+              <Button size="sm" variant={search.fav ? "primary" : "secondary"} onClick={() => set({ fav: search.fav ? undefined : true })} aria-pressed={!!search.fav}>
+                <Star className="size-4" aria-hidden /> Rated 4★+
+              </Button>
+            )}
             <div className="w-44">
             <Select aria-label="Sort by" className="h-8" value={sort} onChange={(e) => set({ sort: e.target.value === "title" ? undefined : (e.target.value as LibrarySearch["sort"]) })}>
               {sortOptions
-                .filter((o) => isVideo || !o.video)
+                .filter((o) => (isVideo || !o.video) && (!collections || !o.personal))
                 .map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
@@ -293,7 +304,7 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
         {savingSmart && smartType && (
           <SaveSmartCollectionDialog
             libraryId={id}
-            rules={{ itemType: smartType, sort, watch: search.watch, genre: search.genre, decade: search.decade, contentRating: search.rating, resolution: search.res }}
+            rules={{ itemType: smartType, sort: sort === "-myRating" ? undefined : sort, watch: search.watch, genre: search.genre, decade: search.decade, contentRating: search.rating, resolution: search.res }}
             onClose={() => setSavingSmart(false)}
           />
         )}
@@ -303,8 +314,9 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
             {search.genre && <Chip label={search.genre} onClear={() => set({ genre: undefined })} />}
             {search.decade && <Chip label={`${search.decade}s`} onClear={() => set({ decade: undefined })} />}
             {search.rating && <Chip label={search.rating} onClear={() => set({ rating: undefined })} />}
+            {search.fav && <Chip label="Rated 4★+" onClear={() => set({ fav: undefined })} />}
             {search.res && <Chip label={search.res === "4k" ? "4K" : search.res === "sd" ? "SD" : `${search.res}p`} onClear={() => set({ res: undefined })} />}
-            <button onClick={() => set({ watch: undefined, genre: undefined, decade: undefined, rating: undefined, res: undefined })} className="text-xs text-muted hover:text-text">
+            <button onClick={() => set({ watch: undefined, genre: undefined, decade: undefined, rating: undefined, res: undefined, fav: undefined })} className="text-xs text-muted hover:text-text">
               Clear all
             </button>
           </div>
@@ -371,7 +383,7 @@ function ListRow({ item, shape, onPlay }: { item?: ItemSummary; shape: "poster" 
   if (!item) return <div className="h-14 animate-pulse rounded bg-surface-2" />;
   const watched = item.type === "show" ? item.leafCount > 0 && item.watchedLeafCount === item.leafCount : (item.viewCount ?? 0) > 0;
   return (
-    <div className="flex h-14 items-center gap-4 border-b border-border">
+    <div className="group flex h-14 items-center gap-4 border-b border-border">
       <Link
         to="/item/$itemId"
         params={{ itemId: String(item.id) }}
@@ -390,6 +402,7 @@ function ListRow({ item, shape, onPlay }: { item?: ItemSummary; shape: "poster" 
           <span className="block truncate text-xs text-muted">{subtitleFor(item)}</span>
         </span>
       </Link>
+      {item.type === "track" && <RowRating item={item} />}
       <span className="hidden w-16 text-sm text-muted sm:block">{item.year ?? ""}</span>
       <span className="hidden w-20 text-right text-sm text-muted tabular-nums md:block">{item.type === "movie" || item.type === "video" ? formatDuration(item.durationMs) : item.type === "show" ? `${item.childCount} seasons` : ""}</span>
       <span className={clsx("hidden w-20 text-right text-xs md:block", watched ? "text-success" : "text-faint")}>{item.type === "artist" ? "" : watched ? "Watched" : ""}</span>
