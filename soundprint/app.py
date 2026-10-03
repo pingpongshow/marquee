@@ -1,4 +1,4 @@
-"""Marquee sonic analysis service (MUSIC-1, D56).
+"""Marquee Soundprint analysis service (MUSIC-1, D56).
 
 Runs next to the Marquee server on the same host and is only reachable from it
 (127.0.0.1). It reads audio files (read-only mounts) and returns:
@@ -25,17 +25,23 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from transformers import AutoModel, AutoTokenizer, ClapModel, ClapProcessor
 
-MODEL_ID = os.environ.get("SONIC_MODEL", "laion/larger_clap_general")
+
+def env(name: str, default: str) -> str:
+    """Reads SOUNDPRINT_<name>, falling back to the older SONIC_<name>."""
+    return os.environ.get(f"SOUNDPRINT_{name}") or os.environ.get(f"SONIC_{name}") or default
+
+
+MODEL_ID = env("MODEL", "laion/larger_clap_general")
 # Reported to the server as the analysis version: bumping the suffix re-analyses the library.
 ANALYSIS_ID = f"{MODEL_ID}#2"
 SR = 48_000          # CLAP's sample rate
 WINDOW = 10.0        # seconds per CLAP window
 FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
-DOC_MODEL_ID = os.environ.get("SONIC_DOC_MODEL", "BAAI/bge-base-en-v1.5")
+DOC_MODEL_ID = env("DOC_MODEL", "BAAI/bge-base-en-v1.5")
 # bge wants this instruction on short queries (not on the documents they search).
 DOC_QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 
-log = logging.getLogger("sonic")
+log = logging.getLogger("soundprint")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -45,9 +51,9 @@ model = ClapModel.from_pretrained(MODEL_ID).to(device).eval()
 if device == "cuda":
     model = model.half()
 gpu_lock = threading.Lock()
-decoders = ThreadPoolExecutor(max_workers=int(os.environ.get("SONIC_DECODERS", "8")))
+decoders = ThreadPoolExecutor(max_workers=int(env("DECODERS", "8")))
 
-app = FastAPI(title="Marquee sonic analysis")
+app = FastAPI(title="Marquee Soundprint analysis")
 
 # Krumhansl–Schmuckler key profiles.
 MAJOR = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])

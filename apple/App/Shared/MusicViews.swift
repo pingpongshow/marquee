@@ -13,6 +13,9 @@ struct MusicDiscoverView: View {
     @State private var prompt = ""
     @State private var busy = false
     @State private var error: String?
+    /// The last Muse mix started here, to offer saving it.
+    @State private var museStation: Station?
+    @State private var saveRequest: SavePlaylistRequest?
 
     var body: some View {
         if let status, status.enabled {
@@ -20,7 +23,7 @@ struct MusicDiscoverView: View {
                 if status.analyzed < status.total {
                     Label(status.available
                           ? "Listening to your music: \(status.analyzed.formatted()) of \(status.total.formatted()) tracks analysed. Radios and mixes improve as it goes."
-                          : "The sonic analysis service isn't running, so radios and Muse are unavailable.",
+                          : "The Soundprint analysis service isn't running, so radios and Muse are unavailable.",
                           systemImage: "sparkles")
                         .font(.footnote).foregroundStyle(.secondary)
                         .padding(.horizontal, sidePadding)
@@ -36,6 +39,7 @@ struct MusicDiscoverView: View {
                 }
             }
             .disabled(busy)
+            .savePlaylistFlow($saveRequest)
         } else {
             Color.clear.frame(height: 0).task { await load() }
         }
@@ -65,6 +69,18 @@ struct MusicDiscoverView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(prompt.trimmingCharacters(in: .whitespaces).count < 2)
+            }
+            if let m = museStation {
+                Button {
+                    var seen = Set<Int64>()
+                    let ids = m.items.map(\.id).filter { seen.insert($0).inserted }.prefix(500)
+                    saveRequest = SavePlaylistRequest(title: m.title, itemIDs: Array(ids))
+                } label: {
+                    Label("Save “\(m.title)” as Playlist", systemImage: "text.badge.plus").lineLimit(1)
+                }
+                .buttonStyle(.bordered)
+                .font(.footnote)
+                .accessibilityIdentifier("saveMuse")
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: chipSpacing) {
@@ -119,7 +135,11 @@ struct MusicDiscoverView: View {
     private func runMuse(_ text: String) {
         let p = text.trimmingCharacters(in: .whitespaces)
         guard p.count > 1, !busy else { return }
-        run { music.playStation(try await app.muse(p, library: libraryID)) }
+        run {
+            let station = try await app.muse(p, library: libraryID)
+            music.playStation(station)
+            museStation = station.items.isEmpty ? nil : station
+        }
     }
 
     private func startRadio(_ req: RadioRequest) {
@@ -356,24 +376,24 @@ struct LevellingMenu: View {
     }
 }
 
-/// Guest DJ choice (MUSIC-6).
+/// DJ choice (MUSIC-6).
 struct DJMenu: View {
     @Environment(MusicPlayer.self) private var music
 
     var body: some View {
         @Bindable var music = music
         Menu {
-            Picker("Guest DJ", selection: $music.dj) {
+            Picker("DJ", selection: $music.dj) {
                 Text("Off").tag(MusicPlayer.DJ?.none)
                 ForEach(MusicPlayer.DJ.allCases, id: \.self) { d in
                     Text(d.label).tag(MusicPlayer.DJ?.some(d))
                 }
             }
         } label: {
-            Label(music.dj?.label ?? "Guest DJ", systemImage: music.dj == nil ? "person.wave.2" : "person.wave.2.fill")
+            Label(music.dj.map { "DJ: \($0.label)" } ?? "DJ", systemImage: music.dj == nil ? "person.wave.2" : "person.wave.2.fill")
                 .labelStyle(.iconOnly)
         }
-        .accessibilityLabel(music.dj.map { "Guest DJ: \($0.label)" } ?? "Guest DJ: off")
+        .accessibilityLabel(music.dj.map { "DJ: \($0.label)" } ?? "DJ: off")
     }
 }
 

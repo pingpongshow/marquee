@@ -1084,7 +1084,7 @@ open class UsersApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
 
     /**
      * GET /profiles
-     * Profiles that can be switched to from this device (Plex Home equivalent).
+     * Profiles that can be switched to from this device.
      * 
      * @return kotlin.collections.List<Profile>
      * @throws IllegalStateException If the request is not correctly configured
@@ -1115,7 +1115,7 @@ open class UsersApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
 
     /**
      * GET /profiles
-     * Profiles that can be switched to from this device (Plex Home equivalent).
+     * Profiles that can be switched to from this device.
      * 
      * @return ApiResponse<kotlin.collections.List<Profile>?>
      * @throws IllegalStateException If the request is not correctly configured

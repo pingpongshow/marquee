@@ -131,7 +131,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const [switching, setSwitching] = useState(false);
   const music = useMusicState();
 
-  // "/" jumps to search from anywhere (as in Plex), unless you're typing in a field.
+  // "/" jumps to search from anywhere, unless you're typing in a field.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;

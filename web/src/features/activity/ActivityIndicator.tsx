@@ -27,7 +27,7 @@ function pct(t: Task) {
 }
 
 /**
- * Header activity indicator (like Plex's): pulses while the server is busy and opens a panel
+ * Header activity indicator: pulses while the server is busy and opens a panel
  * listing scans and metadata work. Streams join this list once playback lands (M3).
  */
 export function ActivityIndicator() {

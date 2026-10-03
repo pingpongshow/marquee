@@ -23,6 +23,7 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.MediaFile
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -31,22 +32,30 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param fromId 
- * @param toId 
- * @param length 
+ * @param itemId 
+ * @param itemTitle 
+ * @param file 
+ * @param addedAt 
+ * @param versionLabel 
  */
 @Serializable
 
-data class MusicAdventureRequest (
+data class IssueFile (
 
-    @SerialName(value = "fromId")
-    val fromId: kotlin.Long,
+    @SerialName(value = "itemId")
+    val itemId: kotlin.Long,
 
-    @SerialName(value = "toId")
-    val toId: kotlin.Long,
+    @SerialName(value = "itemTitle")
+    val itemTitle: kotlin.String,
 
-    @SerialName(value = "length")
-    val length: kotlin.Int? = 15
+    @SerialName(value = "file")
+    val file: MediaFile,
+
+    @Contextual @SerialName(value = "addedAt")
+    val addedAt: java.time.OffsetDateTime,
+
+    @SerialName(value = "versionLabel")
+    val versionLabel: kotlin.String? = null
 
 ) {
 

@@ -1,6 +1,14 @@
 package app.marquee.ui
 
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Explore
 
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -80,14 +88,16 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
     val music = LocalMusic.current
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val page by produceState<Result<Page>?>(null, itemId) {
+    val me by marquee.me.collectAsState()
+    var reload by remember { mutableIntStateOf(0) }
+    val page by produceState<Result<Page>?>(null, itemId, reload) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 val d = marquee.items.getItem(itemId)
                 val children = if (d.childCount > 0) marquee.items.listItemChildren(itemId, limit = 500).items else emptyList()
                 val related = if (d.type in listOf(ItemType.MOVIE, ItemType.SHOW, ItemType.ALBUM, ItemType.ARTIST)) runCatching { marquee.items.relatedItems(itemId) }.getOrDefault(emptyList()) else emptyList()
-                // Music: what sounds like it, from the sonic analysis (MUSIC-2).
-                val similar = if (d.type in listOf(ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK)) runCatching { marquee.music.sonicSimilar(itemId, 20) }.getOrDefault(emptyList()) else emptyList()
+                // Music: what sounds like it, from Soundprint analysis (MUSIC-2).
+                val similar = if (d.type in listOf(ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK)) runCatching { marquee.music.soundsLike(itemId, 20) }.getOrDefault(emptyList()) else emptyList()
                 // An artist's most-listened tracks in the library (MUSIC-15).
                 val popular = if (d.type == ItemType.ARTIST) runCatching { marquee.items.listPopularTracks(itemId).items }.getOrDefault(emptyList()) else emptyList()
                 Page(d, children, related, similar, popular)
@@ -131,6 +141,27 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
         if (!marquee.isTv && d.type in listOf(ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO, ItemType.TRACK, ItemType.ALBUM, ItemType.ARTIST, ItemType.SEASON, ItemType.SHOW))
             DownloadButton(d.summary())
     }
+    /** The "…" menu: Fix match for admins (movies and shows), Sound Journey for tracks. */
+    @Composable fun MoreMenu() {
+        val admin = me?.isAdmin == true && matchable(d.type)
+        val track = d.type == ItemType.TRACK
+        if (!admin && !track) return
+        var open by remember { mutableStateOf(false) }
+        var match by remember { mutableStateOf(false) }
+        var journey by remember { mutableStateOf(false) }
+        Box {
+            IconButton({ open = true }, Modifier.focusRing()) { Icon(Icons.Filled.MoreVert, "More actions") }
+            DropdownMenu(open, { open = false }) {
+                if (admin) DropdownMenuItem({ Text("Fix match…") }, { match = true; open = false }, leadingIcon = { Icon(Icons.Filled.Search, null) })
+                if (track) DropdownMenuItem({ Text("Sound Journey…") }, { journey = true; open = false }, leadingIcon = { Icon(Icons.Filled.Explore, null) })
+            }
+        }
+        if (match) FixMatchDialog(d.id) { updated ->
+            match = false
+            if (updated != null) { Toast.makeText(context, "Matched “${updated.title}”", Toast.LENGTH_SHORT).show(); reload++ }
+        }
+        if (journey) app.marquee.music.SoundJourneyDialog(d.id, d.title) { journey = false }
+    }
     @Composable fun Actions() {
             when (d.type) {
                 ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO -> {
@@ -165,6 +196,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
         // Play on another Marquee app (USER-14); it expands albums and shows like its own Play button.
         if (d.type in listOf(ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO, ItemType.SHOW, ItemType.SEASON, ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK))
             PlayOnButton(nav, tint = MaterialTheme.colorScheme.onSurface, handoff = { app.marquee.api.models.RemoteCommand(app.marquee.api.models.RemoteCommand.Type.PLAY, itemIds = listOf(d.id)) })
+        MoreMenu()
     }
     LazyColumn(contentPadding = PaddingValues(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
         item {
@@ -204,11 +236,23 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                     }
                 }
                 ItemType.ALBUM -> Column {
-                    Text("Tracks", Modifier.padding(horizontal = sidePadding, vertical = 4.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     val tracks = pg.children.filter { it.type == ItemType.TRACK }
+                    val showQuality by music.showQuality.collectAsState()
+                    // Show audio quality (MUSIC-23): the album's format once when every track shares it.
+                    val shared = tracks.mapNotNull { it.audioFormat?.let(app.marquee.music.AudioQuality::short) }.distinct()
+                        .singleOrNull()?.takeIf { showQuality && tracks.all { it.audioFormat != null } }
+                    Row(Modifier.padding(horizontal = sidePadding, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Tracks", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        shared?.let { Text(it, Modifier.padding(start = 10.dp).semantics { contentDescription = "Album audio quality: $it" },
+                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
                     tracks.forEachIndexed { i, t ->
                         ListItem(
                             headlineContent = { Text(t.title, maxLines = 1) },
+                            supportingContent = t.audioFormat?.takeIf { showQuality }?.let { f -> {
+                                Text(app.marquee.music.AudioQuality.short(f), style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                            } },
                             leadingContent = { Text("${t.index ?: i + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                             trailingContent = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -223,7 +267,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 }
                 ItemType.ARTIST -> Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     if (pg.popular.isNotEmpty()) PopularTracks(d.title, pg.popular)
-                    // Plexamp-style sections by release type (MusicBrainz, META-3).
+                    // Sections by release type (MusicBrainz, META-3).
                     releaseSections(pg.children).forEach { (title, list) ->
                         Shelf(title, list, sidePadding) { _, it ->
                             PosterCard(it, marquee.imageUrl(it.images?.poster, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) })
@@ -251,7 +295,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
             }
         }
         if (pg.similar.isNotEmpty()) item {
-            Shelf(if (d.type == ItemType.ARTIST) "Similar artists" else "Sounds similar", pg.similar, sidePadding) { _, it ->
+            Shelf(if (d.type == ItemType.ARTIST) "Similar artists" else "Sounds like this", pg.similar, sidePadding) { _, it ->
                 PosterCard(it, marquee.imageUrl(it.images?.poster, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) })
             }
         }

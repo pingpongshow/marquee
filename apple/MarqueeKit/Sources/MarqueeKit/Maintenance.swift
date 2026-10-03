@@ -7,8 +7,11 @@ public typealias HealthCheck = Components.Schemas.HealthCheck
 public typealias HealthIssue = Components.Schemas.HealthIssue
 public typealias MatchCandidate = Components.Schemas.MatchCandidate
 public typealias IntegrationSettings = Components.Schemas.IntegrationSettings
+public typealias IssueFile = Components.Schemas.IssueFile
+public typealias MediaFile = Components.Schemas.MediaFile
+public typealias MediaStream = Components.Schemas.MediaStream
 
-/// Bazarr subtitles (META-12), library health (ADM-11), Fix Match, metadata refresh and the
+/// Bazarr subtitles (META-12), library health (ADM-11), deleting media files, Fix Match, metadata refresh and the
 /// integration settings they need (admin).
 @MainActor
 public extension AppSession {
@@ -89,6 +92,33 @@ public extension AppSession {
             guard case .noContent = try await adminAPI.unignoreHealthIssue(path: .init(checkId: check, itemId: itemID)) else {
                 throw MarqueeError("Couldn't undo.")
             }
+        }
+    }
+
+    // MARK: - Deleting media files (ADM-11)
+
+    /// Whether admins may delete media files from Library Health (Settings → Libraries).
+    func mediaDeletionAllowed() async throws -> Bool {
+        try await adminAPI.getSettings().ok.body.json.library.allowMediaDeletion ?? false
+    }
+
+    func setMediaDeletionAllowed(_ on: Bool) async throws {
+        switch try await adminAPI.updateSettings(body: .json(.init(library: .init(allowMediaDeletion: on)))) {
+        case .ok: return
+        case .badRequest(let r): throw MarqueeError((try? r.body.json.message) ?? "Couldn't save the setting.")
+        case .forbidden: throw MarqueeError("Only admins can change this.")
+        default: throw MarqueeError("Couldn't save the setting.")
+        }
+    }
+
+    /// Moves a media file to its library's .marquee-trash folder (kept for 30 days).
+    func deleteMediaFile(_ fileID: Int64) async throws {
+        switch try await adminAPI.deleteMediaFile(path: .init(fileId: fileID)) {
+        case .noContent: return
+        case .forbidden(let r): throw MarqueeError((try? r.body.json.message) ?? "Deleting media files is turned off.")
+        case .conflict(let r): throw MarqueeError((try? r.body.json.message) ?? "Couldn't move the file to the trash.")
+        case .notFound: throw MarqueeError("That file isn't in the library any more.")
+        default: throw MarqueeError("Couldn't delete the file.")
         }
     }
 

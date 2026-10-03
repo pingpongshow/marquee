@@ -136,6 +136,7 @@ type rawOutput struct {
 		RFrameRate     string            `json:"r_frame_rate"`
 		PixFmt         string            `json:"pix_fmt"`
 		BitsPerRaw     string            `json:"bits_per_raw_sample"`
+		BitsPerSample  int               `json:"bits_per_sample"`
 		ColorTransfer  string            `json:"color_transfer"`
 		ColorPrimaries string            `json:"color_primaries"`
 		Channels       int               `json:"channels"`
@@ -220,6 +221,9 @@ func Parse(data []byte) (*Result, error) {
 				}
 			}
 		}
+		if s.CodecType == "audio" {
+			st.BitDepth = audioBitDepth(s.CodecName, s.BitsPerRaw, s.BitsPerSample)
+		}
 		if s.CodecType == "subtitle" && strings.Contains(strings.ToLower(st.Title), "sdh") {
 			st.HearingImpaired = true
 		}
@@ -291,6 +295,26 @@ func bitDepth(pixFmt, raw string) int {
 		return 10
 	case pixFmt != "":
 		return 8
+	}
+	return 0
+}
+
+// audioBitDepth is the bits per sample of lossless audio (FLAC 16/24, PCM); lossy formats
+// have none worth showing, so they get 0.
+func audioBitDepth(codec, raw string, perSample int) int {
+	if n := atoi(raw); n > 0 {
+		return n
+	}
+	if strings.HasPrefix(codec, "pcm_") {
+		for _, b := range []int{8, 16, 24, 32, 64} {
+			if strings.Contains(codec, strconv.Itoa(b)) {
+				return b
+			}
+		}
+	}
+	switch codec {
+	case "flac", "alac", "ape", "wavpack", "tta":
+		return perSample
 	}
 	return 0
 }

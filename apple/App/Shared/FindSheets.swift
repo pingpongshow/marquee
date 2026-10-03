@@ -79,15 +79,15 @@ struct SubtitleSearchSheet: View {
     }
 }
 
-/// Asks MainView to show the Sonic Adventure picker for a track.
+/// Asks MainView to show the Sound Journey picker for a track.
 @MainActor @Observable
-final class AdventurePicker {
-    static let shared = AdventurePicker()
+final class JourneyPicker {
+    static let shared = JourneyPicker()
     var from: Item?
 }
 
-/// Sonic Adventure (MUSIC-4): choose where to travel to from a track.
-struct AdventureSheet: View {
+/// Sound Journey (MUSIC-4): choose where to travel to from a track.
+struct JourneySheet: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
     @Environment(\.dismiss) private var dismiss
@@ -116,7 +116,7 @@ struct AdventureSheet: View {
                 }
             }
             .searchable(text: $query, prompt: "Search for the destination track")
-            .navigationTitle("Sonic Adventure")
+            .navigationTitle("Sound Journey")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
             .task(id: query) {
                 guard query.count >= 2 else { tracks = []; return }
@@ -132,7 +132,7 @@ struct AdventureSheet: View {
         Task {
             defer { busy = false }
             do {
-                music.playStation(try await app.adventure(from: from.id, to: to.id))
+                music.playStation(try await app.journey(from: from.id, to: to.id))
                 dismiss()
             } catch { self.error = error.localizedDescription }
         }

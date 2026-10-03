@@ -7,8 +7,8 @@ import type { ItemSummary } from "@/api/types";
 import { Alert, Dialog, Input, Spinner } from "@/components/ui";
 import { useMusicActions } from "../player/MusicPlayer";
 
-/** Sonic Adventure (MUSIC-4): pick a destination track and travel there through music that sounds in between. */
-export function AdventureDialog({
+/** Sound Journey (MUSIC-4): pick a destination track and travel there through music that sounds in between. */
+export function JourneyDialog({
   from,
   onClose,
 }: {
@@ -26,7 +26,7 @@ export function AdventureDialog({
   const go = useMutation({
     mutationFn: (to: ItemSummary) =>
       unwrap(
-        api.POST("/music/adventure", {
+        api.POST("/music/journey", {
           body: { fromId: from.id, toId: to.id, length: 15 },
         }),
       ),
@@ -36,7 +36,7 @@ export function AdventureDialog({
     },
   });
   return (
-    <Dialog open onClose={onClose} title="Sonic Adventure">
+    <Dialog open onClose={onClose} title="Sound Journey">
       <div className="space-y-4">
         <p className="text-sm text-muted">
           From <strong className="text-text">{from.title}</strong>, travel to

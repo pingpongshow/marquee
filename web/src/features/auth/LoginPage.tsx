@@ -106,7 +106,7 @@ function PasswordForm({ onBack }: { onBack?: () => void }) {
   );
 }
 
-/** Plex-style "Who's watching?": choose a profile, then its PIN (or password). */
+/** "Who's watching?": choose a profile, then its PIN (or password). */
 function ProfilePicker({
   profiles,
   onUsePassword,

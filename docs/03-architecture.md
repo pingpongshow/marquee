@@ -122,7 +122,7 @@ A scheduler (`internal/tasks/scheduler.go`) runs registered tasks and records ea
 | Metadata refresh | weekly for recently added items, monthly for everything else | M7 |
 | Trickplay generation | nightly, low priority | M7 |
 | Intro/credits detection | nightly, low priority (audio fingerprint per season) | M7 |
-| Sonic analysis | continuous, low priority, GPU | M6.5 |
+| Soundprint analysis | continuous, low priority, GPU | M6.5 |
 | Transcode dir cleanup | on startup (sessions clean up their own directories) | Implemented |
 
 **Restore:** restoring copies the chosen backup to `<config>/restore-pending.db` and restarts. On start, before the database is opened, the current database moves to `backups/pre-restore-*.db` and the pending file takes its place.

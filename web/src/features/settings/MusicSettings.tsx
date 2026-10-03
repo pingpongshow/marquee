@@ -15,7 +15,7 @@ import {
 import { SaveBar } from "./SaveBar";
 import { useSectionDraft } from "./useSectionDraft";
 
-/** Settings → Music: sonic analysis, lyrics and loudness (M6.5). */
+/** Settings → Music: Soundprint analysis, lyrics and loudness (M6.5). */
 export function MusicSettings() {
   const s = useSectionDraft("music");
   const qc = useQueryClient();
@@ -36,8 +36,8 @@ export function MusicSettings() {
     <>
       <div className="space-y-6">
         <Card
-          title="Sonic analysis"
-          description="Marquee listens to every track on this server's GPU to power radios, “sounds like” suggestions, Sonic Adventure, Muse and daily mixes. Audio never leaves the server."
+          title="Soundprint analysis"
+          description="Marquee listens to every track on this server's GPU to power radios, “sounds like” suggestions, Sound Journey, Muse and daily mixes. Audio never leaves the server."
         >
           {st && (
             <div className="space-y-2 rounded-lg bg-surface-2 p-4 text-sm">
@@ -68,20 +68,20 @@ export function MusicSettings() {
           )}
           {!st?.available && st?.enabled && (
             <Alert tone="info">
-              Start the <code>sonic</code> container (it's in the compose file)
+              Start the <code>soundprint</code> container (it's in the compose file)
               to enable radios and Muse.
             </Alert>
           )}
           <Toggle
             label="Analyse music"
             help="New tracks are analysed within the hour, and right after a music scan."
-            checked={!!s.draft.sonicAnalysis}
-            onChange={(v) => s.update({ sonicAnalysis: v })}
+            checked={!!s.draft.soundprintAnalysis}
+            onChange={(v) => s.update({ soundprintAnalysis: v })}
           />
           <div>
             <Button
               size="sm"
-              onClick={() => run.mutate("sonic")}
+              onClick={() => run.mutate("soundprint")}
               disabled={!st?.available || st?.running}
               loading={run.isPending}
             >

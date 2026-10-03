@@ -108,6 +108,7 @@ type Decision struct {
 	AudioCopy     bool
 	AudioCodec    string // output audio codec when not copying: aac
 	AudioChannels int
+	AudioKbps     int  // the converted audio's bitrate (0 when the audio is copied)
 	BurnSubtitle  bool // burn the selected (image) subtitle into the video
 	SubtitleVTT   bool // deliver the selected text subtitle as a WebVTT sidecar
 	SubtitleASS   bool // deliver it as the original ASS (client renders styling and fonts)
@@ -152,6 +153,7 @@ func Decide(m Media, p DeviceProfile, l Limits) Decision {
 		}
 		d.Method = Transcode
 		d.AudioCodec, d.AudioChannels = "aac", min(max(m.Audio.Channels, 2), 2)
+		d.AudioKbps = musicKbps(l.MaxKbps)
 		return d
 	}
 
@@ -232,6 +234,7 @@ func Decide(m Media, p DeviceProfile, l Limits) Decision {
 		d.AudioCopy = a == nil || (has(p.HLSAudioCodecs, a.Codec) && (p.MaxAudioChannels == 0 || a.Channels <= p.MaxAudioChannels))
 		if !d.AudioCopy {
 			d.AudioCodec, d.AudioChannels = audioTarget(a, p)
+			d.AudioKbps = audioKbps(d.AudioChannels)
 		}
 		return d
 	}
@@ -256,6 +259,7 @@ func Decide(m Media, p DeviceProfile, l Limits) Decision {
 	d.AudioCopy = a == nil || (has(p.HLSAudioCodecs, a.Codec) && (p.MaxAudioChannels == 0 || a.Channels <= p.MaxAudioChannels) && l.MaxKbps == 0)
 	if !d.AudioCopy {
 		d.AudioCodec, d.AudioChannels = audioTarget(a, p)
+		d.AudioKbps = audioKbps(d.AudioChannels)
 	}
 	return d
 }
@@ -269,6 +273,15 @@ func audioTarget(a *AudioStream, p DeviceProfile) (string, int) {
 }
 
 // audioKbps is what the transcoded audio costs.
+// musicKbps is the AAC bitrate music is converted at: 256 kbps, or the session's limit
+// when that is lower (but never below 64).
+func musicKbps(limitKbps int) int {
+	if limitKbps > 0 && limitKbps < 256 {
+		return max(limitKbps, 64)
+	}
+	return 256
+}
+
 func audioKbps(channels int) int {
 	if channels > 2 {
 		return 384

@@ -43,6 +43,7 @@ import kotlinx.serialization.Contextual
  * @param videoKbps 
  * @param audioCodec 
  * @param audioChannels 
+ * @param audioKbps Bitrate of the converted audio (MUSIC-23); absent when the audio is sent as it is.
  */
 @Serializable
 
@@ -82,7 +83,11 @@ data class PlaybackDecision (
     val audioCodec: kotlin.String? = null,
 
     @SerialName(value = "audioChannels")
-    val audioChannels: kotlin.Int? = null
+    val audioChannels: kotlin.Int? = null,
+
+    /* Bitrate of the converted audio (MUSIC-23); absent when the audio is sent as it is. */
+    @SerialName(value = "audioKbps")
+    val audioKbps: kotlin.Int? = null
 
 ) {
 

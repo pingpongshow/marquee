@@ -80,9 +80,9 @@ type Cinema struct {
 
 // Music configures the M6.5 music features.
 type Music struct {
-	SonicAnalysis    bool `json:"sonicAnalysis"`
-	OnlineLyrics     bool `json:"onlineLyrics"`
-	LoudnessAnalysis bool `json:"loudnessAnalysis"`
+	SoundprintAnalysis bool `json:"soundprintAnalysis"`
+	OnlineLyrics       bool `json:"onlineLyrics"`
+	LoudnessAnalysis   bool `json:"loudnessAnalysis"`
 }
 
 type Security struct {
@@ -137,6 +137,9 @@ type Library struct {
 	WatchedThresholdPercent int      `json:"watchedThresholdPercent"`
 	Trickplay               bool     `json:"trickplay"`
 	DetectIntros            bool     `json:"detectIntros"`
+	// AllowMediaDeletion lets admins delete media files from Library Health; they move to
+	// a .marquee-trash folder in the library folder and are removed after 30 days.
+	AllowMediaDeletion bool `json:"allowMediaDeletion"`
 }
 
 type Metadata struct {
@@ -197,7 +200,7 @@ func Defaults() Settings {
 		},
 		Metadata:     Metadata{AnimeEpisodeOrdering: "seasonal", OMDbDailyLimit: 950},
 		Tasks:        Tasks{MaintenanceWindowStart: "03:00", MaintenanceWindowHours: 4, BackupRetention: 7},
-		Music:        Music{SonicAnalysis: true, OnlineLyrics: false, LoudnessAnalysis: true},
+		Music:        Music{SoundprintAnalysis: true, OnlineLyrics: false, LoudnessAnalysis: true},
 		Integrations: Integrations{DVRPaddingBefore: 1, DVRPaddingAfter: 3},
 	}
 }

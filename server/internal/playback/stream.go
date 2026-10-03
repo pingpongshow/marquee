@@ -445,9 +445,9 @@ func (m *Manager) serveFont(w http.ResponseWriter, r *http.Request, s *Session, 
 // serveAudioTranscode streams music converted to AAC (progressive; ?start=seconds to seek).
 func (m *Manager) serveAudioTranscode(w http.ResponseWriter, r *http.Request, s *Session) {
 	start, _ := strconv.ParseFloat(r.URL.Query().Get("start"), 64)
-	kbps := 256
-	if s.LimitKbps > 0 && s.LimitKbps < kbps {
-		kbps = max(s.LimitKbps, 64)
+	kbps := s.Decision.AudioKbps
+	if kbps == 0 {
+		kbps = musicKbps(s.LimitKbps)
 	}
 	args := []string{"-hide_banner", "-v", "error", "-nostdin"}
 	if start > 0 {

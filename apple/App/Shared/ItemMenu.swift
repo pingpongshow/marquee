@@ -34,7 +34,7 @@ struct ItemMenuItems: View {
                 Button { startRadio() } label: { Label("Start Radio", systemImage: "dot.radiowaves.left.and.right") }
             }
             if item._type == .track {
-                Button { AdventurePicker.shared.from = item } label: { Label("Sonic Adventure…", systemImage: "point.topleft.down.to.point.bottomright.curvepath") }
+                Button { JourneyPicker.shared.from = item } label: { Label("Sound Journey…", systemImage: "point.topleft.down.to.point.bottomright.curvepath") }
             }
             Button { ActionError.run { music.playNext(try await leaves()) } } label: { Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") }
             Button { ActionError.run { music.addToQueue(try await leaves()) } } label: { Label("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") }

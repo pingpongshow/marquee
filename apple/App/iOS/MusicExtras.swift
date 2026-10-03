@@ -71,7 +71,7 @@ struct EqualizerButton: View {
     }
 }
 
-/// Car mode (Plexamp style): big artwork, huge transport buttons and quick-start tiles, on a
+/// Car mode: big artwork, huge transport buttons and quick-start tiles, on a
 /// black screen that stays awake. Works in either orientation.
 struct CarModeView: View {
     @Environment(MusicPlayer.self) private var music

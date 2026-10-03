@@ -1,4 +1,4 @@
-package sonic
+package soundprint
 
 import (
 	"context"
@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	ErrUnavailable = errors.New("sonic analysis isn't running")
-	ErrNotAnalyzed = errors.New("this hasn't been sonically analysed yet")
+	ErrUnavailable = errors.New("Soundprint analysis isn't running")
+	ErrNotAnalyzed = errors.New("this hasn't had its Soundprint analysis yet")
 )
 
 // Service owns the index and the analysis task.
@@ -22,7 +22,7 @@ type Service struct {
 	DB     *sql.DB
 	Client *Client
 	Index  *Index
-	// Enabled reports the Music → Sonic analysis setting.
+	// Enabled reports the Music → Soundprint analysis setting.
 	Enabled func() bool
 
 	mu      sync.Mutex
@@ -47,7 +47,7 @@ func (s *Service) Status(ctx context.Context) Status {
 		st.Available, st.Model, st.Device = true, h.Model, h.Device
 	}
 	s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM items WHERE type = 'track'`).Scan(&st.Total)
-	s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FILTER (WHERE embedding IS NOT NULL), COUNT(*) FILTER (WHERE error IS NOT NULL) FROM sonic`).Scan(&st.Analyzed, &st.Failed)
+	s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FILTER (WHERE embedding IS NOT NULL), COUNT(*) FILTER (WHERE error IS NOT NULL) FROM soundprint`).Scan(&st.Analyzed, &st.Failed)
 	s.mu.Lock()
 	st.Running, st.Progress, st.RunTotal = s.running, s.done, s.total
 	s.mu.Unlock()
@@ -63,7 +63,7 @@ type pending struct {
 // a scheduled task; report receives progress.
 func (s *Service) Analyze(ctx context.Context) (string, error) {
 	if !s.Enabled() {
-		return "Sonic analysis is turned off", nil
+		return "Soundprint analysis is turned off", nil
 	}
 	// The sidecar loads its model at startup; give it a few minutes.
 	h, err := s.Client.Health(ctx)
@@ -114,7 +114,7 @@ func (s *Service) analyzePass(ctx context.Context, h Health) (string, int, error
 	var todo []pending
 	rows, err := s.DB.QueryContext(ctx, `SELECT i.id, f.id, f.path FROM items i
 		JOIN media_versions v ON v.item_id = i.id JOIN media_files f ON f.version_id = v.id AND f.part_index = 0
-		LEFT JOIN sonic s ON s.item_id = i.id
+		LEFT JOIN soundprint s ON s.item_id = i.id
 		WHERE i.type = 'track' AND f.available = 1
 		  AND (s.item_id IS NULL OR s.file_id != f.id OR (s.model != ? AND s.error IS NULL))
 		GROUP BY i.id ORDER BY i.id`, h.Model)
@@ -136,7 +136,7 @@ func (s *Service) analyzePass(ctx context.Context, h Health) (string, int, error
 	if len(todo) == 0 {
 		return fmt.Sprintf("All %d tracks analysed", s.Index.Len()), 0, nil
 	}
-	slog.Info("sonic analysis starting", "tracks", len(todo), "model", h.Model, "device", h.Device)
+	slog.Info("soundprint analysis starting", "tracks", len(todo), "model", h.Model, "device", h.Device)
 	start := time.Now()
 	analysed, failed := 0, 0
 	const batch = 32
@@ -163,12 +163,12 @@ func (s *Service) analyzePass(ctx context.Context, h Health) (string, int, error
 			p := chunk[j]
 			if r.Error != "" || len(r.Embedding) == 0 {
 				failed++
-				s.DB.ExecContext(ctx, `INSERT INTO sonic(item_id, file_id, model, error) VALUES (?, ?, ?, ?)
+				s.DB.ExecContext(ctx, `INSERT INTO soundprint(item_id, file_id, model, error) VALUES (?, ?, ?, ?)
 					ON CONFLICT(item_id) DO UPDATE SET file_id = excluded.file_id, model = excluded.model, embedding = NULL,
 					error = excluded.error, analyzed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`, p.itemID, p.fileID, model, nonEmpty(r.Error, "no embedding"))
 				continue
 			}
-			_, err := s.DB.ExecContext(ctx, `INSERT INTO sonic(item_id, file_id, model, embedding, bpm, musical_key, mode, energy) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			_, err := s.DB.ExecContext(ctx, `INSERT INTO soundprint(item_id, file_id, model, embedding, bpm, musical_key, mode, energy) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 				ON CONFLICT(item_id) DO UPDATE SET file_id = excluded.file_id, model = excluded.model, embedding = excluded.embedding,
 				bpm = excluded.bpm, musical_key = excluded.musical_key, mode = excluded.mode, energy = excluded.energy, error = NULL,
 				analyzed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
@@ -187,7 +187,7 @@ func (s *Service) analyzePass(ctx context.Context, h Health) (string, int, error
 	if failed > 0 {
 		msg += fmt.Sprintf(" (%d unreadable)", failed)
 	}
-	slog.Info("sonic analysis finished", "analysed", analysed, "failed", failed, "took", time.Since(start).Round(time.Second))
+	slog.Info("soundprint analysis finished", "analysed", analysed, "failed", failed, "took", time.Since(start).Round(time.Second))
 	return msg, len(todo), nil
 }
 
@@ -199,7 +199,7 @@ func (s *Service) analyzeBatch(ctx context.Context, paths []string) (string, []A
 	if err == nil || len(paths) == 1 || ctx.Err() != nil {
 		return model, results, err
 	}
-	slog.Warn("sonic batch failed; retrying files one by one", "err", err)
+	slog.Warn("soundprint batch failed; retrying files one by one", "err", err)
 	results = make([]Analysis, len(paths))
 	ok := false
 	for i, p := range paths {
@@ -479,7 +479,7 @@ func (s *Service) DailyMixes(ctx context.Context, userID int64, scope string, ke
 	return mixes
 }
 
-// historyMixes are Plexamp-style mixes from what someone has (and hasn't) played:
+// historyMixes are mixes from what someone has (and hasn't) played:
 // Discovery (never-played tracks close to their taste, favouring artists they rarely play),
 // Rediscover (favourites not played for six months), New Music (recent additions that fit
 // their taste) and their favourite decade.

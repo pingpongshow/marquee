@@ -68,6 +68,16 @@ func nz[T comparable](v T) *T {
 	return &v
 }
 
+// losslessCodec reports whether an audio codec keeps the original samples.
+func losslessCodec(c string) bool {
+	switch {
+	case c == "flac", c == "alac", c == "ape", c == "wavpack", c == "tta", c == "mlp", c == "truehd",
+		strings.HasPrefix(c, "pcm_"), strings.HasPrefix(c, "dsd_"):
+		return true
+	}
+	return false
+}
+
 func toAPISummary(s items.Summary) ItemSummary {
 	out := ItemSummary{
 		Id: s.ID, LibraryId: s.LibraryID, Type: ItemType(s.Type), Title: s.Title,
@@ -76,6 +86,10 @@ func toAPISummary(s items.Summary) ItemSummary {
 		GrandparentTitle: nz(s.GrandparentTitle), ArtistCredit: nz(s.ArtistCredit),
 		ChildCount: s.ChildCount, LeafCount: s.LeafCount, DurationMs: nz(s.DurationMS),
 		Available: s.Available, MatchState: ItemSummaryMatchState(s.MatchState), AddedAt: s.AddedAt,
+	}
+	if a := s.Audio; a.Codec != "" {
+		out.AudioFormat = &AudioFormat{Codec: a.Codec, Lossless: losslessCodec(a.Codec), BitrateKbps: nz(a.BitrateKbps),
+			SampleRate: nz(a.SampleRate), BitDepth: nz(a.BitDepth), Channels: nz(a.Chans)}
 	}
 	// Index 0 is meaningful (Specials, track 0 is not); report it for seasons/episodes.
 	if s.Index != 0 || s.Type == "season" || s.Type == "episode" {
@@ -269,25 +283,7 @@ func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 	for i, v := range d.Versions {
 		mv := MediaVersion{Id: v.ID, Label: v.Label, Files: make([]MediaFile, len(v.Files))}
 		for j, f := range v.Files {
-			mf := MediaFile{
-				Id: f.ID, Path: nz(f.Path), Size: f.Size, Container: nz(f.Container), DurationMs: nz(f.DurationMS),
-				BitrateKbps: nz(f.BitrateKbps), Width: nz(f.Width), Height: nz(f.Height), VideoCodec: nz(f.VideoCodec),
-				AudioCodec: nz(f.AudioCodec), DvProfile: nz(f.DVProfile), PartIndex: f.PartIndex, Available: f.Available,
-				Streams: make([]MediaStream, len(f.Streams)),
-			}
-			if f.HDRFormat != "" {
-				mf.HdrFormat = ptr(MediaFileHdrFormat(f.HDRFormat))
-			}
-			for k, st := range f.Streams {
-				mf.Streams[k] = MediaStream{
-					Id: st.ID, Kind: MediaStreamKind(st.Kind), Codec: st.Codec, Profile: nz(st.Profile), Language: nz(st.Language),
-					Title: nz(st.Title), Default: st.Default, Forced: st.Forced, HearingImpaired: st.HearingImpaired,
-					External: st.External, Channels: nz(st.Channels), ChannelLayout: nz(st.ChannelLayout),
-					SampleRate: nz(st.SampleRate), BitrateKbps: nz(st.BitrateKbps), Width: nz(st.Width), Height: nz(st.Height),
-					FrameRate: nz(float32(st.FrameRate)), BitDepth: nz(st.Depth),
-				}
-			}
-			mv.Files[j] = mf
+			mv.Files[j] = toAPIMediaFile(f)
 		}
 		out.Versions[i] = mv
 	}
@@ -309,6 +305,29 @@ func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 		out.Chapters[i] = Chapter{Title: nz(c.Title), StartMs: c.StartMS, EndMs: c.EndMS}
 	}
 	return out, nil
+}
+
+// toAPIMediaFile maps a file with its streams (the path only when it was loaded: admins).
+func toAPIMediaFile(f items.File) MediaFile {
+	mf := MediaFile{
+		Id: f.ID, Path: nz(f.Path), Size: f.Size, Container: nz(f.Container), DurationMs: nz(f.DurationMS),
+		BitrateKbps: nz(f.BitrateKbps), Width: nz(f.Width), Height: nz(f.Height), VideoCodec: nz(f.VideoCodec),
+		AudioCodec: nz(f.AudioCodec), DvProfile: nz(f.DVProfile), PartIndex: f.PartIndex, Available: f.Available,
+		Streams: make([]MediaStream, len(f.Streams)),
+	}
+	if f.HDRFormat != "" {
+		mf.HdrFormat = ptr(MediaFileHdrFormat(f.HDRFormat))
+	}
+	for k, st := range f.Streams {
+		mf.Streams[k] = MediaStream{
+			Id: st.ID, Kind: MediaStreamKind(st.Kind), Codec: st.Codec, Profile: nz(st.Profile), Language: nz(st.Language),
+			Title: nz(st.Title), Default: st.Default, Forced: st.Forced, HearingImpaired: st.HearingImpaired,
+			External: st.External, Channels: nz(st.Channels), ChannelLayout: nz(st.ChannelLayout),
+			SampleRate: nz(st.SampleRate), BitrateKbps: nz(st.BitrateKbps), Width: nz(st.Width), Height: nz(st.Height),
+			FrameRate: nz(float32(st.FrameRate)), BitDepth: nz(st.Depth),
+		}
+	}
+	return mf
 }
 
 // ---------- images ----------

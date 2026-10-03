@@ -1,5 +1,5 @@
 // Package naming parses titles, years, season/episode numbers and provider IDs out of
-// media file and folder names. It handles Plex/Sonarr/Radarr naming as well as common
+// media file and folder names. It handles the usual library, Sonarr and Radarr naming as well as common
 // scene and fansub release names.
 package naming
 

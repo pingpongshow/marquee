@@ -119,7 +119,7 @@ func (s *Store) Leaves(ctx context.Context, acc Access, id int64, unwatchedFirst
 	if err != nil || !unwatchedFirst {
 		return out, err
 	}
-	// Continue from the first unwatched episode, like Plex's Play on a show.
+	// Playing a show continues from its first unwatched episode.
 	for i, it := range out {
 		if it.ViewCount == 0 {
 			return out[i:], nil

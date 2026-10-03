@@ -29,7 +29,7 @@ type itemFields struct {
 	MatchState        string
 }
 
-// Folders and filename suffixes (Plex/Jellyfin conventions) that hold extras rather than
+// Folders and filename suffixes (common library conventions) that hold extras rather than
 // main content (LIB-8). "skip" marks samples and subtitle folders, which aren't extras.
 var extrasDirs = map[string]string{"extras": "other", "featurettes": "featurette", "behind the scenes": "behind_the_scenes",
 	"deleted scenes": "deleted_scene", "interviews": "interview", "scenes": "scene", "shorts": "short", "trailers": "trailer",

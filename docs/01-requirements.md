@@ -95,12 +95,12 @@ The owner wants the best music experience possible: everything Plexamp and Plex'
 
 | ID | Requirement | Pri |
 |---|---|---|
-| MUSIC-1 | **Sonic analysis:** every track gets an audio embedding plus features (BPM, key, energy, danceability, mood, loudness), computed in the background on the server with GPU acceleration. New tracks are analysed as they are added. | P1 |
+| MUSIC-1 | **Soundprint analysis:** every track gets an audio embedding plus features (BPM, key, energy, danceability, mood, loudness), computed in the background on the server with GPU acceleration. New tracks are analysed as they are added. | P1 |
 | MUSIC-2 | **Sonically similar:** similar tracks, albums and artists by sound (not just tags), shown on track, album and artist pages. | P1 |
 | MUSIC-3 | **Radios:** track, album, artist, genre, mood, decade ("Time Travel") and library radio. Endless, and steered by sonic similarity, ratings, skips and play history. | P1 |
-| MUSIC-4 | **Sonic Adventure:** a playlist that travels smoothly from one track to another through sonically adjacent tracks. | P1 |
-| MUSIC-5 | **Muse (natural-language playlists):** "rainy Sunday jazz with a late-night feel" builds a playlist from your library. Text-to-audio embeddings run locally; an optional LLM (admin-supplied API key) interprets longer prompts. | P1 |
-| MUSIC-6 | **Guest DJ / smart play:** optional modes that weave related tracks, deeper cuts or the artist's other albums into whatever is playing. | P1 |
+| MUSIC-4 | **Sound Journey:** a playlist that travels smoothly from one track to another through similar-sounding adjacent tracks. | P1 |
+| MUSIC-5 | **Muse (natural-language playlists):** "rainy Sunday jazz with a late-night feel" builds a playlist from your library. Text-to-audio embeddings run locally; an optional LLM (admin-supplied API key) interprets longer prompts. A Muse mix, like any station, radio or queue, can be saved as a playlist from Now Playing. | P1 |
+| MUSIC-6 | **DJ / smart play:** optional modes that weave related tracks, deeper cuts or the artist's other albums into whatever is playing. | P1 |
 | MUSIC-7 | **Mixes for you:** daily mixes per user (by taste clusters), "Rediscover" (loved but not played lately), "Deep cuts", "Recently added mix", mood mixes and anniversary albums on Home. | P1 |
 | MUSIC-8 | **Smart playlists:** rule-based (genre, artist, year, rating, play count, last played, added date, mood, BPM, key…) with limits and sort, kept up to date automatically. | P1 |
 | MUSIC-9 | **Playback quality:** gapless playback, loudness levelling (ReplayGain tags or EBU R128 analysis, track/album mode), optional crossfade and "sweet fades" that respect gapless albums, and a 10-band EQ on clients that support it. | P1 |
@@ -112,11 +112,12 @@ The owner wants the best music experience possible: everything Plexamp and Plex'
 | MUSIC-15 | **Discovery:** artist bios and photos, similar artists in your library, popular tracks (via Last.fm/ListenBrainz data) for an artist, and "Recently played" / "Most played" hubs.  ✅ Bios and popular tracks D79. | P1 |
 | MUSIC-16 | **Muse (natural-language playlists) under Marquee's own name:** the feature Plex calls "Sonic Sage" is **Muse** across the server, API (`/music/muse`), web, Apple and Android apps and the docs (Q17). | P1 |
 | MUSIC-17 | **Mixes for you from listening history:** curated mixes like Plexamp's, from what each person plays, skips and rates (taste clusters, "discovery" of rarely played library tracks near their taste, rediscover, decade and mood mixes), refreshed daily. Builds on MUSIC-7. | P1 |
-| MUSIC-18 | **Browse and play by mood and style:** Plexamp-style mood, style and genre pages with stations and playlists for each (moods from sonic analysis and tags, styles from tags/MusicBrainz), on every client. | P1 |
+| MUSIC-18 | **Browse and play by mood and style:** Mood, style and genre pages with stations and playlists for each (moods from sonic analysis and tags, styles from tags/MusicBrainz), on every client. | P1 |
 | MUSIC-19 | **Playlist downloads:** download whole playlists (including smart playlists and mixes) for offline playback on Apple and Android, kept in sync as they change. | P1 |
 | MUSIC-20 | **Equaliser:** presets and custom bands for music, per device (web, iPhone/iPad, Android) (D86). | P2 |
 | MUSIC-21 | **Car mode:** a Plexamp-style full-screen music screen with large controls and one-tap stations on iPhone and Android phones (D86). | P2 |
 | MUSIC-22 | **Your year in music:** a Wrapped-style recap of each year (minutes, top artists, albums, songs and genres, when you listen, streaks, new artists) with a playlist of your top 50 songs (D87). | P1 |
+| MUSIC-23 | **Show audio quality** (optional, per device): the file's format in Now Playing and track lists, e.g. "FLAC · 24-bit/96 kHz · Hi-Res" or "MP3 · 320 kbps", plus what is actually streamed when it's converted (D89). | P2 |
 
 ## 3b-2. Watch together
 

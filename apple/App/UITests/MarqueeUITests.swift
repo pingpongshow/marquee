@@ -93,7 +93,7 @@ final class MarqueeUITests: XCTestCase {
     }
 
     /// Muse, Now Playing's source and lyrics (M6.5). Needs the test music library and
-    /// the sonic analysis sidecar.
+    /// the Soundprint analysis sidecar.
     func testMusicFeatures() {
         connectAndSignIn()
         openLibrary("Music")
@@ -205,7 +205,6 @@ final class MarqueeUITests: XCTestCase {
         app.buttons["Delete Download"].tap()
     }
 
-    /// Your Stats (ADM-4) and Sonic Adventure from a track's menu (MUSIC-4).
     /// Discover (REQ-1): browse Seerr, request a title, see it under My Requests, withdraw it.
     /// Needs the server connected to Seerr and the test profile allowed to request.
     func testDiscoverAndRequest() {
@@ -401,7 +400,8 @@ final class MarqueeUITests: XCTestCase {
         app.buttons["Off"].tap()
     }
 
-    func testStatsAndAdventure() {
+    /// Your Stats (ADM-4) and Sound Journey from a track's menu (MUSIC-4).
+    func testStatsAndJourney() {
         connectAndSignIn()
         app.buttons["Settings"].firstMatch.tap()
         let stats = app.buttons["Your Stats"]
@@ -412,7 +412,7 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Top artists"].waitForExistence(timeout: 10))
         shot("s1-stats")
 
-        // A track's menu → Sonic Adventure → pick a destination.
+        // A track's menu → Sound Journey → pick a destination.
         openLibrary("Music")
         let artist = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Calm Pads'")).firstMatch
         // The grid is lazy and sits below the year-in-music card and Muse: scroll to it.
@@ -425,19 +425,21 @@ final class MarqueeUITests: XCTestCase {
         let track = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Floating 2'")).firstMatch
         XCTAssertTrue(track.waitForExistence(timeout: 10))
         track.press(forDuration: 1.2)
-        app.buttons["Sonic Adventure…"].tap()
+        app.buttons["Sound Journey…"].tap()
+        XCTAssertTrue(app.navigationBars["Sound Journey"].waitForExistence(timeout: 5))
         let search = app.searchFields.firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 5))
         search.tap()
         search.typeText("Thump")
         let dest = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Thump'")).firstMatch
         XCTAssertTrue(dest.waitForExistence(timeout: 10))
-        shot("s2-adventure")
+        shot("s2-journey")
         dest.tap()
         XCTAssertTrue(app.buttons["miniPlayer"].waitForExistence(timeout: 15))
         app.buttons["miniPlayer"].tap()
         XCTAssertTrue(app.staticTexts["PLAYING FROM"].waitForExistence(timeout: 5))
-        shot("s3-adventure-playing")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Sound Journey'")).firstMatch.exists)
+        shot("s3-journey-playing")
     }
 
     /// RFC 6238 code for a base32 secret, `ahead` steps from now.
@@ -563,7 +565,7 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Upcoming"].waitForNonExistence(timeout: 10))
     }
 
-    // MARK: - Plex parity (PLAY-17/18/19, USER-12/13, META-7, equaliser, car mode)
+    // MARK: - Playback and Home extras (PLAY-17/18/19, USER-12/13, META-7, equaliser, car mode)
 
     /// Opens a movie by title from the Movies library.
     private func openMovie(_ prefix: String) {

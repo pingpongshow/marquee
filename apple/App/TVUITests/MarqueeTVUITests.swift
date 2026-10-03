@@ -205,7 +205,7 @@ final class MarqueeTVUITests: XCTestCase {
         shot("tv-topshelf-link")
     }
 
-    // MARK: - Plex parity on the TV (USER-12, PLAY-17, PLAY-19)
+    // MARK: - Playback and profile extras on the TV (USER-12, PLAY-17, PLAY-19)
 
     /// Calls the server; returns the JSON object.
     @discardableResult

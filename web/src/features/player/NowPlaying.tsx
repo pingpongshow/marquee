@@ -5,6 +5,7 @@ import {
   ChevronDown,
   GripVertical,
   ListMusic,
+  ListPlus,
   Maximize2,
   MicVocal,
   Moon,
@@ -34,7 +35,9 @@ import {
 } from "./MusicPlayer";
 import type { Entry } from "./queue";
 import { EqualizerSheet } from "./Equalizer";
+import { audioQualityLabel, isHiRes, setShowAudioQuality, streamedLabel, useShowAudioQuality } from "./audioQuality";
 import { PlayOnButton } from "../remote/PlayOn";
+import { queueTitle, SaveAsPlaylistDialog } from "../playlists/SaveAsPlaylist";
 
 export function fmtTime(s: number) {
   if (!isFinite(s) || s < 0) return "0:00";
@@ -284,6 +287,55 @@ export function MiniPlayer() {
   );
 }
 
+/** The track's audio quality, and what's streamed when it isn't the original (MUSIC-23). */
+function QualityBadge({ item }: { item: ItemSummary }) {
+  const show = useShowAudioQuality();
+  const m = useMusicState();
+  const f = item.audioFormat;
+  if (!show || !f) return null;
+  const streamed = streamedLabel(m.stream);
+  const text = audioQualityLabel(f) + (streamed ? ` → ${streamed}` : "");
+  return (
+    <div className="mt-2 flex min-w-0 items-center justify-center gap-1.5 text-xs text-white/60" data-testid="audio-quality">
+      {isHiRes(f) && <span className="shrink-0 rounded border border-accent/60 px-1 text-[10px] font-semibold text-accent">Hi-Res</span>}
+      <span className="truncate" title={text}>
+        {text}
+      </span>
+    </div>
+  );
+}
+
+function QualityToggle() {
+  const show = useShowAudioQuality();
+  return (
+    <label className="flex cursor-pointer items-center gap-1.5 text-xs text-white/80">
+      <input type="checkbox" checked={show} onChange={(e) => setShowAudioQuality(e.target.checked)} className="accent-current" />
+      Show audio quality
+    </label>
+  );
+}
+
+/** Saves what's playing (the station, mix or queue: played and upcoming tracks) as a playlist. */
+function SaveQueueButton({ label, className, iconClass }: { label: string; className: string; iconClass: string }) {
+  const m = useMusicState();
+  const [open, setOpen] = useState(false);
+  if (!m.queue.entries.length) return null;
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className={className} aria-label={label} title={label}>
+        <ListPlus className={iconClass} />
+      </button>
+      {open && (
+        <SaveAsPlaylistDialog
+          defaultTitle={m.source?.title || queueTitle()}
+          itemIds={m.queue.entries.map((e) => e.item.id)}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
 /** Up next, with drag to reorder, click to jump and remove. */
 export function QueueList({ dark }: { dark?: boolean }) {
   const m = useMusicState();
@@ -370,8 +422,9 @@ export function QueueList({ dark }: { dark?: boolean }) {
         )}
       >
         <span>Playing from queue</span>
-        <span>
+        <span className="flex items-center gap-2">
           {m.queue.index + 1} / {m.queue.entries.length}
+          <SaveQueueButton label="Save queue as playlist" className={clsx("rounded p-1", dark ? "hover:bg-white/10" : "hover:bg-surface-2")} iconClass="size-4" />
         </span>
       </div>
       <ul className="flex-1 overflow-y-auto pb-2">
@@ -392,7 +445,7 @@ export function QueueList({ dark }: { dark?: boolean }) {
   );
 }
 
-/** Full-screen Now Playing (Plexamp-style), tinted with the artwork's colour. */
+/** Full-screen Now Playing, tinted with the artwork's colour. */
 export function NowPlaying() {
   const m = useMusic();
   const t = m.current!.item;
@@ -447,6 +500,7 @@ export function NowPlaying() {
             <div className="truncate text-sm font-medium">{m.source.title}</div>
           )}
         </div>
+        <SaveQueueButton label="Save as playlist" className="rounded-full p-2 hover:bg-white/10" iconClass="size-5" />
         <SleepMenu />
         <PlayOnButton
           itemIds={m.queue.entries.map((e) => e.item.id)}
@@ -533,6 +587,7 @@ export function NowPlaying() {
                 </>
               )}
             </div>
+            <QualityBadge item={t} />
           </div>
           <div className="w-full max-w-[32rem]">
             <Scrubber />
@@ -548,6 +603,7 @@ export function NowPlaying() {
             <LevellingSelect />
             <CrossfadeSelect />
             <DJSelect />
+            <QualityToggle />
           </div>
         </div>
         {panel && (
@@ -685,16 +741,16 @@ function CrossfadeSelect() {
 }
 
 export const djLabels: Record<DJMode, string> = {
-  stretch: "DJ Stretch",
-  groupie: "DJ Groupie",
-  deep_cuts: "DJ Deep Cuts",
-  contempo: "DJ Contempo",
+  wander: "DJ: Wander",
+  superfan: "DJ: Superfan",
+  deep_cuts: "DJ: Deep Cuts",
+  same_era: "DJ: Same Era",
 };
 const djHelp: Record<DJMode, string> = {
-  stretch: "Tracks that sound like what's playing, by other artists",
-  groupie: "More from the artist's other albums",
+  wander: "A similar sound, by other artists",
+  superfan: "More from the same artists",
   deep_cuts: "The artist's tracks you play least",
-  contempo: "A similar sound from the same era",
+  same_era: "A similar sound from the same years",
 };
 
 function DJSelect() {
@@ -703,11 +759,11 @@ function DJSelect() {
     <select
       value={m.dj ?? ""}
       onChange={(e) => m.setDJ((e.target.value || null) as DJMode | null)}
-      aria-label="Guest DJ"
+      aria-label="DJ"
       className={selectCls}
       title={m.dj ? djHelp[m.dj] : "A DJ weaves a track in every few songs"}
     >
-      <option value="">Guest DJ: off</option>
+      <option value="">DJ: off</option>
       {(Object.keys(djLabels) as DJMode[]).map((k) => (
         <option key={k} value={k}>
           {djLabels[k]}

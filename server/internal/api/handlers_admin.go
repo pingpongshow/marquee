@@ -56,6 +56,7 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			WatchedThresholdPercent: ptr(s.Library.WatchedThresholdPercent),
 			Trickplay:               ptr(s.Library.Trickplay),
 			DetectIntros:            ptr(s.Library.DetectIntros),
+			AllowMediaDeletion:      ptr(s.Library.AllowMediaDeletion),
 		},
 		Metadata: MetadataSettings{
 			TmdbApiKeySet:            ptr(s.Metadata.TMDBAPIKey != ""),
@@ -73,9 +74,9 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			BackupRetention:        ptr(s.Tasks.BackupRetention),
 		},
 		Music: &MusicSettings{
-			SonicAnalysis:    ptr(s.Music.SonicAnalysis),
-			OnlineLyrics:     ptr(s.Music.OnlineLyrics),
-			LoudnessAnalysis: ptr(s.Music.LoudnessAnalysis),
+			SoundprintAnalysis: ptr(s.Music.SoundprintAnalysis),
+			OnlineLyrics:       ptr(s.Music.OnlineLyrics),
+			LoudnessAnalysis:   ptr(s.Music.LoudnessAnalysis),
 		},
 		Cinema: &CinemaSettings{Trailers: ptr(s.Cinema.Trailers), PrerollItemId: s.Cinema.PrerollItemID},
 		Integrations: &IntegrationSettings{
@@ -162,6 +163,7 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		set(&s.Library.WatchedThresholdPercent, l.WatchedThresholdPercent)
 		set(&s.Library.Trickplay, l.Trickplay)
 		set(&s.Library.DetectIntros, l.DetectIntros)
+		set(&s.Library.AllowMediaDeletion, l.AllowMediaDeletion)
 	}
 	if m := u.Metadata; m != nil {
 		set(&s.Metadata.TMDBAPIKey, m.TmdbApiKey)
@@ -181,7 +183,7 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		set(&s.Tasks.BackupRetention, t.BackupRetention)
 	}
 	if m := u.Music; m != nil {
-		set(&s.Music.SonicAnalysis, m.SonicAnalysis)
+		set(&s.Music.SoundprintAnalysis, m.SoundprintAnalysis)
 		set(&s.Music.OnlineLyrics, m.OnlineLyrics)
 		set(&s.Music.LoudnessAnalysis, m.LoudnessAnalysis)
 	}
@@ -389,7 +391,7 @@ func (h *Handlers) CreateLibrary(ctx context.Context, req CreateLibraryRequestOb
 		return nil, internal(ctx, "createLibrary", err)
 	}
 	if h.Scans != nil {
-		h.Scans.Queue(l.ID) // new libraries scan straight away, like Plex
+		h.Scans.Queue(l.ID) // new libraries scan straight away
 	}
 	h.librariesChanged()
 	return CreateLibrary201JSONResponse(h.toAPILibrary(l)), nil

@@ -41,7 +41,7 @@ struct ItemDetailView: View {
                         }
                     }
                     if !soundsLike.isEmpty {
-                        ShelfRow(title: d.type == .artist ? "Artists that sound similar" : "Albums that sound similar") {
+                        ShelfRow(title: "Sounds like this") {
                             ForEach(soundsLike, id: \.id) { PosterCard(item: $0) }
                         }
                     }
@@ -79,7 +79,7 @@ struct ItemDetailView: View {
             if d.base.childCount > 0 { children = try await app.children(id) }
             if [.movie, .show, .artist, .album].contains(d.type) { related = (try? await app.related(id)) ?? [] }
             if d.type == .artist { popular = (try? await app.popularTracks(id)) ?? [] }
-            if d.type == .artist || d.type == .album { soundsLike = (try? await app.sonicSimilar(id, limit: 15)) ?? [] }
+            if d.type == .artist || d.type == .album { soundsLike = (try? await app.soundsLike(id, limit: 15)) ?? [] }
             watchlisted = d.base.watchlisted ?? false
             var found: [(collection: Item, members: [Item])] = []
             for c in d.info.collections ?? [] {
@@ -136,6 +136,11 @@ struct ItemDetailView: View {
                     }
                     if let artist = d.base.artistCredit, d.type != .artist { Text(artist).font(.title3).foregroundStyle(.secondary) }
                     Text(metaLine(d)).font(.subheadline).foregroundStyle(.secondary)
+                    if d.type == .album, music.showAudioQuality, let f = sharedAudioFormat {
+                        // Every track has the same format: say it once (MUSIC-23).
+                        Text(f.label).font(.caption.weight(.semibold)).foregroundStyle(.secondary).lineLimit(1)
+                            .accessibilityIdentifier("albumQuality")
+                    }
                     if !d.info.genres.isEmpty { Text(d.info.genres.joined(separator: ", ")).font(.caption).foregroundStyle(.tertiary) }
                     ratings(d)
                 }
@@ -159,6 +164,13 @@ struct ItemDetailView: View {
         .padding(.top, 24)
     }
 
+    /// The album's format when all its tracks share it.
+    private var sharedAudioFormat: AudioFormat? {
+        let formats = children.filter { $0._type == .track }.map(\.audioFormat)
+        guard let first = formats.first ?? nil, formats.allSatisfy({ $0?.shortLabel == first.shortLabel }) else { return nil }
+        return first
+    }
+
     private func metaLine(_ d: ItemDetail) -> String {
         var parts: [String] = []
         if d.type == .episode, let season = d.base.parentTitle { parts.append("\(season) · Episode \(d.base.index ?? 0)") }
@@ -172,11 +184,21 @@ struct ItemDetailView: View {
 
     @ViewBuilder private func ratings(_ d: ItemDetail) -> some View {
         if let r = d.info.ratings, r.imdb != nil || r.rottenTomatoes != nil || r.metacritic != nil || r.anilist != nil {
-            HStack(spacing: 12) {
+            // Each chip stays on one line ("61%", never "61" over "%"); when the row is too narrow
+            // for all of them, they stack.
+            let chips = Group {
                 if let imdb = r.imdb { Label(String(format: "%.1f", imdb), systemImage: "star.fill").foregroundStyle(.yellow) }
-                if let rt = r.rottenTomatoes { Label("\(rt)%", systemImage: "leaf.fill").foregroundStyle(rt >= 60 ? .red : .green) }
+                if let rt = r.rottenTomatoes {
+                    Label("\(rt)%", systemImage: "leaf.fill").foregroundStyle(rt >= 60 ? .red : .green).accessibilityIdentifier("rating.rottenTomatoes")
+                }
                 if let mc = r.metacritic { Text("MC \(mc)").foregroundStyle(.secondary) }
                 if let al = r.anilist { Text("AniList \(al)%").foregroundStyle(.secondary) } // anime (META-2)
+            }
+            .lineLimit(1)
+            .fixedSize()
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { chips }
+                VStack(alignment: .leading, spacing: 4) { chips }
             }
             .font(.caption.bold())
         }
@@ -356,7 +378,7 @@ struct ItemDetailView: View {
             switch d.type {
             case .artist:
                 if !popular.isEmpty { popularSection(d) }
-                // Plexamp-style sections by release type (MusicBrainz, META-3).
+                // Sections by release type (MusicBrainz, META-3).
                 ForEach(releaseSections(children), id: \.title) { section in
                     ShelfRow(title: section.title) {
                         ForEach(section.items, id: \.id) { PosterCard(item: $0) }
@@ -504,6 +526,10 @@ struct TrackRow: View {
                     if let credit = track.artistCredit, credit != album?.artistCredit { Text(credit).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
                 }
                 Spacer()
+                if music.showAudioQuality, let f = track.audioFormat {
+                    Text(f.shortLabel).font(.caption2).foregroundStyle(.tertiary).lineLimit(1).fixedSize()
+                        .accessibilityIdentifier("trackQuality")
+                }
                 Text(formatTime(seconds: Double(track.durationMs ?? 0) / 1000)).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
             }
             .padding(.horizontal, sidePadding)

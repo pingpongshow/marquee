@@ -27,6 +27,7 @@ struct SettingsView: View {
                     NavigationLink("Users and Friends") { UsersView() }
                     NavigationLink("Cinema Trailers") { CinemaSettingsView() }
                     #if os(iOS)
+                    NavigationLink("Library Settings") { LibrarySettingsView() }
                     NavigationLink("Library Health") { LibraryHealthView() }
                     NavigationLink("Integrations") { IntegrationsView() }
                     #endif
@@ -79,10 +80,12 @@ struct SettingsView: View {
                 Picker("Volume levelling", selection: $music.levelling) {
                     ForEach(MusicPlayer.Levelling.allCases, id: \.self) { Text($0.label).tag($0) }
                 }
+                Toggle("Show audio quality", isOn: $music.showAudioQuality)
+                    .accessibilityIdentifier("showAudioQuality")
             } header: {
                 Text("Music")
             } footer: {
-                Text("Plays tracks at an even volume using their loudness. Automatic keeps an album's own dynamics when you play it in order.")
+                Text("Volume levelling plays tracks at an even volume using their loudness; Automatic keeps an album's own dynamics when you play it in order. Audio quality shows each track's format, such as FLAC · 24-bit/96 kHz, in Now Playing and track lists.")
             }
             #if os(iOS)
             Section {
@@ -115,7 +118,7 @@ struct SettingsView: View {
     }
 }
 
-/// Switch to another profile on this device (Plex Home style).
+/// Switch to another profile on this device.
 struct ProfileSwitcher: View {
     @Environment(AppSession.self) private var app
     @Environment(\.dismiss) private var dismiss

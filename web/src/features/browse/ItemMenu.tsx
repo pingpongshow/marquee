@@ -6,7 +6,7 @@ import { api, unwrap } from "@/api/client";
 import { fetchLeaves, meQuery } from "@/api/queries";
 import type { ItemSummary } from "@/api/types";
 import { Menu, MenuDivider, MenuItem } from "@/components/Menu";
-import { AdventureDialog } from "../music/Adventure";
+import { JourneyDialog } from "../music/Journey";
 import { useRadio } from "../music/useRadio";
 import { AddToPlaylistDialog } from "../playlists/AddToPlaylist";
 import { useMusicActions } from "../player/MusicPlayer";
@@ -20,7 +20,7 @@ export function ItemMenu({ item, className }: { item: ItemSummary; className?: s
   const player = useMusicActions();
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
-  const [adventure, setAdventure] = useState(false);
+  const [journey, setJourney] = useState(false);
   const [collecting, setCollecting] = useState(false);
   const radio = useRadio();
   const qc = useQueryClient();
@@ -49,8 +49,8 @@ export function ItemMenu({ item, className }: { item: ItemSummary; className?: s
               Start Radio
             </MenuItem>
             {item.type === "track" && (
-              <MenuItem icon={<Compass />} onClick={() => setAdventure(true)}>
-                Sonic Adventure…
+              <MenuItem icon={<Compass />} onClick={() => setJourney(true)}>
+                Sound Journey…
               </MenuItem>
             )}
             {item.type !== "track" && (
@@ -89,7 +89,7 @@ export function ItemMenu({ item, className }: { item: ItemSummary; className?: s
       </Menu>
       {adding && <AddToPlaylistDialog item={item} onClose={() => setAdding(false)} />}
       {collecting && <AddToCollectionDialog item={item} onClose={() => setCollecting(false)} />}
-      {adventure && <AdventureDialog from={item} onClose={() => setAdventure(false)} />}
+      {journey && <JourneyDialog from={item} onClose={() => setJourney(false)} />}
     </>
   );
 }

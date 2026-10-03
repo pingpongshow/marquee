@@ -75,7 +75,7 @@ private val CarGrey = Color(0xFFB5B5BD)
 private val CarTile = Color(0xFF1C1C22)
 
 /**
- * Car mode (Plexamp-style) for phones: black, high contrast and big targets. Large artwork,
+ * Car mode for phones: black, high contrast and big targets. Large artwork,
  * huge previous / play-pause / next, a like button and quick starts (Library Radio, a daily
  * mix, recently played, shuffle all). Keeps the screen on and works either way up.
  */

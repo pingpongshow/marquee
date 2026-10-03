@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// Filter narrows a library listing (the Plex library filter bar).
+// Filter narrows a library listing (the library filter bar).
 type Filter struct {
 	Watch         string `json:"watch,omitempty"` // "", "unwatched", "watched", "in_progress"
 	Genre         string `json:"genre,omitempty"`

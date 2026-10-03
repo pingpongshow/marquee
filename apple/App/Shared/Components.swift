@@ -17,7 +17,7 @@ enum PosterShape {
     }
 }
 
-/// Artwork with a titled placeholder, plus Plex-style watch badges.
+/// Artwork with a titled placeholder, plus watch badges.
 struct ArtworkView: View {
     @Environment(AppSession.self) private var app
     let item: Item
@@ -32,7 +32,7 @@ struct ArtworkView: View {
         ZStack(alignment: .bottomLeading) {
             placeholder
             CachedImage(url: app.imageURL(artID, width: Int(width))) { phase in
-                if let image = phase.image { image.resizable().scaledToFill() }
+                if let image = phase.image { image.resizable().scaledToFill().accessibilityIdentifier("artwork.loaded") }
             }
         }
         .aspectRatio(shape.aspect, contentMode: .fit)
@@ -98,7 +98,10 @@ struct CachedImage<Content: View>: View {
     @State private var failedURL: URL?
 
     var body: some View {
-        content(phase)
+        // The task hangs off a view that is always there: while nothing has loaded, the content
+        // is empty, and SwiftUI never starts tasks on empty views (the image never loaded).
+        Color.clear
+            .overlay { content(phase) }
             .task(id: url) { await load() }
     }
 

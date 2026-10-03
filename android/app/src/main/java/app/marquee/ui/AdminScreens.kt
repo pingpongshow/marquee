@@ -101,7 +101,7 @@ fun TrailersPreference() {
 private fun SectionTitle(t: String) =
     Text(t, Modifier.padding(horizontal = sidePadding).padding(top = 20.dp, bottom = 6.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Gold)
 
-/** Admin server settings on Android: cinema trailers (PLAY-18) and integrations (Seerr, Bazarr). The full set lives on the web. */
+/** Admin server settings on Android: cinema trailers (PLAY-18), deleting media files, and integrations (Seerr, Bazarr). The full set lives on the web. */
 @Composable
 fun ServerSettingsScreen() {
     val marquee = LocalMarquee.current
@@ -122,12 +122,16 @@ fun ServerSettingsScreen() {
     var bazarrKey by remember { mutableStateOf("") }
     var bazarrKeySet by remember { mutableStateOf(false) }
     var integrationStatus by remember { mutableStateOf<String?>(null) }
+    // Library settings (only the deletion switch is changed here; the server leaves the rest alone).
+    var library by remember { mutableStateOf<app.marquee.api.models.LibraryGlobalSettings?>(null) }
+    var libraryStatus by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) { runCatching { marquee.settings.getSettings() } }
             .onSuccess { st ->
                 val c = st.cinema
                 trailers = c?.trailers ?: 0
                 prerollId = c?.prerollItemId
+                library = st.library
                 st.integrations?.let { i ->
                     seerrUrl = i.seerrUrl.orEmpty(); seerrKeySet = i.seerrApiKeySet == true
                     bazarrUrl = i.bazarrUrl.orEmpty(); bazarrKeySet = i.bazarrApiKeySet == true
@@ -161,6 +165,15 @@ fun ServerSettingsScreen() {
         results = withContext(Dispatchers.IO) {
             runCatching { marquee.search.search(query.trim(), 10).groups.flatMap { it.items } }.getOrDefault(emptyList())
         }.filter { it.type in listOf(ItemType.MOVIE, ItemType.VIDEO, ItemType.EPISODE) }
+    }
+    fun setDeletion(on: Boolean) {
+        val l = library ?: return
+        library = l.copy(allowMediaDeletion = on)
+        scope.launch {
+            withContext(Dispatchers.IO) { runCatching { marquee.settings.updateSettings(ServerSettingsUpdate(library = app.marquee.api.models.LibraryGlobalSettings(allowMediaDeletion = on))) } }
+                .onSuccess { library = it.library; libraryStatus = null }
+                .onFailure { library = l; libraryStatus = "Couldn't save: ${serverMessage(it)}" }
+        }
     }
     fun save() {
         scope.launch {
@@ -213,6 +226,21 @@ fun ServerSettingsScreen() {
                 }
                 Button(::save, Modifier.focusRing(), enabled = loaded) { Text("Save") }
                 status?.let { Text(it, color = if (it == "Saved.") Gold else MaterialTheme.colorScheme.error) }
+            }
+        }
+        item { SectionTitle("Libraries") }
+        item {
+            Column(Modifier.padding(horizontal = sidePadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text("Allow deleting media files")
+                        Text("Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good after 30 days.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(library?.allowMediaDeletion == true, ::setDeletion, Modifier.focusRing().semantics { contentDescription = "Allow deleting media files" },
+                        enabled = library != null)
+                }
+                libraryStatus?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         }
         item { SectionTitle("Integrations") }

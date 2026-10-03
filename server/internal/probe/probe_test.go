@@ -54,3 +54,14 @@ func TestParseTrack(t *testing.T) {
 		t.Fatalf("audio: %+v", a)
 	}
 }
+
+func TestAudioBitDepth(t *testing.T) {
+	for _, c := range []struct {
+		codec, raw string
+		per, want  int
+	}{{"flac", "24", 0, 24}, {"flac", "", 16, 16}, {"pcm_s24le", "", 0, 24}, {"pcm_s16be", "", 0, 16}, {"mp3", "", 0, 0}, {"aac", "", 16, 0}} {
+		if got := audioBitDepth(c.codec, c.raw, c.per); got != c.want {
+			t.Errorf("%s %q %d: %d, want %d", c.codec, c.raw, c.per, got, c.want)
+		}
+	}
+}

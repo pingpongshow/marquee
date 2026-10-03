@@ -23,6 +23,7 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.IssueFile
 import app.marquee.api.models.ItemSummary
 
 import kotlinx.serialization.Serializable
@@ -37,6 +38,7 @@ import kotlinx.serialization.Contextual
  * @param fileId 
  * @param path 
  * @param related duplicates: the other copies.
+ * @param files The files involved, to compare. duplicates: every file of every copy (this item and the related ones).
  */
 @Serializable
 
@@ -56,7 +58,11 @@ data class HealthIssue (
 
     /* duplicates: the other copies. */
     @SerialName(value = "related")
-    val related: kotlin.collections.List<ItemSummary>? = null
+    val related: kotlin.collections.List<ItemSummary>? = null,
+
+    /* The files involved, to compare. duplicates: every file of every copy (this item and the related ones). */
+    @SerialName(value = "files")
+    val files: kotlin.collections.List<IssueFile>? = null
 
 ) {
 

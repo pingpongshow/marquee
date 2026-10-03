@@ -9,7 +9,7 @@ import { Alert, Button, Dialog, Input, Spinner } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { Avatar } from "./Avatar";
 
-/** Plex Home-style profile picker with an on-screen PIN pad. */
+/** Profile picker with an on-screen PIN pad. */
 export function ProfileSwitcher({ onClose }: { onClose: () => void }) {
   const { signIn } = useAuth();
   const profiles = useQuery(profilesQuery);

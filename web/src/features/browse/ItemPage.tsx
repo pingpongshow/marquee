@@ -17,6 +17,7 @@ import { Rating } from "../music/Rating";
 import { PlayButtons } from "./PlayButtons";
 import { Poster } from "./Poster";
 import { formatBytes, formatDuration, formatTrackTime, languageName, subtitleFor } from "./format";
+import { audioQualityLabel, audioQualityShort, useShowAudioQuality } from "../player/audioQuality";
 
 function Breadcrumbs({ item }: { item: ItemDetail }) {
   const crumbs: { id?: number; title: string }[] = [];
@@ -153,6 +154,7 @@ function Cast({ credits }: { credits: Credit[] }) {
 function Children({ item }: { item: ItemDetail }) {
   const music = useMusicState();
   const children = useQuery({ ...itemChildrenQuery(item.id), enabled: item.childCount > 0 });
+  const showQuality = useShowAudioQuality();
   if (!children.data?.items.length) return null;
   const list = children.data.items;
   const heading = { show: "Seasons", season: "Episodes", artist: "Albums", album: "Tracks", collection: "In this collection" }[item.type as string] ?? "Contents";
@@ -166,9 +168,19 @@ function Children({ item }: { item: ItemDetail }) {
     );
   // Episodes and tracks are rows; seasons and albums are poster cards.
   const rows = item.type === "season" || item.type === "album";
+  // The album's format once, when every track shares it (MUSIC-23).
+  const formats = new Set(list.map((t) => (t.audioFormat ? audioQualityLabel(t.audioFormat) : "")));
+  const albumQuality = showQuality && item.type === "album" && formats.size === 1 ? [...formats][0] : "";
   return (
     <section className="mt-10">
-      <h2 className="mb-4 text-lg font-semibold">{heading}</h2>
+      <div className="mb-4 flex items-baseline gap-3">
+        <h2 className="text-lg font-semibold">{heading}</h2>
+        {albumQuality && (
+          <span className="text-xs text-muted" data-testid="album-quality">
+            {albumQuality}
+          </span>
+        )}
+      </div>
       {rows ? (
         <ol className="divide-y divide-border rounded-lg border border-border bg-surface">
           {list.map((c: ItemSummary) => (
@@ -190,6 +202,11 @@ function Children({ item }: { item: ItemDetail }) {
                   <span className={c.available ? "block truncate" : "block truncate text-faint line-through"}>{c.title}</span>
                   {c.type === "track" && c.artistCredit && c.artistCredit !== item.artistCredit && <span className="block truncate text-xs text-muted">{c.artistCredit}</span>}
                 </span>
+                {showQuality && c.audioFormat && (
+                  <span className="hidden shrink-0 text-[11px] text-faint sm:inline" data-testid="track-quality">
+                    {audioQualityShort(c.audioFormat)}
+                  </span>
+                )}
                 <span className="shrink-0 text-sm text-muted tabular-nums">{c.type === "track" ? formatTrackTime(c.durationMs) : formatDuration(c.durationMs)}</span>
                 {c.type === "track" && <ItemMenu item={c} className="-my-1" />}
               </Link>
@@ -260,7 +277,7 @@ function PopularTracks({ artist }: { artist: ItemDetail }) {
   );
 }
 
-/** Plexamp-style sections of an artist's releases, by MusicBrainz release type (META-3). */
+/** Sections of an artist's releases, by MusicBrainz release type (META-3). */
 const releaseSections: [string, string[]][] = [
   ["Albums", ["album", ""]],
   ["Singles & EPs", ["ep", "single"]],
@@ -350,7 +367,7 @@ function Related({ item }: { item: ItemDetail }) {
     queryKey: ["items", item.id, "related"],
     queryFn: () =>
       music
-        ? unwrap(api.GET("/items/{itemId}/sonic-similar", { params: { path: { itemId: item.id } } })).catch(() => [])
+        ? unwrap(api.GET("/items/{itemId}/sounds-like", { params: { path: { itemId: item.id } } })).catch(() => [])
         : unwrap(api.GET("/items/{itemId}/related", { params: { path: { itemId: item.id } } })),
     enabled: ["movie", "show", "artist", "album", "track"].includes(item.type),
   });
@@ -358,7 +375,7 @@ function Related({ item }: { item: ItemDetail }) {
   const square = music;
   return (
     <section className="mt-10">
-      <h2 className="mb-4 text-lg font-semibold">{square ? (item.type === "track" ? "Sonically similar tracks" : "Sounds like") : "More like this"}</h2>
+      <h2 className="mb-4 text-lg font-semibold">{square ? "Sounds like this" : "More like this"}</h2>
       <ul className="flex gap-4 overflow-x-auto pb-2">
         {related.data.map((r) => (
           <li key={r.id} className="w-36 shrink-0">

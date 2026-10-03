@@ -168,9 +168,17 @@ func TestChecks(t *testing.T) {
 			if len(is.Related) != 1 || is.Related[0] != m2 || is.Detail != "2 copies in this library" {
 				t.Errorf("heat: %+v", is)
 			}
+			// Both copies' files, this item's first, to compare.
+			if len(is.Files) != 2 || is.Files[0].ItemID != m1 || is.Files[1].ItemID != m2 ||
+				is.Files[0].ItemTitle != "Heat" || is.Files[1].ItemTitle != "Heat (copy)" || is.Files[0].AddedAt == "" {
+				t.Errorf("heat files: %+v", is.Files)
+			}
 		case twice:
 			if is.Path != "/m/Twice.copy.mkv" || is.Detail != "2 files at 1080p" {
 				t.Errorf("twice: %+v", is)
+			}
+			if len(is.Files) != 2 || is.Files[0].ItemID != twice || is.Files[1].ItemID != twice || is.Files[0].FileID == is.Files[1].FileID {
+				t.Errorf("twice files: %+v", is.Files)
 			}
 		}
 	}
@@ -184,7 +192,8 @@ func TestChecks(t *testing.T) {
 	if un := details("unmatched"); un[byTitle("Odd Show")] != "Matching failed" || un[byTitle("Mystery")] != "Not matched" {
 		t.Errorf("unmatched: %v", un)
 	}
-	if list := issues("unavailable"); list[0].ItemID != gone || list[0].Path != "/m/gone.mkv" {
+	if list := issues("unavailable"); list[0].ItemID != gone || list[0].Path != "/m/gone.mkv" ||
+		len(list[0].Files) != 1 || list[0].Files[0].FileID != list[0].FileID {
 		t.Errorf("unavailable: %+v", list)
 	}
 

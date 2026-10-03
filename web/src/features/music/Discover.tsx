@@ -3,6 +3,7 @@ import { clsx } from "clsx";
 import {
   Disc3,
   Heart,
+  ListPlus,
   Library as LibraryIcon,
   Loader2,
   Play,
@@ -16,6 +17,7 @@ import type { Station } from "@/api/types";
 import { Alert } from "@/components/ui";
 import { useMusicActions } from "../player/MusicPlayer";
 import { useRadio, useMuse } from "./useRadio";
+import { SaveAsPlaylistDialog } from "../playlists/SaveAsPlaylist";
 
 const moods = [
   "Chill",
@@ -80,6 +82,7 @@ export function MusicDiscover({ libraryId }: { libraryId: number }) {
   const radio = useRadio();
   const muse = useMuse();
   const [prompt, setPrompt] = useState("");
+  const [saving, setSaving] = useState(false);
   const status = useQuery({
     queryKey: ["music", "status"],
     queryFn: () => unwrap(api.GET("/music/status")),
@@ -120,7 +123,7 @@ export function MusicDiscover({ libraryId }: { libraryId: number }) {
           <Sparkles className="size-4 text-accent" aria-hidden />
           {st.available
             ? `Listening to your music: ${st.analyzed.toLocaleString()} of ${st.total.toLocaleString()} tracks analysed. Radios and mixes improve as it goes.`
-            : "The sonic analysis service isn't running, so radios and Muse are unavailable."}
+            : "The Soundprint analysis service isn't running, so radios and Muse are unavailable."}
         </p>
       )}
       {error && <Alert tone="error">{error.message}</Alert>}
@@ -158,6 +161,20 @@ export function MusicDiscover({ libraryId }: { libraryId: number }) {
               Play
             </button>
           </div>
+          {muse.isSuccess && muse.data.items.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm" data-testid="muse-playing">
+              <span className="min-w-0 truncate text-muted">
+                Playing <strong className="text-text">{muse.data.title}</strong> · {muse.data.items.length} tracks
+              </span>
+              <button
+                type="button"
+                onClick={() => setSaving(true)}
+                className="flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1 text-xs font-medium hover:bg-surface-3"
+              >
+                <ListPlus className="size-4" /> Save as playlist
+              </button>
+            </div>
+          )}
           <div className="mt-3 flex flex-wrap gap-2">
             {musePrompts.map((p) => (
               <button
@@ -172,6 +189,9 @@ export function MusicDiscover({ libraryId }: { libraryId: number }) {
             ))}
           </div>
         </form>
+      )}
+      {saving && muse.data && (
+        <SaveAsPlaylistDialog defaultTitle={muse.data.title} itemIds={muse.data.items.map((i) => i.id)} onClose={() => setSaving(false)} />
       )}
 
       {ready && (
@@ -296,7 +316,7 @@ const moodColours: Record<string, string> = {
   Aggressive: "from-red-700 to-zinc-900",
 };
 
-/** Plexamp-style mood and style tiles (MUSIC-18); each opens a page with its radio and music. */
+/** Mood and style tiles (MUSIC-18); each opens a page with its radio and music. */
 function BrowseMoodsAndStyles({
   libraryId,
   genres,

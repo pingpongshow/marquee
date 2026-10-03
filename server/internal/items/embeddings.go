@@ -19,7 +19,7 @@ import (
 // ErrEmbedderUnavailable means the sidecar that embeds text isn't reachable.
 var ErrEmbedderUnavailable = errors.New("the analysis service isn't running")
 
-// TextEmbedder embeds text with the sonic sidecar's text model (sonic.Client.EmbedDocs).
+// TextEmbedder embeds text with the Soundprint sidecar's text model (soundprint.Client.EmbedDocs).
 // kind is "doc" for descriptions and "query" for prompts. An empty texts list only
 // reports the model id.
 type TextEmbedder interface {

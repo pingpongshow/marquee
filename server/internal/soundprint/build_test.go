@@ -1,4 +1,4 @@
-package sonic
+package soundprint
 
 import (
 	"math/rand/v2"
@@ -49,10 +49,10 @@ func TestFlowStaysInGenreWithVariety(t *testing.T) {
 	}
 }
 
-func TestAdventureTravelsBetweenGenres(t *testing.T) {
+func TestJourneyTravelsBetweenGenres(t *testing.T) {
 	x := testIndex()
 	from, to := x.Get(1), x.Get(45) // genre 0 → genre 2
-	got := x.Adventure(from, to, 8, Options{})
+	got := x.Journey(from, to, 8, Options{})
 	if len(got) != 8 || got[0] != from || got[7] != to {
 		t.Fatalf("ends wrong: %d tracks", len(got))
 	}

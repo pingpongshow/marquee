@@ -148,6 +148,14 @@ export function LibrariesSettings() {
               {() => <StringListEditor values={scanning.draft!.browseRoots ?? []} onChange={(v) => scanning.update({ browseRoots: v })} placeholder="/media" addLabel="Add folder" />}
             </Field>
           </Card>
+          <Card title="Media files">
+            <Toggle
+              label="Allow deleting media files"
+              help="Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good after 30 days."
+              checked={!!scanning.draft.allowMediaDeletion}
+              onChange={(v) => scanning.update({ allowMediaDeletion: v })}
+            />
+          </Card>
           <SaveBar dirty={scanning.dirty} saving={scanning.saving} error={scanning.error} savedAt={scanning.savedAt} onSave={scanning.save} onReset={scanning.reset} />
         </>
       )}

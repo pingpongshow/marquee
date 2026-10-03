@@ -602,7 +602,7 @@ paths:
     get:
       tags: [users]
       operationId: listProfiles
-      summary: Profiles that can be switched to from this device (Plex Home equivalent).
+      summary: Profiles that can be switched to from this device.
       responses:
         "200":
           description: OK
@@ -1817,6 +1817,24 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /files/{fileId}:
+    parameters:
+      - name: fileId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    delete:
+      tags: [libraries]
+      operationId: deleteMediaFile
+      summary: Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
+      description: "The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item's last file the item goes too, along with a season or show left empty."
+      responses:
+        "204": { description: Moved to the trash. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
   /me/home-layout:
     get:
@@ -3158,7 +3176,7 @@ paths:
     get:
       tags: [music]
       operationId: musicStatus
-      summary: Sonic analysis progress and whether the analysis service is running.
+      summary: Soundprint analysis progress and whether the analysis service is running.
       responses:
         "200":
           description: OK
@@ -3167,13 +3185,13 @@ paths:
               schema: { $ref: "#/components/schemas/MusicStatus" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /items/{itemId}/sonic-similar:
+  /items/{itemId}/sounds-like:
     parameters:
       - $ref: "#/components/parameters/ItemId"
     get:
       tags: [music]
-      operationId: sonicSimilar
-      summary: Tracks, albums or artists (matching the item's type) that sound like it (MUSIC-2).
+      operationId: soundsLike
+      summary: Sounds like this (MUSIC-2) — tracks, albums or artists (matching the item's type) that sound like it.
       parameters:
         - name: limit
           in: query
@@ -3237,11 +3255,11 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
 
-  /music/adventure:
+  /music/journey:
     post:
       tags: [music]
-      operationId: musicAdventure
-      summary: Sonic Adventure (MUSIC-4) — a path from one track to another through tracks that sound in between.
+      operationId: musicJourney
+      summary: Sound Journey (MUSIC-4) — a path from one track to another through tracks that sound in between.
       requestBody:
         required: true
         content:
@@ -3267,8 +3285,8 @@ paths:
     post:
       tags: [music]
       operationId: musicDJ
-      summary: Guest DJ (MUSIC-6) — one track to weave in after the one playing.
-      description: "stretch: sounds like it, by another artist. groupie: the artist's other albums. deep_cuts: the artist's least-played tracks. contempo: a similar sound from the same era."
+      summary: DJ (MUSIC-6) — one track to weave in after the one playing.
+      description: "wander: sounds like it, by another artist. superfan: the artist's other albums. deep_cuts: the artist's least-played tracks. same_era: a similar sound from the same years."
       requestBody:
         required: true
         content:
@@ -3278,7 +3296,7 @@ paths:
               required: [trackId, mode]
               properties:
                 trackId: { type: integer, format: int64 }
-                mode: { type: string, enum: [stretch, groupie, deep_cuts, contempo] }
+                mode: { type: string, enum: [wander, superfan, deep_cuts, same_era] }
                 exclude:
                   type: array
                   description: Tracks already queued.
@@ -3786,7 +3804,7 @@ components:
     MusicSettings:
       type: object
       properties:
-        sonicAnalysis: { type: boolean, description: "Analyse how tracks sound (on this server's GPU) for radios, similar music and Muse." }
+        soundprintAnalysis: { type: boolean, description: "Soundprint: analyse how tracks sound (on this server's GPU) for radios, similar music and Muse." }
         onlineLyrics: { type: boolean, description: Look up lyrics on LRCLIB when a track has none (sends artist and title). }
         loudnessAnalysis: { type: boolean, description: Measure loudness of tracks without ReplayGain tags so volume levelling works for everything. }
 
@@ -3876,6 +3894,7 @@ components:
         watchedThresholdPercent: { type: integer, minimum: 50, maximum: 100 }
         detectIntros: { type: boolean, description: "Find intros and end credits in TV episodes by comparing their audio, for Skip Intro and Skip Credits (PLAY-12). Markers from Plex or the files take precedence." }
         trickplay: { type: boolean, description: "Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie." }
+        allowMediaDeletion: { type: boolean, default: false, description: "Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good after 30 days." }
 
     WatchGroup:
       type: object
@@ -4488,6 +4507,7 @@ components:
         audioCopy: { type: boolean }
         audioCodec: { type: string }
         audioChannels: { type: integer }
+        audioKbps: { type: integer, description: "Bitrate of the converted audio (MUSIC-23); absent when the audio is sent as it is." }
         burnSubtitle: { type: boolean }
         toneMap: { type: boolean }
 
@@ -4833,6 +4853,20 @@ components:
           type: array
           description: "duplicates: the other copies."
           items: { $ref: "#/components/schemas/ItemSummary" }
+        files:
+          type: array
+          description: "The files involved, to compare. duplicates: every file of every copy (this item and the related ones)."
+          items: { $ref: "#/components/schemas/IssueFile" }
+
+    IssueFile:
+      type: object
+      required: [itemId, itemTitle, file, addedAt]
+      properties:
+        itemId: { type: integer, format: int64 }
+        itemTitle: { type: string }
+        versionLabel: { type: string }
+        file: { $ref: "#/components/schemas/MediaFile" }
+        addedAt: { type: string, format: date-time }
 
     HealthIssuePage:
       type: object
@@ -5295,6 +5329,19 @@ components:
           type: string
           description: "Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown."
           enum: [album, ep, single, compilation, live, soundtrack, remix, demo, other]
+        audioFormat: { $ref: "#/components/schemas/AudioFormat" }
+
+    AudioFormat:
+      type: object
+      description: "Tracks: the file's audio quality (MUSIC-23), for apps that show it, e.g. FLAC 24/96 or MP3 320."
+      required: [codec, lossless]
+      properties:
+        codec: { type: string, example: flac, description: "ffprobe codec name: flac, alac, mp3, aac, opus, vorbis, pcm_s16le…" }
+        lossless: { type: boolean }
+        bitrateKbps: { type: integer }
+        sampleRate: { type: integer, description: "Hz, e.g. 96000" }
+        bitDepth: { type: integer, description: "Bits per sample, for lossless formats (16, 24)." }
+        channels: { type: integer }
 
     ItemImages:
       type: object

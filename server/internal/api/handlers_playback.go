@@ -34,7 +34,7 @@ func toProfile(p DeviceProfile) playback.DeviceProfile {
 func toAPIDecision(d playback.Decision) PlaybackDecision {
 	return PlaybackDecision{Method: PlaybackDecisionMethod(d.Method), Summary: d.String(), Reasons: orEmpty(d.Reasons),
 		VideoCopy: d.VideoCopy, VideoCodec: nz(d.VideoCodec), Height: nz(d.Height), VideoKbps: nz(d.VideoKbps),
-		AudioCopy: d.AudioCopy, AudioCodec: nz(d.AudioCodec), AudioChannels: nz(d.AudioChannels),
+		AudioCopy: d.AudioCopy, AudioCodec: nz(d.AudioCodec), AudioChannels: nz(d.AudioChannels), AudioKbps: nz(d.AudioKbps),
 		BurnSubtitle: d.BurnSubtitle, ToneMap: d.ToneMap}
 }
 

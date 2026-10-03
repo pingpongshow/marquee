@@ -3541,7 +3541,7 @@ public struct Client: APIProtocol {
             }
         )
     }
-    /// Profiles that can be switched to from this device (Plex Home equivalent).
+    /// Profiles that can be switched to from this device.
     ///
     /// - Remark: HTTP `GET /profiles`.
     /// - Remark: Generated from `#/paths//profiles/get(listProfiles)`.
@@ -11297,6 +11297,138 @@ public struct Client: APIProtocol {
                         preconditionFailure("bestContentType chose an invalid content type.")
                     }
                     return .notFound(.init(body: body))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
+    ///
+    /// The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item's last file the item goes too, along with a season or show left empty.
+    ///
+    /// - Remark: HTTP `DELETE /files/{fileId}`.
+    /// - Remark: Generated from `#/paths//files/{fileId}/delete(deleteMediaFile)`.
+    public func deleteMediaFile(_ input: Operations.DeleteMediaFile.Input) async throws -> Operations.DeleteMediaFile.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.DeleteMediaFile.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/files/{}",
+                    parameters: [
+                        input.path.fileId
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .delete
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 204:
+                    return .noContent(.init())
+                case 401:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Components.Responses.Unauthorized.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas._Error.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .unauthorized(.init(body: body))
+                case 403:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Components.Responses.Forbidden.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas._Error.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .forbidden(.init(body: body))
+                case 404:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Components.Responses.NotFound.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas._Error.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .notFound(.init(body: body))
+                case 409:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Components.Responses.Conflict.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas._Error.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .conflict(.init(body: body))
                 default:
                     return .undocumented(
                         statusCode: response.status.code,
@@ -19616,7 +19748,7 @@ public struct Client: APIProtocol {
             }
         )
     }
-    /// Sonic analysis progress and whether the analysis service is running.
+    /// Soundprint analysis progress and whether the analysis service is running.
     ///
     /// - Remark: HTTP `GET /music/status`.
     /// - Remark: Generated from `#/paths//music/status/get(musicStatus)`.
@@ -19698,17 +19830,17 @@ public struct Client: APIProtocol {
             }
         )
     }
-    /// Tracks, albums or artists (matching the item's type) that sound like it (MUSIC-2).
+    /// Sounds like this (MUSIC-2) — tracks, albums or artists (matching the item's type) that sound like it.
     ///
-    /// - Remark: HTTP `GET /items/{itemId}/sonic-similar`.
-    /// - Remark: Generated from `#/paths//items/{itemId}/sonic-similar/get(sonicSimilar)`.
-    public func sonicSimilar(_ input: Operations.SonicSimilar.Input) async throws -> Operations.SonicSimilar.Output {
+    /// - Remark: HTTP `GET /items/{itemId}/sounds-like`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/sounds-like/get(soundsLike)`.
+    public func soundsLike(_ input: Operations.SoundsLike.Input) async throws -> Operations.SoundsLike.Output {
         try await client.send(
             input: input,
-            forOperation: Operations.SonicSimilar.id,
+            forOperation: Operations.SoundsLike.id,
             serializer: { input in
                 let path = try converter.renderedPath(
-                    template: "/items/{}/sonic-similar",
+                    template: "/items/{}/sounds-like",
                     parameters: [
                         input.path.itemId
                     ]
@@ -19735,7 +19867,7 @@ public struct Client: APIProtocol {
                 switch response.status.code {
                 case 200:
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
-                    let body: Operations.SonicSimilar.Output.Ok.Body
+                    let body: Operations.SoundsLike.Output.Ok.Body
                     let chosenContentType = try converter.bestContentType(
                         received: contentType,
                         options: [
@@ -20125,17 +20257,17 @@ public struct Client: APIProtocol {
             }
         )
     }
-    /// Sonic Adventure (MUSIC-4) — a path from one track to another through tracks that sound in between.
+    /// Sound Journey (MUSIC-4) — a path from one track to another through tracks that sound in between.
     ///
-    /// - Remark: HTTP `POST /music/adventure`.
-    /// - Remark: Generated from `#/paths//music/adventure/post(musicAdventure)`.
-    public func musicAdventure(_ input: Operations.MusicAdventure.Input) async throws -> Operations.MusicAdventure.Output {
+    /// - Remark: HTTP `POST /music/journey`.
+    /// - Remark: Generated from `#/paths//music/journey/post(musicJourney)`.
+    public func musicJourney(_ input: Operations.MusicJourney.Input) async throws -> Operations.MusicJourney.Output {
         try await client.send(
             input: input,
-            forOperation: Operations.MusicAdventure.id,
+            forOperation: Operations.MusicJourney.id,
             serializer: { input in
                 let path = try converter.renderedPath(
-                    template: "/music/adventure",
+                    template: "/music/journey",
                     parameters: []
                 )
                 var request: HTTPTypes.HTTPRequest = .init(
@@ -20162,7 +20294,7 @@ public struct Client: APIProtocol {
                 switch response.status.code {
                 case 200:
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
-                    let body: Operations.MusicAdventure.Output.Ok.Body
+                    let body: Operations.MusicJourney.Output.Ok.Body
                     let chosenContentType = try converter.bestContentType(
                         received: contentType,
                         options: [
@@ -20260,9 +20392,9 @@ public struct Client: APIProtocol {
             }
         )
     }
-    /// Guest DJ (MUSIC-6) — one track to weave in after the one playing.
+    /// DJ (MUSIC-6) — one track to weave in after the one playing.
     ///
-    /// stretch: sounds like it, by another artist. groupie: the artist's other albums. deep_cuts: the artist's least-played tracks. contempo: a similar sound from the same era.
+    /// wander: sounds like it, by another artist. superfan: the artist's other albums. deep_cuts: the artist's least-played tracks. same_era: a similar sound from the same years.
     ///
     /// - Remark: HTTP `POST /music/dj`.
     /// - Remark: Generated from `#/paths//music/dj/post(musicDJ)`.

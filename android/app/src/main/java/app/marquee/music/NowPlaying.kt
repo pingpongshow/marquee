@@ -1,5 +1,9 @@
 package app.marquee.music
 
+import androidx.compose.foundation.border
+
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+
 import app.marquee.ui.CastButton
 import kotlinx.coroutines.launch
 import app.marquee.ui.initialFocus
@@ -96,10 +100,10 @@ fun MiniPlayer(onOpen: () -> Unit) {
     }
 }
 
-/** Full-screen Now Playing: artwork or lyrics or the queue, rating, radio, sleep timer and Guest DJ. */
+/** Full-screen Now Playing: artwork or lyrics or the queue, rating, radio, sleep timer and DJ. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun NowPlayingScreen(onClose: () -> Unit, onCarMode: (() -> Unit)? = null, onRemote: ((Long) -> Unit)? = null) {
+fun NowPlayingScreen(onClose: () -> Unit, onCarMode: (() -> Unit)? = null, onRemote: ((Long) -> Unit)? = null, onOpenPlaylist: ((Long) -> Unit)? = null) {
     val music = LocalMusic.current
     val marquee = LocalMarquee.current
     val now by music.now.collectAsState()
@@ -109,6 +113,10 @@ fun NowPlayingScreen(onClose: () -> Unit, onCarMode: (() -> Unit)? = null, onRem
     var radioError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val n = now
+    // Save as playlist: the whole queue (played and upcoming), named after the station or mix.
+    var saving by remember { mutableStateOf(false) }
+    val snackbar = remember { androidx.compose.material3.SnackbarHostState() }
+    fun saveQueue() { if (music.queue.value.isNotEmpty()) saving = true }
     fun startRadio() {
         val id = n?.id ?: return
         scope.launch {
@@ -140,7 +148,7 @@ fun NowPlayingScreen(onClose: () -> Unit, onCarMode: (() -> Unit)? = null, onRem
         when {
             n == null -> Box(m, contentAlignment = Alignment.Center) { Text("Nothing playing", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             panel == Panel.Lyrics -> LyricsPanel(n.id, music.position.collectAsState().value.first, music::seek, m)
-            panel == Panel.Queue -> QueueList(m)
+            panel == Panel.Queue -> QueueList(m, ::saveQueue)
             else -> Box(m, contentAlignment = Alignment.Center) {
                 AsyncImage(n.artwork, null, contentScale = ContentScale.Crop,
                     modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(12.dp)).background(Surface2))
@@ -152,6 +160,7 @@ fun NowPlayingScreen(onClose: () -> Unit, onCarMode: (() -> Unit)? = null, onRem
             n.dj?.let { Text(it.uppercase(), style = MaterialTheme.typography.labelSmall, color = Gold) }
             Text(n.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(listOf(n.artist, n.album).filter { it.isNotBlank() }.joinToString(" · "), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            QualityBadge(n)
             Transport()
             // Wraps onto a second line on narrow phones.
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)) {
@@ -159,6 +168,9 @@ fun NowPlayingScreen(onClose: () -> Unit, onCarMode: (() -> Unit)? = null, onRem
                     RatingStars(music.rating.collectAsState().value, music::rate, size = if (marquee.isTv) 22 else 24)
                 }
                 IconButton(::startRadio, Modifier.focusRing()) { Icon(Icons.Filled.Radio, "Start Radio", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                IconButton(::saveQueue, Modifier.focusRing()) {
+                    Icon(Icons.AutoMirrored.Filled.PlaylistAdd, "Save as playlist", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 SleepButton()
                 DJButton()
                 LevellingButton()
@@ -189,6 +201,15 @@ fun NowPlayingScreen(onClose: () -> Unit, onCarMode: (() -> Unit)? = null, onRem
                 panelContent(Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp))
                 details()
             }
+        }
+        androidx.compose.material3.SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp))
+    }
+    if (saving) SaveAsPlaylistDialog(defaultPlaylistTitle(source), music.queue.value.map { it.id }) { pl ->
+        saving = false
+        if (pl != null) scope.launch {
+            val r = snackbar.showSnackbar("Saved “${pl.title}”", actionLabel = if (onOpenPlaylist != null) "Open" else null,
+                duration = androidx.compose.material3.SnackbarDuration.Long)
+            if (r == androidx.compose.material3.SnackbarResult.ActionPerformed) onOpenPlaylist?.invoke(pl.id)
         }
     }
 }
@@ -233,15 +254,25 @@ private fun Transport() {
     }
 }
 
-/** Up Next: tap to jump, with the Guest DJ's picks marked. */
+/** Up Next: tap to jump, with the DJ's picks marked. */
 @Composable
-private fun QueueList(modifier: Modifier) {
+private fun QueueList(modifier: Modifier, onSave: () -> Unit) {
     val music = LocalMusic.current
     val queue by music.queue.collectAsState()
     val index by music.index.collectAsState()
     val state = rememberLazyListState()
-    LaunchedEffect(Unit) { state.scrollToItem(index.coerceAtLeast(0)) }
+    LaunchedEffect(Unit) { state.scrollToItem(index.coerceAtLeast(0) + 1) } // past the header
     LazyColumn(modifier, state = state) {
+        item {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(if (queue.size == 1) "1 track" else "${queue.size} tracks", Modifier.weight(1f), style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                androidx.compose.material3.TextButton(onSave, Modifier.focusRing()) {
+                    Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null)
+                    Text("Save as playlist", Modifier.padding(start = 6.dp))
+                }
+            }
+        }
         itemsIndexed(queue) { i, q ->
             Row(Modifier.fillMaxWidth().focusCard({ music.jump(i) }).padding(vertical = 10.dp, horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -254,5 +285,23 @@ private fun QueueList(modifier: Modifier) {
                 }
             }
         }
+    }
+}
+
+/** Show audio quality (MUSIC-23): the track's format, a Hi-Res tag, and what's streamed when it isn't the original. */
+@Composable
+private fun QualityBadge(n: MusicController.Now) {
+    val music = LocalMusic.current
+    val on by music.showQuality.collectAsState()
+    val f = n.audio
+    if (!on || f == null) return
+    val streamed by MusicService.streamed.collectAsState()
+    val text = AudioQuality.label(f) + (streamed[n.id]?.let { " → $it" } ?: "")
+    Row(Modifier.padding(top = 4.dp).semantics(mergeDescendants = true) { contentDescription = "Audio quality: $text" + if (AudioQuality.isHiRes(f)) ", Hi-Res" else "" },
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (AudioQuality.isHiRes(f)) Text("Hi-Res", Modifier.clip(RoundedCornerShape(4.dp)).background(Gold).padding(horizontal = 5.dp, vertical = 1.dp),
+            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(text, Modifier.clip(RoundedCornerShape(4.dp)).border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 1.dp),
+            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

@@ -20,7 +20,7 @@ const defaultNames: Record<LibraryType, string> = { movies: "Movies", shows: "TV
 
 type Step = "type" | "folders" | "advanced";
 
-/** Add (library undefined) or edit a library. Mirrors Plex's add-library flow: type → folders → advanced. */
+/** Add (library undefined) or edit a library, in three steps: type → folders → advanced. */
 export function LibraryDialog({ open, onClose, library }: { open: boolean; onClose: () => void; library?: Library }) {
   const editing = !!library;
   const [step, setStep] = useState<Step>(editing ? "folders" : "type");

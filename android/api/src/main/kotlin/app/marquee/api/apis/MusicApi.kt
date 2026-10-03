@@ -31,8 +31,8 @@ import app.marquee.api.models.Error
 import app.marquee.api.models.ItemSummary
 import app.marquee.api.models.ListeningRecap
 import app.marquee.api.models.Lyrics
-import app.marquee.api.models.MusicAdventureRequest
 import app.marquee.api.models.MusicDJRequest
+import app.marquee.api.models.MusicJourneyRequest
 import app.marquee.api.models.MusicMuseRequest
 import app.marquee.api.models.MusicStatus
 import app.marquee.api.models.Playlist
@@ -217,83 +217,9 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
-     * POST /music/adventure
-     * Sonic Adventure (MUSIC-4) — a path from one track to another through tracks that sound in between.
-     * 
-     * @param musicAdventureRequest 
-     * @return Station
-     * @throws IllegalStateException If the request is not correctly configured
-     * @throws IOException Rethrows the OkHttp execute method exception
-     * @throws UnsupportedOperationException If the API returns an informational or redirection response
-     * @throws ClientException If the API returns a client error response
-     * @throws ServerException If the API returns a server error response
-     */
-    @Suppress("UNCHECKED_CAST")
-    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun musicAdventure(musicAdventureRequest: MusicAdventureRequest) : Station {
-        val localVarResponse = musicAdventureWithHttpInfo(musicAdventureRequest = musicAdventureRequest)
-
-        return when (localVarResponse.responseType) {
-            ResponseType.Success -> (localVarResponse as Success<*>).data as Station
-            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
-            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
-            ResponseType.ClientError -> {
-                val localVarError = localVarResponse as ClientError<*>
-                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
-            }
-            ResponseType.ServerError -> {
-                val localVarError = localVarResponse as ServerError<*>
-                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
-            }
-        }
-    }
-
-    /**
-     * POST /music/adventure
-     * Sonic Adventure (MUSIC-4) — a path from one track to another through tracks that sound in between.
-     * 
-     * @param musicAdventureRequest 
-     * @return ApiResponse<Station?>
-     * @throws IllegalStateException If the request is not correctly configured
-     * @throws IOException Rethrows the OkHttp execute method exception
-     */
-    @Suppress("UNCHECKED_CAST")
-    @Throws(IllegalStateException::class, IOException::class)
-    fun musicAdventureWithHttpInfo(musicAdventureRequest: MusicAdventureRequest) : ApiResponse<Station?> {
-        val localVariableConfig = musicAdventureRequestConfig(musicAdventureRequest = musicAdventureRequest)
-
-        return request<MusicAdventureRequest, Station>(
-            localVariableConfig
-        )
-    }
-
-    /**
-     * To obtain the request config of the operation musicAdventure
-     *
-     * @param musicAdventureRequest 
-     * @return RequestConfig
-     */
-    fun musicAdventureRequestConfig(musicAdventureRequest: MusicAdventureRequest) : RequestConfig<MusicAdventureRequest> {
-        val localVariableBody = musicAdventureRequest
-        val localVariableQuery: MultiValueMap = mutableMapOf()
-        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
-        localVariableHeaders["Content-Type"] = "application/json"
-        localVariableHeaders["Accept"] = "application/json"
-
-        return RequestConfig(
-            method = RequestMethod.POST,
-            path = "/music/adventure",
-            query = localVariableQuery,
-            headers = localVariableHeaders,
-            requiresAuthentication = true,
-            body = localVariableBody
-        )
-    }
-
-    /**
      * POST /music/dj
-     * Guest DJ (MUSIC-6) — one track to weave in after the one playing.
-     * stretch: sounds like it, by another artist. groupie: the artist&#39;s other albums. deep_cuts: the artist&#39;s least-played tracks. contempo: a similar sound from the same era.
+     * DJ (MUSIC-6) — one track to weave in after the one playing.
+     * wander: sounds like it, by another artist. superfan: the artist&#39;s other albums. deep_cuts: the artist&#39;s least-played tracks. same_era: a similar sound from the same years.
      * @param musicDJRequest 
      * @return ItemSummary
      * @throws IllegalStateException If the request is not correctly configured
@@ -324,8 +250,8 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
 
     /**
      * POST /music/dj
-     * Guest DJ (MUSIC-6) — one track to weave in after the one playing.
-     * stretch: sounds like it, by another artist. groupie: the artist&#39;s other albums. deep_cuts: the artist&#39;s least-played tracks. contempo: a similar sound from the same era.
+     * DJ (MUSIC-6) — one track to weave in after the one playing.
+     * wander: sounds like it, by another artist. superfan: the artist&#39;s other albums. deep_cuts: the artist&#39;s least-played tracks. same_era: a similar sound from the same years.
      * @param musicDJRequest 
      * @return ApiResponse<ItemSummary?>
      * @throws IllegalStateException If the request is not correctly configured
@@ -357,6 +283,80 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/music/dj",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /music/journey
+     * Sound Journey (MUSIC-4) — a path from one track to another through tracks that sound in between.
+     * 
+     * @param musicJourneyRequest 
+     * @return Station
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun musicJourney(musicJourneyRequest: MusicJourneyRequest) : Station {
+        val localVarResponse = musicJourneyWithHttpInfo(musicJourneyRequest = musicJourneyRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as Station
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /music/journey
+     * Sound Journey (MUSIC-4) — a path from one track to another through tracks that sound in between.
+     * 
+     * @param musicJourneyRequest 
+     * @return ApiResponse<Station?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun musicJourneyWithHttpInfo(musicJourneyRequest: MusicJourneyRequest) : ApiResponse<Station?> {
+        val localVariableConfig = musicJourneyRequestConfig(musicJourneyRequest = musicJourneyRequest)
+
+        return request<MusicJourneyRequest, Station>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation musicJourney
+     *
+     * @param musicJourneyRequest 
+     * @return RequestConfig
+     */
+    fun musicJourneyRequestConfig(musicJourneyRequest: MusicJourneyRequest) : RequestConfig<MusicJourneyRequest> {
+        val localVariableBody = musicJourneyRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/music/journey",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -592,7 +592,7 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
 
     /**
      * GET /music/status
-     * Sonic analysis progress and whether the analysis service is running.
+     * Soundprint analysis progress and whether the analysis service is running.
      * 
      * @return MusicStatus
      * @throws IllegalStateException If the request is not correctly configured
@@ -623,7 +623,7 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
 
     /**
      * GET /music/status
-     * Sonic analysis progress and whether the analysis service is running.
+     * Soundprint analysis progress and whether the analysis service is running.
      * 
      * @return ApiResponse<MusicStatus?>
      * @throws IllegalStateException If the request is not correctly configured
@@ -809,8 +809,8 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
-     * GET /items/{itemId}/sonic-similar
-     * Tracks, albums or artists (matching the item&#39;s type) that sound like it (MUSIC-2).
+     * GET /items/{itemId}/sounds-like
+     * Sounds like this (MUSIC-2) — tracks, albums or artists (matching the item&#39;s type) that sound like it.
      * 
      * @param itemId 
      * @param limit  (optional, default to 20)
@@ -823,8 +823,8 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun sonicSimilar(itemId: kotlin.Long, limit: kotlin.Int? = 20) : kotlin.collections.List<ItemSummary> {
-        val localVarResponse = sonicSimilarWithHttpInfo(itemId = itemId, limit = limit)
+    fun soundsLike(itemId: kotlin.Long, limit: kotlin.Int? = 20) : kotlin.collections.List<ItemSummary> {
+        val localVarResponse = soundsLikeWithHttpInfo(itemId = itemId, limit = limit)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<ItemSummary>
@@ -842,8 +842,8 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
-     * GET /items/{itemId}/sonic-similar
-     * Tracks, albums or artists (matching the item&#39;s type) that sound like it (MUSIC-2).
+     * GET /items/{itemId}/sounds-like
+     * Sounds like this (MUSIC-2) — tracks, albums or artists (matching the item&#39;s type) that sound like it.
      * 
      * @param itemId 
      * @param limit  (optional, default to 20)
@@ -853,8 +853,8 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun sonicSimilarWithHttpInfo(itemId: kotlin.Long, limit: kotlin.Int?) : ApiResponse<kotlin.collections.List<ItemSummary>?> {
-        val localVariableConfig = sonicSimilarRequestConfig(itemId = itemId, limit = limit)
+    fun soundsLikeWithHttpInfo(itemId: kotlin.Long, limit: kotlin.Int?) : ApiResponse<kotlin.collections.List<ItemSummary>?> {
+        val localVariableConfig = soundsLikeRequestConfig(itemId = itemId, limit = limit)
 
         return request<Unit, kotlin.collections.List<ItemSummary>>(
             localVariableConfig
@@ -862,13 +862,13 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
-     * To obtain the request config of the operation sonicSimilar
+     * To obtain the request config of the operation soundsLike
      *
      * @param itemId 
      * @param limit  (optional, default to 20)
      * @return RequestConfig
      */
-    fun sonicSimilarRequestConfig(itemId: kotlin.Long, limit: kotlin.Int?) : RequestConfig<Unit> {
+    fun soundsLikeRequestConfig(itemId: kotlin.Long, limit: kotlin.Int?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -881,7 +881,7 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
 
         return RequestConfig(
             method = RequestMethod.GET,
-            path = "/items/{itemId}/sonic-similar".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            path = "/items/{itemId}/sounds-like".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

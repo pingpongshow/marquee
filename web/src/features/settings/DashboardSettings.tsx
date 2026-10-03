@@ -179,7 +179,7 @@ export function DashboardSettings() {
               <span className="w-28 shrink-0 truncate text-muted">{h.userName}</span>
               <span className="min-w-0 flex-1 truncate">{h.title}</span>
               <span className="hidden shrink-0 text-xs text-faint sm:inline">
-                {h.source === "plex" ? "Plex" : [h.method && methodLabel[h.method as keyof typeof methodLabel], h.networkClass === "remote" ? "Remote" : h.networkClass ? "Local" : ""].filter(Boolean).join(" · ")}
+                {h.source === "plex" ? "Plex (imported)" : [h.method && methodLabel[h.method as keyof typeof methodLabel], h.networkClass === "remote" ? "Remote" : h.networkClass ? "Local" : ""].filter(Boolean).join(" · ")}
               </span>
             </li>
           ))}

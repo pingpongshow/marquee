@@ -5530,7 +5530,7 @@ public enum Operations {
             }
         }
     }
-    /// Profiles that can be switched to from this device (Plex Home equivalent).
+    /// Profiles that can be switched to from this device.
     ///
     /// - Remark: HTTP `GET /profiles`.
     /// - Remark: Generated from `#/paths//profiles/get(listProfiles)`.
@@ -17975,6 +17975,212 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
+    ///
+    /// The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item's last file the item goes too, along with a season or show left empty.
+    ///
+    /// - Remark: HTTP `DELETE /files/{fileId}`.
+    /// - Remark: Generated from `#/paths//files/{fileId}/delete(deleteMediaFile)`.
+    public enum DeleteMediaFile {
+        public static let id: Swift.String = "deleteMediaFile"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/files/{fileId}/DELETE/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/files/{fileId}/DELETE/path/fileId`.
+                public var fileId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - fileId:
+                public init(fileId: Swift.Int64) {
+                    self.fileId = fileId
+                }
+            }
+            public var path: Operations.DeleteMediaFile.Input.Path
+            /// - Remark: Generated from `#/paths/files/{fileId}/DELETE/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteMediaFile.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteMediaFile.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.DeleteMediaFile.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.DeleteMediaFile.Input.Path,
+                headers: Operations.DeleteMediaFile.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Moved to the trash.
+            ///
+            /// - Remark: Generated from `#/paths//files/{fileId}/delete(deleteMediaFile)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.DeleteMediaFile.Output.NoContent)
+            /// Moved to the trash.
+            ///
+            /// - Remark: Generated from `#/paths//files/{fileId}/delete(deleteMediaFile)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.DeleteMediaFile.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//files/{fileId}/delete(deleteMediaFile)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//files/{fileId}/delete(deleteMediaFile)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//files/{fileId}/delete(deleteMediaFile)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Conflicts with current state.
+            ///
+            /// - Remark: Generated from `#/paths//files/{fileId}/delete(deleteMediaFile)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Components.Responses.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Components.Responses.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -31679,7 +31885,7 @@ public enum Operations {
             }
         }
     }
-    /// Sonic analysis progress and whether the analysis service is running.
+    /// Soundprint analysis progress and whether the analysis service is running.
     ///
     /// - Remark: HTTP `GET /music/status`.
     /// - Remark: Generated from `#/paths//music/status/get(musicStatus)`.
@@ -31812,16 +32018,16 @@ public enum Operations {
             }
         }
     }
-    /// Tracks, albums or artists (matching the item's type) that sound like it (MUSIC-2).
+    /// Sounds like this (MUSIC-2) — tracks, albums or artists (matching the item's type) that sound like it.
     ///
-    /// - Remark: HTTP `GET /items/{itemId}/sonic-similar`.
-    /// - Remark: Generated from `#/paths//items/{itemId}/sonic-similar/get(sonicSimilar)`.
-    public enum SonicSimilar {
-        public static let id: Swift.String = "sonicSimilar"
+    /// - Remark: HTTP `GET /items/{itemId}/sounds-like`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/sounds-like/get(soundsLike)`.
+    public enum SoundsLike {
+        public static let id: Swift.String = "soundsLike"
         public struct Input: Sendable, Hashable {
-            /// - Remark: Generated from `#/paths/items/{itemId}/sonic-similar/GET/path`.
+            /// - Remark: Generated from `#/paths/items/{itemId}/sounds-like/GET/path`.
             public struct Path: Sendable, Hashable {
-                /// - Remark: Generated from `#/paths/items/{itemId}/sonic-similar/GET/path/itemId`.
+                /// - Remark: Generated from `#/paths/items/{itemId}/sounds-like/GET/path/itemId`.
                 public var itemId: Components.Parameters.ItemId
                 /// Creates a new `Path`.
                 ///
@@ -31831,10 +32037,10 @@ public enum Operations {
                     self.itemId = itemId
                 }
             }
-            public var path: Operations.SonicSimilar.Input.Path
-            /// - Remark: Generated from `#/paths/items/{itemId}/sonic-similar/GET/query`.
+            public var path: Operations.SoundsLike.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/sounds-like/GET/query`.
             public struct Query: Sendable, Hashable {
-                /// - Remark: Generated from `#/paths/items/{itemId}/sonic-similar/GET/query/limit`.
+                /// - Remark: Generated from `#/paths/items/{itemId}/sounds-like/GET/query/limit`.
                 public var limit: Swift.Int?
                 /// Creates a new `Query`.
                 ///
@@ -31844,19 +32050,19 @@ public enum Operations {
                     self.limit = limit
                 }
             }
-            public var query: Operations.SonicSimilar.Input.Query
-            /// - Remark: Generated from `#/paths/items/{itemId}/sonic-similar/GET/header`.
+            public var query: Operations.SoundsLike.Input.Query
+            /// - Remark: Generated from `#/paths/items/{itemId}/sounds-like/GET/header`.
             public struct Headers: Sendable, Hashable {
-                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SonicSimilar.AcceptableContentType>]
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SoundsLike.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SonicSimilar.AcceptableContentType>] = .defaultValues()) {
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SoundsLike.AcceptableContentType>] = .defaultValues()) {
                     self.accept = accept
                 }
             }
-            public var headers: Operations.SonicSimilar.Input.Headers
+            public var headers: Operations.SoundsLike.Input.Headers
             /// Creates a new `Input`.
             ///
             /// - Parameters:
@@ -31864,9 +32070,9 @@ public enum Operations {
             ///   - query:
             ///   - headers:
             public init(
-                path: Operations.SonicSimilar.Input.Path,
-                query: Operations.SonicSimilar.Input.Query = .init(),
-                headers: Operations.SonicSimilar.Input.Headers = .init()
+                path: Operations.SoundsLike.Input.Path,
+                query: Operations.SoundsLike.Input.Query = .init(),
+                headers: Operations.SoundsLike.Input.Headers = .init()
             ) {
                 self.path = path
                 self.query = query
@@ -31875,9 +32081,9 @@ public enum Operations {
         }
         @frozen public enum Output: Sendable, Hashable {
             public struct Ok: Sendable, Hashable {
-                /// - Remark: Generated from `#/paths/items/{itemId}/sonic-similar/GET/responses/200/content`.
+                /// - Remark: Generated from `#/paths/items/{itemId}/sounds-like/GET/responses/200/content`.
                 @frozen public enum Body: Sendable, Hashable {
-                    /// - Remark: Generated from `#/paths/items/{itemId}/sonic-similar/GET/responses/200/content/application\/json`.
+                    /// - Remark: Generated from `#/paths/items/{itemId}/sounds-like/GET/responses/200/content/application\/json`.
                     case json([Components.Schemas.ItemSummary])
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
@@ -31893,26 +32099,26 @@ public enum Operations {
                     }
                 }
                 /// Received HTTP response body
-                public var body: Operations.SonicSimilar.Output.Ok.Body
+                public var body: Operations.SoundsLike.Output.Ok.Body
                 /// Creates a new `Ok`.
                 ///
                 /// - Parameters:
                 ///   - body: Received HTTP response body
-                public init(body: Operations.SonicSimilar.Output.Ok.Body) {
+                public init(body: Operations.SoundsLike.Output.Ok.Body) {
                     self.body = body
                 }
             }
             /// OK
             ///
-            /// - Remark: Generated from `#/paths//items/{itemId}/sonic-similar/get(sonicSimilar)/responses/200`.
+            /// - Remark: Generated from `#/paths//items/{itemId}/sounds-like/get(soundsLike)/responses/200`.
             ///
             /// HTTP response code: `200 ok`.
-            case ok(Operations.SonicSimilar.Output.Ok)
+            case ok(Operations.SoundsLike.Output.Ok)
             /// The associated value of the enum case if `self` is `.ok`.
             ///
             /// - Throws: An error if `self` is not `.ok`.
             /// - SeeAlso: `.ok`.
-            public var ok: Operations.SonicSimilar.Output.Ok {
+            public var ok: Operations.SoundsLike.Output.Ok {
                 get throws {
                     switch self {
                     case let .ok(response):
@@ -31927,7 +32133,7 @@ public enum Operations {
             }
             /// Missing or invalid credentials.
             ///
-            /// - Remark: Generated from `#/paths//items/{itemId}/sonic-similar/get(sonicSimilar)/responses/401`.
+            /// - Remark: Generated from `#/paths//items/{itemId}/sounds-like/get(soundsLike)/responses/401`.
             ///
             /// HTTP response code: `401 unauthorized`.
             case unauthorized(Components.Responses.Unauthorized)
@@ -31950,7 +32156,7 @@ public enum Operations {
             }
             /// Not found.
             ///
-            /// - Remark: Generated from `#/paths//items/{itemId}/sonic-similar/get(sonicSimilar)/responses/404`.
+            /// - Remark: Generated from `#/paths//items/{itemId}/sounds-like/get(soundsLike)/responses/404`.
             ///
             /// HTTP response code: `404 notFound`.
             case notFound(Components.Responses.NotFound)
@@ -31973,7 +32179,7 @@ public enum Operations {
             }
             /// Conflicts with current state.
             ///
-            /// - Remark: Generated from `#/paths//items/{itemId}/sonic-similar/get(sonicSimilar)/responses/409`.
+            /// - Remark: Generated from `#/paths//items/{itemId}/sounds-like/get(soundsLike)/responses/409`.
             ///
             /// HTTP response code: `409 conflict`.
             case conflict(Components.Responses.Conflict)
@@ -32457,34 +32663,34 @@ public enum Operations {
             }
         }
     }
-    /// Sonic Adventure (MUSIC-4) — a path from one track to another through tracks that sound in between.
+    /// Sound Journey (MUSIC-4) — a path from one track to another through tracks that sound in between.
     ///
-    /// - Remark: HTTP `POST /music/adventure`.
-    /// - Remark: Generated from `#/paths//music/adventure/post(musicAdventure)`.
-    public enum MusicAdventure {
-        public static let id: Swift.String = "musicAdventure"
+    /// - Remark: HTTP `POST /music/journey`.
+    /// - Remark: Generated from `#/paths//music/journey/post(musicJourney)`.
+    public enum MusicJourney {
+        public static let id: Swift.String = "musicJourney"
         public struct Input: Sendable, Hashable {
-            /// - Remark: Generated from `#/paths/music/adventure/POST/header`.
+            /// - Remark: Generated from `#/paths/music/journey/POST/header`.
             public struct Headers: Sendable, Hashable {
-                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MusicAdventure.AcceptableContentType>]
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MusicJourney.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MusicAdventure.AcceptableContentType>] = .defaultValues()) {
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MusicJourney.AcceptableContentType>] = .defaultValues()) {
                     self.accept = accept
                 }
             }
-            public var headers: Operations.MusicAdventure.Input.Headers
-            /// - Remark: Generated from `#/paths/music/adventure/POST/requestBody`.
+            public var headers: Operations.MusicJourney.Input.Headers
+            /// - Remark: Generated from `#/paths/music/journey/POST/requestBody`.
             @frozen public enum Body: Sendable, Hashable {
-                /// - Remark: Generated from `#/paths/music/adventure/POST/requestBody/json`.
+                /// - Remark: Generated from `#/paths/music/journey/POST/requestBody/json`.
                 public struct JsonPayload: Codable, Hashable, Sendable {
-                    /// - Remark: Generated from `#/paths/music/adventure/POST/requestBody/json/fromId`.
+                    /// - Remark: Generated from `#/paths/music/journey/POST/requestBody/json/fromId`.
                     public var fromId: Swift.Int64
-                    /// - Remark: Generated from `#/paths/music/adventure/POST/requestBody/json/toId`.
+                    /// - Remark: Generated from `#/paths/music/journey/POST/requestBody/json/toId`.
                     public var toId: Swift.Int64
-                    /// - Remark: Generated from `#/paths/music/adventure/POST/requestBody/json/length`.
+                    /// - Remark: Generated from `#/paths/music/journey/POST/requestBody/json/length`.
                     public var length: Swift.Int?
                     /// Creates a new `JsonPayload`.
                     ///
@@ -32507,18 +32713,18 @@ public enum Operations {
                         case length
                     }
                 }
-                /// - Remark: Generated from `#/paths/music/adventure/POST/requestBody/content/application\/json`.
-                case json(Operations.MusicAdventure.Input.Body.JsonPayload)
+                /// - Remark: Generated from `#/paths/music/journey/POST/requestBody/content/application\/json`.
+                case json(Operations.MusicJourney.Input.Body.JsonPayload)
             }
-            public var body: Operations.MusicAdventure.Input.Body
+            public var body: Operations.MusicJourney.Input.Body
             /// Creates a new `Input`.
             ///
             /// - Parameters:
             ///   - headers:
             ///   - body:
             public init(
-                headers: Operations.MusicAdventure.Input.Headers = .init(),
-                body: Operations.MusicAdventure.Input.Body
+                headers: Operations.MusicJourney.Input.Headers = .init(),
+                body: Operations.MusicJourney.Input.Body
             ) {
                 self.headers = headers
                 self.body = body
@@ -32526,9 +32732,9 @@ public enum Operations {
         }
         @frozen public enum Output: Sendable, Hashable {
             public struct Ok: Sendable, Hashable {
-                /// - Remark: Generated from `#/paths/music/adventure/POST/responses/200/content`.
+                /// - Remark: Generated from `#/paths/music/journey/POST/responses/200/content`.
                 @frozen public enum Body: Sendable, Hashable {
-                    /// - Remark: Generated from `#/paths/music/adventure/POST/responses/200/content/application\/json`.
+                    /// - Remark: Generated from `#/paths/music/journey/POST/responses/200/content/application\/json`.
                     case json(Components.Schemas.Station)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
@@ -32544,26 +32750,26 @@ public enum Operations {
                     }
                 }
                 /// Received HTTP response body
-                public var body: Operations.MusicAdventure.Output.Ok.Body
+                public var body: Operations.MusicJourney.Output.Ok.Body
                 /// Creates a new `Ok`.
                 ///
                 /// - Parameters:
                 ///   - body: Received HTTP response body
-                public init(body: Operations.MusicAdventure.Output.Ok.Body) {
+                public init(body: Operations.MusicJourney.Output.Ok.Body) {
                     self.body = body
                 }
             }
             /// OK
             ///
-            /// - Remark: Generated from `#/paths//music/adventure/post(musicAdventure)/responses/200`.
+            /// - Remark: Generated from `#/paths//music/journey/post(musicJourney)/responses/200`.
             ///
             /// HTTP response code: `200 ok`.
-            case ok(Operations.MusicAdventure.Output.Ok)
+            case ok(Operations.MusicJourney.Output.Ok)
             /// The associated value of the enum case if `self` is `.ok`.
             ///
             /// - Throws: An error if `self` is not `.ok`.
             /// - SeeAlso: `.ok`.
-            public var ok: Operations.MusicAdventure.Output.Ok {
+            public var ok: Operations.MusicJourney.Output.Ok {
                 get throws {
                     switch self {
                     case let .ok(response):
@@ -32578,7 +32784,7 @@ public enum Operations {
             }
             /// Missing or invalid credentials.
             ///
-            /// - Remark: Generated from `#/paths//music/adventure/post(musicAdventure)/responses/401`.
+            /// - Remark: Generated from `#/paths//music/journey/post(musicJourney)/responses/401`.
             ///
             /// HTTP response code: `401 unauthorized`.
             case unauthorized(Components.Responses.Unauthorized)
@@ -32601,7 +32807,7 @@ public enum Operations {
             }
             /// Not found.
             ///
-            /// - Remark: Generated from `#/paths//music/adventure/post(musicAdventure)/responses/404`.
+            /// - Remark: Generated from `#/paths//music/journey/post(musicJourney)/responses/404`.
             ///
             /// HTTP response code: `404 notFound`.
             case notFound(Components.Responses.NotFound)
@@ -32624,7 +32830,7 @@ public enum Operations {
             }
             /// Conflicts with current state.
             ///
-            /// - Remark: Generated from `#/paths//music/adventure/post(musicAdventure)/responses/409`.
+            /// - Remark: Generated from `#/paths//music/journey/post(musicJourney)/responses/409`.
             ///
             /// HTTP response code: `409 conflict`.
             case conflict(Components.Responses.Conflict)
@@ -32676,9 +32882,9 @@ public enum Operations {
             }
         }
     }
-    /// Guest DJ (MUSIC-6) — one track to weave in after the one playing.
+    /// DJ (MUSIC-6) — one track to weave in after the one playing.
     ///
-    /// stretch: sounds like it, by another artist. groupie: the artist's other albums. deep_cuts: the artist's least-played tracks. contempo: a similar sound from the same era.
+    /// wander: sounds like it, by another artist. superfan: the artist's other albums. deep_cuts: the artist's least-played tracks. same_era: a similar sound from the same years.
     ///
     /// - Remark: HTTP `POST /music/dj`.
     /// - Remark: Generated from `#/paths//music/dj/post(musicDJ)`.
@@ -32705,10 +32911,10 @@ public enum Operations {
                     public var trackId: Swift.Int64
                     /// - Remark: Generated from `#/paths/music/dj/POST/requestBody/json/mode`.
                     @frozen public enum ModePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                        case stretch = "stretch"
-                        case groupie = "groupie"
+                        case wander = "wander"
+                        case superfan = "superfan"
                         case deepCuts = "deep_cuts"
-                        case contempo = "contempo"
+                        case sameEra = "same_era"
                     }
                     /// - Remark: Generated from `#/paths/music/dj/POST/requestBody/json/mode`.
                     public var mode: Operations.MusicDJ.Input.Body.JsonPayload.ModePayload

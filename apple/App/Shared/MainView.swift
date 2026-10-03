@@ -2,7 +2,7 @@ import MarqueeKit
 import SwiftUI
 
 /// Tabs: Home, each library, Playlists, Search and Settings. On iPad the tab bar becomes a
-/// Plex-style sidebar.
+/// The main sidebar.
 struct MainView: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
@@ -11,7 +11,7 @@ struct MainView: View {
     @State private var video = VideoPresenter()
     @State private var showNowPlaying = false
     @State private var playlistPicker = PlaylistPicker.shared
-    @State private var adventure = AdventurePicker.shared
+    @State private var journey = JourneyPicker.shared
     @State private var actionError = ActionError.shared
     @State private var linkedItem: LinkedItem?
     @State private var canDiscover = false
@@ -70,7 +70,7 @@ struct MainView: View {
             hasLiveTV = (try? await app.liveStatus())?.enabled == true
         }
         .sheet(item: $playlistPicker.item) { item in AddToPlaylistSheet(item: item) }
-        .sheet(item: $adventure.from) { item in AdventureSheet(from: item) }
+        .sheet(item: $journey.from) { item in JourneySheet(from: item) }
         .alert("Something went wrong", isPresented: Binding(get: { actionError.message != nil }, set: { if !$0 { actionError.message = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {
