@@ -1,17 +1,17 @@
-package sonic
+package soundprint
 
 import "sort"
 
-// Guest DJ modes (MUSIC-6), after Plexamp's DJs: each weaves one track into the queue now
+// DJ modes (MUSIC-6): each weaves one track into the queue now
 // and then, chosen from what's playing.
 const (
-	DJStretch  = "stretch"   // sounds like this, by someone else
-	DJGroupie  = "groupie"   // the same artist's other albums
+	DJWander   = "wander"    // sounds like this, by someone else
+	DJSuperfan = "superfan"  // the same artist's other albums
 	DJDeepCuts = "deep_cuts" // the artist's least-played tracks
-	DJContempo = "contempo"  // similar sound from the same era
+	DJSameEra  = "same_era"  // similar sound from the same years
 )
 
-var DJModes = []string{DJStretch, DJGroupie, DJDeepCuts, DJContempo}
+var DJModes = []string{DJWander, DJSuperfan, DJDeepCuts, DJSameEra}
 
 // DJPick chooses a track to play after t. plays gives the listener's play counts (for
 // deep cuts). It returns nil when nothing fits.
@@ -22,11 +22,11 @@ func (x *Index) DJPick(t *Track, mode string, o Options, plays func(ids []int64)
 	}
 	var pool []Scored
 	switch mode {
-	case DJStretch:
+	case DJWander:
 		pool = x.Nearest(t.Vec, 12, keep(func(c *Track) bool { return c.ArtistID != t.ArtistID }))
-	case DJGroupie:
+	case DJSuperfan:
 		pool = x.Nearest(t.Vec, 6, keep(func(c *Track) bool { return c.ArtistID == t.ArtistID && c.AlbumID != t.AlbumID }))
-	case DJContempo:
+	case DJSameEra:
 		if t.Year == 0 {
 			return nil
 		}

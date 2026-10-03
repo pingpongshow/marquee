@@ -23,6 +23,7 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.AudioFormat
 import app.marquee.api.models.ItemImages
 import app.marquee.api.models.ItemType
 
@@ -63,6 +64,7 @@ import kotlinx.serialization.Contextual
  * @param watchlisted On the user's watchlist (USER-8).
  * @param extraType Set for extras (LIB-8).
  * @param releaseType Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
+ * @param audioFormat 
  */
 @Serializable
 
@@ -166,7 +168,10 @@ data class ItemSummary (
 
     /* Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown. */
     @SerialName(value = "releaseType")
-    val releaseType: ItemSummary.ReleaseType? = null
+    val releaseType: ItemSummary.ReleaseType? = null,
+
+    @SerialName(value = "audioFormat")
+    val audioFormat: AudioFormat? = null
 
 ) {
 

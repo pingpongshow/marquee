@@ -6,9 +6,11 @@ import (
 	"log/slog"
 	"regexp"
 	"strings"
+	"time"
 
 	"marquee/internal/bazarr"
 	"marquee/internal/health"
+	"marquee/internal/mediatrash"
 )
 
 // ---------- Bazarr subtitles (META-12) ----------
@@ -224,6 +226,17 @@ func (h *Handlers) LibraryHealthIssues(ctx context.Context, req LibraryHealthIss
 	for _, s := range sums {
 		byID[s.ID] = toAPISummary(s)
 	}
+	// The files to compare, with their streams.
+	var fileIDs []int64
+	for _, is := range list {
+		for _, f := range is.Files {
+			fileIDs = append(fileIDs, f.FileID)
+		}
+	}
+	files, err := h.Items.Files(ctx, fileIDs)
+	if err != nil {
+		return nil, internal(ctx, "libraryHealthIssues", err)
+	}
 	out := LibraryHealthIssues200JSONResponse{Items: make([]HealthIssue, 0, len(list)), Total: total, Offset: offset}
 	for _, is := range list {
 		item, ok := byID[is.ItemID]
@@ -240,9 +253,57 @@ func (h *Handlers) LibraryHealthIssues(ctx context.Context, req LibraryHealthIss
 			}
 			hi.Related = &rel
 		}
+		if len(is.Files) > 0 {
+			fl := make([]IssueFile, 0, len(is.Files))
+			for _, f := range is.Files {
+				mf, ok := files[f.FileID]
+				if !ok {
+					continue
+				}
+				added, _ := time.Parse(time.RFC3339Nano, f.AddedAt)
+				fl = append(fl, IssueFile{ItemId: f.ItemID, ItemTitle: f.ItemTitle, VersionLabel: nz(f.VersionLabel),
+					File: toAPIMediaFile(*mf), AddedAt: added})
+			}
+			hi.Files = &fl
+		}
 		out.Items = append(out.Items, hi)
 	}
 	return out, nil
+}
+
+// trash returns the media trash; it holds no state, so one is made when not wired.
+func (h *Handlers) trash() *mediatrash.Service {
+	if h.Trash != nil {
+		return h.Trash
+	}
+	return &mediatrash.Service{DB: h.DB}
+}
+
+// DeleteMediaFile moves a file to its library's trash (ADM-11): admins only, and only
+// when Library → Allow media deletion is on.
+func (h *Handlers) DeleteMediaFile(ctx context.Context, req DeleteMediaFileRequestObject) (DeleteMediaFileResponseObject, error) {
+	s, ok := session(ctx)
+	switch {
+	case !ok:
+		return DeleteMediaFile401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !s.User.IsAdmin:
+		return DeleteMediaFile403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	case !h.Settings.Get().Library.AllowMediaDeletion:
+		return DeleteMediaFile403JSONResponse{ForbiddenJSONResponse(apiErr("deletion_off",
+			"Deleting media is turned off. Turn on Allow media deletion in Library settings."))}, nil
+	}
+	err := h.trash().Delete(ctx, req.FileId, s.User.Username)
+	var me *mediatrash.MoveError
+	switch {
+	case err == nil:
+		return DeleteMediaFile204Response{}, nil
+	case errors.Is(err, mediatrash.ErrNotFound):
+		return DeleteMediaFile404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "file not found"))}, nil
+	case errors.As(err, &me):
+		slog.WarnContext(ctx, "delete media file", "file", req.FileId, "err", err)
+		return DeleteMediaFile409JSONResponse{ConflictJSONResponse(apiErr("cannot_move", me.Msg))}, nil
+	}
+	return nil, internal(ctx, "deleteMediaFile", err)
 }
 
 // healthNotFoundMsg names what wasn't found: the check or the item.

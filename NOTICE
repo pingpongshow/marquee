@@ -1,0 +1,22 @@
+Marquee
+Copyright (C) 2026 pingpongshow
+
+This program is free software: you can redistribute it and/or modify it under the terms of
+the GNU Affero General Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version. See LICENSE.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+Additional permission under GNU AGPL version 3 section 7
+
+If you modify this program, or any covered work, by linking or combining it with the
+Google Cast SDK for iOS or the Google Play services Cast framework for Android (or a
+modified version of those libraries), containing parts covered by the terms of Google's
+license for those libraries, the licensors of this program grant you additional permission
+to convey the resulting work. Corresponding Source for a non-source form of such a
+combination shall not include the source code for the parts of those libraries used.
+
+Third-party components keep their own licences. Notably, the Docker image includes
+jellyfin-ffmpeg (GPL), and the companion analysis service downloads the LAION CLAP and
+BAAI bge models from Hugging Face under their own licences.

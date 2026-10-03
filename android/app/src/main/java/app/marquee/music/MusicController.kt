@@ -27,20 +27,31 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The app's handle on background music playback, as Compose-friendly state, plus what
- * Plexamp layers on top (M6.5): stations that keep going, the Guest DJ, a sleep timer and
- * ratings.
+ * The app's handle on background music playback, as Compose-friendly state, plus the
+ * music extras (M6.5): stations that keep going, the DJ, a sleep timer and ratings.
  */
 class MusicController(private val context: Context, private val marquee: Marquee) {
-    /** A queued track; dj names the Guest DJ that wove it in. */
-    data class Now(val id: Long, val title: String, val artist: String, val album: String, val artwork: Uri?, val dj: String? = null, val albumId: Long? = null)
+    /** A queued track; dj names the DJ that wove it in. */
+    data class Now(val id: Long, val title: String, val artist: String, val album: String, val artwork: Uri?, val dj: String? = null, val albumId: Long? = null,
+        val audio: app.marquee.api.models.AudioFormat? = null)
 
-    /** Guest DJ modes (MUSIC-6): a pick every few of your own tracks. */
+    /** DJ modes (MUSIC-6): a pick every few of your own tracks. */
     enum class DJ(val label: String, val mode: MusicDJRequest.Mode, val blurb: String) {
-        Stretch("DJ Stretch", MusicDJRequest.Mode.STRETCH, "Similar sound, other artists"),
-        Groupie("DJ Groupie", MusicDJRequest.Mode.GROUPIE, "More from the same artists"),
-        DeepCuts("DJ Deep Cuts", MusicDJRequest.Mode.DEEP_CUTS, "Their tracks you play least"),
-        Contempo("DJ Contempo", MusicDJRequest.Mode.CONTEMPO, "Similar sound from the same years"),
+        Wander("DJ: Wander", MusicDJRequest.Mode.WANDER, "Similar sound, other artists"),
+        Superfan("DJ: Superfan", MusicDJRequest.Mode.SUPERFAN, "More from the same artists"),
+        DeepCuts("DJ: Deep Cuts", MusicDJRequest.Mode.DEEP_CUTS, "Their tracks you play least"),
+        SameEra("DJ: Same Era", MusicDJRequest.Mode.SAME_ERA, "Similar sound from the same years");
+
+        companion object {
+            /** A saved choice, including the modes' earlier names. */
+            fun saved(name: String?): DJ? = when (name) {
+                null -> null
+                "Stretch" -> Wander
+                "Groupie" -> Superfan
+                "Contempo" -> SameEra
+                else -> entries.firstOrNull { it.name == name }
+            }
+        }
     }
 
     /** The sleep timer: a time, or the end of the current track. */
@@ -74,7 +85,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
     val rating: StateFlow<Double?> = _rating
     private val _sleep = MutableStateFlow<Sleep?>(null)
     val sleep: StateFlow<Sleep?> = _sleep
-    private val _dj = MutableStateFlow(prefs.getString("dj", null)?.let { n -> DJ.entries.firstOrNull { it.name == n } })
+    private val _dj = MutableStateFlow(DJ.saved(prefs.getString("dj", null)))
     val dj: StateFlow<DJ?> = _dj
 
     /** Set while a station plays: it asks for more before the queue runs out. */
@@ -134,7 +145,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
     private fun meta(item: MediaItem): Now {
         val m = item.mediaMetadata
         return Now(item.mediaId.toLongOrNull() ?: 0, m.title?.toString() ?: "", m.artist?.toString() ?: "", m.albumTitle?.toString() ?: "", m.artworkUri,
-            m.extras?.getString("dj"), m.extras?.getLong("album", 0L)?.takeIf { it > 0 })
+            m.extras?.getString("dj"), m.extras?.getLong("album", 0L)?.takeIf { it > 0 }, AudioQuality.from(m.extras))
     }
 
     private fun sync(p: Player, queueChanged: Boolean) {
@@ -159,7 +170,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
     private fun onNewTrack(p: Player, cur: Now) {
         loadRating(cur.id)
         topUpRadio(p)
-        guestDJ(p, cur)
+        djPick(p, cur)
     }
 
     private fun loadRating(id: Long) {
@@ -210,7 +221,7 @@ class MusicController(private val context: Context, private val marquee: Marquee
     suspend fun startRadio(req: RadioRequest) {
         val r = req.copy(limit = 50, exclude = null)
         val st = withContext(Dispatchers.IO) { marquee.music.musicRadio(r) }
-        if (st.items.isEmpty()) throw IllegalStateException("Nothing to play yet: sonic analysis may still be running.")
+        if (st.items.isEmpty()) throw IllegalStateException("Nothing to play yet: Soundprint analysis may still be running.")
         playStation(st, r)
     }
 
@@ -230,8 +241,8 @@ class MusicController(private val context: Context, private val marquee: Marquee
         }
     }
 
-    /** After every third of your own tracks, asks the Guest DJ for one to play next. */
-    private fun guestDJ(p: Player, cur: Now) {
+    /** After every third of your own tracks, asks the DJ for one to play next. */
+    private fun djPick(p: Player, cur: Now) {
         val dj = _dj.value ?: return
         if (djBusy) return
         if (cur.dj != null) { djCount = 0; return }
@@ -265,6 +276,13 @@ class MusicController(private val context: Context, private val marquee: Marquee
     /** Volume levelling (MUSIC-10); MusicService applies it. */
     val levelling: StateFlow<Levelling> = _levelling
     private fun levellingPref() = prefs.getString("levelling", null)?.let { n -> Levelling.entries.firstOrNull { it.name == n } } ?: Levelling.Auto
+    private val _showQuality = MutableStateFlow(prefs.getBoolean("showQuality", false))
+    /** Show audio quality (MUSIC-23), per device, off by default. */
+    val showQuality: StateFlow<Boolean> = _showQuality
+    fun setShowQuality(on: Boolean) {
+        _showQuality.value = on
+        prefs.edit().putBoolean("showQuality", on).apply()
+    }
     private val _crossfade = MutableStateFlow(prefs.getInt("crossfade", 0))
     /** Crossfade length in seconds; 0 = off (MUSIC-9). MusicService applies it. */
     val crossfade: StateFlow<Int> = _crossfade

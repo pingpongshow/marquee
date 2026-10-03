@@ -28,6 +28,7 @@ fun trackItem(marquee: Marquee, t: ItemSummary, dj: String? = null): MediaItem =
             .setExtras(Bundle().apply {
                 if (dj != null) putString("dj", dj)
                 t.parentId?.let { putLong("album", it) }
+                t.audioFormat?.let { AudioQuality.put(this, it) }
             })
             .build(),
     )
@@ -38,6 +39,6 @@ enum class Levelling(val label: String) {
     Off("Off"),
     Track("Track"),
     Album("Album"),
-    /** Album gain while an album plays in order, track gain otherwise (like Plexamp). */
+    /** Album gain while an album plays in order, track gain otherwise. */
     Auto("Smart"),
 }

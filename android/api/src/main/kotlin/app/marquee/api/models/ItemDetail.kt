@@ -23,6 +23,7 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.AudioFormat
 import app.marquee.api.models.Chapter
 import app.marquee.api.models.Credit
 import app.marquee.api.models.ItemImages
@@ -75,6 +76,7 @@ import kotlinx.serialization.Contextual
  * @param watchlisted On the user's watchlist (USER-8).
  * @param extraType Set for extras (LIB-8).
  * @param releaseType Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
+ * @param audioFormat 
  * @param collections Collections the item belongs to (META-7).
  * @param smartRules 
  * @param extras Trailers, featurettes and other extras (LIB-8), trailers first.
@@ -208,6 +210,9 @@ data class ItemDetail (
     /* Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown. */
     @SerialName(value = "releaseType")
     val releaseType: ItemDetail.ReleaseType? = null,
+
+    @SerialName(value = "audioFormat")
+    val audioFormat: AudioFormat? = null,
 
     /* Collections the item belongs to (META-7). */
     @SerialName(value = "collections")

@@ -2,7 +2,7 @@ import AVKit
 import MarqueeKit
 import SwiftUI
 
-/// Live TV (LIVE-2): Plex-style Guide and What's On, a live preview on iPhone/iPad, and
+/// Live TV (LIVE-2): a Guide and What's On, a live preview on iPhone/iPad, and
 /// full-screen watching with channel up/down.
 struct LiveTVView: View {
     @Environment(AppSession.self) private var app

@@ -104,7 +104,7 @@ func (s *Service) GetUser(ctx context.Context, id int64) (User, error) { return 
 // profile switching); everyone else needs one.
 func (s *Service) Create(ctx context.Context, n NewUser) (User, error) {
 	// Only administrators must have a password; everyone else may have a password, a PIN,
-	// both or neither (Plex Home style: tap your profile on the home network).
+	// both or neither (on the home network, tapping your profile is enough).
 	if n.Password == "" && n.IsAdmin && !n.IsManaged {
 		return User{}, ErrNoAuthMeans
 	}

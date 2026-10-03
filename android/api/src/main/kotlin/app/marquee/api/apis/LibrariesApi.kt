@@ -277,6 +277,77 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
     }
 
     /**
+     * DELETE /files/{fileId}
+     * Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
+     * The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item&#39;s last file the item goes too, along with a season or show left empty.
+     * @param fileId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun deleteMediaFile(fileId: kotlin.Long) : Unit {
+        val localVarResponse = deleteMediaFileWithHttpInfo(fileId = fileId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /files/{fileId}
+     * Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
+     * The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item&#39;s last file the item goes too, along with a season or show left empty.
+     * @param fileId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun deleteMediaFileWithHttpInfo(fileId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = deleteMediaFileRequestConfig(fileId = fileId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation deleteMediaFile
+     *
+     * @param fileId 
+     * @return RequestConfig
+     */
+    fun deleteMediaFileRequestConfig(fileId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/files/{fileId}".replace("{"+"fileId"+"}", encodeURIComponent(fileId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * GET /libraries/{libraryId}
      * 
      * 

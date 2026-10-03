@@ -150,7 +150,7 @@ struct HomeView: View {
     #endif
 }
 
-/// Continue Watching: wide art that plays straight away (Plex behaviour).
+/// Continue Watching: wide art that plays straight away.
 struct ContinueCard: View {
     @Environment(VideoPresenter.self) private var video
     let item: Item

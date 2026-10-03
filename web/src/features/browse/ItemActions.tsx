@@ -6,6 +6,7 @@ import { api, unwrap } from "@/api/client";
 import type { components } from "@/api/schema.gen";
 import type { ItemDetail } from "@/api/types";
 import { Alert, Button, Dialog, Field, Input, Spinner } from "@/components/ui";
+import { ItemFiles } from "./FileNames";
 
 type Edit = components["schemas"]["ItemEdit"];
 type LockField = NonNullable<Edit["unlock"]>[number];
@@ -41,6 +42,7 @@ export function FixMatchDialog({ item, onClose }: { item: ItemDetail; onClose: (
   };
   return (
     <Dialog open wide onClose={onClose} title="Fix match">
+      <ItemFiles item={item} />
       <form onSubmit={search} className="mb-4 flex gap-2">
         <Input aria-label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
         <Input aria-label="Year" placeholder="Year" inputMode="numeric" className="w-24" value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, "").slice(0, 4))} />

@@ -233,8 +233,7 @@ func (w *writer) writeStreams(ctx context.Context, fileID int64, c candidate, re
 	return nil
 }
 
-// finish marks missing files unavailable, removes items left without files, recomputes
-// availability and child counts, and commits.
+// finish marks missing files unavailable, tidies the library (see Tidy) and commits.
 func (w *writer) finish(ctx context.Context) error {
 	if err := w.ensure(ctx); err != nil {
 		return err
@@ -244,7 +243,23 @@ func (w *writer) finish(ctx context.Context) error {
 			return err
 		}
 	}
-	lib := w.lib.ID
+	if err := tidy(ctx, w.tx, w.lib.ID); err != nil {
+		return err
+	}
+	if _, err := w.tx.ExecContext(ctx, `UPDATE libraries SET last_scanned_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`, w.lib.ID); err != nil {
+		return err
+	}
+	err := w.tx.Commit()
+	w.tx = nil
+	return err
+}
+
+// Tidy removes a library's versions and items left without files (and seasons, shows,
+// albums and artists left empty), then recomputes availability and child counts. Scans
+// run it at the end; deleting a file runs it too.
+func Tidy(ctx context.Context, tx *sql.Tx, libID int64) error { return tidy(ctx, tx, libID) }
+
+func tidy(ctx context.Context, tx *sql.Tx, lib int64) error {
 	steps := []string{
 		// Versions and leaf items whose files are all gone from the database.
 		`DELETE FROM media_versions WHERE item_id IN (SELECT id FROM items WHERE library_id = ?1)
@@ -278,16 +293,13 @@ func (w *writer) finish(ctx context.Context) error {
 			child_count = (SELECT COUNT(*) FROM items c WHERE c.parent_id = items.id),
 			leaf_count  = (SELECT COUNT(*) FROM items t JOIN items a ON t.parent_id = a.id WHERE a.parent_id = items.id)
 			WHERE library_id = ?1 AND type = 'artist'`,
-		`UPDATE libraries SET last_scanned_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?1`,
 	}
 	for _, q := range steps {
-		if _, err := w.tx.ExecContext(ctx, q, lib); err != nil {
+		if _, err := tx.ExecContext(ctx, q, lib); err != nil {
 			return err
 		}
 	}
-	err := w.tx.Commit()
-	w.tx = nil
-	return err
+	return nil
 }
 
 // ---- helpers ----

@@ -39,7 +39,7 @@ const WINDOW_HOURS = 6;
 const ROW = 72;
 const CHANNEL_COL = 132;
 
-/** Live TV (LIVE-2): a Plex-style guide and What's On, with a live preview. */
+/** Live TV (LIVE-2): a guide and What's On, with a live preview. */
 export function LiveTvPage() {
   const status = useQuery(liveStatusQuery);
   const groups = useQuery(liveGroupsQuery);

@@ -24,20 +24,20 @@ services:
       MARQUEE_LOG_LEVEL: ${MARQUEE_LOG_LEVEL:-info}
     volumes:
       - ./config:/config
-      - /mnt/data/Video:/media/video:ro
+      - /mnt/data/Video:/media/video     # writable: Library Health can move files to .marquee-trash (allowMediaDeletion)
       - /mnt/data/Music:/media/music:ro
       - /mnt/docker/plex:/plex:ro          # Plex import (read-only)
       - ${RECORDINGS_DIR:-./recordings}:/recordings   # Live TV recordings (LIVE-5), writable
     tmpfs:
       - /transcode:size=16g,uid=${PUID:-99},gid=${PGID:-100},mode=0750
 
-  # Sonic analysis (MUSIC-1, D56): CLAP embeddings, tempo and key for music, on the GPU.
+  # Soundprint analysis (MUSIC-1, D56): CLAP embeddings, tempo and key for music, on the GPU.
   # Only Marquee talks to it (127.0.0.1:32501). Media is read-only; the model is cached in ./models.
-  sonic:
-    image: marquee-sonic:${MARQUEE_VERSION:-latest}
+  soundprint:
+    image: marquee-soundprint:${MARQUEE_VERSION:-latest}
     build:
-      context: ./src/sonic
-    container_name: marquee-sonic
+      context: ./src/soundprint
+    container_name: marquee-soundprint
     restart: unless-stopped
     user: "${PUID:-99}:${PGID:-100}"
     runtime: nvidia

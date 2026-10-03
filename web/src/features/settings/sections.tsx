@@ -74,7 +74,7 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] =
           icon: Library,
           component: LibrariesSettings,
           keywords:
-            "folders paths scan add library ignore patterns watcher file watching empty trash refresh metadata trickplay seek previews thumbnails",
+            "folders paths scan add library ignore patterns watcher file watching empty trash refresh metadata trickplay seek previews thumbnails delete media files duplicates",
           description:
             "Add and manage the folders Marquee organises, and how they are scanned.",
         },
@@ -122,8 +122,8 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] =
           icon: AudioLines,
           component: MusicSettings,
           keywords:
-            "sonic analysis radio sage mixes lyrics lrclib loudness replaygain volume levelling gpu",
-          description: "Sonic analysis, lyrics and volume levelling.",
+            "soundprint analysis sound journey radio sage mixes lyrics lrclib loudness replaygain volume levelling gpu",
+          description: "Soundprint analysis, lyrics and volume levelling.",
         },
         {
           id: "cinema",

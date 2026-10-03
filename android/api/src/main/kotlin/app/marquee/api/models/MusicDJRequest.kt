@@ -54,14 +54,14 @@ data class MusicDJRequest (
     /**
      * 
      *
-     * Values: STRETCH,GROUPIE,DEEP_CUTS,CONTEMPO
+     * Values: WANDER,SUPERFAN,DEEP_CUTS,SAME_ERA
      */
     @Serializable
     enum class Mode(val value: kotlin.String) {
-        @SerialName(value = "stretch") STRETCH("stretch"),
-        @SerialName(value = "groupie") GROUPIE("groupie"),
+        @SerialName(value = "wander") WANDER("wander"),
+        @SerialName(value = "superfan") SUPERFAN("superfan"),
         @SerialName(value = "deep_cuts") DEEP_CUTS("deep_cuts"),
-        @SerialName(value = "contempo") CONTEMPO("contempo");
+        @SerialName(value = "same_era") SAME_ERA("same_era");
     }
 
 }

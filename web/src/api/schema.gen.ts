@@ -393,7 +393,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Profiles that can be switched to from this device (Plex Home equivalent). */
+        /** Profiles that can be switched to from this device. */
         get: operations["listProfiles"];
         put?: never;
         post?: never;
@@ -1358,6 +1358,28 @@ export interface paths {
         post?: never;
         /** Report it again (admin only). */
         delete: operations["unignoreHealthIssue"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/files/{fileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
+         * @description The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item's last file the item goes too, along with a season or show left empty.
+         */
+        delete: operations["deleteMediaFile"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2436,7 +2458,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Sonic analysis progress and whether the analysis service is running. */
+        /** Soundprint analysis progress and whether the analysis service is running. */
         get: operations["musicStatus"];
         put?: never;
         post?: never;
@@ -2446,7 +2468,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/items/{itemId}/sonic-similar": {
+    "/items/{itemId}/sounds-like": {
         parameters: {
             query?: never;
             header?: never;
@@ -2455,8 +2477,8 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Tracks, albums or artists (matching the item's type) that sound like it (MUSIC-2). */
-        get: operations["sonicSimilar"];
+        /** Sounds like this (MUSIC-2) — tracks, albums or artists (matching the item's type) that sound like it. */
+        get: operations["soundsLike"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2499,7 +2521,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/music/adventure": {
+    "/music/journey": {
         parameters: {
             query?: never;
             header?: never;
@@ -2508,8 +2530,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sonic Adventure (MUSIC-4) — a path from one track to another through tracks that sound in between. */
-        post: operations["musicAdventure"];
+        /** Sound Journey (MUSIC-4) — a path from one track to another through tracks that sound in between. */
+        post: operations["musicJourney"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2526,8 +2548,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Guest DJ (MUSIC-6) — one track to weave in after the one playing.
-         * @description stretch: sounds like it, by another artist. groupie: the artist's other albums. deep_cuts: the artist's least-played tracks. contempo: a similar sound from the same era.
+         * DJ (MUSIC-6) — one track to weave in after the one playing.
+         * @description wander: sounds like it, by another artist. superfan: the artist's other albums. deep_cuts: the artist's least-played tracks. same_era: a similar sound from the same years.
          */
         post: operations["musicDJ"];
         delete?: never;
@@ -2912,8 +2934,8 @@ export interface components {
             prerollItemId?: number | null;
         };
         MusicSettings: {
-            /** @description Analyse how tracks sound (on this server's GPU) for radios, similar music and Muse. */
-            sonicAnalysis?: boolean;
+            /** @description Soundprint: analyse how tracks sound (on this server's GPU) for radios, similar music and Muse. */
+            soundprintAnalysis?: boolean;
             /** @description Look up lyrics on LRCLIB when a track has none (sends artist and title). */
             onlineLyrics?: boolean;
             /** @description Measure loudness of tracks without ReplayGain tags so volume levelling works for everything. */
@@ -2990,6 +3012,11 @@ export interface components {
             detectIntros?: boolean;
             /** @description Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie. */
             trickplay?: boolean;
+            /**
+             * @description Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good after 30 days.
+             * @default false
+             */
+            allowMediaDeletion: boolean;
         };
         WatchGroup: {
             id: string;
@@ -3633,6 +3660,8 @@ export interface components {
             audioCopy: boolean;
             audioCodec?: string;
             audioChannels?: number;
+            /** @description Bitrate of the converted audio (MUSIC-23); absent when the audio is sent as it is. */
+            audioKbps?: number;
             burnSubtitle: boolean;
             toneMap: boolean;
         };
@@ -4008,6 +4037,17 @@ export interface components {
             detail: string;
             /** @description duplicates: the other copies. */
             related?: components["schemas"]["ItemSummary"][];
+            /** @description The files involved, to compare. duplicates: every file of every copy (this item and the related ones). */
+            files?: components["schemas"]["IssueFile"][];
+        };
+        IssueFile: {
+            /** Format: int64 */
+            itemId: number;
+            itemTitle: string;
+            versionLabel?: string;
+            file: components["schemas"]["MediaFile"];
+            /** Format: date-time */
+            addedAt: string;
         };
         HealthIssuePage: {
             items: components["schemas"]["HealthIssue"][];
@@ -4442,6 +4482,22 @@ export interface components {
              * @enum {string}
              */
             releaseType?: "album" | "ep" | "single" | "compilation" | "live" | "soundtrack" | "remix" | "demo" | "other";
+            audioFormat?: components["schemas"]["AudioFormat"];
+        };
+        /** @description Tracks: the file's audio quality (MUSIC-23), for apps that show it, e.g. FLAC 24/96 or MP3 320. */
+        AudioFormat: {
+            /**
+             * @description ffprobe codec name: flac, alac, mp3, aac, opus, vorbis, pcm_s16le…
+             * @example flac
+             */
+            codec: string;
+            lossless: boolean;
+            bitrateKbps?: number;
+            /** @description Hz, e.g. 96000 */
+            sampleRate?: number;
+            /** @description Bits per sample, for lossless formats (16, 24). */
+            bitDepth?: number;
+            channels?: number;
         };
         /** @description Artwork ids for /images/{artworkId}. Seasons and episodes fall back to the show's art, tracks to the album's. */
         ItemImages: {
@@ -7229,6 +7285,30 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    deleteMediaFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Moved to the trash. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
     getHomeLayout: {
         parameters: {
             query?: never;
@@ -9174,7 +9254,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
-    sonicSimilar: {
+    soundsLike: {
         parameters: {
             query?: {
                 limit?: number;
@@ -9262,7 +9342,7 @@ export interface operations {
             503: components["responses"]["ServiceUnavailable"];
         };
     };
-    musicAdventure: {
+    musicJourney: {
         parameters: {
             query?: never;
             header?: never;
@@ -9309,7 +9389,7 @@ export interface operations {
                     /** Format: int64 */
                     trackId: number;
                     /** @enum {string} */
-                    mode: "stretch" | "groupie" | "deep_cuts" | "contempo";
+                    mode: "wander" | "superfan" | "deep_cuts" | "same_era";
                     /** @description Tracks already queued. */
                     exclude?: number[];
                 };

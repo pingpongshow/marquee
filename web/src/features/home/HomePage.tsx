@@ -14,7 +14,7 @@ import { pinnedTarget } from "./layout";
 import { MuseButton } from "../search/MuseVideo";
 
 function HubItem({ it, wide }: { it: ItemSummary; wide: boolean }) {
-  // Continue Watching episodes open the player directly, like Plex.
+  // Continue Watching episodes open the player directly.
   const playable =
     (it.type === "episode" || it.type === "movie" || it.type === "video") &&
     wide;

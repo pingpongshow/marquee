@@ -46,6 +46,14 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import app.marquee.api.models.HealthCheck
 import app.marquee.api.models.HealthIssue
+import app.marquee.api.models.IssueFile
+import app.marquee.api.models.MediaFile
+import app.marquee.api.models.MediaStream
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.platform.testTag
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -115,6 +123,11 @@ fun HealthIssuesScreen(nav: NavHostController, checkId: String) {
     var title by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var bazarr by remember { mutableStateOf<HealthIssue?>(null) }
+    var match by remember { mutableStateOf<HealthIssue?>(null) }
+    // Deleting duplicate files (admins, only with the server's "Allow deleting media files" on).
+    var allowDeletion by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<IssueFile?>(null) }
+    var deleting by remember { mutableStateOf(false) }
     fun loadMore() {
         if (loading || (total >= 0 && offset >= total)) return
         loading = true
@@ -125,7 +138,13 @@ fun HealthIssuesScreen(nav: NavHostController, checkId: String) {
             loading = false
         }
     }
+    /** Starts the list again from the top (after a delete changes it). */
+    fun reload() {
+        issues.clear(); total = -1; offset = 0
+        loadMore()
+    }
     LaunchedEffect(checkId) {
+        allowDeletion = withContext(Dispatchers.IO) { runCatching { marquee.settings.getSettings().library.allowMediaDeletion == true } }.getOrDefault(false)
         title = withContext(Dispatchers.IO) { runCatching { marquee.libraries.libraryHealth().firstOrNull { it.id.value == checkId }?.title } }.getOrNull() ?: ""
         loadMore()
     }
@@ -140,6 +159,18 @@ fun HealthIssuesScreen(nav: NavHostController, checkId: String) {
                     .onSuccess { issues.add(at.coerceIn(0, issues.size), issue) }
                     .onFailure { snackbar.showSnackbar("Couldn't undo: ${it.message}") }
             }
+        }
+    }
+    fun delete(f: IssueFile) {
+        deleting = true
+        scope.launch {
+            val r = withContext(Dispatchers.IO) { runCatching { marquee.libraries.deleteMediaFile(f.file.id) } }
+            deleting = false
+            pendingDelete = null
+            r.onSuccess {
+                reload()
+                snackbar.showSnackbar("Moved “${splitPath(f.file.path ?: f.itemTitle).first}” to the trash")
+            }.onFailure { snackbar.showSnackbar("Couldn't delete it: ${serverMessage(it)}") }
         }
     }
     fun refresh(issue: HealthIssue) = scope.launch {
@@ -165,18 +196,44 @@ fun HealthIssuesScreen(nav: NavHostController, checkId: String) {
                 if (i >= issues.size - 10) LaunchedEffect(i) { loadMore() }
                 IssueRow(issue, checkId,
                     onOpen = { openItem(nav, issue.item) }, onRefresh = { refresh(issue) }, onIgnore = { ignore(issue) },
-                    onBazarr = { bazarr = issue }, onRelated = { nav.navigate("item/${it}") })
+                    onBazarr = { bazarr = issue }, onRelated = { nav.navigate("item/${it}") }, onMatch = { match = issue })
+                if (checkId == HealthCheck.Id.DUPLICATES.value && (issue.files?.size ?: 0) > 1)
+                    DuplicateComparison(issue.files!!, allowDeletion) { pendingDelete = it }
                 HorizontalDivider()
             }
             if (loading) item { CircularProgressIndicator(Modifier.padding(sidePadding)) }
         }
     }
     bazarr?.let { b -> BazarrDialog(b.item.id, b.item.title) { bazarr = null } }
+    match?.let { m ->
+        FixMatchDialog(m.item.id) { updated ->
+            match = null
+            if (updated != null) scope.launch { snackbar.showSnackbar("Matched “${updated.title}”") }
+        }
+    }
+    pendingDelete?.let { f ->
+        val name = splitPath(f.file.path ?: f.itemTitle).first
+        AlertDialog(
+            onDismissRequest = { if (!deleting) pendingDelete = null },
+            title = { Text("Delete this file?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("“$name”", fontWeight = FontWeight.SemiBold)
+                    Text("It moves to the library's .marquee-trash folder, along with subtitles and artwork that belong only to it, and is removed for good after 30 days.")
+                }
+            },
+            confirmButton = {
+                TextButton({ delete(f) }, Modifier.focusRing(), enabled = !deleting) { Text("Move to trash", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton({ pendingDelete = null }, Modifier.focusRing(), enabled = !deleting) { Text("Cancel") } },
+        )
+    }
 }
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun IssueRow(issue: HealthIssue, checkId: String, onOpen: () -> Unit, onRefresh: () -> Unit, onIgnore: () -> Unit, onBazarr: () -> Unit, onRelated: (Long) -> Unit) {
+private fun IssueRow(issue: HealthIssue, checkId: String, onOpen: () -> Unit, onRefresh: () -> Unit, onIgnore: () -> Unit, onBazarr: () -> Unit, onRelated: (Long) -> Unit,
+    onMatch: () -> Unit) {
     val marquee = LocalMarquee.current
     val it = issue.item
     Row(Modifier.fillMaxWidth().padding(horizontal = sidePadding, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -196,8 +253,96 @@ private fun IssueRow(issue: HealthIssue, checkId: String, onOpen: () -> Unit, on
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 TextButton(onOpen, Modifier.focusRing()) { Text("Open") }
                 TextButton(onRefresh, Modifier.focusRing()) { Text("Refresh metadata") }
+                if (matchable(it.type)) TextButton(onMatch, Modifier.focusRing().semantics { contentDescription = "Fix match for ${it.title}" }) { Text("Fix match…") }
                 if (checkId == HealthCheck.Id.MISSING_SUBTITLES.value) TextButton(onBazarr, Modifier.focusRing()) { Text("Download with Bazarr") }
                 TextButton(onIgnore, Modifier.focusRing().semantics { contentDescription = "Ignore ${it.title}" }) { Text("Ignore") }
+            }
+        }
+    }
+}
+
+
+/** One comparable fact about a file: what to show, and a score where higher is better (null: not compared). */
+private class Fact(val label: String, val text: String, val score: Double? = null)
+
+private fun resolution(f: MediaFile): Pair<String, Double>? {
+    val v = f.streams.firstOrNull { it.kind == MediaStream.Kind.VIDEO }
+    val w = f.width ?: v?.width ?: return null
+    val h = f.height ?: v?.height ?: return null
+    val name = when {
+        w >= 3200 || h >= 2000 -> "4K"
+        w >= 1800 || h >= 1000 -> "1080p"
+        w >= 1200 || h >= 700 -> "720p"
+        else -> "SD"
+    }
+    return "$name · $w×$h" to (w.toDouble() * h)
+}
+
+private fun channels(n: Int): String = when (n) {
+    1 -> "1.0"; 2 -> "2.0"; 3 -> "2.1"; 6 -> "5.1"; 7 -> "6.1"; 8 -> "7.1"; else -> "$n ch"
+}
+
+private val hdrNames = mapOf(
+    MediaFile.HdrFormat.HDR10 to "HDR10", MediaFile.HdrFormat.HDR10PLUS to "HDR10+",
+    MediaFile.HdrFormat.HLG to "HLG", MediaFile.HdrFormat.DOLBY_VISION to "Dolby Vision",
+)
+
+private val addedFormat = java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM)
+
+private fun facts(i: IssueFile): List<Fact> {
+    val f = i.file
+    val audio = f.streams.firstOrNull { it.kind == MediaStream.Kind.AUDIO }
+    val subs = f.streams.count { it.kind == MediaStream.Kind.SUBTITLE }
+    val res = resolution(f)
+    return listOfNotNull(
+        i.versionLabel?.takeIf { it.isNotBlank() }?.let { Fact("Edition", it) },
+        Fact("Size", if (f.propertySize >= 100_000_000) "%.2f GB".format(f.propertySize / 1e9) else "%.1f MB".format(f.propertySize / 1e6)),
+        Fact("Resolution", res?.first ?: "Unknown", res?.second ?: 0.0),
+        Fact("Video", f.videoCodec?.uppercase() ?: "Unknown"),
+        Fact("HDR", f.hdrFormat?.let { hdrNames[it] } ?: "SDR", if (f.hdrFormat != null) 1.0 else 0.0),
+        Fact("Bitrate", f.bitrateKbps?.let { "%.1f Mbps".format(it / 1000.0) } ?: "Unknown", f.bitrateKbps?.toDouble() ?: 0.0),
+        Fact("Audio", audio?.let { a -> listOfNotNull(a.codec.uppercase(), a.channels?.let(::channels)).joinToString(" ") } ?: "None",
+            audio?.channels?.toDouble() ?: 0.0),
+        Fact("Subtitles", "$subs", subs.toDouble()),
+        Fact("Duration", f.durationMs?.let { formatTime(it) } ?: "Unknown"),
+        Fact("Container", f.container?.uppercase() ?: "Unknown"),
+        Fact("Added", i.addedAt.atZoneSameInstant(java.time.ZoneId.systemDefault()).format(addedFormat)),
+    )
+}
+
+/**
+ * Duplicates (ADM-11): every file of every copy side by side, the better value in each
+ * comparable row highlighted, each with Delete… (to the trash) when the server allows it.
+ * The last file left can't be deleted from here.
+ */
+@Composable
+private fun DuplicateComparison(files: List<IssueFile>, allowDeletion: Boolean, onDelete: (IssueFile) -> Unit) {
+    val all = files.map { facts(it) }
+    // Per label, the best score when the files differ.
+    val best = all.flatten().filter { it.score != null }.groupBy { it.label }
+        .mapValues { (_, fs) -> fs.mapNotNull { it.score }.let { sc -> if (sc.distinct().size > 1) sc.max() else null } }
+    Column(Modifier.fillMaxWidth().padding(bottom = 12.dp).testTag("duplicateComparison")) {
+        Text("Compare files", Modifier.padding(horizontal = sidePadding, vertical = 4.dp), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        if (!allowDeletion) Text("Turn on 'Allow deleting media files' in Settings → Libraries to delete from here.",
+            Modifier.padding(horizontal = sidePadding, vertical = 4.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = sidePadding), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            files.forEachIndexed { idx, f ->
+                val name = splitPath(f.file.path ?: f.itemTitle).first
+                Column(Modifier.width(260.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).padding(12.dp)
+                    .semantics { contentDescription = "Duplicate file $name" }, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(f.itemTitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    f.file.path?.let { FileName(it) } ?: Text(name, fontWeight = FontWeight.Medium)
+                    all[idx].forEach { fact ->
+                        val better = fact.score != null && best[fact.label] != null && fact.score == best[fact.label]
+                        Row(Modifier.fillMaxWidth().semantics { if (better) contentDescription = "Better ${fact.label}: ${fact.text}" }) {
+                            Text(fact.label, Modifier.width(84.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(fact.text, style = MaterialTheme.typography.bodySmall, color = if (better) Gold else MaterialTheme.colorScheme.onSurface,
+                                fontWeight = if (better) FontWeight.Bold else FontWeight.Normal)
+                        }
+                    }
+                    if (allowDeletion) OutlinedButton({ onDelete(f) }, Modifier.padding(top = 6.dp).focusRing().semantics { contentDescription = "Delete $name" },
+                        enabled = files.size > 1) { Text("Delete…", color = if (files.size > 1) MaterialTheme.colorScheme.error else Color.Unspecified) }
+                }
             }
         }
     }

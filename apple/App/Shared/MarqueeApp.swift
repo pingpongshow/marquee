@@ -27,6 +27,7 @@ struct MarqueeApp: App {
         // UI tests start from a clean slate.
         if ProcessInfo.processInfo.arguments.contains("-marquee-reset") {
             for s in ServerStore.servers { ServerStore.forget(s.id) }
+            for key in ["marquee.showAudioQuality", "marquee.dj"] { UserDefaults.standard.removeObject(forKey: key) }
         }
         let session = AppSession()
         let player = MusicPlayer(app: session)

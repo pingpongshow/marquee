@@ -156,7 +156,8 @@ private fun Routes(nav: NavHostController) {
         composable("live/{id}", listOf(navArgument("id") { type = NavType.LongType })) { LiveWatchScreen(nav, it.arguments!!.getLong("id")) }
         composable("approvals") { ApprovalsScreen() }
         composable("stats") { StatsScreen(nav) }
-        composable("nowplaying") { NowPlayingScreen(onClose = { nav.popBackStack() }, onCarMode = { nav.navigate("carmode") }, onRemote = { nav.navigate("remote/$it") }) }
+        composable("nowplaying") { NowPlayingScreen(onClose = { nav.popBackStack() }, onCarMode = { nav.navigate("carmode") }, onRemote = { nav.navigate("remote/$it") },
+            onOpenPlaylist = { nav.navigate("playlist/$it") }) }
         composable("carmode?lib={lib}", listOf(navArgument("lib") { type = NavType.LongType; defaultValue = -1L })) {
             app.marquee.music.CarModeScreen(it.arguments!!.getLong("lib").takeIf { l -> l >= 0 }, onExit = { nav.popBackStack() })
         }

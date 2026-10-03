@@ -1,4 +1,4 @@
-package sonic
+package soundprint
 
 import (
 	"math"
@@ -155,9 +155,9 @@ func order(ts []*Track, v []float32) []*Track {
 	return out
 }
 
-// Adventure travels from one track to another through tracks that sit between them in
-// sound (Plex's "Sonic Adventure").
-func (x *Index) Adventure(from, to *Track, n int, o Options) []*Track {
+// Journey travels from one track to another through tracks that sit between them in
+// sound (Sound Journey).
+func (x *Index) Journey(from, to *Track, n int, o Options) []*Track {
 	if n < 3 {
 		n = 3
 	}

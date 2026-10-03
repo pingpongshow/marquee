@@ -34,6 +34,18 @@ type Issue struct {
 	ItemID, FileID int64 // FileID 0 = the item as a whole
 	Path, Detail   string
 	Related        []int64 // duplicates: the other copies
+	// Files are the files involved, to compare: for duplicates every file of every copy
+	// (movies, episodes and videos; a show's copies list none), otherwise the issue's file.
+	Files []File
+}
+
+// File is one file of an issue.
+type File struct {
+	ItemID       int64
+	ItemTitle    string
+	VersionLabel string
+	FileID       int64
+	AddedAt      string // when the file was added
 }
 
 // Service runs the checks.
@@ -208,9 +220,54 @@ func (s *Service) Issues(ctx context.Context, id string, offset, limit int) ([]I
 		return nil, 0, err
 	}
 	if id == "duplicates" {
-		err = s.related(ctx, out)
+		if err := s.related(ctx, out); err != nil {
+			return nil, 0, err
+		}
 	}
-	return out, total, err
+	return out, total, s.files(ctx, id, out)
+}
+
+// files fills in each issue's files: for duplicates every file of the item and its other
+// copies, for other checks the file the issue names.
+func (s *Service) files(ctx context.Context, checkID string, issues []Issue) error {
+	const cols = `SELECT i.id, i.title, v.label, f.id, f.created_at FROM items i
+		CROSS JOIN media_versions v ON v.item_id = i.id CROSS JOIN media_files f ON f.version_id = v.id`
+	for k := range issues {
+		is := &issues[k]
+		var q string
+		var args []any
+		switch {
+		case checkID == "duplicates":
+			ids := append([]int64{is.ItemID}, is.Related...)
+			q = cols + ` WHERE i.id IN (?` + strings.Repeat(",?", len(ids)-1) + `)
+				ORDER BY i.id <> ?, i.id, v.id, f.part_index, f.id`
+			for _, id := range ids {
+				args = append(args, id)
+			}
+			args = append(args, is.ItemID)
+		case is.FileID > 0:
+			q, args = cols+` WHERE f.id = ?`, []any{is.FileID}
+		default:
+			continue
+		}
+		rows, err := s.DB.QueryContext(ctx, q, args...)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var f File
+			if err := rows.Scan(&f.ItemID, &f.ItemTitle, &f.VersionLabel, &f.FileID, &f.AddedAt); err != nil {
+				rows.Close()
+				return err
+			}
+			is.Files = append(is.Files, f)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // related fills in the other copies of duplicated titles.

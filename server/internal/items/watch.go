@@ -94,7 +94,7 @@ type Hub struct {
 }
 
 // ContinueWatching returns in-progress movies/episodes/videos plus the next episode of shows
-// the user has been watching (Plex's "On Deck"), most recent first.
+// the user has been watching, most recent first.
 func (s *Store) ContinueWatching(ctx context.Context, acc Access, libIDs []int64, limit int) ([]Summary, error) {
 	acc.LibraryIDs = intersect(acc.LibraryIDs, libIDs)
 	ac, aargs := acc.clause()

@@ -5,6 +5,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"marquee/internal/library"
 )
 
 var (
@@ -63,7 +65,9 @@ func walk(root string, wantAudio bool, patterns []string, out *walkResult) error
 		}
 		name := d.Name()
 		if d.IsDir() {
-			if p != root && (strings.HasPrefix(name, ".") || strings.EqualFold(name, "@eaDir") || strings.EqualFold(name, "#recycle")) {
+			// Hidden folders (the media trash among them), Synology and recycle bins.
+			if p != root && (strings.HasPrefix(name, ".") || strings.EqualFold(name, library.TrashDir) ||
+				strings.EqualFold(name, "@eaDir") || strings.EqualFold(name, "#recycle")) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -93,4 +97,10 @@ func walk(root string, wantAudio bool, patterns []string, out *walkResult) error
 		})
 		return nil
 	})
+}
+
+// IsMedia reports whether a file name has a video or audio extension the scanner picks up.
+func IsMedia(name string) bool {
+	e := ext(name)
+	return videoExts[e] || audioExts[e]
 }

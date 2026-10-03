@@ -79,6 +79,9 @@ func addTree(w *fsnotify.Watcher, root string) int {
 		if err != nil || !d.IsDir() {
 			return nil
 		}
+		if library.InTrash(d.Name()) {
+			return filepath.SkipDir // deleted media waiting in the trash
+		}
 		if p != root && strings.HasPrefix(d.Name(), ".") {
 			return filepath.SkipDir
 		}
@@ -98,6 +101,9 @@ func (wt *Watcher) loop(w *fsnotify.Watcher) {
 		case ev, ok := <-w.Events:
 			if !ok {
 				return
+			}
+			if library.InTrash(ev.Name) {
+				continue // files moving into or out of the media trash
 			}
 			// New folders (a show's new season, a new album) need watching too.
 			if ev.Has(fsnotify.Create) {

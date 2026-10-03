@@ -53,6 +53,10 @@ struct NowPlayingView: View {
     @Environment(AppSession.self) private var app
     @State private var panel: Panel = .player
     @State private var scrub: Double?
+    @State private var saveRequest: SavePlaylistRequest?
+    #if os(iOS)
+    @Environment(\.verticalSizeClass) private var verticalSize
+    #endif
 
     enum Panel: String, CaseIterable {
         case player = "Now Playing", lyrics = "Lyrics", queue = "Up Next"
@@ -60,8 +64,9 @@ struct NowPlayingView: View {
 
     var body: some View {
         if let t = music.current?.item {
-            ZStack {
-                backdrop(t)
+            // The backdrop sits behind the content and never sizes it: a scaled-to-fill image in
+            // a ZStack made the whole screen wider than the window.
+            Group {
                 #if os(tvOS)
                 HStack(spacing: 80) {
                     VStack(spacing: 30) {
@@ -80,23 +85,26 @@ struct NowPlayingView: View {
                 .padding(.vertical, 30)
                 .onAppear { if panel == .player { panel = .queue } }
                 #else
-                VStack(spacing: 16) {
-                    Capsule().fill(.secondary).frame(width: 40, height: 5).padding(.top, 8)
-                    sourceHeader
-                    switch panel {
-                    case .player: player(t)
-                    case .lyrics: LyricsView(itemID: t.id).padding(.horizontal, 8)
-                    case .queue: queueList
+                if verticalSize == .compact {
+                    landscape(t)
+                } else {
+                    VStack(spacing: 16) {
+                        Capsule().fill(.secondary).frame(width: 40, height: 5).padding(.top, 8)
+                        sourceHeader
+                        switch panel {
+                        case .player: player(t)
+                        case .lyrics: LyricsView(itemID: t.id).padding(.horizontal, 8)
+                        case .queue: queueList
+                        }
+                        panelPicker.padding(.bottom)
                     }
-                    Picker("Show", selection: $panel.animation()) {
-                        ForEach(Panel.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.bottom)
+                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .padding(.horizontal, 24)
                 #endif
             }
+            .background { backdrop(t) }
+            .savePlaylistFlow($saveRequest)
         } else {
             ContentUnavailableView("Nothing playing", systemImage: "music.note")
         }
@@ -154,33 +162,114 @@ struct NowPlayingView: View {
     }
 
     private func backdrop(_ t: Item) -> some View {
-        ZStack {
-            Color.black
-            AsyncImage(url: app.imageURL(t.images?.poster, width: 64)) { $0.image?.resizable().scaledToFill() }
-                .blur(radius: 60).opacity(0.55)
+        Color.black
+            .overlay {
+                AsyncImage(url: app.imageURL(t.images?.poster, width: 64)) { $0.image?.resizable().scaledToFill() }
+                    .blur(radius: 60).opacity(0.55)
+            }
+            .clipped()
+            .ignoresSafeArea()
+    }
+
+    #if os(iOS)
+    private var panelPicker: some View {
+        Picker("Show", selection: $panel.animation()) {
+            ForEach(Panel.allCases, id: \.self) { Text($0.rawValue).tag($0) }
         }
-        .ignoresSafeArea()
+        .pickerStyle(.segmented)
+        .accessibilityIdentifier("nowPlayingPanel")
+    }
+
+    /// Landscape on iPhone: artwork (or lyrics / Up Next) on the left, the controls on the
+    /// right, both within the safe area.
+    private func landscape(_ t: Item) -> some View {
+        HStack(spacing: 28) {
+            Group {
+                switch panel {
+                case .player:
+                    artwork(t).frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .lyrics: LyricsView(itemID: t.id)
+                case .queue: queueList
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 10) {
+                sourceHeader
+                Spacer(minLength: 0)
+                info(t)
+                scrubber
+                transport
+                actions(t)
+                Spacer(minLength: 0)
+                panelPicker
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+    #endif
+
+    private func artwork(_ t: Item) -> some View {
+        ArtworkView(item: t, shape: .square, width: 600)
+            #if os(tvOS)
+            .frame(width: artSize, height: artSize)
+            .layoutPriority(1)
+            #else
+            .frame(maxWidth: artSize)
+            #endif
+            .shadow(color: .black.opacity(0.5), radius: 30, y: 10)
+    }
+
+    /// Title and artist, one line each and truncated, so long names never widen the screen.
+    private func info(_ t: Item) -> some View {
+        VStack(spacing: 4) {
+            Text(t.title).font(.title2.bold()).lineLimit(1).truncationMode(.tail)
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("nowPlayingTitle")
+            Text([t.artistCredit ?? t.grandparentTitle, t.parentTitle].compactMap { $0 }.joined(separator: " · "))
+                .foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("nowPlayingSubtitle")
+            if music.showAudioQuality, let f = t.audioFormat { qualityBadge(f) }
+            if let error = music.error {
+                Label(error, systemImage: "exclamationmark.triangle.fill").font(.footnote).foregroundStyle(.red).lineLimit(2)
+                    .accessibilityIdentifier("musicError")
+            }
+        }
+    }
+
+    /// "FLAC · 24-bit/96 kHz → AAC 256 kbps", one line, with a Hi-Res tag (MUSIC-23).
+    private func qualityBadge(_ f: AudioFormat) -> some View {
+        let text = [f.label, music.currentStreamed.map { "→ \($0.label)" }].compactMap { $0 }.joined(separator: " ")
+        return HStack(spacing: 6) {
+            if f.isHiRes {
+                Text("Hi-Res").font(.caption2.weight(.heavy))
+                    .padding(.horizontal, 5).padding(.vertical, 1)
+                    .background(Color.marqueeGold.opacity(0.25), in: RoundedRectangle(cornerRadius: 4))
+                    .foregroundStyle(Color.marqueeGold)
+                    .fixedSize()
+            }
+            Text(text).font(.caption.weight(.semibold)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("audioQuality")
     }
 
     private func player(_ t: Item) -> some View {
         VStack(spacing: stackSpacing) {
             Spacer(minLength: 0)
-            ArtworkView(item: t, shape: .square, width: 600)
-                #if os(tvOS)
-                .frame(width: artSize, height: artSize)
-                .layoutPriority(1)
-                #else
-                .frame(maxWidth: artSize)
-                #endif
-                .shadow(color: .black.opacity(0.5), radius: 30, y: 10)
-            VStack(spacing: 4) {
-                Text(t.title).font(.title2.bold()).lineLimit(1).accessibilityIdentifier("nowPlayingTitle")
-                Text([t.artistCredit ?? t.grandparentTitle, t.parentTitle].compactMap { $0 }.joined(separator: " · ")).foregroundStyle(.secondary).lineLimit(1)
-                if let error = music.error {
-                    Label(error, systemImage: "exclamationmark.triangle.fill").font(.footnote).foregroundStyle(.red).lineLimit(2)
-                        .accessibilityIdentifier("musicError")
-                }
-            }
+            artwork(t)
+            info(t)
+            scrubber
+            transport
+            actions(t)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var scrubber: some View {
             VStack(spacing: 4) {
                 #if os(tvOS)
                 ProgressView(value: music.duration > 0 ? music.time / music.duration : 0)
@@ -196,60 +285,126 @@ struct NowPlayingView: View {
                 }
                 .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
             }
-            HStack(spacing: 36) {
+    }
+
+    /// Space between the transport buttons: fixed on the TV; on iPhone it shrinks to fit.
+    @ViewBuilder private var gap: some View {
+        #if os(tvOS)
+        Color.clear.frame(width: 36, height: 1)
+        #else
+        Spacer(minLength: 6)
+        #endif
+    }
+
+    private var transport: some View {
+            HStack(spacing: 0) {
                 Button { music.toggleShuffle() } label: { Image(systemName: "shuffle").foregroundStyle(music.queue.shuffled ? Color.marqueeGold : .secondary) }
+                    .accessibilityIdentifier("np.shuffle")
+                gap
                 Button { music.previous() } label: { Image(systemName: "backward.fill").font(.title) }
-                Button { music.toggle() } label: { Image(systemName: music.playing ? "pause.circle.fill" : "play.circle.fill").font(.system(size: 64)) }
+                    .accessibilityIdentifier("np.previous")
+                gap
+                Button { music.toggle() } label: { Image(systemName: music.playing ? "pause.circle.fill" : "play.circle.fill").font(.system(size: playSize)) }
+                    .accessibilityIdentifier("np.playPause")
+                gap
                 Button { music.next() } label: { Image(systemName: "forward.fill").font(.title) }
+                    .accessibilityIdentifier("np.next")
+                gap
                 Button { music.cycleRepeat() } label: {
                     Image(systemName: music.queue.repeatMode == .one ? "repeat.1" : "repeat")
                         .foregroundStyle(music.queue.repeatMode == .off ? .secondary : Color.marqueeGold)
                 }
+                .accessibilityIdentifier("np.repeat")
             }
             .buttonStyle(.plain)
             #if os(tvOS)
             .frame(maxWidth: .infinity) // full width, so up/down from any button reaches the row
             .focusSection()
+            #else
+            .frame(maxWidth: 330)
+            .frame(maxWidth: .infinity)
             #endif
+    }
+
+    private func actions(_ t: Item) -> some View {
+            #if os(iOS)
+            // Stars and the menus on one row when they fit, otherwise on two.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 18) {
+                    RatingStars(itemID: t.id, rating: t.userRating).id(t.id)
+                    Spacer(minLength: 8)
+                    actionMenus
+                }
+                VStack(spacing: 12) {
+                    RatingStars(itemID: t.id, rating: t.userRating).id(t.id)
+                    actionMenus
+                }
+            }
+            .font(.title3)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            #else
             HStack(spacing: 24) {
-                #if os(iOS)
-                RatingStars(itemID: t.id, rating: t.userRating).id(t.id)
-                Spacer()
-                #endif
-                #if os(tvOS)
                 Button { panel = panel == .lyrics ? .queue : .lyrics } label: {
                     Label(panel == .lyrics ? "Show Up Next" : "Lyrics", systemImage: panel == .lyrics ? "list.bullet" : "quote.bubble")
                         .labelStyle(.iconOnly)
                 }
                 .accessibilityLabel(panel == .lyrics ? "Show Up Next" : "Lyrics")
-                #endif
                 SleepMenu().labelStyle(.iconOnly)
                 DJMenu()
                 LevellingMenu()
                 CrossfadeMenu()
+                Button { saveRequest = music.queueAsPlaylist } label: {
+                    Label("Save as Playlist", systemImage: "text.badge.plus").labelStyle(.iconOnly)
+                }
+                .accessibilityLabel("Save as Playlist")
             }
             .font(.title3)
             .foregroundStyle(.secondary)
-            #if os(tvOS)
             .frame(maxWidth: .infinity) // full width, so up/down from any button reaches the row
             .focusSection()
             #endif
-            Spacer(minLength: 0)
-        }
     }
+
+    #if os(iOS)
+    private var actionMenus: some View {
+        HStack(spacing: 18) {
+            SleepMenu().labelStyle(.iconOnly)
+            DJMenu()
+            LevellingMenu()
+            CrossfadeMenu()
+            Menu {
+                Button("Save as Playlist…", systemImage: "text.badge.plus") { saveRequest = music.queueAsPlaylist }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .accessibilityLabel("More")
+            .accessibilityIdentifier("np.more")
+        }
+        .fixedSize()
+    }
+    #endif
 
     #if os(tvOS)
     private let artSize: CGFloat = 360
     private let stackSpacing: CGFloat = 18
+    private let playSize: CGFloat = 64
     #else
     private let artSize: CGFloat = 340
     private let stackSpacing: CGFloat = 22
+    private var playSize: CGFloat { verticalSize == .compact ? 52 : 64 }
     #endif
 
     private var queueList: some View {
         List {
             if let cur = music.current {
                 Section("Now playing") { row(cur, current: true) }
+            }
+            Section {
+                Button { saveRequest = music.queueAsPlaylist } label: {
+                    Label("Save Queue as Playlist", systemImage: "text.badge.plus")
+                }
+                .accessibilityIdentifier("saveQueue")
             }
             Section("Up next") {
                 ForEach(Array(music.queue.upcoming)) { e in row(e, current: false) }

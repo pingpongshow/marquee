@@ -1,4 +1,4 @@
-package sonic
+package soundprint
 
 import (
 	"context"
@@ -47,7 +47,7 @@ func decode(b []byte) []float32 {
 func (x *Index) Load(ctx context.Context, db *sql.DB) error {
 	rows, err := db.QueryContext(ctx, `SELECT s.item_id, COALESCE(i.parent_id, 0), COALESCE(i.grandparent_id, 0), i.library_id,
 		COALESCE(i.year, a.year, 0), s.embedding, COALESCE(s.bpm, 0), COALESCE(s.energy, 0), COALESCE(s.musical_key, ''), COALESCE(s.mode, '')
-		FROM sonic s JOIN items i ON i.id = s.item_id LEFT JOIN items a ON a.id = i.parent_id WHERE s.embedding IS NOT NULL`)
+		FROM soundprint s JOIN items i ON i.id = s.item_id LEFT JOIN items a ON a.id = i.parent_id WHERE s.embedding IS NOT NULL`)
 	if err != nil {
 		return err
 	}

@@ -250,7 +250,7 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
             // Music libraries open with Muse, stations and mixes above the artists.
             // Your Year in Music (MUSIC-22), when there's a year to show.
             if (isMusic) item(span = { GridItemSpan(maxLineSpan) }) { app.marquee.music.YearInMusicCard(nav) }
-            if (isMusic) item(span = { GridItemSpan(maxLineSpan) }) { app.marquee.music.MusicDiscover(libraryId) { kind, name -> nav.navigate("browse/$libraryId/$kind/${android.net.Uri.encode(name)}") } }
+            if (isMusic) item(span = { GridItemSpan(maxLineSpan) }) { app.marquee.music.MusicDiscover(libraryId, onOpenPlaylist = { nav.navigate("playlist/$it") }) { kind, name -> nav.navigate("browse/$libraryId/$kind/${android.net.Uri.encode(name)}") } }
             itemsIndexed(items, key = { _, it -> it.id }) { i, it ->
                 if (i >= items.size - 30) LaunchedEffect(i) { loadMore() }
                 PosterCard(it, marquee.imageUrl(it.images?.poster, 240), min, { openItem(nav, it) }, autoFocus = marquee.isTv && i == 0 && !isMusic)
@@ -357,6 +357,7 @@ fun SettingsScreen(nav: NavHostController) {
         Text("Server: ${marquee.server?.name ?: ""} · ${if (marquee.isRemote) "Tailscale (away)" else "home network"}", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("Version ${marquee.info?.version ?: ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
         TrailersPreference()
+        ShowAudioQualityPreference()
         // Buttons wrap onto more lines rather than running off a phone's edge.
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { nav.navigate("stats") }) { Text("Your Stats") }
@@ -388,5 +389,20 @@ private fun PlaylistDownloadButton(id: Long) {
         OutlinedButton({ downloads.unsyncPlaylist(id) }, Modifier.semantics { stateDescription = if (done == ids.size) "Downloaded" else "$done of ${ids.size}" }) {
             Text(if (done == ids.size) "Downloaded · Remove" else "$done/${ids.size} · Remove")
         }
+    }
+}
+
+/** Music: Show audio quality (MUSIC-23), on this device only. */
+@Composable
+private fun ShowAudioQualityPreference() {
+    val music = LocalMusic.current
+    val on by music.showQuality.collectAsState()
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text("Show audio quality")
+            Text("Music: the format in Now Playing and album track lists, on this device", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        androidx.compose.material3.Switch(on, music::setShowQuality, Modifier.focusRing().semantics { contentDescription = "Show audio quality" })
     }
 }

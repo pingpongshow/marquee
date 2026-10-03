@@ -28,7 +28,7 @@ type SmartRules struct {
 }
 
 // fieldExpr maps a rule field to SQL over aliases i (item), p (parent), g (grandparent),
-// us (the user's state) and so (sonic analysis). Numeric fields are flagged.
+// us (the user's state) and so (Soundprint analysis). Numeric fields are flagged.
 func fieldExpr(field string) (expr string, numeric bool, err error) {
 	switch field {
 	case "genre":
@@ -161,7 +161,7 @@ func smartFrom(uid int64) string {
 		// Energy is compared as a percentile of the analysed library (0 = calmest, 1 = most
 		// intense): raw values bunch up across mastered music, so fixed thresholds mean little.
 		` LEFT JOIN (SELECT item_id, bpm, musical_key, mode, percent_rank() OVER (ORDER BY energy) AS energy
-		   FROM sonic WHERE energy IS NOT NULL) so ON so.item_id = i.id`
+		   FROM soundprint WHERE energy IS NOT NULL) so ON so.item_id = i.id`
 }
 
 // SmartItems evaluates a smart playlist's rules for acc.

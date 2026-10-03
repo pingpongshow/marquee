@@ -15,7 +15,7 @@ function matches(s: SettingsSection, q: string) {
     .every((w) => hay.includes(w));
 }
 
-/** Plex-style settings: grouped section nav on the left, the selected section on the right (ADM-8). */
+/** Settings: grouped section nav on the left, the selected section on the right (ADM-8). */
 export function SettingsLayout() {
   const me = useQuery(meQuery);
   const navigate = useNavigate();

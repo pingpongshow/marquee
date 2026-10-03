@@ -22,6 +22,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -152,7 +153,7 @@ class MarqueeUiTest {
 
     /**
      * Muse, Now Playing's source, lyrics and ratings (M6.5). Needs the test music
-     * library and the sonic analysis sidecar.
+     * library and the Soundprint analysis sidecar.
      */
     @Test fun musicFeatures() {
         connectAndSignIn()
@@ -1463,5 +1464,268 @@ class MarqueeUiTest {
         rule.waitUntilAtLeastOneExists(androidx.compose.ui.test.hasTestTag("bazarrUrl") and hasText("32767", substring = true), 10_000)
         rule.waitText("Key: set")
         shot("lh5-bazarr-settings")
+    }
+
+    // ---------- Batch 3 ----------
+
+    /**
+     * Fix match (admins): from the item page's "…" menu, the dialog names the item's files (each
+     * version's) above a title and year search; and again from Library Health's unmatched check.
+     * Nothing is applied (the test server has no TMDB key, so the search reports that).
+     */
+    @Test fun fixMatchShowsFileName() {
+        assumeTrue("phones", !isTv)
+        signInAsAdmin()
+        openLibrary("Movies")
+        rule.waitUntil(15_000) { scrollTo(hasText("00 Preview Test")) }
+        tap("00 Preview Test")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("More actions"), 10_000)
+        rule.onNode(hasContentDescription("More actions")).performClick()
+        tap("Fix match…")
+        rule.waitUntilAtLeastOneExists(androidx.compose.ui.test.hasTestTag("matchFiles"), 10_000)
+        rule.waitText("00 Preview Test (2024).mkv")
+        rule.waitText("00 Preview Test (2024) {edition-Extended Cut}.mkv · Extended Cut")
+        // The title and year are pre-filled, and the search ran.
+        rule.onNode(androidx.compose.ui.test.hasTestTag("matchTitle") and hasText("00 Preview Test")).assertExists()
+        rule.onNode(androidx.compose.ui.test.hasTestTag("matchYear") and hasText("2024")).assertExists()
+        rule.waitUntilAtLeastOneExists(hasText("TMDB", substring = true) or hasContentDescription("Match ", substring = true), 15_000)
+        shot("fm1-item-fix-match")
+        tap("Cancel")
+        back()
+        back()
+        tap("Settings")
+        rule.waitText("Library Health")
+        tap("Library Health")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Unmatched:", substring = true), 15_000)
+        rule.onNode(hasContentDescription("Unmatched:", substring = true)).performClick()
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Fix match for 00 Long Test"), 15_000)
+        rule.onNode(hasContentDescription("Fix match for 00 Long Test")).performClick()
+        rule.waitUntilAtLeastOneExists(androidx.compose.ui.test.hasTestTag("matchFiles"), 10_000)
+        rule.waitText("00 Long Test", substring = true)
+        rule.onNode(hasContentDescription("File ", substring = true)).assertExists()
+        shot("fm2-health-fix-match")
+        tap("Cancel")
+    }
+
+    /** Turns "Allow deleting media files" on or off through the API. */
+    private fun setDeletion(on: Boolean) = adminApi("PATCH", "/settings", """{"library":{"allowMediaDeletion":$on}}""")
+
+    /**
+     * Duplicates (ADM-11): the files compared side by side, the note while deleting is off, the
+     * "Allow deleting media files" switch in Server settings, then Delete… on the copy moves it to
+     * the trash. Needs a duplicate made on the server's disk first: "66 Ghost (android copy)/66 Ghost
+     * (1954) copy.mp4" next to "66 Ghost (1954)", scanned in.
+     */
+    @Test fun duplicatesCompareAndDelete() {
+        assumeTrue("phones", !isTv)
+        assumeTrue("needs the 66 Ghost copy", adminApi("GET", "/library-health/duplicates?limit=500").contains("66 Ghost (1954) copy.mp4"))
+        setDeletion(false)
+        try {
+            signInAsAdmin()
+            tap("Settings")
+            rule.waitText("Library Health")
+            tap("Library Health")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Duplicates:", substring = true), 15_000)
+            rule.onNode(hasContentDescription("Duplicates:", substring = true)).performClick()
+            val copy = hasContentDescription("Duplicate file 66 Ghost (1954) copy.mp4")
+            rule.waitUntil(20_000) { scrollTo(copy) }
+            rule.onAllNodes(copy).onFirst().assertExists()
+            rule.onAllNodes(hasContentDescription("Duplicate file 66 Ghost (1954).mp4")).onFirst().assertExists()
+            rule.waitText("Turn on 'Allow deleting media files' in Settings → Libraries to delete from here.", substring = true)
+            assertTrue(rule.onAllNodes(hasContentDescription("Delete 66 Ghost (1954) copy.mp4")).fetchSemanticsNodes().isEmpty())
+            // The facts compared: resolution, codec, audio channels and more.
+            rule.onAllNodes(hasText("SD · 160×90")).onFirst().assertExists()
+            rule.onAllNodes(hasText("AAC 1.0")).onFirst().assertExists()
+            shot("dup1-compare")
+            back()
+            back()
+            // The switch in Server settings.
+            rule.waitText("Server settings")
+            tap("Server settings")
+            rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasContentDescription("Allow deleting media files"))
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Allow deleting media files") and androidx.compose.ui.test.isEnabled(), 10_000)
+            rule.onNode(hasContentDescription("Allow deleting media files")).performClick()
+            rule.waitUntil(10_000) { adminApi("GET", "/settings").contains("\"allowMediaDeletion\":true") }
+            shot("dup2-setting")
+            back()
+            tap("Library Health")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Duplicates:", substring = true), 15_000)
+            rule.onNode(hasContentDescription("Duplicates:", substring = true)).performClick()
+            val delete = hasContentDescription("Delete 66 Ghost (1954) copy.mp4")
+            rule.waitUntil(20_000) { scrollTo(delete) }
+            rule.onAllNodes(delete).onFirst().performClick()
+            rule.waitText("Delete this file?")
+            rule.waitText("“66 Ghost (1954) copy.mp4”")
+            rule.waitText(".marquee-trash", substring = true)
+            shot("dup3-confirm")
+            tap("Move to trash")
+            rule.waitText("Moved “66 Ghost (1954) copy.mp4” to the trash", 15_000)
+            rule.waitUntil(10_000) { !adminApi("GET", "/library-health/duplicates?limit=500").contains("66 Ghost (1954) copy.mp4") }
+            rule.waitUntil(10_000) { rule.onAllNodes(copy).fetchSemanticsNodes().isEmpty() }
+            shot("dup4-deleted")
+        } finally {
+            setDeletion(false)
+        }
+    }
+
+    /** Sound Journey (MUSIC-4) from a track's menu to another artist's track, then the DJ's renamed modes (MUSIC-6). */
+    @Test fun soundJourneyAndDJ() {
+        assumeTrue("phones", !isTv)
+        connectAndSignIn()
+        openLibrary("Music")
+        rule.waitUntil(20_000) { scrollTo(hasText("Calm Pads", substring = true)) }
+        tap("Calm Pads", substring = true)
+        rule.waitText("Floating")
+        rule.onAllNodes(hasContentDescription("Floating")).onFirst().performClick()
+        rule.waitUntilAtLeastOneExists(hasContentDescription("More actions for Floating 1"), 15_000)
+        rule.onNode(hasContentDescription("More actions for Floating 1")).performClick()
+        tap("Sound Journey…")
+        rule.waitText("Where to?", substring = true)
+        rule.onAllNodes(hasSetTextAction()).onLast().performTextInput("White Room")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Journey to White Room 1"), 15_000)
+        shot("sj1-journey")
+        rule.onNode(hasContentDescription("Journey to White Room 1")).performClick()
+        openNowPlaying()
+        rule.waitText("Sound Journey", 10_000)
+        shot("sj2-now-playing")
+        // The DJ, with its modes' new names.
+        rule.onNode(hasContentDescription("DJ")).performClick()
+        rule.waitText("DJ: Wander")
+        rule.waitText("DJ: Superfan")
+        rule.waitText("DJ: Deep Cuts")
+        rule.waitText("DJ: Same Era")
+        rule.waitText("Similar sound, other artists")
+        shot("sj3-dj-modes")
+        tap("DJ: Wander")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("DJ: Wander"), 5_000)
+        rule.onNode(hasContentDescription("DJ: Wander")).performClick()
+        tap("DJ off")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("DJ"), 5_000)
+        rule.onAllNodes(hasContentDescription("Pause")).onFirst().performClick()
+    }
+
+    /** The track count the Save as playlist dialog shows. */
+    private fun dialogTrackCount(): Int {
+        val texts = rule.onAllNodes(hasText(" tracks", substring = true) or hasText("1 track")).fetchSemanticsNodes()
+            .flatMap { it.config.getOrElse(SemanticsProperties.Text) { emptyList() } }.map { it.text }
+        return texts.firstNotNullOf { Regex("^(\\d+) tracks?$").find(it)?.groupValues?.get(1)?.toInt() }
+    }
+
+    /** The person's playlist with this title (as JSON), checking its track count; then deletes it. */
+    private fun checkAndDeletePlaylist(title: String, count: Int) {
+        val lists = org.json.JSONArray(adminApi("GET", "/playlists", asToken = appToken))
+        val pl = (0 until lists.length()).map { lists.getJSONObject(it) }.firstOrNull { it.getString("title") == title }
+        assertTrue("playlist $title exists", pl != null)
+        try {
+            assertEquals("audio", pl!!.getString("kind"))
+            assertEquals(count, pl.getInt("itemCount"))
+            assertTrue(count > 0)
+        } finally {
+            adminApi("DELETE", "/playlists/${pl!!.getLong("id")}", asToken = appToken)
+        }
+    }
+
+    /**
+     * Save a Muse mix as a playlist: after a prompt, from the library's Muse panel (named after the
+     * prompt), and the whole queue from Now Playing, then Open from the snackbar. Both are checked
+     * through the API and deleted.
+     */
+    @Test fun saveMixAsPlaylist() {
+        connectAndSignIn()
+        openLibrary("Music")
+        rule.waitText("Muse", 20_000)
+        val prompt = "white noise and static hiss"
+        rule.onAllNodes(hasSetTextAction()).onFirst().performTextInput(prompt)
+        rule.onNode(hasText("Play") and hasClickAction() and !hasContentDescription("Play")).performClick()
+        val saveMix = hasText("Save “$prompt” as playlist")
+        rule.waitUntilAtLeastOneExists(saveMix, 20_000)
+        rule.onNode(saveMix).performScrollTo().performClick()
+        rule.waitText("Playlist name")
+        rule.onNode(androidx.compose.ui.test.hasTestTag("playlistTitle") and hasText(prompt)).assertExists()
+        val mixTitle = "Muse mix ${(1000..9999).random()}"
+        rule.onNode(androidx.compose.ui.test.hasTestTag("playlistTitle")).performTextReplacement(mixTitle)
+        val mixCount = dialogTrackCount()
+        shot("sp1-save-mix")
+        tap("Save")
+        rule.waitText("Saved · Open “$mixTitle”", 15_000)
+        checkAndDeletePlaylist(mixTitle, mixCount)
+
+        // The queue from Now Playing (on TV too), named after what's playing.
+        openNowPlaying()
+        rule.onNode(hasContentDescription("Save as playlist")).performClick()
+        rule.waitText("Playlist name")
+        rule.onNode(androidx.compose.ui.test.hasTestTag("playlistTitle") and hasText(prompt)).assertExists()
+        val queueTitle = "Queue mix ${(1000..9999).random()}"
+        rule.onNode(androidx.compose.ui.test.hasTestTag("playlistTitle")).performTextReplacement(queueTitle)
+        val queueCount = dialogTrackCount()
+        tap("Save")
+        rule.waitText("Saved “$queueTitle”", 15_000)
+        shot("sp2-saved-queue")
+        tap("Open")
+        rule.waitText(queueTitle, 15_000)
+        shot("sp3-playlist")
+        checkAndDeletePlaylist(queueTitle, queueCount)
+        (context.applicationContext as MarqueeApplication).let { app -> InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() } }
+    }
+
+    /** Flips Settings → Show audio quality to [on]. */
+    private fun setShowQuality(on: Boolean) {
+        tap("Settings")
+        val sw = hasContentDescription("Show audio quality")
+        rule.waitUntilAtLeastOneExists(sw, 10_000)
+        rule.onNode(sw).performScrollTo()
+        val state = SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, if (on) androidx.compose.ui.state.ToggleableState.On else androidx.compose.ui.state.ToggleableState.Off)
+        if (rule.onAllNodes(sw and state).fetchSemanticsNodes().isEmpty()) rule.onNode(sw).performClick()
+        rule.waitUntilAtLeastOneExists(sw and state, 5_000)
+    }
+
+    /**
+     * Show audio quality (MUSIC-23): off by default; on, a 24-bit/96 kHz FLAC shows its format and
+     * Hi-Res in Now Playing and the album's track list, an MP3 its bitrate; off again, it's gone.
+     * Needs "Test Artist 1/Album 1 (2001)/1-99 Hi-Res Tone.flac" in the music library.
+     */
+    @Test fun showAudioQuality() {
+        assumeTrue("phones", !isTv)
+        connectAndSignIn()
+        val app = context.applicationContext as MarqueeApplication
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.setShowQuality(false) }
+        try {
+            setShowQuality(true)
+            shot("aq1-setting")
+            openLibrary("Music")
+            rule.waitUntil(20_000) { scrollTo(hasText("Test Artist 1")) }
+            tap("Test Artist 1")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Album 1 (2001)"), 15_000)
+            rule.onAllNodes(hasContentDescription("Album 1 (2001)")).onFirst().performClick()
+            rule.waitText("99 Hi-Res Tone")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Album audio quality: FLAC 24/96"), 10_000)
+            rule.waitText("FLAC 24/96")
+            shot("aq2-album")
+            tap("99 Hi-Res Tone")
+            openNowPlaying()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Audio quality: FLAC · 24-bit/96 kHz", substring = true), 15_000)
+            rule.onNode(hasContentDescription("Hi-Res", substring = true)).assertExists()
+            shot("aq3-now-playing-flac")
+            rule.onNode(hasContentDescription("Close Now Playing")).performClick()
+            back()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Album 1"), 15_000)
+            rule.onAllNodes(hasContentDescription("Album 1")).onFirst().performClick()
+            rule.waitText("Song 1-1")
+            rule.waitText("MP3 128")
+            tap("Song 1-1")
+            openNowPlaying()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Audio quality: MP3 · 128 kbps", substring = true), 15_000)
+            assertTrue(rule.onAllNodes(hasContentDescription("Hi-Res", substring = true)).fetchSemanticsNodes().isEmpty())
+            shot("aq4-now-playing-mp3")
+            rule.onNode(hasContentDescription("Close Now Playing")).performClick()
+            // Off again: no badge.
+            setShowQuality(false)
+            openNowPlaying()
+            rule.waitText("Song 1-1")
+            assertTrue(rule.onAllNodes(hasContentDescription("Audio quality:", substring = true)).fetchSemanticsNodes().isEmpty())
+            shot("aq5-off")
+        } finally {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.setShowQuality(false); app.music.stop() }
+        }
     }
 }
