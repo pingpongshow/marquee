@@ -307,7 +307,7 @@ func run() error {
 		Run:         embedder.Run, Progress: embedder.Progress})
 	runEmbed := func() { scheduler.RunNow(ctx, "embeddings") }
 	afterVideoScan.Store(&runEmbed)
-	loud := &loudness.Service{DB: database, FFmpeg: cfg.FFmpegPath, Workers: 4, Analyse: func() bool { return store.Get().Music.LoudnessAnalysis }}
+	loud := &loudness.Service{DB: database, FFmpeg: cfg.FFmpegPath, Workers: 4, Analyse: func() bool { return true }} // volume levelling is always on, so every track is measured
 	scheduler.Register(tasks.Task{ID: "loudness", Name: "Measure music loudness", Window: true,
 		Description: "Reads ReplayGain tags and measures loudness of tracks without them, so volume levelling works for everything.",
 		Run:         loud.Run})

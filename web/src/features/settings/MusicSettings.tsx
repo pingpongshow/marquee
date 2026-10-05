@@ -102,14 +102,12 @@ export function MusicSettings() {
         </Card>
         <Card
           title="Volume levelling"
-          description="Tracks with ReplayGain tags are levelled straight away. Others need their loudness measured once."
+          description="Every track plays at an even volume."
         >
-          <Toggle
-            label="Measure loudness"
-            help="Runs in the maintenance window, a few tracks at a time at low priority."
-            checked={!!s.draft.loudnessAnalysis}
-            onChange={(v) => s.update({ loudnessAnalysis: v })}
-          />
+          <p className="text-sm text-muted">
+            Volume levelling is always on. Tracks without ReplayGain tags have their loudness measured once, in the
+            maintenance window, a few at a time at low priority.
+          </p>
           <div>
             <Button
               size="sm"

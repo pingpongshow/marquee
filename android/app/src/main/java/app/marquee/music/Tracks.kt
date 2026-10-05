@@ -34,11 +34,3 @@ fun trackItem(marquee: Marquee, t: ItemSummary, dj: String? = null): MediaItem =
     )
     .build()
 
-/** Volume levelling (MUSIC-10): which ReplayGain value to apply. */
-enum class Levelling(val label: String) {
-    Off("Off"),
-    Track("Track"),
-    Album("Album"),
-    /** Album gain while an album plays in order, track gain otherwise. */
-    Auto("Smart"),
-}
