@@ -69,6 +69,39 @@ struct LibraryGrid: View {
     private static let page = 120
 
     var body: some View {
+        #if os(tvOS)
+        // The TV hides the navigation bar as the grid scrolls: Muse and the sort and filter
+        // menu stay pinned at the top right instead (Right from the grid's edge reaches them).
+        grid
+            .frame(maxWidth: .infinity)
+            .safeAreaInset(edge: .trailing, alignment: .top, spacing: 0) {
+                VStack(spacing: 30) {
+                    museLink
+                    sortMenu
+                }
+                .labelStyle(.iconOnly)
+                .padding(.top, 30)
+                .padding(.trailing, 50)
+                // The full height, so Right from any row of the grid lands here.
+                .frame(maxHeight: .infinity, alignment: .top)
+                .focusSection()
+            }
+            .navigationTitle(title)
+            .task(id: "\(sort)-\(unwatchedOnly)-\(ratedOnly)-\(showCollections)-\(genre ?? "")-\(decade ?? 0)") { await reload() }
+            .task { if facets == nil { facets = try? await app.filters(library: libraryID, type: type) } }
+        #else
+        grid
+            .navigationTitle(title)
+            .toolbar {
+                ToolbarItem { museLink }
+                ToolbarItem { sortMenu }
+            }
+            .task(id: "\(sort)-\(unwatchedOnly)-\(ratedOnly)-\(showCollections)-\(genre ?? "")-\(decade ?? 0)") { await reload() }
+            .task { if facets == nil { facets = try? await app.filters(library: libraryID, type: type) } }
+        #endif
+    }
+
+    private var grid: some View {
         ScrollView {
             if let error { ErrorBanner(message: error).padding() }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: minWidth, maximum: minWidth * 1.4), spacing: gap, alignment: .top)], spacing: gap) {
@@ -87,44 +120,41 @@ struct LibraryGrid: View {
                                        description: Text(ratedOnly || unwatchedOnly ? "Try turning the filter off." : "This library is empty, or still being scanned."))
             }
         }
-        .navigationTitle(title)
-        .toolbar {
-            if [.movies, .shows, .anime, .videos].contains(library._type) {
-                // Muse for this library (USER-15).
-                ToolbarItem {
-                    NavigationLink(value: Route.museVideo(library: libraryID)) { Label("Muse", systemImage: "sparkles") }
-                }
-            }
-            ToolbarItem {
-                Menu {
-                    if library._type == .movies {
-                        Picker("Show", selection: $showCollections) {
-                            Text("Movies").tag(false)
-                            Text("Collections").tag(true)
-                        }
-                    }
-                    Picker("Sort", selection: $sort) {
-                        Text("Title").tag(ItemSort.title)
-                        Text("Recently added").tag(ItemSort._hyphen_added)
-                        Text("Release date").tag(ItemSort._hyphen_released)
-                        Text("Rating").tag(ItemSort._hyphen_rating)
-                        if !showCollections { Text("My rating").tag(ItemSort._hyphen_myRating) }
-                        Text(isMusic ? "Recently played" : "Last watched").tag(ItemSort._hyphen_viewed)
-                        Text("Random").tag(ItemSort.random)
-                    }
-                    Toggle(isMusic ? "Unplayed only" : "Unwatched only", isOn: $unwatchedOnly)
-                    if !showCollections {
-                        Toggle("Rated 4★+", isOn: $ratedOnly)
-                        FacetPickers(facets: facets, genre: $genre, decade: $decade)
-                    }
-                } label: {
-                    Label("Sort and filter", systemImage: "line.3.horizontal.decrease.circle")
-                }
-                .accessibilityIdentifier("sortMenu")
-            }
+    }
+
+    @ViewBuilder private var museLink: some View {
+        if [.movies, .shows, .anime, .videos].contains(library._type) {
+            // Muse for this library (USER-15).
+            NavigationLink(value: Route.museVideo(library: libraryID)) { Label("Muse", systemImage: "sparkles") }
         }
-        .task(id: "\(sort)-\(unwatchedOnly)-\(ratedOnly)-\(showCollections)-\(genre ?? "")-\(decade ?? 0)") { await reload() }
-        .task { if facets == nil { facets = try? await app.filters(library: libraryID, type: type) } }
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            if library._type == .movies {
+                Picker("Show", selection: $showCollections) {
+                    Text("Movies").tag(false)
+                    Text("Collections").tag(true)
+                }
+            }
+            Picker("Sort", selection: $sort) {
+                Text("Title").tag(ItemSort.title)
+                Text("Recently added").tag(ItemSort._hyphen_added)
+                Text("Release date").tag(ItemSort._hyphen_released)
+                Text("Rating").tag(ItemSort._hyphen_rating)
+                if !showCollections { Text("My rating").tag(ItemSort._hyphen_myRating) }
+                Text(isMusic ? "Recently played" : "Last watched").tag(ItemSort._hyphen_viewed)
+                Text("Random").tag(ItemSort.random)
+            }
+            Toggle(isMusic ? "Unplayed only" : "Unwatched only", isOn: $unwatchedOnly)
+            if !showCollections {
+                Toggle("Rated 4★+", isOn: $ratedOnly)
+                FacetPickers(facets: facets, genre: $genre, decade: $decade)
+            }
+        } label: {
+            Label("Sort and filter", systemImage: "line.3.horizontal.decrease.circle")
+        }
+        .accessibilityIdentifier("sortMenu")
     }
 
     #if os(tvOS)

@@ -251,6 +251,41 @@ final class MarqueeTVUITests: XCTestCase {
         XCTAssertTrue(find.waitForExistence(timeout: 5))
     }
 
+    /// A library's Muse and sort-and-filter buttons stay at the top right while the grid
+    /// scrolls (tvOS hides the navigation bar), and Right from the grid reaches them.
+    func testLibraryButtonsStayPinned() throws {
+        _ = try signInTemporaryUser()
+        remote.press(.up)
+        let tab = app.buttons["Movies"].firstMatch
+        XCTAssertTrue(tab.waitForExistence(timeout: 10))
+        focus(tab, direction: .right, tries: 6)
+        remote.press(.select)
+        XCTAssertTrue(app.descendants(matching: .any)["libraryGrid"].waitForExistence(timeout: 10))
+        remote.press(.down)
+        let sortMenu = app.descendants(matching: .any).matching(identifier: "sortMenu").firstMatch
+        let muse = app.buttons["Muse"].firstMatch
+        XCTAssertTrue(sortMenu.waitForExistence(timeout: 5))
+        // Well down the grid.
+        for _ in 0..<8 { remote.press(.down) }
+        sleep(1)
+        shot("tv-library-scrolled")
+        let window = app.windows.firstMatch.frame
+        for b in [muse, sortMenu] {
+            XCTAssertTrue(b.exists, "\(b) still there")
+            XCTAssertTrue(b.frame.minY >= 0 && b.frame.maxY < window.height * 0.5 && b.frame.minX > window.width * 0.7,
+                          "\(b) pinned top right: \(b.frame) in \(window)")
+        }
+        // Right along the row reaches the sort menu (XCUITest doesn't report focus on these
+        // buttons, so open it): five columns, then the button.
+        for _ in 0..<6 { remote.press(.right) }
+        remote.press(.select)
+        sleep(1)
+        shot("tv-library-menu")
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Recently added")).firstMatch.waitForExistence(timeout: 5), "the sort and filter menu opened")
+        remote.press(.menu)
+        shot("tv-library-button-focused")
+    }
+
     // MARK: - Playback and profile extras on the TV (USER-12, PLAY-17, PLAY-19)
 
     /// Calls the server; returns the JSON object.
