@@ -93,7 +93,7 @@ func TestTranscoderCopiesEAC3(t *testing.T) {
 		t.Skipf("can't build sample: %v %s", err, out)
 	}
 	d := Decision{Method: Transcode, VideoCodec: "h264", Height: 360, VideoKbps: 2000, AudioCopy: true}
-	tr := &Transcoder{FFmpeg: ff, Job: Job{Input: in, Decision: d, VideoIndex: 0, AudioIndex: 1, SubIndex: -1, Dir: filepath.Join(dir, "s"), Preset: "speed"},
+	tr := &Transcoder{FFmpeg: ff, Job: Job{Input: in, Decision: d, VideoIndex: 0, AudioIndex: 1, AudioCodec: "eac3", SubIndex: -1, Dir: filepath.Join(dir, "s"), Preset: "speed"},
 		Encoders: []string{"software"}, TotalSegments: SegmentCount(8_000), ThrottleAhead: 20}
 	defer tr.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -103,5 +103,22 @@ func TestTranscoderCopiesEAC3(t *testing.T) {
 	}
 	if _, err := tr.Segment(ctx, 0); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// delay_moov only for copied AC3/EAC3: elsewhere its edit list shifted timestamps differently
+// after each restart and copied HEVC jumped at segment boundaries.
+func TestDelayMoovOnlyForDolbyCopy(t *testing.T) {
+	for _, c := range []struct {
+		codec string
+		copy  bool
+		want  bool
+	}{{"eac3", true, true}, {"ac3", true, true}, {"aac", true, false}, {"eac3", false, false}} {
+		j := Job{Input: "in.mkv", Decision: Decision{Method: DirectStream, VideoCopy: true, AudioCopy: c.copy, AudioCodec: "aac", AudioChannels: 2},
+			VideoIndex: 0, AudioIndex: 1, AudioCodec: c.codec, VideoCodec: "hevc", SubIndex: -1, Encoder: "software"}
+		got := strings.Contains(strings.Join(j.Args(), " "), "delay_moov")
+		if got != c.want {
+			t.Errorf("%s copy=%v: delay_moov %v, want %v", c.codec, c.copy, got, c.want)
+		}
 	}
 }
