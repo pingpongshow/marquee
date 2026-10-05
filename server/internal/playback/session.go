@@ -545,7 +545,7 @@ func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 			}
 		}
 	} else if r.SubtitleStreamID == 0 {
-		sub = autoSubtitle(subs, r, audio, func(st *stream) (string, bool) { return st.lang, st.forced })
+		sub = autoSubtitle(textFirst(subs, func(st stream) string { return st.codec }), r, audio, func(st *stream) (string, bool) { return st.lang, st.forced })
 	}
 	s.HLSSubs = r.Profile.HLSSubtitles
 	for _, st := range subs {
@@ -573,6 +573,16 @@ func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 	}
 	s.positionMS = s.StartMS
 	return nil
+}
+
+// textFirst orders text subtitles before image ones (stable otherwise): a client shows text
+// itself, while an image subtitle has to be burned in, which forces a video transcode.
+func textFirst[T any](subs []T, codec func(T) string) []T {
+	out := append([]T(nil), subs...)
+	sort.SliceStable(out, func(i, j int) bool {
+		return !(&SubtitleStream{Codec: codec(out[i])}).IsImage() && (&SubtitleStream{Codec: codec(out[j])}).IsImage()
+	})
+	return out
 }
 
 // autoSubtitle applies the user's subtitle mode: forced (only forced tracks in the audio's
