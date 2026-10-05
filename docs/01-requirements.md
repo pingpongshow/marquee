@@ -1,6 +1,6 @@
 # Requirements
 
-_Last updated: 2026-10-02_
+_Last updated: 2026-10-04_
 
 Priority key:
 - **P0:** required for the first usable release.
@@ -52,7 +52,7 @@ Priority key:
 | PLAY-5 | Hardware acceleration: NVIDIA NVENC/NVDEC first (production has an RTX 5090), then Intel QSV, then automatic software fallback. AMD VAAPI is P2. | P0 |
 | PLAY-6 | HDR→SDR tone mapping when transcoding for SDR clients. No 4K/HDR/DV in the library yet, but it must be supported later (schema and decision engine model HDR/DV from day one). | P1 |
 | PLAY-7 | Subtitles: pass through text subtitles as WebVTT. Deliver ASS/SSA styled (with embedded fonts) to clients that can render it. Burn in image subtitles (PGS/VobSub). | P0 |
-| PLAY-8 | Audio and subtitle track selection, with per-user language preferences and "remember per show". | P0 |
+| PLAY-8 | Audio and subtitle track selection, with per-user language preferences and "remember per show". Automatic selection prefers a text subtitle over an image one in the same language, so the video needn't be transcoded to burn it in. | P0 |
 | PLAY-9 | **Automatic quality selection.** The server picks the best bitrate per session from the network class (local or remote), measured client bandwidth, server settings, user limits and client settings. See §3a. | P0 |
 | PLAY-15 | Adaptive bitrate during playback (implemented, D53): multi-rung HLS ladder for remote sessions. The player switches rungs as throughput changes, and the server re-evaluates the session ceiling when bandwidth or the number of concurrent remote streams changes. | P0 |
 | PLAY-16 | Encoder capacity awareness: track active NVENC sessions (the consumer driver limit is about 8 concurrent encodes), overflow to QSV and then CPU, and queue or downgrade rather than fail. | P0 |
