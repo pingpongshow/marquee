@@ -392,7 +392,7 @@ struct ItemDetailView: View {
         let streams = chosen?.files.first?.streams ?? []
         let audio = streams.filter { $0.kind == .audio }
         let subs = streams.filter { $0.kind == .subtitle }
-        if audio.count > 1 || !subs.isEmpty || versions.count > 1 || (!isTV && (d.type == .movie || d.type == .episode)) {
+        if audio.count > 1 || !subs.isEmpty || versions.count > 1 || d.type == .movie || d.type == .episode {
             // Uniform one-line chips; when the row is too narrow, each shows its icon and a
             // short value; never a word broken over two lines.
             ViewThatFits(in: .horizontal) {
@@ -404,12 +404,14 @@ struct ItemDetailView: View {
             }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("trackChips")
-            .sheet(isPresented: $findingSubs) {
-                SubtitleSearchSheet(itemID: d.id, onAdded: { stream in
-                    subtitleID = stream
-                    Task { await refresh() }
-                }, onBazarr: { Task { await refresh() } })
+            #if os(tvOS)
+            // Full screen on the TV (a sheet is a narrow card); the remote's Back closes it.
+            .fullScreenCover(isPresented: $findingSubs) {
+                findSubtitles(d).background(Color.black.ignoresSafeArea())
             }
+            #else
+            .sheet(isPresented: $findingSubs) { findSubtitles(d) }
+            #endif
             .onChange(of: fileID) {
                 audioID = nil
                 subtitleID = nil
@@ -418,6 +420,13 @@ struct ItemDetailView: View {
             .onChange(of: audioID) { PendingTracks.shared.set(item: d.id, audio: audioID, subtitle: subtitleID, file: fileID) }
             .onChange(of: subtitleID) { PendingTracks.shared.set(item: d.id, audio: audioID, subtitle: subtitleID, file: fileID) }
         }
+    }
+
+    private func findSubtitles(_ d: ItemDetail) -> some View {
+        SubtitleSearchSheet(itemID: d.id, onAdded: { stream in
+            subtitleID = stream
+            Task { await refresh() }
+        }, onBazarr: { Task { await refresh() } })
     }
 
     private func chipRow(_ d: ItemDetail, versions: [Schemas.MediaVersion], chosen: Schemas.MediaVersion?,
@@ -460,7 +469,6 @@ struct ItemDetailView: View {
                 }
                 .accessibilityIdentifier("trackChip.subtitles")
             }
-            #if os(iOS)
             if d.type == .movie || d.type == .episode {
                 Button { findingSubs = true } label: {
                     trackChip(nil, "magnifyingglass", short ? "Find" : "Find subtitles", short: short)
@@ -469,7 +477,6 @@ struct ItemDetailView: View {
                 .accessibilityLabel("Find subtitles")
                 .accessibilityIdentifier("trackChip.find")
             }
-            #endif
         }
         .fixedSize()
     }
@@ -485,7 +492,7 @@ struct ItemDetailView: View {
         }
         .font(.footnote.weight(.medium))
         .lineLimit(1)
-        .frame(maxWidth: short ? 140 : 240)
+        .frame(maxWidth: short ? chipShortWidth : chipWidth)
         .fixedSize(horizontal: false, vertical: true)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -498,8 +505,13 @@ struct ItemDetailView: View {
 
     #if os(tvOS)
     private let chipHeight: CGFloat = 50
+    // TV text is about twice the size: "Subtitles: Automatic" needs the room.
+    private let chipWidth: CGFloat = 480
+    private let chipShortWidth: CGFloat = 260
     #else
     private let chipHeight: CGFloat = 32
+    private let chipWidth: CGFloat = 240
+    private let chipShortWidth: CGFloat = 140
     #endif
 
     private func versionLabel(_ v: Schemas.MediaVersion) -> String {

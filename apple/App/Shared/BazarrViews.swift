@@ -75,12 +75,26 @@ struct BazarrPanel: View {
                     .accessibilityLabel("\(name), downloaded")
                 Spacer()
             } else {
+                let key = "lang-\(l.code2)-\(l.forced)-\(l.hi)"
+                #if os(tvOS)
+                Button { download(code: l.code2, name: name, forced: l.forced, hi: l.hi, key: key) } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(name)
+                            Text("Wanted · Download").font(.caption).foregroundStyle(.orange)
+                        }
+                        Spacer()
+                        if busy == key { ProgressView() } else { Image(systemName: "arrow.down.circle") }
+                    }
+                }
+                .disabled(busy != nil)
+                .accessibilityLabel("Download \(name)")
+                #else
                 VStack(alignment: .leading, spacing: 2) {
                     Text(name)
                     Text("Wanted").font(.caption).foregroundStyle(.orange)
                 }
                 Spacer()
-                let key = "lang-\(l.code2)-\(l.forced)-\(l.hi)"
                 if busy == key {
                     ProgressView()
                 } else {
@@ -89,25 +103,38 @@ struct BazarrPanel: View {
                         .disabled(busy != nil)
                         .accessibilityLabel("Download \(name)")
                 }
+                #endif
             }
         }
     }
 
     private func candidateRow(_ c: BazarrCandidate) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(c.release?.isEmpty == false ? c.release! : c.provider).lineLimit(2)
-                HStack(spacing: 8) {
-                    Text(c.provider)
-                    Text("Score \(c.score)")
-                    Text(languageName(c.language))
-                    if c.hi == true { Text("SDH") }
-                    if c.forced == true { Text("Forced") }
-                }
-                .font(.caption).foregroundStyle(.secondary)
+        let key = "pick-\(c.provider)-\(c.subtitle)"
+        let info = VStack(alignment: .leading, spacing: 3) {
+            Text(c.release?.isEmpty == false ? c.release! : c.provider).lineLimit(2)
+            HStack(spacing: 8) {
+                Text(c.provider)
+                Text("Score \(c.score)")
+                Text(languageName(c.language))
+                if c.hi == true { Text("SDH") }
+                if c.forced == true { Text("Forced") }
             }
+            .font(.caption).foregroundStyle(.secondary)
+        }
+        #if os(tvOS)
+        return Button { pick(c, key: key) } label: {
+            HStack {
+                info
+                Spacer()
+                if busy == key { ProgressView() } else { Image(systemName: "arrow.down.circle") }
+            }
+        }
+        .disabled(busy != nil)
+        .accessibilityLabel("Download from \(c.provider)")
+        #else
+        return HStack {
+            info
             Spacer()
-            let key = "pick-\(c.provider)-\(c.subtitle)"
             if busy == key {
                 ProgressView()
             } else {
@@ -117,6 +144,7 @@ struct BazarrPanel: View {
                     .accessibilityLabel("Download from \(c.provider)")
             }
         }
+        #endif
     }
 
     private func load() async {
@@ -172,6 +200,7 @@ struct BazarrPanel: View {
     }
 }
 
+#if os(iOS)
 /// Bazarr on its own (library health's "Download with Bazarr").
 struct BazarrSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -192,3 +221,4 @@ struct BazarrSheet: View {
         }
     }
 }
+#endif

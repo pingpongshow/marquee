@@ -1,7 +1,8 @@
 import MarqueeKit
 import SwiftUI
 
-/// Searches OpenSubtitles for a movie or episode and adds the chosen file (PLAY-7).
+/// Finds subtitles for a movie or episode: Bazarr when it manages the title (META-12), and
+/// OpenSubtitles, adding the chosen file (PLAY-7).
 struct SubtitleSearchSheet: View {
     @Environment(AppSession.self) private var app
     @Environment(\.dismiss) private var dismiss
@@ -22,14 +23,15 @@ struct SubtitleSearchSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                #if os(iOS)
                 // Bazarr first, when it manages this title (META-12).
                 BazarrPanel(itemID: itemID, onArrived: onBazarr)
-                #endif
                 Section("OpenSubtitles") {
                     Picker("Language", selection: $language) {
                         ForEach(languages, id: \.0) { Text($0.1).tag($0.0) }
                     }
+                    #if os(tvOS)
+                    .pickerStyle(.navigationLink) // a segmented row can't hold 13 languages
+                    #endif
                     if let error { Text(error).foregroundStyle(.red) }
                     if let results {
                         if results.isEmpty { Text("No subtitles found in this language.").foregroundStyle(.secondary) }
@@ -58,7 +60,9 @@ struct SubtitleSearchSheet: View {
                 }
             }
             .navigationTitle("Find Subtitles")
+            #if os(iOS)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
+            #endif
             .task(id: language) {
                 results = nil
                 error = nil // the last language's error doesn't hide this one's results
