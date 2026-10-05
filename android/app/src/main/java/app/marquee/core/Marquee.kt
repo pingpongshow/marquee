@@ -40,6 +40,16 @@ class Marquee(context: Context) {
     enum class State { NoServer, Connecting, SignedOut, SignedIn }
 
     val store = ServerStore(context)
+    private val appContext: Context = context.applicationContext
+    /** Changes made while the server couldn't be reached, sent when it's back (USER-18). */
+    val sync: OfflineSync by lazy { OfflineSync(appContext, this) }
+    /**
+     * Test hook (debug builds only): every request fails as if the network were down, while the
+     * app keeps its address, so UI tests can make changes offline and then sync them.
+     */
+    @Volatile var simulateOffline = false
+        set(value) { field = value && debuggable }
+    private val debuggable = (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
     /** For fire-and-forget calls that must outlive a screen (progress reports, stopping sessions). */
     val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
     val isTv: Boolean = context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
@@ -63,6 +73,7 @@ class Marquee(context: Context) {
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .addInterceptor { chain ->
+            if (simulateOffline) throw java.io.IOException("Offline (test)")
             val t = token
             val req = if (t != null) chain.request().newBuilder().header("Authorization", "Bearer $t").build() else chain.request()
             chain.proceed(req)
@@ -90,6 +101,12 @@ class Marquee(context: Context) {
     val isRemote: Boolean get() = info?.networkClass == NetworkClass.REMOTE
     /** Signed in but the server can't be reached. */
     val isOffline: Boolean get() = token != null && baseUrl == null
+
+    /** Who is signed in on the current server, even offline (remembered from the last sign-in). */
+    val userId: Long? get() = me.value?.id ?: server?.let { store.userId(it.id) }
+
+    /** Screens that follow [connection] reload (after offline changes were sent). */
+    fun refresh() { _connection.value++ }
 
     val device: DeviceInfo
         get() = DeviceInfo(
@@ -163,7 +180,7 @@ class Marquee(context: Context) {
         _connection.value++
         if (token == null) { _state.value = State.SignedOut; return }
         val me = withContext(Dispatchers.IO) { runCatching { auth.getMe() } }
-        me.onSuccess { _me.value = it; _state.value = State.SignedIn }
+        me.onSuccess { _me.value = it; store.setUserId(record.id, it.id); _state.value = State.SignedIn }
             .onFailure { e ->
                 if ((e as? app.marquee.api.infrastructure.ClientException)?.statusCode == 401) signOutLocally() else _state.value = State.SignedIn
             }
@@ -182,7 +199,7 @@ class Marquee(context: Context) {
 
     suspend fun finish(result: AuthResult) {
         token = result.token
-        server?.let { store.setToken(it.id, result.token) }
+        server?.let { store.setToken(it.id, result.token); store.setUserId(it.id, result.user.id) }
         _me.value = withContext(Dispatchers.IO) { runCatching { auth.getMe() }.getOrNull() }
         _state.value = State.SignedIn
     }
@@ -194,7 +211,7 @@ class Marquee(context: Context) {
 
     private fun signOutLocally() {
         token = null
-        server?.let { store.setToken(it.id, null) }
+        server?.let { store.setToken(it.id, null); store.setUserId(it.id, null) }
         _me.value = null
         _state.value = State.SignedOut
     }

@@ -83,7 +83,6 @@ struct CarModeView: View {
     @State private var mix: Station?
     @State private var busy: String?
     @State private var error: String?
-    @State private var liked: [Int64: Bool] = [:]
     /// Button scale for the space there is (the transport row is 420 pt at full size).
     @State private var scale: CGFloat = 1
     @State private var tileHeight: CGFloat = 64
@@ -162,10 +161,10 @@ struct CarModeView: View {
             big(music.playing ? "pause.fill" : "play.fill", music.playing ? "Pause" : "Play", size: 120 * scale) { music.toggle() }
             big("forward.fill", "Next track", size: 84 * scale) { music.next() }
             if let t = music.current?.item {
-                let on = liked[t.id] ?? ((t.userRating ?? 0) >= 10)
+                let rating = RatingStore.shared.rating(t.id, t.userRating)
+                let on = (rating ?? 0) >= 10
                 big(on ? "heart.fill" : "heart", on ? "Unlike" : "Like", size: 64 * scale, tint: on ? Color.marqueeGold : .white) {
-                    liked[t.id] = !on
-                    Task { try? await app.rate(t.id, on ? nil : 10) }
+                    RatingStore.shared.rate(t.id, on ? nil : 10, was: rating, app: app)
                 }
             }
         }

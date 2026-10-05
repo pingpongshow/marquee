@@ -4838,6 +4838,8 @@ export interface components {
     parameters: {
         UserId: number;
         ItemId: number;
+        /** @description When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. */
+        ChangedAt: string;
         /** @description Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. */
         ImageWidth: number;
         /** @description Sort order. Prefix with "-" for descending. */
@@ -6561,7 +6563,10 @@ export interface operations {
     };
     markWatched: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. */
+                at?: components["parameters"]["ChangedAt"];
+            };
             header?: never;
             path: {
                 itemId: components["parameters"]["ItemId"];
@@ -6583,7 +6588,10 @@ export interface operations {
     };
     markUnwatched: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. */
+                at?: components["parameters"]["ChangedAt"];
+            };
             header?: never;
             path: {
                 itemId: components["parameters"]["ItemId"];
@@ -6806,7 +6814,10 @@ export interface operations {
     };
     addToWatchlist: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. */
+                at?: components["parameters"]["ChangedAt"];
+            };
             header?: never;
             path: {
                 itemId: components["parameters"]["ItemId"];
@@ -6828,7 +6839,10 @@ export interface operations {
     };
     removeFromWatchlist: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. */
+                at?: components["parameters"]["ChangedAt"];
+            };
             header?: never;
             path: {
                 itemId: components["parameters"]["ItemId"];
@@ -9568,6 +9582,11 @@ export interface operations {
             content: {
                 "application/json": {
                     rating?: number | null;
+                    /**
+                     * Format: date-time
+                     * @description When the change was made (apps send changes made offline later); an older change than the last one is ignored.
+                     */
+                    at?: string;
                 };
             };
         };
@@ -9621,6 +9640,11 @@ export interface operations {
             content: {
                 "application/json": {
                     comment: string;
+                    /**
+                     * Format: date-time
+                     * @description When the change was made; an older change than the last one is ignored.
+                     */
+                    at?: string;
                 };
             };
         };
@@ -9639,7 +9663,10 @@ export interface operations {
     };
     deleteReview: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. */
+                at?: components["parameters"]["ChangedAt"];
+            };
             header?: never;
             path: {
                 itemId: components["parameters"]["ItemId"];

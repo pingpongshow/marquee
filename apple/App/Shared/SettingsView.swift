@@ -40,6 +40,7 @@ struct SettingsView: View {
                 Button("Switch Profile") { switching = true }
                 Button("Sign Out", role: .destructive) { Task { await app.signOut() } }
             }
+            PendingSyncSection()
             Section {
                 LabeledContent("Server", value: app.server?.name ?? "")
                 LabeledContent("Connected via", value: app.isRemote ? "Tailscale (away)" : "Home network")

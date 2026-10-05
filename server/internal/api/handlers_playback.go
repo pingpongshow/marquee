@@ -247,6 +247,12 @@ func (h *Handlers) MarkWatched(ctx context.Context, req MarkWatchedRequestObject
 	if err := h.Items.Visible(ctx, access(ctx), req.ItemId); err != nil {
 		return MarkWatched404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
+	// A change made offline and sent later only applies if nothing newer happened (USER-18).
+	if fresh, err := h.Items.Fresh(ctx, sess.User.ID, req.ItemId, "watched", req.Params.At); err != nil {
+		return nil, internal(ctx, "markWatched", err)
+	} else if !fresh {
+		return MarkWatched204Response{}, nil
+	}
 	if err := h.Items.SetWatched(ctx, sess.User.ID, req.ItemId, true); err != nil {
 		return nil, internal(ctx, "markWatched", err)
 	}
@@ -260,6 +266,12 @@ func (h *Handlers) MarkUnwatched(ctx context.Context, req MarkUnwatchedRequestOb
 	}
 	if err := h.Items.Visible(ctx, access(ctx), req.ItemId); err != nil {
 		return MarkUnwatched404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
+	}
+	// A change made offline and sent later only applies if nothing newer happened (USER-18).
+	if fresh, err := h.Items.Fresh(ctx, sess.User.ID, req.ItemId, "watched", req.Params.At); err != nil {
+		return nil, internal(ctx, "markUnwatched", err)
+	} else if !fresh {
+		return MarkUnwatched204Response{}, nil
 	}
 	if err := h.Items.SetWatched(ctx, sess.User.ID, req.ItemId, false); err != nil {
 		return nil, internal(ctx, "markUnwatched", err)

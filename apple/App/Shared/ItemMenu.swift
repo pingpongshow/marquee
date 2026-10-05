@@ -52,14 +52,15 @@ struct ItemMenuItems: View {
             NavigationLink(value: Route.item(artist)) { Label("Go to Artist", systemImage: "music.mic") }
         }
         if showsLibraryState, [.movie, .show, .episode, .video].contains(item._type) {
-            let listed = item.watchlisted ?? false
+            let listed = OfflineSync.shared.pendingWatchlist(item.id) ?? item.watchlisted ?? false
             Button { ActionError.run { try await app.setWatchlist(item.id, !listed) } } label: {
                 Label(listed ? "Remove from Watchlist" : "Add to Watchlist", systemImage: listed ? "bookmark.slash" : "bookmark")
             }
         }
         if showsLibraryState, item.isPlayableVideo || item._type == .show || item._type == .season {
-            Button { ActionError.run { try await app.setWatched(item.id, !item.watched) } } label: {
-                Label(item.watched ? "Mark Unwatched" : "Mark Watched", systemImage: item.watched ? "circle" : "checkmark.circle")
+            let watched = OfflineSync.shared.pendingWatched(item.id) ?? item.watched
+            Button { ActionError.run { try await app.setWatched(item.id, !watched) } } label: {
+                Label(watched ? "Mark Unwatched" : "Mark Watched", systemImage: watched ? "circle" : "checkmark.circle")
             }
         }
     }

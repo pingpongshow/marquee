@@ -21,7 +21,11 @@ class MarqueeApplication : Application(), SingletonImageLoader.Factory {
         // A player for remote control while in the foreground (and while music plays).
         remote.attach()
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
-            override fun onActivityStarted(activity: android.app.Activity) = remote.activityStarted()
+            override fun onActivityStarted(activity: android.app.Activity) {
+                remote.activityStarted()
+                // Back in the foreground: send what was changed offline (USER-18).
+                if (marquee.state.value == Marquee.State.SignedIn) marquee.scope.launch { marquee.sync.syncNow() }
+            }
             override fun onActivityStopped(activity: android.app.Activity) = remote.activityStopped()
             override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {}
             override fun onActivityResumed(activity: android.app.Activity) {}
@@ -29,13 +33,13 @@ class MarqueeApplication : Application(), SingletonImageLoader.Factory {
             override fun onActivitySaveInstanceState(activity: android.app.Activity, outState: android.os.Bundle) {}
             override fun onActivityDestroyed(activity: android.app.Activity) {}
         })
-        // Back online after being offline: reconnect and send plays made meanwhile.
+        // Back online after being offline: reconnect and send what was changed meanwhile (USER-18).
         getSystemService(android.net.ConnectivityManager::class.java).registerDefaultNetworkCallback(object : android.net.ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: android.net.Network) {
-                if (!marquee.isOffline || marquee.state.value != Marquee.State.SignedIn) return
+                if (marquee.state.value != Marquee.State.SignedIn) return
                 marquee.scope.launch {
-                    marquee.reconnect(quiet = true)
-                    downloads.flushProgress()
+                    if (marquee.isOffline) marquee.reconnect(quiet = true)
+                    marquee.sync.syncNow()
                 }
             }
         })

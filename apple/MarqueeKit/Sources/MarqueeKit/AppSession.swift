@@ -74,6 +74,8 @@ public final class AppSession {
                 imageKey = key
                 if let id = server?.id { ServerStore.setImageKey(key, for: id) }
             }
+            // Changes made offline are tagged with this person (USER-18).
+            if let user = me?.id, let id = server?.id { OfflineSync.rememberUser(user, server: id) }
         }
     }
     /// The image key (D85) for the signed-in person, remembered across launches.
@@ -102,6 +104,7 @@ public final class AppSession {
     @ObservationIgnored private var urlSessions: [URLSession] = []
 
     public init() {
+        OfflineSync.shared.app = self
         if let id = ServerStore.currentServerID, let s = ServerStore.servers.first(where: { $0.id == id }) {
             server = s
             token = ServerStore.token(for: s.id)
@@ -161,7 +164,8 @@ public final class AppSession {
         let client = Client(serverURL: base.appending(path: "api/v1"),
                             configuration: .init(dateTranscoder: FlexibleDateTranscoder()),
                             transport: URLSessionTransport(configuration: .init(session: session)),
-                            middlewares: [AuthMiddleware(token: { [box = tokenBox] in box.token })])
+                            middlewares: [AuthMiddleware(token: { [box = tokenBox] in box.token })]
+                                + (OfflineSync.simulateOffline ? [OfflineChangesMiddleware()] : []))
         return (client, session)
     }
 
@@ -280,6 +284,8 @@ public final class AppSession {
         case .ok(let ok):
             if let user = try? ok.body.json { me = user }
             state = .signedIn
+            // Back in touch: send what was changed while offline (USER-18).
+            Task { await OfflineSync.shared.flush() }
         case .unauthorized:
             signOutLocally()
         default:
@@ -297,7 +303,10 @@ public final class AppSession {
         me = auth.user
         state = .signedIn
         // The image key only comes with /me.
-        Task { await refreshMe() }
+        Task {
+            await refreshMe()
+            await OfflineSync.shared.flush()
+        }
     }
 
     public func signIn(username: String, password: String, totpCode: String? = nil) async throws {

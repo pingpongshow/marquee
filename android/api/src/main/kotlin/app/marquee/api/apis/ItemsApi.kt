@@ -156,6 +156,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * Save to your watchlist (USER-8). Movies and episodes leave it once watched.
      * 
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return void
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -164,8 +165,8 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @throws ServerException If the API returns a server error response
      */
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun addToWatchlist(itemId: kotlin.Long) : Unit {
-        val localVarResponse = addToWatchlistWithHttpInfo(itemId = itemId)
+    fun addToWatchlist(itemId: kotlin.Long, at: java.time.OffsetDateTime? = null) : Unit {
+        val localVarResponse = addToWatchlistWithHttpInfo(itemId = itemId, at = at)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> Unit
@@ -187,13 +188,14 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * Save to your watchlist (USER-8). Movies and episodes leave it once watched.
      * 
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return ApiResponse<Unit?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Throws(IllegalStateException::class, IOException::class)
-    fun addToWatchlistWithHttpInfo(itemId: kotlin.Long) : ApiResponse<Unit?> {
-        val localVariableConfig = addToWatchlistRequestConfig(itemId = itemId)
+    fun addToWatchlistWithHttpInfo(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : ApiResponse<Unit?> {
+        val localVariableConfig = addToWatchlistRequestConfig(itemId = itemId, at = at)
 
         return request<Unit, Unit>(
             localVariableConfig
@@ -204,11 +206,17 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * To obtain the request config of the operation addToWatchlist
      *
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return RequestConfig
      */
-    fun addToWatchlistRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+    fun addToWatchlistRequestConfig(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : RequestConfig<Unit> {
         val localVariableBody = null
-        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (at != null) {
+                    put("at", listOf(parseDateToQueryString<java.time.OffsetDateTime>(at)))
+                }
+            }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
         localVariableHeaders["Accept"] = "application/json"
 
@@ -826,6 +834,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * 
      * @param itemId 
      * @param userId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return void
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -834,8 +843,8 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @throws ServerException If the API returns a server error response
      */
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun deleteReview(itemId: kotlin.Long, userId: kotlin.Long) : Unit {
-        val localVarResponse = deleteReviewWithHttpInfo(itemId = itemId, userId = userId)
+    fun deleteReview(itemId: kotlin.Long, userId: kotlin.Long, at: java.time.OffsetDateTime? = null) : Unit {
+        val localVarResponse = deleteReviewWithHttpInfo(itemId = itemId, userId = userId, at = at)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> Unit
@@ -858,13 +867,14 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * 
      * @param itemId 
      * @param userId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return ApiResponse<Unit?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Throws(IllegalStateException::class, IOException::class)
-    fun deleteReviewWithHttpInfo(itemId: kotlin.Long, userId: kotlin.Long) : ApiResponse<Unit?> {
-        val localVariableConfig = deleteReviewRequestConfig(itemId = itemId, userId = userId)
+    fun deleteReviewWithHttpInfo(itemId: kotlin.Long, userId: kotlin.Long, at: java.time.OffsetDateTime?) : ApiResponse<Unit?> {
+        val localVariableConfig = deleteReviewRequestConfig(itemId = itemId, userId = userId, at = at)
 
         return request<Unit, Unit>(
             localVariableConfig
@@ -876,11 +886,17 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      *
      * @param itemId 
      * @param userId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return RequestConfig
      */
-    fun deleteReviewRequestConfig(itemId: kotlin.Long, userId: kotlin.Long) : RequestConfig<Unit> {
+    fun deleteReviewRequestConfig(itemId: kotlin.Long, userId: kotlin.Long, at: java.time.OffsetDateTime?) : RequestConfig<Unit> {
         val localVariableBody = null
-        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (at != null) {
+                    put("at", listOf(parseDateToQueryString<java.time.OffsetDateTime>(at)))
+                }
+            }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
         localVariableHeaders["Accept"] = "application/json"
 
@@ -1808,6 +1824,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * 
      * 
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return void
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -1816,8 +1833,8 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @throws ServerException If the API returns a server error response
      */
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun markUnwatched(itemId: kotlin.Long) : Unit {
-        val localVarResponse = markUnwatchedWithHttpInfo(itemId = itemId)
+    fun markUnwatched(itemId: kotlin.Long, at: java.time.OffsetDateTime? = null) : Unit {
+        val localVarResponse = markUnwatchedWithHttpInfo(itemId = itemId, at = at)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> Unit
@@ -1839,13 +1856,14 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * 
      * 
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return ApiResponse<Unit?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Throws(IllegalStateException::class, IOException::class)
-    fun markUnwatchedWithHttpInfo(itemId: kotlin.Long) : ApiResponse<Unit?> {
-        val localVariableConfig = markUnwatchedRequestConfig(itemId = itemId)
+    fun markUnwatchedWithHttpInfo(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : ApiResponse<Unit?> {
+        val localVariableConfig = markUnwatchedRequestConfig(itemId = itemId, at = at)
 
         return request<Unit, Unit>(
             localVariableConfig
@@ -1856,11 +1874,17 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * To obtain the request config of the operation markUnwatched
      *
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return RequestConfig
      */
-    fun markUnwatchedRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+    fun markUnwatchedRequestConfig(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : RequestConfig<Unit> {
         val localVariableBody = null
-        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (at != null) {
+                    put("at", listOf(parseDateToQueryString<java.time.OffsetDateTime>(at)))
+                }
+            }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
         localVariableHeaders["Accept"] = "application/json"
 
@@ -1879,6 +1903,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * Mark watched (shows, seasons, artists and albums mark everything inside).
      * 
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return void
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -1887,8 +1912,8 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @throws ServerException If the API returns a server error response
      */
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun markWatched(itemId: kotlin.Long) : Unit {
-        val localVarResponse = markWatchedWithHttpInfo(itemId = itemId)
+    fun markWatched(itemId: kotlin.Long, at: java.time.OffsetDateTime? = null) : Unit {
+        val localVarResponse = markWatchedWithHttpInfo(itemId = itemId, at = at)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> Unit
@@ -1910,13 +1935,14 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * Mark watched (shows, seasons, artists and albums mark everything inside).
      * 
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return ApiResponse<Unit?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Throws(IllegalStateException::class, IOException::class)
-    fun markWatchedWithHttpInfo(itemId: kotlin.Long) : ApiResponse<Unit?> {
-        val localVariableConfig = markWatchedRequestConfig(itemId = itemId)
+    fun markWatchedWithHttpInfo(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : ApiResponse<Unit?> {
+        val localVariableConfig = markWatchedRequestConfig(itemId = itemId, at = at)
 
         return request<Unit, Unit>(
             localVariableConfig
@@ -1927,11 +1953,17 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * To obtain the request config of the operation markWatched
      *
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return RequestConfig
      */
-    fun markWatchedRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+    fun markWatchedRequestConfig(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : RequestConfig<Unit> {
         val localVariableBody = null
-        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (at != null) {
+                    put("at", listOf(parseDateToQueryString<java.time.OffsetDateTime>(at)))
+                }
+            }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
         localVariableHeaders["Accept"] = "application/json"
 
@@ -2392,6 +2424,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * 
      * 
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return void
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -2400,8 +2433,8 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @throws ServerException If the API returns a server error response
      */
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun removeFromWatchlist(itemId: kotlin.Long) : Unit {
-        val localVarResponse = removeFromWatchlistWithHttpInfo(itemId = itemId)
+    fun removeFromWatchlist(itemId: kotlin.Long, at: java.time.OffsetDateTime? = null) : Unit {
+        val localVarResponse = removeFromWatchlistWithHttpInfo(itemId = itemId, at = at)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> Unit
@@ -2423,13 +2456,14 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * 
      * 
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return ApiResponse<Unit?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Throws(IllegalStateException::class, IOException::class)
-    fun removeFromWatchlistWithHttpInfo(itemId: kotlin.Long) : ApiResponse<Unit?> {
-        val localVariableConfig = removeFromWatchlistRequestConfig(itemId = itemId)
+    fun removeFromWatchlistWithHttpInfo(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : ApiResponse<Unit?> {
+        val localVariableConfig = removeFromWatchlistRequestConfig(itemId = itemId, at = at)
 
         return request<Unit, Unit>(
             localVariableConfig
@@ -2440,11 +2474,17 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * To obtain the request config of the operation removeFromWatchlist
      *
      * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
      * @return RequestConfig
      */
-    fun removeFromWatchlistRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+    fun removeFromWatchlistRequestConfig(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : RequestConfig<Unit> {
         val localVariableBody = null
-        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (at != null) {
+                    put("at", listOf(parseDateToQueryString<java.time.OffsetDateTime>(at)))
+                }
+            }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
         localVariableHeaders["Accept"] = "application/json"
 
