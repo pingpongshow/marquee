@@ -140,7 +140,10 @@ func fragmentTime(moof []byte, id, timescale uint32) (float64, bool) {
 		tfdt := find(traf, "tfdt")
 		switch {
 		case len(tfdt) >= 12 && tfdt[0] == 1:
-			t = float64(binary.BigEndian.Uint64(tfdt[4:12])) / float64(timescale)
+			// Signed: a copied stream that starts before zero (B-frame delay, an edit list in
+			// the source) has a negative first decode time, which FFmpeg writes wrapped. Read
+			// unsigned, it filed the film's opening seconds as its last segment.
+			t = float64(int64(binary.BigEndian.Uint64(tfdt[4:12]))) / float64(timescale)
 			found = true
 		case len(tfdt) >= 8:
 			t = float64(binary.BigEndian.Uint32(tfdt[4:8])) / float64(timescale)

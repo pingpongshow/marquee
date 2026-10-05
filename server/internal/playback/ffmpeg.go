@@ -291,11 +291,17 @@ func (j Job) Args() []string {
 	}
 	// frag_discont keeps absolute timestamps in each fragment (tfdt), so segments made after
 	// a seek restart line up with the rest; without it they would restart at zero.
-	// delay_moov waits for the first packets before writing the header: copied EAC3/AC3 audio
-	// has no frame size until then, and without it FFmpeg refuses to start.
+	// Copied AC3/EAC3 audio has no frame size until its first packets are parsed, and FFmpeg
+	// refuses to write the header without it: delay_moov waits for them. Only then, because
+	// delay_moov also shifts timestamps by an edit list, which differs between restarts
+	// (after a seek) and made video segments jump.
+	movflags := "+frag_keyframe+empty_moov+default_base_moof+frag_discont"
+	if d.AudioCopy && (j.AudioCodec == "ac3" || j.AudioCodec == "eac3") {
+		movflags = "+frag_keyframe+empty_moov+delay_moov+default_base_moof+frag_discont"
+	}
 	a = append(a, "-sn", "-dn", "-map_metadata", "-1", "-map_chapters", "-1",
 		"-avoid_negative_ts", "disabled", "-max_muxing_queue_size", "4096",
-		"-f", "mp4", "-movflags", "+frag_keyframe+empty_moov+delay_moov+default_base_moof+frag_discont", "pipe:1")
+		"-f", "mp4", "-movflags", movflags, "pipe:1")
 	return a
 }
 
