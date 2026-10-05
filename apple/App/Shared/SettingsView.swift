@@ -77,15 +77,12 @@ struct SettingsView: View {
             }
             Section {
                 @Bindable var music = music
-                Picker("Volume levelling", selection: $music.levelling) {
-                    ForEach(MusicPlayer.Levelling.allCases, id: \.self) { Text($0.label).tag($0) }
-                }
                 Toggle("Show audio quality", isOn: $music.showAudioQuality)
                     .accessibilityIdentifier("showAudioQuality")
             } header: {
                 Text("Music")
             } footer: {
-                Text("Volume levelling plays tracks at an even volume using their loudness; Automatic keeps an album's own dynamics when you play it in order. Audio quality shows each track's format, such as FLAC · 24-bit/96 kHz, in Now Playing and track lists.")
+                Text("Audio quality shows each track's format, such as FLAC · 24-bit/96 kHz, in Now Playing and track lists.")
             }
             #if os(iOS)
             Section {

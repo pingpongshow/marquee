@@ -49,8 +49,7 @@ class MusicService : MediaLibraryService() {
     private val gains = ConcurrentHashMap<Long, Pair<Double?, Double?>>()
     private var enhancer: LoudnessEnhancer? = null
     private val prefs by lazy { getSharedPreferences("marquee.music", MODE_PRIVATE) }
-    private val levellingChanged = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
-        if (key == "levelling") mediaSession?.player?.let(::level)
+    private val settingsChanged = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
         if (key?.startsWith("eq.") == true) EqSettings.load(p).let { s -> equalizers.forEach { it.apply(s) } }
     }
     /** The equaliser on the main player's audio session, and on the crossfade player's. */
@@ -94,7 +93,7 @@ class MusicService : MediaLibraryService() {
         // The equaliser rides on the same session, which this service owns for its lifetime
         // (it's never regenerated, so the effect needn't be re-attached).
         equalizers += SessionEqualizer(audioSession).also { it.apply(EqSettings.load(prefs)); equalizerBands = it.bands }
-        prefs.registerOnSharedPreferenceChangeListener(levellingChanged)
+        prefs.registerOnSharedPreferenceChangeListener(settingsChanged)
         player.addListener(object : Player.Listener {
             override fun onEvents(p: Player, events: Player.Events) {
                 if (p.duration > 0) lastDuration = p.duration
@@ -271,13 +270,8 @@ class MusicService : MediaLibraryService() {
     private fun level(p: Player) {
         val id = p.currentMediaItem?.mediaId?.toLongOrNull()
         val (track, album) = id?.let { gains[it] } ?: (null to null)
-        val mode = prefs.getString("levelling", null)?.let { n -> Levelling.entries.firstOrNull { it.name == n } } ?: Levelling.Auto
-        val db = when (mode) {
-            Levelling.Off -> null
-            Levelling.Track -> track
-            Levelling.Album -> album ?: track
-            Levelling.Auto -> if (inAlbumOrder(p)) album ?: track else track
-        } ?: 0.0
+        // Always on (no setting): album gain while an album plays in order, else track gain.
+        val db = (if (inAlbumOrder(p)) album ?: track else track) ?: 0.0
         val g = db.coerceIn(-15.0, 6.0)
         baseVolume = if (g < 0) 10.0.pow(g / 20).toFloat() else 1f
         applyVolume(p)
@@ -327,7 +321,7 @@ class MusicService : MediaLibraryService() {
     override fun onDestroy() {
         ticker?.cancel()
         watcher?.cancel()
-        prefs.unregisterOnSharedPreferenceChangeListener(levellingChanged)
+        prefs.unregisterOnSharedPreferenceChangeListener(settingsChanged)
         enhancer?.release()
         equalizers.forEach { it.release() }
         equalizers.clear()

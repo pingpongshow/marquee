@@ -36,9 +36,9 @@ public struct PlayQueue: Sendable, Equatable {
         guard !e.isEmpty else { entries = []; index = -1; return }
         let s = min(max(start, 0), e.count - 1)
         if shuffle {
-            var rest = e
-            let first = rest.remove(at: s)
-            entries = [first] + rest.shuffled()
+            // The whole list, the opening track included: a Shuffle button shouldn't always
+            // start with the same song.
+            entries = e.shuffled()
             index = 0
             original = e
             shuffled = true

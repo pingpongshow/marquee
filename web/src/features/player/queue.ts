@@ -40,7 +40,10 @@ function shuffled<T>(list: T[], random = Math.random): T[] {
 
 export const current = (q: Queue): Entry | undefined => q.entries[q.index];
 
-/** Replaces the queue and starts at `start`; with shuffle the started track plays first. */
+/**
+ * Replaces the queue and starts at `start`. With shuffle the whole list is shuffled, the
+ * first track included (a Shuffle button shouldn't always open with the same song).
+ */
 export function load(
   q: Queue,
   items: ItemSummary[],
@@ -58,13 +61,8 @@ export function load(
       original: null,
       repeat: q.repeat,
     };
-  const first = entries[Math.min(Math.max(start, 0), entries.length - 1)]!;
-  const rest = shuffled(
-    entries.filter((e) => e !== first),
-    random,
-  );
   return {
-    entries: [first, ...rest],
+    entries: shuffled(entries, random),
     index: 0,
     shuffled: true,
     original: entries,

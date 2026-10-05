@@ -272,10 +272,6 @@ class MusicController(private val context: Context, private val marquee: Marquee
         djCount = 0
     }
 
-    private val _levelling = MutableStateFlow(levellingPref())
-    /** Volume levelling (MUSIC-10); MusicService applies it. */
-    val levelling: StateFlow<Levelling> = _levelling
-    private fun levellingPref() = prefs.getString("levelling", null)?.let { n -> Levelling.entries.firstOrNull { it.name == n } } ?: Levelling.Auto
     private val _showQuality = MutableStateFlow(prefs.getBoolean("showQuality", false))
     /** Show audio quality (MUSIC-23), per device, off by default. */
     val showQuality: StateFlow<Boolean> = _showQuality
@@ -297,11 +293,6 @@ class MusicController(private val context: Context, private val marquee: Marquee
     fun setEq(s: EqSettings) {
         _eq.value = s
         s.save(prefs)
-    }
-
-    fun setLevelling(l: Levelling) {
-        _levelling.value = l
-        prefs.edit().putString("levelling", l.name).apply()
     }
 
     fun setDJ(dj: DJ?) {

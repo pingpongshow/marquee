@@ -197,6 +197,8 @@ class MarqueeUiTest {
         tap("Play")
         openNowPlaying()
         rule.waitText("Floating 1")
+        // The test tracks last seconds: pause, so the lyrics and rating steps stay on this one.
+        rule.onAllNodes(hasContentDescription("Pause")).onFirst().performClick()
         rule.onNode(hasContentDescription("Lyrics")).performClick()
         rule.waitText("Floating on a quiet sea")
         Thread.sleep(3000)

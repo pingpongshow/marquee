@@ -378,7 +378,6 @@ struct NowPlayingView: View {
                 .accessibilityLabel(panel == .lyrics ? "Show Up Next" : "Lyrics")
                 SleepMenu().labelStyle(.iconOnly)
                 DJMenu()
-                LevellingMenu()
                 CrossfadeMenu()
                 Button { saveRequest = music.queueAsPlaylist } label: {
                     Label("Save as Playlist", systemImage: "text.badge.plus").labelStyle(.iconOnly)
@@ -397,7 +396,6 @@ struct NowPlayingView: View {
         HStack(spacing: 18) {
             SleepMenu().labelStyle(.iconOnly)
             DJMenu()
-            LevellingMenu()
             CrossfadeMenu()
             Menu {
                 Button("Save as Playlist…", systemImage: "text.badge.plus") { saveRequest = music.queueAsPlaylist }
