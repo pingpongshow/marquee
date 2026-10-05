@@ -336,7 +336,10 @@ fun TrackRating(track: app.marquee.api.models.ItemSummary, modifier: Modifier = 
     val marquee = LocalMarquee.current
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
-    var rating by remember(track.id, track.userRating) { mutableStateOf(track.userRating?.takeIf { it > 0 }) }
+    // A rating made offline and not yet sent shows over the list's older value (USER-18).
+    var rating by remember(track.id, track.userRating) {
+        mutableStateOf(marquee.sync.queued(track.id, app.marquee.core.PendingChange.Kind.Rating)?.let { it.rating } ?: track.userRating?.takeIf { it > 0 })
+    }
     var open by remember { mutableStateOf(false) }
     val music = LocalMusic.current
     fun rate(r: Double?) {
@@ -345,7 +348,7 @@ fun TrackRating(track: app.marquee.api.models.ItemSummary, modifier: Modifier = 
         open = false
         music.ratingChanged(track.id, r)
         scope.launch {
-            val ok = withContext(Dispatchers.IO) { runCatching { marquee.items.rateItem(track.id, app.marquee.api.models.RateItemRequest(r)) }.isSuccess }
+            val ok = marquee.sync.saveShowing(marquee.sync.rating(track.id, r), context)
             if (!ok) {
                 rating = before
                 music.ratingChanged(track.id, before)

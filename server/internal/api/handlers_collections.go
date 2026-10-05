@@ -17,6 +17,12 @@ func (h *Handlers) AddToWatchlist(ctx context.Context, req AddToWatchlistRequest
 	if err := h.Items.Visible(ctx, access(ctx), req.ItemId); err != nil {
 		return AddToWatchlist404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
+	// A change made offline and sent later only applies if nothing newer happened (USER-18).
+	if fresh, err := h.Items.Fresh(ctx, sess.User.ID, req.ItemId, "watchlist", req.Params.At); err != nil {
+		return nil, internal(ctx, "watchlist", err)
+	} else if !fresh {
+		return AddToWatchlist204Response{}, nil
+	}
 	if err := h.Items.SetWatchlist(ctx, sess.User.ID, req.ItemId, true); err != nil {
 		return nil, internal(ctx, "watchlist", err)
 	}
@@ -27,6 +33,12 @@ func (h *Handlers) RemoveFromWatchlist(ctx context.Context, req RemoveFromWatchl
 	sess, ok := session(ctx)
 	if !ok {
 		return RemoveFromWatchlist401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	// A change made offline and sent later only applies if nothing newer happened (USER-18).
+	if fresh, err := h.Items.Fresh(ctx, sess.User.ID, req.ItemId, "watchlist", req.Params.At); err != nil {
+		return nil, internal(ctx, "watchlist", err)
+	} else if !fresh {
+		return RemoveFromWatchlist204Response{}, nil
 	}
 	if err := h.Items.SetWatchlist(ctx, sess.User.ID, req.ItemId, false); err != nil {
 		return nil, internal(ctx, "watchlist", err)

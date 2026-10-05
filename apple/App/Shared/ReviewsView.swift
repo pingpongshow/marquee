@@ -80,6 +80,8 @@ struct ReviewsSheet: View {
     @State private var confirmDelete: Review?
 
     private var mine: Review? { reviews?.reviews.first { $0.mine } }
+    /// Your comment: one waiting to sync (USER-18), or the server's.
+    private var myComment: String { OfflineSync.shared.pendingComment(itemID) ?? mine?.comment ?? "" }
     private var others: [Review] { reviews?.reviews.filter { !$0.mine } ?? [] }
     private var isAdmin: Bool { app.me?.isAdmin == true }
 
@@ -101,11 +103,11 @@ struct ReviewsSheet: View {
                         .lineLimit(2...8)
                         .accessibilityIdentifier("commentField")
                     HStack {
-                        Button(mine?.comment?.isEmpty == false ? "Save" : "Post") { save(draft) }
+                        Button(!myComment.isEmpty ? "Save" : "Post") { save(draft) }
                             .buttonStyle(.borderedProminent)
-                            .disabled(busy || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || draft == (mine?.comment ?? "") || draft.count > 2000)
+                            .disabled(busy || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || draft == myComment || draft.count > 2000)
                             .accessibilityIdentifier("postComment")
-                        if mine?.comment?.isEmpty == false {
+                        if !myComment.isEmpty {
                             Button("Delete", role: .destructive) { save("") }
                                 .buttonStyle(.bordered)
                                 .disabled(busy)
@@ -115,6 +117,11 @@ struct ReviewsSheet: View {
                         if draft.count > 1800 { Text("\(draft.count)/2000").font(.caption).foregroundStyle(draft.count > 2000 ? .red : .secondary) }
                     }
                     #endif
+                    if OfflineSync.shared.pendingComment(itemID) != nil {
+                        Label("Saved offline, will sync", systemImage: "icloud.and.arrow.up")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .accessibilityIdentifier("commentPending")
+                    }
                 }
                 Section("Ratings & Comments") {
                     if reviews == nil, error == nil {
@@ -134,6 +141,8 @@ struct ReviewsSheet: View {
             .task { await load(resetDraft: true) }
             // A star changed here: the average and your row follow once it's saved.
             .onChange(of: RatingStore.shared.saves[itemID]) { Task { await load(resetDraft: false) } }
+            // Changes made offline reached the server (USER-18).
+            .onChange(of: OfflineSync.shared.generation) { Task { await load(resetDraft: true) } }
             .confirmationDialog("Delete \(confirmDelete?.userName ?? "")'s comment?", isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }),
                                 presenting: confirmDelete) { r in
                 Button("Delete", role: .destructive) { adminDelete(r) }
@@ -180,7 +189,7 @@ struct ReviewsSheet: View {
         do {
             let r = try await app.reviews(itemID)
             reviews = r
-            if resetDraft { draft = r.reviews.first { $0.mine }?.comment ?? "" }
+            if resetDraft { draft = OfflineSync.shared.pendingComment(itemID) ?? r.reviews.first { $0.mine }?.comment ?? "" }
             error = nil
         } catch is CancellationError {
         } catch {
@@ -193,8 +202,12 @@ struct ReviewsSheet: View {
         Task {
             defer { busy = false }
             do {
-                try await app.setComment(itemID, text.trimmingCharacters(in: .whitespacesAndNewlines))
-                await load(resetDraft: true)
+                // Kept on the device when the server can't be reached; it syncs later.
+                if try await app.setComment(itemID, text.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                    await load(resetDraft: true)
+                } else {
+                    draft = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
             } catch { self.error = error.localizedDescription }
         }
     }
@@ -202,8 +215,11 @@ struct ReviewsSheet: View {
     private func adminDelete(_ r: Review) {
         Task {
             do {
-                try await app.deleteReview(itemID, userID: r.userId)
-                await load(resetDraft: false)
+                if try await app.deleteReview(itemID, userID: r.userId) {
+                    await load(resetDraft: false)
+                } else {
+                    reviews?.reviews.removeAll { $0.userId == r.userId }
+                }
             } catch { self.error = error.localizedDescription }
         }
     }

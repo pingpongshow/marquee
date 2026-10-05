@@ -98,6 +98,8 @@ struct HomeView: View {
         }
         #endif
         .refreshable { await load() }
+        // Changes made offline reached the server (USER-18).
+        .onChange(of: OfflineSync.shared.generation) { Task { await load() } }
         .task {
             // Watch-together groups to join, refreshed while Home is open.
             while !Task.isCancelled {

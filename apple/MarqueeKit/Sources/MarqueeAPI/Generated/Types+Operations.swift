@@ -12108,6 +12108,21 @@ public enum Operations {
                 }
             }
             public var path: Operations.MarkWatched.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/watched/POST/query`.
+            public struct Query: Sendable, Hashable {
+                /// When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                ///
+                /// - Remark: Generated from `#/paths/items/{itemId}/watched/POST/query/at`.
+                public var at: Components.Parameters.ChangedAt?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - at: When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                public init(at: Components.Parameters.ChangedAt? = nil) {
+                    self.at = at
+                }
+            }
+            public var query: Operations.MarkWatched.Input.Query
             /// - Remark: Generated from `#/paths/items/{itemId}/watched/POST/header`.
             public struct Headers: Sendable, Hashable {
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkWatched.AcceptableContentType>]
@@ -12124,12 +12139,15 @@ public enum Operations {
             ///
             /// - Parameters:
             ///   - path:
+            ///   - query:
             ///   - headers:
             public init(
                 path: Operations.MarkWatched.Input.Path,
+                query: Operations.MarkWatched.Input.Query = .init(),
                 headers: Operations.MarkWatched.Input.Headers = .init()
             ) {
                 self.path = path
+                self.query = query
                 self.headers = headers
             }
         }
@@ -12264,6 +12282,21 @@ public enum Operations {
                 }
             }
             public var path: Operations.MarkUnwatched.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/watched/DELETE/query`.
+            public struct Query: Sendable, Hashable {
+                /// When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                ///
+                /// - Remark: Generated from `#/paths/items/{itemId}/watched/DELETE/query/at`.
+                public var at: Components.Parameters.ChangedAt?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - at: When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                public init(at: Components.Parameters.ChangedAt? = nil) {
+                    self.at = at
+                }
+            }
+            public var query: Operations.MarkUnwatched.Input.Query
             /// - Remark: Generated from `#/paths/items/{itemId}/watched/DELETE/header`.
             public struct Headers: Sendable, Hashable {
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkUnwatched.AcceptableContentType>]
@@ -12280,12 +12313,15 @@ public enum Operations {
             ///
             /// - Parameters:
             ///   - path:
+            ///   - query:
             ///   - headers:
             public init(
                 path: Operations.MarkUnwatched.Input.Path,
+                query: Operations.MarkUnwatched.Input.Query = .init(),
                 headers: Operations.MarkUnwatched.Input.Headers = .init()
             ) {
                 self.path = path
+                self.query = query
                 self.headers = headers
             }
         }
@@ -13913,6 +13949,21 @@ public enum Operations {
                 }
             }
             public var path: Operations.AddToWatchlist.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/watchlist/PUT/query`.
+            public struct Query: Sendable, Hashable {
+                /// When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                ///
+                /// - Remark: Generated from `#/paths/items/{itemId}/watchlist/PUT/query/at`.
+                public var at: Components.Parameters.ChangedAt?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - at: When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                public init(at: Components.Parameters.ChangedAt? = nil) {
+                    self.at = at
+                }
+            }
+            public var query: Operations.AddToWatchlist.Input.Query
             /// - Remark: Generated from `#/paths/items/{itemId}/watchlist/PUT/header`.
             public struct Headers: Sendable, Hashable {
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.AddToWatchlist.AcceptableContentType>]
@@ -13929,12 +13980,15 @@ public enum Operations {
             ///
             /// - Parameters:
             ///   - path:
+            ///   - query:
             ///   - headers:
             public init(
                 path: Operations.AddToWatchlist.Input.Path,
+                query: Operations.AddToWatchlist.Input.Query = .init(),
                 headers: Operations.AddToWatchlist.Input.Headers = .init()
             ) {
                 self.path = path
+                self.query = query
                 self.headers = headers
             }
         }
@@ -14069,6 +14123,21 @@ public enum Operations {
                 }
             }
             public var path: Operations.RemoveFromWatchlist.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/watchlist/DELETE/query`.
+            public struct Query: Sendable, Hashable {
+                /// When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                ///
+                /// - Remark: Generated from `#/paths/items/{itemId}/watchlist/DELETE/query/at`.
+                public var at: Components.Parameters.ChangedAt?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - at: When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                public init(at: Components.Parameters.ChangedAt? = nil) {
+                    self.at = at
+                }
+            }
+            public var query: Operations.RemoveFromWatchlist.Input.Query
             /// - Remark: Generated from `#/paths/items/{itemId}/watchlist/DELETE/header`.
             public struct Headers: Sendable, Hashable {
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RemoveFromWatchlist.AcceptableContentType>]
@@ -14085,12 +14154,15 @@ public enum Operations {
             ///
             /// - Parameters:
             ///   - path:
+            ///   - query:
             ///   - headers:
             public init(
                 path: Operations.RemoveFromWatchlist.Input.Path,
+                query: Operations.RemoveFromWatchlist.Input.Query = .init(),
                 headers: Operations.RemoveFromWatchlist.Input.Headers = .init()
             ) {
                 self.path = path
+                self.query = query
                 self.headers = headers
             }
         }
@@ -33466,15 +33538,25 @@ public enum Operations {
                 public struct JsonPayload: Codable, Hashable, Sendable {
                     /// - Remark: Generated from `#/paths/items/{itemId}/rating/PUT/requestBody/json/rating`.
                     public var rating: Swift.Double?
+                    /// When the change was made (apps send changes made offline later); an older change than the last one is ignored.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{itemId}/rating/PUT/requestBody/json/at`.
+                    public var at: Foundation.Date?
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
                     ///   - rating:
-                    public init(rating: Swift.Double? = nil) {
+                    ///   - at: When the change was made (apps send changes made offline later); an older change than the last one is ignored.
+                    public init(
+                        rating: Swift.Double? = nil,
+                        at: Foundation.Date? = nil
+                    ) {
                         self.rating = rating
+                        self.at = at
                     }
                     public enum CodingKeys: String, CodingKey {
                         case rating
+                        case at
                     }
                 }
                 /// - Remark: Generated from `#/paths/items/{itemId}/rating/PUT/requestBody/content/application\/json`.
@@ -33845,15 +33927,25 @@ public enum Operations {
                 public struct JsonPayload: Codable, Hashable, Sendable {
                     /// - Remark: Generated from `#/paths/items/{itemId}/reviews/PUT/requestBody/json/comment`.
                     public var comment: Swift.String
+                    /// When the change was made; an older change than the last one is ignored.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{itemId}/reviews/PUT/requestBody/json/at`.
+                    public var at: Foundation.Date?
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
                     ///   - comment:
-                    public init(comment: Swift.String) {
+                    ///   - at: When the change was made; an older change than the last one is ignored.
+                    public init(
+                        comment: Swift.String,
+                        at: Foundation.Date? = nil
+                    ) {
                         self.comment = comment
+                        self.at = at
                     }
                     public enum CodingKeys: String, CodingKey {
                         case comment
+                        case at
                     }
                 }
                 /// - Remark: Generated from `#/paths/items/{itemId}/reviews/PUT/requestBody/content/application\/json`.
@@ -34039,6 +34131,21 @@ public enum Operations {
                 }
             }
             public var path: Operations.DeleteReview.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/reviews/{userId}/DELETE/query`.
+            public struct Query: Sendable, Hashable {
+                /// When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                ///
+                /// - Remark: Generated from `#/paths/items/{itemId}/reviews/{userId}/DELETE/query/at`.
+                public var at: Components.Parameters.ChangedAt?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - at: When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                public init(at: Components.Parameters.ChangedAt? = nil) {
+                    self.at = at
+                }
+            }
+            public var query: Operations.DeleteReview.Input.Query
             /// - Remark: Generated from `#/paths/items/{itemId}/reviews/{userId}/DELETE/header`.
             public struct Headers: Sendable, Hashable {
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteReview.AcceptableContentType>]
@@ -34055,12 +34162,15 @@ public enum Operations {
             ///
             /// - Parameters:
             ///   - path:
+            ///   - query:
             ///   - headers:
             public init(
                 path: Operations.DeleteReview.Input.Path,
+                query: Operations.DeleteReview.Input.Query = .init(),
                 headers: Operations.DeleteReview.Input.Headers = .init()
             ) {
                 self.path = path
+                self.query = query
                 self.headers = headers
             }
         }

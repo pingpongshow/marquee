@@ -32,13 +32,18 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param comment 
+ * @param at When the change was made; an older change than the last one is ignored.
  */
 @Serializable
 
 data class SetReviewRequest (
 
     @SerialName(value = "comment")
-    val comment: kotlin.String
+    val comment: kotlin.String,
+
+    /* When the change was made; an older change than the last one is ignored. */
+    @Contextual @SerialName(value = "at")
+    val at: java.time.OffsetDateTime? = null
 
 ) {
 

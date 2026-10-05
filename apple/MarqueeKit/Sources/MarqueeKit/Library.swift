@@ -71,13 +71,17 @@ public extension AppSession {
         return try? ok.body.json
     }
 
-    func setWatched(_ id: Int64, _ watched: Bool) async throws {
-        if watched { _ = try await api.markWatched(path: .init(itemId: id)) } else { _ = try await api.markUnwatched(path: .init(itemId: id)) }
+    /// Marks watched or unwatched. Kept on the device and sent later when the server can't be
+    /// reached (USER-18): returns false then.
+    @discardableResult
+    func setWatched(_ id: Int64, _ watched: Bool) async throws -> Bool {
+        try await OfflineSync.shared.submit(.watched(id, watched))
     }
 
-    /// Adds to or removes from the watchlist (USER-8).
-    func setWatchlist(_ id: Int64, _ on: Bool) async throws {
-        if on { _ = try await api.addToWatchlist(path: .init(itemId: id)).noContent } else { _ = try await api.removeFromWatchlist(path: .init(itemId: id)).noContent }
+    /// Adds to or removes from the watchlist (USER-8); kept to sync later when offline.
+    @discardableResult
+    func setWatchlist(_ id: Int64, _ on: Bool) async throws -> Bool {
+        try await OfflineSync.shared.submit(.watchlist(id, on))
     }
 
     func watchlist() async throws -> [Item] { try await api.getWatchlist().ok.body.json }
@@ -92,21 +96,17 @@ public extension AppSession {
     }
 
     /// Sets your comment on an item (up to 2000 characters); an empty one removes it.
-    func setComment(_ id: Int64, _ comment: String) async throws {
-        switch try await api.setReview(path: .init(itemId: id), body: .json(.init(comment: comment))) {
-        case .noContent: return
-        case let .badRequest(r): throw MarqueeError((try? r.body.json.message) ?? "That comment can't be saved.")
-        default: throw MarqueeError("Couldn't save the comment.")
-        }
+    /// Kept to sync later when offline (returns false then).
+    @discardableResult
+    func setComment(_ id: Int64, _ comment: String) async throws -> Bool {
+        try await OfflineSync.shared.submit(.comment(id, comment))
     }
 
     /// Removes a person's comment and rating (your own, or anyone's for an administrator).
-    func deleteReview(_ id: Int64, userID: Int64) async throws {
-        switch try await api.deleteReview(path: .init(itemId: id, userId: userID)) {
-        case .noContent: return
-        case .forbidden: throw MarqueeError("Only an administrator can remove someone else's comment.")
-        default: throw MarqueeError("Couldn't delete the comment.")
-        }
+    /// Kept to sync later when offline (returns false then).
+    @discardableResult
+    func deleteReview(_ id: Int64, userID: Int64) async throws -> Bool {
+        try await OfflineSync.shared.submit(.deleteReview(id, user: userID))
     }
 
     func playlist(_ id: Int64) async throws -> Playlist {

@@ -69,11 +69,14 @@ struct MainView: View {
         #endif
         .environment(video)
         .remoteToast()
+        .offlineSavedToast()
         // Remote control (USER-14): a player while open, and while music plays in the background.
         .onChange(of: scenePhase, initial: true) { old, new in
             updateRemote()
             // Back in the app: anything that failed at launch (server unreachable) loads now.
             if old != new, new == .active, libraries.isEmpty || librariesError != nil { Task { await loadAll() } }
+            // And changes made offline go to the server (USER-18).
+            if old != new, new == .active { Task { await OfflineSync.shared.flush() } }
         }
         .onChange(of: music.playing) { updateRemote() }
         .onDisappear { RemoteReceiver.shared.stop() }
