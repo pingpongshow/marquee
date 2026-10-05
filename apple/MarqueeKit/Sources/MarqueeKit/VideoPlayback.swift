@@ -1,4 +1,7 @@
 import AVFoundation
+#if os(tvOS)
+import AVKit // AVPlayerItem.externalMetadata
+#endif
 import Foundation
 import MarqueeAPI
 import Observation
@@ -152,6 +155,7 @@ public final class VideoPlayback {
             let playerItem = AVPlayerItem(url: url)
             playerItem.preferredForwardBufferDuration = app.isRemote ? 30 : 10
             playerItem.textStyleRules = app.subtitleStyle.textStyleRules // PLAY-20
+            describe(playerItem)
             observe(playerItem)
             player.replaceCurrentItem(with: playerItem)
             if s.startMs > 0 { await player.seek(to: CMTime(seconds: Double(s.startMs) / 1000, preferredTimescale: 600)) }
@@ -200,11 +204,39 @@ public final class VideoPlayback {
         if app.client != nil { item = try? await app.item(itemID) }
         let playerItem = AVPlayerItem(url: file)
         playerItem.textStyleRules = app.subtitleStyle.textStyleRules
+        describe(playerItem)
         observe(playerItem)
         player.replaceCurrentItem(with: playerItem)
         let resume = downloads.resumePosition(itemID)
         if resume > 0 { await player.seek(to: CMTime(seconds: Double(resume) / 1000, preferredTimescale: 600)) }
         player.play()
+    }
+
+    /// Apple TV: title, description and artwork for the player's info panel and the system's
+    /// Now Playing; without them the system asks for artwork and gets none.
+    private func describe(_ playerItem: AVPlayerItem) {
+        #if os(tvOS)
+        guard let d = item else { return }
+        func meta(_ id: AVMetadataIdentifier, _ value: any NSCopying & NSObjectProtocol, type: String? = nil) -> AVMetadataItem {
+            let m = AVMutableMetadataItem()
+            m.identifier = id
+            m.value = value
+            m.extendedLanguageTag = "und"
+            if let type { m.dataType = type }
+            return m
+        }
+        var items = [meta(.commonIdentifierTitle, d.title as NSString)]
+        let subtitle = d.type == .episode ? d.base.grandparentTitle : d.base.year.map(String.init)
+        if let subtitle { items.append(meta(.iTunesMetadataTrackSubTitle, subtitle as NSString)) }
+        if let summary = d.info.summary, !summary.isEmpty { items.append(meta(.commonIdentifierDescription, summary as NSString)) }
+        playerItem.externalMetadata = items
+        let art = d.type == .episode ? (d.base.images?.thumb ?? d.base.images?.poster) : d.base.images?.poster
+        guard let url = app.imageURL(art, pixels: 600) else { return }
+        Task { [weak playerItem] in
+            guard let (data, _) = try? await URLSession.shared.data(from: url), let playerItem else { return }
+            playerItem.externalMetadata = items + [meta(.commonIdentifierArtwork, data as NSData, type: kCMMetadataBaseDataType_JPEG as String)]
+        }
+        #endif
     }
 
     public func stop() async {
