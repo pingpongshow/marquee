@@ -214,6 +214,43 @@ final class MarqueeTVUITests: XCTestCase {
         shot("tv-topshelf-link")
     }
 
+    /// Find subtitles on the title's page, beside its other track options: Bazarr's section
+    /// (download another language) and OpenSubtitles in one sheet, driven with the remote.
+    func testFindSubtitlesTV() throws {
+        try signInTemporaryUser()
+        app.launchArguments = []
+        app.open(URL(string: "marquee://item/6")!) // 31 Ocean, managed by the fake Bazarr
+        let find = app.buttons["trackChip.find"]
+        XCTAssertTrue(find.waitForExistence(timeout: 15))
+        sleep(1)
+        // Play, down to the track chips' row, then right along it to Find subtitles.
+        let play = app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume'}")).firstMatch
+        focus(play, direction: .down)
+        remote.press(.down)
+        for _ in 0..<4 where !find.hasFocus { remote.press(.right) }
+        XCTAssertTrue(find.hasFocus, "Find subtitles focused")
+        shot("tv-subs-1-page")
+        remote.press(.select)
+        let another = app.buttons["Download Another Language…"]
+        XCTAssertTrue(another.waitForExistence(timeout: 15), "Bazarr's section in the sheet")
+        XCTAssertTrue(app.buttons["Search All Providers"].exists)
+        XCTAssertTrue(app.staticTexts["OpenSubtitles"].exists || app.otherElements["OpenSubtitles"].exists)
+        shot("tv-subs-2-sheet")
+        // Focus starts on Search All Providers; list rows don't report focus, so step to the next.
+        remote.press(.down)
+        remote.press(.select)
+        let swedish = app.buttons["Swedish"].firstMatch
+        XCTAssertTrue(swedish.waitForExistence(timeout: 5), "the language choices")
+        focus(swedish, direction: .down)
+        remote.press(.select)
+        let message = app.descendants(matching: .any).matching(identifier: "bazarrMessage").firstMatch
+        XCTAssertTrue(message.waitForExistence(timeout: 15))
+        XCTAssertTrue(message.label.contains("Swedish"), message.label)
+        shot("tv-subs-3-requested")
+        remote.press(.menu)
+        XCTAssertTrue(find.waitForExistence(timeout: 5))
+    }
+
     // MARK: - Playback and profile extras on the TV (USER-12, PLAY-17, PLAY-19)
 
     /// Calls the server; returns the JSON object.

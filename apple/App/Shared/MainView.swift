@@ -99,6 +99,8 @@ struct MainView: View {
                     .marqueeDestinations()
                     .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { linkedItem = nil } } }
             }
+            // tvOS covers are see-through by default: Home showed behind the page.
+            .background(Color.black.ignoresSafeArea())
             // One view can't present two covers at once: while a linked item is up, the
             // player is presented from inside its cover.
             .fullScreenCover(item: $video.request) { req in
