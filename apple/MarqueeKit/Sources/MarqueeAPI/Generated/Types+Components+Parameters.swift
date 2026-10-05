@@ -16,6 +16,10 @@ extension Components {
         public typealias UserId = Swift.Int64
         /// - Remark: Generated from `#/components/parameters/ItemId`.
         public typealias ItemId = Swift.Int64
+        /// When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+        ///
+        /// - Remark: Generated from `#/components/parameters/ChangedAt`.
+        public typealias ChangedAt = Foundation.Date
         /// Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920.
         ///
         /// - Remark: Generated from `#/components/parameters/ImageWidth`.

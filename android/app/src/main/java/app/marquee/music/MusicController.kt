@@ -11,7 +11,6 @@ import androidx.media3.session.SessionToken
 import app.marquee.api.models.ItemSummary
 import app.marquee.api.models.MusicDJRequest
 import app.marquee.api.models.RadioRequest
-import app.marquee.api.models.RateItemRequest
 import app.marquee.api.models.Station
 import app.marquee.core.Marquee
 import kotlinx.coroutines.Deferred
@@ -96,6 +95,11 @@ class MusicController(private val context: Context, private val marquee: Marquee
     private var lastId: Long? = null
     private var ratingJob: Job? = null
 
+    init {
+        // After changes made offline were sent: show the server's rating for the current track.
+        scope.launch { marquee.sync.syncs.collect { n -> if (n > 0) lastId?.let { loadRating(it, reset = false) } } }
+    }
+
     /** The controller being built: every caller waits for the same one (main thread only). */
     private var connecting: Deferred<MediaController>? = null
 
@@ -173,12 +177,15 @@ class MusicController(private val context: Context, private val marquee: Marquee
         djPick(p, cur)
     }
 
-    private fun loadRating(id: Long) {
-        _rating.value = null
+    private fun loadRating(id: Long, reset: Boolean = true) {
+        if (reset) _rating.value = null
         ratingJob?.cancel()
+        // A rating made offline and not yet sent wins over the server's older one (USER-18).
+        marquee.sync.queued(id, app.marquee.core.PendingChange.Kind.Rating)?.let { _rating.value = it.rating }
         ratingJob = scope.launch {
-            val r = withContext(Dispatchers.IO) { runCatching { marquee.items.getItem(id).userRating }.getOrNull() }
-            if (lastId == id) _rating.value = r
+            val r = withContext(Dispatchers.IO) { runCatching { marquee.items.getItem(id).userRating } }
+            val queued = marquee.sync.queued(id, app.marquee.core.PendingChange.Kind.Rating)
+            if (lastId == id) _rating.value = if (queued != null) queued.rating else r.getOrElse { _rating.value }
         }
     }
 
@@ -312,7 +319,8 @@ class MusicController(private val context: Context, private val marquee: Marquee
         val before = _rating.value
         _rating.value = rating
         scope.launch {
-            val ok = withContext(Dispatchers.IO) { runCatching { marquee.items.rateItem(id, RateItemRequest(rating)) }.isSuccess }
+            // Kept on the device and sent later when the server can't be reached (USER-18).
+            val ok = marquee.sync.saveShowing(marquee.sync.rating(id, rating))
             if (!ok && lastId == id) _rating.value = before
         }
     }

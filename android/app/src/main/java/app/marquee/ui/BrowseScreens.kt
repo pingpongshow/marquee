@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.DownloadDone
@@ -384,6 +385,7 @@ fun SettingsScreen(nav: NavHostController) {
         }
         Text("Server: ${marquee.server?.name ?: ""} · ${if (marquee.isRemote) "Tailscale (away)" else "home network"}", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("Version ${marquee.info?.version ?: ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        PendingSyncRow()
         TrailersPreference()
         ShowAudioQualityPreference()
         // Buttons wrap onto more lines rather than running off a phone's edge.
@@ -400,6 +402,31 @@ fun SettingsScreen(nav: NavHostController) {
             OutlinedButton(onClick = { marquee.forgetServer() }) { Text("Use a different server") }
         }
         Box(Modifier.width(1.dp))
+    }
+}
+
+/** Changes made offline that haven't reached the server yet (USER-18), with Sync now. Only while there are some. */
+@Composable
+private fun PendingSyncRow() {
+    val marquee = LocalMarquee.current
+    val sync = marquee.sync
+    val changes by sync.queue.changes.collectAsState()
+    val last by sync.lastSync.collectAsState()
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    val n = sync.count(changes)
+    if (n == 0) return
+    Row(Modifier.semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Filled.CloudUpload, null, Modifier.padding(end = 12.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text("Changes waiting to sync: $n")
+            Text(last?.let { "Last synced " + android.text.format.DateUtils.getRelativeTimeSpanString(it) } ?: "Sent when the server can be reached",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        OutlinedButton({
+            busy = true
+            scope.launch { runCatching { sync.syncNow() }; busy = false }
+        }, Modifier.focusRing(), enabled = !busy) { Text(if (busy) "Syncing…" else "Sync now") }
     }
 }
 

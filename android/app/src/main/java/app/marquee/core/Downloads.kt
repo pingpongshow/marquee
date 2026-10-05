@@ -9,7 +9,6 @@ import app.marquee.api.models.CreateDownloadRequest
 import app.marquee.api.models.Download
 import app.marquee.api.models.ItemSummary
 import app.marquee.api.models.ItemType
-import app.marquee.api.models.SyncProgressRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -17,21 +16,19 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import okhttp3.Request
 import java.io.File
-import java.time.OffsetDateTime
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Offline downloads on phones and tablets (M7, MUSIC-14), as on the iPhone (D64): videos as
  * the original file or converted on the server, music tracks as they are. The system's
  * DownloadManager fetches them into app storage (background, resumable, with a notification).
- * Plays made offline are kept and sent when the server is reachable again.
+ * Plays made offline are kept and sent when the server is reachable again (with everything
+ * else changed offline, in [OfflineSync]).
  */
 class Downloads(private val context: Context, private val marquee: Marquee) {
     enum class Quality(val label: String, val api: CreateDownloadRequest.Quality) {
@@ -62,24 +59,16 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
         val viaPlaylist: Boolean = false,
     )
 
-    @Serializable
-    private data class Pending(val itemId: Long, val positionMs: Long, val watched: Boolean, val atMs: Long)
-
     private val dir = File(context.getExternalFilesDir(null) ?: context.filesDir, "downloads").apply { mkdirs() }
     private val indexFile = File(context.filesDir, "downloads.json")
-    private val pendingFile = File(context.filesDir, "downloads-pending.json")
     private val playlistsFile = File(context.filesDir, "downloads-playlists.json")
     private val json = Serializer.kotlinxSerializationJson
     private val dm = context.getSystemService(DownloadManager::class.java)
-    private val lock = Mutex()
     /** For starting downloads from screens that may go away; Main, for Toasts. */
     val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.Main)
 
     private val _entries = MutableStateFlow(load())
     val entries: StateFlow<Map<Long, Entry>> = _entries
-    /** Offline plays waiting to be sent; guarded by pendingLock. */
-    private var pending: List<Pending> = runCatching { json.decodeFromString(ListSerializer(Pending.serializer()), readFile(pendingFile)) }.getOrDefault(emptyList())
-    private val pendingLock = Any()
     private var watcher: Job? = null
 
     private val playlistsSerializer = kotlinx.serialization.builtins.MapSerializer(Long.serializer(), kotlinx.serialization.builtins.SetSerializer(Long.serializer()))
@@ -125,11 +114,11 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
         save(soon = progressOnly)
     }
 
-    /** After signing in: resumes conversions and transfers, and sends offline plays. */
+    /** After signing in: resumes conversions and transfers, and sends what was changed offline. */
     fun attach() {
         watch()
         marquee.scope.launch {
-            flushProgress()
+            marquee.sync.syncNow()
             // Playlists kept on the device follow their changes.
             _playlists.value.keys.forEach { runCatching { syncPlaylist(it) } }
         }
@@ -218,26 +207,7 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
     /** A play of a downloaded item: kept locally and sent to the server when it's reachable. */
     fun recordProgress(id: Long, positionMs: Long, watched: Boolean) {
         set(id) { it.copy(resumeMs = if (watched) 0 else positionMs) }
-        updatePending { list -> list.filterNot { it.itemId == id && !it.watched } + Pending(id, positionMs, watched, System.currentTimeMillis()) }
-        marquee.scope.launch { flushProgress() }
-    }
-
-    private fun updatePending(f: (List<Pending>) -> List<Pending>) = synchronized(pendingLock) {
-        pending = f(pending)
-        runCatching { writeFile(pendingFile, json.encodeToString(ListSerializer(Pending.serializer()), pending)) }
-    }
-
-    suspend fun flushProgress() = lock.withLock {
-        val batch = synchronized(pendingLock) { pending }
-        if (batch.isEmpty() || marquee.token == null || marquee.baseUrl == null) return@withLock
-        val sent = batch.filter { p ->
-            val at = OffsetDateTime.ofInstant(java.time.Instant.ofEpochMilli(p.atMs), java.time.ZoneOffset.UTC)
-            kotlinx.coroutines.withContext(Dispatchers.IO) {
-                runCatching { marquee.playback.syncProgress(p.itemId, SyncProgressRequest(p.positionMs, p.watched, at)) }.isSuccess
-            }
-        }.toSet()
-        // Plays recorded while this was sending stay for next time.
-        if (sent.isNotEmpty()) updatePending { list -> list.filterNot { it in sent } }
+        marquee.sync.recordProgress(id, positionMs, watched)
     }
 
     // Transfers

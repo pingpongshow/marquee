@@ -83,6 +83,8 @@ struct ItemDetailView: View {
         }
         // A rating saved (here or in the comments): the community average changes.
         .onChange(of: RatingStore.shared.saves[id]) { Task { await refresh() } }
+        // Changes made offline reached the server: show its truth (USER-18).
+        .onChange(of: OfflineSync.shared.generation) { Task { await refresh() } }
         .onChange(of: video.request) {
             if let r = video.request {
                 playingID = r.itemID
@@ -103,7 +105,7 @@ struct ItemDetailView: View {
             detail = d
             error = nil
             loadedID = id
-            watchlisted = d.base.watchlisted ?? false
+            watchlisted = OfflineSync.shared.pendingWatchlist(id) ?? d.base.watchlisted ?? false
             let wantsRelated = [.movie, .show, .artist, .album].contains(d.type)
             // Everything else in parallel.
             async let kids: [Item] = d.base.childCount > 0 ? app.children(id) : []
@@ -126,7 +128,7 @@ struct ItemDetailView: View {
     private func refresh() async {
         guard let d = try? await app.item(id) else { return }
         detail = d
-        watchlisted = d.base.watchlisted ?? false
+        watchlisted = OfflineSync.shared.pendingWatchlist(id) ?? d.base.watchlisted ?? false
         if d.base.childCount > 0, let kids = try? await app.children(id) { children = kids }
     }
 
@@ -333,17 +335,20 @@ struct ItemDetailView: View {
                 Label(watchlisted ? "On Watchlist" : "Watchlist", systemImage: watchlisted ? "bookmark.fill" : "bookmark")
             }
             .buttonStyle(.bordered)
+            .accessibilityIdentifier("watchlistToggle")
         }
         if d.base.isPlayableVideo || d.type == .show || d.type == .season {
+            // A change waiting to sync shows as made (USER-18).
+            let watched = OfflineSync.shared.pendingWatched(d.id) ?? d.base.watched
             Button {
                 Task {
-                    try? await app.setWatched(d.id, !d.base.watched)
-                    await refresh()
+                    if (try? await app.setWatched(d.id, !watched)) == true { await refresh() }
                 }
             } label: {
-                Label(d.base.watched ? "Watched" : "Mark watched", systemImage: d.base.watched ? "checkmark.circle.fill" : "checkmark.circle")
+                Label(watched ? "Watched" : "Mark watched", systemImage: watched ? "checkmark.circle.fill" : "checkmark.circle")
             }
             .buttonStyle(.bordered)
+            .accessibilityIdentifier("markWatched")
         }
         #if os(iOS)
         if [.movie, .episode, .video, .season, .show, .album, .artist, .track].contains(d.type) {

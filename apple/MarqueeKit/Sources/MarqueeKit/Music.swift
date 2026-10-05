@@ -78,8 +78,11 @@ public extension AppSession {
     }
 
     /// Rates an item 0–10 (half stars; 10 = loved), or clears the rating with nil (MUSIC-11).
-    func rate(_ id: Int64, _ rating: Double?) async throws {
-        _ = try await musicAPI.rateItem(path: .init(itemId: id), body: .json(.init(rating: rating))).noContent
+    /// Kept on the device and sent later when the server can't be reached (USER-18): returns
+    /// false then.
+    @discardableResult
+    func rate(_ id: Int64, _ rating: Double?) async throws -> Bool {
+        try await OfflineSync.shared.submit(.rating(id, rating))
     }
 }
 

@@ -47,8 +47,8 @@ public final class Downloads {
         public var networkFailure: Bool?
     }
 
-    /// A play made while offline, waiting to be sent. Tagged with the server and person it
-    /// belongs to (records from before the tags go to whoever is signed in).
+    /// A play made while offline, from the queue Downloads kept before offline sync (USER-18)
+    /// took it over; read once to fold into that queue.
     struct PendingProgress: Codable, Equatable {
         let itemID: Int64
         let positionMs: Int64
@@ -56,26 +56,6 @@ public final class Downloads {
         let at: Date
         var server: String? = nil
         var user: Int64? = nil
-    }
-
-    /// What to do with an offline play after sending it.
-    enum SyncOutcome: Equatable { case sent, drop, keep }
-
-    /// The records that belong to this server and person.
-    nonisolated static func flushable(_ pending: [PendingProgress], server: String, user: Int64) -> [PendingProgress] {
-        pending.filter { ($0.server == nil || $0.server == server) && ($0.user == nil || $0.user == user) }
-    }
-
-    /// From the server's answer (nil = no answer): sent, rejected for good (a 4xx other than
-    /// sign-in, timeout or rate limiting: the item is gone, say), or worth trying again.
-    nonisolated static func outcome(status: Int?) -> SyncOutcome {
-        guard let status else { return .keep }
-        switch status {
-        case 200..<300: return .sent
-        case 401, 408, 429: return .keep
-        case 400..<500: return .drop
-        default: return .keep
-        }
     }
 
     /// Transfer errors that come from the network (worth retrying at another address), not
@@ -97,7 +77,6 @@ public final class Downloads {
     }
 
     public private(set) var entries: [Int64: Entry] = [:]
-    @ObservationIgnored private var pending: [PendingProgress] = []
     @ObservationIgnored private weak var app: AppSession?
     @ObservationIgnored private var session: URLSession!
     @ObservationIgnored private let bridge = SessionBridge()
@@ -105,15 +84,11 @@ public final class Downloads {
     /// Guards against overlapping work when attach runs again (every reconnect).
     @ObservationIgnored private var resuming = false
     @ObservationIgnored private var syncing = false
-    @ObservationIgnored private var flushing = false
-    @ObservationIgnored private var flushAgain = false
     /// When each transfer last updated its progress (updates are throttled).
     @ObservationIgnored private var lastProgress: [Int64: (at: Date, fraction: Double)] = [:]
     /// A save of the index waiting to happen (saves are coalesced and written off the main thread).
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     private static let io = DispatchQueue(label: "app.marquee.downloads.io", qos: .utility)
-    /// The person last signed in, for tagging plays made while /me can't be asked.
-    private static let lastUserKey = "marquee.downloads.lastUser"
 
     public static let directory: URL = {
         let d = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appending(path: "Downloads", directoryHint: .isDirectory)
@@ -126,7 +101,6 @@ public final class Downloads {
     }()
 
     private static var indexURL: URL { directory.appending(path: "index.json") }
-    private static var pendingURL: URL { directory.appending(path: "pending.json") }
     private static var playlistsURL: URL { directory.appending(path: "playlists.json") }
 
     /// Playlists kept on the device (MUSIC-19): playlist id -> its items when last synced.
@@ -138,9 +112,6 @@ public final class Downloads {
         }
         if let data = try? Data(contentsOf: Self.playlistsURL), let m = try? JSONDecoder().decode([Int64: Set<Int64>].self, from: data) {
             syncedPlaylists = m
-        }
-        if let data = try? Data(contentsOf: Self.pendingURL) {
-            pending = (try? JSONDecoder().decode([PendingProgress].self, from: data)) ?? []
         }
         let config = URLSessionConfiguration.background(withIdentifier: "app.marquee.downloads")
         config.sessionSendsLaunchEvents = true
@@ -155,9 +126,8 @@ public final class Downloads {
         self.app = app
         resumeTransfers()
         pollConversions()
-        if let user = app.me?.id { UserDefaults.standard.set(user, forKey: Self.lastUserKey) }
         Task {
-            await flushProgress()
+            await OfflineSync.shared.flush()
             // Playlists kept on the device follow their changes.
             guard !syncing else { return }
             syncing = true
@@ -305,61 +275,18 @@ public final class Downloads {
 
     // MARK: - Offline progress
 
-    /// Records progress made on a downloaded item without a server session.
+    /// Where to resume a downloaded item: progress made offline, else the server's.
     public func resumePosition(_ itemID: Int64) -> Int64 {
         entries[itemID]?.resumeMs ?? entries[itemID]?.item.viewOffsetMs ?? 0
     }
 
+    /// Records progress made on a downloaded item without a server session; it reaches the
+    /// server through the offline sync queue (USER-18) with the time it was made.
     public func recordProgress(itemID: Int64, positionMs: Int64, watched: Bool) {
         entries[itemID]?.resumeMs = watched ? 0 : positionMs
         save()
-        let server = app?.server?.id ?? ServerStore.currentServerID
-        let user = app?.me?.id ?? (UserDefaults.standard.object(forKey: Self.lastUserKey) as? NSNumber)?.int64Value
-        pending.removeAll { $0.itemID == itemID && !$0.watched && $0.server == server && $0.user == user }
-        pending.append(PendingProgress(itemID: itemID, positionMs: positionMs, watched: watched, at: Date(), server: server, user: user))
-        savePending()
-        Task { await flushProgress() }
-    }
-
-    /// Sends offline plays that belong to the signed-in person on this server. One flush at a
-    /// time (a play sent twice counts twice); records added meanwhile go in a follow-up. Plays
-    /// the server took, and ones it rejected for good, are removed; the rest wait.
-    public func flushProgress() async {
-        guard !flushing else { flushAgain = true; return }
-        flushing = true
-        defer { flushing = false }
-        repeat {
-            flushAgain = false
-            guard let app, app.client != nil, !pending.isEmpty else { return }
-            if app.me == nil { await app.refreshMe() }
-            guard let client = app.client, let server = app.server?.id, let user = app.me?.id else { return }
-            UserDefaults.standard.set(user, forKey: Self.lastUserKey)
-            var done: [PendingProgress] = []
-            for p in Self.flushable(pending, server: server, user: user) {
-                let status: Int?
-                do {
-                    switch try await client.syncProgress(path: .init(itemId: p.itemID),
-                                                         body: .json(.init(positionMs: p.positionMs, watched: p.watched, playedAt: p.at))) {
-                    case .noContent: status = 204
-                    case .unauthorized: status = 401
-                    case .notFound: status = 404
-                    case .undocumented(let code, _): status = code
-                    }
-                } catch {
-                    status = nil
-                }
-                if Self.outcome(status: status) != .keep { done.append(p) }
-            }
-            pending.removeAll { done.contains($0) }
-            savePending()
-        } while flushAgain
-    }
-
-    private func savePending() {
-        let list = pending, url = Self.pendingURL
-        Self.io.async {
-            if let data = try? JSONEncoder().encode(list) { try? data.write(to: url, options: .atomic) }
-        }
+        OfflineSync.shared.enqueue(.progress(itemID, positionMs: positionMs, watched: watched))
+        Task { await OfflineSync.shared.flush() }
     }
 
     // MARK: - Conversions

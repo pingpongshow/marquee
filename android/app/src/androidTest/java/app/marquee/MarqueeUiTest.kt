@@ -2084,4 +2084,72 @@ class MarqueeUiTest {
             cleanup()
         }
     }
+
+    /**
+     * Offline sync (USER-18): with requests failing as if the network were down, rating a track in
+     * Now Playing, marking a movie watched and adding it to the watchlist keep their new values and
+     * wait in Settings; Sync now sends them, with when they were made, and the server has them.
+     */
+    @Test fun offlineSync() {
+        assumeTrue("phones", !isTv)
+        connectAndSignIn()
+        val track = 311L // Album 1 / Song 1-2
+        val movie = 359L // 00 Preview Test
+        val app = context.applicationContext as MarqueeApplication
+        fun kid(method: String, path: String, body: String? = null) = adminApi(method, path, body, asToken = appToken)
+        fun item(id: Long) = org.json.JSONObject(kid("GET", "/items/$id"))
+        kid("PUT", "/items/$track/rating", """{"rating":null}""")
+        kid("DELETE", "/items/$movie/watched")
+        kid("DELETE", "/items/$movie/watchlist")
+        Thread.sleep(1100) // the changes below are newer to the second
+        try {
+            // Play the track, then open the movie, while online.
+            tap("Search")
+            rule.waitUntilAtLeastOneExists(hasSetTextAction(), 10_000)
+            rule.onAllNodes(hasSetTextAction()).onFirst().performTextInput("Song 1-2")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Song 1-2") and hasClickAction(), 15_000)
+            rule.onAllNodes(hasContentDescription("Song 1-2") and hasClickAction()).onFirst().performClick()
+            rule.waitUntil(15_000) { scrollTo(hasText("Play") and hasClickAction()) }
+            rule.onNode(hasText("Play") and hasClickAction()).performClick()
+            rule.waitUntil(20_000) { app.music.now.value?.id == track }
+            openLibrary("Movies")
+            rule.waitText("00 Preview Test")
+            tap("00 Preview Test")
+            rule.waitText("Mark watched", 15_000)
+
+            // Offline: the changes show at once and stay.
+            app.marquee.simulateOffline = true
+            tap("Mark watched")
+            rule.waitText("Watched")
+            tap("Watchlist")
+            rule.waitText("On Watchlist")
+            rule.onNode(hasContentDescription("Open Now Playing")).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Close Now Playing"), 10_000)
+            rule.onNode(hasContentDescription("4 stars")).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Rating") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "4 of 5 stars"), 5_000)
+            Thread.sleep(3000)
+            assertEquals(8.0, app.music.rating.value)
+            shot("os1-offline-rated")
+            rule.onNode(hasContentDescription("Close Now Playing")).performClick()
+            tap("Settings")
+            rule.waitText("Changes waiting to sync: 3")
+            shot("os2-pending")
+            assertEquals(0.0, item(track).optDouble("userRating", 0.0), 0.0)
+
+            // Back online: Sync now sends them and the row goes.
+            app.marquee.simulateOffline = false
+            tap("Sync now")
+            rule.waitUntil(15_000) { rule.onAllNodesWithText("Changes waiting to sync", substring = true).fetchSemanticsNodes().isEmpty() }
+            assertEquals(8.0, item(track).optDouble("userRating", 0.0), 0.0)
+            val m = item(movie)
+            assertTrue("watched", m.optInt("viewCount", 0) > 0)
+            assertTrue("on the watchlist", m.optBoolean("watchlisted", false))
+        } finally {
+            app.marquee.simulateOffline = false
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+            kid("PUT", "/items/$track/rating", """{"rating":null}""")
+            kid("DELETE", "/items/$movie/watchlist")
+            kid("POST", "/items/$movie/watched")
+        }
+    }
 }

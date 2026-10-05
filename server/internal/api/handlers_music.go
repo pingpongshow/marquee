@@ -304,6 +304,12 @@ func (h *Handlers) RateItem(ctx context.Context, req RateItemRequestObject) (Rat
 		}
 		r = &v
 	}
+	// A change made offline and sent later only applies if nothing newer happened (USER-18).
+	if fresh, err := h.Items.Fresh(ctx, s.User.ID, req.ItemId, "rating", req.Body.At); err != nil {
+		return nil, internal(ctx, "rate", err)
+	} else if !fresh {
+		return RateItem204Response{}, nil
+	}
 	if err := h.Items.SetRating(ctx, s.User.ID, req.ItemId, r); err != nil {
 		return nil, internal(ctx, "rate", err)
 	}

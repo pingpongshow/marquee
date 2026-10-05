@@ -33,7 +33,7 @@ class ServerStore(context: Context) {
 
     fun forget(id: String) {
         servers = servers.filterNot { it.id == id }
-        prefs.edit().remove("token.$id").apply()
+        prefs.edit().remove("token.$id").remove("user.$id").apply()
         if (currentId == id) currentId = null
     }
 
@@ -41,6 +41,13 @@ class ServerStore(context: Context) {
 
     fun setToken(id: String, token: String?) {
         prefs.edit().apply { if (token == null) remove("token.$id") else putString("token.$id", token) }.apply()
+    }
+
+    /** Who is signed in on a server, kept so changes made offline are queued for the right person (USER-18). */
+    fun userId(id: String): Long? = prefs.getLong("user.$id", -1).takeIf { it >= 0 }
+
+    fun setUserId(id: String, user: Long?) {
+        prefs.edit().apply { if (user == null) remove("user.$id") else putLong("user.$id", user) }.apply()
     }
 
     /** A stable id for this install, sent as the device's client id. */

@@ -90,8 +90,10 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
     val context = LocalContext.current
     val me by marquee.me.collectAsState()
     var reload by remember { mutableIntStateOf(0) }
-    val page by produceState<Result<Page>?>(null, itemId, reload) {
-        value = withContext(Dispatchers.IO) {
+    // Reloads after a reconnection or after changes made offline were sent.
+    val connection by marquee.connection.collectAsState()
+    val page by produceState<Result<Page>?>(null, itemId, reload, connection) {
+        val fresh = withContext(Dispatchers.IO) {
             runCatching {
                 val d = marquee.items.getItem(itemId)
                 val children = if (d.childCount > 0) marquee.items.listItemChildren(itemId, limit = 500).items else emptyList()
@@ -103,6 +105,8 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 Page(d, children, related, similar, popular)
             }
         }
+        // A reload that fails keeps the page already shown.
+        if (fresh.isSuccess || value?.isSuccess != true) value = fresh
     }
     val p = page
     if (p == null) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }; return }
@@ -122,17 +126,23 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
     }) { Icon(Icons.Filled.Radio, null); Text("Radio") }
     /** Watchlist (USER-8) and watched state, for movies and shows. */
     @Composable fun StateButtons() {
-        var listed by remember(d.id) { mutableStateOf(d.watchlisted == true) }
-        var watched by remember(d.id) { mutableStateOf((d.viewCount ?: 0) > 0 || (d.leafCount > 0 && d.watchedLeafCount == d.leafCount)) }
+        // Changes made offline and not yet sent show over the page's older values (USER-18).
+        var listed by remember(d.id, d.watchlisted) {
+            mutableStateOf(marquee.sync.queued(d.id, app.marquee.core.PendingChange.Kind.Watchlist)?.on ?: (d.watchlisted == true))
+        }
+        var watched by remember(d.id, d.viewCount, d.watchedLeafCount) {
+            mutableStateOf(marquee.sync.queued(d.id, app.marquee.core.PendingChange.Kind.Watched)?.on
+                ?: ((d.viewCount ?: 0) > 0 || (d.leafCount > 0 && d.watchedLeafCount == d.leafCount)))
+        }
         if (d.type == ItemType.MOVIE || d.type == ItemType.SHOW) OutlinedButton(modifier = Modifier.focusRing(), onClick = {
             val on = !listed
             listed = on
-            scope.launch { withContext(Dispatchers.IO) { runCatching { if (on) marquee.items.addToWatchlist(d.id) else marquee.items.removeFromWatchlist(d.id) } } }
+            scope.launch { if (!marquee.sync.saveShowing(marquee.sync.watchlist(d.id, on), context)) listed = !on }
         }) { Icon(if (listed) Icons.Filled.BookmarkAdded else Icons.Filled.BookmarkAdd, null); Text(if (listed) "On Watchlist" else "Watchlist") }
         if (d.type in listOf(ItemType.MOVIE, ItemType.SHOW, ItemType.SEASON, ItemType.EPISODE, ItemType.VIDEO)) OutlinedButton(modifier = Modifier.focusRing(), onClick = {
             val on = !watched
             watched = on
-            scope.launch { withContext(Dispatchers.IO) { runCatching { if (on) marquee.items.markWatched(d.id) else marquee.items.markUnwatched(d.id) } } }
+            scope.launch { if (!marquee.sync.saveShowing(marquee.sync.watched(d.id, on), context)) watched = !on }
         }) { Icon(if (watched) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked, null); Text(if (watched) "Watched" else "Mark watched") }
         if (d.type in listOf(ItemType.MOVIE, ItemType.SHOW, ItemType.SEASON, ItemType.EPISODE, ItemType.VIDEO, ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK))
             AddToPlaylistButton(d.id, music = d.type in listOf(ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK))

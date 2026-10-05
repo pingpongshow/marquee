@@ -67,7 +67,7 @@ struct ArtworkView: View {
         if item.unwatchedCount > 0 {
             Text("\(item.unwatchedCount)").font(.caption2.bold()).padding(.horizontal, 5).padding(.vertical, 2)
                 .background(Color.marqueeGold, in: RoundedRectangle(cornerRadius: 4)).foregroundStyle(.black).padding(6)
-        } else if item.isPlayableVideo, item.watched, item.progress == nil {
+        } else if item.isPlayableVideo, OfflineSync.shared.pendingWatched(item.id) ?? item.watched, item.progress == nil {
             Image(systemName: "checkmark.circle.fill").symbolRenderingMode(.palette).foregroundStyle(.black, Color.marqueeGold).padding(6)
         }
     }
@@ -177,22 +177,23 @@ final class RatingStore {
     /// Bumped per item each time a rating reaches the server (community averages reload then).
     private(set) var saves: [Int64: Int] = [:]
 
-    /// The rating to show: this session's change, or the one the server sent.
+    /// The rating to show: this session's change, one waiting to sync (USER-18), or the one
+    /// the server sent.
     func rating(_ id: Int64, _ fallback: Double?) -> Double? {
         if let o = overrides[id] { return o > 0 ? o : nil }
+        if let pending = OfflineSync.shared.pendingRating(id) { return pending }
         return fallback
     }
 
     func set(_ id: Int64, _ rating: Double?) { overrides[id] = rating ?? 0 }
 
     /// Rates (0–10, half stars; nil clears) at once, and puts the old value back if the server
-    /// refuses.
+    /// refuses. Offline, the rating stays and syncs later (USER-18).
     func rate(_ id: Int64, _ rating: Double?, was old: Double?, app: AppSession) {
         set(id, rating)
         Task {
             do {
-                try await app.rate(id, rating)
-                saves[id, default: 0] += 1
+                if try await app.rate(id, rating) { saves[id, default: 0] += 1 }
             } catch {
                 set(id, old)
                 ActionError.shared.message = "Couldn't save the rating: \(error.localizedDescription)"

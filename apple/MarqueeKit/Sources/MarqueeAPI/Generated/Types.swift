@@ -1730,10 +1730,12 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//items/{itemId}/watched/post(markWatched)`.
     public func markWatched(
         path: Operations.MarkWatched.Input.Path,
+        query: Operations.MarkWatched.Input.Query = .init(),
         headers: Operations.MarkWatched.Input.Headers = .init()
     ) async throws -> Operations.MarkWatched.Output {
         try await markWatched(Operations.MarkWatched.Input(
             path: path,
+            query: query,
             headers: headers
         ))
     }
@@ -1741,10 +1743,12 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//items/{itemId}/watched/delete(markUnwatched)`.
     public func markUnwatched(
         path: Operations.MarkUnwatched.Input.Path,
+        query: Operations.MarkUnwatched.Input.Query = .init(),
         headers: Operations.MarkUnwatched.Input.Headers = .init()
     ) async throws -> Operations.MarkUnwatched.Output {
         try await markUnwatched(Operations.MarkUnwatched.Input(
             path: path,
+            query: query,
             headers: headers
         ))
     }
@@ -1853,10 +1857,12 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//items/{itemId}/watchlist/put(addToWatchlist)`.
     public func addToWatchlist(
         path: Operations.AddToWatchlist.Input.Path,
+        query: Operations.AddToWatchlist.Input.Query = .init(),
         headers: Operations.AddToWatchlist.Input.Headers = .init()
     ) async throws -> Operations.AddToWatchlist.Output {
         try await addToWatchlist(Operations.AddToWatchlist.Input(
             path: path,
+            query: query,
             headers: headers
         ))
     }
@@ -1864,10 +1870,12 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//items/{itemId}/watchlist/delete(removeFromWatchlist)`.
     public func removeFromWatchlist(
         path: Operations.RemoveFromWatchlist.Input.Path,
+        query: Operations.RemoveFromWatchlist.Input.Query = .init(),
         headers: Operations.RemoveFromWatchlist.Input.Headers = .init()
     ) async throws -> Operations.RemoveFromWatchlist.Output {
         try await removeFromWatchlist(Operations.RemoveFromWatchlist.Input(
             path: path,
+            query: query,
             headers: headers
         ))
     }
@@ -3150,10 +3158,12 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//items/{itemId}/reviews/{userId}/delete(deleteReview)`.
     public func deleteReview(
         path: Operations.DeleteReview.Input.Path,
+        query: Operations.DeleteReview.Input.Query = .init(),
         headers: Operations.DeleteReview.Input.Headers = .init()
     ) async throws -> Operations.DeleteReview.Output {
         try await deleteReview(Operations.DeleteReview.Input(
             path: path,
+            query: query,
             headers: headers
         ))
     }

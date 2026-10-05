@@ -166,6 +166,7 @@ Plex-style Live TV on every client (see the owner's reference screenshot: Guide 
 | USER-15 | **Muse for movies:** describe what you want to watch ("90s sci-fi with time travel") and get matches from the library: decade, genre, length, rating, watched and kid-friendly rules plus meaning-based ranking of plots, on the server's GPU (D87). | P1 |
 | USER-16 | **Recommendations:** "Recommended for You" and "Because you watched X" rows on Home, and "More like this" ranked by what titles are about (D87). | P1 |
 | USER-17 | **Ratings and reviews:** everyone rates for themselves (stars on every item and on song rows, tap to rate), sees the community rating (everyone's average and how many rated) and can leave a comment; favourites (4★+) and a "my rating" sort in libraries, on every app (D91). | P1 |
+| USER-18 | **Offline changes sync:** ratings, watched marks, the watchlist, comments and play progress changed in the apps without a connection are kept on the device and sent when it reconnects; a change made offline never overwrites a newer one made elsewhere (D93). | P1 |
 
 ## 5. Remote access (WAN)
 

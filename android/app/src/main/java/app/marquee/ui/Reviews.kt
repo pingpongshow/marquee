@@ -44,8 +44,6 @@ import app.marquee.api.models.CommunityRating
 import app.marquee.api.models.ItemDetail
 import app.marquee.api.models.ItemReviews
 import app.marquee.api.models.ItemType
-import app.marquee.api.models.RateItemRequest
-import app.marquee.api.models.SetReviewRequest
 import app.marquee.music.RatingStars
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -80,13 +78,15 @@ fun ItemRatings(d: ItemDetail, community: CommunityRating?, onRated: () -> Unit,
     val music = LocalMusic.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var rating by remember(d.id) { mutableStateOf(d.userRating?.takeIf { it > 0 }) }
+    var rating by remember(d.id, d.userRating) {
+        mutableStateOf(marquee.sync.queued(d.id, app.marquee.core.PendingChange.Kind.Rating)?.let { it.rating } ?: d.userRating?.takeIf { it > 0 })
+    }
     fun rate(r: Double?) {
         val before = rating
         rating = r
         music.ratingChanged(d.id, r)
         scope.launch {
-            val ok = withContext(Dispatchers.IO) { runCatching { marquee.items.rateItem(d.id, RateItemRequest(r)) }.isSuccess }
+            val ok = marquee.sync.saveShowing(marquee.sync.rating(d.id, r), context)
             if (!ok) {
                 rating = before
                 music.ratingChanged(d.id, before)
@@ -130,12 +130,16 @@ fun ReviewsSection(d: ItemDetail, reviews: ItemReviews?, isAdmin: Boolean, onCha
     val mine = reviews?.reviews?.firstOrNull { it.mine }
     var draft by remember(d.id, mine?.comment) { mutableStateOf(mine?.comment ?: "") }
     var busy by remember { mutableStateOf(false) }
-    fun run(what: String, work: () -> Unit) {
+    // Saved straight away, or kept on the device and sent later when the server can't be reached (USER-18).
+    fun run(what: String, change: app.marquee.core.PendingChange) {
         busy = true
         scope.launch {
-            val r = withContext(Dispatchers.IO) { runCatching { work() } }
+            val r = runCatching { marquee.sync.save(change) }
             busy = false
-            r.onSuccess { onChanged() }.onFailure { Toast.makeText(context, it.message ?: "Couldn't $what", Toast.LENGTH_LONG).show() }
+            r.onSuccess {
+                if (it == app.marquee.core.OfflineSync.Result.Queued) Toast.makeText(context, "Saved offline, will sync", Toast.LENGTH_SHORT).show()
+                else onChanged()
+            }.onFailure { Toast.makeText(context, it.message ?: "Couldn't $what", Toast.LENGTH_LONG).show() }
         }
     }
     Column(Modifier.padding(horizontal = sidePadding).semantics { contentDescription = "Ratings & comments" }, verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -150,9 +154,9 @@ fun ReviewsSection(d: ItemDetail, reviews: ItemReviews?, isAdmin: Boolean, onCha
             label = { Text("Your comment") }, placeholder = { Text("What did you think?") }, minLines = 2, maxLines = 6)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             val changed = draft.trim() != (mine?.comment ?: "")
-            Button({ run("save the comment") { marquee.items.setReview(d.id, SetReviewRequest(draft.trim())) } }, Modifier.focusRing(),
+            Button({ run("save the comment", marquee.sync.comment(d.id, draft.trim())) }, Modifier.focusRing(),
                 enabled = !busy && changed && draft.isNotBlank()) { Text(if (mine?.comment != null) "Save" else "Post") }
-            if (mine?.comment != null) OutlinedButton({ run("delete the comment") { marquee.items.setReview(d.id, SetReviewRequest("")) } }, Modifier.focusRing(), enabled = !busy) {
+            if (mine?.comment != null) OutlinedButton({ run("delete the comment", marquee.sync.comment(d.id, "")) }, Modifier.focusRing(), enabled = !busy) {
                 Icon(Icons.Filled.Delete, null); Text("Delete", Modifier.padding(start = 6.dp))
             }
         }
@@ -173,7 +177,7 @@ fun ReviewsSection(d: ItemDetail, reviews: ItemReviews?, isAdmin: Boolean, onCha
                     r.comment?.let { Text(it, Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodyMedium) }
                 }
                 if (isAdmin && !r.mine && r.comment != null) Box {
-                    IconButton({ run("delete the comment") { marquee.items.deleteReview(d.id, r.userId) } }, Modifier.focusRing()) {
+                    IconButton({ run("delete the comment", marquee.sync.deleteComment(d.id, r.userId)) }, Modifier.focusRing()) {
                         Icon(Icons.Filled.Delete, "Delete ${r.userName}'s comment")
                     }
                 }
