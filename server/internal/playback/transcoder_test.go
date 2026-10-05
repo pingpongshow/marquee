@@ -80,3 +80,28 @@ func TestTranscoderSegmentsSeekAndStop(t *testing.T) {
 		t.Error("stop should delete the session's files")
 	}
 }
+
+// An Apple TV playing an MKV whose image subtitle must be burned in: the video is
+// transcoded and the EAC3 audio copied into fMP4, which FFmpeg only accepts with delay_moov.
+func TestTranscoderCopiesEAC3(t *testing.T) {
+	ff := ffmpegPath(t)
+	dir := t.TempDir()
+	in := filepath.Join(dir, "eac3.mkv")
+	if out, err := exec.Command(ff, "-hide_banner", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=24:duration=8",
+		"-f", "lavfi", "-i", "sine=frequency=440:duration=8", "-c:v", "libx265", "-preset", "ultrafast", "-x265-params", "log-level=none",
+		"-c:a", "eac3", "-ac", "6", in).CombinedOutput(); err != nil {
+		t.Skipf("can't build sample: %v %s", err, out)
+	}
+	d := Decision{Method: Transcode, VideoCodec: "h264", Height: 360, VideoKbps: 2000, AudioCopy: true}
+	tr := &Transcoder{FFmpeg: ff, Job: Job{Input: in, Decision: d, VideoIndex: 0, AudioIndex: 1, SubIndex: -1, Dir: filepath.Join(dir, "s"), Preset: "speed"},
+		Encoders: []string{"software"}, TotalSegments: SegmentCount(8_000), ThrottleAhead: 20}
+	defer tr.Stop()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	if _, err := tr.Init(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tr.Segment(ctx, 0); err != nil {
+		t.Fatal(err)
+	}
+}
