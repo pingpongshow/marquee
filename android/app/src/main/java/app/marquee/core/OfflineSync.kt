@@ -95,11 +95,9 @@ class OfflineSync(context: Context, private val marquee: Marquee) {
         }
     }
 
-    /** [save] from a screen: a short "Saved offline" note when queued; false when refused. */
+    /** [save] from a screen, quietly (a queued change just syncs later); false when refused. */
     suspend fun saveShowing(c: PendingChange, context: Context = appContext): Boolean = try {
-        if (save(c) == Result.Queued) withContext(Dispatchers.Main) {
-            Toast.makeText(context, "Saved offline, will sync", Toast.LENGTH_SHORT).show()
-        }
+        save(c)
         true
     } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Throwable) { false }
 

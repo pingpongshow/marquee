@@ -137,8 +137,7 @@ fun ReviewsSection(d: ItemDetail, reviews: ItemReviews?, isAdmin: Boolean, onCha
             val r = runCatching { marquee.sync.save(change) }
             busy = false
             r.onSuccess {
-                if (it == app.marquee.core.OfflineSync.Result.Queued) Toast.makeText(context, "Saved offline, will sync", Toast.LENGTH_SHORT).show()
-                else onChanged()
+                if (it != app.marquee.core.OfflineSync.Result.Queued) onChanged() // a queued comment syncs later, quietly
             }.onFailure { Toast.makeText(context, it.message ?: "Couldn't $what", Toast.LENGTH_LONG).show() }
         }
     }

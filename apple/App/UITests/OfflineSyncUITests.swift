@@ -150,7 +150,6 @@ final class OfflineSyncUITests: XCTestCase {
         let four = app.buttons["4 stars"].firstMatch
         XCTAssertTrue(four.waitForExistence(timeout: 5))
         four.tap()
-        XCTAssertTrue(byID("savedOfflineToast").waitForExistence(timeout: 5), "the change is saved offline")
         sleep(2)
         XCTAssertEqual(rowStars.value as? String, "4 stars", "the rating stays (no revert, no alert)")
         XCTAssertFalse(app.alerts.firstMatch.exists)

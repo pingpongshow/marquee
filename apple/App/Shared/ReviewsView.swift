@@ -117,11 +117,6 @@ struct ReviewsSheet: View {
                         if draft.count > 1800 { Text("\(draft.count)/2000").font(.caption).foregroundStyle(draft.count > 2000 ? .red : .secondary) }
                     }
                     #endif
-                    if OfflineSync.shared.pendingComment(itemID) != nil {
-                        Label("Saved offline, will sync", systemImage: "icloud.and.arrow.up")
-                            .font(.caption).foregroundStyle(.secondary)
-                            .accessibilityIdentifier("commentPending")
-                    }
                 }
                 Section("Ratings & Comments") {
                     if reviews == nil, error == nil {

@@ -69,7 +69,6 @@ struct MainView: View {
         #endif
         .environment(video)
         .remoteToast()
-        .offlineSavedToast()
         // Remote control (USER-14): a player while open, and while music plays in the background.
         .onChange(of: scenePhase, initial: true) { old, new in
             updateRemote()

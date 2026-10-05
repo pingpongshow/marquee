@@ -26,38 +26,3 @@ struct PendingSyncSection: View {
         }
     }
 }
-
-/// A brief "Saved offline, will sync" note when a change is kept on the device.
-private struct OfflineSavedToast: ViewModifier {
-    @State private var shown = false
-    @State private var hide: Task<Void, Never>?
-
-    func body(content: Content) -> some View {
-        content
-            .overlay(alignment: .top) {
-                if shown {
-                    Label("Saved offline, will sync", systemImage: "icloud.and.arrow.up")
-                        .font(isTV ? .callout.weight(.semibold) : .footnote.weight(.semibold))
-                        .padding(.horizontal, 14).padding(.vertical, 8)
-                        .background(.regularMaterial, in: Capsule())
-                        .padding(.top, 8)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                        .accessibilityIdentifier("savedOfflineToast")
-                        .allowsHitTesting(false)
-                }
-            }
-            .onChange(of: OfflineSync.shared.lastQueued) {
-                withAnimation { shown = true }
-                hide?.cancel()
-                hide = Task {
-                    try? await Task.sleep(for: .seconds(2.5))
-                    guard !Task.isCancelled else { return }
-                    withAnimation { shown = false }
-                }
-            }
-    }
-}
-
-extension View {
-    func offlineSavedToast() -> some View { modifier(OfflineSavedToast()) }
-}
