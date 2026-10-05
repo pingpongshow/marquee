@@ -334,6 +334,30 @@ private struct UpNextCard: View {
     }
 }
 
+/// Holds the AVPlayerViewController and adds it once this view has a size. Added during
+/// SwiftUI's first layout pass, at zero width, its controls break their own constraints.
+final class PlayerHost: UIViewController {
+    let controller = AVPlayerViewController()
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        guard controller.parent == nil, view.bounds.width > 0, view.bounds.height > 0 else { return }
+        addChild(controller)
+        controller.view.frame = view.bounds
+        controller.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(controller.view)
+        controller.didMove(toParent: self)
+    }
+
+    // The Siri Remote's focus goes to the player's controls.
+    override var preferredFocusEnvironments: [any UIFocusEnvironment] { [controller] }
+}
+
 /// AVPlayerViewController: native controls, PiP, AirPlay, subtitle menu and Now Playing.
 struct PlayerController: UIViewControllerRepresentable {
     let playback: VideoPlayback
@@ -342,8 +366,9 @@ struct PlayerController: UIViewControllerRepresentable {
     /// Set while a cinema trailer plays.
     var trailer: TrailerActions?
 
-    func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let vc = AVPlayerViewController()
+    func makeUIViewController(context: Context) -> PlayerHost {
+        let host = PlayerHost()
+        let vc = host.controller
         vc.player = playback.player
         // Speed has its own menu, which watch together can hide (PLAY-19).
         vc.speeds = []
@@ -352,12 +377,14 @@ struct PlayerController: UIViewControllerRepresentable {
         vc.allowsPictureInPicturePlayback = true
         vc.canStartPictureInPictureAutomaticallyFromInline = true
         vc.entersFullScreenWhenPlaybackBegins = false
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
         #endif
-        return vc
+        // Movie mode: Apple TV offers Enhance Dialogue and similar audio options for it.
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+        return host
     }
 
-    func updateUIViewController(_ vc: AVPlayerViewController, context: Context) {
+    func updateUIViewController(_ host: PlayerHost, context: Context) {
+        let vc = host.controller
         if vc.player !== playback.player { vc.player = playback.player }
         #if os(tvOS)
         // Siri Remote: "Skip Intro" and "Next Episode" appear as contextual actions.
