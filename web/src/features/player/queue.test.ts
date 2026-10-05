@@ -40,11 +40,15 @@ describe("queue", () => {
     expect(current(q)?.item.id).toBe(2);
   });
 
-  it("starting shuffled plays the chosen track first", () => {
-    const q = load(emptyQueue, [1, 2, 3].map(track), 2, true, reverse);
-    expect(current(q)?.item.id).toBe(3);
+  it("starting shuffled shuffles every track, the first one included", () => {
+    const q = load(emptyQueue, [1, 2, 3].map(track), 0, true, reverse);
+    expect(ids(q).sort()).toEqual([1, 2, 3]);
     expect(q.index).toBe(0);
     expect(q.shuffled).toBe(true);
+    // With real randomness the opening track varies from one Shuffle to the next.
+    const firsts = new Set<number>();
+    for (let i = 0; i < 200; i++) firsts.add(current(load(emptyQueue, [1, 2, 3, 4, 5].map(track), 0, true))!.item.id);
+    expect(firsts.size).toBe(5);
   });
 
   it("play next inserts after the current track, also in the unshuffled order", () => {

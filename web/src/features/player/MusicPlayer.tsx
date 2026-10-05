@@ -62,7 +62,6 @@ type Actions = {
     station: { title: string; items: ItemSummary[] },
     radio?: RadioRequest,
   ) => void;
-  setLevelling: (l: Levelling) => void;
   setCrossfade: (s: number) => void;
   setDJ: (m: DJMode | null) => void;
   setSleep: (s: number | "track" | null) => void;
@@ -124,14 +123,6 @@ type Loaded = {
   peak?: number;
 };
 
-function storedLevelling(): Levelling {
-  try {
-    const v = localStorage.getItem("marquee.levelling");
-    return v === "off" || v === "track" || v === "album" ? v : "auto";
-  } catch {
-    return "auto";
-  }
-}
 
 /** Linear gain for a track: ReplayGain dB, limited so the peak doesn't clip. */
 function levelGain(
@@ -248,7 +239,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   // Playback decisions by queue entry key (the last few), for the audio quality badge.
   const [streams, setStreams] = useState<Record<number, StreamInfo>>({});
   const [source, setSource] = useState<Source | undefined>();
-  const [levelling, setLevellingState] = useState<Levelling>(storedLevelling);
+  // Volume levelling is always on (no setting): album gain while an album plays in order,
+  // else track gain.
+  const levelling: Levelling = "auto";
   const [sleep, setSleep] = useState<number | "track" | null>(null);
   const [crossfade, setCrossfadeState] = useState<number>(() =>
     stored<number>(
@@ -726,16 +719,6 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         unload(1 - active.current);
         setSource({ title: station.title, radio });
         setQueue((q) => Q.load(q, station.items, 0));
-      },
-      setLevelling: (l) => {
-        setLevellingState(l);
-        levellingRef.current = l;
-        applyGain(active.current);
-        try {
-          localStorage.setItem("marquee.levelling", l);
-        } catch {
-          /* storage unavailable */
-        }
       },
       setCrossfade: (s) => {
         setCrossfadeState(s);

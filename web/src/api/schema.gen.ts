@@ -2995,7 +2995,10 @@ export interface components {
             soundprintAnalysis?: boolean;
             /** @description Look up lyrics on LRCLIB when a track has none (sends artist and title). */
             onlineLyrics?: boolean;
-            /** @description Measure loudness of tracks without ReplayGain tags so volume levelling works for everything. */
+            /**
+             * @deprecated
+             * @description Ignored: volume levelling is always on, so tracks without ReplayGain tags are always measured.
+             */
             loudnessAnalysis?: boolean;
         };
         SecuritySettings: {

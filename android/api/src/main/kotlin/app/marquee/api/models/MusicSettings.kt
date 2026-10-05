@@ -33,7 +33,7 @@ import kotlinx.serialization.Contextual
  *
  * @param soundprintAnalysis Soundprint: analyse how tracks sound (on this server's GPU) for radios, similar music and Muse.
  * @param onlineLyrics Look up lyrics on LRCLIB when a track has none (sends artist and title).
- * @param loudnessAnalysis Measure loudness of tracks without ReplayGain tags so volume levelling works for everything.
+ * @param loudnessAnalysis Ignored: volume levelling is always on, so tracks without ReplayGain tags are always measured.
  */
 @Serializable
 
@@ -47,8 +47,9 @@ data class MusicSettings (
     @SerialName(value = "onlineLyrics")
     val onlineLyrics: kotlin.Boolean? = null,
 
-    /* Measure loudness of tracks without ReplayGain tags so volume levelling works for everything. */
+    /* Ignored: volume levelling is always on, so tracks without ReplayGain tags are always measured. */
     @SerialName(value = "loudnessAnalysis")
+    @Deprecated(message = "This property is deprecated.")
     val loudnessAnalysis: kotlin.Boolean? = null
 
 ) {

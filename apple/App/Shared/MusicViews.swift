@@ -364,24 +364,6 @@ struct SleepMenu: View {
     }
 }
 
-/// Volume levelling choice (MUSIC-9).
-struct LevellingMenu: View {
-    @Environment(MusicPlayer.self) private var music
-
-    var body: some View {
-        @Bindable var music = music
-        Menu {
-            Picker("Volume levelling", selection: $music.levelling) {
-                ForEach(MusicPlayer.Levelling.allCases, id: \.self) { Text($0.label).tag($0) }
-            }
-        } label: {
-            Label("Volume levelling: \(music.levelling.label)", systemImage: "slider.vertical.3")
-                .labelStyle(.iconOnly)
-        }
-        .accessibilityLabel("Volume levelling: \(music.levelling.label)")
-    }
-}
-
 /// DJ choice (MUSIC-6).
 struct DJMenu: View {
     @Environment(MusicPlayer.self) private var music

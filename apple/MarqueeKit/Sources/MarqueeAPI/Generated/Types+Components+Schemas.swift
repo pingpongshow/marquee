@@ -1255,16 +1255,17 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MusicSettings/onlineLyrics`.
             public var onlineLyrics: Swift.Bool?
-            /// Measure loudness of tracks without ReplayGain tags so volume levelling works for everything.
+            /// Ignored: volume levelling is always on, so tracks without ReplayGain tags are always measured.
             ///
             /// - Remark: Generated from `#/components/schemas/MusicSettings/loudnessAnalysis`.
+            @available(*, deprecated)
             public var loudnessAnalysis: Swift.Bool?
             /// Creates a new `MusicSettings`.
             ///
             /// - Parameters:
             ///   - soundprintAnalysis: Soundprint: analyse how tracks sound (on this server's GPU) for radios, similar music and Muse.
             ///   - onlineLyrics: Look up lyrics on LRCLIB when a track has none (sends artist and title).
-            ///   - loudnessAnalysis: Measure loudness of tracks without ReplayGain tags so volume levelling works for everything.
+            ///   - loudnessAnalysis: Ignored: volume levelling is always on, so tracks without ReplayGain tags are always measured.
             public init(
                 soundprintAnalysis: Swift.Bool? = nil,
                 onlineLyrics: Swift.Bool? = nil,

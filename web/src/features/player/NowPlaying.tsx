@@ -31,7 +31,6 @@ import {
   useMusicActions,
   useMusicState,
   type DJMode,
-  type Levelling,
 } from "./MusicPlayer";
 import type { Entry } from "./queue";
 import { EqualizerSheet } from "./Equalizer";
@@ -600,7 +599,6 @@ export function NowPlaying() {
           <div className="flex flex-wrap items-center justify-center gap-6">
             <Rating key={t.id} itemId={t.id} value={t.userRating} />
             <Volume className="flex" />
-            <LevellingSelect />
             <CrossfadeSelect />
             <DJSelect />
             <QualityToggle />
@@ -711,12 +709,6 @@ function SleepMenu() {
   );
 }
 
-const levellingLabels: Record<Levelling, string> = {
-  auto: "Volume levelling: auto",
-  track: "Level each track",
-  album: "Level by album",
-  off: "No levelling",
-};
 
 const selectCls =
   "rounded-md border border-white/20 bg-black/30 px-2 py-1 text-xs text-white/80";
@@ -773,20 +765,3 @@ function DJSelect() {
   );
 }
 
-function LevellingSelect() {
-  const m = useMusicState();
-  return (
-    <select
-      value={m.levelling}
-      onChange={(e) => m.setLevelling(e.target.value as Levelling)}
-      aria-label="Volume levelling"
-      className="rounded-md border border-white/20 bg-black/30 px-2 py-1 text-xs text-white/80"
-    >
-      {(Object.keys(levellingLabels) as Levelling[]).map((k) => (
-        <option key={k} value={k}>
-          {levellingLabels[k]}
-        </option>
-      ))}
-    </select>
-  );
-}

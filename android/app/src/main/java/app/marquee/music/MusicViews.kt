@@ -455,24 +455,6 @@ fun DJButton() {
     }
 }
 
-/** Volume levelling: Off, Track, Album or Smart (album gain while an album plays in order). */
-@Composable
-fun LevellingButton() {
-    val music = LocalMusic.current
-    val mode by music.levelling.collectAsState()
-    var open by remember { mutableStateOf(false) }
-    Box {
-        IconButton({ open = true }, Modifier.focusRing()) {
-            Icon(Icons.Filled.Tune, "Volume levelling: ${mode.label}", tint = if (mode == Levelling.Off) MaterialTheme.colorScheme.onSurfaceVariant else Gold)
-        }
-        DropdownMenu(open, { open = false }) {
-            Levelling.entries.forEach { l ->
-                DropdownMenuItem({ Text(l.label, fontWeight = if (l == mode) FontWeight.Bold else FontWeight.Normal) }, { music.setLevelling(l); open = false })
-            }
-        }
-    }
-}
-
 @Composable
 private fun TileRow(title: String, names: List<String>, contentPadding: PaddingValues, onOpen: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

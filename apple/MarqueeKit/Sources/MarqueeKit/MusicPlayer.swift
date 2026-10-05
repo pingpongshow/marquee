@@ -84,12 +84,9 @@ public final class MusicPlayer {
     }
     @ObservationIgnored private var djCount = 0
     @ObservationIgnored private var djBusy = false
-    public var levelling: Levelling = Levelling(rawValue: UserDefaults.standard.string(forKey: "marquee.levelling") ?? "") ?? .auto {
-        didSet {
-            UserDefaults.standard.set(levelling.rawValue, forKey: "marquee.levelling")
-            for item in player.items() { applyLevel(item) }
-        }
-    }
+    /// Volume levelling is always on (Automatic): album gain while an album plays in order,
+    /// else track gain. It's no longer a setting.
+    public let levelling: Levelling = .auto
     /// Crossfade length in seconds, 0 = off (MUSIC-9). Albums played in order stay gapless.
     public var crossfade: Int = UserDefaults.standard.integer(forKey: "marquee.crossfade") {
         didSet { UserDefaults.standard.set(crossfade, forKey: "marquee.crossfade") }

@@ -173,7 +173,6 @@ fun NowPlayingScreen(onClose: () -> Unit, onCarMode: (() -> Unit)? = null, onRem
                 }
                 SleepButton()
                 DJButton()
-                LevellingButton()
                 CrossfadeButton()
                 EqButton()
                 // Car mode on phones (the big-button screen).

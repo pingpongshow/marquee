@@ -117,3 +117,14 @@ private func ids(_ q: PlayQueue) -> [Int64] { q.entries.map(\.item.id) }
     #expect(ids(q) == [4, 1, 2, 3])
     #expect(q.current?.item.id == 2)
 }
+
+@Test func shuffleMixesTheOpeningTrackToo() {
+    var firsts = Set<Int64>()
+    for _ in 0..<200 {
+        var q = PlayQueue()
+        q.load((1...5).map(track), shuffle: true)
+        #expect(q.index == 0 && q.shuffled && Set(ids(q)) == Set(1...5))
+        firsts.insert(q.current!.item.id)
+    }
+    #expect(firsts.count == 5)
+}
