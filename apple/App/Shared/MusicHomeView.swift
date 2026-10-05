@@ -317,6 +317,24 @@ struct MusicSongsView: View {
 
     private static let page = 200
 
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort", selection: $sort) {
+                Text("Title").tag(ItemSort.title)
+                Text("Recently added").tag(ItemSort._hyphen_added)
+                Text("Rating").tag(ItemSort._hyphen_rating)
+                Text("My rating").tag(ItemSort._hyphen_myRating)
+                Text("Recently played").tag(ItemSort._hyphen_viewed)
+                Text("Random").tag(ItemSort.random)
+            }
+            Toggle("Rated 4★+", isOn: $ratedOnly)
+            FacetPickers(facets: facets, genre: $genre, decade: $decade)
+        } label: {
+            Label("Sort", systemImage: "arrow.up.arrow.down")
+        }
+        .accessibilityIdentifier("sortMenu")
+    }
+
     var body: some View {
         List {
             if let error { ErrorBanner(message: error) }
@@ -349,25 +367,17 @@ struct MusicSongsView: View {
         }
         .listStyle(.plain)
         .navigationTitle("Songs")
-        .toolbar {
-            ToolbarItem {
-                Menu {
-                    Picker("Sort", selection: $sort) {
-                        Text("Title").tag(ItemSort.title)
-                        Text("Recently added").tag(ItemSort._hyphen_added)
-                        Text("Rating").tag(ItemSort._hyphen_rating)
-                        Text("My rating").tag(ItemSort._hyphen_myRating)
-                        Text("Recently played").tag(ItemSort._hyphen_viewed)
-                        Text("Random").tag(ItemSort.random)
-                    }
-                    Toggle("Rated 4★+", isOn: $ratedOnly)
-                    FacetPickers(facets: facets, genre: $genre, decade: $decade)
-                } label: {
-                    Label("Sort", systemImage: "arrow.up.arrow.down")
-                }
-                .accessibilityIdentifier("sortMenu")
-            }
+        #if os(tvOS)
+        // The TV hides the navigation bar as the list scrolls: the sort menu stays pinned at
+        // the top right (Right from the list reaches it).
+        .safeAreaInset(edge: .trailing, alignment: .top, spacing: 0) {
+            sortMenu.labelStyle(.iconOnly).padding(.top, 30).padding(.trailing, 50)
+                .frame(maxHeight: .infinity, alignment: .top) // Right from any row lands here
+                .focusSection()
         }
+        #else
+        .toolbar { ToolbarItem { sortMenu } }
+        #endif
         .task { if facets == nil { facets = try? await app.filters(library: libraryID, type: .track) } }
         .task(id: "\(sort)-\(ratedOnly)-\(genre ?? "")-\(decade ?? 0)") {
             generation += 1
