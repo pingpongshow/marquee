@@ -35,7 +35,6 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.foundation.lazy.rememberLazyListState
 import app.marquee.ui.Gold
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
@@ -216,7 +215,6 @@ fun MusicHome(nav: NavHostController, library: Library) {
                     }
                 })
                 if (enabled) add(Triple("Muse", Icons.Filled.AutoAwesome) { nav.navigate("musicmuse/$lib") })
-                if (!marquee.isTv) add(Triple("Car mode", Icons.Filled.DirectionsCar) { nav.navigate("carmode?lib=$lib") })
             }
             Row(Modifier.fillMaxWidth().padding(horizontal = sidePadding).semantics { contentDescription = "Quick actions" },
                 horizontalArrangement = Arrangement.spacedBy(if (marquee.isTv) 28.dp else 8.dp, if (marquee.isTv) Alignment.Start else Alignment.CenterHorizontally)) {

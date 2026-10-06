@@ -8,7 +8,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Download
@@ -36,7 +37,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -173,17 +173,6 @@ fun LibrariesScreen(nav: NavHostController) {
             )
             HorizontalDivider()
         }
-        // Phones with Live TV list Playlists here instead of in the tab bar.
-        if (!marquee.isTv && liveOn) item {
-            ListItem(
-                headlineContent = { Text("Playlists") },
-                leadingContent = { Icon(Icons.Filled.LibraryMusic, null) },
-                trailingContent = { Icon(Icons.Filled.ChevronRight, null) },
-                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                modifier = Modifier.focusCard({ nav.navigate("playlists") }),
-            )
-            HorizontalDivider()
-        }
         // Phones and tablets keep downloads; TVs stream.
         if (!marquee.isTv) item {
             ListItem(
@@ -203,6 +192,18 @@ fun LibrariesScreen(nav: NavHostController) {
                 trailingContent = { Icon(Icons.Filled.ChevronRight, null) },
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
                 modifier = Modifier.initialFocus(marquee.isTv && i == 0).focusCard({ nav.navigate("library/${lib.id}") }),
+            )
+            HorizontalDivider()
+        }
+        // Live TV sits with the libraries (not a tab of its own), once it's set up.
+        if (liveOn) item(key = "livetv") {
+            ListItem(
+                headlineContent = { Text("Live TV") },
+                supportingContent = { Text("Guide, channels and recordings") },
+                leadingContent = { Icon(Icons.Filled.LiveTv, null) },
+                trailingContent = { Icon(Icons.Filled.ChevronRight, null) },
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+                modifier = Modifier.focusCard({ nav.navigate("livetv") }),
             )
             HorizontalDivider()
         }
@@ -388,6 +389,7 @@ fun SettingsScreen(nav: NavHostController) {
         PendingSyncRow()
         TrailersPreference()
         ShowAudioQualityPreference()
+        EqualiserSetting()
         // Buttons wrap onto more lines rather than running off a phone's edge.
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { nav.navigate("stats") }) { Text("Your Stats") }
@@ -447,6 +449,24 @@ private fun PlaylistDownloadButton(id: Long) {
             Text(if (done == ids.size) "Downloaded · Remove" else "$done/${ids.size} · Remove", maxLines = 1, softWrap = false)
         }
     }
+}
+
+/** Music: the equaliser (moved here from Now Playing), on this device only. */
+@Composable
+private fun EqualiserSetting() {
+    val music = LocalMusic.current
+    val eq by music.eq.collectAsState()
+    var open by remember { mutableStateOf(false) }
+    Row(Modifier.focusCard({ open = true }).semantics(mergeDescendants = true) { contentDescription = "Equaliser" }, verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Filled.Equalizer, null, Modifier.padding(end = 12.dp), tint = if (eq.on) Gold else MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text("Equaliser")
+            Text(if (eq.on) "Music: ${eq.preset}, on this device" else "Music: off, on this device", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    if (open) app.marquee.music.EqSheet { open = false }
 }
 
 /** Music: Show audio quality (MUSIC-23), on this device only. */

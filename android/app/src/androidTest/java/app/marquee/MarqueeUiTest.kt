@@ -102,6 +102,13 @@ class MarqueeUiTest {
         shot("03-home")
     }
 
+    /** Live TV is listed under Libraries (after the libraries), not a tab. */
+    private fun openLiveTv() {
+        tap("Libraries")
+        rule.waitUntil(15_000) { scrollTo(hasText("Live TV") and hasClickAction()) }
+        rule.onNode(hasText("Live TV") and hasClickAction()).performClick()
+    }
+
     private fun openLibrary(name: String) {
         tap("Libraries")
         rule.waitText(name)
@@ -507,7 +514,7 @@ class MarqueeUiTest {
     /** Live TV (LIVE-2/3): guide with a playing preview (phones), What's On, full screen, channel down. Needs a source. */
     @Test fun liveTv() {
         connectAndSignIn()
-        tap("Live TV")
+        openLiveTv()
         rule.waitText("What's On", 15_000)
         val playing = { name: String -> hasContentDescription(name) and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Playing") }
         if (!isTv) {
@@ -588,9 +595,7 @@ class MarqueeUiTest {
     @Test fun playlistDownload() {
         assumeTrue("phones and tablets only", !isTv)
         connectAndSignIn()
-        tap("Libraries")
-        rule.waitText("Playlists")
-        rule.onAllNodesWithText("Playlists").onFirst().performClick()
+        tap("Playlists")
         rule.waitText("Road Trip")
         tap("Road Trip")
         rule.waitText("Shuffle")
@@ -722,7 +727,7 @@ class MarqueeUiTest {
         adminApi("PATCH", "/users/${kid.getLong("id")}", org.json.JSONObject().put("restrictions", restrictions).toString())
 
         connectAndSignIn()
-        tap("Live TV")
+        openLiveTv()
         rule.waitText("Recordings", 15_000)
         // Move the guide on 90 minutes so the programmes shown haven't started.
         rule.waitUntilAtLeastOneExists(hasContentDescription("Later"), 10_000)
@@ -954,15 +959,17 @@ class MarqueeUiTest {
         rule.waitUntil(15_000) { scrollTo(hasText("Recently Added Movies")) }
     }
 
-    /** The equaliser (Now Playing → EQ): a preset turns it on and reaches the platform effect. */
+    /** The equaliser (Settings → Equaliser): a preset turns it on and reaches the platform effect. */
     @Test fun equaliser() {
         connectAndSignIn()
         val app = context.applicationContext as MarqueeApplication
         openLibrary("Music")
         rule.waitUntil(20_000) { scrollTo(hasText("Library Radio")) }
         tap("Library Radio")
-        openNowPlaying()
-        rule.onNode(hasContentDescription("Equaliser")).performClick()
+        rule.waitUntil(20_000) { app.music.now.value != null }
+        tap("Settings")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Equaliser") and hasClickAction(), 15_000)
+        rule.onNode(hasContentDescription("Equaliser") and hasClickAction()).performScrollTo().performClick()
         rule.waitText("Bass Boost")
         tap("Rock")
         rule.waitUntil(5_000) { app.music.eq.value.let { it.on && it.preset == "Rock" } }
@@ -976,30 +983,70 @@ class MarqueeUiTest {
         InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
     }
 
-    /** Car mode (phones): entered from the Music page, Shuffle All plays, works in landscape, Exit leaves. */
-    @Test fun carMode() {
+    /** Car mode is gone: no quick action on the music home, nothing in Now Playing; the equaliser isn't in Now Playing either. */
+    @Test fun noCarMode() {
+        connectAndSignIn()
+        val app = context.applicationContext as MarqueeApplication
+        openLibrary("Music")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Quick actions"), 20_000)
+        rule.waitText("Shuffle All")
+        assertTrue("no Car mode quick action", rule.onAllNodes(hasText("Car mode", ignoreCase = true)).fetchSemanticsNodes().isEmpty())
+        tap("Shuffle All")
+        openNowPlaying()
+        Thread.sleep(1000)
+        assertTrue("no Car mode in Now Playing", rule.onAllNodes(hasContentDescription("Car mode", ignoreCase = true)).fetchSemanticsNodes().isEmpty())
+        assertTrue("no equaliser in Now Playing", rule.onAllNodes(hasContentDescription("Equaliser")).fetchSemanticsNodes().isEmpty())
+        rule.onNode(hasContentDescription("Close Now Playing")).performClick()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+    }
+
+    /** Now Playing's header: same-size icon buttons in one row, and the "Playing from" title on its own line, never under them. */
+    @Test fun nowPlayingHeaderTidy() {
         assumeTrue("phones", !isTv)
         connectAndSignIn()
         val app = context.applicationContext as MarqueeApplication
         openLibrary("Music")
-        rule.waitText("Car mode")
-        tap("Car mode")
-        rule.waitUntilAtLeastOneExists(hasContentDescription("Car mode"), 10_000)
-        rule.waitText("Shuffle All")
-        tap("Shuffle All")
-        rule.waitUntil(20_000) { app.music.now.value != null }
-        rule.waitUntilAtLeastOneExists(hasContentDescription("Pause"), 15_000)
-        Thread.sleep(1500)
-        shot("car1-portrait")
-        scenario.onActivity { it.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
-        Thread.sleep(2500)
-        rule.waitText("Shuffle All")
-        shot("car2-landscape")
-        scenario.onActivity { it.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
-        rule.onNode(hasContentDescription("Next track")).performClick()
-        tap("Exit")
-        rule.waitUntil(10_000) { rule.onAllNodes(hasContentDescription("Car mode")).fetchSemanticsNodes().isEmpty() }
+        rule.waitUntil(20_000) { scrollTo(hasText("Library Radio")) }
+        tap("Library Radio")
+        openNowPlaying()
+        val header = rule.onNode(hasContentDescription("Now Playing header")).fetchSemanticsNode().boundsInRoot
+        val buttons = rule.onAllNodes(hasClickAction()).fetchSemanticsNodes().map { it.boundsInRoot }
+            .filter { it.top >= header.top - 1 && it.bottom <= header.bottom + 1 }
+        assertTrue("several header buttons (${buttons.size})", buttons.size >= 3)
+        val width = rule.onRoot().fetchSemanticsNode().boundsInRoot.width
+        buttons.forEach { b ->
+            assertTrue("same size: $b vs ${buttons[0]}", kotlin.math.abs(b.width - buttons[0].width) < 2 && kotlin.math.abs(b.height - buttons[0].height) < 2)
+            assertTrue("inside the screen: $b", b.left >= 0f && b.right <= width + 1f)
+        }
+        buttons.sortedBy { it.left }.zipWithNext().forEach { (a, b) -> assertTrue("no overlap: $a, $b", a.right <= b.left + 1) }
+        val title = rule.onNode(hasText("PLAYING FROM")).fetchSemanticsNode().boundsInRoot
+        assertTrue("title below the buttons ($title, header $header)", title.top >= header.bottom - 1)
+        assertTrue("title centred ($title in $width)", kotlin.math.abs((title.left + title.right) / 2 - width / 2) < 4)
+        shot("np-header")
+        rule.onNode(hasContentDescription("Close Now Playing")).performClick()
         InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+    }
+
+    /** Live TV (when set up) is in the Libraries list, after the libraries, and not a tab; it opens the guide. */
+    @Test fun liveTvInLibraries() {
+        connectAndSignIn()
+        val tab = SemanticsMatcher.expectValue(SemanticsProperties.Role, androidx.compose.ui.semantics.Role.Tab)
+        if (!isTv) {
+            rule.waitUntilAtLeastOneExists(hasText("Libraries") and tab, 10_000)
+            assertTrue("no Live TV tab", rule.onAllNodes(hasText("Live TV") and tab).fetchSemanticsNodes().isEmpty())
+        }
+        tap("Libraries")
+        rule.waitText("Music")
+        rule.waitUntil(15_000) { scrollTo(hasText("Live TV") and hasClickAction()) }
+        val live = rule.onNode(hasText("Live TV") and hasClickAction()).fetchSemanticsNode().boundsInRoot
+        val music = rule.onAllNodesWithText("Music").onFirst().fetchSemanticsNode().boundsInRoot
+        assertTrue("Live TV after the libraries", live.top > music.top)
+        shot("lt0-libraries")
+        rule.onNode(hasText("Live TV") and hasClickAction()).performClick()
+        rule.waitText("What's On", 15_000)
+        rule.waitText("Recordings")
+        back()
+        rule.waitUntilAtLeastOneExists(hasText("Live TV") and hasClickAction(), 10_000)
     }
 
     /** Sharing (USER-13): the admin invites a friend, gets the link to share, and deletes the invite. */
@@ -1845,9 +1892,7 @@ class MarqueeUiTest {
                 assertTrue("$where: $label is one line (${b.height / density} dp tall)", b.height / density <= 60f && b.width > b.height)
             }
         }
-        tap("Libraries")
-        rule.waitText("Playlists")
-        rule.onAllNodesWithText("Playlists").onFirst().performClick()
+        tap("Playlists")
         rule.waitText("Road Trip")
         tap("Road Trip")
         rule.waitText("Shuffle")
