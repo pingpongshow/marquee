@@ -481,6 +481,63 @@ final class Batch3UITests: XCTestCase {
         sleep(2)
         app.buttons["np.playPause"].tap()
     }
+    /// Now Playing's header: no car mode or equaliser buttons; Play On, AirPlay and Cast are
+    /// the same size and overlap neither each other nor the (long, truncated) source title,
+    /// in portrait and landscape.
+    func testNowPlayingHeaderTidy() throws {
+        let user = try temporaryUser()
+        addTeardownBlock { XCUIDevice.shared.orientation = .portrait }
+        signIn(username: user.name, password: user.password)
+        try openLongNamesAlbum()
+        let play = app.buttons["Play"].firstMatch
+        XCTAssertTrue(play.waitForExistence(timeout: 10))
+        play.tap()
+        let mini = app.buttons["miniPlayer"]
+        XCTAssertTrue(mini.waitForExistence(timeout: 15))
+        mini.tap()
+        let source = app.otherElements["nowPlayingSource"]
+        XCTAssertTrue(source.waitForExistence(timeout: 10))
+        for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
+            XCUIDevice.shared.orientation = orientation
+            let wantWide = orientation.isLandscape
+            for _ in 0..<20 {
+                let f = app.windows.firstMatch.frame
+                if (f.width > f.height) == wantWide { break }
+                usleep(250_000)
+            }
+            sleep(2)
+            let name = orientation == .portrait ? "portrait" : "landscape"
+            shot("nph-\(name)")
+            XCTAssertFalse(app.buttons["Car Mode"].exists, "\(name): no car mode button")
+            XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Equali'")).firstMatch.exists, "\(name): no EQ button")
+            let window = app.windows.firstMatch.frame
+            var buttons = [app.buttons["Play on…"].firstMatch, app.buttons["AirPlay"].firstMatch]
+            let cast = app.descendants(matching: .any)["castButton"].firstMatch
+            if cast.exists, !cast.frame.isEmpty { buttons.append(cast) }
+            for b in buttons { XCTAssertTrue(b.waitForExistence(timeout: 5), "\(name): \(b)") }
+            // The title's texts, and the area they sit in.
+            let texts = source.staticTexts.allElementsBoundByIndex.map(\.frame) + [source.frame]
+            XCTAssertTrue(source.staticTexts["PLAYING FROM"].exists, "\(name): the source title shows")
+            for (i, b) in buttons.enumerated() {
+                let f = b.frame
+                XCTAssertTrue(window.contains(f), "\(name): \(b.label) \(f) on screen")
+                // Same size as the first (AirPlay's picker draws its own button inside).
+                XCTAssertEqual(f.width, buttons[0].frame.width, accuracy: 1.5, "\(name): \(b.label) is the same size")
+                XCTAssertEqual(f.height, buttons[0].frame.height, accuracy: 1.5, "\(name): \(b.label) is the same size")
+                for t in texts { XCTAssertFalse(f.intersects(t), "\(name): \(b.label) \(f) overlaps the title \(t)") }
+                for other in buttons[(i + 1)...] {
+                    XCTAssertFalse(f.intersects(other.frame), "\(name): \(b.label) overlaps \(other.label)")
+                }
+            }
+            // Centred: the title's middle is the header's middle.
+            let header = buttons.map(\.frame).reduce(source.frame) { $0.union($1) }
+            XCTAssertEqual(source.frame.midX, header.midX, accuracy: 3, "\(name): the title is centred")
+        }
+        XCUIDevice.shared.orientation = .portrait
+        sleep(2)
+        app.buttons["np.playPause"].tap()
+    }
+
     // MARK: - Save a Muse mix as a playlist
 
     /// Start a Muse mix, save it as a playlist (title from the prompt), open it; Now Playing's

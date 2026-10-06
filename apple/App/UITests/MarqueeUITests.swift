@@ -274,7 +274,16 @@ final class MarqueeUITests: XCTestCase {
     /// channel up. Needs a Live TV source (scripts/fake-iptv.py in development).
     func testLiveTV() {
         connectAndSignIn()
-        app.buttons["Live TV"].firstMatch.tap()
+        // Live TV is with the libraries, not a tab of its own (iPhone).
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            XCTAssertTrue(app.tabBars.buttons["Libraries"].waitForExistence(timeout: 10))
+            XCTAssertFalse(app.tabBars.buttons["Live TV"].exists, "Live TV isn't a tab")
+            app.tabBars.buttons["Libraries"].tap()
+            let row = app.buttons["libraries.liveTV"]
+            XCTAssertTrue(row.waitForExistence(timeout: 10), "Live TV is listed with the libraries")
+            shot("l0-libraries")
+        }
+        openLibrary("Live TV")
         XCTAssertTrue(app.navigationBars["Live TV"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["Unmute"].waitForExistence(timeout: 20), "the preview tunes")
         sleep(5)
@@ -772,7 +781,7 @@ final class MarqueeUITests: XCTestCase {
         try adminAPI("PATCH", "/users/\(kid["id"] as! Int)", ["restrictions": restrictions])
 
         connectAndSignIn()
-        app.buttons["Live TV"].firstMatch.tap()
+        openLibrary("Live TV")
         XCTAssertTrue(app.navigationBars["Live TV"].waitForExistence(timeout: 10))
         // Move the guide on 90 minutes, so what's on screen hasn't started, and pick one.
         XCTAssertTrue(app.buttons["Later"].waitForExistence(timeout: 10))
@@ -809,7 +818,7 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Upcoming"].waitForNonExistence(timeout: 10))
     }
 
-    // MARK: - Playback and Home extras (PLAY-17/18/19, USER-12/13, META-7, equaliser, car mode)
+    // MARK: - Playback and Home extras (PLAY-17/18/19, USER-12/13, META-7, equaliser)
 
     /// Opens a movie by title from the Movies library.
     private func openMovie(_ prefix: String) {
@@ -1012,14 +1021,26 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["PLAYING FROM"].waitForExistence(timeout: 5))
     }
 
-    /// The equaliser (iPhone/iPad): turn it on, pick a preset, and the music keeps playing.
+    /// Settings › Music › Equalizer.
+    private func openEqualizerSettings() {
+        app.buttons["Settings"].firstMatch.tap()
+        let link = app.buttons["settings.equalizer"]
+        for _ in 0..<8 where !link.isHittable { app.swipeUp() }
+        XCTAssertTrue(link.waitForExistence(timeout: 5))
+        link.tap()
+        XCTAssertTrue(app.navigationBars["Equalizer"].waitForExistence(timeout: 5))
+    }
+
+    /// The equaliser (iPhone/iPad), from Settings › Music: turn it on, pick a preset, and the
+    /// music keeps playing. Now Playing has no equaliser button any more.
     func testEqualizer() {
         connectAndSignIn()
         playRadioAndOpenNowPlaying()
-        let eq = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Equaliser'")).firstMatch
-        XCTAssertTrue(eq.waitForExistence(timeout: 5))
-        eq.tap()
-        let toggle = app.switches["Equaliser"]
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Equali'")).firstMatch.exists, "no EQ button in Now Playing")
+        app.swipeDown(velocity: .fast)
+        XCTAssertTrue(app.staticTexts["PLAYING FROM"].waitForNonExistence(timeout: 5))
+        openEqualizerSettings()
+        let toggle = app.switches["Equalizer"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         if toggle.value as? String == "0" { toggle.switches.firstMatch.tap() }
         XCTAssertEqual(toggle.value as? String, "1")
@@ -1028,65 +1049,95 @@ final class MarqueeUITests: XCTestCase {
         let low = app.sliders["31 hertz"]
         XCTAssertTrue(low.exists)
         XCTAssertEqual(low.value as? String, "+6.0 decibels")
-        shot("eq1-sheet")
+        shot("eq1-settings")
         // A custom band makes it "Custom".
-        app.sliders["1k hertz"].adjust(toNormalizedSliderPosition: 0.8)
+        let k1 = app.sliders["1k hertz"]
+        for _ in 0..<4 where !k1.isHittable { app.swipeUp() }
+        k1.adjust(toNormalizedSliderPosition: 0.8)
         XCTAssertTrue(app.staticTexts["Custom"].waitForExistence(timeout: 5))
-        app.buttons["Done"].tap()
-        XCTAssertTrue(app.buttons["Equaliser on"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons["Settings"].tap()
+        // Settings shows it's on.
+        let link = app.buttons["settings.equalizer"]
+        XCTAssertTrue(link.waitForExistence(timeout: 5))
+        XCTAssertTrue(link.label.contains("Custom"), link.label)
         // Still playing through the equaliser: the clock moves.
+        app.buttons["miniPlayer"].tap()
+        XCTAssertTrue(app.staticTexts["PLAYING FROM"].waitForExistence(timeout: 5))
         let clock = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH '-'")).firstMatch
         let t1 = clock.label
         sleep(3)
         XCTAssertNotEqual(clock.label, t1, "music plays on with the equaliser")
         XCTAssertFalse(app.staticTexts["musicError"].exists)
         shot("eq2-playing")
+        app.buttons["np.playPause"].tap()
+        app.swipeDown(velocity: .fast)
         // Off again (it's kept on the device).
-        app.buttons["Equaliser on"].tap()
+        XCTAssertTrue(link.waitForExistence(timeout: 5))
+        link.tap()
         app.buttons["Flat"].tap()
-        app.switches["Equaliser"].switches.firstMatch.tap()
-        app.buttons["Done"].tap()
+        app.switches["Equalizer"].switches.firstMatch.tap()
+        app.navigationBars.buttons["Settings"].tap()
+        XCTAssertTrue(link.waitForExistence(timeout: 5))
+        XCTAssertTrue(link.label.contains("Off"), link.label)
     }
 
-    /// Car mode: big controls and quick-start tiles, in portrait and landscape.
-    func testCarMode() {
+    /// Car mode is gone: no quick action on the music home, nothing in Now Playing.
+    func testNoCarMode() {
         connectAndSignIn()
         openLibrary("Music")
-        let open = app.buttons["Car Mode"].firstMatch
-        XCTAssertTrue(open.waitForExistence(timeout: 10))
-        open.tap()
-        XCTAssertTrue(app.buttons["Exit car mode"].waitForExistence(timeout: 5))
-        let car = app.otherElements["carMode"]
-        XCTAssertTrue(car.exists)
-        shot("car1-empty")
-        let tiles = car.buttons.matching(identifier: "carTile")
-        XCTAssertEqual(tiles.count, 4)
-        tiles["Library Radio"].tap()
-        let title = app.staticTexts["carTitle"]
-        XCTAssertTrue(title.waitForExistence(timeout: 20), "the radio starts")
-        XCTAssertTrue(car.buttons["Pause"].waitForExistence(timeout: 10))
-        shot("car2-playing")
+        XCTAssertTrue(app.buttons["Shuffle All"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["Car Mode"].exists)
+        app.buttons["Shuffle All"].tap()
+        let mini = app.buttons["miniPlayer"]
+        XCTAssertTrue(mini.waitForExistence(timeout: 20))
+        mini.tap()
+        XCTAssertTrue(app.staticTexts["PLAYING FROM"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Car Mode"].exists)
+        app.buttons["np.playPause"].tap()
+    }
+
+    /// A preloaded next track whose session the server dropped (simulated: the first preload's
+    /// session is ended as soon as it starts) is loaded again, not skipped: Next plays it, and
+    /// the clock runs.
+    func testDeadPreloadIsReloaded() {
+        app.terminate()
+        app.launchArguments = ["-marquee-reset", "-marquee-test-dead-preload"]
+        app.launch()
+        connectAndSignIn()
+        openLibrary("Music")
+        let artist = openArtist("Calm Pads")
+        artist.tap()
+        let play = app.buttons["Play"].firstMatch
+        XCTAssertTrue(play.waitForExistence(timeout: 10))
+        play.tap()
+        let mini = app.buttons["miniPlayer"]
+        XCTAssertTrue(mini.waitForExistence(timeout: 20))
+        sleep(4) // the next track preloads (and its session is ended)
+        mini.tap()
+        XCTAssertTrue(app.buttons["Up Next"].waitForExistence(timeout: 5))
+        // What should play next.
+        app.buttons["Up Next"].tap()
+        let upNext = app.cells.matching(NSPredicate(format: "label != ''")).element(boundBy: 2)
+        sleep(1)
+        shot("dp1-up-next")
+        let expected = upNext.exists ? upNext.label : ""
+        app.buttons["Now Playing"].firstMatch.tap()
+        let title = app.staticTexts["nowPlayingTitle"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
         let first = title.label
-        car.buttons["Next track"].tap()
+        app.buttons["np.next"].tap()
         expectation(for: NSPredicate(format: "label != %@", first), evaluatedWith: title)
         waitForExpectations(timeout: 15)
-        XCUIDevice.shared.orientation = .landscapeLeft
+        if !expected.isEmpty { XCTAssertTrue(expected.contains(title.label), "the next track plays (\(title.label)), not one after it: \(expected)") }
+        // It plays: the clock moves and nothing failed.
+        let clock = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH '-'")).firstMatch
         sleep(2)
-        XCTAssertTrue(app.buttons["Exit car mode"].isHittable)
-        XCTAssertTrue(tiles["Shuffle All"].isHittable)
-        XCTAssertTrue(car.buttons["Pause"].isHittable)
-        shot("car3-landscape")
-        XCUIDevice.shared.orientation = .portrait
-        car.buttons["Pause"].tap()
-        XCTAssertTrue(car.buttons["Play"].waitForExistence(timeout: 5))
-        app.buttons["Exit car mode"].tap()
-
-        // Also from Now Playing.
-        app.buttons["miniPlayer"].tap()
-        XCTAssertTrue(app.staticTexts["PLAYING FROM"].waitForExistence(timeout: 5))
-        app.buttons["Car Mode"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["Exit car mode"].waitForExistence(timeout: 5))
-        app.buttons["Exit car mode"].tap()
+        let t1 = clock.label
+        sleep(3)
+        XCTAssertNotEqual(clock.label, t1, "the reloaded track plays")
+        XCTAssertFalse(app.staticTexts["musicError"].exists, "no 'Couldn't play'")
+        shot("dp2-next-playing")
+        app.buttons["np.playPause"].tap()
     }
 
     /// Signs in with a username and password from the profile picker.

@@ -88,8 +88,10 @@ public final class Equalizer {
         state.update(enabled: enabled, gains: gains)
     }
 
-    /// A new tap for one player item (each item needs its own filter state).
-    nonisolated func makeTap() -> MTAudioProcessingTap? { EqualizerTap.make(state) }
+    /// A new tap for one player item (each item needs its own filter state). `gain` (linear)
+    /// is applied whether or not the equaliser is on: volume levelling raises quiet tracks
+    /// here, where an audio mix's volume can't go above 1.
+    nonisolated func makeTap(gain: Double = 1) -> MTAudioProcessingTap? { EqualizerTap.make(state, gain: gain) }
 
     public static func label(_ hz: Double) -> String { hz >= 1000 ? "\(Int(hz / 1000))k" : "\(Int(hz))" }
 }
@@ -180,8 +182,9 @@ final class EQState: @unchecked Sendable {
 
 /// One tap's filters: per band, coefficients and per-channel state (transposed direct form II),
 /// in buffers allocated once. The filter state carries over when the settings change, and the
-/// preamp moves smoothly, so dragging a slider doesn't click.
-private final class EqualizerTap {
+/// preamp moves smoothly, so dragging a slider doesn't click. It also carries the track's
+/// levelling boost (a fixed gain for the item's life).
+final class EqualizerTap {
     /// Channels the filter state has room for (more are left untouched).
     private static let maxChannels = 16
     private let state: EQState
@@ -199,9 +202,12 @@ private final class EqualizerTap {
     private var preamp = 1.0
     /// The preamp actually applied, gliding to `preamp` over each buffer.
     private var appliedPreamp = 1.0
+    /// Volume levelling's boost for this item (1 = none).
+    private let gain: Double
 
-    private init(state: EQState) {
+    private init(state: EQState, gain: Double) {
         self.state = state
+        self.gain = gain.isFinite && gain > 0 ? gain : 1
         coeffs = .allocate(capacity: EQState.coefficientCount)
         z = .allocate(capacity: Equalizer.bands.count * Self.maxChannels * 2)
         for b in 0..<bandCount {
@@ -216,8 +222,8 @@ private final class EqualizerTap {
         z.deallocate()
     }
 
-    static func make(_ state: EQState) -> MTAudioProcessingTap? {
-        let ctx = EqualizerTap(state: state)
+    static func make(_ state: EQState, gain: Double) -> MTAudioProcessingTap? {
+        let ctx = EqualizerTap(state: state, gain: gain)
         var callbacks = MTAudioProcessingTapCallbacks(
             version: kMTAudioProcessingTapCallbacksVersion_0,
             clientInfo: Unmanaged.passRetained(ctx).toOpaque(),
@@ -265,11 +271,31 @@ private final class EqualizerTap {
         preamp = s.preamp
     }
 
+    /// Multiplies every `stride`th sample by `gain`, clamped to full scale (the levelling
+    /// boost while the equaliser is off).
+    static func scale(_ data: UnsafeMutablePointer<Float>, count: Int, stride: Int, gain: Float) {
+        var i = 0
+        while i < count {
+            data[i] = min(1, max(-1, data[i] * gain))
+            i += stride
+        }
+    }
+
     private func process(_ buffers: UnsafeMutableAudioBufferListPointer, frames: Int) {
         refresh()
-        guard enabled, usable, frames > 0 else { return }
-        let from = appliedPreamp, to = preamp
-        appliedPreamp = to
+        guard usable, frames > 0 else { return }
+        guard enabled else {
+            // Only the levelling boost.
+            guard gain != 1 else { return }
+            for buffer in buffers {
+                guard let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
+                let count = interleaved ? frames * Int(buffer.mNumberChannels) : frames
+                Self.scale(data, count: count, stride: 1, gain: Float(gain))
+            }
+            return
+        }
+        let from = appliedPreamp * gain, to = preamp * gain
+        appliedPreamp = preamp
         let step = (to - from) / Double(frames)
         let bands = bandCount
         let stride = EQState.stride

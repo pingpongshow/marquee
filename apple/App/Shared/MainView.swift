@@ -22,31 +22,33 @@ struct MainView: View {
     var body: some View {
         TabView {
             Tab("Home", systemImage: "house") { stack { HomeView() } }
-            if hasLiveTV {
-                Tab("Live TV", systemImage: "tv") { stack { LiveTVView() } }
-            }
             if compact {
-                // iPhone: one Libraries tab so the tab bar doesn't overflow into "More".
+                // iPhone: one Libraries tab so the tab bar doesn't overflow into "More". Live TV
+                // is listed there with the libraries.
                 Tab("Libraries", systemImage: "square.stack") {
-                    stack { LibrariesList(libraries: libraries, error: librariesError, icon: icon, reload: { await loadAll() }) }
+                    stack { LibrariesList(libraries: libraries, liveTV: hasLiveTV, error: librariesError, icon: icon, reload: { await loadAll() }) }
                 }
             } else {
+                // iPad sidebar and Apple TV top bar: Live TV is one of the libraries, after
+                // the video ones.
                 TabSection("Libraries") {
-                    ForEach(libraries, id: \.id) { lib in
-                        Tab(lib.name, systemImage: icon(lib._type)) { stack { LibraryView(libraryID: lib.id) } }
+                    ForEach(LibraryEntry.list(libraries, liveTV: hasLiveTV)) { entry in
+                        switch entry {
+                        case .library(let lib):
+                            Tab(lib.name, systemImage: icon(lib._type)) { stack { LibraryView(libraryID: lib.id) } }
+                        case .liveTV:
+                            Tab("Live TV", systemImage: "antenna.radiowaves.left.and.right") { stack { LiveTVView() } }
+                        }
                     }
                     if libraries.isEmpty, librariesError != nil {
                         // The server wasn't reachable: a way back instead of an empty section.
                         Tab("Libraries", systemImage: "exclamationmark.triangle") {
-                            stack { LibrariesList(libraries: [], error: librariesError, icon: icon, reload: { await loadAll() }) }
+                            stack { LibrariesList(libraries: [], liveTV: false, error: librariesError, icon: icon, reload: { await loadAll() }) }
                         }
                     }
                 }
             }
-            // iPhone with Live TV: Playlists moves under Libraries to keep five tabs.
-            if !(compact && hasLiveTV) {
-                Tab("Playlists", systemImage: "music.note.list") { stack { PlaylistsView() } }
-            }
+            Tab("Playlists", systemImage: "music.note.list") { stack { PlaylistsView() } }
             if !compact && canDiscover {
                 Tab("Discover", systemImage: "safari") { stack { DiscoverView() } }
             }
@@ -191,10 +193,35 @@ extension EnvironmentValues {
     }
 }
 
+/// A row of the Libraries list (or a sidebar / top bar tab): a library, or Live TV, which is
+/// listed after the video libraries when it's set up.
+enum LibraryEntry: Identifiable {
+    case library(Library)
+    case liveTV
+
+    var id: String {
+        switch self {
+        case .library(let l): "library-\(l.id)"
+        case .liveTV: "liveTV"
+        }
+    }
+
+    static func list(_ libraries: [Library], liveTV: Bool) -> [LibraryEntry] {
+        var out = libraries.map(LibraryEntry.library)
+        guard liveTV else { return out }
+        let video: Set<Schemas.LibraryType> = [.movies, .shows, .anime, .videos]
+        let at = (libraries.lastIndex { video.contains($0._type) }).map { $0 + 1 } ?? libraries.count
+        out.insert(.liveTV, at: at)
+        return out
+    }
+}
+
 struct LibrariesList: View {
     @Environment(AppSession.self) private var app
     @State private var canDiscover = false
     let libraries: [Library]
+    /// Live TV is set up: listed with the libraries.
+    var liveTV = false
     var error: String?
     let icon: (Schemas.LibraryType) -> String
     var reload: () async -> Void = {}
@@ -207,16 +234,31 @@ struct LibrariesList: View {
                         .accessibilityIdentifier("librariesRetry")
                 }
             }
-            ForEach(libraries, id: \.id) { lib in
-                NavigationLink(value: Route.library(lib.id)) {
-                    Label {
-                        VStack(alignment: .leading) {
-                            Text(lib.name)
-                            Text("\(lib.itemCount) items").font(.caption).foregroundStyle(.secondary)
+            ForEach(LibraryEntry.list(libraries, liveTV: liveTV)) { entry in
+                switch entry {
+                case .library(let lib):
+                    NavigationLink(value: Route.library(lib.id)) {
+                        Label {
+                            VStack(alignment: .leading) {
+                                Text(lib.name)
+                                Text("\(lib.itemCount) items").font(.caption).foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: icon(lib._type)).foregroundStyle(Color.marqueeGold)
                         }
-                    } icon: {
-                        Image(systemName: icon(lib._type)).foregroundStyle(Color.marqueeGold)
                     }
+                case .liveTV:
+                    NavigationLink(value: Route.liveTV) {
+                        Label {
+                            VStack(alignment: .leading) {
+                                Text("Live TV")
+                                Text("Guide, channels and recordings").font(.caption).foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "antenna.radiowaves.left.and.right").foregroundStyle(Color.marqueeGold)
+                        }
+                    }
+                    .accessibilityIdentifier("libraries.liveTV")
                 }
             }
             #if os(iOS)

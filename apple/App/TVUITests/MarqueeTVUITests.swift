@@ -286,6 +286,32 @@ final class MarqueeTVUITests: XCTestCase {
         shot("tv-library-button-focused")
     }
 
+    /// Live TV is a tab placed with the libraries, after the video ones, not a fixed second
+    /// tab; it opens the guide.
+    func testLiveTVTabWithLibraries() throws {
+        _ = try signInTemporaryUser()
+        remote.press(.up)
+        let live = app.buttons["Live TV"].firstMatch
+        XCTAssertTrue(live.waitForExistence(timeout: 10))
+        sleep(1)
+        shot("tv-live-tab")
+        let home = app.buttons["Home"].firstMatch
+        XCTAssertTrue(home.exists)
+        // The test server's video libraries.
+        let videos = ["Anime", "Movies", "Recorded TV"].map { app.buttons[$0].firstMatch }
+        for v in videos {
+            XCTAssertTrue(v.exists, "\(v) is a tab")
+            XCTAssertLessThan(v.frame.midX, live.frame.midX, "Live TV comes after \(v.label)")
+        }
+        // Not straight after Home: libraries sit between them.
+        let between = videos.filter { $0.frame.midX > home.frame.midX && $0.frame.midX < live.frame.midX }
+        XCTAssertFalse(between.isEmpty, "Live TV isn't the second tab")
+        focus(live, direction: .right, tries: 10)
+        remote.press(.select)
+        XCTAssertTrue(app.buttons["What's On"].firstMatch.waitForExistence(timeout: 15), "the Live TV screen opens")
+        shot("tv-live-open")
+    }
+
     // MARK: - Playback and profile extras on the TV (USER-12, PLAY-17, PLAY-19)
 
     /// Calls the server; returns the JSON object.

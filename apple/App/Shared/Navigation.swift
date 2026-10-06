@@ -10,6 +10,8 @@ enum Route: Hashable {
     case playlists
     case downloads
     case discover
+    /// Live TV, listed with the libraries.
+    case liveTV
     case moodStyle(library: Int64, mood: Bool, name: String)
     /// Muse for movies and shows (USER-15), optionally in one library.
     case museVideo(library: Int64?)
@@ -24,6 +26,8 @@ enum Route: Hashable {
 /// Screens opened from Settings (value links, so the stack never re-pushes or pops them).
 enum SettingsPage: Hashable {
     case stats, requests, users, cinema, librarySettings, libraryHealth, integrations, editHome, subtitleAppearance, remotePlayers
+    /// The music equaliser (iPhone/iPad).
+    case equalizer
 }
 
 /// The full lists behind a music library's landing page.
@@ -51,6 +55,7 @@ extension View {
             case .downloads: EmptyView()
             #endif
             case .discover: DiscoverView()
+            case .liveTV: LiveTVView()
             case let .moodStyle(library, mood, name): MoodStyleView(libraryID: library, kind: mood ? .mood : .style, name: name)
             case let .museVideo(library): VideoMuseView(libraryID: library)
             case let .musicBrowse(library, kind):
@@ -87,8 +92,9 @@ private func settingsPage(_ page: SettingsPage) -> some View {
     case .libraryHealth: LibraryHealthView()
     case .integrations: IntegrationsView()
     case .remotePlayers: RemotePlayersView()
+    case .equalizer: EqualizerView()
     #else
-    case .librarySettings, .libraryHealth, .integrations, .remotePlayers: EmptyView()
+    case .librarySettings, .libraryHealth, .integrations, .remotePlayers, .equalizer: EmptyView()
     #endif
     }
 }
