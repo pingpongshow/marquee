@@ -45,6 +45,12 @@ public final class Downloads {
         /// The transfer failed for want of the network (leaving home, say): it's tried again,
         /// at the address then in use, when the server is reachable.
         public var networkFailure: Bool?
+        /// Music: loudness for volume levelling (MUSIC-9), from the server once it's known;
+        /// `gainsChecked` once asked (a track can have none).
+        public var trackGainDb: Double?
+        public var albumGainDb: Double?
+        public var peak: Double?
+        public var gainsChecked: Bool?
     }
 
     /// A play made while offline, from the queue Downloads kept before offline sync (USER-18)
@@ -84,6 +90,7 @@ public final class Downloads {
     /// Guards against overlapping work when attach runs again (every reconnect).
     @ObservationIgnored private var resuming = false
     @ObservationIgnored private var syncing = false
+    @ObservationIgnored private var fetchingGains = false
     /// When each transfer last updated its progress (updates are throttled).
     @ObservationIgnored private var lastProgress: [Int64: (at: Date, fraction: Double)] = [:]
     /// A save of the index waiting to happen (saves are coalesced and written off the main thread).
@@ -134,6 +141,8 @@ public final class Downloads {
             defer { syncing = false }
             for id in syncedPlaylists.keys { await syncPlaylist(id) }
             saveNow()
+            // Tracks downloaded before loudness was kept with them.
+            await fetchGains()
         }
     }
 
@@ -235,7 +244,10 @@ public final class Downloads {
             pollConversions()
         }
         save()
-        Task { await savePoster(item) }
+        Task {
+            await savePoster(item)
+            if item._type == .track { await fetchGains() }
+        }
     }
 
     /// Downloads every playable item under a container (season, show, album, artist, playlist).
@@ -269,6 +281,49 @@ public final class Downloads {
     public func posterURL(_ itemID: Int64) -> URL? {
         guard let p = entries[itemID]?.poster else { return nil }
         return Self.directory.appending(path: p)
+    }
+
+    /// A downloaded track's loudness (nil values when the server has none or wasn't asked yet).
+    public func gains(_ itemID: Int64) -> (track: Double?, album: Double?, peak: Double?)? {
+        guard let e = entries[itemID] else { return nil }
+        return (e.trackGainDb, e.albumGainDb, e.peak)
+    }
+
+    /// Asks the server for the loudness of downloaded tracks that don't have it yet, so they're
+    /// levelled offline too. The download API doesn't carry it: a playback session started
+    /// (as a preload, which isn't counted as a play) and stopped at once does.
+    func fetchGains() async {
+        guard !fetchingGains else { return }
+        fetchingGains = true
+        defer { fetchingGains = false }
+        var changed = false
+        while let client = app?.client,
+              let id = entries.values.first(where: { $0.item._type == .track && $0.gainsChecked != true })?.id {
+            let response: Operations.StartPlayback.Output
+            do {
+                response = try await client.startPlayback(body: .json(.init(itemId: id, startMs: 0, preload: true,
+                                                                            profile: AppleDeviceProfile.current())))
+            } catch {
+                break // the server can't be reached: next time
+            }
+            switch response {
+            case .ok(let ok):
+                guard let s = try? ok.body.json else { break }
+                _ = try? await client.stopPlayback(path: .init(sessionId: s.id))
+                entries[id]?.trackGainDb = s.trackGainDb
+                entries[id]?.albumGainDb = s.albumGainDb
+                entries[id]?.peak = s.peak
+            case .notFound, .forbidden, .badRequest:
+                break // gone from the server, or not playable there: nothing to ask for
+            default:
+                if changed { save() }
+                return // busy or signed out: next time
+            }
+            // Answered (with or without loudness): not asked again.
+            entries[id]?.gainsChecked = true
+            changed = true
+        }
+        if changed { save() }
     }
 
     public var totalBytes: Int64 { entries.values.filter { $0.state == .done }.reduce(0) { $0 + $1.size } }

@@ -169,9 +169,6 @@ struct MusicHomeView: View {
                         .accessibilityIdentifier("musicMuse")
                 }
                 #if os(iOS)
-                CarModeButton(libraryID: libraryID) { roundLabel("Car Mode", "car.fill") }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Car Mode")
                 // The Library list is far down on a phone: a shortcut to it.
                 Button(action: showLibrary) { roundLabel("Library", "books.vertical") }
                     .buttonStyle(.plain)

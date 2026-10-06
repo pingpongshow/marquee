@@ -3,6 +3,7 @@ import Foundation
 import MarqueeAPI
 import MediaPlayer
 import Observation
+import os
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -120,6 +121,10 @@ public final class MusicPlayer {
         let peak: Double?
         /// HLS streams can't take an audio tap (no equaliser).
         var hls = false
+        /// The levelling gain in effect (linear; above 1 through the tap) and the audio track
+        /// it's set on, so the crossfade tail plays at the same level.
+        var gain = 1.0
+        var trackID: CMPersistentTrackID?
     }
     @ObservationIgnored private var sessions: [ObjectIdentifier: Loaded] = [:]
     @ObservationIgnored private var sleepTask: Task<Void, Never>?
@@ -151,6 +156,13 @@ public final class MusicPlayer {
     @ObservationIgnored private var itemObservers: [ObjectIdentifier: NSKeyValueObservation] = [:]
     /// The entry already retried after a failure (one retry, then on to the next track).
     @ObservationIgnored private var retriedEntry: Int?
+    /// Watches a stall of the current item (waiting for data that may never come: a stream
+    /// whose session the server ended).
+    @ObservationIgnored private var stallTask: Task<Void, Never>?
+    @ObservationIgnored private var stallItem: ObjectIdentifier?
+    /// UI tests: the first preloaded track's server session is ended at once, as when the
+    /// server dropped it, so the player has to load it again.
+    @ObservationIgnored private var killNextPreload = ProcessInfo.processInfo.arguments.contains("-marquee-test-dead-preload")
 
     public init(app: AppSession) {
         self.app = app
@@ -160,33 +172,26 @@ public final class MusicPlayer {
             Task { @MainActor in self?.currentItemChanged(previous: old) }
         })
         observers.append(player.observe(\.timeControlStatus) { [weak self] p, _ in
-            let isPlaying = p.timeControlStatus != .paused
-            Task { @MainActor in
-                guard let self, self.remote == nil, self.playing != isPlaying else { return }
-                self.playing = isPlaying
-                self.report(isPlaying ? "playing" : "paused")
-                self.updateNowPlaying()
-            }
+            let status = p.timeControlStatus
+            Task { @MainActor in self?.statusChanged(status) }
         })
-        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self] t in
-            MainActor.assumeIsolated {
-                guard let self, self.remote == nil else { return }
-                self.time = t.seconds.isFinite ? t.seconds : 0
-                if let d = self.player.currentItem?.duration.seconds, d.isFinite { self.duration = d }
-                if Date().timeIntervalSince(self.lastReport) > 15, self.playing { self.report("playing") }
-                self.maybeCrossfade()
-                self.retryPreloadIfDue()
-            }
-        }
+        installTimeObserver()
         NotificationCenter.default.addObserver(forName: AVPlayerItem.failedToPlayToEndTimeNotification, object: nil, queue: .main) { [weak self] n in
             guard let item = n.object as? AVPlayerItem else { return }
+            let id = ObjectIdentifier(item)
+            MainActor.assumeIsolated { self?.itemFailed(id) }
+        }
+        // A stream whose session the server ended answers 404 (or 410): load it again rather
+        // than wait on it.
+        NotificationCenter.default.addObserver(forName: AVPlayerItem.newErrorLogEntryNotification, object: nil, queue: .main) { [weak self] n in
+            guard let item = n.object as? AVPlayerItem, let code = item.errorLog()?.events.last?.errorStatusCode, code == 404 || code == 410 else { return }
             let id = ObjectIdentifier(item)
             MainActor.assumeIsolated { self?.itemFailed(id) }
         }
         setUpRemoteCommands()
         equalizer.onChange = { [weak self] in
             guard let self else { return }
-            for item in self.player.items() { self.applyLevel(item) }
+            for item in self.player.items() { Task { await self.applyLevel(item) } }
         }
         #if os(iOS)
         NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] _ in
@@ -206,6 +211,86 @@ public final class MusicPlayer {
         #endif
         // Signing out, switching profile or forgetting the server ends the music.
         app.onUserChange = { [weak self] in self?.stop() }
+    }
+
+    /// The position, from the player twice a second. Installed again whenever the track
+    /// changes, so the clock never stays stuck on an observer that stopped firing.
+    private func installTimeObserver() {
+        if let timeObserver { player.removeTimeObserver(timeObserver) }
+        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self] t in
+            MainActor.assumeIsolated {
+                guard let self, self.remote == nil else { return }
+                self.time = t.seconds.isFinite ? max(0, t.seconds) : 0
+                if let d = self.player.currentItem?.duration.seconds, d.isFinite, d > 0 { self.duration = d }
+                if Date().timeIntervalSince(self.lastReport) > 15, self.playing { self.report("playing") }
+                // Full volume whenever no crossfade is running (one never leaves it silent).
+                if self.fadeTask == nil, self.fader == nil, self.player.volume != 1 { self.player.volume = 1 }
+                self.maybeCrossfade()
+                self.retryPreloadIfDue()
+            }
+        }
+    }
+
+    /// Playing, paused or waiting for data. `playing` is what the person asked for (waiting
+    /// counts as playing); Now Playing's clock only runs while audio actually plays.
+    private func statusChanged(_ status: AVPlayer.TimeControlStatus) {
+        guard remote == nil else { return }
+        let isPlaying = status != .paused
+        if playing != isPlaying {
+            playing = isPlaying
+            report(isPlaying ? "playing" : "paused")
+        }
+        if status == .playing, player.currentItem != nil {
+            let t = player.currentTime().seconds
+            if t.isFinite { time = max(0, t) }
+        }
+        watchStall(status)
+        updateNowPlaying()
+    }
+
+    /// The current track waits for data: after a few seconds, check its address; a stream
+    /// that's gone (404/410) is loaded again at once, and one stuck for half a minute too.
+    private func watchStall(_ status: AVPlayer.TimeControlStatus) {
+        guard status == .waitingToPlayAtSpecifiedRate, player.reasonForWaitingToPlay != .noItemToPlay, let item = player.currentItem else {
+            stallTask?.cancel()
+            stallTask = nil
+            stallItem = nil
+            return
+        }
+        let id = ObjectIdentifier(item)
+        guard stallTask == nil || stallItem != id else { return }
+        stallTask?.cancel()
+        stallItem = id
+        let url = (item.asset as? AVURLAsset)?.url
+        stallTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(8))
+            guard let self, !Task.isCancelled, self.stalled(id) else { return }
+            var gone = false
+            if let url, !url.isFileURL { gone = await Self.streamGone(url) }
+            guard !Task.isCancelled, self.stalled(id) else { return }
+            if !gone {
+                try? await Task.sleep(for: .seconds(22))
+                guard !Task.isCancelled, self.stalled(id) else { return }
+            }
+            self.stallTask = nil
+            self.stallItem = nil
+            self.itemFailed(id)
+        }
+    }
+
+    private func stalled(_ id: ObjectIdentifier) -> Bool {
+        remote == nil && player.timeControlStatus == .waitingToPlayAtSpecifiedRate && player.currentItem.map(ObjectIdentifier.init) == id
+    }
+
+    /// Whether a stream's address answers 404 or 410 (its session is gone). Only the response
+    /// headers are read.
+    nonisolated private static func streamGone(_ url: URL) async -> Bool {
+        var r = URLRequest(url: url, timeoutInterval: 6)
+        r.setValue("bytes=0-0", forHTTPHeaderField: "Range")
+        guard let (bytes, response) = try? await URLSession.shared.bytes(for: r) else { return false }
+        bytes.task.cancel()
+        guard let h = response as? HTTPURLResponse else { return false }
+        return h.statusCode == 404 || h.statusCode == 410
     }
 
     // MARK: - Queue actions
@@ -370,21 +455,28 @@ public final class MusicPlayer {
         if let local = downloads?.localURL(entry.item.id) {
             let item = AVPlayerItem(url: local)
             streamed[entry.id] = nil
-            sessions[ObjectIdentifier(item)] = Loaded(entry: entry.id, session: "", trackGain: nil, albumGain: nil, peak: nil)
-            applyLevel(item) // no loudness data, but the equaliser's tap
+            // Loudness kept when it was downloaded (or fetched since).
+            let g = downloads?.gains(entry.item.id)
+            sessions[ObjectIdentifier(item)] = Loaded(entry: entry.id, session: "", trackGain: g?.track, albumGain: g?.album, peak: g?.peak)
             watch(item)
+            await applyLevel(item)
             return item
         }
         guard let client = app.client else { return nil }
         guard let s = try? await client.startPlayback(body: .json(.init(itemId: entry.item.id, startMs: 0, preload: preload,
                                                                          profile: AppleDeviceProfile.current()))).ok.body.json,
               let url = app.absolute(s.url) else { return nil }
+        if preload, killNextPreload {
+            killNextPreload = false
+            _ = try? await client.stopPlayback(path: .init(sessionId: s.id))
+        }
         let item = AVPlayerItem(url: url)
         streamed[entry.id] = StreamedAudio(s.decision)
         sessions[ObjectIdentifier(item)] = Loaded(entry: entry.id, session: s.id, trackGain: s.trackGainDb, albumGain: s.albumGainDb, peak: s.peak,
                                                   hls: url.path().hasSuffix(".m3u8"))
-        applyLevel(item)
         watch(item)
+        // The level is set before the item reaches the player: the first sample is levelled.
+        await applyLevel(item)
         return item
     }
 
@@ -400,7 +492,21 @@ public final class MusicPlayer {
     /// The current track failed: try once more from where it was (with a fresh session at the
     /// current address), then move on to the next track.
     private func itemFailed(_ id: ObjectIdentifier) {
-        guard remote == nil, let item = player.currentItem, ObjectIdentifier(item) == id, let entry = queue.current else { return }
+        guard remote == nil else { return }
+        // The track lined up next failed while it waited (its session ended, say): load it
+        // again with a fresh session shortly, rather than skip it when its turn comes.
+        let items = player.items()
+        if items.count >= 2, ObjectIdentifier(items[1]) == id {
+            endSession(for: items[1])
+            player.remove(items[1])
+            preloadFailures += 1
+            preloadRetryAt = Date().addingTimeInterval(min(60, 2 * pow(2, Double(min(preloadFailures, 6) - 1))))
+            return
+        }
+        guard let item = player.currentItem, ObjectIdentifier(item) == id, let entry = queue.current else { return }
+        stallTask?.cancel()
+        stallTask = nil
+        stallItem = nil
         let at = time
         if retriedEntry != entry.id {
             retriedEntry = entry.id
@@ -596,8 +702,10 @@ public final class MusicPlayer {
                 if remote == nil, player.currentItem === cur { refreshFollowing() }
                 return
             }
-            preloadFailures = 0
+            // (Failures are counted until the track starts, so one that keeps failing backs off.)
             player.insert(item, after: cur)
+            // It failed while loading (a dead address): load it again shortly.
+            if item.status == .failed { itemFailed(ObjectIdentifier(item)) }
         }
     }
 
@@ -666,13 +774,21 @@ public final class MusicPlayer {
 
     private func afterTrackChange() {
         guard let item = player.currentItem, let s = sessions[ObjectIdentifier(item)] else { return }
-        // A preloaded track that failed while waiting its turn.
-        if item.status == .failed { itemFailed(ObjectIdentifier(item)); return }
+        // The queue moves to the item's entry first, so a failure below is that track's (it
+        // used to restart the previous track at its end).
         if let i = queue.entries.firstIndex(where: { $0.id == s.entry }), i != queue.index { queue.setIndex(i) }
+        // A new track gets its own retry.
+        if retriedEntry != s.entry { retriedEntry = nil }
+        time = max(0, player.currentTime().seconds.isFinite ? player.currentTime().seconds : 0)
+        duration = Double(queue.current?.item.durationMs ?? 0) / 1000
+        // A fresh observer for each track (see installTimeObserver).
+        installTimeObserver()
+        // A preloaded track that failed while waiting its turn: a fresh session, from the start.
+        if item.status == .failed { itemFailed(ObjectIdentifier(item)); return }
         preloadFailures = 0
         preloadRetryAt = .distantPast
-        time = 0
-        duration = Double(queue.current?.item.durationMs ?? 0) / 1000
+        // The queue changed since it was loaded (now in an album run, or not): level it again.
+        if s.trackID != nil, abs(levelGain(s) - s.gain) > 0.001 { Task { await applyLevel(item) } }
         report("playing")
         updateNowPlaying()
         refreshFollowing()
@@ -742,12 +858,9 @@ public final class MusicPlayer {
         if let s = sessions[ObjectIdentifier(item)], let i = queue.entries.firstIndex(where: { $0.id == s.entry }),
            queue.entries.indices.contains(i + 1), let a = queue.entries[i].item.parentId, queue.entries[i + 1].item.parentId == a { return }
         let tail = AVPlayerItem(url: url)
-        // The same level, with an equaliser tap of its own (a tap can't serve two items).
-        if let p = item.audioMix?.inputParameters.first {
-            var level: Float = 1, end: Float = 1
-            var range = CMTimeRange()
-            p.getVolumeRamp(for: .zero, startVolume: &level, endVolume: &end, timeRange: &range)
-            tail.audioMix = mix(trackID: p.trackID, gain: level, tap: p.audioTapProcessor != nil)
+        // The same level (a boost too), with a tap of its own (a tap can't serve two items).
+        if let l = sessions[ObjectIdentifier(item)], let trackID = l.trackID {
+            tail.audioMix = mix(trackID: trackID, gain: l.gain, eq: equalizer.enabled && !l.hls)
         }
         let f = AVPlayer(playerItem: tail)
         f.automaticallyWaitsToMinimizeStalling = false
@@ -846,42 +959,84 @@ public final class MusicPlayer {
         }
     }
 
-    /// Sets an item's volume from its loudness. AVFoundation can only turn audio down, so
-    /// quiet tracks play at full volume rather than being boosted.
-    private func applyLevel(_ item: AVPlayerItem) {
-        guard let l = sessions[ObjectIdentifier(item)] else { return }
-        var gain: Float = 1
-        if levelling != .off {
+    /// The levelling gain for an item (linear): automatic levelling uses album gain while an
+    /// album plays in order, else track gain; quiet tracks are raised (through the tap) where
+    /// the stream can take one.
+    private func levelGain(_ l: Loaded) -> Double {
+        let useAlbum: Bool
+        switch levelling {
+        case .off: return 1
+        case .album: useAlbum = true
+        case .track: useAlbum = false
+        case .auto:
             let i = queue.entries.firstIndex { $0.id == l.entry }
-            let albumRun = i.map { i in
-                let album = queue.entries[i].item.parentId
-                return album != nil && [i - 1, i + 1].contains { queue.entries.indices.contains($0) && queue.entries[$0].item.parentId == album }
-            } ?? false
-            let db = levelling == .album || (levelling == .auto && albumRun) ? (l.albumGain ?? l.trackGain) : l.trackGain
-            if let db {
-                var g = pow(10, db / 20)
-                if let peak = l.peak, peak > 0 { g = min(g, 1 / peak) }
-                gain = Float(min(g, 1))
-            }
+            useAlbum = i.map { Loudness.useAlbumGain(albums: queue.entries.map(\.item.parentId), index: $0) } ?? false
         }
-        let tap = equalizer.enabled && !l.hls
+        return Loudness.gain(trackDb: l.trackGain, albumDb: l.albumGain, peak: l.peak, useAlbum: useAlbum, allowBoost: !l.hls)
+    }
+
+    /// Sets an item's level from its loudness, with the equaliser's tap when it's on. Awaited
+    /// before the item is handed to the player, so playback starts at the right level (it
+    /// used to start loud and drop once the mix arrived). A track whose audio takes too long
+    /// to describe is levelled as soon as it can be.
+    private func applyLevel(_ item: AVPlayerItem) async {
+        let id = ObjectIdentifier(item)
+        guard let l = sessions[id] else { return }
+        if let trackID = l.trackID {
+            setMix(item, trackID: trackID)
+            return
+        }
         let asset = item.asset
+        let load = Task { try? await asset.loadTracks(withMediaType: .audio).first?.trackID }
+        if let trackID = await Self.firstValue(of: load, within: 6) {
+            guard sessions[id] != nil else { return }
+            sessions[id]?.trackID = trackID
+            setMix(item, trackID: trackID)
+            return
+        }
+        // Slow to load: level it when it's known (it may start at the file's own level).
         Task {
-            guard let track = try? await asset.loadTracks(withMediaType: .audio).first else { return }
-            item.audioMix = mix(trackID: track.trackID, gain: gain, tap: tap)
+            guard let trackID = await load.value, sessions[id] != nil else { return }
+            sessions[id]?.trackID = trackID
+            setMix(item, trackID: trackID)
         }
     }
 
-    /// An audio mix: the levelling volume, and the equaliser's tap when it's on.
-    private func mix(trackID: CMPersistentTrackID, gain: Float, tap: Bool) -> AVAudioMix {
+    /// A task's value, or nil when it takes longer than `seconds` (the task carries on).
+    nonisolated private static func firstValue<T: Sendable>(of task: Task<T?, Never>, within seconds: Double) async -> T? {
+        let once = OSAllocatedUnfairLock(initialState: false)
+        return await withCheckedContinuation { (c: CheckedContinuation<T?, Never>) in
+            let finish: @Sendable (T?) -> Void = { v in
+                if once.withLock({ done in defer { done = true }; return !done }) { c.resume(returning: v) }
+            }
+            Task { finish(await task.value) }
+            Task {
+                try? await Task.sleep(for: .seconds(seconds))
+                finish(nil)
+            }
+        }
+    }
+
+    private func setMix(_ item: AVPlayerItem, trackID: CMPersistentTrackID) {
+        let id = ObjectIdentifier(item)
+        guard let l = sessions[id] else { return }
+        let gain = levelGain(l)
+        sessions[id]?.gain = gain
+        item.audioMix = mix(trackID: trackID, gain: gain, eq: equalizer.enabled && !l.hls)
+    }
+
+    /// An audio mix: the levelling volume (cuts), and a tap for the equaliser and for boosts
+    /// (a mix's volume can't go above 1).
+    private func mix(trackID: CMPersistentTrackID, gain: Double, eq: Bool) -> AVAudioMix {
         let p = AVMutableAudioMixInputParameters()
         p.trackID = trackID
-        p.setVolume(gain, at: .zero)
-        if tap { p.audioTapProcessor = equalizer.makeTap() }
+        p.setVolume(Float(min(gain, 1)), at: .zero)
+        if eq || gain > 1 { p.audioTapProcessor = equalizer.makeTap(gain: max(gain, 1)) }
         let mix = AVMutableAudioMix()
         mix.inputParameters = [p]
         return mix
     }
+
 
     /// Why the equaliser can't be heard right now, if it can't.
     public var equalizerNote: String? {
@@ -968,13 +1123,22 @@ public final class MusicPlayer {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             return
         }
+        // The lock screen runs its clock from the rate: 1 only while audio actually plays here,
+        // so a track waiting for data doesn't look like it's playing silently.
+        var elapsed = time
+        var rate = playing ? 1.0 : 0.0
+        if remote == nil, player.currentItem != nil {
+            let t = player.currentTime().seconds
+            if t.isFinite { elapsed = max(0, t) }
+            rate = player.timeControlStatus == .playing ? 1 : 0
+        }
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: t.title,
             MPMediaItemPropertyArtist: t.artistCredit ?? t.grandparentTitle ?? "",
             MPMediaItemPropertyAlbumTitle: t.parentTitle ?? "",
             MPMediaItemPropertyPlaybackDuration: duration,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: time,
-            MPNowPlayingInfoPropertyPlaybackRate: playing ? 1.0 : 0.0,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsed,
+            MPNowPlayingInfoPropertyPlaybackRate: rate,
             MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue,
         ]
         // Artwork belongs to an item id; it's fetched once per track, not restarted on every update.
