@@ -58,27 +58,47 @@ private struct MiniPlayerProgress: View {
 /// this, not the whole screen.
 private struct MusicScrubber: View {
     @Environment(MusicPlayer.self) private var music
+    /// Where the thumb is while it's dragged; nil otherwise (the player's time shows).
     @State private var scrub: Double?
+    @State private var editing = false
+
+    /// The slider's range: the track's length, or the time when it runs past it (a length
+    /// from the library that's shorter than the stream).
+    private var upper: Double { max(music.duration, music.time, 1) }
+
+    /// The position shown: the drag, else the player's time, always within the range (a value
+    /// outside it made the slider write it back, which looked like a drag that never ended,
+    /// so the bar stayed put while the music played on, typically after a skip).
+    private var shown: Double { min(max(0, scrub ?? music.time), upper) }
 
     var body: some View {
         VStack(spacing: 4) {
             #if os(tvOS)
-            ProgressView(value: music.duration > 0 ? music.time / music.duration : 0)
+            ProgressView(value: music.duration > 0 ? min(1, music.time / music.duration) : 0)
             #else
-            Slider(value: Binding(get: { scrub ?? music.time }, set: { scrub = $0 }), in: 0...max(music.duration, 1)) { editing in
-                if !editing, let s = scrub { music.seek(s); scrub = nil }
+            Slider(value: Binding(get: { shown }, set: { v in
+                if editing {
+                    scrub = v
+                } else if abs(v - music.time) > 0.5 {
+                    music.seek(v) // VoiceOver's adjust: no drag, a direct move
+                }
+            }), in: 0...upper) { e in
+                editing = e
+                if !e, let s = scrub { music.seek(s); scrub = nil }
             }
             .accessibilityLabel("Position")
-            .accessibilityValue("\(formatTime(seconds: scrub ?? music.time)) of \(formatTime(seconds: music.duration))")
+            .accessibilityValue("\(formatTime(seconds: shown)) of \(formatTime(seconds: music.duration))")
             #endif
             HStack {
-                Text(formatTime(seconds: scrub ?? music.time))
+                Text(formatTime(seconds: shown))
                 Spacer()
-                Text("-" + formatTime(seconds: max(0, music.duration - (scrub ?? music.time))))
+                Text("-" + formatTime(seconds: max(0, music.duration - shown)))
             }
             .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
             .accessibilityHidden(true)
         }
+        // A new track never keeps the last one's drag.
+        .onChange(of: music.current?.id) { scrub = nil; editing = false }
     }
 }
 
@@ -146,24 +166,25 @@ struct NowPlayingView: View {
 
     @ViewBuilder private var sourceHeader: some View {
         #if os(iOS)
-        // Where it plays: AirPlay (HomePod, Sonos…) and Chromecast, beside what's playing.
-        HStack(alignment: .center) {
-            // Car mode and the equaliser on the left, balancing the outputs on the right.
-            HStack(spacing: 6) {
-                CarModeButton().labelStyle(.iconOnly).font(.callout).foregroundStyle(.secondary).frame(width: 32, height: 32)
-                EqualizerButton().frame(width: 32, height: 32)
-            }
-            .frame(width: 106, alignment: .leading)
-            Spacer(minLength: 0)
-            sourceTitle
-            Spacer(minLength: 0)
-            HStack(spacing: 6) {
+        // Where it plays, in two groups of the same width either side of what's playing, so
+        // the title has the middle to itself (truncated, never under a button): another
+        // Marquee app on the left; AirPlay (HomePod, Sonos…) and Chromecast on the right.
+        HStack(alignment: .center, spacing: 8) {
+            HStack(spacing: Self.headerSpacing) {
                 // Another Marquee app (USER-14): the queue carries on there from here.
-                PlayOnButton(target: handOff, compact: true).font(.callout).foregroundStyle(.secondary).frame(width: 32, height: 32)
-                AirPlayButton().frame(width: 32, height: 32)
-                CastButton(tint: .secondaryLabel).frame(width: 32, height: 32)
+                PlayOnButton(target: handOff, compact: true)
+                    .font(.system(size: 17, weight: .regular)).foregroundStyle(.secondary)
+                    .headerButton()
+                Spacer(minLength: 0)
             }
-            .frame(width: 106, alignment: .trailing)
+            .frame(width: Self.headerGroup)
+            sourceTitle.frame(maxWidth: .infinity)
+            HStack(spacing: Self.headerSpacing) {
+                Spacer(minLength: 0)
+                AirPlayButton().headerButton()
+                CastButton(tint: .secondaryLabel).padding(5).headerButton()
+            }
+            .frame(width: Self.headerGroup)
         }
         #else
         sourceTitle
@@ -183,16 +204,26 @@ struct NowPlayingView: View {
     }
     #endif
 
+    #if os(iOS)
+    /// Header buttons: all the same size, two to a side.
+    static let headerButtonSize: CGFloat = 36
+    static let headerSpacing: CGFloat = 6
+    static let headerGroup: CGFloat = headerButtonSize * 2 + headerSpacing
+    #endif
+
     @ViewBuilder private var sourceTitle: some View {
         VStack(spacing: 2) {
             Text(music.source == nil ? "NOW PLAYING" : "PLAYING FROM").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-            if let s = music.source { Text(s.title).font(.footnote.weight(.semibold)).lineLimit(1) }
+                .lineLimit(1)
+            if let s = music.source { Text(s.title).font(.footnote.weight(.semibold)).lineLimit(1).truncationMode(.tail) }
             #if os(iOS)
             if music.remote != nil, let d = CastController.shared.device {
                 Text("Playing on \(d)").font(.caption.weight(.semibold)).foregroundStyle(Color.marqueeGold).lineLimit(1)
             }
             #endif
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("nowPlayingSource")
     }
 
     private func backdrop(_ t: Item) -> some View {
@@ -472,6 +503,14 @@ struct NowPlayingView: View {
 }
 
 #if os(iOS)
+private extension View {
+    /// A Now Playing header button: a fixed square, the whole of it tappable.
+    func headerButton() -> some View {
+        frame(width: NowPlayingView.headerButtonSize, height: NowPlayingView.headerButtonSize)
+            .contentShape(Rectangle())
+    }
+}
+
 /// The system AirPlay picker: AirPlay 2 speakers (HomePod, Sonos…), Apple TV and Bluetooth.
 struct AirPlayButton: UIViewRepresentable {
     func makeUIView(context: Context) -> AVRoutePickerView {

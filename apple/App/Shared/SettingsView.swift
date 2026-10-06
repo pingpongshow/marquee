@@ -80,6 +80,12 @@ struct SettingsView: View {
                 @Bindable var music = music
                 Toggle("Show audio quality", isOn: $music.showAudioQuality)
                     .accessibilityIdentifier("showAudioQuality")
+                #if os(iOS)
+                NavigationLink(value: Route.settings(.equalizer)) {
+                    LabeledContent("Equalizer", value: music.equalizer.enabled ? music.equalizer.preset : "Off")
+                }
+                .accessibilityIdentifier("settings.equalizer")
+                #endif
             } header: {
                 Text("Music")
             } footer: {
