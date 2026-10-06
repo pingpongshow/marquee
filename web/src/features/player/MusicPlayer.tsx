@@ -22,8 +22,9 @@ import {
 import { MiniPlayer, NowPlaying } from "./NowPlaying";
 import * as Q from "./queue";
 import type { StreamInfo } from "./audioQuality";
+import { albumRun, levelGain, type Levelling } from "./levelling";
 
-export type Levelling = "off" | "track" | "album" | "auto";
+export type { Levelling } from "./levelling";
 export type DJMode = "wander" | "superfan" | "deep_cuts" | "same_era";
 /** Older stored DJ mode names, carried over to the current ones. */
 const legacyDJ: Record<string, DJMode> = { stretch: "wander", groupie: "superfan", contempo: "same_era" };
@@ -123,23 +124,6 @@ type Loaded = {
   peak?: number;
 };
 
-
-/** Linear gain for a track: ReplayGain dB, limited so the peak doesn't clip. */
-function levelGain(
-  l: Loaded | null,
-  mode: Levelling,
-  albumRun: boolean,
-): number {
-  if (!l || mode === "off") return 1;
-  const db =
-    mode === "album" || (mode === "auto" && albumRun)
-      ? (l.albumGain ?? l.trackGain)
-      : l.trackGain;
-  if (db === undefined) return 1;
-  let g = Math.pow(10, db / 20);
-  if (l.peak && l.peak > 0) g = Math.min(g, 1 / l.peak);
-  return Math.min(g, 4);
-}
 
 /** Moves an audio parameter to `value` over a few milliseconds, without clicks. */
 function glide(ctx: AudioContext, p: AudioParam, value: number) {
@@ -260,6 +244,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       })() || null,
   );
   const crossfadeRef = useRef(crossfade);
+  // Queue entry keys whose stream was already reopened once, and whose preload failed.
+  const retried = useRef(new Set<number>());
+  const preloadFailed = useRef(new Set<number>());
+  // The listener paused (not a stall or error), so a reopened stream stays paused.
+  const userPaused = useRef(false);
   const fading = useRef(false);
   const cur = Q.current(queue);
 
@@ -303,6 +292,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         g.connect(master);
         return g;
       });
+      // The elements keep playing (and the progress bar moving) while a suspended or
+      // interrupted context is silent, so bring it back whenever that happens mid-play.
+      const wake = () => {
+        const a = audios.current[active.current];
+        if (ctx.state !== "running" && ctx.state !== "closed" && a && !a.paused)
+          ctx.resume().catch(() => {});
+      };
+      ctx.addEventListener("statechange", wake);
+      document.addEventListener("visibilitychange", wake);
       graph.current = { ctx, master, gains, eq: chain, limiter };
     } catch {
       graph.current = null;
@@ -316,23 +314,31 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     volumeRef.current = volume;
     crossfadeRef.current = crossfade;
   });
-  /** Applies volume and levelling to element i (album gain when the previous track was from the same album). */
+  /** Element i's levelling gain, for the queue entry it holds (album gain within an album). */
+  const gainFor = useCallback((i: number) => {
+    const l = loaded.current[i];
+    const q = queueRef.current;
+    const at = l ? q.entries.findIndex((e) => e.key === l.key) : -1;
+    return levelGain(
+      l,
+      levellingRef.current,
+      at >= 0 && albumRun(q.entries, at),
+      // Boosts may lean on the limiter only when the Web Audio graph (with it) is there.
+      !!graph.current,
+    );
+  }, []);
+  /** A suspended or interrupted context (mobile Safari after a lock or a call) plays silence while the element's clock runs on. */
+  const resumeCtx = useCallback(() => {
+    const g = graph.current;
+    if (g && g.ctx.state !== "running" && g.ctx.state !== "closed")
+      g.ctx.resume().catch(() => {});
+  }, []);
+  /** Applies volume and levelling to element i. */
   /** `starting`: element i hasn't begun playing yet, so its gain is set at once, not glided. */
   const applyGain = useCallback((i: number, starting = false) => {
     const g = graph.current;
     const a = audios.current[i];
-    const q = queueRef.current;
-    const curEntry = q.entries[q.index];
-    const prevEntry = q.entries[q.index - 1];
-    const albumRun =
-      !!curEntry &&
-      !!prevEntry &&
-      curEntry.item.parentId === prevEntry.item.parentId;
-    const gain = levelGain(
-      loaded.current[i] ?? null,
-      levellingRef.current,
-      albumRun,
-    );
+    const gain = gainFor(i);
     if (g) {
       // A short glide rather than a jump: stepping a gain mid-waveform clicks.
       glide(g.ctx, g.master.gain, volumeRef.current);
@@ -342,11 +348,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         p.cancelScheduledValues(g.ctx.currentTime);
         p.setValueAtTime(gain, g.ctx.currentTime);
       } else if (!fading.current) glide(g.ctx, g.gains[i]!.gain, gain);
-      if (g.ctx.state === "suspended") g.ctx.resume().catch(() => {});
+      resumeCtx();
     } else if (a) {
       a.volume = Math.min(1, volumeRef.current * gain);
     }
-  }, []);
+  }, [gainFor, resumeCtx]);
 
   useEffect(() => {
     queueRef.current = queue;
@@ -420,6 +426,17 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  /** Moves past a track that can't be played (unless it's the only one left). */
+  const skipFailed = useCallback(
+    () =>
+      setQueue((q) =>
+        Q.skipIndex(q) >= 0 && Q.skipIndex(q) !== q.index
+          ? { ...q, index: Q.skipIndex(q) }
+          : q,
+      ),
+    [],
+  );
+
   // Start the current entry unless it's already loaded in the active element (after a
   // gapless switch) or waiting in the idle one (preloaded).
   const curKey = cur?.key;
@@ -429,22 +446,25 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     if (loaded.current[active.current]?.key === curKey) return;
     let cancelled = false;
     const idle = (1 - active.current) as 0 | 1;
+    // The previous track's time must not stay on screen while this one loads.
+    setTime(0);
+    userPaused.current = false; // a new track starts playing
     (async () => {
       unload(active.current);
       const pre = loaded.current[idle];
-      if (pre?.ready && pre.key === curKey) {
+      // Reuse a preloaded element only when it holds this track and isn't the tail of a
+      // crossfade (that element is about to be unloaded and its gain is ramping to 0).
+      if (pre?.ready && pre.key === curKey && !fading.current) {
         active.current = idle;
       } else {
+        // Whatever the idle element holds (another track, a half-done preload of this one,
+        // a fading tail) is stale now: free it so what follows this track can preload.
+        if (pre) unload(idle);
         try {
           if (!(await loadInto(active.current, entry))) return; // overtaken
         } catch {
           // Skip tracks that can't be played.
-          if (!cancelled)
-            setQueue((q) =>
-              Q.skipIndex(q) >= 0 && Q.skipIndex(q) !== q.index
-                ? { ...q, index: Q.skipIndex(q) }
-                : q,
-            );
+          if (!cancelled) skipFailed();
           return;
         }
       }
@@ -459,7 +479,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
     // Volume is applied separately; only a track change restarts playback.
-  }, [curKey, loadInto, unload, activeEl, ensureGraph, applyGain]);
+  }, [curKey, loadInto, unload, activeEl, ensureGraph, applyGain, skipFailed]);
 
   // Stations keep going: fetch more when the end of the queue gets close.
   const refilling = useRef(false);
@@ -519,6 +539,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     if (typeof sleep !== "number") return;
     const t = window.setTimeout(
       () => {
+        userPaused.current = true;
         activeEl()?.pause();
         setSleep(null);
       },
@@ -572,13 +593,21 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const toggle = useCallback(() => {
     const a = activeEl();
     if (!a) return;
-    if (a.paused) a.play().catch(() => {});
-    else a.pause();
-  }, [activeEl]);
+    if (a.paused) {
+      userPaused.current = false;
+      resumeCtx();
+      a.play().catch(() => {});
+    } else {
+      userPaused.current = true;
+      a.pause();
+    }
+  }, [activeEl, resumeCtx]);
   const close = useCallback(() => {
     report("paused");
     unload(0);
     unload(1);
+    retried.current.clear();
+    preloadFailed.current.clear();
     setQueue(Q.emptyQueue);
     setSource(undefined);
     setSleep(null);
@@ -590,9 +619,16 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     if (!("mediaSession" in navigator)) return;
     navigator.mediaSession.setActionHandler("nexttrack", next);
     navigator.mediaSession.setActionHandler("previoustrack", prev);
-    navigator.mediaSession.setActionHandler("play", () => activeEl()?.play());
-    navigator.mediaSession.setActionHandler("pause", () => activeEl()?.pause());
-  }, [next, prev, activeEl]);
+    navigator.mediaSession.setActionHandler("play", () => {
+      userPaused.current = false;
+      resumeCtx();
+      activeEl()?.play().catch(() => {});
+    });
+    navigator.mediaSession.setActionHandler("pause", () => {
+      userPaused.current = true;
+      activeEl()?.pause();
+    });
+  }, [next, prev, activeEl, resumeCtx]);
 
   const onTimeUpdate = (i: number) => {
     if (i !== active.current) return;
@@ -608,7 +644,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       fi !== q.index &&
       isFinite(a.duration) &&
       a.duration - a.currentTime < PRELOAD_SECONDS &&
-      !loaded.current[idle]
+      !loaded.current[idle] &&
+      // A preload that already failed is loaded afresh when its turn comes instead.
+      !preloadFailed.current.has(following.key)
     ) {
       loaded.current[idle] = {
         key: following.key,
@@ -617,7 +655,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       }; // reserve
       const gen = loadGen.current[idle]! + 1;
       loadInto(idle, following, true).catch(() => {
-        if (loadGen.current[idle] === gen) loaded.current[idle] = null;
+        if (loadGen.current[idle] !== gen) return;
+        loaded.current[idle] = null;
+        preloadFailed.current.add(following.key);
       });
     }
     // Crossfade into what follows, except within an album played in order (gapless albums
@@ -654,7 +694,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       active.current = idle;
       const nq = { ...q, index: fi };
       queueRef.current = nq;
-      const target = levelGain(pre, levellingRef.current, false);
+      const target = gainFor(idle);
       const into = g.gains[idle]!;
       into.gain.setValueAtTime(0, now);
       into.gain.linearRampToValueAtTime(target, now + left);
@@ -663,9 +703,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       setDuration(b.duration);
       setTime(0);
       setQueue(nq);
+      const tail = loadGen.current[i];
       window.setTimeout(
         () => {
-          unload(i);
+          // Only the faded-out track: a skip meanwhile may have reloaded this element or
+          // made it the active one again, and unloading that would leave silence.
+          if (loadGen.current[i] === tail && active.current !== i) unload(i);
           fading.current = false;
         },
         left * 1000 + 250,
@@ -707,10 +750,51 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       setDuration(b.duration);
       setTime(0);
       unload(i);
-    } else {
-      applyGain(active.current);
     }
+    // Otherwise the current-track effect loads it fresh (and sets its level first).
     setQueue({ ...q, index: fi });
+  };
+
+  /**
+   * An element's stream failed, typically because its session URL is gone (404 once the
+   * server has ended it). The current track gets one fresh session, resuming where it
+   * stopped, before it's skipped; a failed preload is dropped so the track is requested
+   * afresh when its turn comes, never skipped silently.
+   */
+  const onError = (i: number) => {
+    const l = loaded.current[i];
+    const a = audios.current[i];
+    if (!l?.ready || !a?.getAttribute("src")) return; // unloaded, or still being set up
+    if (i !== active.current) {
+      preloadFailed.current.add(l.key);
+      unload(i);
+      return;
+    }
+    const q = queueRef.current;
+    const entry = q.entries.find((e) => e.key === l.key);
+    if (!entry || retried.current.has(l.key)) {
+      skipFailed();
+      return;
+    }
+    retried.current.add(l.key);
+    const position = a.currentTime;
+    const wasPlaying = !userPaused.current;
+    loadInto(i, entry)
+      .then((ok) => {
+        if (!ok || active.current !== i) return;
+        const sid = loaded.current[i]?.sessionId;
+        const start = () => {
+          if (loaded.current[i]?.sessionId !== sid) return; // replaced since
+          if (position > 0) a.currentTime = position;
+          applyGain(i, true);
+          if (wasPlaying) a.play().catch(() => setPlaying(false));
+        };
+        if (a.readyState >= HTMLMediaElement.HAVE_METADATA) start();
+        else a.addEventListener("loadedmetadata", start, { once: true });
+      })
+      .catch(() => {
+        if (active.current === i && loaded.current[i]?.key === l.key) skipFailed();
+      });
   };
 
   const actions = useMemo<Actions>(
@@ -841,6 +925,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
               }}
               onPlay={() => {
                 if (i !== active.current) return;
+                resumeCtx();
                 setPlaying(true);
                 report("playing");
               }}
@@ -857,6 +942,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
                 i === active.current && setDuration(e.currentTarget.duration)
               }
               onEnded={() => onEnded(i)}
+              onError={() => onError(i)}
             />
           ))}
           {cur && (expanded ? <NowPlaying /> : <MiniPlayer />)}

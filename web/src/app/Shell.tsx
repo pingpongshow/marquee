@@ -195,14 +195,7 @@ export function Shell({ children }: { children: ReactNode }) {
       {libraries.data?.length === 0 && (
         <p className="px-3 text-sm text-faint">No libraries yet</p>
       )}
-      <Link
-        to="/playlists"
-        className={clsx(navItem, "mt-4")}
-        activeProps={navActive}
-        onClick={() => setNavOpen(false)}
-      >
-        <ListMusic className="size-5" aria-hidden /> Playlists
-      </Link>
+      {/* Live TV sits with the libraries, only once it's set up. */}
       {live.data?.enabled && (
         <Link
           to="/livetv"
@@ -213,6 +206,14 @@ export function Shell({ children }: { children: ReactNode }) {
           <Tv className="size-5" aria-hidden /> Live TV
         </Link>
       )}
+      <Link
+        to="/playlists"
+        className={clsx(navItem, "mt-4")}
+        activeProps={navActive}
+        onClick={() => setNavOpen(false)}
+      >
+        <ListMusic className="size-5" aria-hidden /> Playlists
+      </Link>
       {requests.data?.enabled && requests.data.canRequest && (
         <Link
           to="/discover"
