@@ -1,6 +1,6 @@
 # Requirements
 
-_Last updated: 2026-10-04_
+_Last updated: 2026-10-05_
 
 Priority key:
 - **P0:** required for the first usable release.
@@ -104,7 +104,7 @@ The owner wants the best music experience possible: everything Plexamp and Plex'
 | MUSIC-6 | **DJ / smart play:** optional modes that weave related tracks, deeper cuts or the artist's other albums into whatever is playing. | P1 |
 | MUSIC-7 | **Mixes for you:** daily mixes per user (by taste clusters), "Rediscover" (loved but not played lately), "Deep cuts", "Recently added mix", mood mixes and anniversary albums on Home. | P1 |
 | MUSIC-8 | **Smart playlists:** rule-based (genre, artist, year, rating, play count, last played, added date, mood, BPM, key…) with limits and sort, kept up to date automatically. | P1 |
-| MUSIC-9 | **Playback quality:** gapless playback, loudness levelling (ReplayGain tags or EBU R128 analysis, track/album mode), optional crossfade and "sweet fades" that respect gapless albums, and a 10-band EQ on clients that support it. | P1 |
+| MUSIC-9 | **Playback quality:** gapless playback, loudness levelling (ReplayGain tags or EBU R128 analysis, always on: album gain while an album plays in order, else track gain; in effect from a track's first sample, on downloads too, and raising quiet tracks where the player can without clipping), optional crossfade and "sweet fades" that respect gapless albums, and a 10-band EQ on clients that support it. | P1 |
 | MUSIC-10 | **Lyrics:** embedded, `.lrc` sidecars and LRCLIB, with synced, scrolling lyrics in the player (also META-9). | P1 |
 | MUSIC-11 | **Ratings and taste:** 1–5 star ratings in half stars (every client can set halves, not only show them) / love ratings on tracks, albums and artists. Skips and plays feed recommendations. Per-user listening stats ("Year in music"). | P1 |
 | MUSIC-12 | **Scrobbling:** optional Last.fm and ListenBrainz scrobbling per user. ✅ ListenBrainz (D80) and Last.fm once the owner enters its API key (D81). | P2 |
@@ -116,7 +116,7 @@ The owner wants the best music experience possible: everything Plexamp and Plex'
 | MUSIC-18 | **Browse and play by mood and style:** Mood, style and genre pages with stations and playlists for each (moods from sonic analysis and tags, styles from tags/MusicBrainz), on every client. | P1 |
 | MUSIC-19 | **Playlist downloads:** download whole playlists (including smart playlists and mixes) for offline playback on Apple and Android, kept in sync as they change. | P1 |
 | MUSIC-20 | **Equaliser:** presets and custom bands for music, per device (web, iPhone/iPad, Android) (D86). | P2 |
-| MUSIC-21 | **Car mode:** a Plexamp-style full-screen music screen with large controls and one-tap stations on iPhone and Android phones (D86). | P2 |
+| MUSIC-21 | ~~Car mode~~ Removed 2026-10-05 at the owner's request (D94). | — |
 | MUSIC-22 | **Your year in music:** a Wrapped-style recap of each year (minutes, top artists, albums, songs and genres, when you listen, streaks, new artists) with a playlist of your top 50 songs (D87). | P1 |
 | MUSIC-23 | **Show audio quality** (optional, per device): the file's format in Now Playing and track lists, e.g. "FLAC · 24-bit/96 kHz · Hi-Res" or "MP3 · 320 kbps", plus what is actually streamed when it's converted (D89). | P2 |
 
@@ -142,7 +142,7 @@ Plex-style Live TV on every client (see the owner's reference screenshot: Guide 
 
 | ID | Requirement | Pri |
 |---|---|---|
-| REQ-1 | **Seerr integration:** the admin connects the Seerr instance on the server (URL and API key). Users search for movies and shows that aren't in the library and request them from any Marquee client; request status shows in the app. Marquee users map to Seerr users so quotas and approvals apply. | P1 |
+| REQ-1 | **Seerr integration:** the admin connects the Seerr instance on the server (URL and API key). Users search for movies and shows that aren't in the library and request them from any Marquee client; request status shows in the app. Marquee users map to Seerr users so quotas and approvals apply. Requests wait for an admin's approval, except an admin's own, which go to Seerr straight away (D94). | P1 |
 | REQ-2 | **Discover:** trending, popular and upcoming titles from Seerr, marked "In library", "Requested" or "Request", in a Discover tab. | P2 |
 
 ## 4. Users, auth & state

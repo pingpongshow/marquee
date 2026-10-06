@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 
 	"marquee/internal/auth"
@@ -210,7 +211,28 @@ func (h *Handlers) CreateRequest(ctx context.Context, req CreateRequestRequestOb
 	case err != nil:
 		return CreateRequest400JSONResponse{BadRequestJSONResponse(apiErr("invalid", err.Error()))}, nil
 	}
+	// An admin's own request needs no approval: it goes to Seerr straight away. If Seerr
+	// refuses it, it stays pending and can be approved again from the queue.
+	if s.User.IsAdmin {
+		if approved, err := h.Requests.Approve(ctx, r.ID, s.User.ID, h.seerrUser(ctx)); err == nil {
+			r = approved
+		} else {
+			slog.Warn("admin request left pending", "title", r.Title, "err", err)
+		}
+	}
 	return CreateRequest201JSONResponse(toAPIRequest(r)), nil
+}
+
+// seerrUser finds a Marquee user's linked Seerr user, if any: approved requests are made in
+// Seerr as that user.
+func (h *Handlers) seerrUser(ctx context.Context) func(userID int64) *int64 {
+	return func(userID int64) *int64 {
+		u, err := h.Auth.GetUser(ctx, userID)
+		if err != nil {
+			return nil
+		}
+		return u.Restrictions.SeerrUserID
+	}
 }
 
 func (h *Handlers) CancelRequest(ctx context.Context, req CancelRequestRequestObject) (CancelRequestResponseObject, error) {
@@ -243,15 +265,7 @@ func (h *Handlers) ApproveRequest(ctx context.Context, req ApproveRequestRequest
 	case !s.User.IsAdmin:
 		return ApproveRequest403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
 	}
-	// Made in Seerr as the requester's linked Seerr user, if any.
-	seerrUser := func(userID int64) *int64 {
-		u, err := h.Auth.GetUser(ctx, userID)
-		if err != nil {
-			return nil
-		}
-		return u.Restrictions.SeerrUserID
-	}
-	r, err := h.Requests.Approve(ctx, req.RequestId, s.User.ID, seerrUser)
+	r, err := h.Requests.Approve(ctx, req.RequestId, s.User.ID, h.seerrUser(ctx))
 	switch {
 	case errors.Is(err, requests.ErrNotFound):
 		return ApproveRequest404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "request not found"))}, nil

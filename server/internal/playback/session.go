@@ -777,10 +777,29 @@ func nullStr(s string) any {
 	return s
 }
 
+// preloadLimit is the longest a preloaded track waits for its turn.
+const preloadLimit = 2 * time.Hour
+
 // Reap stops sessions that stopped reporting (closed tab, lost connection).
+//
+// A preloaded (gapless) session makes no requests while it waits, often longer than idle
+// (a long track before it): it's kept while another session of the same device is active,
+// up to preloadLimit. Ending it left the player holding a dead address, so the next track
+// failed, or stopped part-way once its buffered start ran out.
 func (m *Manager) Reap(ctx context.Context, idle time.Duration) {
-	for _, s := range m.List() {
-		if time.Since(s.Snapshot().LastActive) > idle {
+	sessions := m.List()
+	activeDevice := map[int64]bool{}
+	for _, s := range sessions {
+		if !s.Preloading() && time.Since(s.Snapshot().LastActive) <= idle {
+			activeDevice[s.DeviceID] = true
+		}
+	}
+	for _, s := range sessions {
+		quiet := time.Since(s.Snapshot().LastActive)
+		if s.Preloading() && activeDevice[s.DeviceID] && quiet <= preloadLimit {
+			continue
+		}
+		if quiet > idle {
 			slog.Info("ending idle playback session", "user", s.UserName, "title", s.Title)
 			m.Stop(ctx, s.ID)
 		}
