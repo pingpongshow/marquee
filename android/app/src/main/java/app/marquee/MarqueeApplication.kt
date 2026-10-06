@@ -18,6 +18,7 @@ class MarqueeApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         marquee = Marquee(this)
+        app.marquee.music.TrackGains.init(this)
         // A player for remote control while in the foreground (and while music plays).
         remote.attach()
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {

@@ -15,11 +15,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -30,9 +26,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
@@ -114,18 +107,6 @@ class SessionEqualizer(sessionId: Int) {
             return (gains[i] + (gains[i + 1] - gains[i]) * t).toFloat()
         }
     }
-}
-
-/** The EQ button in Now Playing: gold while the equaliser is on. */
-@Composable
-fun EqButton() {
-    val music = LocalMusic.current
-    val eq by music.eq.collectAsState()
-    var open by remember { mutableStateOf(false) }
-    IconButton({ open = true }, Modifier.focusRing()) {
-        Icon(Icons.Filled.Equalizer, "Equaliser", tint = if (eq.on) Gold else MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-    if (open) EqSheet { open = false }
 }
 
 /** The equaliser: on/off, presets and the ten bands. */
