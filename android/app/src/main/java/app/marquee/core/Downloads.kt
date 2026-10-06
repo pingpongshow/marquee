@@ -171,6 +171,8 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
         if (info.status == Download.Status.READY && info.url != null) fetch(item.id, info.url!!, info.fileName)
         watch()
         marquee.scope.launch(Dispatchers.IO) { savePoster(item) }
+        // Tracks keep their volume levelling data, for playing offline (MUSIC-10).
+        if (item.type == ItemType.TRACK) marquee.scope.launch(Dispatchers.IO) { app.marquee.music.MusicService.fetchGains(marquee, item.id) }
     }
 
     /** Everything playable under a season, show, album or artist. */

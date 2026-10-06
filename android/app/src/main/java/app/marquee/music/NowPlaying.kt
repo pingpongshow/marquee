@@ -13,7 +13,6 @@ import app.marquee.api.models.RadioRequest
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material.icons.filled.Radio
-import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -103,7 +102,7 @@ fun MiniPlayer(onOpen: () -> Unit) {
 /** Full-screen Now Playing: artwork or lyrics or the queue, rating, radio, sleep timer and DJ. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun NowPlayingScreen(onClose: () -> Unit, onCarMode: (() -> Unit)? = null, onRemote: ((Long) -> Unit)? = null, onOpenPlaylist: ((Long) -> Unit)? = null) {
+fun NowPlayingScreen(onClose: () -> Unit, onRemote: ((Long) -> Unit)? = null, onOpenPlaylist: ((Long) -> Unit)? = null) {
     val music = LocalMusic.current
     val marquee = LocalMarquee.current
     val now by music.now.collectAsState()
@@ -124,14 +123,12 @@ fun NowPlayingScreen(onClose: () -> Unit, onCarMode: (() -> Unit)? = null, onRem
         }
     }
 
+    // A row of same-size icon buttons (close on the left, the rest on the right), then the
+    // title centred on its own line, so the buttons never crowd or cover it.
     val header: @Composable () -> Unit = {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().semantics { contentDescription = "Now Playing header" }, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose, modifier = Modifier.focusRing()) { Icon(Icons.Filled.KeyboardArrowDown, "Close Now Playing") }
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(if (source == null) "NOW PLAYING" else "PLAYING FROM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                source?.let { Text(it, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                castDevice?.let { Text("Playing on $it", style = MaterialTheme.typography.labelMedium, color = Gold, maxLines = 1) }
-            }
+            Spacer(Modifier.weight(1f))
             CastButton(MaterialTheme.colorScheme.onSurface)
             // Play on another Marquee app (USER-14): the queue, from this track and position; then pauses here.
             if (onRemote != null) app.marquee.ui.PlayOnButton(tint = MaterialTheme.colorScheme.onSurface, handoff = {
@@ -142,6 +139,11 @@ fun NowPlayingScreen(onClose: () -> Unit, onCarMode: (() -> Unit)? = null, onRem
             }, onSent = { music.pause() }, onPlayer = onRemote)
             PanelButton(Icons.Filled.Lyrics, "Lyrics", panel == Panel.Lyrics) { panel = if (panel == Panel.Lyrics) Panel.Art else Panel.Lyrics }
             PanelButton(Icons.AutoMirrored.Filled.QueueMusic, "Up Next", panel == Panel.Queue) { panel = if (panel == Panel.Queue) Panel.Art else Panel.Queue }
+        }
+        Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp).semantics(mergeDescendants = true) {}, horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(if (source == null) "NOW PLAYING" else "PLAYING FROM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            source?.let { Text(it, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            castDevice?.let { Text("Playing on $it", style = MaterialTheme.typography.labelMedium, color = Gold, maxLines = 1) }
         }
     }
     val panelContent: @Composable (Modifier) -> Unit = { m ->
@@ -174,11 +176,6 @@ fun NowPlayingScreen(onClose: () -> Unit, onCarMode: (() -> Unit)? = null, onRem
                 SleepButton()
                 DJButton()
                 CrossfadeButton()
-                EqButton()
-                // Car mode on phones (the big-button screen).
-                if (onCarMode != null && !marquee.isTv) IconButton(onCarMode, Modifier.focusRing()) {
-                    Icon(Icons.Filled.DirectionsCar, "Car mode", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
             }
             radioError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         }
