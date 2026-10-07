@@ -418,3 +418,28 @@ func (c *Client) Validate(ctx context.Context) error {
 	var v struct{}
 	return c.get(ctx, "/configuration", nil, &v)
 }
+
+// Video is one of a movie's or show's videos (trailers, teasers, clips) on YouTube or Vimeo.
+type Video struct {
+	Key         string `json:"key"`
+	Name        string `json:"name"`
+	Site        string `json:"site"`
+	Type        string `json:"type"`
+	Official    bool   `json:"official"`
+	Language    string `json:"iso_639_1"`
+	PublishedAt string `json:"published_at"`
+}
+
+// Videos lists a movie's ("movie") or show's ("tv") videos in the client's language and
+// English, plus those with no language.
+func (c *Client) Videos(ctx context.Context, kind string, id int) ([]Video, error) {
+	langs := "en,null"
+	if l := strings.SplitN(c.Language, "-", 2)[0]; l != "" && l != "en" {
+		langs = l + "," + langs
+	}
+	var out struct {
+		Results []Video `json:"results"`
+	}
+	err := c.get(ctx, "/"+kind+"/"+strconv.Itoa(id)+"/videos", url.Values{"include_video_language": {langs}}, &out)
+	return out.Results, err
+}

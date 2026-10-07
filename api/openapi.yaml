@@ -1896,6 +1896,22 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /items/{itemId}/trailer:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [items]
+      operationId: getItemTrailer
+      summary: "The trailer for a movie or show (PLAY-22): a local trailer file when there is one, else the official trailer TMDB lists on YouTube."
+      responses:
+        "200":
+          description: The trailer.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemTrailer" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /hubs/home:
     get:
       tags: [hubs]
@@ -5449,6 +5465,18 @@ components:
         updatedAt: { type: string, format: date-time }
         mine: { type: boolean }
 
+    ItemTrailer:
+      type: object
+      required: [source]
+      properties:
+        source:
+          type: string
+          enum: [local, youtube]
+          description: "local: play itemId like any video. youtube: open or embed the YouTube video."
+        itemId: { type: integer, format: int64, description: "The local trailer item (source local)." }
+        youtubeKey: { type: string, description: "YouTube video id (source youtube)." }
+        url: { type: string, description: "https://www.youtube.com/watch?v=<key> (source youtube)." }
+        name: { type: string, description: "The trailer's title." }
     ItemReviews:
       type: object
       required: [count, reviews]
