@@ -37,6 +37,27 @@ struct MiniPlayerBar: View {
             .overlay(alignment: .bottom) { MiniPlayerProgress().padding(.horizontal, 10) }
             .padding(.horizontal, 10)
             .padding(.bottom, 4)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { MiniPlayerMetrics.shared.height = $0 }
+        }
+    }
+}
+
+/// The mini player's height, measured, for the room screens keep under their content.
+@MainActor @Observable
+final class MiniPlayerMetrics {
+    static let shared = MiniPlayerMetrics()
+    var height: CGFloat = 64
+}
+
+/// Keeps the mini player's height clear at the bottom of a screen while music plays.
+struct MiniPlayerSpace: ViewModifier {
+    @Environment(MusicPlayer.self) private var music
+
+    func body(content: Content) -> some View {
+        content.safeAreaInset(edge: .bottom, spacing: 0) {
+            if music.current != nil {
+                Color.clear.frame(height: MiniPlayerMetrics.shared.height).allowsHitTesting(false)
+            }
         }
     }
 }
@@ -76,18 +97,15 @@ private struct MusicScrubber: View {
             #if os(tvOS)
             ProgressView(value: music.duration > 0 ? min(1, music.time / music.duration) : 0)
             #else
-            Slider(value: Binding(get: { shown }, set: { v in
-                if editing {
-                    scrub = v
-                } else if abs(v - music.time) > 0.5 {
-                    music.seek(v) // VoiceOver's adjust: no drag, a direct move
+            bar
+                // VoiceOver (and UI tests) see a standard slider; adjusting it moves directly.
+                .accessibilityRepresentation {
+                    Slider(value: Binding(get: { shown }, set: { v in
+                        if abs(v - music.time) > 0.5 { music.seek(v) }
+                    }), in: 0...upper)
                 }
-            }), in: 0...upper) { e in
-                editing = e
-                if !e, let s = scrub { music.seek(s); scrub = nil }
-            }
-            .accessibilityLabel("Position")
-            .accessibilityValue("\(formatTime(seconds: shown)) of \(formatTime(seconds: music.duration))")
+                .accessibilityLabel("Position")
+                .accessibilityValue("\(formatTime(seconds: shown)) of \(formatTime(seconds: music.duration))")
             #endif
             HStack {
                 Text(formatTime(seconds: shown))
@@ -100,6 +118,47 @@ private struct MusicScrubber: View {
         // A new track never keeps the last one's drag.
         .onChange(of: music.current?.id) { scrub = nil; editing = false }
     }
+
+    #if os(iOS)
+    /// The track and thumb. A tap anywhere on it jumps there; a drag moves the thumb and seeks
+    /// where it's let go. The whole row's height takes touches, not only the thin line.
+    private var bar: some View {
+        GeometryReader { g in
+            let width = max(1, g.size.width)
+            let fraction = CGFloat(shown / upper)
+            let thumb: CGFloat = editing ? 20 : 14
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.secondary.opacity(0.35)).frame(height: 4)
+                Capsule().fill(Color.accentColor).frame(width: width * fraction, height: 4)
+                Circle().fill(Color.white)
+                    .shadow(color: .black.opacity(0.3), radius: 2)
+                    .frame(width: thumb, height: thumb)
+                    .offset(x: min(max(0, width * fraction - thumb / 2), width - thumb))
+            }
+            .frame(width: width, height: g.size.height)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { v in
+                        withAnimation(.easeOut(duration: 0.1)) { editing = true }
+                        scrub = position(v.location.x, width)
+                    }
+                    .onEnded { v in
+                        music.seek(position(v.location.x, width))
+                        scrub = nil
+                        withAnimation(.easeOut(duration: 0.1)) { editing = false }
+                    }
+            )
+        }
+        .frame(height: 30)
+        .accessibilityIdentifier("np.scrubber")
+    }
+
+    /// The time at a point along the bar.
+    private func position(_ x: CGFloat, _ width: CGFloat) -> Double {
+        Double(min(max(0, x / width), 1)) * upper
+    }
+    #endif
 }
 
 /// Full-screen Now Playing with the queue.

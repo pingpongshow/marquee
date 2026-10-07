@@ -43,38 +43,53 @@ extension View {
     /// Registers every Route destination on a NavigationStack.
     func marqueeDestinations() -> some View {
         navigationDestination(for: Route.self) { route in
-            switch route {
-            case .item(let id): ItemDetailView(id: id)
-            case .library(let id): LibraryView(libraryID: id)
-            case .person(let id): PersonView(id: id)
-            case .playlist(let id): PlaylistView(id: id)
-            case .playlists: PlaylistsView()
-            #if os(iOS)
-            case .downloads: DownloadsView()
-            #else
-            case .downloads: EmptyView()
-            #endif
-            case .discover: DiscoverView()
-            case .liveTV: LiveTVView()
-            case let .moodStyle(library, mood, name): MoodStyleView(libraryID: library, kind: mood ? .mood : .style, name: name)
-            case let .museVideo(library): VideoMuseView(libraryID: library)
-            case let .musicBrowse(library, kind):
-                switch kind {
-                case .artists: LibraryView(libraryID: library, type: .artist)
-                case .albums: LibraryView(libraryID: library, type: .album)
-                case .recentAlbums: LibraryView(libraryID: library, type: .album, initialSort: ._hyphen_added)
-                case .recentlyPlayed: LibraryView(libraryID: library, type: .album, initialSort: ._hyphen_viewed)
-                case .moodsAndStyles: MoodsAndStylesPage(libraryID: library)
-                case .decades: MusicDecadesView(libraryID: library)
-                case let .decade(year): MusicDecadeView(libraryID: library, decade: year)
-                case .songs: MusicSongsView(libraryID: library)
-                case .genres: MusicGenresView(libraryID: library)
-                case .favorites: MusicFavoritesView(libraryID: library)
-                }
-            case let .musicMuse(library): MuseStationsView(libraryID: library)
-            case let .settings(page): settingsPage(page)
-            }
+            routeView(route).miniPlayerSpace()
         }
+    }
+
+    /// Room at the bottom for the mini player while music plays (iPhone/iPad), so the end of
+    /// every list and page can be scrolled clear of it.
+    func miniPlayerSpace() -> some View {
+        #if os(iOS)
+        modifier(MiniPlayerSpace())
+        #else
+        self
+        #endif
+    }
+}
+
+@MainActor @ViewBuilder
+private func routeView(_ route: Route) -> some View {
+    switch route {
+    case .item(let id): ItemDetailView(id: id)
+    case .library(let id): LibraryView(libraryID: id)
+    case .person(let id): PersonView(id: id)
+    case .playlist(let id): PlaylistView(id: id)
+    case .playlists: PlaylistsView()
+    #if os(iOS)
+    case .downloads: DownloadsView()
+    #else
+    case .downloads: EmptyView()
+    #endif
+    case .discover: DiscoverView()
+    case .liveTV: LiveTVView()
+    case let .moodStyle(library, mood, name): MoodStyleView(libraryID: library, kind: mood ? .mood : .style, name: name)
+    case let .museVideo(library): VideoMuseView(libraryID: library)
+    case let .musicBrowse(library, kind):
+        switch kind {
+        case .artists: LibraryView(libraryID: library, type: .artist)
+        case .albums: LibraryView(libraryID: library, type: .album)
+        case .recentAlbums: LibraryView(libraryID: library, type: .album, initialSort: ._hyphen_added)
+        case .recentlyPlayed: LibraryView(libraryID: library, type: .album, initialSort: ._hyphen_viewed)
+        case .moodsAndStyles: MoodsAndStylesPage(libraryID: library)
+        case .decades: MusicDecadesView(libraryID: library)
+        case let .decade(year): MusicDecadeView(libraryID: library, decade: year)
+        case .songs: MusicSongsView(libraryID: library)
+        case .genres: MusicGenresView(libraryID: library)
+        case .favorites: MusicFavoritesView(libraryID: library)
+        }
+    case let .musicMuse(library): MuseStationsView(libraryID: library)
+    case let .settings(page): settingsPage(page)
     }
 }
 

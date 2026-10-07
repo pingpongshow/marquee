@@ -88,7 +88,7 @@ final class MarqueeTVUITests: XCTestCase {
         let codeText = app.staticTexts.matching(NSPredicate(format: "label MATCHES '^([A-Z0-9] ){5}[A-Z0-9]$'")).firstMatch
         XCTAssertTrue(codeText.waitForExistence(timeout: 10))
         try approve(code: codeText.label.replacingOccurrences(of: " ", with: ""), as: userToken)
-        XCTAssertTrue(app.staticTexts["Continue Watching"].waitForExistence(timeout: 15) || app.staticTexts["Recently Added Movies"].waitForExistence(timeout: 5))
+        XCTAssertTrue(homeShows())
     }
 
     /// Stations and Now Playing with lyrics on the TV (M6.5).
@@ -157,7 +157,7 @@ final class MarqueeTVUITests: XCTestCase {
         try approve(code: codeText.label.replacingOccurrences(of: " ", with: ""))
 
         // Signed in: Home.
-        XCTAssertTrue(app.staticTexts["Continue Watching"].waitForExistence(timeout: 15) || app.staticTexts["Recently Added Movies"].waitForExistence(timeout: 5))
+        XCTAssertTrue(homeShows())
         sleep(2)
         shot("tv-04-home")
 
@@ -187,6 +187,12 @@ final class MarqueeTVUITests: XCTestCase {
         remote.press(.menu)
     }
 
+    /// Signed in: Home's rows show (which come first depends on the server's Home layout).
+    private func homeShows() -> Bool {
+        let row = app.staticTexts.matching(NSPredicate(format: "label IN {'Continue Watching', 'Recently Added Movies', 'Recommended for You'}")).firstMatch
+        return row.waitForExistence(timeout: 20)
+    }
+
     /// How many playback sessions the server has (admin view).
     private func activeSessionIDs() throws -> Set<String> {
         guard let admin = adminToken else { throw XCTSkip("MARQUEE_TEST_ADMIN_TOKEN not set") }
@@ -212,6 +218,48 @@ final class MarqueeTVUITests: XCTestCase {
         XCTAssertTrue(title.waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume'}")).firstMatch.waitForExistence(timeout: 5))
         shot("tv-topshelf-link")
+    }
+
+    /// The Trailer button on a movie's page (PLAY-22) plays its local trailer (362, Official
+    /// Trailer) in the normal player.
+    func testTrailerButtonPlaysLocalTrailer() throws {
+        try signIn()
+        app.launchArguments = [] // opening the link relaunches the app: keep the sign-in
+        app.open(URL(string: "marquee://item/359")!)
+        let trailer = app.buttons["trailerButton"]
+        XCTAssertTrue(trailer.waitForExistence(timeout: 15), "the Trailer button shows for 00 Preview Test")
+        let play = app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume'}")).firstMatch
+        XCTAssertTrue(play.waitForExistence(timeout: 5))
+        sleep(1)
+        focus(play, direction: .down)
+        focus(trailer, direction: .right, tries: 4)
+        shot("tv-trailer-1-page")
+        let before = try trailerSessions()
+        remote.press(.select)
+        var now = try trailerSessions()
+        for _ in 0..<15 where now <= before {
+            sleep(1)
+            now = try trailerSessions()
+        }
+        XCTAssertGreaterThan(now, before, "the local trailer plays")
+        shot("tv-trailer-2-playing")
+        remote.press(.menu)
+    }
+
+    /// The server's playback sessions of the local trailer (item 362).
+    private func trailerSessions() throws -> Int {
+        guard let admin = adminToken else { throw XCTSkip("MARQUEE_TEST_ADMIN_TOKEN not set") }
+        var req = URLRequest(url: URL(string: server + "/api/v1/playback/sessions")!)
+        req.setValue("Bearer \(admin)", forHTTPHeaderField: "Authorization")
+        let done = expectation(description: "sessions")
+        var n = 0
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            let list = ((try? JSONSerialization.jsonObject(with: data ?? Data())) as? [[String: Any]]) ?? []
+            n = list.filter { ($0["itemId"] as? Int) == 362 }.count
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 10)
+        return n
     }
 
     /// Find subtitles on the title's page, beside its other track options: Bazarr's section

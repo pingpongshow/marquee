@@ -347,6 +347,7 @@ struct MusicSongsView: View {
                             }
                             Spacer()
                             Text(formatTime(seconds: Double(t.durationMs ?? 0) / 1000)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                                .lineLimit(1).fixedSize().layoutPriority(1)
                         }
                         .contentShape(Rectangle())
                     }
