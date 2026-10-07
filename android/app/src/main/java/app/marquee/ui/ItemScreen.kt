@@ -9,6 +9,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Theaters
 
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -172,6 +173,20 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
         }
         if (journey) app.marquee.music.SoundJourneyDialog(d.id, d.title) { journey = false }
     }
+    // A trailer (PLAY-22), only once the server says there is one; movies and shows, not episodes.
+    val trailer by produceState<app.marquee.api.models.ItemTrailer?>(null, d.id) {
+        value = if (d.type != ItemType.MOVIE && d.type != ItemType.SHOW) null
+            else Trailers.fake ?: withContext(Dispatchers.IO) { runCatching { marquee.items.getItemTrailer(d.id) }.getOrNull() }
+    }
+    @Composable fun TrailerButton() {
+        val t = trailer ?: return
+        OutlinedButton(modifier = Modifier.focusRing(), onClick = {
+            when (t.source) {
+                app.marquee.api.models.ItemTrailer.Source.LOCAL -> t.itemId?.let { nav.navigate("player/$it") }
+                app.marquee.api.models.ItemTrailer.Source.YOUTUBE -> t.youtubeKey?.let { Trailers.openYouTube(context, it, t.name ?: d.title) }
+            }
+        }) { Icon(Icons.Filled.Theaters, null); Text("Trailer") }
+    }
     @Composable fun Actions() {
             when (d.type) {
                 ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO -> {
@@ -201,6 +216,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 ItemType.COLLECTION -> PinToHomeButton("collection-${d.id}")
                 else -> {}
             }
+        TrailerButton()
         StateButtons()
         Download()
         // Play on another Marquee app (USER-14); it expands albums and shows like its own Play button.
@@ -267,7 +283,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                     }
                     tracks.forEachIndexed { i, t ->
                         ListItem(
-                            headlineContent = { Text(t.title, maxLines = 1) },
+                            headlineContent = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             supportingContent = t.audioFormat?.takeIf { showQuality }?.let { f -> {
                                 Text(app.marquee.music.AudioQuality.short(f), style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
@@ -275,8 +291,8 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                             leadingContent = { Text("${t.index ?: i + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                             trailingContent = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    app.marquee.music.TrackRating(t, Modifier.padding(end = 4.dp))
-                                    Text(t.durationMs?.let { formatTime(it) } ?: "")
+                                    app.marquee.music.TrackRating(t, Modifier.padding(end = 8.dp))
+                                    Text(t.durationMs?.let { formatTime(it) } ?: "", maxLines = 1, softWrap = false)
                                     if (!marquee.isTv) TrackMenu(t)
                                 }
                             },
@@ -415,13 +431,13 @@ private fun PopularTracks(artist: String, tracks: List<ItemSummary>) {
         Text("Popular", Modifier.padding(horizontal = sidePadding, vertical = 4.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         (if (all) tracks else tracks.take(5)).forEachIndexed { i, t ->
             ListItem(
-                headlineContent = { Text(t.title, maxLines = 1) },
-                supportingContent = { t.parentTitle?.let { Text(it, maxLines = 1) } },
+                headlineContent = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                supportingContent = { t.parentTitle?.let { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
                 leadingContent = { Text("${i + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 trailingContent = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        app.marquee.music.TrackRating(t, Modifier.padding(end = 4.dp))
-                        Text(t.durationMs?.let { formatTime(it) } ?: "")
+                        app.marquee.music.TrackRating(t, Modifier.padding(end = 8.dp))
+                        Text(t.durationMs?.let { formatTime(it) } ?: "", maxLines = 1, softWrap = false)
                     }
                 },
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
