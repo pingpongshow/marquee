@@ -133,10 +133,14 @@ struct MainView: View {
     private func stack<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         NavigationStack {
             content()
+                .miniPlayerSpace()
                 .marqueeDestinations()
         }
         #if os(iOS)
-        .safeAreaInset(edge: .bottom) { MiniPlayerBar() }
+        // The bar floats above the tab bar, and every screen in the stack (the root here, pushed
+        // ones in marqueeDestinations) keeps room for it at the bottom: an inset on the stack
+        // itself didn't reach the scroll views inside, so lists ended under the bar.
+        .overlay(alignment: .bottom) { MiniPlayerBar() }
         #endif
     }
 

@@ -207,6 +207,8 @@ final class RatingStore {
 struct RowRating: View {
     @Environment(AppSession.self) private var app
     let item: Item
+    /// The space kept before the stars (in a row: between them and the duration).
+    var gap: CGFloat = isTV ? 16 : 10
 
     var body: some View {
         let current = RatingStore.shared.rating(item.id, item.userRating)
@@ -223,8 +225,11 @@ struct RowRating: View {
                     Image(systemName: "star").font(.system(size: isTV ? 18 : 11, weight: .regular)).foregroundStyle(.tertiary)
                 }
             }
-            // One width rated or not, so durations beside it line up down a list.
-            .frame(width: isTV ? 110 : 50, alignment: .trailing)
+            // One width rated or not, so durations beside it line up down a list; wide enough
+            // for five stars (and never narrower than them), with a fixed gap before it so the
+            // duration beside it never touches the stars.
+            .frame(minWidth: isTV ? 110 : 56, alignment: .trailing)
+            .padding(.leading, gap)
             .frame(minHeight: isTV ? 50 : 30)
             .contentShape(Rectangle())
         }
@@ -353,7 +358,7 @@ struct PosterCard: View {
             #if os(tvOS)
             RatingBadge(itemID: item.id, rating: item.userRating)
             #else
-            RowRating(item: item).padding(.top, -6)
+            RowRating(item: item, gap: 0).padding(.top, -6)
             #endif
         }
     }

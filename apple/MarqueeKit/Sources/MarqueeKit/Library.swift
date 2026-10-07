@@ -14,6 +14,7 @@ public typealias ItemSort = Components.Parameters.Sort
 public typealias Review = Components.Schemas.Review
 public typealias ItemReviews = Components.Schemas.ItemReviews
 public typealias CommunityRating = Components.Schemas.CommunityRating
+public typealias ItemTrailer = Components.Schemas.ItemTrailer
 
 /// Data access used by the app screens.
 @MainActor
@@ -59,6 +60,20 @@ public extension AppSession {
     }
 
     func related(_ id: Int64) async throws -> [Item] { try await api.relatedItems(path: .init(itemId: id)).ok.body.json }
+
+    /// A movie's or show's trailer (PLAY-22): a local trailer extra, or TMDB's YouTube trailer;
+    /// nil when it has none. UI tests fake a YouTube one with -marquee-test-youtube-trailer.
+    func trailer(_ id: Int64) async throws -> ItemTrailer? {
+        if ProcessInfo.processInfo.arguments.contains("-marquee-test-youtube-trailer") {
+            return ItemTrailer(source: .youtube, youtubeKey: "dQw4w9WgXcQ",
+                               url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", name: "Test Trailer")
+        }
+        switch try await api.getItemTrailer(path: .init(itemId: id)) {
+        case let .ok(ok): return try ok.body.json
+        case .notFound: return nil
+        default: throw MarqueeError("Couldn't look up the trailer")
+        }
+    }
 
     func person(_ id: Int64) async throws -> Person { try await api.getPerson(path: .init(personId: id)).ok.body.json }
 

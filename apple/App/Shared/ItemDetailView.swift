@@ -31,6 +31,8 @@ struct ItemDetailView: View {
     @State private var playingID: Int64?
     /// Continue on a show or season started an episode from this page.
     @State private var startedHere = false
+    /// The movie's or show's trailer (PLAY-22); the button shows once it's known to exist.
+    @State private var trailer: ItemTrailer?
 
     var body: some View {
         ScrollView {
@@ -113,11 +115,13 @@ struct ItemDetailView: View {
             async let pop: [Item]? = d.type == .artist ? try? app.popularTracks(id) : []
             async let sounds: [Item]? = d.type == .artist || d.type == .album ? try? app.soundsLike(id, limit: 15) : []
             async let found = collectionMembers(d.info.collections ?? [])
+            async let trail: ItemTrailer? = d.type == .movie || d.type == .show ? try? app.trailer(id) : nil
             children = try await kids
             related = await rel ?? []
             popular = await pop ?? []
             soundsLike = await sounds ?? []
             series = await found
+            trailer = await trail
         } catch is CancellationError {
         } catch {
             if detail == nil { self.error = error.localizedDescription }
@@ -320,6 +324,7 @@ struct ItemDetailView: View {
         if [.movie, .episode, .video].contains(d.type), (d.base.viewOffsetMs ?? 0) > 0 {
             Button { video.play(d.id, startMs: 0) } label: { Label("From start", systemImage: "arrow.counterclockwise") }.buttonStyle(.bordered)
         }
+        if let trailer, d.type == .movie || d.type == .show { TrailerButton(trailer: trailer, title: d.title) }
         if [.album, .artist, .track].contains(d.type) { radioButton(d) }
         #if os(iOS)
         if [.movie, .episode, .video, .season, .show, .album, .artist, .track].contains(d.type) {
@@ -701,6 +706,7 @@ struct TrackRow: View {
                             .accessibilityIdentifier("trackQuality")
                     }
                     Text(formatTime(seconds: Double(track.durationMs ?? 0) / 1000)).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+                        .lineLimit(1).fixedSize().layoutPriority(1)
                 }
                 .padding(.leading, sidePadding)
                 .padding(.vertical, 10)
