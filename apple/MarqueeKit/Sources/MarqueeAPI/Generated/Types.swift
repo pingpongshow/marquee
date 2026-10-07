@@ -522,6 +522,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /items/{itemId}/prerolls`.
     /// - Remark: Generated from `#/paths//items/{itemId}/prerolls/get(listPrerolls)`.
     func listPrerolls(_ input: Operations.ListPrerolls.Input) async throws -> Operations.ListPrerolls.Output
+    /// The trailer for a movie or show (PLAY-22): a local trailer file when there is one, else the official trailer TMDB lists on YouTube.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/trailer`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/trailer/get(getItemTrailer)`.
+    func getItemTrailer(_ input: Operations.GetItemTrailer.Input) async throws -> Operations.GetItemTrailer.Output
     /// Rows for the Home screen (Continue Watching, Recently Added…).
     ///
     /// - Remark: HTTP `GET /hubs/home`.
@@ -2186,6 +2191,19 @@ extension APIProtocol {
         headers: Operations.ListPrerolls.Input.Headers = .init()
     ) async throws -> Operations.ListPrerolls.Output {
         try await listPrerolls(Operations.ListPrerolls.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// The trailer for a movie or show (PLAY-22): a local trailer file when there is one, else the official trailer TMDB lists on YouTube.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/trailer`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/trailer/get(getItemTrailer)`.
+    public func getItemTrailer(
+        path: Operations.GetItemTrailer.Input.Path,
+        headers: Operations.GetItemTrailer.Input.Headers = .init()
+    ) async throws -> Operations.GetItemTrailer.Output {
+        try await getItemTrailer(Operations.GetItemTrailer.Input(
             path: path,
             headers: headers
         ))
