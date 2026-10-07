@@ -8,6 +8,7 @@ import type { ItemDetail } from "@/api/types";
 import { Button, Select } from "@/components/ui";
 import { useMusicActions } from "../player/MusicPlayer";
 import { formatTrackTime, versionLabel } from "./format";
+import { TrailerButton } from "./Trailer";
 
 export function PlayButtons({ item }: { item: ItemDetail }) {
   const navigate = useNavigate();
@@ -71,6 +72,7 @@ export function PlayButtons({ item }: { item: ItemDetail }) {
           <Play className="size-4 fill-current" /> {item.watchedLeafCount ? "Continue" : "Play"}
         </Button>
       )}
+      {(item.type === "movie" || item.type === "show") && <TrailerButton item={item} />}
       {(item.type === "album" || item.type === "artist") && (
         <>
           <Button variant="primary" loading={busy} onClick={() => run(async () => music.play(await fetchLeaves(item.id), 0, { source: item.title }))}>
