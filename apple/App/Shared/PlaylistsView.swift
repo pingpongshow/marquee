@@ -146,6 +146,7 @@ struct PlaylistView: View {
                             }
                             Spacer()
                             Text(formatTime(seconds: Double(e.item.durationMs ?? 0) / 1000)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                                .lineLimit(1).fixedSize().layoutPriority(1)
                         }
                         .contentShape(Rectangle())
                     }
