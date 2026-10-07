@@ -39,6 +39,7 @@ import app.marquee.api.models.ItemEdit
 import app.marquee.api.models.ItemPage
 import app.marquee.api.models.ItemReviews
 import app.marquee.api.models.ItemSummary
+import app.marquee.api.models.ItemTrailer
 import app.marquee.api.models.ItemType
 import app.marquee.api.models.LibraryFilters
 import app.marquee.api.models.MatchCandidate
@@ -1053,6 +1054,79 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/items/{itemId}".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /items/{itemId}/trailer
+     * The trailer for a movie or show (PLAY-22): a local trailer file when there is one, else the official trailer TMDB lists on YouTube.
+     * 
+     * @param itemId 
+     * @return ItemTrailer
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getItemTrailer(itemId: kotlin.Long) : ItemTrailer {
+        val localVarResponse = getItemTrailerWithHttpInfo(itemId = itemId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ItemTrailer
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /items/{itemId}/trailer
+     * The trailer for a movie or show (PLAY-22): a local trailer file when there is one, else the official trailer TMDB lists on YouTube.
+     * 
+     * @param itemId 
+     * @return ApiResponse<ItemTrailer?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getItemTrailerWithHttpInfo(itemId: kotlin.Long) : ApiResponse<ItemTrailer?> {
+        val localVariableConfig = getItemTrailerRequestConfig(itemId = itemId)
+
+        return request<Unit, ItemTrailer>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getItemTrailer
+     *
+     * @param itemId 
+     * @return RequestConfig
+     */
+    fun getItemTrailerRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/items/{itemId}/trailer".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

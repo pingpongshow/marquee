@@ -8334,6 +8334,64 @@ extension Components {
                 case mine
             }
         }
+        /// - Remark: Generated from `#/components/schemas/ItemTrailer`.
+        public struct ItemTrailer: Codable, Hashable, Sendable {
+            /// local: play itemId like any video. youtube: open or embed the YouTube video.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemTrailer/source`.
+            @frozen public enum SourcePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case local = "local"
+                case youtube = "youtube"
+            }
+            /// local: play itemId like any video. youtube: open or embed the YouTube video.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemTrailer/source`.
+            public var source: Components.Schemas.ItemTrailer.SourcePayload
+            /// The local trailer item (source local).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemTrailer/itemId`.
+            public var itemId: Swift.Int64?
+            /// YouTube video id (source youtube).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemTrailer/youtubeKey`.
+            public var youtubeKey: Swift.String?
+            /// https://www.youtube.com/watch?v=<key> (source youtube).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemTrailer/url`.
+            public var url: Swift.String?
+            /// The trailer's title.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemTrailer/name`.
+            public var name: Swift.String?
+            /// Creates a new `ItemTrailer`.
+            ///
+            /// - Parameters:
+            ///   - source: local: play itemId like any video. youtube: open or embed the YouTube video.
+            ///   - itemId: The local trailer item (source local).
+            ///   - youtubeKey: YouTube video id (source youtube).
+            ///   - url: https://www.youtube.com/watch?v=<key> (source youtube).
+            ///   - name: The trailer's title.
+            public init(
+                source: Components.Schemas.ItemTrailer.SourcePayload,
+                itemId: Swift.Int64? = nil,
+                youtubeKey: Swift.String? = nil,
+                url: Swift.String? = nil,
+                name: Swift.String? = nil
+            ) {
+                self.source = source
+                self.itemId = itemId
+                self.youtubeKey = youtubeKey
+                self.url = url
+                self.name = name
+            }
+            public enum CodingKeys: String, CodingKey {
+                case source
+                case itemId
+                case youtubeKey
+                case url
+                case name
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/ItemReviews`.
         public struct ItemReviews: Codable, Hashable, Sendable {
             /// Community average (absent when nobody rated it).

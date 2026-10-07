@@ -1422,6 +1422,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/items/{itemId}/trailer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        /** The trailer for a movie or show (PLAY-22): a local trailer file when there is one, else the official trailer TMDB lists on YouTube. */
+        get: operations["getItemTrailer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/hubs/home": {
         parameters: {
             query?: never;
@@ -4574,6 +4593,24 @@ export interface components {
             updatedAt: string;
             mine: boolean;
         };
+        ItemTrailer: {
+            /**
+             * @description local: play itemId like any video. youtube: open or embed the YouTube video.
+             * @enum {string}
+             */
+            source: "local" | "youtube";
+            /**
+             * Format: int64
+             * @description The local trailer item (source local).
+             */
+            itemId?: number;
+            /** @description YouTube video id (source youtube). */
+            youtubeKey?: string;
+            /** @description https://www.youtube.com/watch?v=<key> (source youtube). */
+            url?: string;
+            /** @description The trailer's title. */
+            name?: string;
+        };
         ItemReviews: {
             /** @description Community average (absent when nobody rated it). */
             average?: number;
@@ -7488,6 +7525,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ItemSummary"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getItemTrailer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The trailer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemTrailer"];
                 };
             };
             401: components["responses"]["Unauthorized"];

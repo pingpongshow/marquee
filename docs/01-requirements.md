@@ -1,6 +1,6 @@
 # Requirements
 
-_Last updated: 2026-10-05_
+_Last updated: 2026-10-07_
 
 Priority key:
 - **P0:** required for the first usable release.
@@ -66,6 +66,7 @@ Priority key:
 | PLAY-19 | Playback speed 0.5×–2× in the video players (not during watch together). | P2 |
 | PLAY-20 | **Subtitle appearance:** each person picks text size, colour, background and position once; every app applies it, and burned-in subtitles use it too (styled ASS subtitles keep their look) (D87). | P1 |
 | PLAY-21 | **Download to a computer** (web): a movie or episode's original file, or a whole season or show as one uncompressed zip (a folder per season), with the same remote-access rule as streaming. | P2 |
+| PLAY-22 | **Trailer button** on a movie or show page in every app: plays a local trailer file when there is one, otherwise the official trailer TMDB lists, streamed from YouTube (nothing is downloaded or stored on the server). | P2 |
 
 ## 3a. Automatic quality & network awareness
 

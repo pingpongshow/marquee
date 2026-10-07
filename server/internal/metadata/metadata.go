@@ -43,6 +43,7 @@ type Service struct {
 	client     *tmdb.Client
 	key        string
 	lang       string
+	trailers   trailerCache // TMDB trailer lookups (only the video id; nothing is downloaded)
 }
 
 func (s *Service) tmdb(lang string) (*tmdb.Client, error) {

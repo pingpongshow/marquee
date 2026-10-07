@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"marquee/internal/auth"
 	"marquee/internal/items"
 	"marquee/internal/library"
+	"marquee/internal/metadata"
 )
 
 // ---------- smart collections (META-7, D86) ----------
@@ -498,4 +500,27 @@ func (h *Handlers) AcceptInvitation(ctx context.Context, req AcceptInvitationReq
 		return nil, internal(ctx, "acceptInvitation", err)
 	}
 	return AcceptInvitation200JSONResponse{Token: token, User: toAPIUser(u)}, nil
+}
+
+// GetItemTrailer finds a movie's or show's trailer (PLAY-22). Nothing is downloaded: a
+// YouTube trailer is only looked up, and the client plays it from YouTube.
+func (h *Handlers) GetItemTrailer(ctx context.Context, req GetItemTrailerRequestObject) (GetItemTrailerResponseObject, error) {
+	if _, ok := session(ctx); !ok {
+		return GetItemTrailer401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	if h.Metadata == nil || h.Items.Visible(ctx, access(ctx), req.ItemId) != nil {
+		return GetItemTrailer404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
+	}
+	t, err := h.Metadata.Trailer(ctx, req.ItemId)
+	switch {
+	case errors.Is(err, metadata.ErrNoTrailer), errors.Is(err, sql.ErrNoRows):
+		return GetItemTrailer404JSONResponse{NotFoundJSONResponse(apiErr("no_trailer", "No trailer found for this title."))}, nil
+	case err != nil:
+		return GetItemTrailer404JSONResponse{NotFoundJSONResponse(apiErr("no_trailer", "Couldn't look up the trailer right now."))}, nil
+	}
+	if t.LocalItemID != 0 {
+		return GetItemTrailer200JSONResponse{Source: ItemTrailerSourceLocal, ItemId: ptr(t.LocalItemID), Name: nz(t.Name)}, nil
+	}
+	return GetItemTrailer200JSONResponse{Source: ItemTrailerSourceYoutube, YoutubeKey: ptr(t.YouTubeKey), Url: ptr("https://www.youtube.com/watch?v=" + t.YouTubeKey),
+		Name: nz(t.Name)}, nil
 }
