@@ -23,6 +23,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ActivityScenario
@@ -2196,5 +2198,122 @@ class MarqueeUiTest {
             kid("DELETE", "/items/$movie/watchlist")
             kid("POST", "/items/$movie/watched")
         }
+    }
+
+    /** Now Playing's scrubber: a tap anywhere on it jumps there (dragging still works, as a Slider). */
+    @Test fun tapToSeek() {
+        assumeTrue("phones", !isTv)
+        connectAndSignIn()
+        val app = context.applicationContext as MarqueeApplication
+        try {
+            openLibrary("Music")
+            rule.waitUntil(20_000) { scrollTo(hasText("Library Radio")) }
+            tap("Library Radio")
+            openNowPlaying()
+            rule.waitUntil(20_000) { app.music.position.value.second > 0 }
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.pause() }
+            rule.waitUntil(5_000) { !app.music.playing.value }
+            val bar = rule.onNode(hasContentDescription("Position"))
+            fun tapAt(f: Float) {
+                bar.performTouchInput { click(androidx.compose.ui.geometry.Offset(width * f, centerY)) }
+                rule.waitUntil(5_000) {
+                    val (pos, dur) = app.music.position.value
+                    dur > 0 && kotlin.math.abs(pos.toFloat() / dur - f) < 0.08f
+                }
+            }
+            tapAt(0.75f)
+            shot("seek-75")
+            tapAt(0.25f)
+            val p = bar.fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].current
+            assertTrue("scrubber shows the new place ($p)", kotlin.math.abs(p - 0.25f) < 0.08f)
+            rule.onNode(hasContentDescription("Close Now Playing")).performClick()
+        } finally {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+        }
+    }
+
+    private fun openMovie(title: String) {
+        openLibrary("Movies")
+        rule.waitUntil(15_000) { scrollTo(hasText(title)) }
+        tap(title)
+        rule.waitUntilAtLeastOneExists(hasText("Play") or hasText("Resume"), 10_000)
+    }
+
+    /** Trailer button (PLAY-22): shown only when there's a trailer; a local one plays in the video player. */
+    @Test fun trailerLocal() {
+        assumeTrue("phones", !isTv)
+        connectAndSignIn()
+        openMovie("10 Xenon") // no trailer: no button
+        Thread.sleep(3000)
+        assertTrue("no Trailer button without a trailer", rule.onAllNodes(hasText("Trailer") and hasClickAction()).fetchSemanticsNodes().isEmpty())
+        back()
+        rule.waitUntil(15_000) { scrollTo(hasText("00 Preview Test")) }
+        tap("00 Preview Test")
+        rule.waitUntilAtLeastOneExists(hasText("Trailer") and hasClickAction(), 15_000)
+        shot("tr1-button")
+        rule.onNode(hasText("Trailer") and hasClickAction()).performClick()
+        rule.waitUntilAtLeastOneExists(videoPlaying, 30_000)
+        showControls()
+        rule.waitText("Official Trailer")
+        shot("tr2-local")
+        back()
+    }
+
+    /** A YouTube trailer opens YouTube (the app, else the browser) with an ACTION_VIEW intent; nothing is downloaded. */
+    @Test fun trailerYouTube() {
+        assumeTrue("phones", !isTv)
+        val fired = java.util.concurrent.LinkedBlockingQueue<Intent>()
+        val monitor = object : android.app.Instrumentation.ActivityMonitor() {
+            override fun onStartActivity(intent: Intent): android.app.Instrumentation.ActivityResult? =
+                if (intent.action == Intent.ACTION_VIEW && intent.data?.scheme in setOf("vnd.youtube", "https")) {
+                    fired.add(intent); android.app.Instrumentation.ActivityResult(0, null)
+                } else null
+        }
+        val inst = InstrumentationRegistry.getInstrumentation()
+        app.marquee.ui.Trailers.fake = app.marquee.api.models.ItemTrailer(app.marquee.api.models.ItemTrailer.Source.YOUTUBE,
+            youtubeKey = "dQw4w9WgXcQ", url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ", name = "Test Trailer")
+        inst.addMonitor(monitor)
+        try {
+            connectAndSignIn()
+            openMovie("10 Xenon")
+            rule.waitUntilAtLeastOneExists(hasText("Trailer") and hasClickAction(), 15_000)
+            rule.onNode(hasText("Trailer") and hasClickAction()).performClick()
+            val i = fired.poll(10, TimeUnit.SECONDS)
+            assertTrue("an intent was fired", i != null)
+            assertEquals("vnd.youtube:dQw4w9WgXcQ", i!!.dataString)
+        } finally {
+            inst.removeMonitor(monitor)
+            app.marquee.ui.Trailers.fake = null
+        }
+    }
+
+    /** Album track rows: the stars and the duration keep a gap and stay on screen; the title truncates instead. */
+    @Test fun trackRowStarsAndDuration() {
+        assumeTrue("phones", !isTv)
+        connectAndSignIn()
+        openLibrary("Music")
+        openArtist("Calm Pads")
+        tap("Calm Pads", substring = true)
+        rule.waitText("Floating")
+        rule.onAllNodes(hasContentDescription("Floating")).onFirst().performClick()
+        rule.waitText("Tracks")
+        val stars = hasContentDescription("Rate ", substring = true) or hasContentDescription("Rated ", substring = true)
+        rule.waitUntilAtLeastOneExists(stars, 10_000)
+        val width = rule.onRoot().fetchSemanticsNode().boundsInRoot.width
+        val time = Regex("""^\d+:\d\d$""")
+        val times = rule.onAllNodes(SemanticsMatcher("time") { n -> n.config.getOrElseNullable(SemanticsProperties.Text) { null }?.any { s -> time.matches(s.text) } == true }, useUnmergedTree = true)
+            .fetchSemanticsNodes().map { it.boundsInRoot }
+        val rows = rule.onAllNodes(stars, useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }
+        assertTrue("track rows (${rows.size}) and times (${times.size})", rows.isNotEmpty() && times.isNotEmpty())
+        val density = context.resources.displayMetrics.density
+        var checked = 0
+        rows.forEach { s ->
+            val t = times.firstOrNull { kotlin.math.abs(it.center.y - s.center.y) < s.height } ?: return@forEach
+            assertTrue("gap between stars $s and time $t", t.left - s.right >= 6 * density)
+            assertTrue("time on screen ($t, width $width)", t.right <= width + 1)
+            checked++
+        }
+        assertTrue("rows checked: $checked", checked > 0)
+        shot("rows-album")
     }
 }
