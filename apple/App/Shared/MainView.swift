@@ -74,12 +74,17 @@ struct MainView: View {
         // Remote control (USER-14): a player while open, and while music plays in the background.
         .onChange(of: scenePhase, initial: true) { old, new in
             updateRemote()
-            // Back in the app: anything that failed at launch (server unreachable) loads now.
-            if old != new, new == .active, libraries.isEmpty || librariesError != nil { Task { await loadAll() } }
+            // Back in the app: anything that failed at launch (server unreachable) loads now,
+            // and Live TV is checked again (a source may have lost its channels, LIVE-1).
+            if old != new, new == .active { Task { await loadAll() } }
             // And changes made offline go to the server (USER-18).
             if old != new, new == .active { Task { await OfflineSync.shared.flush() } }
         }
         .onChange(of: music.playing) { updateRemote() }
+        // A video played: its watched state is the server's again.
+        .onChange(of: video.request) { old, new in
+            if new == nil, let old { WatchStore.shared.played(old.itemID) }
+        }
         .onDisappear { RemoteReceiver.shared.stop() }
         // Again whenever the connection changes (another address, reconnected, signed in).
         .task(id: "\(app.baseURL?.absoluteString ?? "")|\(app.state)|\(app.me?.id ?? 0)") { await loadAll() }

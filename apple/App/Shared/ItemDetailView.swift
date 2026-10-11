@@ -85,6 +85,9 @@ struct ItemDetailView: View {
         }
         // A rating saved (here or in the comments): the community average changes.
         .onChange(of: RatingStore.shared.saves[id]) { Task { await refresh() } }
+        // Marked watched or unwatched (here, an episode's menu, anywhere): the item and its
+        // episodes again.
+        .onChange(of: WatchStore.shared.saves) { Task { await refresh() } }
         // Changes made offline reached the server: show its truth (USER-18).
         .onChange(of: OfflineSync.shared.generation) { Task { await refresh() } }
         .onChange(of: video.request) {
@@ -292,7 +295,7 @@ struct ItemDetailView: View {
     @ViewBuilder private func primaryButtons(_ d: ItemDetail) -> some View {
         switch d.type {
         case .movie, .episode, .video:
-            let resume = (d.base.viewOffsetMs ?? 0) > 0
+            let resume = WatchStore.shared.canResume(d.base)
             Button { video.play(d.id) } label: {
                 Label(resume ? "Resume" : "Play", systemImage: "play.fill")
             }
@@ -321,7 +324,7 @@ struct ItemDetailView: View {
     }
 
     @ViewBuilder private func secondaryButtons(_ d: ItemDetail) -> some View {
-        if [.movie, .episode, .video].contains(d.type), (d.base.viewOffsetMs ?? 0) > 0 {
+        if [.movie, .episode, .video].contains(d.type), WatchStore.shared.canResume(d.base) {
             Button { video.play(d.id, startMs: 0) } label: { Label("From start", systemImage: "arrow.counterclockwise") }.buttonStyle(.bordered)
         }
         if let trailer, d.type == .movie || d.type == .show { TrailerButton(trailer: trailer, title: d.title) }
@@ -343,13 +346,10 @@ struct ItemDetailView: View {
             .accessibilityIdentifier("watchlistToggle")
         }
         if d.base.isPlayableVideo || d.type == .show || d.type == .season {
-            // A change waiting to sync shows as made (USER-18).
-            let watched = OfflineSync.shared.pendingWatched(d.id) ?? d.base.watched
-            Button {
-                Task {
-                    if (try? await app.setWatched(d.id, !watched)) == true { await refresh() }
-                }
-            } label: {
+            // Shows as made at once, as does a change waiting to sync (USER-18); the page reloads
+            // once the server has it (a show's or season's episodes too).
+            let watched = WatchStore.shared.watched(d.base)
+            Button { WatchStore.shared.mark(d.base, watched: !watched, app: app) } label: {
                 Label(watched ? "Watched" : "Mark watched", systemImage: watched ? "checkmark.circle.fill" : "checkmark.circle")
             }
             .buttonStyle(.bordered)
@@ -672,7 +672,7 @@ struct EpisodeRow: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(episode.index ?? 0). \(episode.title)").font(.headline).lineLimit(2)
                     Text(formatDuration(ms: episode.durationMs)).font(.caption).foregroundStyle(.secondary)
-                    if episode.watched { Label("Watched", systemImage: "checkmark").font(.caption2).foregroundStyle(Color.marqueeGold) }
+                    if WatchStore.shared.watched(episode) { Label("Watched", systemImage: "checkmark").font(.caption2).foregroundStyle(Color.marqueeGold) }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }

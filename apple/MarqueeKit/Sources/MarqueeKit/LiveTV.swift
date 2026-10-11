@@ -18,8 +18,13 @@ public extension AppSession {
         }
     }
 
+    /// Whether Live TV is usable for this profile (a source with channels it may watch).
+    /// UI tests force "not usable" with -marquee-test-live-off.
     func liveStatus() async throws -> LiveTvStatus {
-        try await liveAPI.liveTvStatus().ok.body.json
+        if ProcessInfo.processInfo.arguments.contains("-marquee-test-live-off") {
+            return LiveTvStatus(enabled: false, channels: 0, sources: [])
+        }
+        return try await liveAPI.liveTvStatus().ok.body.json
     }
 
     /// Channels with now and next; group nil = all, favorites = only the caller's, recent =

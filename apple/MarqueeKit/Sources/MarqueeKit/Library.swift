@@ -93,6 +93,16 @@ public extension AppSession {
         try await OfflineSync.shared.submit(.watched(id, watched))
     }
 
+    /// Hides a movie or video, or an episode's whole show, from Continue Watching until it's
+    /// watched again; the resume position is kept (USER-6).
+    func removeFromContinueWatching(_ id: Int64) async throws {
+        switch try await api.removeFromContinueWatching(path: .init(itemId: id)) {
+        case .noContent: return
+        case .notFound(let r): throw MarqueeError((try? r.body.json.message) ?? "This can't be removed from Continue Watching.")
+        default: throw MarqueeError("Couldn't remove it from Continue Watching.")
+        }
+    }
+
     /// Adds to or removes from the watchlist (USER-8); kept to sync later when offline.
     @discardableResult
     func setWatchlist(_ id: Int64, _ on: Bool) async throws -> Bool {

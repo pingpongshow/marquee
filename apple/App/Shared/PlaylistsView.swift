@@ -71,10 +71,10 @@ struct PlaylistsView: View {
 
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: cell), spacing: 16, alignment: .top)], spacing: 20) {
-                ForEach(playlists, id: \.id) { p in
-                    PlaylistCard(playlist: p, size: cell)
-                }
+            // Video playlists first (movies and episodes, a few at most), then the music ones.
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: cell), spacing: 16, alignment: .top)], alignment: .leading, spacing: 20) {
+                section("Video Playlists", kind: .video)
+                section("Music Playlists", kind: .audio)
             }
             .padding(sidePadding)
             if let error, playlists.isEmpty {
@@ -94,6 +94,22 @@ struct PlaylistsView: View {
         .navigationTitle("Playlists")
         .task { if !loaded { await load() } }
         .refreshable { await load() }
+    }
+
+    @ViewBuilder private func section(_ title: String, kind: Schemas.PlaylistKind) -> some View {
+        let list = playlists.filter { $0.kind == kind }
+        if !list.isEmpty {
+            Section {
+                ForEach(list, id: \.id) { p in PlaylistCard(playlist: p, size: cell) }
+            } header: {
+                // Headed only when both kinds are there.
+                if list.count != playlists.count {
+                    Text(title).font(.title2.bold()).frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityIdentifier("playlists.\(kind.rawValue)")
+                }
+            }
+        }
     }
 
     private func load() async {
@@ -260,9 +276,12 @@ struct PlaylistView: View {
         guard !items.isEmpty else { return }
         if playlist?.kind == .audio {
             music.play(items, start: start, shuffle: shuffle, source: playlist?.title)
+        } else if shuffle {
+            // Every item once, in a random order, one after another.
+            let order = items.map(\.id).shuffled()
+            video.play(order[0], startMs: 0, playlistID: id, order: order)
         } else {
-            let first = shuffle ? items.randomElement()! : items[start]
-            video.play(first.id, startMs: 0, playlistID: id)
+            video.play(items[start].id, startMs: 0, playlistID: id)
         }
     }
 }

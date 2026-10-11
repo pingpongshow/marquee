@@ -55,6 +55,8 @@ public final class VideoPlayback {
 
     private let app: AppSession
     private let playlistID: Int64?
+    /// A shuffled playlist's play order (item ids); nil = the playlist's own order.
+    private let order: [Int64]?
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
     @ObservationIgnored private var endObserver: NSObjectProtocol?
@@ -80,9 +82,10 @@ public final class VideoPlayback {
     public private(set) var offlineTitle: String?
     @ObservationIgnored private static var measured: (kbps: Int, at: Date)?
 
-    public init(app: AppSession, playlistID: Int64? = nil) {
+    public init(app: AppSession, playlistID: Int64? = nil, order: [Int64]? = nil) {
         self.app = app
         self.playlistID = playlistID
+        self.order = order
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 600), queue: .main) { [weak self] t in
             MainActor.assumeIsolated { self?.tick(t.seconds) }
         }
@@ -280,9 +283,16 @@ public final class VideoPlayback {
 
     private func loadNext(_ itemID: Int64) {
         Task {
-            if let playlistID, let entries = try? await app.playlistItems(playlistID),
-               let i = entries.firstIndex(where: { $0.item.id == itemID }), i + 1 < entries.count {
-                nextUp = entries[i + 1].item
+            if let playlistID, let entries = try? await app.playlistItems(playlistID) {
+                // Up next in the playlist (shuffled or in order); nothing after its last item.
+                if let order {
+                    let next = order.firstIndex(of: itemID).flatMap { $0 + 1 < order.count ? order[$0 + 1] : nil }
+                    nextUp = next.flatMap { id in entries.first { $0.item.id == id }?.item }
+                } else if let i = entries.firstIndex(where: { $0.item.id == itemID }), i + 1 < entries.count {
+                    nextUp = entries[i + 1].item
+                } else {
+                    nextUp = nil
+                }
             } else if item?.type == .episode {
                 nextUp = await app.next(after: itemID)
             } else {

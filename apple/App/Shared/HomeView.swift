@@ -14,6 +14,9 @@ struct HomeView: View {
     @State private var error: String?
 
     @State private var groups: [WatchGroup] = []
+    /// Video playlists, a row on the TV's Home: the Playlists tab sits at the far end of the
+    /// top bar, out of sight behind the libraries.
+    @State private var videoPlaylists: [Playlist] = []
     @State private var editing = false
 
     var body: some View {
@@ -51,15 +54,21 @@ struct HomeView: View {
                     let wide = hub.id == "continue-watching"
                     ShelfRow(title: hub.title, destination: destination(hub)) {
                         ForEach(hub.items, id: \.id) { item in
+                            let remove: (() -> Void)? = wide ? { removeFromContinue(item) } : nil
                             if wide && item.isPlayableVideo {
-                                ContinueCard(item: item)
+                                ContinueCard(item: item, onRemove: remove)
                             } else {
-                                PosterCard(item: item, shape: PosterShape.for(item) == .wide ? .wide : nil)
+                                PosterCard(item: item, shape: PosterShape.for(item) == .wide ? .wide : nil, onRemoveFromContinue: remove)
                             }
                         }
                     }
                 }
                 #if os(tvOS)
+                if !videoPlaylists.isEmpty {
+                    ShelfRow(title: "Video Playlists") {
+                        ForEach(videoPlaylists, id: \.id) { PlaylistCard(playlist: $0, size: 250) }
+                    }
+                }
                 if loaded {
                     HStack(spacing: 30) {
                         Button { editing = true } label: { Label("Edit Home", systemImage: "slider.horizontal.3") }
@@ -131,12 +140,32 @@ struct HomeView: View {
         return hub.libraryId.map { .library($0) }
     }
 
+    /// Takes a title off Continue Watching (USER-6): gone from the row at once (an episode
+    /// takes its show's other episodes with it), then the row comes from the server again.
+    private func removeFromContinue(_ item: Item) {
+        let before = hubs
+        if let i = hubs.firstIndex(where: { $0.id == "continue-watching" }) {
+            hubs[i].items.removeAll { $0.id == item.id || (item._type == .episode && item.grandparentId != nil && $0.grandparentId == item.grandparentId) }
+            if hubs[i].items.isEmpty { hubs.remove(at: i) }
+        }
+        ActionError.run {
+            do {
+                try await app.removeFromContinueWatching(item.id)
+            } catch {
+                hubs = before
+                throw error
+            }
+            await load()
+        }
+    }
+
     private func load() async {
         loadedVersion = HomeChanges.shared.version
         do {
             hubs = try await app.hubs()
             error = nil
             #if os(tvOS)
+            if let lists = try? await app.playlists(kind: .video) { videoPlaylists = lists }
             saveTopShelf()
             #endif
         } catch {
@@ -169,6 +198,8 @@ struct HomeView: View {
 struct ContinueCard: View {
     @Environment(VideoPresenter.self) private var video
     let item: Item
+    /// Takes it off Continue Watching (its context menu).
+    var onRemove: (() -> Void)?
     #if os(tvOS)
     private let width: CGFloat = 420
     #else
@@ -190,6 +221,19 @@ struct ContinueCard: View {
         #else
         .buttonStyle(.plain)
         #endif
-        .contextMenu { ItemMenuItems(item: item) }
+        .accessibilityIdentifier("continue.\(item.id)")
+        .contextMenu {
+            if let onRemove { RemoveFromContinueButton(action: onRemove) }
+            ItemMenuItems(item: item)
+        }
+    }
+}
+
+/// "Remove from Continue Watching" in a Continue Watching tile's context menu (USER-6).
+struct RemoveFromContinueButton: View {
+    let action: () -> Void
+    var body: some View {
+        Button(role: .destructive, action: action) { Label("Remove from Continue Watching", systemImage: "eye.slash") }
+            .accessibilityIdentifier("removeFromContinue")
     }
 }
