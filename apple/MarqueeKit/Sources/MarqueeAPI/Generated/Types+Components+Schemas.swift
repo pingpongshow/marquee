@@ -70,6 +70,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/SystemInfo/remoteUrl`.
             public var remoteUrl: Swift.String?
+            /// The admin turned on rating requests when a movie or episode ends (USER-19); apps still honour the person's ratingPrompt preference.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SystemInfo/ratingPrompt`.
+            public var ratingPrompt: Swift.Bool?
             /// Creates a new `SystemInfo`.
             ///
             /// - Parameters:
@@ -82,6 +86,7 @@ extension Components {
             ///   - pinSignIn: The sign-in screen should offer the profile picker with PINs from this network.
             ///   - lanUrl: The server's home-network address (Settings → Network), so apps reached over Tailscale learn it.
             ///   - remoteUrl: The Tailscale address (Settings → Remote Access), so apps on the LAN learn where to go when away.
+            ///   - ratingPrompt: The admin turned on rating requests when a movie or episode ends (USER-19); apps still honour the person's ratingPrompt preference.
             public init(
                 serverId: Swift.String,
                 serverName: Swift.String,
@@ -91,7 +96,8 @@ extension Components {
                 networkClass: Components.Schemas.NetworkClass,
                 pinSignIn: Swift.Bool? = nil,
                 lanUrl: Swift.String? = nil,
-                remoteUrl: Swift.String? = nil
+                remoteUrl: Swift.String? = nil,
+                ratingPrompt: Swift.Bool? = nil
             ) {
                 self.serverId = serverId
                 self.serverName = serverName
@@ -102,6 +108,7 @@ extension Components {
                 self.pinSignIn = pinSignIn
                 self.lanUrl = lanUrl
                 self.remoteUrl = remoteUrl
+                self.ratingPrompt = ratingPrompt
             }
             public enum CodingKeys: String, CodingKey {
                 case serverId
@@ -113,6 +120,7 @@ extension Components {
                 case pinSignIn
                 case lanUrl
                 case remoteUrl
+                case ratingPrompt
             }
         }
         /// - Remark: Generated from `#/components/schemas/Health`.
@@ -550,6 +558,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/UserPreferences/cinemaTrailers`.
             public var cinemaTrailers: Swift.Bool?
+            /// Ask me to rate a movie or episode when I finish it, if the server has it on (USER-19). Default true.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserPreferences/ratingPrompt`.
+            public var ratingPrompt: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/UserPreferences/subtitleStyle`.
             public var subtitleStyle: Components.Schemas.SubtitleStyle?
             /// Creates a new `UserPreferences`.
@@ -561,6 +573,7 @@ extension Components {
             ///   - localQualityKbps: 0 = original
             ///   - remoteQualityKbps: 0 = automatic
             ///   - cinemaTrailers: Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true.
+            ///   - ratingPrompt: Ask me to rate a movie or episode when I finish it, if the server has it on (USER-19). Default true.
             ///   - subtitleStyle:
             public init(
                 audioLanguage: Swift.String? = nil,
@@ -569,6 +582,7 @@ extension Components {
                 localQualityKbps: Swift.Int? = nil,
                 remoteQualityKbps: Swift.Int? = nil,
                 cinemaTrailers: Swift.Bool? = nil,
+                ratingPrompt: Swift.Bool? = nil,
                 subtitleStyle: Components.Schemas.SubtitleStyle? = nil
             ) {
                 self.audioLanguage = audioLanguage
@@ -577,6 +591,7 @@ extension Components {
                 self.localQualityKbps = localQualityKbps
                 self.remoteQualityKbps = remoteQualityKbps
                 self.cinemaTrailers = cinemaTrailers
+                self.ratingPrompt = ratingPrompt
                 self.subtitleStyle = subtitleStyle
             }
             public enum CodingKeys: String, CodingKey {
@@ -586,6 +601,7 @@ extension Components {
                 case localQualityKbps
                 case remoteQualityKbps
                 case cinemaTrailers
+                case ratingPrompt
                 case subtitleStyle
             }
         }
@@ -1312,21 +1328,29 @@ extension Components {
             public var serverName: Swift.String?
             /// - Remark: Generated from `#/components/schemas/GeneralSettings/metadataLanguage`.
             public var metadataLanguage: Swift.String?
+            /// Ask people to rate a movie or episode when they finish it (USER-19). Default off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/GeneralSettings/ratingPrompt`.
+            public var ratingPrompt: Swift.Bool?
             /// Creates a new `GeneralSettings`.
             ///
             /// - Parameters:
             ///   - serverName:
             ///   - metadataLanguage:
+            ///   - ratingPrompt: Ask people to rate a movie or episode when they finish it (USER-19). Default off.
             public init(
                 serverName: Swift.String? = nil,
-                metadataLanguage: Swift.String? = nil
+                metadataLanguage: Swift.String? = nil,
+                ratingPrompt: Swift.Bool? = nil
             ) {
                 self.serverName = serverName
                 self.metadataLanguage = metadataLanguage
+                self.ratingPrompt = ratingPrompt
             }
             public enum CodingKeys: String, CodingKey {
                 case serverName
                 case metadataLanguage
+                case ratingPrompt
             }
         }
         /// - Remark: Generated from `#/components/schemas/NetworkSettings`.

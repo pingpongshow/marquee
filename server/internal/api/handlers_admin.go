@@ -26,7 +26,7 @@ func toAPISettings(s settings.Settings) ServerSettings {
 	}
 	return ServerSettings{
 		Security: SecuritySettings{PinSignIn: ptr(SecuritySettingsPinSignIn(s.Security.PinSignIn))},
-		General:  GeneralSettings{ServerName: ptr(s.General.ServerName), MetadataLanguage: ptr(s.General.MetadataLanguage)},
+		General:  GeneralSettings{ServerName: ptr(s.General.ServerName), MetadataLanguage: ptr(s.General.MetadataLanguage), RatingPrompt: ptr(s.General.RatingPrompt)},
 		Network: NetworkSettings{
 			LanSubnets:     ptr(append([]string{}, s.Network.LANSubnets...)),
 			LanUrl:         ptr(s.Network.LANURL),
@@ -120,6 +120,7 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 	}
 	if g := u.General; g != nil {
 		set(&s.General.ServerName, g.ServerName)
+		set(&s.General.RatingPrompt, g.RatingPrompt)
 		set(&s.General.MetadataLanguage, g.MetadataLanguage)
 	}
 	if n := u.Network; n != nil {

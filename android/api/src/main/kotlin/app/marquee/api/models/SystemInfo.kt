@@ -41,6 +41,7 @@ import kotlinx.serialization.Contextual
  * @param pinSignIn The sign-in screen should offer the profile picker with PINs from this network.
  * @param lanUrl The server's home-network address (Settings → Network), so apps reached over Tailscale learn it.
  * @param remoteUrl The Tailscale address (Settings → Remote Access), so apps on the LAN learn where to go when away.
+ * @param ratingPrompt The admin turned on rating requests when a movie or episode ends (USER-19); apps still honour the person's ratingPrompt preference.
  */
 @Serializable
 
@@ -75,7 +76,11 @@ data class SystemInfo (
 
     /* The Tailscale address (Settings → Remote Access), so apps on the LAN learn where to go when away. */
     @SerialName(value = "remoteUrl")
-    val remoteUrl: kotlin.String? = null
+    val remoteUrl: kotlin.String? = null,
+
+    /* The admin turned on rating requests when a movie or episode ends (USER-19); apps still honour the person's ratingPrompt preference. */
+    @SerialName(value = "ratingPrompt")
+    val ratingPrompt: kotlin.Boolean? = null
 
 ) {
 

@@ -3662,6 +3662,7 @@ components:
         pinSignIn: { type: boolean, description: The sign-in screen should offer the profile picker with PINs from this network. }
         lanUrl: { type: string, description: "The server's home-network address (Settings → Network), so apps reached over Tailscale learn it." }
         remoteUrl: { type: string, description: "The Tailscale address (Settings → Remote Access), so apps on the LAN learn where to go when away." }
+        ratingPrompt: { type: boolean, description: "The admin turned on rating requests when a movie or episode ends (USER-19); apps still honour the person's ratingPrompt preference." }
 
     Health:
       type: object
@@ -3761,6 +3762,7 @@ components:
         localQualityKbps: { type: integer, minimum: 0, description: 0 = original }
         remoteQualityKbps: { type: integer, minimum: 0, description: 0 = automatic }
         cinemaTrailers: { type: boolean, description: "Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true." }
+        ratingPrompt: { type: boolean, description: "Ask me to rate a movie or episode when I finish it, if the server has it on (USER-19). Default true." }
         subtitleStyle: { $ref: "#/components/schemas/SubtitleStyle" }
 
     UserCreate:
@@ -3936,6 +3938,7 @@ components:
       properties:
         serverName: { type: string, minLength: 1, maxLength: 64 }
         metadataLanguage: { type: string, example: en-US }
+        ratingPrompt: { type: boolean, description: "Ask people to rate a movie or episode when they finish it (USER-19). Default off." }
 
     NetworkSettings:
       type: object

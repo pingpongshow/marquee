@@ -93,6 +93,8 @@ type Security struct {
 type General struct {
 	ServerName       string `json:"serverName"`
 	MetadataLanguage string `json:"metadataLanguage"`
+	// RatingPrompt asks people to rate a movie or episode when they finish it (USER-19).
+	RatingPrompt bool `json:"ratingPrompt"`
 }
 
 type Network struct {

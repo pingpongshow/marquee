@@ -2793,6 +2793,8 @@ export interface components {
             lanUrl?: string;
             /** @description The Tailscale address (Settings → Remote Access), so apps on the LAN learn where to go when away. */
             remoteUrl?: string;
+            /** @description The admin turned on rating requests when a movie or episode ends (USER-19); apps still honour the person's ratingPrompt preference. */
+            ratingPrompt?: boolean;
         };
         Health: {
             /** @enum {string} */
@@ -2892,6 +2894,8 @@ export interface components {
             remoteQualityKbps?: number;
             /** @description Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true. */
             cinemaTrailers?: boolean;
+            /** @description Ask me to rate a movie or episode when I finish it, if the server has it on (USER-19). Default true. */
+            ratingPrompt?: boolean;
             subtitleStyle?: components["schemas"]["SubtitleStyle"];
         };
         UserCreate: {
@@ -3050,6 +3054,8 @@ export interface components {
             serverName?: string;
             /** @example en-US */
             metadataLanguage?: string;
+            /** @description Ask people to rate a movie or episode when they finish it (USER-19). Default off. */
+            ratingPrompt?: boolean;
         };
         NetworkSettings: {
             /** @description CIDRs treated as the local network. Everything else (including Tailscale) is remote. */
