@@ -23,6 +23,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performTextInput
@@ -2315,5 +2318,160 @@ class MarqueeUiTest {
         }
         assertTrue("rows checked: $checked", checked > 0)
         shot("rows-album")
+    }
+
+    // Batch 6 (2026-10-10)
+
+    private fun hasAction(label: String) = SemanticsMatcher("has action $label") { n ->
+        n.config.getOrElseNullable(androidx.compose.ui.semantics.SemanticsActions.CustomActions) { null }?.any { it.label == label } == true
+    }
+    private val watchedState = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Watched")
+    private fun itemJson(id: Long) = org.json.JSONObject(adminApi("GET", "/items/$id", asToken = appToken))
+    private fun continueWatchingIds(): List<Long> {
+        val hubs = org.json.JSONArray(adminApi("GET", "/hubs/home", asToken = appToken))
+        val cw = (0 until hubs.length()).map { hubs.getJSONObject(it) }.firstOrNull { it.getString("id") == "continue-watching" } ?: return emptyList()
+        val items = cw.getJSONArray("items")
+        return (0 until items.length()).map { items.getJSONObject(it).getLong("id") }
+    }
+    /** Home reloads its rows when it's opened again. */
+    private fun reopenHome() {
+        tap("Settings"); rule.waitText("Switch profile")
+        tap("Home")
+    }
+
+    /** Remove from Continue Watching (USER-6): a long press on the tile, gone at once and from the server's row. */
+    @Test fun removeFromContinueWatching() {
+        connectAndSignIn()
+        val id = 322L // 00 Long Test (90 s)
+        adminApi("PUT", "/items/$id/progress", """{"positionMs":30000}""", asToken = appToken)
+        try {
+            assertTrue("in Continue Watching", id in continueWatchingIds())
+            reopenHome()
+            val tile = hasContentDescription("00 Long Test") and hasAction("Remove from Continue Watching")
+            rule.waitUntilAtLeastOneExists(tile, 15_000)
+            rule.onNode(tile).performTouchInput { longClick() }
+            rule.waitText("Remove from Continue Watching", 5_000)
+            shot("cw1-menu")
+            rule.onNode(hasText("Remove from Continue Watching") and hasClickAction()).performClick()
+            rule.waitUntil(10_000) { rule.onAllNodes(tile).fetchSemanticsNodes().isEmpty() }
+            assertTrue("removed on the server", id !in continueWatchingIds())
+            // The resume position is kept.
+            assertTrue("position kept", itemJson(id).optLong("viewOffsetMs") > 0)
+            shot("cw2-removed")
+        } finally {
+            adminApi("POST", "/items/$id/watched", asToken = appToken)
+            adminApi("DELETE", "/items/$id/watched", asToken = appToken)
+        }
+    }
+
+    /** Mark as watched (USER-6): from the item page and from a tile's menu, shown at once and on the server, Home refreshed. */
+    @Test fun markWatchedUpdatesUi() {
+        connectAndSignIn()
+        val id = 359L // 00 Preview Test
+        adminApi("PUT", "/items/$id/progress", """{"positionMs":30000}""", asToken = appToken)
+        try {
+            openMovie("00 Preview Test")
+            rule.waitUntilAtLeastOneExists(hasText("Mark watched") and hasClickAction(), 10_000)
+            rule.onNode(hasText("Mark watched") and hasClickAction()).performClick()
+            rule.waitUntilAtLeastOneExists(hasText("Watched") and hasClickAction(), 5_000)
+            rule.waitUntil(10_000) { itemJson(id).optInt("viewCount") > 0 }
+            shot("mw1-page")
+            // Back on the grid: the tile has its watched badge.
+            back()
+            val tile = hasContentDescription("00 Preview Test") and hasAction("Mark as unwatched")
+            rule.waitUntilAtLeastOneExists(tile and watchedState, 10_000)
+            // Home's Continue Watching no longer has it.
+            tap("Home")
+            rule.waitUntil(15_000) { rule.onAllNodes(hasContentDescription("00 Preview Test") and hasAction("Remove from Continue Watching")).fetchSemanticsNodes().isEmpty() }
+            assertTrue("not in Continue Watching", id !in continueWatchingIds())
+            // From a tile's menu: unwatched again.
+            openLibrary("Movies")
+            rule.waitUntil(15_000) { scrollTo(hasContentDescription("00 Preview Test")) }
+            rule.onNode(tile).performTouchInput { longClick() }
+            rule.waitText("Mark as unwatched", 5_000)
+            shot("mw2-menu")
+            rule.onNode(hasText("Mark as unwatched") and hasClickAction()).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("00 Preview Test") and hasAction("Mark as watched"), 5_000)
+            assertTrue("no badge", rule.onAllNodes(hasContentDescription("00 Preview Test") and watchedState).fetchSemanticsNodes().isEmpty())
+            rule.waitUntil(10_000) { itemJson(id).optInt("viewCount") == 0 }
+            // And watched from the tile's menu, then the page agrees.
+            rule.onNode(hasContentDescription("00 Preview Test")).performTouchInput { longClick() }
+            rule.waitText("Mark as watched", 5_000)
+            rule.onNode(hasText("Mark as watched") and hasClickAction()).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("00 Preview Test") and watchedState, 5_000)
+            rule.waitUntil(10_000) { itemJson(id).optInt("viewCount") > 0 }
+            rule.onNode(hasContentDescription("00 Preview Test")).performClick()
+            rule.waitUntilAtLeastOneExists(hasText("Watched") and hasClickAction(), 10_000)
+        } finally {
+            adminApi("DELETE", "/items/$id/watched", asToken = appToken)
+        }
+    }
+
+    /** Live TV (LIVE-1): its entry under Libraries only while the status says it's usable. */
+    @Test fun liveTvHiddenWhenUnusable() {
+        connectAndSignIn()
+        val marquee = (context.applicationContext as MarqueeApplication).marquee
+        try {
+            scenario.onActivity { marquee.fakeLiveTv = false }
+            tap("Libraries")
+            rule.waitText("Music")
+            Thread.sleep(2000)
+            assertTrue("no Live TV", !scrollTo(hasText("Live TV") and hasClickAction()))
+            shot("ltx1-hidden")
+            scenario.onActivity { marquee.fakeLiveTv = true }
+            rule.waitUntil(10_000) { scrollTo(hasText("Live TV") and hasClickAction()) }
+            shot("ltx2-shown")
+        } finally {
+            scenario.onActivity { marquee.fakeLiveTv = null }
+        }
+    }
+
+    /** Video playlists (USER-7): listed with music ones, Play plays the first video and goes on to the next. */
+    @Test fun videoPlaylistPlays() {
+        connectAndSignIn()
+        val name = "Video PL ${System.currentTimeMillis() % 100000}"
+        val created = org.json.JSONObject(adminApi("POST", "/playlists", """{"title":"$name","kind":"video","itemIds":[4,5]}""", asToken = appToken))
+        try {
+            tap("Playlists")
+            rule.waitText("Video playlists")
+            rule.waitUntil(10_000) { scrollTo(hasText(name)) }
+            shot("vp1-list")
+            tap(name)
+            rule.waitText("20 Valley")
+            rule.waitUntilAtLeastOneExists(hasText("Play") and hasClickAction(), 10_000)
+            shot("vp2-playlist")
+            rule.onNode(hasText("Play") and hasClickAction()).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Video player"), 15_000)
+            rule.waitUntil(15_000) { rule.onAllNodes(hasContentDescription("Video player")).fetchSemanticsNodes().isNotEmpty() && rule.onAllNodesWithText("20 Valley").fetchSemanticsNodes().isNotEmpty() }
+            // Two-second videos: the next one follows on its own.
+            rule.waitUntil(30_000) { rule.onAllNodes(hasContentDescription("Video player")).fetchSemanticsNodes().isNotEmpty() && rule.onAllNodesWithText("15 Thunder").fetchSemanticsNodes().isNotEmpty() }
+            shot("vp3-next")
+        } finally {
+            adminApi("DELETE", "/playlists/${created.getLong("id")}", asToken = appToken)
+        }
+    }
+
+    /** Going back to a list keeps its place (the item opened is still on screen), not the top. */
+    @Test fun listKeepsPlaceAfterBack() {
+        connectAndSignIn()
+        openLibrary("Movies")
+        val grid = hasContentDescription("Library items")
+        rule.waitUntilAtLeastOneExists(hasAnyAncestor(grid) and hasClickAction(), 15_000)
+        // Past the first page (120), so coming back needs more than the first page reloaded.
+        rule.onNode(grid).performScrollToIndex(110)
+        rule.waitUntil(15_000) { runCatching { rule.onNode(grid).performScrollToIndex(200) }.isSuccess }
+        rule.waitForIdle()
+        Thread.sleep(1000)
+        val visible = rule.onAllNodes(hasAnyAncestor(grid) and hasClickAction()).fetchSemanticsNodes()
+            .mapNotNull { n -> n.config.getOrElseNullable(SemanticsProperties.ContentDescription) { null }?.firstOrNull() }
+        assertTrue("tiles after scrolling", visible.size > 2)
+        val pick = visible[visible.size / 2]
+        rule.onNode(hasContentDescription(pick) and hasAnyAncestor(grid)).performClick()
+        rule.waitUntilAtLeastOneExists(hasText("Play") or hasText("Resume"), 10_000)
+        back()
+        rule.waitUntilAtLeastOneExists(hasContentDescription(pick) and hasAnyAncestor(grid), 10_000)
+        rule.onNode(hasContentDescription(pick) and hasAnyAncestor(grid)).assertIsDisplayed()
+        assertTrue("not back at the top", rule.onAllNodes(hasContentDescription("00 Long Test") and hasAnyAncestor(grid)).fetchSemanticsNodes().isEmpty())
+        shot("lp1-kept")
     }
 }

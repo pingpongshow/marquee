@@ -26,6 +26,7 @@ import app.marquee.api.models.PinLoginRequest
 import app.marquee.api.models.SystemInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
@@ -43,6 +44,13 @@ class Marquee(context: Context) {
     private val appContext: Context = context.applicationContext
     /** Changes made while the server couldn't be reached, sent when it's back (USER-18). */
     val sync: OfflineSync by lazy { OfflineSync(appContext, this) }
+    /** Watched marks shown at once, and a signal for rows and pages to reload (USER-6). */
+    val watch = WatchState()
+    /**
+     * Videos playing in order (a video playlist, USER-7): the player moves on to the next of
+     * these when one ends. Cleared when a video outside it is played.
+     */
+    @Volatile var videoQueue: List<Long> = emptyList()
     /**
      * Test hook (debug builds only): every request fails as if the network were down, while the
      * app keeps its address, so UI tests can make changes offline and then sync them.
@@ -104,6 +112,26 @@ class Marquee(context: Context) {
 
     /** Who is signed in on the current server, even offline (remembered from the last sign-in). */
     val userId: Long? get() = me.value?.id ?: server?.let { store.userId(it.id) }
+
+    private val _liveTv = MutableStateFlow(false)
+    /**
+     * Whether Live TV is usable: a source with channels this profile may watch (LIVE-1). Every
+     * Live TV entry point hides while it's false. Re-checked on (re)connecting and when the app
+     * returns to the foreground.
+     */
+    val liveTv: StateFlow<Boolean> = _liveTv
+    /** Test hook (debug builds only): a fixed Live TV status instead of the server's. */
+    @Volatile var fakeLiveTv: Boolean? = null
+        set(value) { field = value.takeIf { debuggable }; refreshLiveTv() }
+
+    fun refreshLiveTv() {
+        fakeLiveTv?.let { _liveTv.value = it; return }
+        if (token == null || baseUrl == null) { _liveTv.value = false; return }
+        scope.launch {
+            val on = runCatching { livetv.liveTvStatus().enabled }.getOrNull() ?: return@launch
+            _liveTv.value = fakeLiveTv ?: on
+        }
+    }
 
     /** Screens that follow [connection] reload (after offline changes were sent). */
     fun refresh() { _connection.value++ }
@@ -180,7 +208,7 @@ class Marquee(context: Context) {
         _connection.value++
         if (token == null) { _state.value = State.SignedOut; return }
         val me = withContext(Dispatchers.IO) { runCatching { auth.getMe() } }
-        me.onSuccess { _me.value = it; store.setUserId(record.id, it.id); _state.value = State.SignedIn }
+        me.onSuccess { _me.value = it; store.setUserId(record.id, it.id); _state.value = State.SignedIn; refreshLiveTv() }
             .onFailure { e ->
                 if ((e as? app.marquee.api.infrastructure.ClientException)?.statusCode == 401) signOutLocally() else _state.value = State.SignedIn
             }
@@ -202,6 +230,7 @@ class Marquee(context: Context) {
         server?.let { store.setToken(it.id, result.token); store.setUserId(it.id, result.user.id) }
         _me.value = withContext(Dispatchers.IO) { runCatching { auth.getMe() }.getOrNull() }
         _state.value = State.SignedIn
+        refreshLiveTv()
     }
 
     suspend fun signOut() {
@@ -213,6 +242,7 @@ class Marquee(context: Context) {
         token = null
         server?.let { store.setToken(it.id, null); store.setUserId(it.id, null) }
         _me.value = null
+        _liveTv.value = false
         _state.value = State.SignedOut
     }
 

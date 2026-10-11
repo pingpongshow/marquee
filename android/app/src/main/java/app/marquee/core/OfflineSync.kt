@@ -101,6 +101,19 @@ class OfflineSync(context: Context, private val marquee: Marquee) {
         true
     } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Throwable) { false }
 
+    /**
+     * Marks an item (a movie, video or episode; a show or season covers all its episodes)
+     * watched or unwatched: shown at once everywhere, then saved (or queued offline). Rows and
+     * pages reload once it's done; a refusal undoes the mark and returns false.
+     */
+    suspend fun setWatched(item: Long, on: Boolean): Boolean {
+        marquee.watch.mark(item, on)
+        val ok = saveShowing(watched(item, on))
+        if (!ok) marquee.watch.forget(item)
+        marquee.watch.changed()
+        return ok
+    }
+
     private fun enqueue(c: PendingChange): Result {
         queue.add(c)
         scheduleRetry()
