@@ -311,6 +311,8 @@ struct MusicSongsView: View {
     @State private var loading = false
     @State private var error: String?
     @State private var generation = 0
+    /// The sort and filters the list was last loaded for.
+    @State private var loadedKey: String?
 
     private static let page = 200
 
@@ -378,6 +380,14 @@ struct MusicSongsView: View {
         #endif
         .task { if facets == nil { facets = try? await app.filters(library: libraryID, type: .track) } }
         .task(id: "\(sort)-\(ratedOnly)-\(genre ?? "")-\(decade ?? 0)") {
+            // Back from an album or artist re-runs this: the list keeps its place unless the
+            // sort or filters changed.
+            let key = "\(sort)-\(ratedOnly)-\(genre ?? "")-\(decade ?? 0)"
+            if loadedKey == key {
+                if tracks.isEmpty || tracks.count < total { await loadMore() }
+                return
+            }
+            loadedKey = key
             generation += 1
             tracks = []
             total = 0

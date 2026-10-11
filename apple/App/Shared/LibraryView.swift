@@ -55,6 +55,9 @@ struct LibraryGrid: View {
     @State private var positions: [Int64: Int] = [:]
     /// Bumped by every reload, so a page that arrives for an older sort is dropped.
     @State private var generation = 0
+    /// The sort and filters the grid was last loaded for. Coming back from an item re-runs the
+    /// task: the grid only reloads when they changed, so it keeps its place (and TV focus).
+    @State private var loadedKey: String?
 
     private var libraryID: Int64 { library.id }
     private var isMusic: Bool { library._type == .music }
@@ -87,7 +90,7 @@ struct LibraryGrid: View {
                 .focusSection()
             }
             .navigationTitle(title)
-            .task(id: "\(sort)-\(unwatchedOnly)-\(ratedOnly)-\(showCollections)-\(genre ?? "")-\(decade ?? 0)") { await reload() }
+            .task(id: queryKey) { await reloadIfChanged() }
             .task { if facets == nil { facets = try? await app.filters(library: libraryID, type: type) } }
         #else
         grid
@@ -96,7 +99,7 @@ struct LibraryGrid: View {
                 ToolbarItem { museLink }
                 ToolbarItem { sortMenu }
             }
-            .task(id: "\(sort)-\(unwatchedOnly)-\(ratedOnly)-\(showCollections)-\(genre ?? "")-\(decade ?? 0)") { await reload() }
+            .task(id: queryKey) { await reloadIfChanged() }
             .task { if facets == nil { facets = try? await app.filters(library: libraryID, type: type) } }
         #endif
     }
@@ -164,6 +167,20 @@ struct LibraryGrid: View {
     private let minWidth: CGFloat = 110
     private let gap: CGFloat = 14
     #endif
+
+    private var queryKey: String {
+        "\(sort)-\(unwatchedOnly)-\(ratedOnly)-\(showCollections)-\(genre ?? "")-\(decade ?? 0)"
+    }
+
+    private func reloadIfChanged() async {
+        if loadedKey == queryKey {
+            // Back from an item: carry on with a page that was cut short, if any.
+            if items.count < total || items.isEmpty { await loadMore() }
+            return
+        }
+        loadedKey = queryKey
+        await reload()
+    }
 
     private func reload() async {
         generation += 1

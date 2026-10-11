@@ -43,7 +43,7 @@ struct PlayerView: View {
         }
         .task {
             music.pause() // a video takes over from the music
-            let p = VideoPlayback(app: app, playlistID: request.playlistID)
+            let p = VideoPlayback(app: app, playlistID: request.playlistID, order: request.order)
             playback = p
             RemoteReceiver.shared.video = RemoteVideoTarget(playback: p, next: playNext, close: close)
             let t = WatchTogether(app: app, player: p.player, itemID: request.itemID)
@@ -303,7 +303,7 @@ struct PlayerView: View {
         countdown = nil
         Task {
             await playback?.stop()
-            presenter.play(next.id, startMs: 0, playlistID: request.playlistID)
+            presenter.play(next.id, startMs: 0, playlistID: request.playlistID, order: request.order)
         }
     }
 

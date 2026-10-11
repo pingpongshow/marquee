@@ -39,7 +39,7 @@ struct ArtworkView: View {
         .clipShape(RoundedRectangle(cornerRadius: shape == .square && item._type == .artist ? width : 8, style: .continuous))
         .overlay(alignment: .topTrailing) { badge }
         .overlay(alignment: .bottom) {
-            if let p = item.progress {
+            if let p = WatchStore.shared.progress(item) {
                 GeometryReader { g in
                     ZStack(alignment: .leading) {
                         Rectangle().fill(.black.opacity(0.6))
@@ -64,10 +64,11 @@ struct ArtworkView: View {
     }
 
     @ViewBuilder private var badge: some View {
-        if item.unwatchedCount > 0 {
-            Text("\(item.unwatchedCount)").font(.caption2.bold()).padding(.horizontal, 5).padding(.vertical, 2)
+        let store = WatchStore.shared
+        if store.unwatchedCount(item) > 0 {
+            Text("\(store.unwatchedCount(item))").font(.caption2.bold()).padding(.horizontal, 5).padding(.vertical, 2)
                 .background(Color.marqueeGold, in: RoundedRectangle(cornerRadius: 4)).foregroundStyle(.black).padding(6)
-        } else if item.isPlayableVideo, OfflineSync.shared.pendingWatched(item.id) ?? item.watched, item.progress == nil {
+        } else if item.isPlayableVideo, store.watched(item), store.progress(item) == nil {
             Image(systemName: "checkmark.circle.fill").symbolRenderingMode(.palette).foregroundStyle(.black, Color.marqueeGold).padding(6)
         }
     }
@@ -202,6 +203,76 @@ final class RatingStore {
     }
 }
 
+/// Watched marks made in this session, so the item page, its menus, every poster's badge and
+/// progress bar agree at once, before their lists are fetched again. A show or season mark
+/// covers its seasons and episodes (the server marks them all).
+@MainActor @Observable
+final class WatchStore {
+    static let shared = WatchStore()
+    private struct Mark {
+        var watched: Bool
+        var at: Date
+        var container: Bool
+    }
+    private var marks: [Int64: Mark] = [:]
+    /// Bumped each time a mark reaches the server (pages showing the item reload then).
+    private(set) var saves = 0
+
+    /// The newest mark on the item, or on the season or show above it.
+    private func mark(_ item: Item) -> Mark? {
+        let ids: [Int64?] = switch item._type {
+        case .episode: [item.id, item.parentId, item.grandparentId]
+        case .season: [item.id, item.parentId]
+        default: [item.id]
+        }
+        return ids.compactMap { $0.flatMap { marks[$0] } }.max { $0.at < $1.at }
+    }
+
+    /// This session's mark, one waiting to sync (USER-18), or what the server sent.
+    func watched(_ item: Item) -> Bool {
+        mark(item)?.watched ?? OfflineSync.shared.pendingWatched(item.id) ?? item.watched
+    }
+
+    /// Unwatched episodes under a show or season (its badge).
+    func unwatchedCount(_ item: Item) -> Int {
+        guard item._type == .show || item._type == .season else { return 0 }
+        if let w = mark(item)?.watched ?? OfflineSync.shared.pendingWatched(item.id) { return w ? 0 : item.leafCount }
+        return item.unwatchedCount
+    }
+
+    /// The resume position's share; marking either way clears it on the server.
+    func progress(_ item: Item) -> Double? { canResume(item) ? item.progress : nil }
+
+    /// Whether the item has a resume position (not since marked watched or unwatched).
+    func canResume(_ item: Item) -> Bool {
+        (item.viewOffsetMs ?? 0) > 0 && mark(item) == nil && OfflineSync.shared.pendingWatched(item.id) == nil
+    }
+
+    /// Marks watched or unwatched at once, and puts the old state back if the server refuses.
+    /// Offline, the mark stays and syncs later (USER-18). Home's rows reload once it's saved.
+    func mark(_ item: Item, watched: Bool, app: AppSession) {
+        let id = item.id, old = marks[id]
+        marks[id] = Mark(watched: watched, at: Date(), container: item._type == .show || item._type == .season)
+        ActionError.run { [self] in
+            do {
+                try await app.setWatched(id, watched)
+            } catch {
+                marks[id] = old
+                throw error
+            }
+            saves += 1
+            HomeChanges.shared.version += 1
+        }
+    }
+
+    /// A video was played: its watched state is the server's again (as is every show's and
+    /// season's, which the next episodes may have changed).
+    func played(_ id: Int64) {
+        marks[id] = nil
+        marks = marks.filter { !$0.value.container }
+    }
+}
+
 /// A row's own rating that can be changed in place: small stars when rated, a faint outline
 /// star when not; tapping opens a menu of ratings (half stars) and No rating.
 struct RowRating: View {
@@ -308,6 +379,8 @@ struct PosterCard: View {
     let item: Item
     var width: CGFloat = PosterCard.defaultWidth
     var shape: PosterShape?
+    /// In the Continue Watching row: takes it off the row (its context menu).
+    var onRemoveFromContinue: (() -> Void)?
 
     #if os(tvOS)
     static let defaultWidth: CGFloat = 250
@@ -323,7 +396,7 @@ struct PosterCard: View {
                 ArtworkView(item: item, shape: shape ?? .for(item), width: width)
             }
             .buttonStyle(.card)
-            .contextMenu { ItemMenuItems(item: item) }
+            .contextMenu { menu }
             .accessibilityLabel(item.title)
             titles
             trackRating
@@ -339,10 +412,15 @@ struct PosterCard: View {
                 .frame(width: width)
             }
             .buttonStyle(.plain)
-            .contextMenu { ItemMenuItems(item: item) }
+            .contextMenu { menu }
             trackRating
         }
         #endif
+    }
+
+    @ViewBuilder private var menu: some View {
+        if let onRemoveFromContinue { RemoveFromContinueButton(action: onRemoveFromContinue) }
+        ItemMenuItems(item: item)
     }
 
     private var titles: some View {

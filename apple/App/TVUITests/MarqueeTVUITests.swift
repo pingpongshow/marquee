@@ -587,3 +587,149 @@ final class MarqueeTVUITests: XCTestCase {
         _ = done.wait(timeout: .now() + 15)
     }
 }
+
+// MARK: - Batch 6: Continue Watching, watched marks, video playlists, keeping the place
+
+extension MarqueeTVUITests {
+    /// The element with focus.
+    private var focused: XCUIElement {
+        app.buttons.element(matching: NSPredicate(format: "hasFocus == true"))
+    }
+
+    /// A temporary account that isn't signed in yet (deleted when the test ends); its token.
+    private func temporaryAccount() throws -> String {
+        let name = "uitv6-\(Int.random(in: 1000...9999))"
+        let pass = "correct horse battery"
+        let user = try api("POST", "/users", ["username": name, "displayName": name, "password": pass])
+        let id = try XCTUnwrap(user["id"] as? Int)
+        let login = try api("POST", "/auth/login", ["username": name, "password": pass, "device": ["clientId": "uitest-\(name)", "name": "UI test", "platform": "tvos"]])
+        let url = server + "/api/v1/users/\(id)", admin = adminToken
+        addTeardownBlock { Self.send("DELETE", url, token: admin) }
+        return try XCTUnwrap(login["token"] as? String)
+    }
+
+    private func viewCount(_ id: Int, _ token: String) throws -> Int {
+        try api("GET", "/items/\(id)", token: token)["viewCount"] as? Int ?? 0
+    }
+
+    private func continueIDs(_ token: String) throws -> [Int] {
+        let row = try list("/hubs/home", token: token).first { $0["id"] as? String == "continue-watching" }
+        return (row?["items"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? Int }
+    }
+
+    /// Long-press a Continue Watching tile: Remove from Continue Watching (USER-6).
+    func testRemoveFromContinueWatchingTV() throws {
+        let token = try temporaryAccount()
+        try api("PUT", "/items/322/progress", ["positionMs": 60000], token: token)
+        try signIn(as: token)
+        let tile = app.buttons["continue.322"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 15), "00 Long Test is in Continue Watching")
+        for _ in 0..<6 where !tile.hasFocus { remote.press(.down) }
+        for _ in 0..<6 where !tile.hasFocus { remote.press(.left) }
+        XCTAssertTrue(tile.hasFocus, "focus is on \(focused.label)")
+        remote.press(.select, forDuration: 1.5)
+        let remove = app.descendants(matching: .any)["removeFromContinue"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 5), "the context menu offers it")
+        shot("tv-b6-continue-menu")
+        remote.press(.select) // the first entry has focus
+        XCTAssertTrue(tile.waitForNonExistence(timeout: 5), "the tile goes at once")
+        try eventually(10, "gone from the server's row") { try !continueIDs(token).contains(322) }
+        XCTAssertEqual(try api("GET", "/items/322", token: token)["viewOffsetMs"] as? Int, 60000, "the position is kept")
+    }
+
+    /// Mark watched on the item page: the button changes at once and the server has it.
+    func testMarkWatchedTV() throws {
+        let token = try temporaryAccount()
+        try signIn(as: token)
+        app.launchArguments = [] // opening the link relaunches the app: keep the sign-in
+        app.open(URL(string: "marquee://item/322")!)
+        let mark = app.buttons["markWatched"]
+        XCTAssertTrue(mark.waitForExistence(timeout: 15))
+        let play = app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume'}")).firstMatch
+        focus(play, direction: .down)
+        focus(mark, direction: .right, tries: 6)
+        remote.press(.select)
+        try eventually(10, "watched on the server") { try viewCount(322, token) > 0 }
+        XCTAssertTrue(app.buttons["Watched"].waitForExistence(timeout: 5), "the page shows it")
+        shot("tv-b6-watched")
+        remote.press(.select) // and back
+        try eventually(10, "unwatched on the server") { try viewCount(322, token) == 0 }
+        XCTAssertTrue(app.buttons["Mark watched"].waitForExistence(timeout: 5))
+    }
+
+    /// Video playlists are on the Playlists tab; Play starts the first item.
+    func testVideoPlaylistTV() throws {
+        let token = try temporaryAccount()
+        let created = try api("POST", "/playlists", ["title": "UI6 TV Movies", "kind": "video", "itemIds": [322, 8]], token: token)
+        XCTAssertNotNil(created["id"])
+        try signIn(as: token)
+        remote.press(.up)
+        let tab = app.buttons["Playlists"].firstMatch
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "a Playlists tab")
+        focus(tab, direction: .right, tries: 12)
+        remote.press(.select)
+        let card = app.buttons["UI6 TV Movies"].firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "the video playlist is listed")
+        remote.press(.down)
+        XCTAssertTrue(card.hasFocus, "focus is on \(focused.label)")
+        shot("tv-b6-playlists")
+        remote.press(.select)
+        XCTAssertTrue(app.staticTexts["00 Long Test"].waitForExistence(timeout: 10), "its items")
+        sleep(1)
+        // Focus starts on the first item; the actions are above it.
+        remote.press(.up) // to the header's actions
+        for _ in 0..<4 where focused.label != "Play" { remote.press(.left) }
+        XCTAssertEqual(focused.label, "Play")
+        let before = try activeSessionIDs()
+        remote.press(.select)
+        try eventually(20, "a video starts") {
+            let fresh = try activeSessionIDs().subtracting(before)
+            return !fresh.isEmpty
+        }
+        let sessions = try list("/playback/sessions", token: adminToken ?? "")
+        XCTAssertTrue(sessions.contains { $0["itemId"] as? Int == 322 }, "00 Long Test plays first")
+        shot("tv-b6-playing")
+        remote.press(.menu)
+    }
+
+    /// Back from a title, the grid is where it was, with focus on that title.
+    func testLibraryKeepsFocusAfterBack() throws {
+        _ = try signInTemporaryUser()
+        remote.press(.up)
+        let tab = app.buttons["Movies"].firstMatch
+        XCTAssertTrue(tab.waitForExistence(timeout: 10))
+        focus(tab, direction: .right, tries: 6)
+        remote.press(.select)
+        XCTAssertTrue(app.descendants(matching: .any)["libraryGrid"].waitForExistence(timeout: 10))
+        remote.press(.down)
+        for _ in 0..<6 { remote.press(.down) }
+        // Focus can land on the pinned sort menu (not a poster): left into the grid.
+        for _ in 0..<6 where !focused.exists { remote.press(.left) }
+        sleep(1)
+        let label = focused.label
+        XCTAssertFalse(label.isEmpty || label.hasPrefix("00 "), "well down the grid: \(label)")
+        shot("tv-b6-grid-before")
+        remote.press(.select)
+        XCTAssertTrue(app.buttons["markWatched"].waitForExistence(timeout: 15), "the title's page")
+        remote.press(.menu)
+        XCTAssertTrue(app.descendants(matching: .any)["libraryGrid"].waitForExistence(timeout: 10))
+        sleep(2)
+        shot("tv-b6-grid-after")
+        XCTAssertEqual(focused.label, label, "focus is back on the title opened")
+        let poster = app.buttons[label].firstMatch
+        XCTAssertTrue(poster.exists && app.windows.firstMatch.frame.contains(CGPoint(x: poster.frame.midX, y: poster.frame.midY)), "and it's on screen")
+    }
+
+    /// Video playlists are also a row on Home (the Playlists tab is at the far end of the bar).
+    func testVideoPlaylistsOnHomeTV() throws {
+        let token = try temporaryAccount()
+        _ = try api("POST", "/playlists", ["title": "UI6 Home Movies", "kind": "video", "itemIds": [322, 8]], token: token)
+        try signIn(as: token)
+        let card = app.buttons["UI6 Home Movies"].firstMatch
+        for _ in 0..<12 where !(card.exists && card.hasFocus) { remote.press(.down) }
+        XCTAssertTrue(card.hasFocus, "the playlist on Home has focus (\(focused.label))")
+        shot("tv-b6-home-playlists")
+        remote.press(.select)
+        XCTAssertTrue(app.staticTexts["00 Long Test"].waitForExistence(timeout: 10), "it opens with its items")
+    }
+}

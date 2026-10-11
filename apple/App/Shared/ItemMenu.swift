@@ -58,8 +58,9 @@ struct ItemMenuItems: View {
             }
         }
         if showsLibraryState, item.isPlayableVideo || item._type == .show || item._type == .season {
-            let watched = OfflineSync.shared.pendingWatched(item.id) ?? item.watched
-            Button { ActionError.run { try await app.setWatched(item.id, !watched) } } label: {
+            // This session's marks count (the tile's own data may be older).
+            let watched = WatchStore.shared.watched(item)
+            Button { WatchStore.shared.mark(item, watched: !watched, app: app) } label: {
                 Label(watched ? "Mark Unwatched" : "Mark Watched", systemImage: watched ? "circle" : "checkmark.circle")
             }
         }
