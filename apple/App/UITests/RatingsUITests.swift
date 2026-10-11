@@ -224,7 +224,7 @@ final class RatingsUITests: XCTestCase {
 
     private var kidToken: String? {
         let path = ProcessInfo.processInfo.environment["MARQUEE_TEST_KID_TOKEN_FILE"]
-            ?? "/private/tmp/claude-501/-Users-stephen-Desktop-Media-Server/444e0e4f-966a-4478-8095-b26cddc3cd0c/scratchpad/kid.token"
+            ?? "/Users/stephen/Desktop/Media Server/.e2e/kid.token"
         return (try? String(contentsOfFile: path, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
