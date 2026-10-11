@@ -34,11 +34,13 @@ import androidx.mediarouter.media.MediaRouter
 
 /** The Cast button (D82): opens a device picker, gold while casting. Hidden on TVs and without Cast. */
 @Composable
-fun CastButton(tint: Color = Color.White) {
+fun CastButton(tint: Color = Color.White, onOpenChange: (Boolean) -> Unit = {}) {
     val marquee = LocalMarquee.current
     if (marquee.isTv || !marquee.cast.available) return
     val device by marquee.cast.device.collectAsState()
     var open by remember { mutableStateOf(false) }
+    // The video player keeps its controls (and so this picker) up while the picker is open.
+    androidx.compose.runtime.LaunchedEffect(open) { onOpenChange(open) }
     IconButton({ open = true }, Modifier.focusRing().testTag("castButton")) {
         if (device != null) Icon(Icons.Filled.CastConnected, "Casting to $device", tint = Gold)
         else Icon(Icons.Filled.Cast, "Cast", tint = tint)
