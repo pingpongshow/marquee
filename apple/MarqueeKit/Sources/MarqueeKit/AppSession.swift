@@ -409,6 +409,13 @@ public final class AppSession {
         if let me = try? await client?.getMe().ok.body.json { self.me = me }
     }
 
+    /// Fetches /system/info again: the admin may have changed a switch it carries, such as
+    /// rating requests (USER-19). Called when the app returns to the foreground.
+    public func refreshInfo() async {
+        guard let url = baseURL, let fresh = await Self.probe(url), baseURL == url else { return }
+        info = fresh
+    }
+
     // MARK: - URLs
 
     /// How image, person photo and avatar URLs authenticate: the image key from /me (D85),

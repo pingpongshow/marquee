@@ -14,6 +14,12 @@ struct PlayerView: View {
     let request: VideoRequest
     @State private var playback: VideoPlayback?
     @State private var countdown: Int?
+    /// The person is answering the rating request: the Up Next countdown waits (USER-19).
+    @State private var countdownPaused = false
+    /// The rating request on the end screen, beside Up Next (USER-19).
+    @State private var endPrompt: RatingPromptItem?
+    /// This video's rating request has been made (on the end screen or after closing).
+    @State private var prompted = false
     @State private var together: WatchTogether?
     @State private var showGroup = false
     /// Cinema trailers (PLAY-18) playing before the movie, and which one is on.
@@ -46,6 +52,7 @@ struct PlayerView: View {
         }
         .task {
             music.pause() // a video takes over from the music
+            Task { await app.refreshInfo() } // the rating request switch may have changed (USER-19)
             let p = VideoPlayback(app: app, playlistID: request.playlistID, order: request.order)
             playback = p
             RemoteReceiver.shared.video = RemoteVideoTarget(playback: p, next: playNext, close: close)
@@ -83,7 +90,17 @@ struct PlayerView: View {
         .onChange(of: playback?.finished) { _, done in
             guard done == true else { return }
             if trailerIndex != nil { nextTrailer(); return }
-            if playback?.nextUp != nil { startCountdown() } else { close() }
+            if playback?.nextUp != nil {
+                // The rating request sits beside the countdown; autoplay carries on unless
+                // the person touches it (USER-19).
+                if !prompted, let ask = RatingPrompt.wanted(playback?.item, app: app) {
+                    prompted = true
+                    endPrompt = ask
+                }
+                startCountdown()
+            } else {
+                close() // asks for a rating over the page (USER-19)
+            }
         }
         #if os(iOS)
         .sheet(item: $timing) { kind in
@@ -132,8 +149,16 @@ struct PlayerView: View {
                 }
                 #endif
                 if let next = p.nextUp, let countdown {
-                    UpNextCard(next: next, seconds: countdown, play: playNext, cancel: { self.countdown = nil; close() })
-                        .padding(.trailing, 40).padding(.bottom, 60)
+                    VStack(alignment: .trailing, spacing: 14) {
+                        if let ask = endPrompt {
+                            RatingPromptCard(prompt: ask, onInteract: { countdownPaused = true }) {
+                                endPrompt = nil
+                                countdownPaused = false
+                            }
+                        }
+                        UpNextCard(next: next, seconds: countdown, paused: countdownPaused, play: playNext, cancel: { self.countdown = nil; close() })
+                    }
+                    .padding(.trailing, 40).padding(.bottom, 60)
                 }
             }
         }
@@ -305,10 +330,11 @@ struct PlayerView: View {
 
     private func startCountdown() {
         countdown = 10
+        countdownPaused = false
         Task {
             while let c = countdown, c > 0 {
                 try? await Task.sleep(for: .seconds(1))
-                if countdown != nil { countdown = c - 1 }
+                if let now = countdown, !countdownPaused { countdown = now - 1 }
             }
             if countdown == 0 { playNext() }
         }
@@ -317,6 +343,7 @@ struct PlayerView: View {
     private func playNext() {
         guard let next = playback?.nextUp else { return }
         countdown = nil
+        endPrompt = nil
         Task {
             await playback?.stop()
             presenter.play(next.id, startMs: 0, playlistID: request.playlistID, order: request.order)
@@ -333,20 +360,41 @@ struct PlayerView: View {
     }
 
     private func close() {
+        askAfterClosing()
         countdown = nil
+        endPrompt = nil
         presenter.request = nil
         dismiss()
+    }
+
+    /// A movie or episode that played to the end, or far enough to count as watched, asks for
+    /// a rating over the page once the player has gone (USER-19).
+    private func askAfterClosing() {
+        guard !prompted, trailerIndex == nil, let p = playback, watchedEnough(p),
+              let ask = RatingPrompt.wanted(p.item, app: app) else { return }
+        prompted = true
+        RatingPrompt.shared.pending = ask
+    }
+
+    /// Played to the end, or 90% of the way (as the server counts a play).
+    private func watchedEnough(_ p: VideoPlayback) -> Bool {
+        if p.finished { return true }
+        var duration = p.player.currentItem?.duration.seconds ?? .nan
+        if !duration.isFinite || duration <= 0, let ms = p.item?.base.durationMs { duration = Double(ms) / 1000 }
+        return duration.isFinite && duration > 0 && p.position >= duration * 0.9
     }
 }
 
 private struct UpNextCard: View {
     let next: Item
     let seconds: Int
+    /// Waiting while the person answers the rating request.
+    var paused = false
     let play: () -> Void
     let cancel: () -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Up next in \(seconds)s").font(.caption).foregroundStyle(.secondary)
+            Text(paused ? "Up next" : "Up next in \(seconds)s").font(.caption).foregroundStyle(.secondary)
             Text(next._type == .episode ? "\(next.grandparentTitle ?? "") · \(next.subtitle) · \(next.title)" : next.title).font(.headline).lineLimit(2)
             HStack {
                 Button("Play now", action: play).buttonStyle(.borderedProminent)
