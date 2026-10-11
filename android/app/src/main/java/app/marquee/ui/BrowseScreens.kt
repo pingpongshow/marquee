@@ -437,6 +437,8 @@ fun SettingsScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
     val me by marquee.me.collectAsState()
     val scope = rememberCoroutineScope()
+    // The rating switch below shows only while the server asks for ratings (USER-19).
+    LaunchedEffect(Unit) { marquee.refreshRatingPrompt() }
     Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(sidePadding), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -450,6 +452,7 @@ fun SettingsScreen(nav: NavHostController) {
         Text("Version ${marquee.info?.version ?: ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
         PendingSyncRow()
         TrailersPreference()
+        RatingPromptPreference()
         ShowAudioQualityPreference()
         EqualiserSetting()
         // Buttons wrap onto more lines rather than running off a phone's edge.

@@ -186,6 +186,13 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     var roll by remember { mutableIntStateOf(-1) }
     // Bumped by a timing change; the session restarts once the stepping stops.
     var timingChange by remember { mutableIntStateOf(0) }
+    // The end screen (USER-19): the next video's countdown with a rating request beside it.
+    var endNext by remember { mutableStateOf<Long?>(null) }
+    var endPrompt by remember { mutableStateOf<app.marquee.core.RatingRequest?>(null) }
+    var countdown by remember { mutableIntStateOf(10) }
+    var countdownHeld by remember { mutableStateOf(false) }
+    // Set once the end was dealt with, so closing the player doesn't ask again.
+    val endHandled = remember { booleanArrayOf(false) }
     LaunchedEffect(groupId) { if (groupId != null) { delay(1500); together.join(groupId) } }
     // Playing in order from a video playlist (USER-7) while this video is one of it; anything else ends that.
     val queue = remember(itemId) { marquee.videoQueue.takeIf { itemId in it } ?: emptyList<Long>().also { marquee.videoQueue = it } }
@@ -289,6 +296,16 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     }
     // Watching together keeps everyone at 1×.
     LaunchedEffect(group != null) { if (group != null && speed != 1f) { speed = 1f; player.setPlaybackSpeed(1f) } }
+    fun playNext(next: Long) {
+        if (stillShowing()) nav.navigate("player/$next?start=0") { popUpTo("player/{id}?start={start}&group={group}") { inclusive = true } }
+    }
+    // Up Next counts down unless the person is using the rating card; then the next video plays.
+    LaunchedEffect(endNext, countdownHeld) {
+        val next = endNext ?: return@LaunchedEffect
+        if (countdownHeld) return@LaunchedEffect
+        while (countdown > 0) { delay(1000); countdown-- }
+        playNext(next)
+    }
     LaunchedEffect(timingChange) {
         if (timingChange == 0) return@LaunchedEffect
         delay(800)
@@ -339,14 +356,32 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                 buffering = state == Player.STATE_BUFFERING || state == Player.STATE_IDLE
                 if (state != Player.STATE_ENDED) return
                 if (roll >= 0) { nextRoll(); return }
-                if (local != null) { recordLocal(ended = true); if (stillShowing()) nav.popBackStack(); return }
+                if (endHandled[0]) return
+                endHandled[0] = true
+                // Watched to the end: maybe ask for a rating (USER-19).
+                val d = detail?.takeIf { marquee.wantsRating(it) }
+                d?.let { marquee.askedRating(it.id) }
+                if (local != null) {
+                    recordLocal(ended = true)
+                    if (stillShowing()) { d?.let { marquee.requestRating(ratingRequestFor(marquee, it)) }; nav.popBackStack() }
+                    return
+                }
                 report(PlaybackProgress.State.PAUSED)
                 // Up next: the following episode (or nothing), unless the viewer has already left.
                 marquee.scope.launch(Dispatchers.Main) {
                     val next = upNext()
                     if (!stillShowing()) return@launch
-                    if (next != null) nav.navigate("player/$next?start=0") { popUpTo("player/{id}?start={start}&group={group}") { inclusive = true } }
-                    else nav.popBackStack()
+                    if (next != null && d != null) {
+                        // The stars sit beside the countdown; ignored, the next one still plays.
+                        controls = false
+                        endPrompt = ratingRequestFor(marquee, d)
+                        countdown = 10
+                        endNext = next
+                    } else if (next != null) playNext(next)
+                    else {
+                        d?.let { marquee.requestRating(ratingRequestFor(marquee, it)) }
+                        nav.popBackStack()
+                    }
                 }
             }
             override fun onPlayerError(e: androidx.media3.common.PlaybackException) {
@@ -359,6 +394,13 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
         onDispose {
             val s = session
             val pos = player.currentPosition
+            // Closed after watching most of it (counts as watched): ask for a rating over the page below (USER-19).
+            val dur = player.duration
+            val d = detail
+            if (!endHandled[0] && roll < 0 && !casting && d != null && dur > 0 && pos >= dur * 0.9 && marquee.wantsRating(d)) {
+                marquee.askedRating(d.id)
+                marquee.requestRating(ratingRequestFor(marquee, d))
+            }
             recordLocal()
             together.leave()
             player.removeListener(listener)
@@ -478,7 +520,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             // TV remote with the controls hidden, or mid-scrub: left/right scrub with previews,
             // select jumps there (or plays/pauses).
             .onPreviewKeyEvent { e ->
-                if (e.type != KeyEventType.KeyDown || settings || (controls && scrub == null)) return@onPreviewKeyEvent false
+                if (e.type != KeyEventType.KeyDown || settings || endNext != null || (controls && scrub == null)) return@onPreviewKeyEvent false
                 when (e.key) {
                     Key.DirectionLeft -> { seekBy(-10_000); true }
                     Key.DirectionRight -> { seekBy(10_000); true }
@@ -492,7 +534,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                 }
             }
             .focusable()
-            .clickable(remember { MutableInteractionSource() }, indication = null) { if (controls) controls = false else poke() },
+            .clickable(remember { MutableInteractionSource() }, indication = null) { if (endNext != null) return@clickable; if (controls) controls = false else poke() },
     ) {
         // Subtitle appearance (PLAY-20) follows the person to every app.
         val me by marquee.me.collectAsState()
@@ -514,7 +556,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
         }
 
         if (casting) CastingPanel(castDevice ?: "", detail?.title ?: "", castError, onClose = { nav.popBackStack() })
-        AnimatedVisibility(controls && !casting, Modifier.fillMaxSize(), enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility(controls && !casting && endNext == null, Modifier.fillMaxSize(), enter = fadeIn(), exit = fadeOut()) {
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.7f), 0.3f to Color.Transparent, 0.65f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.8f)))) {
                 // Top: back, title, settings.
                 Row(Modifier.align(Alignment.TopStart).fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -572,6 +614,21 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                     modifier = Modifier.widthIn(max = 280.dp))
                 TextButton({ nextRoll() }, Modifier.focusRing()) { Text("Skip", color = Gold) }
                 Button({ startFeature() }, Modifier.focusRing()) { Text("Skip all") }
+            }
+        }
+
+        // The end screen (USER-19): Up Next's countdown, and the rating request beside it.
+        endNext?.let { next ->
+            Column(
+                Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.65f)).padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically), horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(if (countdownHeld) "Up next" else "Up next in ${countdown}s", color = Color.White, style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold, modifier = Modifier.semantics { contentDescription = "Up next countdown" })
+                Button({ playNext(next) }, Modifier.focusRing().initialFocus(marquee.isTv && endPrompt == null)) { Text("Play next") }
+                endPrompt?.let { p ->
+                    RatingPromptCard(p, onDone = { endPrompt = null; countdownHeld = false }, onInteract = { countdownHeld = true })
+                }
             }
         }
 

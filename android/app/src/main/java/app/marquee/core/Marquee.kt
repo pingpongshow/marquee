@@ -133,6 +133,44 @@ class Marquee(context: Context) {
         }
     }
 
+    private val _ratingPrompt = MutableStateFlow(false)
+    /**
+     * Whether the admin turned on rating requests when a movie or episode ends (USER-19), from
+     * system info. Read on (re)connecting and refreshed when the app returns to the foreground.
+     */
+    val ratingPrompt: StateFlow<Boolean> = _ratingPrompt
+
+    fun refreshRatingPrompt() {
+        if (baseUrl == null) return
+        scope.launch {
+            val i = runCatching { system.getSystemInfo() }.getOrNull() ?: return@launch
+            info = i
+            _ratingPrompt.value = i.ratingPrompt == true
+        }
+    }
+
+    /** Items already asked about in this run of the app, so one watch asks at most once. */
+    private val ratingAsked = java.util.Collections.synchronizedSet(mutableSetOf<Long>())
+
+    /**
+     * Whether to ask for a rating of this item now that it has been watched (USER-19): the
+     * server has it on, the person hasn't turned it off, it's a movie or episode (not an
+     * extra or trailer), it isn't rated yet, and it hasn't been asked about already.
+     */
+    fun wantsRating(d: app.marquee.api.models.ItemDetail): Boolean =
+        ratingPrompt.value && me.value?.preferences?.ratingPrompt != false &&
+            (d.type == app.marquee.api.models.ItemType.MOVIE || d.type == app.marquee.api.models.ItemType.EPISODE) &&
+            d.extraType == null && (d.userRating ?: 0.0) <= 0.0 &&
+            sync.queued(d.id, PendingChange.Kind.Rating) == null && d.id !in ratingAsked
+
+    /** Records that the person was asked to rate this item. */
+    fun askedRating(id: Long) { ratingAsked += id }
+
+    private val _ratingRequest = MutableStateFlow<RatingRequest?>(null)
+    /** A rating request to show over the item page or home after the player closed (USER-19). */
+    val ratingRequest: StateFlow<RatingRequest?> = _ratingRequest
+    fun requestRating(r: RatingRequest?) { _ratingRequest.value = r }
+
     /** Screens that follow [connection] reload (after offline changes were sent). */
     fun refresh() { _connection.value++ }
 
@@ -205,6 +243,7 @@ class Marquee(context: Context) {
         lastError = null
         baseUrl = chosen.first
         info = chosen.second
+        _ratingPrompt.value = chosen.second.ratingPrompt == true
         _connection.value++
         if (token == null) { _state.value = State.SignedOut; return }
         val me = withContext(Dispatchers.IO) { runCatching { auth.getMe() } }
@@ -231,6 +270,7 @@ class Marquee(context: Context) {
         _me.value = withContext(Dispatchers.IO) { runCatching { auth.getMe() }.getOrNull() }
         _state.value = State.SignedIn
         refreshLiveTv()
+        refreshRatingPrompt()
     }
 
     suspend fun signOut() {
@@ -243,6 +283,7 @@ class Marquee(context: Context) {
         server?.let { store.setToken(it.id, null); store.setUserId(it.id, null) }
         _me.value = null
         _liveTv.value = false
+        _ratingRequest.value = null
         _state.value = State.SignedOut
     }
 
@@ -287,3 +328,6 @@ class Marquee(context: Context) {
         return baseUrl + path + keyParam
     }
 }
+
+/** What a rating request shows (USER-19): the item, its title line and artwork. */
+data class RatingRequest(val itemId: Long, val title: String, val imageUrl: String?)

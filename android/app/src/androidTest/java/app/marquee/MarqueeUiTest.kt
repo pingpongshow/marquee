@@ -24,6 +24,7 @@ import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.assertIsDisplayed
@@ -912,6 +913,87 @@ class MarqueeUiTest {
             back()
         } finally {
             adminApi("PATCH", "/settings", """{"cinema":{"trailers":0}}""")
+        }
+    }
+
+    /** Plays the open item's video and moves it to [fraction] of the way through. */
+    private fun seekTo(fraction: Float) {
+        rule.waitUntilAtLeastOneExists(videoPlaying, 30_000)
+        showControls()
+        rule.onNode(hasContentDescription("Position")).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.SetProgress) { it(fraction) }
+        rule.waitUntilAtLeastOneExists(videoPlaying, 30_000)
+    }
+
+    private fun kidItem(id: Long, token: String) = adminApi("GET", "/items/$id", asToken = token)
+
+    /**
+     * Rating request (USER-19): nothing while the admin switch is off; with it on, a movie
+     * played to its end asks for a rating over its page, and 4 stars save 8. A movie closed
+     * after most of it was watched asks too, and Don't ask again turns the person's switch off.
+     * The switch, the preference and the ratings are put back afterwards.
+     */
+    @Test fun ratingPrompt() {
+        assumeTrue("phones", !isTv)
+        adminApi("PATCH", "/settings", """{"general":{"ratingPrompt":false}}""")
+        val application = context.applicationContext as MarqueeApplication
+        var kid: String? = null
+        var prefs: app.marquee.api.models.UserPreferences? = null
+        val noRating = """{"rating":null}"""
+        try {
+            connectAndSignIn()
+            kid = application.marquee.token!!
+            prefs = Serializer.kotlinxSerializationJson.decodeFromString(User.serializer(), adminApi("GET", "/me", asToken = kid)).preferences
+            adminApi("PUT", "/items/359/rating", noRating, kid)
+            adminApi("PUT", "/items/322/rating", noRating, kid)
+
+            // Off: played to the end, no request.
+            playMovie("00 Preview Test")
+            seekTo(0.97f)
+            shot("rp0-seeked")
+            rule.waitUntilAtLeastOneExists(hasText("Play") or hasText("Resume"), 30_000)
+            Thread.sleep(3000)
+            rule.onAllNodes(hasContentDescription("Rating request")).assertCountEquals(0)
+
+            // On: Settings shows the person's own switch, and the end of the movie asks.
+            adminApi("PATCH", "/settings", """{"general":{"ratingPrompt":true}}""")
+            tap("Settings")
+            rule.waitText("Ask me to rate after watching")
+            shot("rp1-preference")
+            // Back to the movie's page (the Libraries tab keeps its place), and play it again.
+            tap("Libraries")
+            rule.waitUntilAtLeastOneExists(hasText("Play") or hasText("Resume"), 10_000)
+            rule.onAllNodes(hasText("Play") or hasText("Resume")).onFirst().performClick()
+            seekTo(0.97f)
+            shot("rp1b-seeked")
+            runCatching { rule.waitUntilAtLeastOneExists(hasContentDescription("Rating request"), 30_000) }.onFailure { shot("rp-fail"); throw it }
+            rule.waitText("00 Preview Test", substring = true)
+            shot("rp2-request")
+            rule.onNode(hasContentDescription("4 stars") and hasAnyAncestor(hasContentDescription("Rating request"))).performClick()
+            rule.waitText("Thanks!", 10_000)
+            rule.waitUntil(10_000) { kidItem(359, kid).contains("\"userRating\":8") }
+            rule.waitUntil(10_000) { rule.onAllNodes(hasContentDescription("Rating request")).fetchSemanticsNodes().isEmpty() }
+
+            // Closed after most of it: asks over the page; Don't ask again turns it off.
+            back()
+            playMovie("00 Long Test")
+            seekTo(0.95f)
+            back()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Rating request"), 15_000)
+            shot("rp3-after-close")
+            tap("Don't ask again")
+            rule.waitUntil(10_000) { adminApi("GET", "/me", asToken = kid).contains("\"ratingPrompt\":false") }
+            rule.onAllNodes(hasContentDescription("Rating request")).assertCountEquals(0)
+            assertTrue(!kidItem(322, kid).contains("\"userRating\""))
+        } finally {
+            adminApi("PATCH", "/settings", """{"general":{"ratingPrompt":false}}""")
+            kid?.let { t ->
+                prefs?.let { p ->
+                    adminApi("PATCH", "/me", Serializer.kotlinxSerializationJson.encodeToString(app.marquee.api.models.MeUpdate.serializer(),
+                        app.marquee.api.models.MeUpdate(preferences = p.copy(ratingPrompt = true))), t)
+                }
+                adminApi("PUT", "/items/359/rating", noRating, t)
+                adminApi("PUT", "/items/322/rating", noRating, t)
+            }
         }
     }
 
@@ -2177,7 +2259,7 @@ class MarqueeUiTest {
             rule.waitText("On Watchlist")
             rule.onNode(hasContentDescription("Open Now Playing")).performClick()
             rule.waitUntilAtLeastOneExists(hasContentDescription("Close Now Playing"), 10_000)
-            rule.onNode(hasContentDescription("4 stars")).performClick()
+            rule.onNode(hasContentDescription("4 stars") and hasAnyAncestor(hasContentDescription("Rating request"))).performClick()
             rule.waitUntilAtLeastOneExists(hasContentDescription("Rating") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "4 of 5 stars"), 5_000)
             Thread.sleep(3000)
             assertEquals(8.0, app.music.rating.value)

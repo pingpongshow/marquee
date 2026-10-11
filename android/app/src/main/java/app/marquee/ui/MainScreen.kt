@@ -98,7 +98,11 @@ fun MainScreen() {
                 Spacer(Modifier.weight(1f))
                 TvNowPlaying { nav.navigate("nowplaying") }
             }
-            Box(Modifier.fillMaxSize()) { Routes(nav) }
+            Box(Modifier.fillMaxSize()) {
+                Routes(nav)
+                // Asks for a rating after the player closed at the end (USER-19).
+                RatingPromptHost(!fullScreen, Modifier.align(Alignment.BottomCenter))
+            }
         }
         return
     }
@@ -113,7 +117,13 @@ fun MainScreen() {
                 }
             }
         },
-    ) { padding -> Box(Modifier.padding(padding)) { Routes(nav) } }
+    ) { padding ->
+        Box(Modifier.padding(padding)) {
+            Routes(nav)
+            // Asks for a rating after the player closed at the end (USER-19).
+            RatingPromptHost(!fullScreen, Modifier.align(Alignment.BottomCenter))
+        }
+    }
 }
 
 @Composable
