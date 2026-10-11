@@ -8,3 +8,6 @@ apple
 android
 **/.DS_Store
 .e2e
+deploy/config
+deploy/models
+deploy/recordings

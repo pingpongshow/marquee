@@ -1,0 +1,8 @@
+# Intel Quick Sync (or other VA-API) transcoding through /dev/dri.
+# RENDER_GID is the group that owns /dev/dri/renderD128 on the host: stat -c %g /dev/dri/renderD128
+services:
+  marquee:
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "${RENDER_GID:-109}"

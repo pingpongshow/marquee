@@ -27,3 +27,10 @@ apple/Vendor/
 
 # Private planning notes (removed from the repository 2026-10-11)
 docs/
+
+# Local Docker Compose data (deploy/.env points here by default)
+deploy/config/
+deploy/models/
+deploy/recordings/
+deploy/empty-music/
+deploy/empty-plex/
