@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var linkCode = ""
     @State private var linkResult: String?
     @State private var trailersError: String?
+    @State private var ratingError: String?
 
     var body: some View {
         Form {
@@ -76,6 +77,31 @@ struct SettingsView: View {
             } footer: {
                 Text("When the server has cinema trailers on, they play before a movie you start from the beginning.")
             }
+            // Rating requests when a movie or episode ends (USER-19): the server-wide switch
+            // for admins, and everyone's own choice while the server has it on.
+            if app.me?.isAdmin == true || app.serverAsksForRatings {
+                Section {
+                    if app.me?.isAdmin == true {
+                        Toggle("Ask people to rate movies and episodes when they finish them", isOn: Binding(get: { app.serverAsksForRatings }, set: { on in
+                            Task {
+                                do { try await app.saveRatingPromptSetting(on); ratingError = nil } catch { ratingError = error.localizedDescription }
+                            }
+                        }))
+                        .accessibilityIdentifier("serverRatingPrompt")
+                    }
+                    if app.serverAsksForRatings {
+                        Toggle("Ask me to rate after watching", isOn: Binding(get: { app.ratingPromptPreference }, set: { on in
+                            Task {
+                                do { try await app.setRatingPrompt(on); ratingError = nil } catch { ratingError = error.localizedDescription }
+                            }
+                        }))
+                        .accessibilityIdentifier("ratingPromptPreference")
+                    }
+                    if let ratingError { Text(ratingError).font(.caption).foregroundStyle(.red) }
+                } footer: {
+                    Text(app.me?.isAdmin == true ? "When a movie or episode ends, a small card asks for stars. Each person can turn it off for themselves." : "When a movie or episode ends, a small card asks for stars.")
+                }
+            }
             Section {
                 @Bindable var music = music
                 Toggle("Show audio quality", isOn: $music.showAudioQuality)
@@ -119,6 +145,7 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .sheet(isPresented: $switching) { ProfileSwitcher() }
+        .task { await app.refreshInfo() } // the rating request switch (USER-19)
     }
 }
 

@@ -70,6 +70,8 @@ struct MainView: View {
         .tabViewStyle(.sidebarAdaptable)
         #endif
         .environment(video)
+        // A rating request after a movie or episode ended (USER-19).
+        .ratingPromptOverlay(active: linkedItem == nil)
         .remoteToast()
         // Remote control (USER-14): a player while open, and while music plays in the background.
         .onChange(of: scenePhase, initial: true) { old, new in
@@ -79,6 +81,13 @@ struct MainView: View {
             if old != new, new == .active { Task { await loadAll() } }
             // And changes made offline go to the server (USER-18).
             if old != new, new == .active { Task { await OfflineSync.shared.flush() } }
+            // And the rating request switches may have changed (USER-19).
+            if old != new, new == .active, app.client != nil {
+                Task {
+                    await app.refreshInfo()
+                    await app.refreshMe()
+                }
+            }
         }
         .onChange(of: music.playing) { updateRemote() }
         // A video played: its watched state is the server's again.
@@ -106,6 +115,7 @@ struct MainView: View {
                     .marqueeDestinations()
                     .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { linkedItem = nil } } }
             }
+            .ratingPromptOverlay()
             // tvOS covers are see-through by default: Home showed behind the page.
             .background(Color.black.ignoresSafeArea())
             // One view can't present two covers at once: while a linked item is up, the

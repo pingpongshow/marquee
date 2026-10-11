@@ -6,8 +6,8 @@ public typealias Invite = Components.Schemas.Invite
 public typealias UserRestrictions = Components.Schemas.UserRestrictions
 public typealias CinemaSettings = Components.Schemas.CinemaSettings
 
-/// Home rows (USER-12), cinema trailers (PLAY-18), sharing (USER-13) and the admin
-/// settings these need.
+/// Home rows (USER-12), cinema trailers (PLAY-18), rating requests (USER-19), sharing
+/// (USER-13) and the admin settings these need.
 @MainActor
 public extension AppSession {
     private var personalAPI: Client {
@@ -71,13 +71,48 @@ public extension AppSession {
     var cinemaTrailersPreference: Bool { me?.preferences.cinemaTrailers ?? true }
 
     func setCinemaTrailers(_ on: Bool) async throws {
-        // Preferences are replaced as a whole, so the others are sent back unchanged.
+        try await updatePreferences { $0.cinemaTrailers = on }
+    }
+
+    /// Changes one of the person's preferences. They're replaced as a whole, so the others are
+    /// sent back unchanged.
+    private func updatePreferences(_ change: (inout Schemas.UserPreferences) -> Void) async throws {
         var prefs = me?.preferences ?? .init()
-        prefs.cinemaTrailers = on
+        change(&prefs)
         switch try await personalAPI.updateMe(body: .json(.init(preferences: prefs))) {
         case .ok: await refreshMe()
         case .badRequest(let r): throw MarqueeError((try? r.body.json.message) ?? "Couldn't save.")
         default: throw MarqueeError("Couldn't save.")
+        }
+    }
+
+    // MARK: - Rating requests (USER-19)
+
+    /// The admin turned on rating requests when a movie or episode ends.
+    var serverAsksForRatings: Bool { info?.ratingPrompt == true }
+
+    /// The person's "Ask me to rate after watching" choice (default on).
+    var ratingPromptPreference: Bool { me?.preferences.ratingPrompt ?? true }
+
+    /// Whether to ask for a rating when a movie or episode ends: the server has it on and the
+    /// person hasn't turned it off.
+    var asksForRatings: Bool { serverAsksForRatings && ratingPromptPreference }
+
+    func setRatingPrompt(_ on: Bool) async throws {
+        try await updatePreferences { $0.ratingPrompt = on }
+    }
+
+    /// The server-wide switch (admin).
+    func ratingPromptSetting() async throws -> Bool {
+        try await personalAPI.getSettings().ok.body.json.general.ratingPrompt ?? false
+    }
+
+    func saveRatingPromptSetting(_ on: Bool) async throws {
+        switch try await personalAPI.updateSettings(body: .json(.init(general: .init(ratingPrompt: on)))) {
+        case .ok: await refreshInfo()
+        case .badRequest(let r): throw MarqueeError((try? r.body.json.message) ?? "Couldn't save the settings.")
+        case .forbidden: throw MarqueeError("Only admins can change this.")
+        default: throw MarqueeError("Couldn't save the settings.")
         }
     }
 
