@@ -329,6 +329,8 @@ final class MarqueeTVUITests: XCTestCase {
         for _ in 0..<8 { remote.press(.down) }
         sleep(1)
         shot("tv-library-scrolled")
+        // No page title faded over the grid: the top bar's "Movies" tab names the library.
+        XCTAssertFalse(app.staticTexts["Movies"].exists, "no Movies title over the grid")
         let window = app.windows.firstMatch.frame
         for b in [muse, sortMenu] {
             XCTAssertTrue(b.exists, "\(b) still there")
