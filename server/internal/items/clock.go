@@ -18,7 +18,9 @@ func (s *Store) Fresh(ctx context.Context, uid, itemID int64, field string, at *
 			when = time.Now().UTC() // a device clock ahead of ours
 		}
 	}
-	stamp := when.Format(time.RFC3339Nano)
+	// Fixed width, so the database's text comparison orders times correctly (RFC3339Nano
+	// drops trailing zeros: "…:06Z" sorted after "…:06.5Z").
+	stamp := when.Format(clockLayout)
 	res, err := s.db.ExecContext(ctx, `INSERT INTO change_clock (user_id, item_id, field, at) VALUES (?, ?, ?, ?)
 		ON CONFLICT (user_id, item_id, field) DO UPDATE SET at = excluded.at WHERE excluded.at >= change_clock.at`,
 		uid, itemID, field, stamp)
@@ -28,3 +30,5 @@ func (s *Store) Fresh(ctx context.Context, uid, itemID int64, field string, at *
 	n, _ := res.RowsAffected()
 	return n > 0, nil
 }
+
+const clockLayout = "2006-01-02T15:04:05.000000000Z"
