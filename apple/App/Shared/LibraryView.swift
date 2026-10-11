@@ -13,11 +13,18 @@ struct LibraryView: View {
 
     var body: some View {
         if let library {
-            if library._type == .music && type == nil {
-                MusicHomeView(library: library)
-            } else {
-                LibraryGrid(library: library, type: type, sort: initialSort)
+            Group {
+                if library._type == .music && type == nil {
+                    MusicHomeView(library: library)
+                } else {
+                    LibraryGrid(library: library, type: type, sort: initialSort)
+                }
             }
+            #if os(tvOS)
+            // A library's own page on the TV: the top bar's tab already names it, and tvOS
+            // keeps the title faded over the grid while it scrolls.
+            .toolbar(type == nil ? .hidden : .automatic, for: .navigationBar)
+            #endif
         } else if let error {
             ErrorBanner(message: error).padding()
         } else {
