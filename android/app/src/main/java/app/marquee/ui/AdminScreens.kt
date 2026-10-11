@@ -97,6 +97,32 @@ fun TrailersPreference() {
     }
 }
 
+/** "Ask me to rate after watching" (USER-19): the person's own switch, shown while the server asks at all. */
+@Composable
+fun RatingPromptPreference() {
+    val marquee = LocalMarquee.current
+    val me by marquee.me.collectAsState()
+    val serverOn by marquee.ratingPrompt.collectAsState()
+    val scope = rememberCoroutineScope()
+    val u = me ?: return
+    if (!serverOn) return
+    val on = u.preferences.ratingPrompt != false
+    var error by remember { mutableStateOf<String?>(null) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Ask me to rate after watching")
+            Text("When a movie or episode ends", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        }
+        Switch(on, { v ->
+            scope.launch {
+                withContext(Dispatchers.IO) { runCatching { marquee.auth.updateMe(MeUpdate(preferences = u.preferences.copy(ratingPrompt = v))) } }
+                    .onSuccess { marquee.updated(it); error = null }.onFailure { error = it.message ?: "Couldn't save" }
+            }
+        }, Modifier.focusRing().semantics { contentDescription = "Ask me to rate after watching" })
+    }
+}
+
 @Composable
 private fun SectionTitle(t: String) =
     Text(t, Modifier.padding(horizontal = sidePadding).padding(top = 20.dp, bottom = 6.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Gold)
@@ -125,6 +151,9 @@ fun ServerSettingsScreen() {
     // Library settings (only the deletion switch is changed here; the server leaves the rest alone).
     var library by remember { mutableStateOf<app.marquee.api.models.LibraryGlobalSettings?>(null) }
     var libraryStatus by remember { mutableStateOf<String?>(null) }
+    // Rating requests when a movie or episode ends (USER-19).
+    var ratingPrompt by remember { mutableStateOf<Boolean?>(null) }
+    var generalStatus by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) { runCatching { marquee.settings.getSettings() } }
             .onSuccess { st ->
@@ -132,6 +161,7 @@ fun ServerSettingsScreen() {
                 trailers = c?.trailers ?: 0
                 prerollId = c?.prerollItemId
                 library = st.library
+                ratingPrompt = st.general.ratingPrompt == true
                 st.integrations?.let { i ->
                     seerrUrl = i.seerrUrl.orEmpty(); seerrKeySet = i.seerrApiKeySet == true
                     bazarrUrl = i.bazarrUrl.orEmpty(); bazarrKeySet = i.bazarrApiKeySet == true
@@ -175,6 +205,15 @@ fun ServerSettingsScreen() {
                 .onFailure { library = l; libraryStatus = "Couldn't save: ${serverMessage(it)}" }
         }
     }
+    fun setRatingPrompt(on: Boolean) {
+        val before = ratingPrompt
+        ratingPrompt = on
+        scope.launch {
+            withContext(Dispatchers.IO) { runCatching { marquee.settings.updateSettings(ServerSettingsUpdate(general = app.marquee.api.models.GeneralSettings(ratingPrompt = on))) } }
+                .onSuccess { ratingPrompt = it.general.ratingPrompt == true; generalStatus = null; marquee.refreshRatingPrompt() }
+                .onFailure { ratingPrompt = before; generalStatus = "Couldn't save: ${serverMessage(it)}" }
+        }
+    }
     fun save() {
         scope.launch {
             status = withContext(Dispatchers.IO) {
@@ -185,6 +224,20 @@ fun ServerSettingsScreen() {
 
     LazyColumn(contentPadding = PaddingValues(vertical = 16.dp)) {
         item { Text("Server settings", Modifier.padding(horizontal = sidePadding, vertical = 8.dp), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+        item { SectionTitle("General") }
+        item {
+            Column(Modifier.padding(horizontal = sidePadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text("Ask people to rate movies and episodes when they finish them")
+                        Text("Each person can turn this off in their settings.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(ratingPrompt == true, ::setRatingPrompt, Modifier.focusRing().semantics { contentDescription = "Ask people to rate movies and episodes when they finish them" },
+                        enabled = ratingPrompt != null)
+                }
+                generalStatus?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        }
         item { SectionTitle("Cinema trailers") }
         item {
             Column(Modifier.padding(horizontal = sidePadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
