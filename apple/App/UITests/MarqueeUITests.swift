@@ -107,7 +107,7 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(close.waitForExistence(timeout: 10))
         sleep(6)
         shot("06-video-playing")
-        close.tap()
+        app.closePlayer()
 
         // Music: play an artist and open Now Playing.
         openLibrary("Music")
@@ -226,7 +226,7 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Close player"].waitForExistence(timeout: 10))
         sleep(4)
         shot("d3-playing-offline")
-        app.buttons["Close player"].tap()
+        app.closePlayer()
 
         // Clean up so the test can run again.
         XCTAssertTrue(entry.waitForExistence(timeout: 5))
@@ -351,7 +351,7 @@ final class MarqueeUITests: XCTestCase {
         state = try adminAPI("GET", "/syncplay/groups/\(id)")
         XCTAssertEqual(state["playing"] as? Bool, false)
         shot("w3-paused-by-admin")
-        app.buttons["Close player"].tap()
+        app.closePlayer()
     }
 
     /// Moods and styles (MUSIC-18): a mood page lists tracks and starts its radio.
@@ -844,9 +844,10 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(play.waitForExistence(timeout: 10))
         play.tap()
         skipTrailersIfAny()
-        let settings = app.buttons["Playback settings"]
-        XCTAssertTrue(settings.waitForExistence(timeout: 15))
         sleep(3)
+        // The overlay buttons hide a few seconds into playback: playerControl brings them back.
+        var settings: XCUIElement { app.playerControl("Playback settings") }
+        XCTAssertTrue(settings.waitForExistence(timeout: 15))
         settings.tap()
         let speed = app.buttons["Speed"].firstMatch
         XCTAssertTrue(speed.waitForExistence(timeout: 5))
@@ -878,15 +879,15 @@ final class MarqueeUITests: XCTestCase {
         shot("ps3-subtitle-timing")
         sleep(4) // the stream restarts with it
         app.buttons["Done"].tap()
-        app.buttons["Close player"].tap()
+        app.closePlayer()
 
         // The server remembers it for this file: playing again starts with +200 ms, at 1×.
         let again = app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume'}")).firstMatch
         XCTAssertTrue(again.waitForExistence(timeout: 10))
         again.tap()
         skipTrailersIfAny()
-        XCTAssertTrue(settings.waitForExistence(timeout: 15))
         sleep(3)
+        XCTAssertTrue(settings.waitForExistence(timeout: 15))
         settings.tap()
         let remembered = app.buttons["Subtitle Timing (+200 ms)"]
         XCTAssertTrue(remembered.waitForExistence(timeout: 5), "the offset was remembered")
@@ -903,7 +904,7 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertEqual(value.label, "0 ms")
         sleep(4)
         app.buttons["Done"].tap()
-        app.buttons["Close player"].tap()
+        app.closePlayer()
     }
 
     /// Puts the cinema settings back when the test ends, however it ends.
@@ -936,7 +937,7 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Playback settings"].waitForExistence(timeout: 10), "the movie plays")
         sleep(2)
         shot("ct2-movie")
-        app.buttons["Close player"].tap()
+        app.closePlayer()
 
         // The person's own setting turns them off.
         app.buttons["Settings"].firstMatch.tap()

@@ -253,7 +253,7 @@ final class Batch6UITests: XCTestCase {
         XCTAssertTrue(app.buttons["Close player"].waitForExistence(timeout: 15), "the video player opens")
         try eventually(20, "00 Long Test plays first") { try sessions(for: longTest) > before }
         shot("d2-playing")
-        app.buttons["Close player"].tap()
+        app.closePlayer()
     }
 
     // MARK: - E. Lists keep their place

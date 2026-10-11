@@ -246,6 +246,18 @@ final class MarqueeTVUITests: XCTestCase {
         remote.press(.menu)
     }
 
+    /// A YouTube trailer can't play inside Marquee on the TV (no WebKit), so its button says
+    /// it opens YouTube.
+    func testTrailerButtonSaysYouTube() throws {
+        try signIn()
+        app.launchArguments = ["-marquee-test-youtube-trailer"] // keeps the sign-in
+        app.open(URL(string: "marquee://item/359")!)
+        let trailer = app.buttons["trailerButton"]
+        XCTAssertTrue(trailer.waitForExistence(timeout: 15))
+        XCTAssertEqual(trailer.label, "Trailer (YouTube)")
+        shot("tv-trailer-youtube-label")
+    }
+
     /// The server's playback sessions of the local trailer (item 362).
     private func trailerSessions() throws -> Int {
         guard let admin = adminToken else { throw XCTSkip("MARQUEE_TEST_ADMIN_TOKEN not set") }

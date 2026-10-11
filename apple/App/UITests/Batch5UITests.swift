@@ -259,26 +259,92 @@ final class Batch5UITests: XCTestCase {
         }
         XCTAssertGreaterThan(now, before, "the local trailer (362, Official Trailer) plays")
         shot("d2-trailer-playing")
-        app.buttons["Close player"].tap()
+        app.closePlayer()
     }
 
-    func testTrailerYouTubeOpensSheet() throws {
+    /// A YouTube trailer plays full screen inside Marquee in YouTube's embedded player, with a
+    /// close button; the YouTube app isn't opened.
+    func testTrailerYouTubePlaysInApp() throws {
         app.launchArguments += ["-marquee-test-youtube-trailer"]
         let user = try temporaryUser()
         signIn(user)
         openMovie("00 Preview Test")
         let trailer = app.buttons["trailerButton"]
         XCTAssertTrue(trailer.waitForExistence(timeout: 15))
+        XCTAssertEqual(trailer.label, "Trailer")
         trailer.tap()
-        let open = app.buttons["openInYouTube"]
-        XCTAssertTrue(open.waitForExistence(timeout: 10), "the YouTube sheet opens")
-        XCTAssertEqual(open.label, "Open in YouTube")
-        XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 10), "with the embedded player")
-        XCTAssertTrue(app.navigationBars["Test Trailer"].exists, "titled with the trailer's name")
-        sleep(4)
-        shot("d3-youtube-sheet")
-        app.buttons["Done"].tap()
-        XCTAssertTrue(open.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(trailer.exists)
+        let close = app.buttons["closeTrailer"]
+        XCTAssertTrue(close.waitForExistence(timeout: 10), "the in-app trailer player opens")
+        XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 10), "with YouTube's embedded player")
+        XCTAssertFalse(app.buttons["openInYouTube"].exists, "no Open in YouTube button")
+        XCTAssertFalse(app.buttons["watchOnYouTube"].exists, "the YouTube fallback is only for errors")
+        // Full screen: the web view fills the window.
+        let window = app.windows.firstMatch.frame, web = app.webViews.firstMatch.frame
+        XCTAssertGreaterThanOrEqual(web.width, window.width - 1, "\(web) in \(window)")
+        XCTAssertGreaterThanOrEqual(web.height, window.height * 0.8, "\(web) in \(window)")
+        sleep(5)
+        XCTAssertEqual(app.state, .runningForeground, "Marquee stays in front: the YouTube app wasn't opened")
+        XCTAssertTrue(close.exists)
+        shot("d3-youtube-player")
+        close.tap()
+        XCTAssertTrue(close.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(trailer.waitForExistence(timeout: 5), "back on the movie's page")
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
+    /// When the owner doesn't allow embedding, the player says so and offers YouTube instead.
+    func testTrailerYouTubeEmbedErrorOffersYouTube() throws {
+        app.launchArguments += ["-marquee-test-youtube-trailer", "-marquee-test-youtube-embed-error"]
+        let user = try temporaryUser()
+        signIn(user)
+        openMovie("00 Preview Test")
+        let trailer = app.buttons["trailerButton"]
+        XCTAssertTrue(trailer.waitForExistence(timeout: 15))
+        trailer.tap()
+        let fallback = app.buttons["watchOnYouTube"]
+        XCTAssertTrue(fallback.waitForExistence(timeout: 10), "the error offers Watch on YouTube")
+        XCTAssertEqual(fallback.label, "Watch on YouTube")
+        shot("d4-youtube-error")
+        app.buttons["closeTrailer"].tap()
+        XCTAssertTrue(trailer.waitForExistence(timeout: 5))
+    }
+
+    // MARK: - E. Video player overlay buttons hide
+
+    /// The overlay buttons show when playback starts, hide after a few seconds untouched, and
+    /// come back with a tap on the video; each is one round bubble.
+    func testPlayerOverlayHidesAndReturns() throws {
+        let user = try temporaryUser()
+        signIn(user)
+        openMovie("00 Long Test")
+        let play = app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume'}")).firstMatch
+        XCTAssertTrue(play.waitForExistence(timeout: 10))
+        play.tap()
+        let close = app.buttons["Close player"]
+        XCTAssertTrue(close.waitForExistence(timeout: 15), "the overlay shows at start")
+        XCTAssertTrue(close.isHittable)
+        let settings = app.buttons["Playback settings"]
+        XCTAssertTrue(settings.exists)
+        // One background per button: the bubble is the button, 44 points round.
+        for b in [close, settings] {
+            XCTAssertEqual(b.frame.width, 44, accuracy: 2, "\(b.label): \(b.frame)")
+            XCTAssertEqual(b.frame.height, 44, accuracy: 2, "\(b.label): \(b.frame)")
+        }
+        shot("e1-overlay-shown")
+
+        // Untouched while playing: gone after about 3 s.
+        let gone = NSPredicate(format: "exists == false OR hittable == false")
+        let hidden = expectation(for: gone, evaluatedWith: close)
+        wait(for: [hidden], timeout: 8)
+        XCTAssertFalse(settings.exists && settings.isHittable, "the other buttons hide with it")
+        shot("e2-overlay-hidden")
+
+        // A tap on the video brings them back.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)).tap()
+        XCTAssertTrue(close.waitForExistence(timeout: 3), "a tap brings the overlay back")
+        XCTAssertTrue(close.isHittable)
+        shot("e3-overlay-back")
+        close.tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume'}")).firstMatch.waitForExistence(timeout: 10))
     }
 }
