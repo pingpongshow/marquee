@@ -26,6 +26,8 @@ class MarqueeApplication : Application(), SingletonImageLoader.Factory {
                 remote.activityStarted()
                 // Back in the foreground: send what was changed offline (USER-18).
                 if (marquee.state.value == Marquee.State.SignedIn) marquee.scope.launch { marquee.sync.syncNow() }
+                // Live TV entry points follow whether it's usable now (LIVE-1).
+                if (marquee.state.value == Marquee.State.SignedIn) marquee.refreshLiveTv()
             }
             override fun onActivityStopped(activity: android.app.Activity) = remote.activityStopped()
             override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {}
@@ -41,6 +43,7 @@ class MarqueeApplication : Application(), SingletonImageLoader.Factory {
                 marquee.scope.launch {
                     if (marquee.isOffline) marquee.reconnect(quiet = true)
                     marquee.sync.syncNow()
+                    marquee.refreshLiveTv()
                 }
             }
         })

@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +39,20 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.stateDescription
+import app.marquee.core.WatchState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
@@ -58,17 +73,36 @@ fun shapeFor(item: ItemSummary): Shape = when (item.type) {
     else -> Shape.Poster
 }
 
-/** Clickable and, on TV, visibly focused: scales up with a gold border under the D-pad. */
+/**
+ * Clickable and, on TV, visibly focused: scales up with a gold border under the D-pad. With
+ * [onLongClick] (a context menu): a long press on phones, and a long press of the D-pad's
+ * centre or the menu key on TV.
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun Modifier.focusCard(onClick: () -> Unit, shape: RoundedCornerShape = RoundedCornerShape(8.dp)): Modifier {
+fun Modifier.focusCard(onClick: () -> Unit, shape: RoundedCornerShape = RoundedCornerShape(8.dp), onLongClick: (() -> Unit)? = null): Modifier {
     var focused by remember { mutableStateOf(false) }
     val s by animateFloatAsState(if (focused) 1.06f else 1f, label = "focus")
-    return this
+    var heldCentre by remember { mutableStateOf(false) }
+    val base = this
         .scale(s)
         .onFocusChanged { focused = it.isFocused }
         .clip(shape)
         .border(if (focused) 3.dp else 0.dp, if (focused) Gold else Color.Transparent, shape)
-        .clickable(onClick = onClick)
+    if (onLongClick == null) return base.clickable(onClick = onClick)
+    return base
+        .onPreviewKeyEvent { e ->
+            val k = e.nativeKeyEvent
+            val centre = k.keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER || k.keyCode == android.view.KeyEvent.KEYCODE_ENTER
+            when {
+                k.keyCode == android.view.KeyEvent.KEYCODE_MENU -> { if (e.type == KeyEventType.KeyUp) onLongClick(); true }
+                // Held: the menu opens once, and letting go doesn't also open the item.
+                centre && e.type == KeyEventType.KeyDown && k.repeatCount > 0 -> { if (!heldCentre) { heldCentre = true; onLongClick() }; true }
+                centre && e.type == KeyEventType.KeyUp && heldCentre -> { heldCentre = false; true }
+                else -> false
+            }
+        }
+        .combinedClickable(onClick = onClick, onLongClick = onLongClick)
 }
 
 /** A gold ring around a focused button or chip, for the D-pad (Material's own focus state is too faint on a TV). */
@@ -139,12 +173,44 @@ fun RatingBadge(rating: Double?, modifier: Modifier = Modifier, size: Dp = 12.dp
     }
 }
 
-/** A poster with its title underneath. */
+/** One entry of a tile's context menu. */
+data class TileAction(val label: String, val run: () -> Unit)
+
+/**
+ * A poster with its title underneath. Videos show a watched check or how far they were
+ * watched, with this device's marks shown at once (USER-6). [actions] open as a context
+ * menu on a long press (TV: hold the D-pad's centre, or the menu key).
+ */
 @Composable
 fun PosterCard(item: ItemSummary, imageUrl: String?, width: Dp, onClick: () -> Unit, shape: Shape = shapeFor(item), autoFocus: Boolean = false,
-    showRating: Boolean = item.type == ItemType.TRACK) {
+    showRating: Boolean = item.type == ItemType.TRACK, actions: List<TileAction> = emptyList()) {
+    val marquee = LocalMarquee.current
+    val marks by marquee.watch.marks.collectAsState()
+    var menu by remember { mutableStateOf(false) }
+    val video = item.type in WatchState.videoTypes
+    val mark = if (video) marquee.watch.markFor(item, marks) else null
+    val watched = video && watchedNow(marquee, item, marks)
+    val progress = if (!video || watched || mark != null) null
+        else item.viewOffsetMs?.takeIf { it > 0 }?.let { off -> item.durationMs?.takeIf { it > 0 }?.let { (off.toFloat() / it).coerceIn(0f, 1f) } }
     Column(Modifier.width(width)) {
-        Artwork(imageUrl, item.title, shape, Modifier.fillMaxWidth().initialFocus(autoFocus).focusCard(onClick).semantics { contentDescription = item.title })
+        Box {
+            Artwork(imageUrl, item.title, shape, Modifier.fillMaxWidth().initialFocus(autoFocus)
+                .focusCard(onClick, onLongClick = if (actions.isEmpty()) null else ({ menu = true }))
+                .semantics {
+                    contentDescription = item.title
+                    if (watched) stateDescription = "Watched"
+                    if (actions.isNotEmpty()) customActions = actions.map { a -> CustomAccessibilityAction(a.label) { a.run(); true } }
+                })
+            if (watched) Icon(Icons.Filled.CheckCircle, null, Modifier.align(Alignment.TopEnd).padding(6.dp).size(20.dp)
+                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(50)), tint = Gold)
+            progress?.let {
+                LinearProgressIndicator(progress = { it }, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 6.dp, vertical = 6.dp).height(3.dp),
+                    color = Gold, trackColor = Color.White.copy(alpha = 0.3f), drawStopIndicator = {})
+            }
+            DropdownMenu(menu, { menu = false }) {
+                actions.forEach { a -> DropdownMenuItem({ Text(a.label) }, { menu = false; a.run() }) }
+            }
+        }
         Text(item.title, Modifier.padding(top = 6.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
         Text(subtitleFor(item), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (showRating) RatingBadge(item.userRating, Modifier.padding(top = 2.dp))
@@ -182,3 +248,19 @@ fun app.marquee.api.models.ItemDetail.summary() = ItemSummary(
     viewOffsetMs = viewOffsetMs, viewCount = viewCount, lastViewedAt = lastViewedAt, watchedLeafCount = watchedLeafCount,
     userRating = userRating, watchlisted = watchlisted, communityRating = communityRating,
 )
+
+/** A playlist's poster mosaic: up to four of its items' posters, or its one poster. */
+@Composable
+fun PlaylistMosaic(imageIds: List<Long>, title: String, modifier: Modifier = Modifier) {
+    val marquee = LocalMarquee.current
+    if (imageIds.size < 4) { Artwork(marquee.imageUrl(imageIds.firstOrNull(), 200), title, Shape.Square, modifier); return }
+    Column(modifier.aspectRatio(1f).clip(RoundedCornerShape(8.dp)).background(Color(0xFF15151B))) {
+        imageIds.take(4).chunked(2).forEach { row ->
+            Row(Modifier.weight(1f)) {
+                row.forEach { id ->
+                    AsyncImage(marquee.imageUrl(id, 100), null, contentScale = ContentScale.Crop, modifier = Modifier.weight(1f).fillMaxSize())
+                }
+            }
+        }
+    }
+}

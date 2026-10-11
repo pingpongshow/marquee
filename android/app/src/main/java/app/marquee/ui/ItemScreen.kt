@@ -1,6 +1,7 @@
 package app.marquee.ui
 
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.material3.DropdownMenu
@@ -15,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.BookmarkAdded
@@ -93,7 +95,13 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
     var reload by remember { mutableIntStateOf(0) }
     // Reloads after a reconnection or after changes made offline were sent.
     val connection by marquee.connection.collectAsState()
-    val page by produceState<Result<Page>?>(null, itemId, reload, connection) {
+    // And after watched marks reached the server (USER-6), so episodes and progress show the server's truth.
+    val changes by marquee.watch.changes.collectAsState()
+    // Kept while on the back stack, so coming back (from a player or another item) keeps the page's place.
+    val pageState = rememberCached("item-$itemId") { mutableStateOf<Result<Page>?>(null) }
+    val page by pageState
+    LaunchedEffect(itemId, reload, connection, changes) {
+        val value = pageState.value
         val fresh = withContext(Dispatchers.IO) {
             runCatching {
                 val d = marquee.items.getItem(itemId)
@@ -107,7 +115,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
             }
         }
         // A reload that fails keeps the page already shown.
-        if (fresh.isSuccess || value?.isSuccess != true) value = fresh
+        if (fresh.isSuccess || value?.isSuccess != true) pageState.value = fresh
     }
     val p = page
     if (p == null) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }; return }
@@ -122,7 +130,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
     @Composable fun RadioButton() = OutlinedButton(modifier = Modifier.focusRing(), onClick = {
         scope.launch {
             runCatching { music.startRadio(RadioRequest(RadioRequest.Seed.ITEM, itemId = d.id)) }
-                .onFailure { Toast.makeText(context, it.message ?: "Couldn't start a radio", Toast.LENGTH_LONG).show() }
+                .onFailure { toast(context, it.message ?: "Couldn't start a radio", long = true) }
         }
     }) { Icon(Icons.Filled.Radio, null); Text("Radio") }
     /** Watchlist (USER-8) and watched state, for movies and shows. */
@@ -131,19 +139,18 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
         var listed by remember(d.id, d.watchlisted) {
             mutableStateOf(marquee.sync.queued(d.id, app.marquee.core.PendingChange.Kind.Watchlist)?.on ?: (d.watchlisted == true))
         }
-        var watched by remember(d.id, d.viewCount, d.watchedLeafCount) {
-            mutableStateOf(marquee.sync.queued(d.id, app.marquee.core.PendingChange.Kind.Watched)?.on
-                ?: ((d.viewCount ?: 0) > 0 || (d.leafCount > 0 && d.watchedLeafCount == d.leafCount)))
-        }
+        // This device's marks show at once, over the page's older values (USER-6).
+        val watched = isWatched(d.summary())
         if (d.type == ItemType.MOVIE || d.type == ItemType.SHOW) OutlinedButton(modifier = Modifier.focusRing(), onClick = {
             val on = !listed
             listed = on
             scope.launch { if (!marquee.sync.saveShowing(marquee.sync.watchlist(d.id, on), context)) listed = !on }
         }) { Icon(if (listed) Icons.Filled.BookmarkAdded else Icons.Filled.BookmarkAdd, null); Text(if (listed) "On Watchlist" else "Watchlist") }
         if (d.type in listOf(ItemType.MOVIE, ItemType.SHOW, ItemType.SEASON, ItemType.EPISODE, ItemType.VIDEO)) OutlinedButton(modifier = Modifier.focusRing(), onClick = {
+            val id = d.id
             val on = !watched
-            watched = on
-            scope.launch { if (!marquee.sync.saveShowing(marquee.sync.watched(d.id, on), context)) watched = !on }
+            // The app's scope: leaving the page doesn't cancel the change.
+            marquee.scope.launch { if (!marquee.sync.setWatched(id, on)) toast(context, "Couldn't update “${d.title}”") }
         }) { Icon(if (watched) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked, null); Text(if (watched) "Watched" else "Mark watched") }
         if (d.type in listOf(ItemType.MOVIE, ItemType.SHOW, ItemType.SEASON, ItemType.EPISODE, ItemType.VIDEO, ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK))
             AddToPlaylistButton(d.id, music = d.type in listOf(ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK))
@@ -260,15 +267,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
             when (d.type) {
                 ItemType.SEASON -> Column {
                     Text("Episodes", Modifier.padding(horizontal = sidePadding, vertical = 4.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    pg.children.forEach { ep ->
-                        ListItem(
-                            headlineContent = { Text("${ep.index ?: ""}. ${ep.title}") },
-                            supportingContent = { Text(listOfNotNull(ep.durationMs?.let { formatTime(it) }, if ((ep.viewCount ?: 0) > 0) "Watched" else null).joinToString(" · ")) },
-                            leadingContent = { Artwork(marquee.imageUrl(ep.images?.thumb, 200), ep.title, Shape.Wide, Modifier.width(120.dp)) },
-                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                            modifier = Modifier.focusCard({ nav.navigate("player/${ep.id}") }),
-                        )
-                    }
+                    pg.children.forEach { ep -> EpisodeRow(nav, ep) }
                 }
                 ItemType.ALBUM -> Column {
                     val tracks = pg.children.filter { it.type == ItemType.TRACK }
@@ -311,7 +310,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                     }
                 }
                 else -> Shelf(when (d.type) { ItemType.SHOW -> "Seasons"; ItemType.ARTIST -> "Albums"; else -> "In this collection" }, pg.children, sidePadding) { _, it ->
-                    PosterCard(it, marquee.imageUrl(it.images?.poster, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) })
+                    PosterCard(it, marquee.imageUrl(it.images?.poster, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) }, actions = tileActions(it))
                 }
             }
         }
@@ -364,6 +363,27 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
         }
         // Last, so the Community rating can scroll here.
         if (reviewable(d.type)) item { ReviewsSection(d, reviews, me?.isAdmin == true) { reviewsVersion++ } }
+    }
+}
+
+/** A season's episode: plays on a tap; a long press (TV: hold OK, or the menu key) marks it watched or unwatched. */
+@Composable
+private fun EpisodeRow(nav: NavHostController, ep: ItemSummary) {
+    val marquee = LocalMarquee.current
+    val watched = isWatched(ep)
+    val actions = tileActions(ep)
+    var menu by remember { mutableStateOf(false) }
+    Box {
+        ListItem(
+            headlineContent = { Text("${ep.index ?: ""}. ${ep.title}") },
+            supportingContent = { Text(listOfNotNull(ep.durationMs?.let { formatTime(it) }, if (watched) "Watched" else null).joinToString(" · ")) },
+            leadingContent = { Artwork(marquee.imageUrl(ep.images?.thumb, 200), ep.title, Shape.Wide, Modifier.width(120.dp)) },
+            trailingContent = if (watched) { { Icon(Icons.Filled.CheckCircle, "Watched", tint = Gold) } } else null,
+            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+            modifier = Modifier.focusCard({ nav.navigate("player/${ep.id}") }, onLongClick = { menu = true })
+                .semantics { customActions = actions.map { a -> androidx.compose.ui.semantics.CustomAccessibilityAction(a.label) { a.run(); true } } },
+        )
+        DropdownMenu(menu, { menu = false }) { actions.forEach { a -> DropdownMenuItem({ Text(a.label) }, { menu = false; a.run() }) } }
     }
 }
 

@@ -3,6 +3,7 @@ package app.marquee.ui
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
@@ -99,7 +100,19 @@ fun HomeScreen(nav: NavHostController) {
             kotlinx.coroutines.delay(15_000)
         }
     }
-    val hubs by produceState<Result<List<Hub>>?>(null, connection) { value = withContext(Dispatchers.IO) { runCatching { marquee.hubs.homeHubs() } } }
+    // Reloads after watched marks or a removal from Continue Watching (USER-6), keeping the rows shown meanwhile.
+    val changes by marquee.watch.changes.collectAsState()
+    // Removed from Continue Watching: gone at once, until the row reloads.
+    val removed = remember { mutableStateListOf<Long>() }
+    // Kept while Home is on the back stack: coming back shows the same rows at once (refreshed in place), so it keeps its place.
+    val hubsState = rememberCached("home-hubs") { mutableStateOf<Result<List<Hub>>?>(null) }
+    val hubs by hubsState
+    var opened by rememberLastOpened("home")
+    LaunchedEffect(connection, changes) {
+        val fresh = withContext(Dispatchers.IO) { runCatching { marquee.hubs.homeHubs() } }
+        if (fresh.isSuccess || hubsState.value?.isSuccess != true) { hubsState.value = fresh; if (fresh.isSuccess) removed.clear() }
+    }
+    val marks by marquee.watch.marks.collectAsState()
     val cardWidth = if (marquee.isTv) 130.dp else 120.dp
     when (val h = hubs) {
         null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -141,10 +154,14 @@ fun HomeScreen(nav: NavHostController) {
             if (!marquee.isOffline) h.exceptionOrNull()?.let { e -> item { Text("Couldn't load: ${e.message}", Modifier.padding(horizontal = sidePadding), color = MaterialTheme.colorScheme.error) } }
             itemsIndexed(h.getOrDefault(emptyList()), key = { _, it -> it.id }) { hi, hub ->
                 val wide = hub.id == "continue-watching"
-                Shelf(hub.title, hub.items, sidePadding, onTitle = HomeRows.route(hub.id)?.let { r -> { nav.navigate(r) } }) { i, it ->
+                // Continue Watching drops what was removed or just marked watched here, before the row reloads.
+                val shown = if (!wide) hub.items else hub.items.filter { it.id !in removed && marquee.watch.markFor(it, marks)?.on != true }
+                if (shown.isEmpty()) return@itemsIndexed
+                Shelf(hub.title, shown, sidePadding, onTitle = HomeRows.route(hub.id)?.let { r -> { nav.navigate(r) } }) { i, it ->
                     val art = if (wide) it.images?.thumb ?: it.images?.backdrop else it.images?.poster
-                    PosterCard(it, marquee.imageUrl(art, 300), if (wide) cardWidth * 1.6f else cardWidth, { openItem(nav, it, play = wide) },
-                        shape = if (wide) Shape.Wide else shapeFor(it), autoFocus = marquee.isTv && hi == 0 && i == 0)
+                    PosterCard(it, marquee.imageUrl(art, 300), if (wide) cardWidth * 1.6f else cardWidth, { opened = it.id; openItem(nav, it, play = wide) },
+                        shape = if (wide) Shape.Wide else shapeFor(it), autoFocus = marquee.isTv && (if (opened != null) it.id == opened else hi == 0 && i == 0),
+                        actions = tileActions(it, continueWatching = wide) { id -> removed.add(id) })
                 }
             }
         }
@@ -154,7 +171,9 @@ fun HomeScreen(nav: NavHostController) {
 @Composable
 fun LibrariesScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
-    val liveOn by produceState(false) { value = withContext(Dispatchers.IO) { runCatching { marquee.livetv.liveTvStatus().enabled }.getOrDefault(false) } }
+    // Only while Live TV has channels this profile may watch (LIVE-1); checked again on opening.
+    val liveOn by marquee.liveTv.collectAsState()
+    LaunchedEffect(Unit) { marquee.refreshLiveTv() }
     val requests by produceState<app.marquee.api.models.RequestsStatus?>(null) {
         value = withContext(Dispatchers.IO) { runCatching { marquee.requests.requestsStatus() }.getOrNull() }
     }
@@ -214,18 +233,20 @@ fun LibrariesScreen(nav: NavHostController) {
 @Composable
 fun LibraryScreen(nav: NavHostController, libraryId: Long) {
     val marquee = LocalMarquee.current
-    val items = remember { mutableStateListOf<ItemSummary>() }
-    var total by remember { mutableIntStateOf(-1) }
+    // Kept while the library is on the back stack, so coming back keeps its place in the grid.
+    val items = rememberCached("library-$libraryId-items") { mutableStateListOf<ItemSummary>() }
+    var total by rememberCached("library-$libraryId-total") { mutableIntStateOf(-1) }
     var loading by remember { mutableStateOf(false) }
-    var library by remember { mutableStateOf<Library?>(null) }
+    var library by rememberCached("library-$libraryId") { mutableStateOf<Library?>(null) }
+    var opened by rememberLastOpened("library-$libraryId")
     // Movie libraries also browse by collection (META-7).
-    var collections by remember { mutableStateOf(false) }
+    var collections by rememberSaveable { mutableStateOf(false) }
     // Sort by the person's own rating, and only what they rated 4★ or more.
     var byMyRating by rememberSaveable { mutableStateOf(false) }
     var fav by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     // Bumped when the sort, filter or collections view changes, so a page still loading for the old one is dropped.
-    var generation by remember { mutableIntStateOf(0) }
+    var generation by rememberCached("library-$libraryId-generation") { mutableIntStateOf(0) }
     fun loadMore() {
         if (loading || (total >= 0 && items.size >= total)) return
         loading = true
@@ -240,7 +261,7 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
     }
     fun reload() { generation++; loading = false; items.clear(); total = -1; loadMore() }
     LaunchedEffect(libraryId) {
-        library = withContext(Dispatchers.IO) { runCatching { marquee.libraries.getLibrary(libraryId) }.getOrNull() }
+        library = withContext(Dispatchers.IO) { runCatching { marquee.libraries.getLibrary(libraryId) }.getOrNull() } ?: library
         if (library?.type != LibraryType.MUSIC) loadMore()
     }
     val min = if (marquee.isTv) 130.dp else 110.dp
@@ -270,11 +291,13 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
         }
         if (total == 0) Text(if (fav && !collections) "Nothing rated 4★ or more yet." else "Nothing here yet.", Modifier.padding(sidePadding),
             color = MaterialTheme.colorScheme.onSurfaceVariant)
-        LazyVerticalGrid(GridCells.Adaptive(min), contentPadding = PaddingValues(sidePadding), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        LazyVerticalGrid(GridCells.Adaptive(min), Modifier.semantics { contentDescription = "Library items" }, contentPadding = PaddingValues(sidePadding),
+            horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             itemsIndexed(items, key = { _, it -> it.id }) { i, it ->
                 if (i >= items.size - 30) LaunchedEffect(i) { loadMore() }
-                PosterCard(it, marquee.imageUrl(it.images?.poster, 240), min, { openItem(nav, it) }, autoFocus = marquee.isTv && i == 0,
-                    showRating = byMyRating || fav)
+                PosterCard(it, marquee.imageUrl(it.images?.poster, 240), min, { opened = it.id; openItem(nav, it) },
+                    autoFocus = marquee.isTv && (if (opened != null) it.id == opened else i == 0),
+                    showRating = byMyRating || fav, actions = tileActions(it))
             }
         }
     }
@@ -283,18 +306,31 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
 @Composable
 fun PlaylistsScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
-    val lists by produceState(emptyList<app.marquee.api.models.Playlist>()) { value = withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylists() }.getOrDefault(emptyList()) } }
+    // Kept while on the back stack, so coming back keeps the list's place.
+    val loaded by cachedLoad("playlists") { withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylists() }.getOrNull() } }
+    val lists = loaded ?: emptyList()
+    var opened by rememberLastOpened("playlists")
     LazyColumn(contentPadding = PaddingValues(vertical = 16.dp)) {
         item { Text("Playlists", Modifier.padding(horizontal = sidePadding, vertical = 8.dp), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
         if (lists.isEmpty()) item { Text("No playlists yet.", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        items(lists, key = { it.id }) { p ->
-            ListItem(
-                headlineContent = { Text(p.title) },
-                supportingContent = { Text("${p.itemCount} ${if (p.kind == PlaylistKind.AUDIO) "tracks" else "videos"}") },
-                trailingContent = { Icon(Icons.Filled.ChevronRight, null) },
-                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                modifier = Modifier.focusCard({ nav.navigate("playlist/${p.id}") }),
-            )
+        // Video and music playlists, each under its own heading (USER-7), with their poster mosaics.
+        val (videos, music) = lists.partition { it.kind == PlaylistKind.VIDEO }
+        listOf("Video playlists" to videos, "Music playlists" to music).filter { it.second.isNotEmpty() }.forEach { (heading, group) ->
+            if (videos.isNotEmpty()) item(key = heading) {
+                Text(heading, Modifier.padding(start = sidePadding, end = sidePadding, top = 16.dp, bottom = 4.dp).semantics { this.heading() },
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+            items(group, key = { it.id }) { p ->
+                ListItem(
+                    headlineContent = { Text(p.title) },
+                    supportingContent = { Text("${p.itemCount} ${if (p.kind == PlaylistKind.AUDIO) "tracks" else "videos"}") },
+                    leadingContent = { PlaylistMosaic(p.imageIds, p.title, Modifier.size(56.dp)) },
+                    trailingContent = { Icon(Icons.Filled.ChevronRight, null) },
+                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+                    modifier = Modifier.initialFocus(marquee.isTv && (if (opened != null) opened == p.id else p == lists.first()))
+                        .focusCard({ opened = p.id; nav.navigate("playlist/${p.id}") }),
+                )
+            }
         }
     }
 }
@@ -304,23 +340,44 @@ fun PlaylistsScreen(nav: NavHostController) {
 fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
     val marquee = LocalMarquee.current
     val music = LocalMusic.current
-    val entries by produceState(emptyList<app.marquee.api.models.PlaylistEntry>()) { value = withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylistItems(playlistId).items }.getOrDefault(emptyList()) } }
-    val title by produceState("") { value = withContext(Dispatchers.IO) { runCatching { marquee.playlists.getPlaylist(playlistId).title }.getOrDefault("") } }
+    // Kept while on the back stack, so coming back keeps the list's place.
+    val loadedEntries by cachedLoad("playlist-$playlistId-items") { withContext(Dispatchers.IO) { runCatching { marquee.playlists.listPlaylistItems(playlistId).items }.getOrNull() } }
+    val entries = loadedEntries ?: emptyList()
+    val playlist by cachedLoad("playlist-$playlistId") { withContext(Dispatchers.IO) { runCatching { marquee.playlists.getPlaylist(playlistId) }.getOrNull() } }
+    val title = playlist?.title ?: ""
     val tracks = entries.map { it.item }
+    var opened by rememberLastOpened("playlist-$playlistId")
+    // A video playlist plays in the video player, in order, each video going on to the next (USER-7).
+    val videos = tracks.filter { it.type in app.marquee.core.WatchState.videoTypes && it.type != ItemType.SHOW && it.type != ItemType.SEASON }
+    fun playVideos(list: List<ItemSummary>) {
+        if (list.isEmpty()) return
+        marquee.videoQueue = list.map { it.id }
+        nav.navigate("player/${list.first().id}")
+    }
     LazyColumn(contentPadding = PaddingValues(vertical = 16.dp)) {
         item {
             Column(Modifier.padding(horizontal = sidePadding)) {
-                Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    playlist?.let { PlaylistMosaic(it.imageIds, it.title, Modifier.size(if (marquee.isTv) 120.dp else 88.dp)) }
+                    Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                }
                 // Full width, wrapping onto another line rather than squeezing a button's label.
                 FlowRow(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (tracks.any { it.type == ItemType.TRACK }) {
-                        Button(onClick = { music.play(tracks, 0, source = title) }, modifier = Modifier.focusRing().initialFocus(marquee.isTv)) {
+                        Button(onClick = { music.play(tracks, 0, source = title) }, modifier = Modifier.focusRing().initialFocus(marquee.isTv && opened == null)) {
                             Icon(Icons.Filled.PlayArrow, null); Text("Play", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
                         }
                         OutlinedButton(onClick = { music.play(tracks.shuffled(), 0, source = title) }, modifier = Modifier.focusRing()) {
                             Icon(Icons.Filled.Shuffle, null); Text("Shuffle", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
                         }
                         if (!marquee.isTv) PlaylistDownloadButton(playlistId)
+                    } else if (videos.isNotEmpty()) {
+                        Button(onClick = { playVideos(videos) }, modifier = Modifier.focusRing().initialFocus(marquee.isTv && opened == null)) {
+                            Icon(Icons.Filled.PlayArrow, null); Text("Play", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
+                        }
+                        OutlinedButton(onClick = { playVideos(videos.shuffled()) }, modifier = Modifier.focusRing()) {
+                            Icon(Icons.Filled.Shuffle, null); Text("Shuffle", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
+                        }
                     }
                     PinToHomeButton("playlist-$playlistId")
                 }
@@ -328,12 +385,16 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
         }
         items(entries.size) { i ->
             val it = entries[i].item
+            val vi = videos.indexOf(it)
             ListItem(
                 headlineContent = { Text(it.title) },
                 supportingContent = { Text(subtitleFor(it)) },
+                leadingContent = if (it.type == ItemType.TRACK) null else { { Artwork(marquee.imageUrl(it.images?.thumb ?: it.images?.poster, 160), it.title, Shape.Wide, Modifier.width(96.dp)) } },
                 trailingContent = if (it.type == ItemType.TRACK) { { app.marquee.music.TrackRating(it) } } else null,
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                modifier = Modifier.focusCard({ if (it.type == ItemType.TRACK) music.play(tracks, i, source = title) else openItem(nav, it, play = true) }),
+                // A video plays from here on through the rest of the playlist.
+                modifier = Modifier.initialFocus(marquee.isTv && opened == it.id)
+                    .focusCard({ opened = it.id; if (it.type == ItemType.TRACK) music.play(tracks, i, source = title) else if (vi >= 0) playVideos(videos.drop(vi)) else openItem(nav, it) }),
             )
         }
     }
@@ -362,7 +423,8 @@ fun SearchScreen(nav: NavHostController) {
         LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
             items(results?.groups ?: emptyList()) { g ->
                 Shelf(g.type.value.replaceFirstChar { it.uppercase() } + "s", g.items, sidePadding) { _, it ->
-                    PosterCard(it, marquee.imageUrl(it.images?.poster ?: it.images?.thumb, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) })
+                    PosterCard(it, marquee.imageUrl(it.images?.poster ?: it.images?.thumb, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) },
+                        actions = tileActions(it))
                 }
             }
         }

@@ -185,6 +185,11 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     // Bumped by a timing change; the session restarts once the stepping stops.
     var timingChange by remember { mutableIntStateOf(0) }
     LaunchedEffect(groupId) { if (groupId != null) { delay(1500); together.join(groupId) } }
+    // Playing in order from a video playlist (USER-7) while this video is one of it; anything else ends that.
+    val queue = remember(itemId) { marquee.videoQueue.takeIf { itemId in it } ?: emptyList<Long>().also { marquee.videoQueue = it } }
+    /** What comes next: the playlist's next video, or the next episode. */
+    suspend fun upNext(): Long? = if (queue.isNotEmpty()) queue.getOrNull(queue.indexOf(itemId) + 1)
+        else withContext(Dispatchers.IO) { runCatching { marquee.items.nextItem(itemId) }.getOrNull() }?.id
     // Downloaded: play the file on the device, even when the server is reachable (D64).
     val downloads = LocalDownloads.current
     val local = remember(itemId) { downloads.localFile(itemId) }
@@ -254,6 +259,8 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
         launch {
             detail = withContext(Dispatchers.IO) { runCatching { marquee.items.getItem(itemId) }.getOrNull() }
             detailReady.complete(detail)
+            // Played again: this device's earlier watched marks give way to what the server will now say (USER-6).
+            marquee.watch.forget(itemId, detail?.parentId, detail?.grandparentId)
         }
         launch { thumbs = TrickplayThumbs.load(marquee, itemId) }
         // Already casting: the Cast hand-off below plays it there instead.
@@ -333,9 +340,9 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                 report(PlaybackProgress.State.PAUSED)
                 // Up next: the following episode (or nothing), unless the viewer has already left.
                 marquee.scope.launch(Dispatchers.Main) {
-                    val next = withContext(Dispatchers.IO) { runCatching { marquee.items.nextItem(itemId) }.getOrNull() }
+                    val next = upNext()
                     if (!stillShowing()) return@launch
-                    if (next != null) nav.navigate("player/${next.id}?start=0") { popUpTo("player/{id}?start={start}&group={group}") { inclusive = true } }
+                    if (next != null) nav.navigate("player/$next?start=0") { popUpTo("player/{id}?start={start}&group={group}") { inclusive = true } }
                     else nav.popBackStack()
                 }
             }
@@ -426,8 +433,8 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                     RemoteCommand.Type.STOP -> if (stillShowing()) nav.popBackStack()
                     RemoteCommand.Type.PREVIOUS -> player.seekTo(0)
                     RemoteCommand.Type.NEXT -> marquee.scope.launch(Dispatchers.Main) {
-                        val next = withContext(Dispatchers.IO) { runCatching { marquee.items.nextItem(itemId) }.getOrNull() }
-                        if (next != null && stillShowing()) nav.navigate("player/${next.id}?start=0") { popUpTo("player/{id}?start={start}&group={group}") { inclusive = true } }
+                        val next = upNext()
+                        if (next != null && stillShowing()) nav.navigate("player/$next?start=0") { popUpTo("player/{id}?start={start}&group={group}") { inclusive = true } }
                     }
                     RemoteCommand.Type.SET_VOLUME -> c.volume?.let { player.volume = it.toFloat().coerceIn(0f, 1f) }
                     RemoteCommand.Type.SET_AUDIO, RemoteCommand.Type.SET_SUBTITLE -> if (local == null) {

@@ -84,6 +84,8 @@ import app.marquee.api.models.PlaylistKind
 import app.marquee.api.models.RadioRequest
 import app.marquee.ui.Artwork
 import app.marquee.ui.LocalMarquee
+import app.marquee.ui.rememberCached
+import app.marquee.ui.rememberLastOpened
 import app.marquee.ui.LocalMusic
 import app.marquee.ui.PosterCard
 import app.marquee.ui.Shape
@@ -147,8 +149,9 @@ fun MusicHome(nav: NavHostController, library: Library) {
     val scope = rememberCoroutineScope()
     val lib = library.id
     val discover = rememberMusicDiscoverData(lib)
-    val shelves by produceState<MusicShelves?>(null, lib) {
-        value = withContext(Dispatchers.IO) {
+    // Kept while on the back stack, so coming back to the music home keeps its place.
+    val shelves by app.marquee.ui.cachedLoad<MusicShelves>("musichome-$lib", lib) {
+        withContext(Dispatchers.IO) {
             coroutineScope {
                 fun albums(sort: SortListLibraryItems) = async { runCatching { marquee.items.listLibraryItems(lib, ItemType.ALBUM, sort, limit = 20).items }.getOrDefault(emptyList()) }
                 val played = albums(SortListLibraryItems._VIEWED)
@@ -182,7 +185,8 @@ fun MusicHome(nav: NavHostController, library: Library) {
     }
     fun start(what: String, work: suspend () -> Unit) {
         scope.launch {
-            runCatching { work() }.onFailure { Toast.makeText(context, it.message ?: "Couldn't start $what", Toast.LENGTH_LONG).show() }
+            // The failure can arrive off the main thread (after withContext), where Toast.makeText throws.
+            runCatching { work() }.onFailure { if (it !is kotlinx.coroutines.CancellationException) app.marquee.ui.toast(context, it.message ?: "Couldn't start $what", long = true) }
         }
     }
     val card = if (marquee.isTv) 130.dp else 120.dp
@@ -408,9 +412,13 @@ private fun PagedMusic(nav: NavHostController, libraryId: Long, kind: MusicBrows
     val marquee = LocalMarquee.current
     val music = LocalMusic.current
     val scope = rememberCoroutineScope()
-    val items = remember { mutableStateListOf<ItemSummary>() }
-    var total by remember { mutableIntStateOf(-1) }
+    // Kept while the page is on the back stack (per sort and filter), so coming back keeps its place.
+    val cacheKey = "music-$libraryId-$kind-${sort.key}-$minRating-$genre-$decade"
+    val items = rememberCached("$cacheKey-items") { mutableStateListOf<ItemSummary>() }
+    var total by rememberCached("$cacheKey-total") { mutableIntStateOf(-1) }
     var loading by remember { mutableStateOf(false) }
+    var opened by rememberLastOpened(cacheKey)
+    fun first(i: Int, id: Long) = marquee.isTv && (if (opened != null) id == opened else i == 0)
     val type = when (kind) { MusicBrowse.Albums -> ItemType.ALBUM; MusicBrowse.Songs -> ItemType.TRACK; else -> ItemType.ARTIST }
     fun loadMore() {
         if (loading || (total >= 0 && items.size >= total)) return
@@ -436,7 +444,7 @@ private fun PagedMusic(nav: NavHostController, libraryId: Long, kind: MusicBrows
                     leadingContent = { Artwork(marquee.imageUrl(t.images?.poster, 120), t.title, Shape.Square, Modifier.width(44.dp)) },
                     trailingContent = { TrackRating(t) },
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                    modifier = Modifier.initialFocus(marquee.isTv && i == 0).focusCard({ music.play(items.toList(), i, source = "Songs") }),
+                    modifier = Modifier.initialFocus(first(i, t.id)).focusCard({ opened = t.id; music.play(items.toList(), i, source = "Songs") }),
                 )
             }
         }
@@ -446,7 +454,8 @@ private fun PagedMusic(nav: NavHostController, libraryId: Long, kind: MusicBrows
             verticalArrangement = Arrangement.spacedBy(18.dp)) {
             itemsIndexed(items, key = { _, it -> it.id }) { i, it ->
                 if (i >= items.size - 30) LaunchedEffect(i) { loadMore() }
-                PosterCard(it, marquee.imageUrl(it.images?.poster, 240), min, { openItem(nav, it) }, autoFocus = marquee.isTv && i == 0, showRating = sort == MusicSort.MyRating || minRating != null)
+                PosterCard(it, marquee.imageUrl(it.images?.poster, 240), min, { opened = it.id; openItem(nav, it) }, autoFocus = first(i, it.id),
+                    showRating = sort == MusicSort.MyRating || minRating != null)
             }
         }
     }
@@ -591,7 +600,7 @@ private fun DecadesPage(libraryId: Long) {
                 modifier = Modifier.initialFocus(marquee.isTv && i == 0).focusCard({
                     scope.launch {
                         runCatching { music.startRadio(RadioRequest(RadioRequest.Seed.DECADE, value = dec, libraryId = libraryId)) }
-                            .onFailure { Toast.makeText(context, it.message ?: "Couldn't start the radio", Toast.LENGTH_LONG).show() }
+                            .onFailure { app.marquee.ui.toast(context, it.message ?: "Couldn't start the radio", long = true) }
                     }
                 }),
             )
