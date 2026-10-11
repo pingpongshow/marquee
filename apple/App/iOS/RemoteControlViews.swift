@@ -16,6 +16,8 @@ struct PlayOnButton: View {
     /// Worked out when the button is pressed (the position then).
     let target: () -> PlayOnTarget?
     var compact = false
+    /// In the video player's overlay: one round bubble like the other buttons there.
+    var bubble = false
     @State private var sent: Sent?
 
     /// What was worked out when the button was pressed (nil target: just control a player).
@@ -28,7 +30,9 @@ struct PlayOnButton: View {
         Button {
             sent = Sent(target: target())
         } label: {
-            if compact {
+            if bubble {
+                PlayerBubble(systemImage: "tv.and.hifispeaker.fill")
+            } else if compact {
                 Image(systemName: "tv.and.hifispeaker.fill")
             } else {
                 Label("Play on…", systemImage: "tv.and.hifispeaker.fill")

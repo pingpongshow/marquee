@@ -455,7 +455,7 @@ final class Batch2UITests: XCTestCase {
         XCTAssertTrue(app.buttons["Close player"].waitForExistence(timeout: 15))
         sleep(3)
         shot("sa2-playing")
-        app.buttons["Close player"].tap()
+        app.closePlayer()
         openSettings()
         scrollTo(link)
         link.tap()
