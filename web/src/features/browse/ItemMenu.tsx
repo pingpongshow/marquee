@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Bookmark, BookmarkMinus, Compass, Disc3, Layers, ListEnd, ListPlus, ListStart, MoreHorizontal, Radio, Shuffle, UserRound } from "lucide-react";
-import { useState } from "react";
+import { Bookmark, BookmarkMinus, CircleCheck, CircleSlash, Compass, Disc3, EyeOff, Layers, ListEnd, ListPlus, ListStart, MoreHorizontal, Radio, Shuffle, UserRound } from "lucide-react";
+import { clsx } from "clsx";
+import { useState, type MouseEvent } from "react";
 import { api, unwrap } from "@/api/client";
 import { fetchLeaves, meQuery } from "@/api/queries";
 import type { ItemSummary } from "@/api/types";
@@ -11,12 +12,31 @@ import { useRadio } from "../music/useRadio";
 import { AddToPlaylistDialog } from "../playlists/AddToPlaylist";
 import { useMusicActions } from "../player/MusicPlayer";
 import { AddToCollectionDialog } from "./AddToCollection";
+import { isWatched, markableTypes, useMarkWatched, useRemoveFromContinueWatching } from "./watched";
 
 const music = new Set(["track", "album", "artist"]);
 const watchable = new Set(["movie", "show", "episode", "video"]);
 
-/** The "…" menu on tracks, albums, artists and videos: queue and playlist actions. */
-export function ItemMenu({ item, className }: { item: ItemSummary; className?: string }) {
+/** The "…" menu on tracks, albums, artists and videos: queue, playlist and watch-state actions. */
+export function ItemMenu({
+  item,
+  className,
+  continueWatching,
+  open,
+  onOpenChange,
+  floating,
+}: {
+  item: ItemSummary;
+  className?: string;
+  /** The item is a Continue Watching tile: offer to remove it from the row (USER-6). */
+  continueWatching?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  floating?: boolean;
+}) {
+  const markWatched = useMarkWatched();
+  const removeCw = useRemoveFromContinueWatching();
+  const watched = isWatched(item);
   const player = useMusicActions();
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
@@ -36,7 +56,17 @@ export function ItemMenu({ item, className }: { item: ItemSummary; className?: s
   const leaves = async () => (item.type === "track" ? [item] : await fetchLeaves(item.id));
   return (
     <>
-      <Menu label={`More actions for ${item.title}`} trigger={<MoreHorizontal className="size-4" />} className={className}>
+      <Menu label={`More actions for ${item.title}`} trigger={<MoreHorizontal className="size-4" />} className={className} open={open} onOpenChange={onOpenChange} floating={floating}>
+        {markableTypes.has(item.type) && (
+          <MenuItem icon={watched ? <CircleSlash /> : <CircleCheck />} onClick={() => markWatched.mutate({ item, watched: !watched })}>
+            {watched ? "Mark as unwatched" : "Mark as watched"}
+          </MenuItem>
+        )}
+        {continueWatching && (
+          <MenuItem icon={<EyeOff />} onClick={() => removeCw.mutate(item.id)}>
+            Remove from Continue Watching
+          </MenuItem>
+        )}
         {isMusic && (
           <>
             <MenuItem icon={<ListStart />} onClick={async () => player.playNext(await leaves())}>
@@ -92,4 +122,28 @@ export function ItemMenu({ item, className }: { item: ItemSummary; className?: s
       {journey && <JourneyDialog from={item} onClose={() => setJourney(false)} />}
     </>
   );
+}
+
+/**
+ * A poster tile's "…" menu: shows on hover in the tile's corner, and right-click on the tile opens it.
+ * Put it inside a `relative group/tile` element and pass that element `onContextMenu`.
+ */
+export function useTileMenu(item: ItemSummary, opts?: { continueWatching?: boolean }) {
+  const [open, setOpen] = useState(false);
+  return {
+    onContextMenu: (e: MouseEvent) => {
+      e.preventDefault();
+      setOpen(true);
+    },
+    menu: (
+      <div
+        className={clsx(
+          "absolute top-1.5 right-1.5 z-20 rounded-full bg-black/70 text-white transition-opacity [&>div>button]:text-white",
+          open ? "opacity-100" : "opacity-0 group-hover/tile:opacity-100 focus-within:opacity-100",
+        )}
+      >
+        <ItemMenu item={item} continueWatching={opts?.continueWatching} open={open} onOpenChange={setOpen} floating />
+      </div>
+    ),
+  };
 }

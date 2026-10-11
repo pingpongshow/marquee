@@ -12,19 +12,11 @@ import { ItemMenu } from "../browse/ItemMenu";
 import { RowRating } from "../music/Rating";
 import { useMusicState } from "../player/MusicPlayer";
 import { PlaylistMosaic } from "./PlaylistMosaic";
+import { newShuffleSeed, seededShuffle } from "./order";
 import { PinToHomeButton } from "../home/EditHome";
 import { RulesEditor, rulesValid } from "./RulesEditor";
 import type { SmartRules } from "@/api/types";
 import { Sparkles } from "lucide-react";
-
-function shuffled<T>(list: T[]) {
-  const out = [...list];
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [out[i], out[j]] = [out[j]!, out[i]!];
-  }
-  return out;
-}
 
 function subtitle(it: ItemSummary) {
   if (it.type === "track") return [it.artistCredit ?? it.grandparentTitle, it.parentTitle].filter(Boolean).join(" · ");
@@ -100,8 +92,12 @@ export function PlaylistPage() {
       music.play(items, start, { shuffle, source: p.title });
       return;
     }
-    const order = shuffle ? shuffled(items) : items.slice(start);
-    if (order[0]) navigate({ to: "/play/$itemId", params: { itemId: String(order[0].id) }, search: { t: 0, pl: id } });
+    // Video plays in the player, which goes on through the playlist in this order (the seed
+    // carries a shuffle to it). Unavailable items are skipped.
+    const playable = items.filter((it) => it.available);
+    const sh = shuffle ? newShuffleSeed() : undefined;
+    const first = sh ? seededShuffle(playable, sh)[0] : items.slice(start).find((it) => it.available);
+    if (first) navigate({ to: "/play/$itemId", params: { itemId: String(first.id) }, search: { t: 0, pl: id, sh } });
   };
   // Dropping on a row moves the dragged entry into that row's position.
   const drop = (target: number) => {

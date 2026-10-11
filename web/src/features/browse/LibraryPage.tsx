@@ -9,7 +9,7 @@ import { librariesQuery, meQuery } from "@/api/queries";
 import type { ItemSummary } from "@/api/types";
 import type { operations } from "@/api/schema.gen";
 import { Alert, Button, Select, Spinner } from "@/components/ui";
-import { ItemMenu } from "./ItemMenu";
+import { ItemMenu, useTileMenu } from "./ItemMenu";
 import { isMusicSection, MusicHome, MusicSectionPage, musicSectionTitles } from "../music/MusicHome";
 import { useMusicActions } from "../player/MusicPlayer";
 import { MuseButton } from "../search/MuseVideo";
@@ -132,7 +132,9 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
 
   const fetchPage = (page: number) => unwrap(api.GET("/libraries/{libraryId}/items", { params: { path: { libraryId: id }, query: { ...query, offset: page * PAGE, limit: PAGE } } }));
   const keyBase = ["libraries", id, "items", query, sort === "random" ? seed : 0] as const;
-  const first = useQuery({ queryKey: [...keyBase, 0], queryFn: () => fetchPage(0), placeholderData: (prev) => prev });
+  // Loaded pages stay cached for a while, so going Back to the grid (after watching a movie, say)
+  // shows it at once at the same scroll position.
+  const first = useQuery({ queryKey: [...keyBase, 0], queryFn: () => fetchPage(0), placeholderData: (prev) => prev, gcTime: PAGE_GC_MS });
   const total = first.data?.total ?? 0;
 
   // Layout: columns from the container width; rows are virtualized inside <main>.
@@ -170,7 +172,7 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
     return [...set].filter((p) => p * PAGE < total);
   }, [visible, cols, total]);
   const pageResults = useQueries({
-    queries: pages.map((p) => ({ queryKey: [...keyBase, p], queryFn: () => fetchPage(p), staleTime: 30_000 })),
+    queries: pages.map((p) => ({ queryKey: [...keyBase, p], queryFn: () => fetchPage(p), staleTime: 30_000, gcTime: PAGE_GC_MS })),
   });
   const itemAt = (i: number): ItemSummary | undefined => {
     const p = Math.floor(i / PAGE);
@@ -348,13 +350,7 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
                   return (
                     <div key={c} className="min-w-0">
                       {it ? (
-                        <Link to="/item/$itemId" params={{ itemId: String(it.id) }} className="group block">
-                          <Poster item={it} shape={shape} width={Math.round(colWidth)} className="transition-transform group-hover:scale-[1.03] group-hover:ring-2 group-hover:ring-accent" />
-                          <div className="mt-2 truncate text-sm font-medium" title={it.title}>
-                            {it.title}
-                          </div>
-                          <div className="truncate text-xs text-muted">{subtitleFor(it)}</div>
-                        </Link>
+                        <GridTile item={it} shape={shape} width={Math.round(colWidth)} />
                       ) : (
                         <div className="animate-pulse rounded-md bg-surface-2" style={{ height: artHeight }} />
                       )}
@@ -375,6 +371,25 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
           ))}
         </nav>
       )}
+    </div>
+  );
+}
+
+const PAGE_GC_MS = 30 * 60_000;
+
+function GridTile({ item: it, shape, width }: { item: ItemSummary; shape: "poster" | "square" | "wide"; width: number }) {
+  // Hover shows the "…" menu; right-click opens it.
+  const tile = useTileMenu(it);
+  return (
+    <div className="group/tile relative" onContextMenu={tile.onContextMenu}>
+      <Link to="/item/$itemId" params={{ itemId: String(it.id) }} className="group block">
+        <Poster item={it} shape={shape} width={width} className="transition-transform group-hover:scale-[1.03] group-hover:ring-2 group-hover:ring-accent" />
+        <div className="mt-2 truncate text-sm font-medium" title={it.title}>
+          {it.title}
+        </div>
+        <div className="truncate text-xs text-muted">{subtitleFor(it)}</div>
+      </Link>
+      {tile.menu}
     </div>
   );
 }

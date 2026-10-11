@@ -19,7 +19,7 @@ const loading = (
 
 export function PlayerPage() {
   const { itemId } = useParams({ from: "/play/$itemId" });
-  const { t, pl, f, g } = useSearch({ from: "/play/$itemId" });
+  const { t, pl, sh, f, g } = useSearch({ from: "/play/$itemId" });
   return (
     <Suspense fallback={loading}>
       {/* Keyed by item so Up Next starts a fresh player (and its own trailers). */}
@@ -28,6 +28,7 @@ export function PlayerPage() {
         itemId={Number(itemId)}
         startMs={t}
         playlistId={pl}
+        shuffleSeed={sh}
         fileId={f}
         groupId={g}
       />
@@ -35,9 +36,12 @@ export function PlayerPage() {
   );
 }
 
-/** A movie started from the beginning, alone, gets the cinema trailers first (PLAY-18). */
-function wantsPrerolls(d: ItemDetail, startMs?: number, groupId?: string) {
-  if (groupId || d.type !== "movie") return false;
+/**
+ * A movie started from the beginning, alone, gets the cinema trailers first (PLAY-18). Not in a
+ * playlist, which goes straight from one item to the next.
+ */
+function wantsPrerolls(d: ItemDetail, startMs?: number, groupId?: string, playlistId?: number) {
+  if (groupId || playlistId || d.type !== "movie") return false;
   return startMs === 0 || (startMs === undefined && !d.viewOffsetMs);
 }
 
@@ -51,12 +55,14 @@ function PlayerFlow({
   itemId,
   startMs,
   playlistId,
+  shuffleSeed,
   fileId,
   groupId,
 }: {
   itemId: number;
   startMs?: number;
   playlistId?: number;
+  shuffleSeed?: number;
   fileId?: number;
   groupId?: string;
 }) {
@@ -65,7 +71,7 @@ function PlayerFlow({
   const [eligible, setEligible] = useState<boolean | null>(null);
   if (eligible === null && (item.data || item.isError))
     setEligible(
-      item.data ? wantsPrerolls(item.data, startMs, groupId) : false,
+      item.data ? wantsPrerolls(item.data, startMs, groupId, playlistId) : false,
     );
   const prerolls = useQuery({
     queryKey: ["prerolls", itemId],
@@ -105,6 +111,7 @@ function PlayerFlow({
       itemId={itemId}
       startMs={startMs}
       playlistId={playlistId}
+      shuffleSeed={shuffleSeed}
       fileId={fileId}
       groupId={groupId}
     />

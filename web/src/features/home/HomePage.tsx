@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ChevronRight, FolderPlus, LayoutList, UsersRound } from "lucide-react";
+import { clsx } from "clsx";
 import { useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { librariesQuery, meQuery } from "@/api/queries";
 import type { ItemSummary } from "@/api/types";
 import { Button, Spinner } from "@/components/ui";
+import { useTileMenu } from "../browse/ItemMenu";
 import { Poster } from "../browse/Poster";
 import { subtitleFor } from "../browse/format";
 import { EditHomeDialog } from "./EditHome";
@@ -13,7 +15,9 @@ import { GettingStarted } from "./GettingStarted";
 import { pinnedTarget } from "./layout";
 import { MuseButton } from "../search/MuseVideo";
 
-function HubItem({ it, wide }: { it: ItemSummary; wide: boolean }) {
+function HubItem({ it, wide, continueWatching }: { it: ItemSummary; wide: boolean; continueWatching: boolean }) {
+  // The "…" menu shows on hover, and right-click opens it too.
+  const tile = useTileMenu(it, { continueWatching });
   // Continue Watching episodes open the player directly.
   const playable =
     (it.type === "episode" || it.type === "movie" || it.type === "video") &&
@@ -42,7 +46,10 @@ function HubItem({ it, wide }: { it: ItemSummary; wide: boolean }) {
     </>
   );
   return (
-    <li className={wide ? "w-72 shrink-0" : "w-36 shrink-0"}>
+    <li
+      className={clsx("group/tile relative", wide ? "w-72 shrink-0" : "w-36 shrink-0")}
+      onContextMenu={tile.onContextMenu}
+    >
       {playable ? (
         <Link
           to="/play/$itemId"
@@ -61,6 +68,7 @@ function HubItem({ it, wide }: { it: ItemSummary; wide: boolean }) {
           {body}
         </Link>
       )}
+      {tile.menu}
     </li>
   );
 }
@@ -139,7 +147,7 @@ export function HomePage() {
             </div>
             <ul className="flex gap-4 overflow-x-auto px-6 pb-2 lg:px-8">
               {hub.items.map((it) => (
-                <HubItem key={it.id} it={it} wide={wide} />
+                <HubItem key={it.id} it={it} wide={wide} continueWatching={wide} />
               ))}
             </ul>
           </section>

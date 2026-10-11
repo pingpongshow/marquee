@@ -33,6 +33,7 @@ import { useMusicState } from "@/features/player/MusicPlayer";
 import { RemoteHost } from "@/features/remote/RemoteHost";
 import { Toaster } from "@/components/Toast";
 import { useAuth } from "@/lib/auth";
+import { useMainScrollRestoration } from "./scrollRestore";
 
 export const libraryIcons: Record<LibraryType, typeof Film> = {
   movies: Film,
@@ -123,6 +124,9 @@ function UserMenu({
 }
 
 export function Shell({ children }: { children: ReactNode }) {
+  // Back and Forward return to where the page was scrolled.
+  const mainRef = useRef<HTMLElement>(null);
+  useMainScrollRestoration(mainRef);
   const { signOut } = useAuth();
   const me = useQuery(meQuery);
   const info = useQuery(systemInfoQuery);
@@ -298,7 +302,7 @@ export function Shell({ children }: { children: ReactNode }) {
             </aside>
           </div>
         )}
-        <main className="min-w-0 flex-1 overflow-y-auto">
+        <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto">
           {children}
           {music.current && <div className="h-20" aria-hidden />}
         </main>

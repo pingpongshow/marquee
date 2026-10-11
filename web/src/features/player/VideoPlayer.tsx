@@ -45,6 +45,7 @@ import { deviceProfile } from "./deviceProfile";
 import { SubtitleSearchDialog } from "./SubtitleSearch";
 import { remoteStateChanged, setVideoTarget, type RemoteTarget } from "../remote/bus";
 import { PlayOnButton } from "../remote/PlayOn";
+import { nextInPlaylist } from "../playlists/order";
 
 type PlaybackSession = components["schemas"]["PlaybackSession"];
 
@@ -173,6 +174,7 @@ export function VideoPlayer({
   itemId,
   startMs,
   playlistId,
+  shuffleSeed,
   fileId,
   groupId,
   preroll,
@@ -180,6 +182,8 @@ export function VideoPlayer({
   itemId: number;
   startMs?: number;
   playlistId?: number;
+  /** A shuffled playlist plays in this seed's order. */
+  shuffleSeed?: number;
   fileId?: number;
   groupId?: string;
   preroll?: Preroll;
@@ -535,11 +539,12 @@ export function VideoPlayer({
       }),
     )
       .then((p) => {
-        const i = p.items.findIndex((e) => e.item.id === itemId);
-        setNext(i >= 0 ? (p.items[i + 1]?.item ?? null) : null);
+        // The same order the playlist page started (a shuffle comes from its seed); unavailable items are skipped.
+        const items = p.items.map((e) => e.item).filter((it) => it.available || it.id === itemId);
+        setNext(nextInPlaylist(items, itemId, shuffleSeed));
       })
       .catch(() => setNext(null));
-  }, [playlistId, itemId]);
+  }, [playlistId, itemId, shuffleSeed]);
   useEffect(() => {
     if (playlistId || item.data?.type !== "episode") return;
     unwrap(api.GET("/items/{itemId}/next", { params: { path: { itemId } } }))
@@ -599,10 +604,10 @@ export function VideoPlayer({
       navigate({
         to: "/play/$itemId",
         params: { itemId: String(next.id) },
-        search: { t: 0, pl: playlistId },
+        search: { t: 0, pl: playlistId, sh: shuffleSeed },
         replace: true,
       });
-  }, [next, navigate, playlistId]);
+  }, [next, navigate, playlistId, shuffleSeed]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
