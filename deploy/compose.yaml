@@ -1,50 +1,46 @@
-# Marquee on the Unraid host. Copy to /mnt/docker/marquee/ with a .env (see .env.example).
+# Marquee with Docker Compose. Copy .env.example to .env, set your folders, then:
+#   docker compose up -d --build
+# Add hardware transcoding with an override file:
+#   NVIDIA:        docker compose -f compose.yaml -f compose.nvidia.yaml up -d --build
+#   Intel/AMD VA:  docker compose -f compose.yaml -f compose.intel.yaml up -d --build
 name: marquee
 services:
   marquee:
     image: marquee:${MARQUEE_VERSION:-latest}
     build:
-      context: ./src
+      context: ..
       dockerfile: deploy/Dockerfile
       args:
         VERSION: ${MARQUEE_VERSION:-dev}
     container_name: marquee
     restart: unless-stopped
-    user: "${PUID:-99}:${PGID:-100}"
-    group_add:
-      - "${RENDER_GID:-18}"   # host group owning /dev/dri/renderD* (Intel Quick Sync)
-    runtime: nvidia           # NVIDIA NVENC/NVDEC
-    devices:
-      - /dev/dri:/dev/dri
-    # Host networking so Bonjour reaches the LAN (apps find the server automatically).
-    # Marquee listens on 32500 on every host interface, as the published port did.
+    user: "${PUID:-1000}:${PGID:-1000}"
+    # Host networking lets the apps find the server on your network (Bonjour/mDNS).
+    # Marquee listens on port 32500.
     network_mode: host
     environment:
-      TZ: ${TZ:-America/Los_Angeles}
+      TZ: ${TZ:-UTC}
       MARQUEE_LOG_LEVEL: ${MARQUEE_LOG_LEVEL:-info}
     volumes:
-      - ./config:/config
-      - /mnt/data/Video:/media/video     # writable: Library Health can move files to .marquee-trash (allowMediaDeletion)
-      - /mnt/data/Music:/media/music:ro
-      - /mnt/docker/plex:/plex:ro          # Plex import (read-only)
-      - ${RECORDINGS_DIR:-./recordings}:/recordings   # Live TV recordings (LIVE-5), writable
+      - ${CONFIG_DIR:-./config}:/config
+      - ${VIDEO_DIR:?set VIDEO_DIR in .env}:/media/video${VIDEO_MODE:-:ro}
+      - ${MUSIC_DIR:-./empty-music}:/media/music:ro
+      - ${RECORDINGS_DIR:-./recordings}:/recordings
+      - ${PLEX_DIR:-./empty-plex}:/plex:ro   # optional: a Plex data folder to import from
     tmpfs:
-      - /transcode:size=16g,uid=${PUID:-99},gid=${PGID:-100},mode=0750
+      - /transcode:size=${TRANSCODE_SIZE:-8g},uid=${PUID:-1000},gid=${PGID:-1000},mode=0750
 
-  # Soundprint analysis (MUSIC-1, D56): CLAP embeddings, tempo and key for music, on the GPU.
-  # Only Marquee talks to it (127.0.0.1:32501). Media is read-only; the model is cached in ./models.
+  # Soundprint: music analysis and natural-language search (Muse, radios, "sounds like").
+  # Runs on the CPU; add compose.nvidia.yaml to use an NVIDIA GPU. Remove this service if
+  # you don't want those features. Only Marquee talks to it (127.0.0.1:32501).
   soundprint:
     image: marquee-soundprint:${MARQUEE_VERSION:-latest}
     build:
-      context: ./src/soundprint
+      context: ../soundprint
     container_name: marquee-soundprint
     restart: unless-stopped
-    user: "${PUID:-99}:${PGID:-100}"
-    runtime: nvidia
+    user: "${PUID:-1000}:${PGID:-1000}"
     network_mode: host
-    environment:
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
-      - ./models:/models
-      - /mnt/data/Music:/media/music:ro
+      - ${MODELS_DIR:-./models}:/models
+      - ${MUSIC_DIR:-./empty-music}:/media/music:ro
