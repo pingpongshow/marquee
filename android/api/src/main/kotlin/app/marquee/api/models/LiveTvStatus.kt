@@ -32,7 +32,7 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param enabled At least one source is set up.
+ * @param enabled Live TV is usable: a source is set up, it has channels, and this profile may watch them. Clients show Live TV only when true.
  * @param channels 
  * @param sources 
  * @param dvrAvailable Recordings can be written (LIVE-5).
@@ -44,7 +44,7 @@ import kotlinx.serialization.Contextual
 
 data class LiveTvStatus (
 
-    /* At least one source is set up. */
+    /* Live TV is usable: a source is set up, it has channels, and this profile may watch them. Clients show Live TV only when true. */
     @SerialName(value = "enabled")
     val enabled: kotlin.Boolean,
 

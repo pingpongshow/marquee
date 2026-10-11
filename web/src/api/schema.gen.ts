@@ -1441,6 +1441,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/hubs/continue-watching/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Removes a movie, episode or show from your Continue Watching (USER-6). The resume position is kept; it comes back once you play it (or, for a show, any of its episodes) again. */
+        delete: operations["removeFromContinueWatching"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/hubs/home": {
         parameters: {
             query?: never;
@@ -3142,7 +3161,7 @@ export interface components {
             lastBy?: string;
         };
         LiveTvStatus: {
-            /** @description At least one source is set up. */
+            /** @description Live TV is usable: a source is set up, it has channels, and this profile may watch them. Clients show Live TV only when true. */
             enabled: boolean;
             channels: number;
             /** @description Recordings can be written (LIVE-5). */
@@ -7550,6 +7569,28 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ItemTrailer"];
                 };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    removeFromContinueWatching: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];

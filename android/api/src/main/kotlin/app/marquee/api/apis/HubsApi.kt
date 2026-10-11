@@ -198,6 +198,77 @@ open class HubsApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
     }
 
     /**
+     * DELETE /hubs/continue-watching/{itemId}
+     * Removes a movie, episode or show from your Continue Watching (USER-6). The resume position is kept; it comes back once you play it (or, for a show, any of its episodes) again.
+     * 
+     * @param itemId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun removeFromContinueWatching(itemId: kotlin.Long) : Unit {
+        val localVarResponse = removeFromContinueWatchingWithHttpInfo(itemId = itemId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /hubs/continue-watching/{itemId}
+     * Removes a movie, episode or show from your Continue Watching (USER-6). The resume position is kept; it comes back once you play it (or, for a show, any of its episodes) again.
+     * 
+     * @param itemId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun removeFromContinueWatchingWithHttpInfo(itemId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = removeFromContinueWatchingRequestConfig(itemId = itemId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation removeFromContinueWatching
+     *
+     * @param itemId 
+     * @return RequestConfig
+     */
+    fun removeFromContinueWatchingRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/hubs/continue-watching/{itemId}".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * PUT /me/home-layout
      * Reorder, hide, pin (add collection-&lt;id&gt; / playlist-&lt;id&gt;) or unpin Home rows. An empty list resets to the default.
      * 

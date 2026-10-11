@@ -524,3 +524,22 @@ func (h *Handlers) GetItemTrailer(ctx context.Context, req GetItemTrailerRequest
 	return GetItemTrailer200JSONResponse{Source: ItemTrailerSourceYoutube, YoutubeKey: ptr(t.YouTubeKey), Url: ptr("https://www.youtube.com/watch?v=" + t.YouTubeKey),
 		Name: nz(t.Name)}, nil
 }
+
+// RemoveFromContinueWatching hides a title from the caller's Continue Watching (USER-6).
+func (h *Handlers) RemoveFromContinueWatching(ctx context.Context, req RemoveFromContinueWatchingRequestObject) (RemoveFromContinueWatchingResponseObject, error) {
+	s, ok := session(ctx)
+	if !ok {
+		return RemoveFromContinueWatching401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	if h.Items.Visible(ctx, access(ctx), req.ItemId) != nil {
+		return RemoveFromContinueWatching404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
+	}
+	err := h.Items.HideFromContinue(ctx, s.User.ID, req.ItemId)
+	switch {
+	case errors.Is(err, items.ErrNotFound):
+		return RemoveFromContinueWatching404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "Only movies, videos, episodes and shows can be removed."))}, nil
+	case err != nil:
+		return nil, internal(ctx, "removeFromContinueWatching", err)
+	}
+	return RemoveFromContinueWatching204Response{}, nil
+}

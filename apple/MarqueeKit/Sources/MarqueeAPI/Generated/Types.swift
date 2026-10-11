@@ -527,6 +527,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /items/{itemId}/trailer`.
     /// - Remark: Generated from `#/paths//items/{itemId}/trailer/get(getItemTrailer)`.
     func getItemTrailer(_ input: Operations.GetItemTrailer.Input) async throws -> Operations.GetItemTrailer.Output
+    /// Removes a movie, episode or show from your Continue Watching (USER-6). The resume position is kept; it comes back once you play it (or, for a show, any of its episodes) again.
+    ///
+    /// - Remark: HTTP `DELETE /hubs/continue-watching/{itemId}`.
+    /// - Remark: Generated from `#/paths//hubs/continue-watching/{itemId}/delete(removeFromContinueWatching)`.
+    func removeFromContinueWatching(_ input: Operations.RemoveFromContinueWatching.Input) async throws -> Operations.RemoveFromContinueWatching.Output
     /// Rows for the Home screen (Continue Watching, Recently Added…).
     ///
     /// - Remark: HTTP `GET /hubs/home`.
@@ -2204,6 +2209,19 @@ extension APIProtocol {
         headers: Operations.GetItemTrailer.Input.Headers = .init()
     ) async throws -> Operations.GetItemTrailer.Output {
         try await getItemTrailer(Operations.GetItemTrailer.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Removes a movie, episode or show from your Continue Watching (USER-6). The resume position is kept; it comes back once you play it (or, for a show, any of its episodes) again.
+    ///
+    /// - Remark: HTTP `DELETE /hubs/continue-watching/{itemId}`.
+    /// - Remark: Generated from `#/paths//hubs/continue-watching/{itemId}/delete(removeFromContinueWatching)`.
+    public func removeFromContinueWatching(
+        path: Operations.RemoveFromContinueWatching.Input.Path,
+        headers: Operations.RemoveFromContinueWatching.Input.Headers = .init()
+    ) async throws -> Operations.RemoveFromContinueWatching.Output {
+        try await removeFromContinueWatching(Operations.RemoveFromContinueWatching.Input(
             path: path,
             headers: headers
         ))
