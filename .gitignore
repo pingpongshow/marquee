@@ -24,3 +24,6 @@ apple/Vendor/
 
 # Local end-to-end test environment (scripts/e2e/setup.sh): media, database, tokens
 .e2e/
+
+# Private planning notes (removed from the repository 2026-10-11)
+docs/
