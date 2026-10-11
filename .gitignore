@@ -21,3 +21,6 @@ apple/**/.swiftpm/
 apple/**/xcuserdata/
 apple/build/
 apple/Vendor/
+
+# Local end-to-end test environment (scripts/e2e/setup.sh): media, database, tokens
+.e2e/
