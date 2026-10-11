@@ -66,7 +66,9 @@ func (h *Handlers) LiveTvStatus(ctx context.Context, _ LiveTvStatusRequestObject
 
 func (h *Handlers) liveStatus(ctx context.Context) LiveTvStatus {
 	n, until, sources := h.LiveTV.Status(ctx)
-	out := LiveTvStatus{Enabled: h.LiveTV.Enabled(), Channels: n, GuideUntil: until}
+	// Usable only with channels: a source whose playlist is empty (or failing) would show
+	// apps an empty Live TV.
+	out := LiveTvStatus{Enabled: h.LiveTV.Enabled() && n > 0, Channels: n, GuideUntil: until}
 	if s, ok := session(ctx); ok {
 		if g := liveGroups(s); g != nil && len(*g) == 0 {
 			out.Enabled = false // this profile may not watch Live TV

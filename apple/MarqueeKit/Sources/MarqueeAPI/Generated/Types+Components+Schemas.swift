@@ -1727,7 +1727,7 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/LiveTvStatus`.
         public struct LiveTvStatus: Codable, Hashable, Sendable {
-            /// At least one source is set up.
+            /// Live TV is usable: a source is set up, it has channels, and this profile may watch them. Clients show Live TV only when true.
             ///
             /// - Remark: Generated from `#/components/schemas/LiveTvStatus/enabled`.
             public var enabled: Swift.Bool
@@ -1803,7 +1803,7 @@ extension Components {
             /// Creates a new `LiveTvStatus`.
             ///
             /// - Parameters:
-            ///   - enabled: At least one source is set up.
+            ///   - enabled: Live TV is usable: a source is set up, it has channels, and this profile may watch them. Clients show Live TV only when true.
             ///   - channels:
             ///   - dvrAvailable: Recordings can be written (LIVE-5).
             ///   - canRecord: The caller may schedule recordings.

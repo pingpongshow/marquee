@@ -1912,6 +1912,18 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /hubs/continue-watching/{itemId}:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    delete:
+      tags: [hubs]
+      operationId: removeFromContinueWatching
+      summary: "Removes a movie, episode or show from your Continue Watching (USER-6). The resume position is kept; it comes back once you play it (or, for a show, any of its episodes) again."
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /hubs/home:
     get:
       tags: [hubs]
@@ -4029,7 +4041,7 @@ components:
       type: object
       required: [enabled, channels, sources]
       properties:
-        enabled: { type: boolean, description: At least one source is set up. }
+        enabled: { type: boolean, description: "Live TV is usable: a source is set up, it has channels, and this profile may watch them. Clients show Live TV only when true." }
         channels: { type: integer }
         dvrAvailable: { type: boolean, description: "Recordings can be written (LIVE-5)." }
         canRecord: { type: boolean, description: The caller may schedule recordings. }

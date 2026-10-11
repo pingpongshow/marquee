@@ -141,12 +141,37 @@ func (s *Store) ContinueWatching(ctx context.Context, acc Access, libIDs []int64
 		item Summary
 		when string
 	}
+	// Removed from Continue Watching: until watched again after it was removed.
+	hidden := map[int64]string{}
+	hr, err := s.db.QueryContext(ctx, `SELECT item_id, hidden_at FROM continue_hidden WHERE user_id = `+uid)
+	if err != nil {
+		return nil, err
+	}
+	for hr.Next() {
+		var id int64
+		var at string
+		hr.Scan(&id, &at)
+		hidden[id] = at
+	}
+	hr.Close()
+	isHidden := func(key int64, when string) bool {
+		at, ok := hidden[key]
+		return ok && when <= at
+	}
+
 	var merged []entry
 	for _, it := range inProgress {
+		key := it.ID
+		if it.Type == "episode" {
+			key = it.GrandparentID
+		}
+		if isHidden(key, it.LastViewedAt) {
+			continue
+		}
 		merged = append(merged, entry{it, it.LastViewedAt})
 	}
 	for _, w := range recent {
-		if busyShows[w.show] {
+		if busyShows[w.show] || isHidden(w.show, w.when) {
 			continue
 		}
 		next, err := s.firstEpisode(ctx, acc, w.show, w.season, w.ep, true)
@@ -169,6 +194,34 @@ func (s *Store) ContinueWatching(ctx context.Context, acc Access, libIDs []int64
 		out = append(out, e.item)
 	}
 	return out, nil
+}
+
+// HideFromContinue removes a movie, video, episode or show from the person's Continue
+// Watching (USER-6). An episode hides its show (its next episode would replace it). The
+// resume position is kept, and the title returns once it is watched again.
+func (s *Store) HideFromContinue(ctx context.Context, userID, itemID int64) error {
+	var typ string
+	var show sql.NullInt64
+	if err := s.db.QueryRowContext(ctx, `SELECT type, grandparent_id FROM items WHERE id = ?`, itemID).Scan(&typ, &show); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
+	}
+	key := itemID
+	switch typ {
+	case "episode":
+		if !show.Valid {
+			return ErrNotFound
+		}
+		key = show.Int64
+	case "movie", "video", "show":
+	default:
+		return ErrNotFound
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO continue_hidden (user_id, item_id) VALUES (?, ?)
+		ON CONFLICT(user_id, item_id) DO UPDATE SET hidden_at = excluded.hidden_at`, userID, key)
+	return err
 }
 
 // RecentlyAdded returns the newest top-level items of a library. For shows, a show counts
