@@ -3,7 +3,7 @@ import { useState } from "react";
 import { LastFmCard } from "./LastFm";
 import { ListenBrainzCard } from "./ListenBrainz";
 import { TwoFactorCard } from "./TwoFactor";
-import { meQuery, useUpdateMe } from "@/api/queries";
+import { meQuery, systemInfoQuery, useUpdateMe } from "@/api/queries";
 import type { UserPreferences } from "@/api/types";
 import {
   Alert,
@@ -29,6 +29,7 @@ import {
 /** Per-user account and playback preferences (any user). */
 export function AccountPage() {
   const me = useQuery(meQuery);
+  const info = useQuery(systemInfoQuery);
   const update = useUpdateMe();
   const [name, setName] = useState<string | null>(null);
   const [cur, setCur] = useState("");
@@ -293,6 +294,14 @@ export function AccountPage() {
           checked={p.cinemaTrailers !== false}
           onChange={(v) => setPrefs({ ...p, cinemaTrailers: v })}
         />
+        {info.data?.ratingPrompt && (
+          <Toggle
+            label="Ask me to rate after watching"
+            help="Stars to tap when a movie or episode ends."
+            checked={p.ratingPrompt !== false}
+            onChange={(v) => setPrefs({ ...p, ratingPrompt: v })}
+          />
+        )}
         <div className="flex justify-end">
           <Button
             variant="primary"

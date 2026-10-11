@@ -46,6 +46,8 @@ import { SubtitleSearchDialog } from "./SubtitleSearch";
 import { remoteStateChanged, setVideoTarget, type RemoteTarget } from "../remote/bus";
 import { PlayOnButton } from "../remote/PlayOn";
 import { nextInPlaylist } from "../playlists/order";
+import { RatingPromptCard, showRatingPrompt } from "./RatingPrompt";
+import { finishedWatching, wantsRatingPrompt } from "./ratingRules";
 
 type PlaybackSession = components["schemas"]["PlaybackSession"];
 
@@ -237,9 +239,15 @@ export function VideoPlayer({
   const [fullscreen, setFullscreen] = useState(false);
   const [next, setNext] = useState<ItemSummary | null>(null);
   const [nextDismissed, setNextDismissed] = useState(false);
+  // The rating request (USER-19): asked once per playback. Touching it beside Up Next holds
+  // the autoplay until it's answered or closed.
+  const [ratingDone, setRatingDone] = useState(false);
+  const [ratingHold, setRatingHold] = useState(false);
+  const [ended, setEnded] = useState(false);
   const hideTimer = useRef<number | undefined>(undefined);
   const [fallback, setFallback] = useState(0);
   const startedRef = useRef(false);
+  const leavingForNext = useRef(false);
   const failRef = useRef<(m: string) => void>(() => {});
   const [bufferedEnd, setBufferedEnd] = useState(0);
   const menuRef = useRef(menu);
@@ -600,13 +608,14 @@ export function VideoPlayer({
     else document.getElementById("player-root")?.requestFullscreen();
   };
   const playNext = useCallback(() => {
-    if (next)
-      navigate({
+    if (!next) return;
+    leavingForNext.current = true;
+    navigate({
         to: "/play/$itemId",
         params: { itemId: String(next.id) },
-        search: { t: 0, pl: playlistId, sh: shuffleSeed },
-        replace: true,
-      });
+      search: { t: 0, pl: playlistId, sh: shuffleSeed },
+      replace: true,
+    });
   }, [next, navigate, playlistId, shuffleSeed]);
 
   useEffect(() => {
@@ -733,6 +742,28 @@ export function VideoPlayer({
     duration > 0 &&
     (duration - time < 30 || (marker?.kind === "credits" && !!next));
   const showUpNext = !!next && nearEnd && !nextDismissed && !preroll;
+  const rateable = wantsRatingPrompt({
+    item: d,
+    serverOn: info.data?.ratingPrompt,
+    personOn: me.data?.preferences?.ratingPrompt,
+    preroll: !!preroll,
+  });
+  const showRatingInline = showUpNext && rateable && !ratingDone;
+  // Closing the player after watching most of it asks over the item page instead.
+  const closeAsk = useRef<() => void>(() => {});
+  useEffect(() => {
+    closeAsk.current = () => {
+      if (rateable && !ratingDone && !leavingForNext.current && d && (ended || finishedWatching(time, duration)))
+        showRatingPrompt(d);
+    };
+  });
+  useEffect(() => () => closeAsk.current(), []);
+  const finishRating = () => {
+    setRatingDone(true);
+    setRatingHold(false);
+    // The episode ended while the card held Up Next: go on now.
+    if (ended && next && !nextDismissed) playNext();
+  };
 
   return (
     <div
@@ -753,6 +784,7 @@ export function VideoPlayer({
         onDoubleClick={goFullscreen}
         onPlay={() => {
           setPlaying(true);
+          setEnded(false);
           report("playing");
           remoteStateChanged();
           poke();
@@ -793,8 +825,14 @@ export function VideoPlayer({
         }}
         onEnded={() => {
           report("paused");
+          setEnded(true);
           if (preroll) preroll.onDone();
-          else if (next && !nextDismissed) playNext();
+          else if (next && !nextDismissed) {
+            if (!ratingHold) playNext();
+          } else if (rateable && !ratingDone && d) {
+            setRatingDone(true);
+            showRatingPrompt(d);
+          }
         }}
       >
         {subUrl && sess?.subtitleFormat !== "ass" && (
@@ -899,12 +937,22 @@ export function VideoPlayer({
 
       {/* Up Next */}
       {showUpNext && next && (
-        <UpNext
-          next={next}
-          onPlay={playNext}
-          onDismiss={() => setNextDismissed(true)}
-          secondsLeft={Math.max(0, Math.ceil(duration - time))}
-        />
+        <div className="absolute right-8 bottom-28 flex w-80 flex-col gap-2">
+          {showRatingInline && d && (
+            <RatingPromptCard
+              item={d}
+              onInteract={() => setRatingHold(true)}
+              onClose={finishRating}
+            />
+          )}
+          <UpNext
+            next={next}
+            onPlay={playNext}
+            onDismiss={() => setNextDismissed(true)}
+            secondsLeft={Math.max(0, Math.ceil(duration - time))}
+            held={ratingHold}
+          />
+        </div>
       )}
       {finding && (
         <SubtitleSearchDialog
@@ -1489,15 +1537,18 @@ function UpNext({
   onPlay,
   onDismiss,
   secondsLeft,
+  held,
 }: {
   next: ItemSummary;
   onPlay: () => void;
   onDismiss: () => void;
   secondsLeft: number;
+  /** Autoplay waits while the person answers the rating card. */
+  held?: boolean;
 }) {
   const art = next.images?.thumb ?? next.images?.backdrop;
   return (
-    <div className="absolute right-8 bottom-28 w-80 overflow-hidden rounded-lg border border-white/15 bg-black/85 text-white shadow-2xl backdrop-blur">
+    <div className="w-80 overflow-hidden rounded-lg border border-white/15 bg-black/85 text-white shadow-2xl backdrop-blur">
       {art && (
         <img
           src={imageUrl(art, 320)}
@@ -1507,7 +1558,8 @@ function UpNext({
       )}
       <div className="space-y-2 p-3">
         <div className="text-xs text-white/60 uppercase">
-          Up next{secondsLeft <= 30 ? ` in ${secondsLeft}s` : ""}
+          Up next
+          {held ? " · paused" : secondsLeft <= 30 ? ` in ${secondsLeft}s` : ""}
         </div>
         <div className="truncate font-semibold">
           {next.type === "episode"

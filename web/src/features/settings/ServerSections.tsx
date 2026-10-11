@@ -62,6 +62,12 @@ export function GeneralSettings() {
             </Select>
           )}
         </Field>
+        <Toggle
+          label="Ask people to rate movies and episodes when they finish them"
+          help="A small card with stars when a movie or episode ends. Each person can turn it off for themselves."
+          checked={!!s.draft.ratingPrompt}
+          onChange={(v) => s.update({ ratingPrompt: v })}
+        />
       </Card>
       <div className="mt-6">
         <RestartServer />

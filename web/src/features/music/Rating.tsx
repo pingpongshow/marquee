@@ -15,6 +15,7 @@ export function Rating({
   label = "Your rating",
   className,
   testId,
+  onChange,
 }: {
   itemId: number;
   value?: number;
@@ -23,6 +24,8 @@ export function Rating({
   label?: string | ((value?: number) => string);
   className?: string;
   testId?: string;
+  /** Called once the server has saved a new value. */
+  onChange?: (value: number | null) => void;
 }) {
   const qc = useQueryClient();
   const [hover, setHover] = useState<number | null>(null);
@@ -50,7 +53,10 @@ export function Rating({
   const set = (next: number | null) => {
     const before = local;
     setLocal(next ?? undefined);
-    rate.mutate(next, { onError: () => setLocal(before) });
+    rate.mutate(next, {
+      onError: () => setLocal(before),
+      onSuccess: () => onChange?.(next),
+    });
   };
   const shown = hover ?? local ?? 0;
   const px = size === "xs" ? "size-3" : size === "sm" ? "size-4" : "size-5";
