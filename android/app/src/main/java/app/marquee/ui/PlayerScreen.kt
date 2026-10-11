@@ -164,6 +164,8 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     var settings by remember { mutableStateOf(false) }
     var lastTouch by remember { mutableIntStateOf(0) } // bumps keep the controls up
     var scrub by remember { mutableStateOf<Long?>(null) }
+    // A dialog opened from the controls (Cast, Play on): the controls stay up while it's open.
+    var menuOpen by remember { mutableStateOf(false) }
     // Set while the video plays on a Cast device (D82); the local player stays idle then.
     var casting by remember { mutableStateOf(false) }
     // The item's details, once loaded (or null if they couldn't be): the Cast hand-off waits for them.
@@ -320,9 +322,10 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             }
         }
     }
-    // Controls fade after a few seconds of playing untouched.
-    LaunchedEffect(controls, lastTouch, playing, settings, scrub) {
-        if (controls && playing && !settings && scrub == null) { delay(4000); controls = false }
+    // Controls (top buttons included) fade after about 3 s of playing untouched; never while
+    // paused, scrubbing, or with a menu open. A tap on the video brings them back.
+    LaunchedEffect(controls, lastTouch, playing, settings, scrub, menuOpen, groupPanel) {
+        if (controls && playing && !settings && !menuOpen && !groupPanel && scrub == null) { delay(3000); controls = false }
     }
     VideoWindow()
     DisposableEffect(Unit) {
@@ -530,11 +533,11 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                             Text("${g.members.size}", color = Gold, style = MaterialTheme.typography.labelSmall)
                         }
                     }
-                    if (local == null && roll < 0) CastButton()
+                    if (local == null && roll < 0) CastButton(onOpenChange = { menuOpen = it; poke() })
                     // Play on another Marquee app (USER-14): hands over at this position, then pauses here.
                     if (local == null && roll < 0) PlayOnButton(nav, handoff = {
                         RemoteCommand(RemoteCommand.Type.PLAY, itemIds = listOf(itemId), startMs = player.currentPosition)
-                    }, onSent = { player.pause() })
+                    }, onSent = { player.pause() }, onOpenChange = { menuOpen = it; poke() })
                     if (local == null && roll < 0) IconButton({ settings = true; poke() }, Modifier.focusRing()) { Icon(Icons.Filled.Settings, "Playback settings", tint = Color.White) }
                 }
                 // Middle: back 10, play/pause, forward 30.

@@ -104,10 +104,12 @@ suspend fun sendRemote(marquee: app.marquee.core.Marquee, deviceId: Long, c: Rem
  */
 @Composable
 fun PlayOnButton(nav: NavHostController? = null, tint: Color = Color.White, handoff: () -> RemoteCommand?, onSent: () -> Unit = {},
-    onPlayer: ((Long) -> Unit)? = null) {
+    onPlayer: ((Long) -> Unit)? = null, onOpenChange: (Boolean) -> Unit = {}) {
     val marquee = LocalMarquee.current
     if (marquee.isTv) return
     var open by remember { mutableStateOf(false) }
+    // The video player keeps its controls (and so this dialog) up while the dialog is open.
+    LaunchedEffect(open) { onOpenChange(open) }
     IconButton({ open = true }, Modifier.focusRing()) { Icon(Icons.Filled.ConnectedTv, "Play on…", tint = tint) }
     if (open) PlayOnDialog(handoff, onDismiss = { open = false }) { player ->
         open = false

@@ -185,12 +185,17 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
         value = if (d.type != ItemType.MOVIE && d.type != ItemType.SHOW) null
             else Trailers.fake ?: withContext(Dispatchers.IO) { runCatching { marquee.items.getItemTrailer(d.id) }.getOrNull() }
     }
+    // A YouTube trailer plays full screen inside Marquee; the YouTube app only on a TV without WebView.
+    var youTubeTrailer by remember(d.id) { mutableStateOf<String?>(null) }
+    youTubeTrailer?.let { key -> YouTubeTrailerPlayer(key, trailer?.name ?: d.title) { youTubeTrailer = null } }
     @Composable fun TrailerButton() {
         val t = trailer ?: return
         OutlinedButton(modifier = Modifier.focusRing(), onClick = {
             when (t.source) {
                 app.marquee.api.models.ItemTrailer.Source.LOCAL -> t.itemId?.let { nav.navigate("player/$it") }
-                app.marquee.api.models.ItemTrailer.Source.YOUTUBE -> t.youtubeKey?.let { Trailers.openYouTube(context, it, t.name ?: d.title) }
+                app.marquee.api.models.ItemTrailer.Source.YOUTUBE -> t.youtubeKey?.let {
+                    if (Trailers.webViewAvailable()) youTubeTrailer = it else Trailers.openYouTube(context, it, t.name ?: d.title)
+                }
             }
         }) { Icon(Icons.Filled.Theaters, null); Text("Trailer") }
     }

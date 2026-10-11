@@ -14,6 +14,8 @@ import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onFirst
@@ -2262,9 +2264,8 @@ class MarqueeUiTest {
         back()
     }
 
-    /** A YouTube trailer opens YouTube (the app, else the browser) with an ACTION_VIEW intent; nothing is downloaded. */
-    @Test fun trailerYouTube() {
-        assumeTrue("phones", !isTv)
+    /** Records any ACTION_VIEW intent to YouTube (app or web) and blocks it, while block runs. */
+    private fun withYouTubeIntents(block: (java.util.concurrent.LinkedBlockingQueue<Intent>) -> Unit) {
         val fired = java.util.concurrent.LinkedBlockingQueue<Intent>()
         val monitor = object : android.app.Instrumentation.ActivityMonitor() {
             override fun onStartActivity(intent: Intent): android.app.Instrumentation.ActivityResult? =
@@ -2273,21 +2274,93 @@ class MarqueeUiTest {
                 } else null
         }
         val inst = InstrumentationRegistry.getInstrumentation()
-        app.marquee.ui.Trailers.fake = app.marquee.api.models.ItemTrailer(app.marquee.api.models.ItemTrailer.Source.YOUTUBE,
-            youtubeKey = "dQw4w9WgXcQ", url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ", name = "Test Trailer")
         inst.addMonitor(monitor)
-        try {
+        try { block(fired) } finally {
+            inst.removeMonitor(monitor)
+            app.marquee.ui.Trailers.fake = null
+        }
+    }
+
+    private fun fakeYouTubeTrailer(key: String) {
+        app.marquee.ui.Trailers.fake = app.marquee.api.models.ItemTrailer(app.marquee.api.models.ItemTrailer.Source.YOUTUBE,
+            youtubeKey = key, url = "https://www.youtube.com/watch?v=$key", name = "Test Trailer")
+    }
+
+    /**
+     * A YouTube trailer plays inside Marquee (PLAY-22): a full-screen web view with YouTube's
+     * embedded player and a close button; no intent goes to the YouTube app. Close returns to the item.
+     */
+    @Test fun trailerYouTube() {
+        assumeTrue("phones", !isTv)
+        fakeYouTubeTrailer("dQw4w9WgXcQ")
+        withYouTubeIntents { fired ->
             connectAndSignIn()
             openMovie("10 Xenon")
             rule.waitUntilAtLeastOneExists(hasText("Trailer") and hasClickAction(), 15_000)
             rule.onNode(hasText("Trailer") and hasClickAction()).performClick()
-            val i = fired.poll(10, TimeUnit.SECONDS)
-            assertTrue("an intent was fired", i != null)
-            assertEquals("vnd.youtube:dQw4w9WgXcQ", i!!.dataString)
-        } finally {
-            inst.removeMonitor(monitor)
-            app.marquee.ui.Trailers.fake = null
+            rule.waitUntilAtLeastOneExists(hasTestTag("trailerWebView"), 10_000)
+            rule.onNode(hasContentDescription("Close trailer")).assertExists()
+            // YouTube's embedded player reports it's playing (the video surface itself doesn't show in screenshots).
+            rule.waitUntilAtLeastOneExists(hasTestTag("trailerWebView") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Playing"), 30_000)
+            shot("tr3-youtube-in-app")
+            assertTrue("no intent to YouTube: ${fired.peek()?.dataString}", fired.isEmpty())
+            rule.onNode(hasTestTag("trailerWebView")).assertExists() // still in Marquee, the trailer still showing
+            rule.onNode(hasContentDescription("Close trailer")).performClick()
+            rule.waitUntil(5_000) { rule.onAllNodes(hasTestTag("trailerPlayer")).fetchSemanticsNodes().isEmpty() }
+            rule.onNode(hasText("Trailer") and hasClickAction()).assertExists() // back on the item page
+            assertTrue("no intent to YouTube", fired.isEmpty())
         }
+    }
+
+    /** A trailer the embed can't play shows a message; only then does "Watch on YouTube" hand off to YouTube. */
+    @Test fun trailerYouTubeError() {
+        assumeTrue("phones", !isTv)
+        fakeYouTubeTrailer("zzzzzzzzzz0") // no such video: YouTube's player reports an error
+        withYouTubeIntents { fired ->
+            connectAndSignIn()
+            openMovie("10 Xenon")
+            rule.waitUntilAtLeastOneExists(hasText("Trailer") and hasClickAction(), 15_000)
+            rule.onNode(hasText("Trailer") and hasClickAction()).performClick()
+            rule.waitUntilAtLeastOneExists(hasText("Watch on YouTube"), 30_000)
+            shot("tr4-youtube-error")
+            assertTrue("no intent before the fallback is tapped", fired.isEmpty())
+            rule.onNode(hasText("Watch on YouTube")).performClick()
+            val i = fired.poll(10, TimeUnit.SECONDS)
+            assertEquals("vnd.youtube:zzzzzzzzzz0", i?.dataString)
+            rule.onNode(hasContentDescription("Close trailer")).performClick()
+            rule.waitUntilAtLeastOneExists(hasText("Trailer") and hasClickAction(), 5_000)
+        }
+    }
+
+    /**
+     * The player's overlay (close, Watch together, Play on, Cast, settings) fades with the controls
+     * after a few seconds of playing untouched, and a tap on the video brings it back.
+     */
+    @Test fun playerOverlayHides() {
+        assumeTrue("phones", !isTv)
+        connectAndSignIn()
+        playMovie("00 Preview Test", fromStart = true)
+        rule.waitUntilAtLeastOneExists(videoPlaying, 30_000)
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Close player"), 5_000)
+        shot("ov1-visible")
+        // (waitUntil, not sleep: the Compose test clock only moves while the test waits on it.)
+        val start = System.currentTimeMillis()
+        rule.waitUntil(5_000) { rule.onAllNodes(hasContentDescription("Close player")).fetchSemanticsNodes().isEmpty() }
+        assertTrue("stayed up a moment first", System.currentTimeMillis() - start >= 2_000)
+        assertTrue("settings hidden after 5 s", rule.onAllNodes(hasContentDescription("Playback settings")).fetchSemanticsNodes().isEmpty())
+        shot("ov2-hidden")
+        rule.onNode(hasContentDescription("Video player")).performClick()
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Close player"), 3_000)
+        rule.onNode(hasContentDescription("Playback settings")).assertExists()
+        // With a menu open (Play on…) the controls stay up, so the menu isn't torn down with them.
+        rule.onNode(hasContentDescription("Play on…")).performClick()
+        rule.waitText("Play on…")
+        val hid = runCatching { rule.waitUntil(5_000) { rule.onAllNodes(hasContentDescription("Close player")).fetchSemanticsNodes().isEmpty() } }.isSuccess
+        assertTrue("controls stay up while a menu is open", !hid)
+        rule.onAllNodesWithText("Play on…").assertCountEquals(1)
+        key(KeyEvent.KEYCODE_BACK) // closes the dialog
+        rule.waitUntil(5_000) { rule.onAllNodesWithText("Play on…").fetchSemanticsNodes().isEmpty() }
+        back()
     }
 
     /** Album track rows: the stars and the duration keep a gap and stay on screen; the title truncates instead. */
