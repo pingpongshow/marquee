@@ -31,6 +31,7 @@ import { Avatar } from "@/features/users/Avatar";
 import { ProfileSwitcher } from "@/features/users/ProfileSwitcher";
 import { useMusicState } from "@/features/player/MusicPlayer";
 import { RemoteHost } from "@/features/remote/RemoteHost";
+import { RatingPromptHost } from "@/features/player/RatingPrompt";
 import { Toaster } from "@/components/Toast";
 import { useAuth } from "@/lib/auth";
 import { useMainScrollRestoration } from "./scrollRestore";
@@ -309,6 +310,7 @@ export function Shell({ children }: { children: ReactNode }) {
       </div>
       {switching && <ProfileSwitcher onClose={() => setSwitching(false)} />}
       <RemoteHost />
+      <RatingPromptHost />
       <Toaster />
     </div>
   );
