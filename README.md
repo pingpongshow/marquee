@@ -180,15 +180,6 @@ The API is defined in [`api/openapi.yaml`](api/openapi.yaml); the server stubs a
 | `soundprint/` | Music analysis and text-embedding companion service (Python) |
 | `deploy/` | Dockerfile and compose file |
 | `scripts/` | Development helpers (fake IPTV and Bazarr servers for testing) |
-| `docs/` | Requirements, architecture, roadmap and decision log |
-
-## Documentation
-
-- [Requirements](docs/01-requirements.md)
-- [Architecture](docs/03-architecture.md)
-- [Roadmap](docs/05-roadmap.md)
-- [Decision log](docs/decision-log.md)
-- [Security](docs/08-security.md)
 
 ## License
 
