@@ -33,6 +33,7 @@ import kotlinx.serialization.Contextual
  *
  * @param serverName 
  * @param metadataLanguage 
+ * @param ratingPrompt Ask people to rate a movie or episode when they finish it (USER-19). Default off.
  */
 @Serializable
 
@@ -42,7 +43,11 @@ data class GeneralSettings (
     val serverName: kotlin.String? = null,
 
     @SerialName(value = "metadataLanguage")
-    val metadataLanguage: kotlin.String? = null
+    val metadataLanguage: kotlin.String? = null,
+
+    /* Ask people to rate a movie or episode when they finish it (USER-19). Default off. */
+    @SerialName(value = "ratingPrompt")
+    val ratingPrompt: kotlin.Boolean? = null
 
 ) {
 

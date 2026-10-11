@@ -143,6 +143,7 @@ func (h *Handlers) GetSystemInfo(ctx context.Context, _ GetSystemInfoRequestObje
 		PinSignIn:     ptr(h.pinSignInAllowed(ctx)),
 		LanUrl:        nz(h.Settings.Get().Network.LANURL),
 		RemoteUrl:     remoteURL(h.Settings.Get()),
+		RatingPrompt:  ptr(h.Settings.Get().General.RatingPrompt),
 	}, nil
 }
 

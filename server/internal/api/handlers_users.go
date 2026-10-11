@@ -95,7 +95,7 @@ func fromAPIRestrictions(r *UserRestrictions) (auth.Restrictions, error) {
 func toAPIPrefs(p auth.Preferences) UserPreferences {
 	out := UserPreferences{AudioLanguage: nz(p.AudioLanguage), SubtitleLanguage: nz(p.SubtitleLanguage),
 		LocalQualityKbps: ptr(p.LocalQualityKbps), RemoteQualityKbps: ptr(p.RemoteQualityKbps),
-		CinemaTrailers: ptr(p.CinemaTrailers == nil || *p.CinemaTrailers)}
+		CinemaTrailers: ptr(p.CinemaTrailers == nil || *p.CinemaTrailers), RatingPrompt: ptr(p.RatingPrompt == nil || *p.RatingPrompt)}
 	if p.SubtitleMode != "" {
 		out.SubtitleMode = ptr(UserPreferencesSubtitleMode(p.SubtitleMode))
 	}
@@ -122,6 +122,9 @@ func fromAPIPrefs(p UserPreferences) (auth.Preferences, error) {
 	set(&out.RemoteQualityKbps, p.RemoteQualityKbps)
 	if p.CinemaTrailers != nil && !*p.CinemaTrailers {
 		out.CinemaTrailers = p.CinemaTrailers // only "no" is stored
+	}
+	if p.RatingPrompt != nil && !*p.RatingPrompt {
+		out.RatingPrompt = p.RatingPrompt
 	}
 	if p.SubtitleMode != nil {
 		out.SubtitleMode = string(*p.SubtitleMode)

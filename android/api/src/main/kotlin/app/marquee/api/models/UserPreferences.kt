@@ -38,6 +38,7 @@ import kotlinx.serialization.Contextual
  * @param localQualityKbps 0 = original
  * @param remoteQualityKbps 0 = automatic
  * @param cinemaTrailers Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true.
+ * @param ratingPrompt Ask me to rate a movie or episode when I finish it, if the server has it on (USER-19). Default true.
  * @param subtitleStyle 
  */
 @Serializable
@@ -65,6 +66,10 @@ data class UserPreferences (
     /* Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true. */
     @SerialName(value = "cinemaTrailers")
     val cinemaTrailers: kotlin.Boolean? = null,
+
+    /* Ask me to rate a movie or episode when I finish it, if the server has it on (USER-19). Default true. */
+    @SerialName(value = "ratingPrompt")
+    val ratingPrompt: kotlin.Boolean? = null,
 
     @SerialName(value = "subtitleStyle")
     val subtitleStyle: SubtitleStyle? = null

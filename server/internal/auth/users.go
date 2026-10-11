@@ -51,6 +51,7 @@ type Preferences struct {
 	LocalQualityKbps  int    `json:"localQualityKbps,omitempty"`
 	RemoteQualityKbps int    `json:"remoteQualityKbps,omitempty"`
 	CinemaTrailers    *bool  `json:"cinemaTrailers,omitempty"` // nil = on (PLAY-18)
+	RatingPrompt      *bool  `json:"ratingPrompt,omitempty"`   // nil = on (USER-19)
 	// SubtitleStyle is how text subtitles look (PLAY-20); nil = the defaults.
 	SubtitleStyle *SubtitleStyle `json:"subtitleStyle,omitempty"`
 }
