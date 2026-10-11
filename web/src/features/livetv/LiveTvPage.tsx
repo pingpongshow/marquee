@@ -61,8 +61,8 @@ export function LiveTvPage() {
     return (
       <div className="p-6">
         <Alert>
-          Live TV isn't set up yet. An admin can add an M3U playlist or
-          Dispatcharr in Settings → Live TV.
+          Live TV isn't available: there are no channels you can watch. An
+          admin can add an M3U playlist or Dispatcharr in Settings → Live TV.
         </Alert>
       </div>
     );

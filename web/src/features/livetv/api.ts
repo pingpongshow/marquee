@@ -13,6 +13,10 @@ export const liveStatusQuery = queryOptions({
   queryKey: ["livetv", "status"],
   queryFn: () => unwrap(api.GET("/livetv/status")),
   staleTime: 60_000,
+  // Live TV shows only while it's usable (a source with channels this profile may watch), and
+  // that can change while the tab is in the background or offline: check again on return.
+  refetchOnWindowFocus: "always",
+  refetchOnReconnect: "always",
 });
 
 export const liveGroupsQuery = queryOptions({

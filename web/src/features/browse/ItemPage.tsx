@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { clsx } from "clsx";
-import { AlertTriangle, ChevronRight, Sparkles } from "lucide-react";
+import { AlertTriangle, Check, ChevronRight, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { api, imageUrl, personPhotoUrl, unwrap } from "@/api/client";
 import { itemChildrenQuery, itemQuery, meQuery } from "@/api/queries";
@@ -17,6 +17,7 @@ import { PlayOnButton } from "../remote/PlayOn";
 import { RowRating } from "../music/Rating";
 import { ItemRatings, Reviews } from "./Reviews";
 import { PlayButtons } from "./PlayButtons";
+import { isWatched } from "./watched";
 import { Poster } from "./Poster";
 import { formatBytes, formatDuration, formatTrackTime, languageName, subtitleFor } from "./format";
 import { audioQualityLabel, audioQualityShort, useShowAudioQuality } from "../player/audioQuality";
@@ -211,7 +212,8 @@ function Children({ item }: { item: ItemDetail }) {
                   </span>
                 )}
                 <span className="shrink-0 text-sm text-muted tabular-nums">{c.type === "track" ? formatTrackTime(c.durationMs) : formatDuration(c.durationMs)}</span>
-                {c.type === "track" && <ItemMenu item={c} className="-my-1" />}
+                {c.type === "episode" && <EpisodeWatchState episode={c} />}
+                {(c.type === "track" || c.type === "episode") && <ItemMenu item={c} className="-my-1" />}
               </Link>
               {c.type === "episode" && c.available && (
                 <span className="pr-2">
@@ -226,6 +228,23 @@ function Children({ item }: { item: ItemDetail }) {
       )}
     </section>
   );
+}
+
+/** An episode row's progress bar or watched tick. */
+function EpisodeWatchState({ episode: e }: { episode: ItemSummary }) {
+  if ((e.viewOffsetMs ?? 0) > 0 && e.durationMs)
+    return (
+      <span className="h-1 w-12 shrink-0 overflow-hidden rounded bg-surface-3" title="In progress" data-testid="episode-progress">
+        <span className="block h-full bg-accent" style={{ width: `${Math.min(100, ((e.viewOffsetMs ?? 0) / e.durationMs) * 100)}%` }} />
+      </span>
+    );
+  if (isWatched(e))
+    return (
+      <span className="shrink-0 text-success" title="Watched" aria-label="Watched" data-testid="episode-watched">
+        <Check className="size-4" />
+      </span>
+    );
+  return <span className="w-4 shrink-0" />;
 }
 
 function CardGrid({ list }: { list: ItemSummary[] }) {

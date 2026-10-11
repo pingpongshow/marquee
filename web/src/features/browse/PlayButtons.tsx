@@ -9,18 +9,16 @@ import { Button, Select } from "@/components/ui";
 import { useMusicActions } from "../player/MusicPlayer";
 import { formatTrackTime, versionLabel } from "./format";
 import { TrailerButton } from "./Trailer";
+import { isWatched, useMarkWatched } from "./watched";
 
 export function PlayButtons({ item }: { item: ItemDetail }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const music = useMusicActions();
   const [busy, setBusy] = useState(false);
-  const watched = item.type === "show" || item.type === "season" ? item.leafCount > 0 && item.watchedLeafCount === item.leafCount : (item.viewCount ?? 0) > 0;
-  const toggleWatched = useMutation({
-    mutationFn: () =>
-      watched ? unwrap(api.DELETE("/items/{itemId}/watched", { params: { path: { itemId: item.id } } })) : unwrap(api.POST("/items/{itemId}/watched", { params: { path: { itemId: item.id } } })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["items"] }),
-  });
+  // Optimistic: the cached item (and its episodes, tiles and Home rows) change at once.
+  const watched = isWatched(item);
+  const toggleWatched = useMarkWatched();
   const toggleWatchlist = useMutation({
     mutationFn: (on: boolean) =>
       on
@@ -106,7 +104,7 @@ export function PlayButtons({ item }: { item: ItemDetail }) {
         </Button>
       )}
       {(playable || item.type === "show" || item.type === "season") && (
-        <Button variant="ghost" onClick={() => toggleWatched.mutate()} loading={toggleWatched.isPending}>
+        <Button variant="ghost" onClick={() => toggleWatched.mutate({ item, watched: !watched })} aria-pressed={watched} title={watched ? "Mark as unwatched" : "Mark as watched"}>
           <Check className={watched ? "size-4 text-success" : "size-4"} /> {watched ? "Watched" : "Mark watched"}
         </Button>
       )}
