@@ -174,7 +174,7 @@ fun LibrariesScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
     // Only while Live TV has channels this profile may watch (LIVE-1); checked again on opening.
     val liveOn by marquee.liveTv.collectAsState()
-    // Movies on demand (LIVE-6) live under Live TV too, so either one lists it.
+    // Movies on demand (LIVE-6): a VOD page of their own, listed after Live TV (or in its place).
     val vodOn by marquee.vod.collectAsState()
     LaunchedEffect(Unit) { marquee.refreshLiveTv() }
     val requests by produceState<app.marquee.api.models.RequestsStatus?>(null) {
@@ -218,10 +218,10 @@ fun LibrariesScreen(nav: NavHostController) {
             HorizontalDivider()
         }
         // Live TV sits with the libraries (not a tab of its own), once it's set up.
-        if (liveOn || vodOn) item(key = "livetv") {
+        if (liveOn) item(key = "livetv") {
             ListItem(
                 headlineContent = { Text("Live TV") },
-                supportingContent = { Text(if (liveOn) "Guide, channels and recordings" else "Movies on demand") },
+                supportingContent = { Text("Guide, channels and recordings") },
                 leadingContent = { Icon(Icons.Filled.LiveTv, null) },
                 trailingContent = { Icon(Icons.Filled.ChevronRight, null) },
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
@@ -229,7 +229,7 @@ fun LibrariesScreen(nav: NavHostController) {
             )
             HorizontalDivider()
         }
-        // VOD, movies on demand (LIVE-6): straight to Live TV's VOD tab, right after Live TV.
+        // VOD, movies on demand (LIVE-6): its own page, right after Live TV.
         if (vodOn) item(key = "vod") {
             ListItem(
                 headlineContent = { Text("VOD") },
@@ -237,7 +237,7 @@ fun LibrariesScreen(nav: NavHostController) {
                 leadingContent = { Icon(Icons.Filled.Movie, null) },
                 trailingContent = { Icon(Icons.Filled.ChevronRight, null) },
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                modifier = Modifier.focusCard({ nav.navigate("livetv?tab=movies") }),
+                modifier = Modifier.focusCard({ nav.navigate("vod") }),
             )
             HorizontalDivider()
         }

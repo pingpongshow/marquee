@@ -148,9 +148,9 @@ private fun Routes(nav: NavHostController) {
         composable("downloads") { DownloadsScreen(nav) }
         composable("discover") { DiscoverScreen(nav) }
         // Opened from Libraries (and by deep links); not a tab.
-        composable("livetv?tab={tab}", listOf(navArgument("tab") { type = NavType.StringType; nullable = true; defaultValue = null })) {
-            LiveTvScreen(nav, it.arguments!!.getString("tab"))
-        }
+        composable("livetv") { LiveTvScreen(nav) }
+        // VOD, movies on demand (LIVE-6): its own page, listed after Live TV.
+        composable("vod") { VodPage(nav) }
         composable("musicbrowse/{lib}/{kind}?sort={sort}", listOf(navArgument("lib") { type = NavType.LongType }, navArgument("sort") { type = NavType.StringType; nullable = true; defaultValue = null })) {
             app.marquee.music.MusicBrowseScreen(nav, it.arguments!!.getLong("lib"), it.arguments!!.getString("kind")!!, it.arguments!!.getString("sort"))
         }

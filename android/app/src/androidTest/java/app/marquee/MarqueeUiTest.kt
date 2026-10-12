@@ -30,6 +30,10 @@ import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
@@ -537,11 +541,49 @@ class MarqueeUiTest {
         rule.waitUntilAtLeastOneExists(playing("Live TV"), 30_000)
         Thread.sleep(3000)
         shot("l3-watching")
-        if (isTv) key(KeyEvent.KEYCODE_DPAD_DOWN) else rule.onNode(hasContentDescription("Channel down")).performClick()
+        if (isTv) key(KeyEvent.KEYCODE_DPAD_DOWN) else rule.onNode(hasContentDescription("Live TV")).performTouchInput { swipeLeft() }
         rule.waitUntilAtLeastOneExists(playing("Live TV"), 30_000)
         Thread.sleep(3000)
         shot("l4-next-channel")
         back()
+    }
+
+    /** Phones' live player: swipe left for the next channel, right for the previous (wrapping), down from the top to close; no channel buttons. */
+    @Test fun liveTvGestures() {
+        assumeTrue("phones swipe; TVs keep the remote", !isTv)
+        connectAndSignIn()
+        val names = org.json.JSONArray(adminApi("GET", "/livetv/channels", asToken = appToken)).let { a -> (0 until a.length()).map { a.getJSONObject(it).getString("name") } }
+        assumeTrue("needs two channels", names.size >= 2)
+        openLiveTv()
+        rule.waitText("What's On", 15_000)
+        tap("What's On")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Watch ${names[0]}"), 10_000)
+        rule.onNode(hasContentDescription("Watch ${names[0]}")).performClick()
+        val playing = hasContentDescription("Live TV") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Playing")
+        rule.waitUntilAtLeastOneExists(playing, 30_000)
+        assertTrue("no channel buttons", rule.onAllNodes(hasContentDescription("Channel up") or hasContentDescription("Channel down")).fetchSemanticsNodes().isEmpty())
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Close Live TV"), 5_000)
+        shot("lg1-watching")
+        val player = hasContentDescription("Live TV")
+        rule.onNode(player).performTouchInput { swipeLeft() }
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Switching to ${names[1]}"), 5_000)
+        shot("lg2-next")
+        rule.waitUntilAtLeastOneExists(playing, 30_000)
+        rule.waitUntilAtLeastOneExists(hasText(names[1], substring = true), 5_000)
+        rule.onNode(player).performTouchInput { swipeRight() }
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Switching to ${names[0]}"), 5_000)
+        // Right again from the first wraps round to the last.
+        rule.onNode(player).performTouchInput { swipeRight() }
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Switching to ${names.last()}"), 5_000)
+        shot("lg3-wrapped")
+        // A swipe down that starts low on the screen doesn't close it; one from the top does.
+        rule.onNode(player).performTouchInput { swipeDown(startY = height * 0.5f, endY = height * 0.95f) }
+        Thread.sleep(1000)
+        assertTrue("still watching", rule.onAllNodes(player).fetchSemanticsNodes().isNotEmpty())
+        rule.onNode(player).performTouchInput { swipeDown(startY = height * 0.08f, endY = height * 0.9f) }
+        rule.waitUntil(10_000) { rule.onAllNodes(player).fetchSemanticsNodes().isEmpty() }
+        rule.waitText("What's On", 10_000)
+        shot("lg4-closed")
     }
 
     private val adminToken = args.getString("admintoken")?.takeIf { it != "none" }
@@ -2664,9 +2706,8 @@ class MarqueeUiTest {
     }
 
     private val moviesEntry = hasText("VOD") and hasClickAction() and !SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected)
-    private val moviesTab = hasText("VOD") and hasClickAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected)
 
-    /** Libraries' VOD entry, straight to Live TV's VOD tab, searched down to the test films. */
+    /** Libraries' VOD entry, to the VOD page, searched down to the test films. */
     private fun openVodTestFilms() {
         tap("Libraries")
         rule.waitUntil(15_000) { scrollTo(moviesEntry) }
@@ -2676,7 +2717,14 @@ class MarqueeUiTest {
         rule.waitUntilAtLeastOneExists(hasText("3 movies"), 15_000)
     }
 
-    /** Movies on demand show (a VOD entry after Live TV, and Live TV's VOD tab) only while the admin has them on. */
+    /** The VOD page: its title and search, with no Live TV tabs. */
+    private fun waitVodPage() {
+        rule.waitUntilAtLeastOneExists(hasContentDescription("VOD"), 15_000)
+        rule.waitUntilAtLeastOneExists(hasSetTextAction(), 15_000)
+        assertTrue("no Live TV tabs", rule.onAllNodesWithText("What's On").fetchSemanticsNodes().isEmpty() && rule.onAllNodesWithText("Guide").fetchSemanticsNodes().isEmpty())
+    }
+
+    /** VOD is listed after Live TV and opens its own page; Live TV has no VOD tab; turned off, VOD goes. */
     @Test fun vodShownOnlyWhenEnabled() {
         ensureVodSource()
         connectAndSignIn()
@@ -2687,46 +2735,49 @@ class MarqueeUiTest {
             val movies = rule.onNode(moviesEntry).fetchSemanticsNode().boundsInRoot
             assertTrue("VOD right after Live TV", movies.top >= live.bottom - 1 && movies.top - live.bottom < 8)
             shot("vod0-libraries")
-            rule.onNode(hasText("Live TV") and hasClickAction()).performClick()
-            rule.waitUntilAtLeastOneExists(moviesTab, 15_000)
-            rule.waitText("Guide")
+            rule.onNode(moviesEntry).performClick()
+            waitVodPage()
+            shot("vod0-page")
             back()
-            // Turned off: gone from Libraries and Live TV (re-checked on opening them).
+            rule.waitUntil(15_000) { scrollTo(hasText("Live TV") and hasClickAction()) }
+            rule.onNode(hasText("Live TV") and hasClickAction()).performClick()
+            rule.waitText("What's On", 15_000)
+            rule.waitText("Guide")
+            Thread.sleep(1500)
+            assertTrue("no VOD tab", rule.onAllNodes(hasText("VOD")).fetchSemanticsNodes().isEmpty())
+            back()
+            // Turned off: gone from Libraries (re-checked on opening it).
             setVodEnabled(false)
             rule.waitUntilAtLeastOneExists(hasText("Live TV") and hasClickAction(), 10_000)
             back()
             tap("Libraries")
             rule.waitUntil(15_000) { !scrollTo(moviesEntry) && scrollTo(hasText("Live TV") and hasClickAction()) }
             shot("vod1-off")
-            rule.onNode(hasText("Live TV") and hasClickAction()).performClick()
-            rule.waitText("What's On", 15_000)
-            Thread.sleep(1500)
-            assertTrue("no VOD tab", rule.onAllNodes(moviesTab).fetchSemanticsNodes().isEmpty())
         } finally {
             setVodEnabled(true)
         }
     }
 
-    /** With only movies on demand usable, Live TV is still listed and opens on VOD, without the guide. */
-    @Test fun liveTvWithOnlyVod() {
+    /** With channels off and VOD on, VOD is listed (in Live TV's place) and Live TV isn't. */
+    @Test fun vodWithoutLiveTv() {
         ensureVodSource()
         connectAndSignIn()
         val marquee = (context.applicationContext as MarqueeApplication).marquee
         try {
             scenario.onActivity { marquee.fakeLiveTv = false }
             tap("Libraries")
-            rule.waitUntil(15_000) { scrollTo(hasText("Live TV") and hasClickAction()) }
-            rule.onNode(hasText("Live TV") and hasClickAction()).performClick()
-            rule.waitUntilAtLeastOneExists(hasSetTextAction(), 15_000) // the VOD tab's search
-            rule.waitUntilAtLeastOneExists(moviesTab and isSelected(), 5_000)
-            assertTrue("no guide", rule.onAllNodesWithText("What's On").fetchSemanticsNodes().isEmpty() && rule.onAllNodesWithText("Guide").fetchSemanticsNodes().isEmpty())
-            shot("vod2-only-movies")
+            rule.waitUntil(15_000) { scrollTo(moviesEntry) }
+            assertTrue("no Live TV", !scrollTo(hasText("Live TV") and hasClickAction()))
+            shot("vod2-no-live-tv")
+            scrollTo(moviesEntry)
+            rule.onNode(moviesEntry).performClick()
+            waitVodPage()
         } finally {
             scenario.onActivity { marquee.fakeLiveTv = null }
         }
     }
 
-    /** Browse, open a film, play it; closing reports where it stopped, so the page offers Resume; back returns to Movies. */
+    /** Browse, open a film, play it; closing reports where it stopped, so the page offers Resume; back returns to the VOD page. */
     @Test fun vodBrowseAndPlay() {
         ensureVodSource()
         connectAndSignIn()
@@ -2752,8 +2803,8 @@ class MarqueeUiTest {
             assertTrue("position saved", vodMovie(id).optLong("positionMs") >= 10_000)
             shot("vod6-resume")
             back()
-            // Back on Live TV's VOD tab, still searched.
-            rule.waitUntilAtLeastOneExists(moviesTab and isSelected(), 10_000)
+            // Back on the VOD page, still searched.
+            rule.waitUntilAtLeastOneExists(hasContentDescription("VOD") and hasScrollAction(), 10_000)
             rule.waitUntilAtLeastOneExists(hasContentDescription("Droid Alpha Film (1985)"), 10_000)
         } finally {
             resetVodMovie(id)
