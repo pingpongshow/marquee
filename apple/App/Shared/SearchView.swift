@@ -1,9 +1,20 @@
 import MarqueeKit
 import SwiftUI
 
+/// The search text.
+@MainActor @Observable
+final class SearchText {
+    static let shared = SearchText()
+    var query = ""
+}
+
 struct SearchView: View {
     @Environment(AppSession.self) private var app
-    @State private var query = ""
+    @Bindable private var search = SearchText.shared
+    private var query: String {
+        get { search.query }
+        nonmutating set { search.query = newValue }
+    }
     @State private var results: SearchResults?
     @State private var error: String?
     /// Search the library, or describe what you want to watch (Muse, USER-15).
@@ -17,6 +28,22 @@ struct SearchView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
+                #if os(tvOS)
+                // Our own field on the TV: the system search bar sits under the sidebar's
+                // collapsed button at the top left and can't be moved aside.
+                HStack(spacing: 16) {
+                    Image(systemName: "magnifyingglass").font(.title2).foregroundStyle(.secondary)
+                    TextField(mode == .muse ? "Describe what you want to watch" : "Movies, shows, music", text: $search.query)
+                        .onSubmit {
+                            guard mode == .muse else { return }
+                            muse.prompt = query
+                            muse.run(app, library: nil)
+                        }
+                        .accessibilityIdentifier("search.field")
+                }
+                .padding(.leading, 150)
+                .padding(.trailing, sidePadding)
+                #endif
                 Picker("Search mode", selection: $mode) {
                     ForEach(Mode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }
@@ -36,8 +63,13 @@ struct SearchView: View {
             }
             .padding(.vertical)
         }
+        #if !os(tvOS)
+        // On the TV no title: it sat under the keyboard, and the sidebar names the page.
         .navigationTitle("Search")
-        .searchable(text: $query, prompt: mode == .muse ? "Describe what you want to watch" : "Movies, shows, music")
+        #endif
+        #if !os(tvOS)
+        .searchable(text: $search.query, prompt: mode == .muse ? "Describe what you want to watch" : "Movies, shows, music")
+        #endif
         .onSubmit(of: .search) {
             guard mode == .muse else { return }
             muse.prompt = query

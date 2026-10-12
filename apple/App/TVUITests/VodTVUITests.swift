@@ -277,4 +277,32 @@ final class VodTVUITests: XCTestCase {
         XCTAssertEqual(app.state, .runningForeground)
         shot("tv-sidebar-open-from-vod")
     }
+
+    /// The search screen: no "Search" title under the keyboard, and the field clear of the
+    /// sidebar's collapsed button.
+    func testSearchScreenLayoutTV() throws {
+        let token = try temporaryAccount()
+        try signIn(as: token)
+        app.openSection("Search")
+        sleep(2)
+        shot("tv-search")
+        XCTAssertFalse(app.pageTitleShows("Search"), "no Search title")
+        let field = app.textFields["search.field"]
+        XCTAssertTrue(field.exists, "the search field")
+        XCTAssertGreaterThan(field.frame.minX, 200, "clear of the sidebar's button")
+        // Typing searches.
+        for _ in 0..<6 where !field.hasFocus { remote.press(.up) }
+        remote.press(.select)
+        sleep(1)
+        app.typeText("Long Test")
+        sleep(1)
+        remote.press(.menu) // done typing
+        let hit = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] '00 Long Test'")).firstMatch
+        XCTAssertTrue(hit.waitForExistence(timeout: 10), "results appear")
+        shot("tv-search-results")
+        // Back still opens the sidebar from Search.
+        app.openSidebar()
+        XCTAssertTrue(app.sidebarIsOpen, "Back opens the sidebar from Search")
+        shot("tv-search-sidebar")
+    }
 }
