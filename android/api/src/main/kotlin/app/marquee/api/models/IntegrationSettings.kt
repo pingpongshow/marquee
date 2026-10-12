@@ -24,6 +24,7 @@
 package app.marquee.api.models
 
 import app.marquee.api.models.LiveTvSource
+import app.marquee.api.models.VodSource
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -40,6 +41,8 @@ import kotlinx.serialization.Contextual
  * @param dvrPaddingBefore Minutes recordings start early.
  * @param dvrPaddingAfter Minutes recordings run late.
  * @param liveTvSources 
+ * @param vodEnabled Movies on demand appear under Live TV (LIVE-6).
+ * @param vodSources 
  */
 @Serializable
 
@@ -72,7 +75,14 @@ data class IntegrationSettings (
     val dvrPaddingAfter: kotlin.Int? = null,
 
     @SerialName(value = "liveTvSources")
-    val liveTvSources: kotlin.collections.List<LiveTvSource>? = null
+    val liveTvSources: kotlin.collections.List<LiveTvSource>? = null,
+
+    /* Movies on demand appear under Live TV (LIVE-6). */
+    @SerialName(value = "vodEnabled")
+    val vodEnabled: kotlin.Boolean? = null,
+
+    @SerialName(value = "vodSources")
+    val vodSources: kotlin.collections.List<VodSource>? = null
 
 ) {
 

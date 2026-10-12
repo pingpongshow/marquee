@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { clsx } from "clsx";
 import {
   ChevronLeft,
@@ -33,31 +33,46 @@ import {
   useSchedule,
 } from "./api";
 import { LivePlayer } from "./LivePlayer";
+import { VodBrowse } from "./Vod";
+import { vodStatusQuery } from "./vodApi";
+import type { LiveTab } from "@/app/router";
 
 const PX_PER_MIN = 6; // 30 minutes = 180 px
 const WINDOW_HOURS = 6;
 const ROW = 72;
 const CHANNEL_COL = 132;
 
-/** Live TV (LIVE-2): a guide and What's On, with a live preview. */
+/** Live TV (LIVE-2): a guide and What's On, with a live preview, and movies on demand (LIVE-6). */
 export function LiveTvPage() {
   const status = useQuery(liveStatusQuery);
-  const groups = useQuery(liveGroupsQuery);
-  const [tab, setTab] = useState<"guide" | "now" | "recordings">("guide");
+  const vod = useQuery(vodStatusQuery);
+  const liveOn = !!status.data?.enabled;
+  const groups = useQuery({ ...liveGroupsQuery, enabled: liveOn });
+  const tabs: LiveTab[] = [
+    ...(liveOn ? (["guide", "now"] as const) : []),
+    ...(liveOn && status.data?.canRecord ? (["recordings"] as const) : []),
+    ...(vod.data?.enabled ? (["movies"] as const) : []),
+  ];
+  // The tab is in the address, so Back from a film returns to Movies.
+  const search = useSearch({ from: "/livetv" });
+  const tab: LiveTab =
+    search.tab && tabs.includes(search.tab) ? search.tab : (tabs[0] ?? "guide");
   const [filter, setFilter] = useState<LiveFilter>(
     () => localStorageGet("marquee.livetv.filter") ?? "all",
   );
-  const channels = useQuery(liveChannelsQuery(filter));
+  const channels = useQuery({ ...liveChannelsQuery(filter), enabled: liveOn });
   const [preview, setPreview] = useState<number | null>(null);
   const [muted, setMuted] = useState(true);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const setTab = (t: LiveTab) =>
+    navigate({ to: "/livetv", search: { tab: t }, replace: true });
   useEffect(() => localStorageSet("marquee.livetv.filter", filter), [filter]);
   const current =
     channels.data?.find((c) => c.id === preview) ?? channels.data?.[0];
 
-  if (status.isPending) return <Spinner />;
-  if (!status.data?.enabled)
+  if (status.isPending || vod.isPending) return <Spinner />;
+  if (!tabs.length)
     return (
       <div className="p-6">
         <Alert>
@@ -72,10 +87,7 @@ export function LiveTvPage() {
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-bold whitespace-nowrap">Live TV</h1>
         <div className="flex gap-1 sm:ml-4" role="tablist">
-          {(status.data?.canRecord
-            ? (["guide", "now", "recordings"] as const)
-            : (["guide", "now"] as const)
-          ).map((t) => (
+          {tabs.map((t) => (
             <button
               key={t}
               role="tab"
@@ -92,14 +104,17 @@ export function LiveTvPage() {
                 ? "Guide"
                 : t === "now"
                   ? "What's On"
-                  : "Recordings"}
+                  : t === "recordings"
+                    ? "Recordings"
+                    : "VOD"}
             </button>
           ))}
         </div>
         <div
           className={clsx(
             "w-full shrink-0 sm:ml-auto sm:w-48",
-            tab === "recordings" && "hidden sm:invisible sm:block",
+            (tab === "recordings" || tab === "movies") &&
+              "hidden sm:invisible sm:block",
           )}
         >
           <Select
@@ -120,7 +135,7 @@ export function LiveTvPage() {
         </div>
       </div>
 
-      {current && tab !== "recordings" && (
+      {current && tab !== "recordings" && tab !== "movies" && (
         <div className="relative mx-auto aspect-video max-h-[42vh] overflow-hidden rounded-lg bg-black">
           <LivePlayer
             key={current.id}
@@ -165,7 +180,9 @@ export function LiveTvPage() {
         </div>
       )}
 
-      {tab === "recordings" ? (
+      {tab === "movies" ? (
+        <VodBrowse />
+      ) : tab === "recordings" ? (
         <Recordings />
       ) : channels.isPending ? (
         <Spinner />

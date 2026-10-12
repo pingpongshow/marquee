@@ -2558,6 +2558,187 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /livetv/vod/status:
+    get:
+      tags: [livetv]
+      operationId: vodStatus
+      summary: "Movies on demand (LIVE-6): whether they're turned on and usable by the caller, and how each source loaded."
+      responses:
+        "200":
+          description: Status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VodStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /livetv/vod/categories:
+    get:
+      tags: [livetv]
+      operationId: listVodCategories
+      summary: The sources' categories (e.g. "'80s Movies") with how many films the caller may see in each.
+      responses:
+        "200":
+          description: Categories by name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VodCategory" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /livetv/vod/movies:
+    get:
+      tags: [livetv]
+      operationId: listVodMovies
+      summary: Films on demand, a page at a time.
+      parameters:
+        - { name: category, in: query, schema: { type: string } }
+        - { name: q, in: query, description: Part of the title., schema: { type: string } }
+        - { name: sort, in: query, schema: { type: string, enum: [title, added, year, rating], default: title } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: A page of films.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VodMoviePage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /livetv/vod/continue:
+    get:
+      tags: [livetv]
+      operationId: vodContinueWatching
+      summary: Films the caller stopped part-way through, most recent first.
+      responses:
+        "200":
+          description: Films.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VodMovie" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /livetv/vod/movies/{movieId}:
+    parameters:
+      - { name: movieId, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      tags: [livetv]
+      operationId: getVodMovie
+      summary: A film's details (TMDB's once matched, else the source's).
+      responses:
+        "200":
+          description: The film.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VodMovieDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /livetv/vod/movies/{movieId}/image:
+    parameters:
+      - { name: movieId, in: path, required: true, schema: { type: integer, format: int64 } }
+      - { name: kind, in: query, schema: { type: string, enum: [poster, backdrop], default: poster } }
+    get:
+      tags: [livetv]
+      operationId: vodMovieImage
+      summary: A film's poster or backdrop, fetched once and cached (no sign-in needed, like artwork).
+      security: []
+      responses:
+        "200":
+          description: The image.
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /livetv/vod/movies/{movieId}/watched:
+    parameters:
+      - { name: movieId, in: path, required: true, schema: { type: integer, format: int64 } }
+    put:
+      tags: [livetv]
+      operationId: markVodWatched
+      summary: Mark a film watched (clears its resume point).
+      responses:
+        "204": { description: Marked. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [livetv]
+      operationId: markVodUnwatched
+      summary: Mark a film unwatched (clears its resume point).
+      responses:
+        "204": { description: Marked. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /livetv/vod/movies/{movieId}/play:
+    parameters:
+      - { name: movieId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [livetv]
+      operationId: playVodMovie
+      summary: Start watching a film. Returns an HLS session passed through from the source (seekable; no transcode).
+      responses:
+        "200":
+          description: The session.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VodSession" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /livetv/vod/sessions/{sessionId}:
+    parameters:
+      - { name: sessionId, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [livetv]
+      operationId: reportVodPlayback
+      summary: Report the position, so the film resumes there (and counts as watched near the end).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [positionMs]
+              properties:
+                positionMs: { type: integer, format: int64, minimum: 0 }
+                durationMs: { type: integer, format: int64, minimum: 0, description: The film's length as the player sees it. }
+      responses:
+        "204": { description: Recorded. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [livetv]
+      operationId: stopVodSession
+      summary: Stop watching (idle sessions also end by themselves).
+      responses:
+        "204": { description: Stopped. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /livetv/vod/refresh:
+    post:
+      tags: [livetv]
+      operationId: refreshVod
+      summary: Reload every movie source now and retry TMDB matching for films that didn't match (admin only). Matching continues in the background.
+      responses:
+        "200":
+          description: What each source returned.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VodStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /requests/status:
     get:
       tags: [requests]
@@ -4154,6 +4335,102 @@ components:
         userAgent: { type: string }
         enabled: { type: boolean }
 
+    VodSource:
+      type: object
+      required: [name, url]
+      description: "An M3U playlist of films, e.g. Pluto TV's on-demand movies (LIVE-6). Each entry's group-title is its category."
+      properties:
+        id: { type: string }
+        name: { type: string }
+        url: { type: string }
+        userAgent: { type: string }
+        enabled: { type: boolean }
+
+    VodStatus:
+      type: object
+      required: [enabled, movies, matched, unmatched, matching, sources]
+      properties:
+        enabled: { type: boolean, description: "Movies on demand are turned on, a source has films, and this profile may watch Live TV. Clients show them only when true." }
+        movies: { type: integer }
+        matched: { type: integer, description: Films matched to TMDB. }
+        unmatched: { type: integer, description: Films TMDB had no confident match for. }
+        matching: { type: boolean, description: Details and TMDB matches are being fetched now. }
+        tmdbConfigured: { type: boolean, description: A TMDB API key is set (admins only). }
+        sources:
+          type: array
+          items:
+            type: object
+            required: [id, name, movies]
+            properties:
+              id: { type: string }
+              name: { type: string }
+              movies: { type: integer }
+              refreshedAt: { type: string, format: date-time }
+              error: { type: string }
+
+    VodCategory:
+      type: object
+      required: [name, count]
+      properties:
+        name: { type: string }
+        count: { type: integer }
+
+    VodMovie:
+      type: object
+      required: [id, title, watched]
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        year: { type: integer }
+        category: { type: string }
+        contentRating: { type: string, description: "e.g. PG-13." }
+        rating: { type: number, description: TMDB's average vote out of 10. }
+        runtimeMs: { type: integer, format: int64 }
+        posterUrl: { type: string, description: Server-relative; no token needed. }
+        positionMs: { type: integer, format: int64, description: The caller's resume point. }
+        watched: { type: boolean }
+
+    VodMovieDetail:
+      allOf:
+        - $ref: "#/components/schemas/VodMovie"
+        - type: object
+          required: [genres, cast, matched]
+          properties:
+            overview: { type: string }
+            tagline: { type: string }
+            genres: { type: array, items: { type: string } }
+            director: { type: string }
+            cast:
+              type: array
+              items:
+                type: object
+                required: [name]
+                properties:
+                  name: { type: string }
+                  character: { type: string }
+            backdropUrl: { type: string, description: Server-relative; no token needed. }
+            tmdbId: { type: integer }
+            imdbId: { type: string }
+            matched: { type: boolean, description: The details are TMDB's. }
+
+    VodMoviePage:
+      type: object
+      required: [total, movies]
+      properties:
+        total: { type: integer }
+        movies:
+          type: array
+          items: { $ref: "#/components/schemas/VodMovie" }
+
+    VodSession:
+      type: object
+      required: [id, url, movieId]
+      properties:
+        id: { type: string }
+        url: { type: string, description: The HLS playlist (server-relative; the session id is its credential). }
+        movieId: { type: integer, format: int64 }
+        startMs: { type: integer, format: int64, description: Where to start (the caller's resume point). }
+
     RequestsStatus:
       type: object
       required: [enabled, canRequest, pendingApprovals]
@@ -4294,6 +4571,10 @@ components:
         liveTvSources:
           type: array
           items: { $ref: "#/components/schemas/LiveTvSource" }
+        vodEnabled: { type: boolean, description: "Movies on demand appear under Live TV (LIVE-6)." }
+        vodSources:
+          type: array
+          items: { $ref: "#/components/schemas/VodSource" }
 
     IntegrationSettingsUpdate:
       type: object
@@ -4310,6 +4591,11 @@ components:
           type: array
           description: Replaces the whole list when sent.
           items: { $ref: "#/components/schemas/LiveTvSource" }
+        vodEnabled: { type: boolean }
+        vodSources:
+          type: array
+          description: Replaces the whole list when sent.
+          items: { $ref: "#/components/schemas/VodSource" }
 
     MetadataSettings:
       type: object

@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"math/rand/v2"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -436,7 +438,28 @@ var (
 //
 // scope names what keep allows (e.g. the library id), so different filters get their own mixes.
 func (s *Service) DailyMixes(ctx context.Context, userID int64, scope string, keep Filter) []Mix {
-	key := mixCacheKey{userID, time.Now().Format("2006-01-02"), scope}
+	return s.dailyMixes(ctx, userID, scope, keep, time.Now())
+}
+
+// mixJitter varies daily picks: enough to change most of a mix from day to day while the
+// closest matches stay likely.
+const mixJitter = 0.08
+
+// recentMixes remembers each listener's mix tracks for the last few days, so tomorrow's
+// mixes favour other tracks (kept in memory; after a restart the day's seed alone varies).
+var (
+	recentMu    sync.Mutex
+	recentMixes = map[mixHistoryKey]map[string][]int64{} // → day → track ids
+)
+
+type mixHistoryKey struct {
+	user  int64
+	scope string
+}
+
+func (s *Service) dailyMixes(ctx context.Context, userID int64, scope string, keep Filter, now time.Time) []Mix {
+	day := now.Format("2006-01-02")
+	key := mixCacheKey{userID, day, scope}
 	mixMu.Lock()
 	if m, ok := mixCache[key]; ok {
 		mixMu.Unlock()
@@ -453,21 +476,52 @@ func (s *Service) DailyMixes(ctx context.Context, userID int64, scope string, ke
 	if len(keepLiked) < 8 {
 		return nil
 	}
-	seed := uint64(userID)*1_000_003 + uint64(time.Now().YearDay())
+	seed := uint64(userID)*1_000_003 + uint64(now.Year())*1000 + uint64(now.YearDay())
 	r := rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15))
 	k := min(4, max(1, len(keepLiked)/15))
 	avoid := s.Avoid(ctx, userID)
+	if avoid == nil {
+		avoid = map[int64]float64{}
+	}
+	// Tracks from the last three days' mixes count against today's.
+	hk := mixHistoryKey{userID, scope}
+	recentMu.Lock()
+	for d, ids := range recentMixes[hk] {
+		if then, err := time.Parse("2006-01-02", d); err == nil && now.Sub(then) < 4*24*time.Hour && d != day {
+			for _, id := range ids {
+				avoid[id] = math.Max(avoid[id], 0.6)
+			}
+		}
+	}
+	recentMu.Unlock()
 	var mixes []Mix
 	used := map[int64]bool{}
 	for i, c := range Clusters(keepLiked, k, r) {
-		o := Options{Keep: keep, Avoid: avoid, Exclude: used, Rand: r}
-		ts := s.Index.Pick(c, 25, o)
+		o := Options{Keep: keep, Avoid: avoid, Exclude: used, Rand: r, Jitter: mixJitter}
+		ts := s.Index.Pick(dayCentre(c, keepLiked, r), 25, o)
 		for _, t := range ts {
 			used[t.ItemID] = true
 		}
 		mixes = append(mixes, Mix{Station: Station{Title: fmt.Sprintf("Daily Mix %d", i+1), IDs: TrackIDs(ts)}, ID: fmt.Sprintf("daily-%d", i+1)})
 	}
 	mixes = append(mixes, s.historyMixes(ctx, userID, keep, keepLiked, avoid, r)...)
+	var today []int64
+	for _, m := range mixes {
+		today = append(today, m.IDs...)
+	}
+	recentMu.Lock()
+	hist := recentMixes[hk]
+	if hist == nil {
+		hist = map[string][]int64{}
+		recentMixes[hk] = hist
+	}
+	hist[day] = today
+	for d := range hist {
+		if then, err := time.Parse("2006-01-02", d); err != nil || now.Sub(then) > 4*24*time.Hour {
+			delete(hist, d)
+		}
+	}
+	recentMu.Unlock()
 	mixMu.Lock()
 	for k := range mixCache {
 		if k.day != key.day {
@@ -477,6 +531,24 @@ func (s *Service) DailyMixes(ctx context.Context, userID int64, scope string, ke
 	mixCache[key] = mixes
 	mixMu.Unlock()
 	return mixes
+}
+
+// dayCentre moves a taste cluster's centre towards a few of its favourites drawn at random
+// for the day, so each Daily Mix keeps its character but starts somewhere new.
+func dayCentre(centre []float32, liked []*Track, r *rand.Rand) []float32 {
+	near := append([]*Track{}, liked...)
+	sort.Slice(near, func(i, j int) bool { return dot(near[i].Vec, centre) > dot(near[j].Vec, centre) })
+	near = near[:min(len(near), max(6, len(near)/4))]
+	r.Shuffle(len(near), func(i, j int) { near[i], near[j] = near[j], near[i] })
+	picked := Mean(near[:min(3, len(near))])
+	if picked == nil {
+		return centre
+	}
+	v := make([]float32, len(centre))
+	for i := range v {
+		v[i] = 0.4*centre[i] + 0.6*picked[i]
+	}
+	return normalize(v)
 }
 
 // historyMixes are mixes from what someone has (and hasn't) played:
@@ -507,7 +579,7 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 	var out []Mix
 
 	// Discovery: unplayed, near their taste; artists they've played a lot count against.
-	disc := Options{Keep: func(t *Track) bool { return allowed(t) && !played[t.ItemID] }, Avoid: map[int64]float64{}, Rand: r}
+	disc := Options{Keep: func(t *Track) bool { return allowed(t) && !played[t.ItemID] }, Avoid: map[int64]float64{}, Rand: r, Jitter: mixJitter}
 	for _, t := range s.Index.Where(disc.Keep) {
 		if n := artistPlays[t.ArtistID]; n > 0 {
 			disc.Avoid[t.ItemID] = min(0.8, float64(n)/40)
@@ -553,7 +625,7 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 		rows.Close()
 	}
 	if len(fresh) >= 10 {
-		o := Options{Keep: func(t *Track) bool { return allowed(t) && fresh[t.ItemID] }, Avoid: avoid, Rand: r}
+		o := Options{Keep: func(t *Track) bool { return allowed(t) && fresh[t.ItemID] }, Avoid: avoid, Rand: r, Jitter: mixJitter}
 		if ts := s.Index.Pick(taste, 25, o); len(ts) >= 10 {
 			out = append(out, Mix{Station: Station{Title: "New Music Mix", IDs: TrackIDs(ts)}, ID: "new",
 				Description: "Recently added music that fits your taste"})
@@ -574,7 +646,7 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 		}
 	}
 	if n >= 10 {
-		o := Options{Keep: func(t *Track) bool { return allowed(t) && t.Year/10*10 == best }, Avoid: avoid, Rand: r}
+		o := Options{Keep: func(t *Track) bool { return allowed(t) && t.Year/10*10 == best }, Avoid: avoid, Rand: r, Jitter: mixJitter}
 		var inDecade []*Track
 		for _, t := range liked {
 			if t.Year/10*10 == best {

@@ -296,6 +296,8 @@ fun ServerSettingsScreen() {
                 libraryStatus?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         }
+        item { SectionTitle("VOD") }
+        item { VodAdminSection() }
         item { SectionTitle("Integrations") }
         item {
             Column(Modifier.padding(horizontal = sidePadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
