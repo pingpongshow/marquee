@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { liveStatusQuery } from "@/features/livetv/api";
+import { vodStatusQuery } from "@/features/livetv/vodApi";
 import { requestsStatusQuery } from "@/features/requests/api";
 import { clsx } from "clsx";
 import { Search as SearchIcon, Compass } from "lucide-react";
@@ -161,6 +162,12 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const requests = useQuery(requestsStatusQuery);
   const live = useQuery(liveStatusQuery);
+  const vod = useQuery(vodStatusQuery); // movies on demand live under Live TV (LIVE-6)
+  const location = useRouterState({ select: (r) => r.location });
+  const onLive = location.pathname.startsWith("/livetv");
+  const onMovies =
+    location.pathname.startsWith("/livetv/movies") ||
+    (location.pathname === "/livetv" && (location.search as { tab?: string }).tab === "movies");
   const sidebar = (
     <nav aria-label="Libraries" className="flex h-full flex-col gap-1 overflow-y-auto p-3">
       <Link
@@ -200,15 +207,25 @@ export function Shell({ children }: { children: ReactNode }) {
       {libraries.data?.length === 0 && (
         <p className="px-3 text-sm text-faint">No libraries yet</p>
       )}
-      {/* Live TV sits with the libraries, only once it's set up. */}
-      {live.data?.enabled && (
+      {/* Live TV sits with the libraries, only once it's set up (channels or movies on demand). */}
+      {(live.data?.enabled || vod.data?.enabled) && (
         <Link
           to="/livetv"
-          className={navItem}
-          activeProps={navActive}
+          className={clsx(navItem, onLive && !onMovies && navActive.className)}
           onClick={() => setNavOpen(false)}
         >
           <Tv className="size-5" aria-hidden /> Live TV
+        </Link>
+      )}
+      {/* Movies on demand (LIVE-6), just under Live TV. */}
+      {vod.data?.enabled && (
+        <Link
+          to="/livetv"
+          search={{ tab: "movies" }}
+          className={clsx(navItem, onMovies && navActive.className)}
+          onClick={() => setNavOpen(false)}
+        >
+          <Film className="size-5" aria-hidden /> VOD
         </Link>
       )}
       <Link

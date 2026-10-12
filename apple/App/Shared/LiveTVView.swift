@@ -3,10 +3,10 @@ import MarqueeKit
 import SwiftUI
 
 /// Live TV (LIVE-2): a Guide and What's On, a live preview on iPhone/iPad, and
-/// full-screen watching with channel up/down.
+/// full-screen watching with channel up/down; and movies on demand (VOD, LIVE-6) when usable.
 struct LiveTVView: View {
     @Environment(AppSession.self) private var app
-    @State private var tab = Tab.guide
+    @State private var tab: Tab
     @State private var filter = "all" // all, favorites, or a group
     @State private var groups: [String] = []
     @State private var channels: [LiveChannel] = []
@@ -22,9 +22,22 @@ struct LiveTVView: View {
     @State private var statusError: String?
     /// Bumped by pull-to-refresh on the Recordings tab.
     @State private var recordingsRefresh = 0
+    /// Movies on demand are on and usable for this profile (LIVE-6).
+    @State private var vodEnabled = false
+    /// Bumped by pull-to-refresh on the Movies tab.
+    @State private var vodRefresh = 0
 
-    enum Tab: String, CaseIterable { case guide = "Guide", now = "What's On", recordings = "Recordings" }
-    private var tabs: [Tab] { canRecord ? Tab.allCases : [.guide, .now] }
+    enum Tab: String, CaseIterable { case guide = "Guide", now = "What's On", recordings = "Recordings", movies = "VOD" }
+    /// Opened from the VOD entry (LIVE-6): starts at the VOD tab.
+    init(initialTab: Tab = .guide) {
+        _tab = State(initialValue: initialTab)
+    }
+
+    private var tabs: [Tab] {
+        var out: [Tab] = enabled == true ? (canRecord ? [.guide, .now, .recordings] : [.guide, .now]) : []
+        if vodEnabled { out.append(.movies) }
+        return out
+    }
 
     static func defaultStart() -> Date {
         let cal = Calendar.current
@@ -43,14 +56,18 @@ struct LiveTVView: View {
                 } actions: {
                     Button("Try Again") { Task { await loadStatus() } }
                 }
-            } else if enabled == false {
+            } else if enabled == nil {
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if enabled == false && !vodEnabled {
                 ContentUnavailableView("Live TV isn't set up", systemImage: "tv", description: Text("An admin can add Dispatcharr or an M3U playlist in the web app's Settings → Live TV."))
             } else {
                 content
             }
         }
         .navigationTitle("Live TV")
-        .task { if enabled == nil { await loadStatus() } }
+        // Checked again each time Live TV opens: movies on demand or channels may have been
+        // turned on or off (LIVE-1, LIVE-6).
+        .task { await loadStatus() }
         .task(id: "\(filter)|\(start.timeIntervalSince1970)") { await load() }
         #if os(iOS)
         .fullScreenCover(item: $watching) { LiveWatchView(channels: channels, start: $0.id) }
@@ -66,12 +83,17 @@ struct LiveTVView: View {
 
     private func loadStatus() async {
         do {
+            async let vod = try? app.vodStatus()
             let status = try await app.liveStatus()
+            vodEnabled = await vod?.enabled ?? false
             enabled = status.enabled
             canRecord = status.canRecord ?? false
             statusError = nil
+            // Only movies on demand: straight to them.
+            if !tabs.contains(tab), let first = tabs.first { tab = first }
+            guard enabled == true else { return }
             groups = (try? await app.liveGroups()) ?? []
-            if enabled == true, channels.isEmpty { await load() }
+            if channels.isEmpty { await load() }
         } catch is CancellationError {
         } catch {
             statusError = error.localizedDescription
@@ -82,33 +104,45 @@ struct LiveTVView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 controls
-                #if os(iOS)
-                if tab != .recordings, let c = preview ?? channels.first { LivePreview(channel: c) { watching = WatchTarget(id: c.id) } }
-                #endif
-                if let error { Text(error).foregroundStyle(.red).padding(.horizontal, sidePadding) }
-                if tab == .recordings {
-                    RecordingsList(refresh: recordingsRefresh).padding(.horizontal, sidePadding)
-                } else if channels.isEmpty, enabled == true {
-                    Text(filter == "favorites" ? "No favourites yet. Add some with the heart next to a channel."
-                        : filter == "recent" ? "Channels you watch will appear here."
-                        : filter == "hidden" ? "No hidden channels. Touch and hold a channel to hide it." : "No channels.")
-                        .foregroundStyle(.secondary).padding(.horizontal, sidePadding)
-                } else if tab == .guide {
-                    GuideGrid(channels: channels, guide: guide, start: start, selected: preview?.id,
-                              onChannel: { c in pick(c) },
-                              onProgramme: { p, c in programmeTapped(p, c) },
-                              onFavorite: { c in toggleFavorite(c) },
-                              onHide: { c in toggleHidden(c) },
-                              onRecord: canRecord ? { p, c, series in record(p, c, series: series) } : nil)
-                } else {
-                    whatsOn
+                if tab == .movies, vodEnabled {
+                    VodBrowseView(refresh: vodRefresh)
+                } else if tab != .movies {
+                    channelContent
                 }
             }
             .padding(.vertical)
         }
         // On the scroll view, where pull-to-refresh works (it did nothing on the VStack inside).
         .refreshable {
-            if tab == .recordings { recordingsRefresh += 1 } else { await load() }
+            switch tab {
+            case .recordings: recordingsRefresh += 1
+            case .movies: vodRefresh += 1
+            default: await load()
+            }
+        }
+    }
+
+    @ViewBuilder private var channelContent: some View {
+        #if os(iOS)
+        if tab != .recordings, let c = preview ?? channels.first { LivePreview(channel: c) { watching = WatchTarget(id: c.id) } }
+        #endif
+        if let error { Text(error).foregroundStyle(.red).padding(.horizontal, sidePadding) }
+        if tab == .recordings {
+            RecordingsList(refresh: recordingsRefresh).padding(.horizontal, sidePadding)
+        } else if channels.isEmpty, enabled == true {
+            Text(filter == "favorites" ? "No favourites yet. Add some with the heart next to a channel."
+                : filter == "recent" ? "Channels you watch will appear here."
+                : filter == "hidden" ? "No hidden channels. Touch and hold a channel to hide it." : "No channels.")
+                .foregroundStyle(.secondary).padding(.horizontal, sidePadding)
+        } else if tab == .guide {
+            GuideGrid(channels: channels, guide: guide, start: start, selected: preview?.id,
+                      onChannel: { c in pick(c) },
+                      onProgramme: { p, c in programmeTapped(p, c) },
+                      onFavorite: { c in toggleFavorite(c) },
+                      onHide: { c in toggleHidden(c) },
+                      onRecord: canRecord ? { p, c, series in record(p, c, series: series) } : nil)
+        } else {
+            whatsOn
         }
     }
 
@@ -144,11 +178,13 @@ struct LiveTVView: View {
 
     private var controls: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Picker("View", selection: $tab) {
-                ForEach(tabs, id: \.self) { Text($0.rawValue).tag($0) }
+            if tabs.count > 1 {
+                Picker("View", selection: $tab) {
+                    ForEach(tabs, id: \.self) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
             }
-            .pickerStyle(.segmented)
-            if tab != .recordings { filterBar }
+            if tab == .guide || tab == .now { filterBar }
         }
         .padding(.horizontal, sidePadding)
     }
@@ -209,6 +245,7 @@ struct LiveTVView: View {
     }
 
     private func load() async {
+        guard enabled == true else { return }
         let group = ["all", "favorites", "recent", "hidden"].contains(filter) ? nil : filter
         do {
             channels = try await app.liveChannels(group: group, favorites: filter == "favorites", recent: filter == "recent", hidden: filter == "hidden")

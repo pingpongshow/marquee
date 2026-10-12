@@ -36,8 +36,15 @@ import app.marquee.api.models.LiveTvStatus
 import app.marquee.api.models.PlayLiveChannelRequest
 import app.marquee.api.models.Recording
 import app.marquee.api.models.RecordingRule
+import app.marquee.api.models.ReportVodPlaybackRequest
 import app.marquee.api.models.ScheduleRecording201Response
 import app.marquee.api.models.ScheduleRecordingRequest
+import app.marquee.api.models.VodCategory
+import app.marquee.api.models.VodMovie
+import app.marquee.api.models.VodMovieDetail
+import app.marquee.api.models.VodMoviePage
+import app.marquee.api.models.VodSession
+import app.marquee.api.models.VodStatus
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -279,6 +286,79 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.PUT,
             path = "/livetv/channels/{channelId}/favorite".replace("{"+"channelId"+"}", encodeURIComponent(channelId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /livetv/vod/movies/{movieId}
+     * A film&#39;s details (TMDB&#39;s once matched, else the source&#39;s).
+     * 
+     * @param movieId 
+     * @return VodMovieDetail
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getVodMovie(movieId: kotlin.Long) : VodMovieDetail {
+        val localVarResponse = getVodMovieWithHttpInfo(movieId = movieId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as VodMovieDetail
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /livetv/vod/movies/{movieId}
+     * A film&#39;s details (TMDB&#39;s once matched, else the source&#39;s).
+     * 
+     * @param movieId 
+     * @return ApiResponse<VodMovieDetail?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getVodMovieWithHttpInfo(movieId: kotlin.Long) : ApiResponse<VodMovieDetail?> {
+        val localVariableConfig = getVodMovieRequestConfig(movieId = movieId)
+
+        return request<Unit, VodMovieDetail>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getVodMovie
+     *
+     * @param movieId 
+     * @return RequestConfig
+     */
+    fun getVodMovieRequestConfig(movieId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/livetv/vod/movies/{movieId}".replace("{"+"movieId"+"}", encodeURIComponent(movieId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -664,6 +744,197 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     }
 
     /**
+     * GET /livetv/vod/categories
+     * The sources&#39; categories (e.g. \&quot;&#39;80s Movies\&quot;) with how many films the caller may see in each.
+     * 
+     * @return kotlin.collections.List<VodCategory>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listVodCategories() : kotlin.collections.List<VodCategory> {
+        val localVarResponse = listVodCategoriesWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<VodCategory>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /livetv/vod/categories
+     * The sources&#39; categories (e.g. \&quot;&#39;80s Movies\&quot;) with how many films the caller may see in each.
+     * 
+     * @return ApiResponse<kotlin.collections.List<VodCategory>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listVodCategoriesWithHttpInfo() : ApiResponse<kotlin.collections.List<VodCategory>?> {
+        val localVariableConfig = listVodCategoriesRequestConfig()
+
+        return request<Unit, kotlin.collections.List<VodCategory>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listVodCategories
+     *
+     * @return RequestConfig
+     */
+    fun listVodCategoriesRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/livetv/vod/categories",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * enum for parameter sort
+     */
+     enum class SortListVodMovies(val value: kotlin.String) {
+         @SerialName(value = "title") TITLE("title"),
+         @SerialName(value = "added") ADDED("added"),
+         @SerialName(value = "year") YEAR("year"),
+         @SerialName(value = "rating") RATING("rating");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * GET /livetv/vod/movies
+     * Films on demand, a page at a time.
+     * 
+     * @param category  (optional)
+     * @param q Part of the title. (optional)
+     * @param sort  (optional, default to Sort.TITLE)
+     * @param limit  (optional, default to 100)
+     * @param offset  (optional, default to 0)
+     * @return VodMoviePage
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listVodMovies(category: kotlin.String? = null, q: kotlin.String? = null, sort: SortListVodMovies? = SortListVodMovies.TITLE, limit: kotlin.Int? = 100, offset: kotlin.Int? = 0) : VodMoviePage {
+        val localVarResponse = listVodMoviesWithHttpInfo(category = category, q = q, sort = sort, limit = limit, offset = offset)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as VodMoviePage
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /livetv/vod/movies
+     * Films on demand, a page at a time.
+     * 
+     * @param category  (optional)
+     * @param q Part of the title. (optional)
+     * @param sort  (optional, default to Sort.TITLE)
+     * @param limit  (optional, default to 100)
+     * @param offset  (optional, default to 0)
+     * @return ApiResponse<VodMoviePage?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listVodMoviesWithHttpInfo(category: kotlin.String?, q: kotlin.String?, sort: SortListVodMovies?, limit: kotlin.Int?, offset: kotlin.Int?) : ApiResponse<VodMoviePage?> {
+        val localVariableConfig = listVodMoviesRequestConfig(category = category, q = q, sort = sort, limit = limit, offset = offset)
+
+        return request<Unit, VodMoviePage>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listVodMovies
+     *
+     * @param category  (optional)
+     * @param q Part of the title. (optional)
+     * @param sort  (optional, default to Sort.TITLE)
+     * @param limit  (optional, default to 100)
+     * @param offset  (optional, default to 0)
+     * @return RequestConfig
+     */
+    fun listVodMoviesRequestConfig(category: kotlin.String?, q: kotlin.String?, sort: SortListVodMovies?, limit: kotlin.Int?, offset: kotlin.Int?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (category != null) {
+                    put("category", listOf(category.toString()))
+                }
+                if (q != null) {
+                    put("q", listOf(q.toString()))
+                }
+                if (sort != null) {
+                    put("sort", listOf(sort.value))
+                }
+                if (limit != null) {
+                    put("limit", listOf(limit.toString()))
+                }
+                if (offset != null) {
+                    put("offset", listOf(offset.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/livetv/vod/movies",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * GET /livetv/channels/{channelId}/logo
      * The channel&#39;s logo, fetched from its source and cached (no sign-in needed, like artwork).
      * 
@@ -905,6 +1176,148 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     }
 
     /**
+     * DELETE /livetv/vod/movies/{movieId}/watched
+     * Mark a film unwatched (clears its resume point).
+     * 
+     * @param movieId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun markVodUnwatched(movieId: kotlin.Long) : Unit {
+        val localVarResponse = markVodUnwatchedWithHttpInfo(movieId = movieId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /livetv/vod/movies/{movieId}/watched
+     * Mark a film unwatched (clears its resume point).
+     * 
+     * @param movieId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun markVodUnwatchedWithHttpInfo(movieId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = markVodUnwatchedRequestConfig(movieId = movieId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation markVodUnwatched
+     *
+     * @param movieId 
+     * @return RequestConfig
+     */
+    fun markVodUnwatchedRequestConfig(movieId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/livetv/vod/movies/{movieId}/watched".replace("{"+"movieId"+"}", encodeURIComponent(movieId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /livetv/vod/movies/{movieId}/watched
+     * Mark a film watched (clears its resume point).
+     * 
+     * @param movieId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun markVodWatched(movieId: kotlin.Long) : Unit {
+        val localVarResponse = markVodWatchedWithHttpInfo(movieId = movieId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /livetv/vod/movies/{movieId}/watched
+     * Mark a film watched (clears its resume point).
+     * 
+     * @param movieId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun markVodWatchedWithHttpInfo(movieId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = markVodWatchedRequestConfig(movieId = movieId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation markVodWatched
+     *
+     * @param movieId 
+     * @return RequestConfig
+     */
+    fun markVodWatchedRequestConfig(movieId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/livetv/vod/movies/{movieId}/watched".replace("{"+"movieId"+"}", encodeURIComponent(movieId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * POST /livetv/channels/{channelId}/play
      * Start watching a channel. Returns a live HLS session (copied or transcoded for the device).
      * 
@@ -982,6 +1395,79 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     }
 
     /**
+     * POST /livetv/vod/movies/{movieId}/play
+     * Start watching a film. Returns an HLS session passed through from the source (seekable; no transcode).
+     * 
+     * @param movieId 
+     * @return VodSession
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun playVodMovie(movieId: kotlin.Long) : VodSession {
+        val localVarResponse = playVodMovieWithHttpInfo(movieId = movieId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as VodSession
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /livetv/vod/movies/{movieId}/play
+     * Start watching a film. Returns an HLS session passed through from the source (seekable; no transcode).
+     * 
+     * @param movieId 
+     * @return ApiResponse<VodSession?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun playVodMovieWithHttpInfo(movieId: kotlin.Long) : ApiResponse<VodSession?> {
+        val localVariableConfig = playVodMovieRequestConfig(movieId = movieId)
+
+        return request<Unit, VodSession>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation playVodMovie
+     *
+     * @param movieId 
+     * @return RequestConfig
+     */
+    fun playVodMovieRequestConfig(movieId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/livetv/vod/movies/{movieId}/play".replace("{"+"movieId"+"}", encodeURIComponent(movieId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * POST /livetv/refresh
      * Reload channels and the guide from every source now (admin only).
      * 
@@ -1044,6 +1530,151 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/livetv/refresh",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /livetv/vod/refresh
+     * Reload every movie source now and retry TMDB matching for films that didn&#39;t match (admin only). Matching continues in the background.
+     * 
+     * @return VodStatus
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun refreshVod() : VodStatus {
+        val localVarResponse = refreshVodWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as VodStatus
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /livetv/vod/refresh
+     * Reload every movie source now and retry TMDB matching for films that didn&#39;t match (admin only). Matching continues in the background.
+     * 
+     * @return ApiResponse<VodStatus?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun refreshVodWithHttpInfo() : ApiResponse<VodStatus?> {
+        val localVariableConfig = refreshVodRequestConfig()
+
+        return request<Unit, VodStatus>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation refreshVod
+     *
+     * @return RequestConfig
+     */
+    fun refreshVodRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/livetv/vod/refresh",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PATCH /livetv/vod/sessions/{sessionId}
+     * Report the position, so the film resumes there (and counts as watched near the end).
+     * 
+     * @param sessionId 
+     * @param reportVodPlaybackRequest 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun reportVodPlayback(sessionId: kotlin.String, reportVodPlaybackRequest: ReportVodPlaybackRequest) : Unit {
+        val localVarResponse = reportVodPlaybackWithHttpInfo(sessionId = sessionId, reportVodPlaybackRequest = reportVodPlaybackRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PATCH /livetv/vod/sessions/{sessionId}
+     * Report the position, so the film resumes there (and counts as watched near the end).
+     * 
+     * @param sessionId 
+     * @param reportVodPlaybackRequest 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun reportVodPlaybackWithHttpInfo(sessionId: kotlin.String, reportVodPlaybackRequest: ReportVodPlaybackRequest) : ApiResponse<Unit?> {
+        val localVariableConfig = reportVodPlaybackRequestConfig(sessionId = sessionId, reportVodPlaybackRequest = reportVodPlaybackRequest)
+
+        return request<ReportVodPlaybackRequest, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation reportVodPlayback
+     *
+     * @param sessionId 
+     * @param reportVodPlaybackRequest 
+     * @return RequestConfig
+     */
+    fun reportVodPlaybackRequestConfig(sessionId: kotlin.String, reportVodPlaybackRequest: ReportVodPlaybackRequest) : RequestConfig<ReportVodPlaybackRequest> {
+        val localVariableBody = reportVodPlaybackRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PATCH,
+            path = "/livetv/vod/sessions/{sessionId}".replace("{"+"sessionId"+"}", encodeURIComponent(sessionId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -1197,6 +1828,77 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     }
 
     /**
+     * DELETE /livetv/vod/sessions/{sessionId}
+     * Stop watching (idle sessions also end by themselves).
+     * 
+     * @param sessionId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun stopVodSession(sessionId: kotlin.String) : Unit {
+        val localVarResponse = stopVodSessionWithHttpInfo(sessionId = sessionId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /livetv/vod/sessions/{sessionId}
+     * Stop watching (idle sessions also end by themselves).
+     * 
+     * @param sessionId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun stopVodSessionWithHttpInfo(sessionId: kotlin.String) : ApiResponse<Unit?> {
+        val localVariableConfig = stopVodSessionRequestConfig(sessionId = sessionId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation stopVodSession
+     *
+     * @param sessionId 
+     * @return RequestConfig
+     */
+    fun stopVodSessionRequestConfig(sessionId: kotlin.String) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/livetv/vod/sessions/{sessionId}".replace("{"+"sessionId"+"}", encodeURIComponent(sessionId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * DELETE /livetv/channels/{channelId}/favorite
      * Remove a channel from the caller&#39;s favourites.
      * 
@@ -1331,6 +2033,244 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.DELETE,
             path = "/livetv/channels/{channelId}/hidden".replace("{"+"channelId"+"}", encodeURIComponent(channelId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /livetv/vod/continue
+     * Films the caller stopped part-way through, most recent first.
+     * 
+     * @return kotlin.collections.List<VodMovie>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun vodContinueWatching() : kotlin.collections.List<VodMovie> {
+        val localVarResponse = vodContinueWatchingWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<VodMovie>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /livetv/vod/continue
+     * Films the caller stopped part-way through, most recent first.
+     * 
+     * @return ApiResponse<kotlin.collections.List<VodMovie>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun vodContinueWatchingWithHttpInfo() : ApiResponse<kotlin.collections.List<VodMovie>?> {
+        val localVariableConfig = vodContinueWatchingRequestConfig()
+
+        return request<Unit, kotlin.collections.List<VodMovie>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation vodContinueWatching
+     *
+     * @return RequestConfig
+     */
+    fun vodContinueWatchingRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/livetv/vod/continue",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * enum for parameter kind
+     */
+     enum class KindVodMovieImage(val value: kotlin.String) {
+         @SerialName(value = "poster") POSTER("poster"),
+         @SerialName(value = "backdrop") BACKDROP("backdrop");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * GET /livetv/vod/movies/{movieId}/image
+     * A film&#39;s poster or backdrop, fetched once and cached (no sign-in needed, like artwork).
+     * 
+     * @param movieId 
+     * @param kind  (optional, default to Kind.POSTER)
+     * @return java.io.File
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun vodMovieImage(movieId: kotlin.Long, kind: KindVodMovieImage? = KindVodMovieImage.POSTER) : java.io.File {
+        val localVarResponse = vodMovieImageWithHttpInfo(movieId = movieId, kind = kind)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as java.io.File
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /livetv/vod/movies/{movieId}/image
+     * A film&#39;s poster or backdrop, fetched once and cached (no sign-in needed, like artwork).
+     * 
+     * @param movieId 
+     * @param kind  (optional, default to Kind.POSTER)
+     * @return ApiResponse<java.io.File?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun vodMovieImageWithHttpInfo(movieId: kotlin.Long, kind: KindVodMovieImage?) : ApiResponse<java.io.File?> {
+        val localVariableConfig = vodMovieImageRequestConfig(movieId = movieId, kind = kind)
+
+        return request<Unit, java.io.File>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation vodMovieImage
+     *
+     * @param movieId 
+     * @param kind  (optional, default to Kind.POSTER)
+     * @return RequestConfig
+     */
+    fun vodMovieImageRequestConfig(movieId: kotlin.Long, kind: KindVodMovieImage?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (kind != null) {
+                    put("kind", listOf(kind.value))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/livetv/vod/movies/{movieId}/image".replace("{"+"movieId"+"}", encodeURIComponent(movieId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /livetv/vod/status
+     * Movies on demand (LIVE-6): whether they&#39;re turned on and usable by the caller, and how each source loaded.
+     * 
+     * @return VodStatus
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun vodStatus() : VodStatus {
+        val localVarResponse = vodStatusWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as VodStatus
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /livetv/vod/status
+     * Movies on demand (LIVE-6): whether they&#39;re turned on and usable by the caller, and how each source loaded.
+     * 
+     * @return ApiResponse<VodStatus?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun vodStatusWithHttpInfo() : ApiResponse<VodStatus?> {
+        val localVariableConfig = vodStatusRequestConfig()
+
+        return request<Unit, VodStatus>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation vodStatus
+     *
+     * @return RequestConfig
+     */
+    fun vodStatusRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/livetv/vod/status",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

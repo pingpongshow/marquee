@@ -24,6 +24,7 @@
 package app.marquee.api.models
 
 import app.marquee.api.models.LiveTvSource
+import app.marquee.api.models.VodSource
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -41,6 +42,8 @@ import kotlinx.serialization.Contextual
  * @param dvrPaddingBefore 
  * @param dvrPaddingAfter 
  * @param liveTvSources Replaces the whole list when sent.
+ * @param vodEnabled 
+ * @param vodSources Replaces the whole list when sent.
  */
 @Serializable
 
@@ -76,7 +79,14 @@ data class IntegrationSettingsUpdate (
 
     /* Replaces the whole list when sent. */
     @SerialName(value = "liveTvSources")
-    val liveTvSources: kotlin.collections.List<LiveTvSource>? = null
+    val liveTvSources: kotlin.collections.List<LiveTvSource>? = null,
+
+    @SerialName(value = "vodEnabled")
+    val vodEnabled: kotlin.Boolean? = null,
+
+    /* Replaces the whole list when sent. */
+    @SerialName(value = "vodSources")
+    val vodSources: kotlin.collections.List<VodSource>? = null
 
 ) {
 

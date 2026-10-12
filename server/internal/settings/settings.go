@@ -49,6 +49,18 @@ type Integrations struct {
 	// DVR padding in minutes (LIVE-5).
 	DVRPaddingBefore int `json:"dvrPaddingBefore"`
 	DVRPaddingAfter  int `json:"dvrPaddingAfter"`
+	// Movies on demand under Live TV (LIVE-6): off until the admin turns it on.
+	VODEnabled bool        `json:"vodEnabled"`
+	VODSources []VODSource `json:"vodSources"`
+}
+
+// VODSource is an M3U playlist of films (e.g. Pluto TV's on-demand movies).
+type VODSource struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	URL       string `json:"url"`
+	UserAgent string `json:"userAgent"`
+	Enabled   bool   `json:"enabled"`
 }
 
 // LiveTVSource is an M3U playlist with its XMLTV guide, or a Dispatcharr server.

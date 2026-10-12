@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.DownloadDone
@@ -173,6 +174,8 @@ fun LibrariesScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
     // Only while Live TV has channels this profile may watch (LIVE-1); checked again on opening.
     val liveOn by marquee.liveTv.collectAsState()
+    // Movies on demand (LIVE-6) live under Live TV too, so either one lists it.
+    val vodOn by marquee.vod.collectAsState()
     LaunchedEffect(Unit) { marquee.refreshLiveTv() }
     val requests by produceState<app.marquee.api.models.RequestsStatus?>(null) {
         value = withContext(Dispatchers.IO) { runCatching { marquee.requests.requestsStatus() }.getOrNull() }
@@ -215,14 +218,26 @@ fun LibrariesScreen(nav: NavHostController) {
             HorizontalDivider()
         }
         // Live TV sits with the libraries (not a tab of its own), once it's set up.
-        if (liveOn) item(key = "livetv") {
+        if (liveOn || vodOn) item(key = "livetv") {
             ListItem(
                 headlineContent = { Text("Live TV") },
-                supportingContent = { Text("Guide, channels and recordings") },
+                supportingContent = { Text(if (liveOn) "Guide, channels and recordings" else "Movies on demand") },
                 leadingContent = { Icon(Icons.Filled.LiveTv, null) },
                 trailingContent = { Icon(Icons.Filled.ChevronRight, null) },
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
                 modifier = Modifier.focusCard({ nav.navigate("livetv") }),
+            )
+            HorizontalDivider()
+        }
+        // VOD, movies on demand (LIVE-6): straight to Live TV's VOD tab, right after Live TV.
+        if (vodOn) item(key = "vod") {
+            ListItem(
+                headlineContent = { Text("VOD") },
+                supportingContent = { Text("Movies on demand") },
+                leadingContent = { Icon(Icons.Filled.Movie, null) },
+                trailingContent = { Icon(Icons.Filled.ChevronRight, null) },
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+                modifier = Modifier.focusCard({ nav.navigate("livetv?tab=movies") }),
             )
             HorizontalDivider()
         }

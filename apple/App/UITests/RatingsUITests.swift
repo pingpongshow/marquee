@@ -223,8 +223,11 @@ final class RatingsUITests: XCTestCase {
     // MARK: - Community ratings and comments
 
     private var kidToken: String? {
+        // Default: the repository's .e2e/kid.token (scripts/e2e/setup.sh), found from this file.
+        let repo = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let path = ProcessInfo.processInfo.environment["MARQUEE_TEST_KID_TOKEN_FILE"]
-            ?? "/Users/stephen/Desktop/Media Server/.e2e/kid.token"
+            ?? repo.appendingPathComponent(".e2e/kid.token").path
         return (try? String(contentsOfFile: path, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 

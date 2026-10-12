@@ -2337,6 +2337,440 @@ extension Components {
                 case enabled
             }
         }
+        /// An M3U playlist of films, e.g. Pluto TV's on-demand movies (LIVE-6). Each entry's group-title is its category.
+        ///
+        /// - Remark: Generated from `#/components/schemas/VodSource`.
+        public struct VodSource: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodSource/id`.
+            public var id: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/VodSource/name`.
+            public var name: Swift.String
+            /// - Remark: Generated from `#/components/schemas/VodSource/url`.
+            public var url: Swift.String
+            /// - Remark: Generated from `#/components/schemas/VodSource/userAgent`.
+            public var userAgent: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/VodSource/enabled`.
+            public var enabled: Swift.Bool?
+            /// Creates a new `VodSource`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - name:
+            ///   - url:
+            ///   - userAgent:
+            ///   - enabled:
+            public init(
+                id: Swift.String? = nil,
+                name: Swift.String,
+                url: Swift.String,
+                userAgent: Swift.String? = nil,
+                enabled: Swift.Bool? = nil
+            ) {
+                self.id = id
+                self.name = name
+                self.url = url
+                self.userAgent = userAgent
+                self.enabled = enabled
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case name
+                case url
+                case userAgent
+                case enabled
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/VodStatus`.
+        public struct VodStatus: Codable, Hashable, Sendable {
+            /// Movies on demand are turned on, a source has films, and this profile may watch Live TV. Clients show them only when true.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodStatus/enabled`.
+            public var enabled: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/VodStatus/movies`.
+            public var movies: Swift.Int
+            /// Films matched to TMDB.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodStatus/matched`.
+            public var matched: Swift.Int
+            /// Films TMDB had no confident match for.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodStatus/unmatched`.
+            public var unmatched: Swift.Int
+            /// Details and TMDB matches are being fetched now.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodStatus/matching`.
+            public var matching: Swift.Bool
+            /// A TMDB API key is set (admins only).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodStatus/tmdbConfigured`.
+            public var tmdbConfigured: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/VodStatus/SourcesPayload`.
+            public struct SourcesPayloadPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/VodStatus/SourcesPayload/id`.
+                public var id: Swift.String
+                /// - Remark: Generated from `#/components/schemas/VodStatus/SourcesPayload/name`.
+                public var name: Swift.String
+                /// - Remark: Generated from `#/components/schemas/VodStatus/SourcesPayload/movies`.
+                public var movies: Swift.Int
+                /// - Remark: Generated from `#/components/schemas/VodStatus/SourcesPayload/refreshedAt`.
+                public var refreshedAt: Foundation.Date?
+                /// - Remark: Generated from `#/components/schemas/VodStatus/SourcesPayload/error`.
+                public var error: Swift.String?
+                /// Creates a new `SourcesPayloadPayload`.
+                ///
+                /// - Parameters:
+                ///   - id:
+                ///   - name:
+                ///   - movies:
+                ///   - refreshedAt:
+                ///   - error:
+                public init(
+                    id: Swift.String,
+                    name: Swift.String,
+                    movies: Swift.Int,
+                    refreshedAt: Foundation.Date? = nil,
+                    error: Swift.String? = nil
+                ) {
+                    self.id = id
+                    self.name = name
+                    self.movies = movies
+                    self.refreshedAt = refreshedAt
+                    self.error = error
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case id
+                    case name
+                    case movies
+                    case refreshedAt
+                    case error
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/VodStatus/sources`.
+            public typealias SourcesPayload = [Components.Schemas.VodStatus.SourcesPayloadPayload]
+            /// - Remark: Generated from `#/components/schemas/VodStatus/sources`.
+            public var sources: Components.Schemas.VodStatus.SourcesPayload
+            /// Creates a new `VodStatus`.
+            ///
+            /// - Parameters:
+            ///   - enabled: Movies on demand are turned on, a source has films, and this profile may watch Live TV. Clients show them only when true.
+            ///   - movies:
+            ///   - matched: Films matched to TMDB.
+            ///   - unmatched: Films TMDB had no confident match for.
+            ///   - matching: Details and TMDB matches are being fetched now.
+            ///   - tmdbConfigured: A TMDB API key is set (admins only).
+            ///   - sources:
+            public init(
+                enabled: Swift.Bool,
+                movies: Swift.Int,
+                matched: Swift.Int,
+                unmatched: Swift.Int,
+                matching: Swift.Bool,
+                tmdbConfigured: Swift.Bool? = nil,
+                sources: Components.Schemas.VodStatus.SourcesPayload
+            ) {
+                self.enabled = enabled
+                self.movies = movies
+                self.matched = matched
+                self.unmatched = unmatched
+                self.matching = matching
+                self.tmdbConfigured = tmdbConfigured
+                self.sources = sources
+            }
+            public enum CodingKeys: String, CodingKey {
+                case enabled
+                case movies
+                case matched
+                case unmatched
+                case matching
+                case tmdbConfigured
+                case sources
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/VodCategory`.
+        public struct VodCategory: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodCategory/name`.
+            public var name: Swift.String
+            /// - Remark: Generated from `#/components/schemas/VodCategory/count`.
+            public var count: Swift.Int
+            /// Creates a new `VodCategory`.
+            ///
+            /// - Parameters:
+            ///   - name:
+            ///   - count:
+            public init(
+                name: Swift.String,
+                count: Swift.Int
+            ) {
+                self.name = name
+                self.count = count
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case count
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/VodMovie`.
+        public struct VodMovie: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodMovie/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/VodMovie/title`.
+            public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/VodMovie/year`.
+            public var year: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/VodMovie/category`.
+            public var category: Swift.String?
+            /// e.g. PG-13.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodMovie/contentRating`.
+            public var contentRating: Swift.String?
+            /// TMDB's average vote out of 10.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodMovie/rating`.
+            public var rating: Swift.Double?
+            /// - Remark: Generated from `#/components/schemas/VodMovie/runtimeMs`.
+            public var runtimeMs: Swift.Int64?
+            /// Server-relative; no token needed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodMovie/posterUrl`.
+            public var posterUrl: Swift.String?
+            /// The caller's resume point.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodMovie/positionMs`.
+            public var positionMs: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/VodMovie/watched`.
+            public var watched: Swift.Bool
+            /// Creates a new `VodMovie`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - title:
+            ///   - year:
+            ///   - category:
+            ///   - contentRating: e.g. PG-13.
+            ///   - rating: TMDB's average vote out of 10.
+            ///   - runtimeMs:
+            ///   - posterUrl: Server-relative; no token needed.
+            ///   - positionMs: The caller's resume point.
+            ///   - watched:
+            public init(
+                id: Swift.Int64,
+                title: Swift.String,
+                year: Swift.Int? = nil,
+                category: Swift.String? = nil,
+                contentRating: Swift.String? = nil,
+                rating: Swift.Double? = nil,
+                runtimeMs: Swift.Int64? = nil,
+                posterUrl: Swift.String? = nil,
+                positionMs: Swift.Int64? = nil,
+                watched: Swift.Bool
+            ) {
+                self.id = id
+                self.title = title
+                self.year = year
+                self.category = category
+                self.contentRating = contentRating
+                self.rating = rating
+                self.runtimeMs = runtimeMs
+                self.posterUrl = posterUrl
+                self.positionMs = positionMs
+                self.watched = watched
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case title
+                case year
+                case category
+                case contentRating
+                case rating
+                case runtimeMs
+                case posterUrl
+                case positionMs
+                case watched
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/VodMovieDetail`.
+        public struct VodMovieDetail: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value1`.
+            public var value1: Components.Schemas.VodMovie
+            /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2`.
+            public struct Value2Payload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/overview`.
+                public var overview: Swift.String?
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/tagline`.
+                public var tagline: Swift.String?
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/genres`.
+                public var genres: [Swift.String]
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/director`.
+                public var director: Swift.String?
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/CastPayload`.
+                public struct CastPayloadPayload: Codable, Hashable, Sendable {
+                    /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/CastPayload/name`.
+                    public var name: Swift.String
+                    /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/CastPayload/character`.
+                    public var character: Swift.String?
+                    /// Creates a new `CastPayloadPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - name:
+                    ///   - character:
+                    public init(
+                        name: Swift.String,
+                        character: Swift.String? = nil
+                    ) {
+                        self.name = name
+                        self.character = character
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case name
+                        case character
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/cast`.
+                public typealias CastPayload = [Components.Schemas.VodMovieDetail.Value2Payload.CastPayloadPayload]
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/cast`.
+                public var cast: Components.Schemas.VodMovieDetail.Value2Payload.CastPayload
+                /// Server-relative; no token needed.
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/backdropUrl`.
+                public var backdropUrl: Swift.String?
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/tmdbId`.
+                public var tmdbId: Swift.Int?
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/imdbId`.
+                public var imdbId: Swift.String?
+                /// The details are TMDB's.
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/matched`.
+                public var matched: Swift.Bool
+                /// Creates a new `Value2Payload`.
+                ///
+                /// - Parameters:
+                ///   - overview:
+                ///   - tagline:
+                ///   - genres:
+                ///   - director:
+                ///   - cast:
+                ///   - backdropUrl: Server-relative; no token needed.
+                ///   - tmdbId:
+                ///   - imdbId:
+                ///   - matched: The details are TMDB's.
+                public init(
+                    overview: Swift.String? = nil,
+                    tagline: Swift.String? = nil,
+                    genres: [Swift.String],
+                    director: Swift.String? = nil,
+                    cast: Components.Schemas.VodMovieDetail.Value2Payload.CastPayload,
+                    backdropUrl: Swift.String? = nil,
+                    tmdbId: Swift.Int? = nil,
+                    imdbId: Swift.String? = nil,
+                    matched: Swift.Bool
+                ) {
+                    self.overview = overview
+                    self.tagline = tagline
+                    self.genres = genres
+                    self.director = director
+                    self.cast = cast
+                    self.backdropUrl = backdropUrl
+                    self.tmdbId = tmdbId
+                    self.imdbId = imdbId
+                    self.matched = matched
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case overview
+                    case tagline
+                    case genres
+                    case director
+                    case cast
+                    case backdropUrl
+                    case tmdbId
+                    case imdbId
+                    case matched
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2`.
+            public var value2: Components.Schemas.VodMovieDetail.Value2Payload
+            /// Creates a new `VodMovieDetail`.
+            ///
+            /// - Parameters:
+            ///   - value1:
+            ///   - value2:
+            public init(
+                value1: Components.Schemas.VodMovie,
+                value2: Components.Schemas.VodMovieDetail.Value2Payload
+            ) {
+                self.value1 = value1
+                self.value2 = value2
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                self.value1 = try .init(from: decoder)
+                self.value2 = try .init(from: decoder)
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                try self.value1.encode(to: encoder)
+                try self.value2.encode(to: encoder)
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/VodMoviePage`.
+        public struct VodMoviePage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodMoviePage/total`.
+            public var total: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/VodMoviePage/movies`.
+            public var movies: [Components.Schemas.VodMovie]
+            /// Creates a new `VodMoviePage`.
+            ///
+            /// - Parameters:
+            ///   - total:
+            ///   - movies:
+            public init(
+                total: Swift.Int,
+                movies: [Components.Schemas.VodMovie]
+            ) {
+                self.total = total
+                self.movies = movies
+            }
+            public enum CodingKeys: String, CodingKey {
+                case total
+                case movies
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/VodSession`.
+        public struct VodSession: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodSession/id`.
+            public var id: Swift.String
+            /// The HLS playlist (server-relative; the session id is its credential).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSession/url`.
+            public var url: Swift.String
+            /// - Remark: Generated from `#/components/schemas/VodSession/movieId`.
+            public var movieId: Swift.Int64
+            /// Where to start (the caller's resume point).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSession/startMs`.
+            public var startMs: Swift.Int64?
+            /// Creates a new `VodSession`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - url: The HLS playlist (server-relative; the session id is its credential).
+            ///   - movieId:
+            ///   - startMs: Where to start (the caller's resume point).
+            public init(
+                id: Swift.String,
+                url: Swift.String,
+                movieId: Swift.Int64,
+                startMs: Swift.Int64? = nil
+            ) {
+                self.id = id
+                self.url = url
+                self.movieId = movieId
+                self.startMs = startMs
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case url
+                case movieId
+                case startMs
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/RequestsStatus`.
         public struct RequestsStatus: Codable, Hashable, Sendable {
             /// Seerr is configured.
@@ -2909,6 +3343,12 @@ extension Components {
             public var dvrPaddingAfter: Swift.Int?
             /// - Remark: Generated from `#/components/schemas/IntegrationSettings/liveTvSources`.
             public var liveTvSources: [Components.Schemas.LiveTvSource]?
+            /// Movies on demand appear under Live TV (LIVE-6).
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/vodEnabled`.
+            public var vodEnabled: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/vodSources`.
+            public var vodSources: [Components.Schemas.VodSource]?
             /// Creates a new `IntegrationSettings`.
             ///
             /// - Parameters:
@@ -2920,6 +3360,8 @@ extension Components {
             ///   - dvrPaddingBefore: Minutes recordings start early.
             ///   - dvrPaddingAfter: Minutes recordings run late.
             ///   - liveTvSources:
+            ///   - vodEnabled: Movies on demand appear under Live TV (LIVE-6).
+            ///   - vodSources:
             public init(
                 seerrUrl: Swift.String? = nil,
                 seerrApiKeySet: Swift.Bool? = nil,
@@ -2928,7 +3370,9 @@ extension Components {
                 bazarrApiKeySet: Swift.Bool? = nil,
                 dvrPaddingBefore: Swift.Int? = nil,
                 dvrPaddingAfter: Swift.Int? = nil,
-                liveTvSources: [Components.Schemas.LiveTvSource]? = nil
+                liveTvSources: [Components.Schemas.LiveTvSource]? = nil,
+                vodEnabled: Swift.Bool? = nil,
+                vodSources: [Components.Schemas.VodSource]? = nil
             ) {
                 self.seerrUrl = seerrUrl
                 self.seerrApiKeySet = seerrApiKeySet
@@ -2938,6 +3382,8 @@ extension Components {
                 self.dvrPaddingBefore = dvrPaddingBefore
                 self.dvrPaddingAfter = dvrPaddingAfter
                 self.liveTvSources = liveTvSources
+                self.vodEnabled = vodEnabled
+                self.vodSources = vodSources
             }
             public enum CodingKeys: String, CodingKey {
                 case seerrUrl
@@ -2948,6 +3394,8 @@ extension Components {
                 case dvrPaddingBefore
                 case dvrPaddingAfter
                 case liveTvSources
+                case vodEnabled
+                case vodSources
             }
         }
         /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate`.
@@ -2980,6 +3428,12 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/liveTvSources`.
             public var liveTvSources: [Components.Schemas.LiveTvSource]?
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/vodEnabled`.
+            public var vodEnabled: Swift.Bool?
+            /// Replaces the whole list when sent.
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/vodSources`.
+            public var vodSources: [Components.Schemas.VodSource]?
             /// Creates a new `IntegrationSettingsUpdate`.
             ///
             /// - Parameters:
@@ -2992,6 +3446,8 @@ extension Components {
             ///   - dvrPaddingBefore:
             ///   - dvrPaddingAfter:
             ///   - liveTvSources: Replaces the whole list when sent.
+            ///   - vodEnabled:
+            ///   - vodSources: Replaces the whole list when sent.
             public init(
                 seerrUrl: Swift.String? = nil,
                 seerrApiKey: Swift.String? = nil,
@@ -3001,7 +3457,9 @@ extension Components {
                 bazarrApiKey: Swift.String? = nil,
                 dvrPaddingBefore: Swift.Int? = nil,
                 dvrPaddingAfter: Swift.Int? = nil,
-                liveTvSources: [Components.Schemas.LiveTvSource]? = nil
+                liveTvSources: [Components.Schemas.LiveTvSource]? = nil,
+                vodEnabled: Swift.Bool? = nil,
+                vodSources: [Components.Schemas.VodSource]? = nil
             ) {
                 self.seerrUrl = seerrUrl
                 self.seerrApiKey = seerrApiKey
@@ -3012,6 +3470,8 @@ extension Components {
                 self.dvrPaddingBefore = dvrPaddingBefore
                 self.dvrPaddingAfter = dvrPaddingAfter
                 self.liveTvSources = liveTvSources
+                self.vodEnabled = vodEnabled
+                self.vodSources = vodSources
             }
             public enum CodingKeys: String, CodingKey {
                 case seerrUrl
@@ -3023,6 +3483,8 @@ extension Components {
                 case dvrPaddingBefore
                 case dvrPaddingAfter
                 case liveTvSources
+                case vodEnabled
+                case vodSources
             }
         }
         /// - Remark: Generated from `#/components/schemas/MetadataSettings`.

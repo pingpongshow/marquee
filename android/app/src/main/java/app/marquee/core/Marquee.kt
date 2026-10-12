@@ -124,12 +124,31 @@ class Marquee(context: Context) {
     @Volatile var fakeLiveTv: Boolean? = null
         set(value) { field = value.takeIf { debuggable }; refreshLiveTv() }
 
+    private val _vod = MutableStateFlow(false)
+    /**
+     * Whether movies on demand are usable (LIVE-6): turned on, a source has films, and this
+     * profile may watch Live TV. They live under Live TV, which is listed while either is on.
+     * Checked with Live TV's status.
+     */
+    val vod: StateFlow<Boolean> = _vod
+    /** Test hook (debug builds only): a fixed movies-on-demand status instead of the server's. */
+    @Volatile var fakeVod: Boolean? = null
+        set(value) { field = value.takeIf { debuggable }; refreshLiveTv() }
+
     fun refreshLiveTv() {
-        fakeLiveTv?.let { _liveTv.value = it; return }
-        if (token == null || baseUrl == null) { _liveTv.value = false; return }
-        scope.launch {
+        val fakeLive = fakeLiveTv
+        val fakeV = fakeVod
+        fakeLive?.let { _liveTv.value = it }
+        fakeV?.let { _vod.value = it }
+        if (fakeLive != null && fakeV != null) return
+        if (token == null || baseUrl == null) { if (fakeLive == null) _liveTv.value = false; if (fakeV == null) _vod.value = false; return }
+        if (fakeLive == null) scope.launch {
             val on = runCatching { livetv.liveTvStatus().enabled }.getOrNull() ?: return@launch
             _liveTv.value = fakeLiveTv ?: on
+        }
+        if (fakeV == null) scope.launch {
+            val on = runCatching { livetv.vodStatus().enabled }.getOrNull() ?: return@launch
+            _vod.value = fakeVod ?: on
         }
     }
 
@@ -283,6 +302,7 @@ class Marquee(context: Context) {
         server?.let { store.setToken(it.id, null); store.setUserId(it.id, null) }
         _me.value = null
         _liveTv.value = false
+        _vod.value = false
         _ratingRequest.value = null
         _state.value = State.SignedOut
     }

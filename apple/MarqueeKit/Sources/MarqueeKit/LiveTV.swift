@@ -19,9 +19,11 @@ public extension AppSession {
     }
 
     /// Whether Live TV is usable for this profile (a source with channels it may watch).
-    /// UI tests force "not usable" with -marquee-test-live-off.
+    /// UI tests force "not usable" with -marquee-test-live-off (movies on demand too), or only
+    /// the channels with -marquee-test-channels-off.
     func liveStatus() async throws -> LiveTvStatus {
-        if ProcessInfo.processInfo.arguments.contains("-marquee-test-live-off") {
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("-marquee-test-live-off") || args.contains("-marquee-test-channels-off") {
             return LiveTvStatus(enabled: false, channels: 0, sources: [])
         }
         return try await liveAPI.liveTvStatus().ok.body.json

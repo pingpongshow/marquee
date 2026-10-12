@@ -59,6 +59,8 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -120,12 +122,18 @@ private fun defaultStart(): OffsetDateTime {
 
 /** Live TV (LIVE-2): Guide and What's On, a live preview on phones, full screen on TV. */
 @Composable
-fun LiveTvScreen(nav: NavHostController) {
+fun LiveTvScreen(nav: NavHostController, initialTab: String? = null) {
     val marquee = LocalMarquee.current
     val scope = rememberCoroutineScope()
-    val status by produceState<app.marquee.api.models.LiveTvStatus?>(null) { value = withContext(Dispatchers.IO) { runCatching { marquee.livetv.liveTvStatus() }.getOrNull() } }
+    // Null while loading; a failure counts as Live TV being off (movies on demand may still be on).
+    val statusResult by produceState<Result<app.marquee.api.models.LiveTvStatus>?>(null) { value = withContext(Dispatchers.IO) { runCatching { marquee.livetv.liveTvStatus() } } }
+    val status = statusResult?.getOrNull()
     val groups by produceState(emptyList<String>()) { value = withContext(Dispatchers.IO) { runCatching { marquee.livetv.listLiveGroups().map { it.name } }.getOrDefault(emptyList()) } }
-    var tab by remember { mutableIntStateOf(0) }
+    // VOD, movies on demand (LIVE-6), is a tab here while they're usable for this profile.
+    val vodOn by marquee.vod.collectAsState()
+    LaunchedEffect(Unit) { marquee.refreshLiveTv() }
+    // Saved, so coming back from a film returns to Movies.
+    var tab by rememberSaveable { mutableStateOf(initialTab ?: "guide") }
     var filter by remember { mutableStateOf("all") }
     var start by remember { mutableStateOf(defaultStart()) }
     var channels by remember { mutableStateOf<List<LiveChannel>?>(null) }
@@ -149,27 +157,40 @@ fun LiveTvScreen(nav: NavHostController) {
     fun pick(c: LiveChannel) { if (marquee.isTv || preview == c.id) watch(c.id) else preview = c.id }
 
     val s = status
-    if (s == null) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }; return }
-    if (!s.enabled) {
+    if (statusResult == null || (s == null && !vodOn)) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }; return }
+    val liveOn = marquee.fakeLiveTv ?: (s?.enabled == true) // the test hook stands in for the server's status
+    val tabs = buildList {
+        if (liveOn) {
+            add("guide" to "Guide")
+            add("now" to "What's On")
+            if (s?.canRecord == true) add("recordings" to "Recordings")
+        }
+        if (vodOn) add("movies" to "VOD")
+    }
+    if (tabs.isEmpty()) {
         Column(Modifier.fillMaxWidth().padding(48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("Live TV isn't set up", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text("An admin can add Dispatcharr or an M3U playlist in the web app's Settings → Live TV.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         return
     }
-    val list = channels
-    LazyColumn(contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
+    val current = tab.takeIf { t -> tabs.any { it.first == t } } ?: tabs.first().first
+    val header: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Live TV", Modifier.padding(horizontal = sidePadding), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        }
-        item {
             Row(Modifier.padding(horizontal = sidePadding), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                (if (s.canRecord == true) listOf("Guide", "What's On", "Recordings") else listOf("Guide", "What's On")).forEachIndexed { i, t ->
-                    FilterChip(tab == i, { tab = i }, { Text(t) }, Modifier.focusRing(RoundedCornerShape(8.dp)).initialFocus(marquee.isTv && i == 0))
+                tabs.forEachIndexed { i, (key, label) ->
+                    FilterChip(current == key, { tab = key }, { Text(label) }, Modifier.focusRing(RoundedCornerShape(8.dp)).initialFocus(marquee.isTv && i == 0))
                 }
             }
         }
-        if (tab == 2) {
+    }
+    if (current == "movies") { VodBrowse(nav, header); return }
+    if (s == null) return
+    val list = channels
+    LazyColumn(contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { header() }
+        if (current == "recordings") {
             item { RecordingsList(nav) }
             return@LazyColumn
         }
@@ -191,7 +212,7 @@ fun LiveTvScreen(nav: NavHostController) {
                 else -> "No channels."
             },
                 Modifier.padding(horizontal = sidePadding), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else if (tab == 0) {
+        } else if (current == "guide") {
             item {
                 Row(Modifier.padding(horizontal = sidePadding), verticalAlignment = Alignment.CenterVertically) {
                     Text(start.local().format(DateTimeFormatter.ofPattern("EEE h:mm a")), Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
