@@ -271,7 +271,7 @@ final class MarqueeUITests: XCTestCase {
     }
 
     /// Live TV (LIVE-2/3): guide with a live preview, What's On, full-screen watching and
-    /// channel up. Needs a Live TV source (scripts/fake-iptv.py in development).
+    /// changing channel with a swipe. Needs a Live TV source (scripts/fake-iptv.py in development).
     func testLiveTV() {
         connectAndSignIn()
         // Live TV is with the libraries, not a tab of its own (iPhone).
@@ -297,10 +297,62 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(close.waitForExistence(timeout: 15))
         sleep(6)
         shot("l3-watching")
-        app.buttons["Channel up"].tap()
+        app.windows.firstMatch.swipeLeft()
         sleep(6)
-        shot("l4-channel-up")
+        shot("l4-next-channel")
         close.tap()
+    }
+
+    /// From the libraries to the full-screen live player, through What's On.
+    private func openLivePlayer() {
+        openLibrary("Live TV")
+        XCTAssertTrue(app.navigationBars["Live TV"].waitForExistence(timeout: 10))
+        app.buttons["What's On"].firstMatch.tap()
+        let watch = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Watch '")).firstMatch
+        XCTAssertTrue(watch.waitForExistence(timeout: 15))
+        watch.tap()
+        XCTAssertTrue(app.buttons["Close Live TV"].waitForExistence(timeout: 15))
+    }
+
+    /// Live TV gestures (iPhone/iPad): no channel buttons; swipe left is the next channel, swipe
+    /// right the previous one, each with a channel overlay; swipe down from the top closes.
+    func testLiveTVSwipeGestures() {
+        connectAndSignIn()
+        openLivePlayer()
+        XCTAssertFalse(app.buttons["Channel up"].exists, "no channel up button")
+        XCTAssertFalse(app.buttons["Channel down"].exists, "no channel down button")
+        let anyNowPlaying = app.descendants(matching: .any)["liveWatch.nowPlaying"].firstMatch
+        XCTAssertTrue(anyNowPlaying.waitForExistence(timeout: 10))
+        let first = anyNowPlaying.label
+        let overlay = app.descendants(matching: .any)["liveWatch.channelOverlay"].firstMatch
+        XCTAssertFalse(overlay.exists, "no overlay before a swipe")
+        sleep(2)
+        shot("g1-watching")
+
+        // Swipe left: the next channel, with its overlay.
+        app.windows.firstMatch.swipeLeft()
+        XCTAssertTrue(overlay.waitForExistence(timeout: 3), "the channel overlay shows")
+        let next = overlay.label
+        shot("g2-swiped-left")
+        XCTAssertFalse(first.contains(next), "moved to another channel (\(first) → \(next))")
+        XCTAssertTrue(anyNowPlaying.label.contains(next), "now playing \(next)")
+        XCTAssertTrue(overlay.waitForNonExistence(timeout: 6), "the overlay goes away")
+
+        // Swipe right: back to the first channel.
+        app.windows.firstMatch.swipeRight()
+        XCTAssertTrue(overlay.waitForExistence(timeout: 3))
+        let back = overlay.label
+        shot("g3-swiped-right")
+        XCTAssertTrue(first.contains(back), "back on the first channel (\(first), got \(back))")
+        XCTAssertTrue(overlay.waitForNonExistence(timeout: 6))
+
+        // Swipe down from the top: the player closes, back on Live TV.
+        let win = app.windows.firstMatch
+        win.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12))
+            .press(forDuration: 0.05, thenDragTo: win.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75)))
+        XCTAssertTrue(app.buttons["Close Live TV"].waitForNonExistence(timeout: 5), "the player closed")
+        XCTAssertTrue(app.navigationBars["Live TV"].waitForExistence(timeout: 5))
+        shot("g4-closed")
     }
 
     private var adminToken: String? { ProcessInfo.processInfo.environment["MARQUEE_TEST_ADMIN_TOKEN"].flatMap { $0.isEmpty ? nil : $0 } }

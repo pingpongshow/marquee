@@ -3,7 +3,7 @@ import MarqueeKit
 import SwiftUI
 
 /// Live TV (LIVE-2): a Guide and What's On, a live preview on iPhone/iPad, and
-/// full-screen watching with channel up/down. Movies on demand (VOD) have their own page.
+/// full-screen watching (swipe to change channel; channel up/down on Apple TV). Movies on demand (VOD) have their own page.
 struct LiveTVView: View {
     @Environment(AppSession.self) private var app
     @State private var tab: Tab
@@ -487,7 +487,8 @@ struct LivePreview: View {
 }
 #endif
 
-/// Full-screen live TV with channel up/down.
+/// Full-screen live TV. iPhone/iPad: swipe left/right on the video to change channel, swipe
+/// down from the top to close. Apple TV: the remote's up/down changes channel.
 struct LiveWatchView: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
@@ -497,6 +498,13 @@ struct LiveWatchView: View {
     @State private var player = AVPlayer()
     @State private var session: String?
     @State private var error: String?
+    #if os(iOS)
+    /// The channel overlay shown briefly after a swipe changes channel.
+    @State private var overlayChannel: LiveChannel?
+    @State private var overlayToken = 0
+    /// How far the view follows a swipe down from the top.
+    @State private var pullDown: CGFloat = 0
+    #endif
 
     init(channels: [LiveChannel], start: Int64) {
         self.channels = channels
@@ -506,22 +514,33 @@ struct LiveWatchView: View {
     private var channel: LiveChannel? { channels.first { $0.id == current } }
 
     var body: some View {
+        #if os(iOS)
+        GeometryReader { geo in
+            content
+                .offset(y: pullDown)
+                .simultaneousGesture(swipes(geo.size))
+        }
+        #else
+        content
+            .onMoveCommand { dir in
+                if dir == .up { step(-1) } else if dir == .down { step(1) }
+            }
+        #endif
+    }
+
+    private var content: some View {
         ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
             VideoPlayer(player: player).ignoresSafeArea()
                 .accessibilityLabel("Live TV")
             #if os(iOS)
             header
+            if let c = overlayChannel { channelOverlay(c).frame(maxHeight: .infinity) }
             #endif
             if let error { Text(error).foregroundStyle(.red).padding(.top, 80) }
         }
         .task(id: current) { await tune() }
         .onDisappear { stop() }
-        #if os(tvOS)
-        .onMoveCommand { dir in
-            if dir == .up { step(-1) } else if dir == .down { step(1) }
-        }
-        #endif
     }
 
     #if os(iOS)
@@ -534,14 +553,68 @@ struct LiveWatchView: View {
                     Text(c.now?.title ?? c.name).font(.headline).lineLimit(1)
                     Text([c.name, c.next.map { "Next: \($0.title)" }].compactMap { $0 }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("liveWatch.nowPlaying")
             }
             Spacer()
-            Button { step(-1) } label: { Image(systemName: "chevron.up") }.accessibilityLabel("Channel up")
-            Button { step(1) } label: { Image(systemName: "chevron.down.circle") }.accessibilityLabel("Channel down")
         }
         .buttonStyle(.bordered).tint(.white)
         .padding()
         .background(LinearGradient(colors: [.black.opacity(0.8), .clear], startPoint: .top, endPoint: .bottom))
+    }
+
+    /// Number, logo and name of the channel being switched to.
+    private func channelOverlay(_ c: LiveChannel) -> some View {
+        HStack(spacing: 14) {
+            if let n = c.number { Text(n).font(.title.monospacedDigit().bold()) }
+            ChannelLogo(channel: c).frame(width: 72, height: 40)
+            Text(c.name).font(.title3.weight(.semibold)).lineLimit(1)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 20).padding(.vertical, 14)
+        .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 14))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(c.name)
+        .accessibilityValue(c.number.map { "Channel \($0)" } ?? "")
+        .accessibilityIdentifier("liveWatch.channelOverlay")
+        .allowsHitTesting(false)
+        .transition(.opacity)
+    }
+
+    /// Swipe left/right to change channel; swipe down from the top quarter to close. Runs
+    /// alongside the player's own gestures, so a tap still shows or hides its controls; a
+    /// horizontal swipe along the bottom (where the player's scrub bar sits) is left to it.
+    private func swipes(_ size: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 20, coordinateSpace: .local)
+            .onChanged { v in
+                let fromTop = v.startLocation.y < size.height * 0.25
+                let dx = v.translation.width, dy = v.translation.height
+                if fromTop, dy > 0, dy > abs(dx) { pullDown = dy } else if pullDown != 0 { pullDown = 0 }
+            }
+            .onEnded { v in
+                let fromTop = v.startLocation.y < size.height * 0.25
+                let dx = v.translation.width, dy = v.translation.height
+                let fling = v.predictedEndTranslation.height
+                if fromTop, dy > abs(dx), dy > size.height * 0.2 || fling > size.height * 0.4 {
+                    dismiss()
+                    return
+                }
+                withAnimation(.spring(duration: 0.25)) { pullDown = 0 }
+                let inScrubBar = v.startLocation.y > size.height - 110
+                guard !inScrubBar, abs(dx) > 60, abs(dx) > abs(dy) * 1.5 else { return }
+                step(dx < 0 ? 1 : -1)
+                showOverlay()
+            }
+    }
+
+    private func showOverlay() {
+        overlayToken += 1
+        let token = overlayToken
+        withAnimation(.easeOut(duration: 0.15)) { overlayChannel = channel }
+        Task {
+            try? await Task.sleep(for: .seconds(2.5))
+            if token == overlayToken { withAnimation(.easeIn(duration: 0.3)) { overlayChannel = nil } }
+        }
     }
     #endif
 
