@@ -6,6 +6,23 @@ import SwiftUI
 // Watching and a poster grid), a film's page, and full-screen playback in AVKit's player.
 
 /// The VOD tab inside Live TV.
+/// VOD on its own page (LIVE-6): the VOD entry after Live TV opens it.
+struct VodPage: View {
+    @State private var refresh = 0
+
+    var body: some View {
+        ScrollView {
+            VodBrowseView(refresh: refresh).padding(.vertical)
+        }
+        .refreshable { refresh += 1 }
+        .navigationTitle("VOD")
+        #if os(tvOS)
+        // A top-bar tab on the TV, which names it (no title faded over the grid).
+        .toolbar(.hidden, for: .navigationBar)
+        #endif
+    }
+}
+
 struct VodBrowseView: View {
     @Environment(AppSession.self) private var app
     /// Bumped by the page's pull-to-refresh.

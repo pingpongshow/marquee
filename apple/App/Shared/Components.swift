@@ -149,6 +149,13 @@ struct CachedImage<Content: View>: View {
             guard (response as? HTTPURLResponse)?.statusCode ?? 200 == 200 else { throw URLError(.badServerResponse) }
             // Decoded off the main thread, ready to draw.
             guard let image = await Task.detached(priority: .userInitiated, operation: { UIImage(data: data)?.preparingForDisplay() }).value else {
+                #if DEBUG
+                // Which artwork can't be decoded (Xcode's console shows "-17102 decompressing
+                // image" without saying which). The query (sign-in key) is left out.
+                let type = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Type") ?? "?"
+                let head = data.prefix(8).map { String(format: "%02x", $0) }.joined()
+                print("Marquee: couldn't decode image \(url.path()) (\(type), \(data.count) bytes, starts \(head))")
+                #endif
                 throw URLError(.cannotDecodeContentData)
             }
             try Task.checkCancellation()

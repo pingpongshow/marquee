@@ -166,6 +166,8 @@ final class VodTVUITests: XCTestCase {
         XCTAssertTrue(tile.waitForExistence(timeout: 15), "the film is in Continue Watching")
         sleep(1)
         shot("tv-vod-browse")
+        XCTAssertFalse(app.buttons["Guide"].exists, "VOD is its own page, not inside Live TV")
+        XCTAssertFalse(app.staticTexts["VOD"].exists, "no page title faded over VOD")
         focus(tile, direction: .down)
         remote.press(.select)
 
@@ -193,6 +195,24 @@ final class VodTVUITests: XCTestCase {
         try eventually(10, "watched on the server") { try movie(id, token)["watched"] as? Bool == true }
         try eventually(5, "the page shows it") { watched.label == "Watched" }
         shot("tv-vod-watched")
+    }
+
+    /// Live TV's page has no title faded over the guide (the top bar's tab names it), and no
+    /// VOD tab inside it.
+    func testLiveTVNoTitleTV() throws {
+        _ = try ensureVod()
+        let token = try temporaryAccount()
+        try signIn(as: token)
+        remote.press(.up)
+        let live = app.buttons["Live TV"].firstMatch
+        XCTAssertTrue(live.waitForExistence(timeout: 10))
+        focus(live, direction: .right, tries: 12)
+        remote.press(.select)
+        XCTAssertTrue(app.buttons["Guide"].firstMatch.waitForExistence(timeout: 15), "Live TV opens")
+        sleep(1)
+        shot("tv-livetv")
+        XCTAssertFalse(app.staticTexts["Live TV"].exists, "no Live TV title over the guide")
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label == 'VOD'")).count, 1, "VOD only in the top bar, not a Live TV tab")
     }
 
     /// Not usable for the profile: no VOD tab.

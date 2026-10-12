@@ -41,7 +41,7 @@ struct MainView: View {
                         case .liveTV:
                             Tab("Live TV", systemImage: "antenna.radiowaves.left.and.right") { stack { LiveTVView() } }
                         case .vod:
-                            Tab("VOD", systemImage: "film.stack") { stack { LiveTVView(initialTab: .movies) } }
+                            Tab("VOD", systemImage: "film.stack") { stack { VodPage() } }
                         }
                     }
                     if libraries.isEmpty, librariesError != nil {
@@ -186,10 +186,10 @@ struct MainView: View {
         }
         // A failed check keeps what was known (a tab doesn't vanish on a blip).
         if let s = await requests { canDiscover = s.enabled && s.canRequest }
-        // Live TV is listed when its channels or its movies on demand (LIVE-6) are usable.
+        // Live TV is listed when its channels are usable; VOD (LIVE-6) separately, after it.
         let l = await live, v = await vod
         if let v { hasVod = v.enabled }
-        if l != nil || v != nil { hasLiveTV = (l?.enabled ?? false) || (v?.enabled ?? false) }
+        if let l { hasLiveTV = l.enabled }
     }
 
     private func icon(_ t: Schemas.LibraryType) -> String {
@@ -238,11 +238,14 @@ enum LibraryEntry: Identifiable {
 
     static func list(_ libraries: [Library], liveTV: Bool, vod: Bool = false) -> [LibraryEntry] {
         var out = libraries.map(LibraryEntry.library)
-        guard liveTV else { return out }
         let video: Set<Schemas.LibraryType> = [.movies, .shows, .anime, .videos]
-        let at = (libraries.lastIndex { video.contains($0._type) }).map { $0 + 1 } ?? libraries.count
-        out.insert(.liveTV, at: at)
-        if vod { out.insert(.vod, at: at + 1) }
+        var at = (libraries.lastIndex { video.contains($0._type) }).map { $0 + 1 } ?? libraries.count
+        // Live TV after the video libraries when it has channels; VOD (its own page) after it.
+        if liveTV {
+            out.insert(.liveTV, at: at)
+            at += 1
+        }
+        if vod { out.insert(.vod, at: at) }
         return out
     }
 }
