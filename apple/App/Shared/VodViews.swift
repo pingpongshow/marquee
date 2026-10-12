@@ -5,7 +5,6 @@ import SwiftUI
 // Movies on demand ("VOD" in the UI) under Live TV (LIVE-6): the VOD tab (categories, search, sort, Continue
 // Watching and a poster grid), a film's page, and full-screen playback in AVKit's player.
 
-/// The VOD tab inside Live TV.
 /// VOD on its own page (LIVE-6): the VOD entry after Live TV opens it.
 struct VodPage: View {
     @State private var refresh = 0
@@ -15,11 +14,8 @@ struct VodPage: View {
             VodBrowseView(refresh: refresh).padding(.vertical)
         }
         .refreshable { refresh += 1 }
+        // (No title on the TV: MainView hides it there, as the sidebar names the page.)
         .navigationTitle("VOD")
-        #if os(tvOS)
-        // A top-bar tab on the TV, which names it (no title faded over the grid).
-        .toolbar(.hidden, for: .navigationBar)
-        #endif
     }
 }
 

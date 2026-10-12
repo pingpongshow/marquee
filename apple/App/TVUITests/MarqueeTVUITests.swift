@@ -94,10 +94,8 @@ final class MarqueeTVUITests: XCTestCase {
     /// Stations and Now Playing with lyrics on the TV (M6.5).
     func testMusicStation() throws {
         try signIn()
-        let musicTab = app.buttons["Music"].firstMatch
-        XCTAssertTrue(musicTab.waitForExistence(timeout: 10))
-        focus(musicTab, direction: .right)
-        remote.press(.select)
+        XCTAssertTrue(app.buttons["Music"].firstMatch.waitForExistence(timeout: 10))
+        app.openSection("Music")
         // The landing page: quick actions first, the Library list at the bottom (MUSIC-15).
         XCTAssertTrue(app.buttons["musicLibrary.artists"].waitForExistence(timeout: 10))
         let radio = app.buttons["Library Radio"]
@@ -113,9 +111,7 @@ final class MarqueeTVUITests: XCTestCase {
 
         let nowPlaying = app.buttons["Now Playing"].firstMatch
         XCTAssertTrue(nowPlaying.waitForExistence(timeout: 20))
-        for _ in 0..<6 where !nowPlaying.hasFocus { remote.press(.up) }
-        focus(nowPlaying, direction: .right)
-        remote.press(.select)
+        app.openSection("Now Playing")
         XCTAssertTrue(app.staticTexts["PLAYING FROM"].waitForExistence(timeout: 10))
         sleep(2)
         shot("tv-m2-now-playing")
@@ -315,11 +311,8 @@ final class MarqueeTVUITests: XCTestCase {
     /// scrolls (tvOS hides the navigation bar), and Right from the grid reaches them.
     func testLibraryButtonsStayPinned() throws {
         _ = try signInTemporaryUser()
-        remote.press(.up)
-        let tab = app.buttons["Movies"].firstMatch
-        XCTAssertTrue(tab.waitForExistence(timeout: 10))
-        focus(tab, direction: .right, tries: 6)
-        remote.press(.select)
+        XCTAssertTrue(app.buttons["Movies"].firstMatch.waitForExistence(timeout: 10))
+        app.openSection("Movies")
         XCTAssertTrue(app.descendants(matching: .any)["libraryGrid"].waitForExistence(timeout: 10))
         remote.press(.down)
         let sortMenu = app.descendants(matching: .any).matching(identifier: "sortMenu").firstMatch
@@ -329,8 +322,8 @@ final class MarqueeTVUITests: XCTestCase {
         for _ in 0..<8 { remote.press(.down) }
         sleep(1)
         shot("tv-library-scrolled")
-        // No page title faded over the grid: the top bar's "Movies" tab names the library.
-        XCTAssertFalse(app.staticTexts["Movies"].exists, "no Movies title over the grid")
+        // No page title faded over the grid: the sidebar names the library.
+        XCTAssertFalse(app.pageTitleShows("Movies"), "no Movies title over the grid")
         let window = app.windows.firstMatch.frame
         for b in [muse, sortMenu] {
             XCTAssertTrue(b.exists, "\(b) still there")
@@ -348,28 +341,25 @@ final class MarqueeTVUITests: XCTestCase {
         shot("tv-library-button-focused")
     }
 
-    /// Live TV is a tab placed with the libraries, after the video ones, not a fixed second
-    /// tab; it opens the guide.
+    /// Live TV is a sidebar entry placed with the libraries, after the video ones, not a fixed
+    /// second entry; it opens the guide.
     func testLiveTVTabWithLibraries() throws {
         _ = try signInTemporaryUser()
-        remote.press(.up)
-        let live = app.buttons["Live TV"].firstMatch
-        XCTAssertTrue(live.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Live TV"].firstMatch.waitForExistence(timeout: 10))
+        app.openSidebar()
+        let live = try XCTUnwrap(app.sidebarItem("Live TV"))
         sleep(1)
         shot("tv-live-tab")
-        let home = app.buttons["Home"].firstMatch
-        XCTAssertTrue(home.exists)
+        let home = try XCTUnwrap(app.sidebarItem("Home"))
         // The test server's video libraries.
-        let videos = ["Anime", "Movies", "Recorded TV"].map { app.buttons[$0].firstMatch }
+        let videos = try ["Anime", "Movies", "Recorded TV"].map { try XCTUnwrap(app.sidebarItem($0), "\($0) is listed") }
         for v in videos {
-            XCTAssertTrue(v.exists, "\(v) is a tab")
-            XCTAssertLessThan(v.frame.midX, live.frame.midX, "Live TV comes after \(v.label)")
+            XCTAssertLessThan(v.frame.midY, live.frame.midY, "Live TV comes after \(v.label)")
         }
         // Not straight after Home: libraries sit between them.
-        let between = videos.filter { $0.frame.midX > home.frame.midX && $0.frame.midX < live.frame.midX }
-        XCTAssertFalse(between.isEmpty, "Live TV isn't the second tab")
-        focus(live, direction: .right, tries: 10)
-        remote.press(.select)
+        let between = videos.filter { $0.frame.midY > home.frame.midY && $0.frame.midY < live.frame.midY }
+        XCTAssertFalse(between.isEmpty, "Live TV isn't the second entry")
+        app.openSection("Live TV")
         XCTAssertTrue(app.buttons["What's On"].firstMatch.waitForExistence(timeout: 15), "the Live TV screen opens")
         shot("tv-live-open")
     }
@@ -551,10 +541,8 @@ final class MarqueeTVUITests: XCTestCase {
     func testRecapTV() throws {
         let kid = try api("POST", "/auth/pin", ["userId": 2, "device": ["clientId": "uitest-\(UUID().uuidString)", "name": "UI test", "platform": "tvos"]])
         try signIn(as: try XCTUnwrap(kid["token"] as? String))
-        let musicTab = app.buttons["Music"].firstMatch
-        XCTAssertTrue(musicTab.waitForExistence(timeout: 10))
-        focus(musicTab, direction: .right)
-        remote.press(.select)
+        XCTAssertTrue(app.buttons["Music"].firstMatch.waitForExistence(timeout: 10))
+        app.openSection("Music")
         let card = app.buttons["recapCard"]
         XCTAssertTrue(card.waitForExistence(timeout: 15))
         sleep(1)
@@ -677,11 +665,8 @@ extension MarqueeTVUITests {
         let created = try api("POST", "/playlists", ["title": "UI6 TV Movies", "kind": "video", "itemIds": [322, 8]], token: token)
         XCTAssertNotNil(created["id"])
         try signIn(as: token)
-        remote.press(.up)
-        let tab = app.buttons["Playlists"].firstMatch
-        XCTAssertTrue(tab.waitForExistence(timeout: 10), "a Playlists tab")
-        focus(tab, direction: .right, tries: 12)
-        remote.press(.select)
+        XCTAssertTrue(app.buttons["Playlists"].firstMatch.waitForExistence(timeout: 10), "a Playlists tab")
+        app.openSection("Playlists")
         let card = app.buttons["UI6 TV Movies"].firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 10), "the video playlist is listed")
         remote.press(.down)
@@ -709,11 +694,8 @@ extension MarqueeTVUITests {
     /// Back from a title, the grid is where it was, with focus on that title.
     func testLibraryKeepsFocusAfterBack() throws {
         _ = try signInTemporaryUser()
-        remote.press(.up)
-        let tab = app.buttons["Movies"].firstMatch
-        XCTAssertTrue(tab.waitForExistence(timeout: 10))
-        focus(tab, direction: .right, tries: 6)
-        remote.press(.select)
+        XCTAssertTrue(app.buttons["Movies"].firstMatch.waitForExistence(timeout: 10))
+        app.openSection("Movies")
         XCTAssertTrue(app.descendants(matching: .any)["libraryGrid"].waitForExistence(timeout: 10))
         remote.press(.down)
         for _ in 0..<6 { remote.press(.down) }
@@ -734,7 +716,7 @@ extension MarqueeTVUITests {
         XCTAssertTrue(poster.exists && app.windows.firstMatch.frame.contains(CGPoint(x: poster.frame.midX, y: poster.frame.midY)), "and it's on screen")
     }
 
-    /// Video playlists are also a row on Home (the Playlists tab is at the far end of the bar).
+    /// Video playlists are also a row on Home (as well as the Playlists entry in the sidebar).
     func testVideoPlaylistsOnHomeTV() throws {
         let token = try temporaryAccount()
         _ = try api("POST", "/playlists", ["title": "UI6 Home Movies", "kind": "video", "itemIds": [322, 8]], token: token)
