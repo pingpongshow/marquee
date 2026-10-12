@@ -123,9 +123,7 @@ export function RequestDialog({
           </fieldset>
         ))}
       {create.isSuccess && (
-        <Alert tone="success">
-          Requested. You'll see it under My requests.
-        </Alert>
+        <Alert tone="success">Request sent.</Alert>
       )}
       {create.error && <Alert tone="error">{create.error.message}</Alert>}
     </Dialog>

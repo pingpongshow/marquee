@@ -6,7 +6,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, unwrap } from "@/api/client";
 import {
   Alert,
-  Badge,
   Button,
   Dialog,
   Input,
@@ -16,10 +15,7 @@ import {
 import {
   availabilityLabel,
   type DiscoverItem,
-  myRequestsQuery,
   requestsStatusQuery,
-  statusLabel,
-  useRequestAction,
 } from "./api";
 import { RequestDialog } from "./RequestDialog";
 
@@ -242,7 +238,6 @@ export function DiscoverPage() {
           </div>
         </div>
       )}
-      <MyRequests />
       {results.isPending ? (
         <Spinner />
       ) : results.error ? (
@@ -540,66 +535,5 @@ function Card({
         )}
       </div>
     </div>
-  );
-}
-
-function MyRequests() {
-  const list = useQuery(myRequestsQuery);
-  const cancel = useRequestAction((id: number) =>
-    unwrap(
-      api.DELETE("/requests/{requestId}", {
-        params: { path: { requestId: id } },
-      }),
-    ),
-  );
-  if (!list.data?.length) return null;
-  return (
-    <section className="space-y-3">
-      <h2 className="text-lg font-semibold">My requests</h2>
-      <ul className="divide-y divide-border rounded-md bg-surface">
-        {list.data.map((r) => (
-          <li key={r.id} className="flex items-center gap-3 p-3">
-            {r.posterUrl && (
-              <img src={r.posterUrl} alt="" className="w-10 rounded" />
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-medium">
-                {r.title}{" "}
-                {r.year && <span className="text-faint">({r.year})</span>}
-              </div>
-              <div className="text-xs text-muted">
-                {r.mediaType === "tv" &&
-                  (r.seasons.length
-                    ? `Seasons ${r.seasons.join(", ")} · `
-                    : "All seasons · ")}
-                {new Date(r.createdAt).toLocaleDateString()}
-                {r.reason && ` · ${r.reason}`}
-              </div>
-            </div>
-            <Badge
-              tone={
-                r.status === "available" || r.status === "approved"
-                  ? "accent"
-                  : r.status === "pending"
-                    ? "muted"
-                    : "danger"
-              }
-            >
-              {statusLabel[r.status]}
-            </Badge>
-            {r.status === "pending" && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => cancel.mutate(r.id)}
-                aria-label={`Withdraw ${r.title}`}
-              >
-                Withdraw
-              </Button>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }

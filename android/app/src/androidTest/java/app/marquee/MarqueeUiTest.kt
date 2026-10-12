@@ -494,7 +494,7 @@ class MarqueeUiTest {
         rule.waitUntilAtLeastOneExists(hasContentDescription("Playback settings"), 5_000)
     }
 
-    /** Discover (REQ-1): request a title from Seerr's trending list, see it, withdraw it. Needs Seerr connected. */
+    /** Discover (REQ-1): request a title from Seerr's trending list and see it marked as requested. Needs Seerr connected. */
     @Test fun discoverAndRequest() {
         connectAndSignIn()
         tap("Libraries")
@@ -504,23 +504,17 @@ class MarqueeUiTest {
         rule.waitUntilAtLeastOneExists(requestable, 20_000)
         Thread.sleep(1500)
         shot("r1-discover")
-        rule.onAllNodes(requestable).onFirst().performClick()
+        val first = rule.onAllNodes(requestable).onFirst()
+        val title = first.fetchSemanticsNode().config[SemanticsProperties.ContentDescription].first().removePrefix("Request ")
+        first.performClick()
         rule.waitUntilAtLeastOneExists(hasText("An admin approves", substring = true), 10_000)
         val confirm = hasText("Request") and hasClickAction()
         rule.waitUntil(15_000) { rule.onAllNodes(confirm).fetchSemanticsNodes().any { n -> !n.config.contains(SemanticsProperties.Disabled) } }
         shot("r2-request")
         rule.onAllNodes(confirm).onFirst().performClick()
-        // My Requests is at the end of the grid: scroll there once the list has reloaded.
-        rule.waitUntil(15_000) { scrollTo(hasText("Withdraw")) }
-        shot("r3-my-requests")
-        // Withdraw it, and anything earlier runs left waiting, until none are left.
-        repeat(10) {
-            if (!scrollTo(hasText("Withdraw"))) return@repeat
-            val before = rule.onAllNodes(hasText("Withdraw")).fetchSemanticsNodes().size
-            rule.onAllNodes(hasText("Withdraw")).onFirst().performClick()
-            rule.waitUntil(10_000) { rule.onAllNodes(hasText("Withdraw")).fetchSemanticsNodes().size < before }
-        }
-        rule.waitUntil(10_000) { !scrollTo(hasText("Withdraw")) }
+        // Once the list reloads, the title is marked instead of requestable.
+        rule.waitUntilAtLeastOneExists(hasContentDescription("$title, ", substring = true), 15_000)
+        shot("r3-requested")
     }
 
     /** Live TV (LIVE-2/3): guide with a playing preview (phones), What's On, full screen, channel down. Needs a source. */
