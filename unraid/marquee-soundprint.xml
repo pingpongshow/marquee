@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Marquee-Soundprint</Name>
+  <Repository>ghcr.io/pingpongshow/marquee-soundprint:latest</Repository>
+  <Registry>https://github.com/pingpongshow/marquee/pkgs/container/marquee-soundprint</Registry>
+  <Network>host</Network>
+  <MyIP/>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/pingpongshow/marquee/issues</Support>
+  <Project>https://github.com/pingpongshow/marquee</Project>
+  <Overview>Music analysis for Marquee: listens to each track on the GPU (or CPU) to power radios, "sounds like", Muse, mixes and mood pages. Install it next to Marquee on the same server; only Marquee talks to it (127.0.0.1:32501). Its models load when needed and unload after a few idle minutes, so the GPU is free otherwise. The first start downloads about 1.5 GB of models into the Models folder.</Overview>
+  <Category>MediaServer:Music Tools:</Category>
+  <TemplateURL>https://raw.githubusercontent.com/pingpongshow/marquee/main/unraid/marquee-soundprint.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/pingpongshow/marquee/main/unraid/marquee.png</Icon>
+  <ExtraParams>--runtime=nvidia --user 99:100</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires>Marquee on the same server (host networking). For the GPU install the Nvidia Driver plugin; without an NVIDIA GPU remove --runtime=nvidia from Extra Parameters (analysis then runs on the CPU, more slowly).</Requires>
+  <Config Name="Models" Target="/models" Default="/mnt/user/appdata/marquee/models" Mode="rw" Description="Downloaded analysis models (about 1.5 GB)." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/marquee/models</Config>
+  <Config Name="Music" Target="/media/music" Default="" Mode="ro" Description="The same music folder as in the Marquee container (read-only)." Type="Path" Display="always" Required="true" Mask="false"/>
+  <Config Name="NVIDIA_VISIBLE_DEVICES" Target="NVIDIA_VISIBLE_DEVICES" Default="all" Mode="" Description="Which NVIDIA GPUs it may use." Type="Variable" Display="advanced" Required="false" Mask="false">all</Config>
+  <Config Name="NVIDIA_DRIVER_CAPABILITIES" Target="NVIDIA_DRIVER_CAPABILITIES" Default="compute,utility" Mode="" Description="GPU capabilities it needs." Type="Variable" Display="advanced" Required="false" Mask="false">compute,utility</Config>
+  <Config Name="Unload when idle (minutes)" Target="IDLE_UNLOAD_MINUTES" Default="5" Mode="" Description="Models are freed from the GPU after this many idle minutes." Type="Variable" Display="advanced" Required="false" Mask="false">5</Config>
+</Container>
