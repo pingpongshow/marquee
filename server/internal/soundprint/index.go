@@ -159,7 +159,7 @@ func (x *Index) Where(keep Filter) []*Track {
 	defer x.mu.RUnlock()
 	var out []*Track
 	for _, t := range x.tracks {
-		if keep(t) {
+		if keep == nil || keep(t) {
 			out = append(out, t)
 		}
 	}

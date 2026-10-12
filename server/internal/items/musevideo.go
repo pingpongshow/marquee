@@ -9,6 +9,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
+
+	"marquee/internal/origins"
 )
 
 // VideoQuery is how Muse for movies (USER-15) reads a prompt: hard constraints parsed with
@@ -28,7 +31,20 @@ type VideoQuery struct {
 	Seeds         []int64  // "like <title>": library items whose meaning steers the ranking
 	SeedTitles    []string
 	ExcludeGenres []string // "not horror"
-	labels        []string
+	// From library details (TMDB extras):
+	Origins   []origins.Origin // "Korean", "British": any may match (country, or the country's own language)
+	Foreign   bool             // not originally in English
+	Keywords  []string         // TMDB keyword tags ("heist", "time loop"): a ranking boost, not a filter
+	MaxRating string           // content rating limit ("PG" for "PG or under")
+	MinCritic int              // critics' score threshold, 0–100 (Rotten Tomatoes, else Metacritic)
+	labels    []string
+}
+
+// VideoVocab is what a prompt's words are matched against: the libraries' genre names and
+// TMDB keyword tags (lower case).
+type VideoVocab struct {
+	Genres   []string
+	Keywords map[string]bool
 }
 
 // GenreGroup is the set of library genre names that satisfy name (e.g. "Science Fiction"
@@ -113,7 +129,31 @@ func (q *VideoQuery) Relabel() {
 	if q.Family {
 		lbl = append(lbl, "Family-friendly")
 	}
+	lbl = append(lbl, q.detailLabels()...)
 	q.labels = lbl
+}
+
+// detailLabels describe the library-details fields.
+func (q VideoQuery) detailLabels() []string {
+	var lbl []string
+	for _, o := range q.Origins {
+		if n := origins.CountryName(o.Country); n != "" {
+			lbl = append(lbl, "From "+strings.TrimPrefix(n, "the "))
+		}
+	}
+	if q.Foreign {
+		lbl = append(lbl, "Not in English")
+	}
+	if len(q.Keywords) > 0 {
+		lbl = append(lbl, "Themes: "+strings.Join(q.Keywords, ", "))
+	}
+	if q.MaxRating != "" {
+		lbl = append(lbl, q.MaxRating+" or under")
+	}
+	if q.MinCritic > 0 {
+		lbl = append(lbl, fmt.Sprintf("Critics %d%%+", q.MinCritic))
+	}
+	return lbl
 }
 
 // Understood describes the reading, e.g. "Movies · 1990s · Science Fiction · like 'time travel'".
@@ -167,6 +207,11 @@ var (
 	// Length: "under 90 minutes", "less than 2 hours", "over two hours".
 	reUnder = regexp.MustCompile(`\b(?:under|less than|shorter than|no more than|at most|max|below)\s+(an|one|two|three|\d+(?:\.\d+)?)\s*(minutes|minute|mins|min|hours|hour|hrs|hr|h|m)\b`)
 	reOver  = regexp.MustCompile(`\b(?:over|more than|longer than|at least)\s+(an|one|two|three|\d+(?:\.\d+)?)\s*(minutes|minute|mins|min|hours|hour|hrs|hr|h|m)\b`)
+	// Content rating limits: "PG or under", "rated PG-13 and below", "at most PG", "nothing above TV-14".
+	reRatingMax    = regexp.MustCompile(`(?:^|\s)(?:rated\s+)?(tv-y7|tv-y|tv-g|tv-pg|tv-14|tv-ma|pg-13|pg13|nc-17|pg|g|r)\s+(?:or|and)\s+(?:under|below|lower|less|younger)\b`)
+	reRatingAtMost = regexp.MustCompile(`\b(?:at most|no higher than|nothing above|up to|max|maximum)\s+(?:rated\s+)?(tv-y7|tv-y|tv-g|tv-pg|tv-14|tv-ma|pg-13|pg13|nc-17|pg|g|r)\b`)
+	// Critics' thresholds: "rotten tomatoes over 90", "rt above 85%", "metacritic at least 80".
+	reCritic = regexp.MustCompile(`\b(?:on\s+)?(rotten tomatoes|tomatometer|rt|critics?(?: score)?|metacritic)\s+(?:score\s+)?(?:of\s+)?(over|above|more than|at least|of at least|>=|>|=)?\s*(\d{2,3})\b\s*%?(?:\s+or\s+(?:more|higher|above))?`)
 )
 
 var decadeWords = map[string]int{"twenties": 1920, "thirties": 1930, "forties": 1940, "fifties": 1950, "sixties": 1960,
@@ -178,11 +223,15 @@ var (
 	showWords      = []string{"tv shows", "tv show", "tv series", "shows", "show", "series", "tv", "miniseries", "season"}
 	unwatchedWords = []string{"i haven't seen", "i have not seen", "i haven't watched", "i have not watched", "haven't seen", "have not seen",
 		"haven't watched", "not seen", "not watched", "never seen", "never watched", "unwatched", "unseen", "new to me", "i've not seen"}
-	shortWords  = []string{"short", "quick", "brief"}
-	longWords   = []string{"long", "epic", "lengthy"}
-	ratedWords  = []string{"critically acclaimed", "highly rated", "highly-rated", "top rated", "top-rated", "well reviewed", "well-reviewed", "award winning", "award-winning", "acclaimed", "the best", "best", "masterpiece", "masterpieces"}
-	familyWords = []string{"for the whole family", "for the family", "family friendly", "family-friendly", "kid friendly", "kid-friendly", "for children", "for kids", "for my kids", "children's", "childrens", "children", "kids", "kid", "family"}
-	stopWords   = map[string]bool{"a": true, "an": true, "the": true, "some": true, "something": true, "anything": true, "i": true, "me": true,
+	shortWords = []string{"short", "quick", "brief"}
+	longWords  = []string{"long", "epic", "lengthy"}
+	ratedWords = []string{"highly rated", "highly-rated", "top rated", "top-rated", "award winning", "award-winning", "acclaimed", "the best", "best", "masterpiece", "masterpieces"}
+	// Critics' scores: "critically acclaimed" is about critics, not audiences.
+	acclaimedWords = []string{"critically acclaimed", "critically-acclaimed", "critically praised", "critics loved", "loved by critics", "critics' favourites", "critics' favorites"}
+	reviewedWords  = []string{"well reviewed", "well-reviewed", "certified fresh", "good reviews", "great reviews"}
+	foreignWords   = []string{"foreign language", "foreign-language", "non-english", "non english", "not in english", "subtitled", "with subtitles", "world cinema", "foreign"}
+	familyWords    = []string{"for the whole family", "for the family", "family friendly", "family-friendly", "kid friendly", "kid-friendly", "for children", "for kids", "for my kids", "children's", "childrens", "children", "kids", "kid", "family"}
+	stopWords      = map[string]bool{"a": true, "an": true, "the": true, "some": true, "something": true, "anything": true, "i": true, "me": true,
 		"want": true, "wanna": true, "to": true, "watch": true, "with": true, "about": true, "and": true, "or": true, "of": true, "for": true,
 		"please": true, "give": true, "find": true, "show me": true, "recommend": true, "like": true, "that": true, "is": true, "are": true,
 		"in": true, "from": true, "good": true, "great": true, "can": true, "you": true, "suggest": true, "my": true, "we": true, "us": true,
@@ -243,6 +292,12 @@ func toMinutes(n float64, unit string) int {
 // ParseVideoPrompt reads hard constraints from a Muse prompt. genres are the genre names
 // in the person's libraries, matched as words in addition to the common synonyms.
 func ParseVideoPrompt(prompt string, genres []string) VideoQuery {
+	return ParseVideoPromptWith(prompt, VideoVocab{Genres: genres})
+}
+
+// ParseVideoPromptWith is ParseVideoPrompt with the libraries' keyword tags too.
+func ParseVideoPromptWith(prompt string, vocab VideoVocab) VideoQuery {
+	genres := vocab.Genres
 	var q VideoQuery
 	s := " " + strings.ToLower(reSpace.ReplaceAllString(strings.TrimSpace(prompt), " ")) + " "
 	s = strings.NewReplacer("’", "'", "“", " ", "”", " ", "\"", " ", ",", " , ", "!", " ", "?", " ", ";", " ").Replace(s)
@@ -397,11 +452,43 @@ func ParseVideoPrompt(prompt string, genres []string) VideoQuery {
 	if q.MinMinutes > 0 {
 		lbl = append(lbl, fmt.Sprintf("Over %d min", q.MinMinutes))
 	}
+	// Critics before "acclaimed" alone, which is about ratings in general.
+	if m := reCritic.FindStringSubmatch(s); m != nil {
+		if n, _ := strconv.Atoi(m[3]); n >= 10 && n <= 100 {
+			if m[2] == "over" || m[2] == "above" || m[2] == "more than" || m[2] == ">" {
+				n = min(n+1, 100)
+			}
+			q.MinCritic = n
+			s = strings.Replace(s, m[0], " ", 1)
+		}
+	}
+	if q.MinCritic == 0 && cut(&s, acclaimedWords) {
+		q.MinCritic = 85
+	} else if q.MinCritic == 0 && cut(&s, reviewedWords) {
+		q.MinCritic = 75
+	}
 	if cut(&s, ratedWords) {
 		q.MinRating, lbl = 7.5, append(lbl, "Highly rated")
 	}
 	if q.Family {
 		lbl = append(lbl, "Family-friendly")
+	}
+	if m := reRatingMax.FindStringSubmatch(s); m != nil {
+		q.MaxRating = normRating(m[1])
+		s = strings.Replace(s, m[0], " ", 1)
+	} else if m := reRatingAtMost.FindStringSubmatch(s); m != nil {
+		q.MaxRating = normRating(m[1])
+		s = strings.Replace(s, m[0], " ", 1)
+	}
+	if cut(&s, foreignWords) {
+		q.Foreign = true
+	}
+	var found []origins.Origin
+	found, s = origins.Find(strings.Join(strings.Fields(s), " "))
+	s = " " + s + " "
+	q.Origins = found
+	if len(q.Origins) > 0 {
+		q.Foreign = false // "Korean films" is more precise than "foreign Korean films"
 	}
 
 	// What's left, minus filler words.
@@ -413,9 +500,86 @@ func ParseVideoPrompt(prompt string, genres []string) VideoQuery {
 		rest = append(rest, w)
 	}
 	q.Rest = strings.Join(rest, " ")
-	q.labels = lbl
+	q.Keywords = MatchKeywords(rest, vocab)
+	q.labels = append(lbl, q.detailLabels()...)
 	return q
 }
+
+func normRating(r string) string {
+	r = strings.ToUpper(r)
+	if r == "PG13" {
+		return "PG-13"
+	}
+	return r
+}
+
+// maxKeywords bounds the keyword tags a prompt is matched to.
+const maxKeywords = 5
+
+// MatchKeywords finds the libraries' keyword tags among words (phrases of up to four words,
+// longest first). Single words need four letters and mustn't be a genre or a filler word.
+func MatchKeywords(words []string, vocab VideoVocab) []string {
+	if len(vocab.Keywords) == 0 || len(words) == 0 {
+		return nil
+	}
+	genre := map[string]bool{}
+	for _, g := range vocab.Genres {
+		genre[strings.ToLower(g)] = true
+	}
+	for k := range genreSynonyms {
+		genre[k] = true
+	}
+	used := make([]bool, len(words))
+	var out []string
+	for n := 4; n >= 1; n-- {
+		for i := 0; i+n <= len(words); i++ {
+			free := true
+			for j := i; j < i+n; j++ {
+				free = free && !used[j]
+			}
+			if !free {
+				continue
+			}
+			phrase := strings.Trim(strings.Join(words[i:i+n], " "), ",.;:'\"")
+			k := phrase
+			if !vocab.Keywords[k] && strings.HasSuffix(k, "s") && vocab.Keywords[strings.TrimSuffix(k, "s")] {
+				k = strings.TrimSuffix(k, "s") // "heists" → "heist"
+			}
+			if !vocab.Keywords[k] || n == 1 && (len(k) < 4 || stopWords[k] || genre[k]) {
+				continue
+			}
+			for j := i; j < i+n; j++ {
+				used[j] = true
+			}
+			out = append(out, k)
+			if len(out) == maxKeywords {
+				return out
+			}
+		}
+	}
+	return out
+}
+
+// Meaningful drops filler words from what's left of a prompt ("films similar to" says
+// nothing about meaning); "" when nothing meaningful is left.
+func Meaningful(s string) string {
+	var out []string
+	for _, w := range strings.Fields(strings.ToLower(s)) {
+		w = strings.Trim(w, ",.;:!?'\"()")
+		if w == "" || stopWords[w] || fillerWords[w] {
+			continue
+		}
+		out = append(out, w)
+	}
+	if len(out) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(s)
+}
+
+var fillerWords = map[string]bool{"similar": true, "films": true, "film": true, "movies": true, "movie": true, "shows": true, "show": true,
+	"series": true, "tv": true, "stuff": true, "things": true, "titles": true, "ones": true, "more": true, "other": true, "others": true,
+	"vibe": true, "vibes": true, "kind": true, "sort": true, "same": true, "as": true, "along": true, "lines": true, "watch": true}
 
 // familyMaxLevel is the highest rating level a family search allows (PG / TV-PG).
 const familyMaxLevel = 3
@@ -531,6 +695,36 @@ func (s *Store) MuseVideo(ctx context.Context, acc Access, idx *VideoIndex, q Vi
 			JOIN tags t ON t.id = it.tag_id AND t.kind = 'genre' WHERE it.item_id = i.id AND t.name IN ('Family', 'Animation', 'Kids'))))`
 		wargs = append(wargs, familyMaxLevel)
 	}
+	if len(q.Origins) > 0 {
+		var codes, langs []any
+		for _, o := range q.Origins {
+			codes = append(codes, o.Country)
+			if o.Language != "" {
+				langs = append(langs, o.Language)
+			}
+		}
+		cond := `EXISTS (SELECT 1 FROM item_tags it JOIN tags t ON t.id = it.tag_id AND t.kind = 'country'
+			WHERE it.item_id = i.id AND t.name IN (?` + strings.Repeat(",?", len(codes)-1) + `))`
+		wargs = append(wargs, codes...)
+		if len(langs) > 0 {
+			cond += ` OR i.original_language IN (?` + strings.Repeat(",?", len(langs)-1) + `)`
+			wargs = append(wargs, langs...)
+		}
+		where += ` AND (` + cond + `)`
+	}
+	if q.Foreign {
+		where += ` AND COALESCE(i.original_language, '') NOT IN ('', 'en')`
+	}
+	if lvl := RatingLevel(q.MaxRating); lvl > 0 {
+		where += ` AND ` + ratingCase("i.content_rating") + ` <= ?`
+		wargs = append(wargs, lvl)
+	}
+	if q.MinCritic > 0 {
+		// Rotten Tomatoes, else Metacritic (which runs about ten points lower), else the
+		// audience rating as a last resort for titles OMDb hasn't covered.
+		where += ` AND COALESCE(i.rt_critic, i.metacritic + 10, COALESCE(i.imdb_rating, i.audience_rating, 0) * 10) >= ?`
+		wargs = append(wargs, q.MinCritic)
+	}
 	rating := `COALESCE(i.audience_rating, i.imdb_rating, i.critic_rating, 0)`
 	type cand struct {
 		id     int64
@@ -549,16 +743,42 @@ func (s *Store) MuseVideo(ctx context.Context, acc Access, idx *VideoIndex, q Vi
 		return res, err
 	}
 	ids := make([]int64, 0, len(cands))
-	// "like <title>": the seeds' meaning, blended with the prompt's.
+	// "like <title>": the seeds' meaning, alone when the prompt says nothing else, otherwise
+	// weighted well above the rest of the prompt.
 	if c := idx.Centroid(q.Seeds, nil); c != nil {
-		vec = blendVecs(vec, c, 0.5)
+		vec = blendVecs(vec, c, 1-seedWeight)
 	}
-	if vec != nil {
-		// Embedded items by meaning; ones not embedded yet follow by rating.
+	// Boosts: titles TMDB recommends for the seeds come first; keyword matches move up.
+	boost := map[int64]float64{}
+	if len(q.Seeds) > 0 {
+		recs, err := s.TMDBRecommended(ctx, q.Seeds, likeRecWeight)
+		if err != nil {
+			return res, err
+		}
+		for id, b := range recs {
+			boost[id] += b
+		}
+	}
+	if len(q.Keywords) > 0 {
+		kw, err := s.keywordMatches(ctx, q.Keywords)
+		if err != nil {
+			return res, err
+		}
+		for id, n := range kw {
+			boost[id] += keywordBoost * float64(min(n, 2))
+		}
+	}
+	if vec != nil || len(boost) > 0 {
+		// Embedded (or boosted) items by meaning plus boosts; the rest follow by rating.
 		score := map[int64]float64{}
 		for _, c := range cands {
-			if v := idx.Get(c.id); v != nil {
-				score[c.id] = dotVec(vec, v.Vec)
+			v := idx.Get(c.id)
+			b, boosted := boost[c.id]
+			switch {
+			case vec != nil && v != nil:
+				score[c.id] = dotVec(vec, v.Vec) + b
+			case boosted:
+				score[c.id] = b
 			}
 		}
 		sort.SliceStable(cands, func(i, j int) bool {
@@ -578,6 +798,92 @@ func (s *Store) MuseVideo(ctx context.Context, acc Access, idx *VideoIndex, q Vi
 	}
 	res.Items, err = s.ByIDs(ctx, acc, ids)
 	return res, err
+}
+
+// Ranking weights for Muse: the seeds' share of the query vector when the prompt also
+// describes something; TMDB's recommendations for a seed (rank 1 gets likeRecWeight, falling
+// by 2% of it per rank), enough to put them first; keyword matches (per keyword, two at most).
+const (
+	seedWeight    = 0.75
+	likeRecWeight = 1.0
+	keywordBoost  = 0.06
+	// relatedRecWeight is the boost for "More like this" and "Because you watched", where
+	// meaning still counts for more.
+	relatedRecWeight = 0.3
+)
+
+// TMDBRecommended maps library items that TMDB recommends for any of seeds (same type: films
+// for a film, shows for a show) to a rank-weighted boost: weight for rank 1, falling by 2% of
+// weight per rank. An item recommended for several seeds gets the best of its boosts.
+func (s *Store) TMDBRecommended(ctx context.Context, seeds []int64, weight float64) (map[int64]float64, error) {
+	out := map[int64]float64{}
+	if len(seeds) == 0 {
+		return out, nil
+	}
+	args := make([]any, len(seeds))
+	for i, id := range seeds {
+		args[i] = id
+	}
+	err := eachRow(ctx, s.db, `SELECT i.id, MIN(r.rank) FROM tmdb_recommendations r
+		JOIN items sd ON sd.id = r.item_id
+		JOIN external_ids x ON x.provider = 'tmdb' AND x.value = CAST(r.tmdb_id AS TEXT)
+		JOIN items i ON i.id = x.item_id AND i.type = sd.type AND i.extra_type IS NULL
+		WHERE r.item_id IN (?`+strings.Repeat(",?", len(seeds)-1)+`) GROUP BY i.id`, args, func(r *sql.Rows) error {
+		var id int64
+		var rank int
+		if err := r.Scan(&id, &rank); err != nil {
+			return err
+		}
+		out[id] = weight * max(0.2, 1-0.02*float64(rank-1))
+		return nil
+	})
+	for _, id := range seeds {
+		delete(out, id)
+	}
+	return out, err
+}
+
+// keywordMatches counts, per movie or show, how many of the keyword tags it has.
+func (s *Store) keywordMatches(ctx context.Context, keywords []string) (map[int64]int, error) {
+	out := map[int64]int{}
+	args := make([]any, len(keywords))
+	for i, k := range keywords {
+		args[i] = k
+	}
+	err := eachRow(ctx, s.db, `SELECT it.item_id, COUNT(*) FROM item_tags it JOIN tags t ON t.id = it.tag_id AND t.kind = 'keyword'
+		WHERE t.name IN (?`+strings.Repeat(",?", len(keywords)-1)+`) GROUP BY it.item_id`, args, func(r *sql.Rows) error {
+		var id int64
+		var n int
+		if err := r.Scan(&id, &n); err != nil {
+			return err
+		}
+		out[id] = n
+		return nil
+	})
+	return out, err
+}
+
+// VideoKeywords lists the keyword tags on movies and shows (lower case), cached for a few minutes.
+func (s *Store) VideoKeywords(ctx context.Context) (map[string]bool, error) {
+	s.kwMu.Lock()
+	defer s.kwMu.Unlock()
+	if s.kwSet != nil && time.Since(s.kwAt) < 10*time.Minute {
+		return s.kwSet, nil
+	}
+	set := map[string]bool{}
+	err := eachRow(ctx, s.db, `SELECT name FROM tags WHERE kind = 'keyword'`, nil, func(r *sql.Rows) error {
+		var n string
+		if err := r.Scan(&n); err != nil {
+			return err
+		}
+		set[strings.ToLower(n)] = true
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.kwSet, s.kwAt = set, time.Now()
+	return set, nil
 }
 
 // blendVecs is the normalized w·a + (1−w)·b (b alone when a is nil).

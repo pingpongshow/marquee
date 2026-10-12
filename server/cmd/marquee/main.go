@@ -280,9 +280,18 @@ func run() error {
 		Description: "Updates shows with new or recently aired episodes (titles and summaries TMDB fills in after airing) and movies not refreshed for six months. Edited fields stay as they are.",
 		Run:         meta.RefreshStale})
 	metadata.MBUserAgent = "Marquee/" + config.Version + " (self-hosted media server)"
-	scheduler.Register(tasks.Task{ID: "musicbrainz", Name: "Enrich music from MusicBrainz", Window: true, Bounded: true,
-		Description: "Adds genres, album types (albums, EPs, singles, live, compilations) and original release dates from MusicBrainz, one request a second. A large library takes a night or two; it continues where it stopped.",
-		Run:         meta.EnrichMusic})
+	scheduler.Register(tasks.Task{ID: "musicbrainz", Name: "Artist and album details", Every: 24 * time.Hour,
+		Description: "With artist and album details on, looks up artists and albums on MusicBrainz, one request a second: genres and styles, solo artist or band, country, active years and a Wikipedia bio for artists; album types, original release dates and labels for albums. The first run covers the library (a few hours for a large one; it continues where it stopped), later runs new artists and albums.",
+		Run:         meta.EnrichMusic, Progress: meta.MusicDetailsProgress})
+	scheduler.Register(tasks.Task{ID: "video-details", Name: "Fetch movie and show details", Every: 24 * time.Hour,
+		Description: "Fetches keywords, countries, original language and TMDB's recommendations for movies and shows matched before Marquee stored them, a few a second (new matches get them straight away).",
+		Run: func(ctx context.Context) (string, error) {
+			msg, err := meta.FetchVideoDetails(ctx)
+			if err == nil && strings.HasPrefix(msg, "Fetched") {
+				scheduler.RunNow(ctx, "embeddings") // descriptions now carry keywords and countries
+			}
+			return msg, err
+		}, Progress: meta.VideoDetailsProgress})
 	scheduler.Register(tasks.Task{ID: "anilist", Name: "Enrich anime from AniList", Window: true, Bounded: true,
 		Description: "Adds the names anime is known by (romaji, English, Japanese — all searchable), studios, genres and AniList scores to shows and films in anime libraries.",
 		Run:         meta.EnrichAnime})
@@ -452,6 +461,26 @@ func run() error {
 	scheduler.Register(tasks.Task{ID: "lyric-themes", Name: "Index lyric themes", Every: 6 * time.Hour,
 		Description: "With AI on, reads the lyrics of tracks (from their tags and .lrc files) with the embedding model, so Muse can find songs about a theme.",
 		Run:         lyricThemes.Run, Progress: lyricThemes.Progress})
+	// Artist and album descriptions for descriptive music prompts (AI only), refreshed after
+	// artist and album details are looked up.
+	musicDocs := &muse.MusicDocs{DB: database, AI: aiClient, Pace: 500 * time.Millisecond, Enabled: func() bool { return store.Get().AI.Enabled }}
+	if err := musicDocs.Load(ctx); err != nil {
+		slog.Warn("artist and album index", "err", err)
+	}
+	scheduler.Register(tasks.Task{ID: "music-docs", Name: "Index artists and albums", Every: 24 * time.Hour,
+		Description: "With AI on, reads the descriptions of artists and albums (origin, years, styles, bio, label) with the embedding model, so Muse can find music by what the artists are like.",
+		Run:         musicDocs.Run, Progress: musicDocs.Progress})
+	meta.AfterMusicDetails = func() { scheduler.RunNow(ctx, "music-docs") }
+	// Turning artist and album details on looks them up straight away.
+	lastDetails := store.Get().Music.ArtistDetails
+	store.Subscribe(func(s settings.Settings) {
+		if s.Music.ArtistDetails != lastDetails {
+			lastDetails = s.Music.ArtistDetails
+			if lastDetails {
+				scheduler.RunNow(ctx, "musicbrainz")
+			}
+		}
+	})
 	// Turning AI on or off, or changing the embedding model, re-indexes in the background.
 	aiIndexKey := func(s settings.Settings) string {
 		return fmt.Sprint(s.AI.Enabled, s.AI.EmbedModel, s.AI.LyricsThemes)
@@ -462,6 +491,7 @@ func run() error {
 			lastAIKey = k
 			scheduler.RunNow(ctx, "embeddings")
 			scheduler.RunNow(ctx, "lyric-themes")
+			scheduler.RunNow(ctx, "music-docs")
 		}
 	})
 	go scheduler.Run(ctx)
@@ -492,6 +522,7 @@ func run() error {
 		Embeddings:  embedder,
 		AI:          aiClient,
 		LyricThemes: lyricThemes,
+		MusicDocs:   musicDocs,
 		Reasons:     &muse.Reasons{},
 		Trash:       mediaTrash,
 		Avatars:     &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},

@@ -138,7 +138,11 @@ func (h *Handlers) MuseVideo(ctx context.Context, req MuseVideoRequestObject) (M
 	if cfg.On(cfg.UnderstandPrompts) && h.AI != nil {
 		llm = h.AI
 	}
-	reading := muse.ReadVideo(ctx, llm, h.Items, access(ctx), prompt, genres)
+	keywords, err := h.Items.VideoKeywords(ctx)
+	if err != nil {
+		return nil, internal(ctx, "museVideo", err)
+	}
+	reading := muse.ReadVideo(ctx, llm, h.Items, access(ctx), prompt, items.VideoVocab{Genres: genres, Keywords: keywords})
 	q := reading.Query
 	if b.Types != nil && len(*b.Types) > 0 {
 		var allowed []string
@@ -188,6 +192,7 @@ func (h *Handlers) MuseVideo(ctx context.Context, req MuseVideoRequestObject) (M
 		for i, it := range top {
 			ids[i] = it.ID
 		}
+		ids = append(ids, q.Seeds...)
 		syn, err := h.Items.Synopses(ctx, ids)
 		if err != nil {
 			return nil, internal(ctx, "museVideo", err)
@@ -198,7 +203,15 @@ func (h *Handlers) MuseVideo(ctx context.Context, req MuseVideoRequestObject) (M
 			cands[i] = muse.Candidate{ID: it.ID, Title: it.Title, Year: it.Year, Synopsis: syn[it.ID]}
 			byID[it.ID] = it
 		}
-		if order, why, err := muse.Rerank(ctx, h.AI, prompt, cands); err != nil {
+		var seeds []muse.Candidate
+		if len(q.Seeds) > 0 {
+			if list, err := h.Items.ByIDs(ctx, access(ctx), q.Seeds); err == nil {
+				for _, it := range list {
+					seeds = append(seeds, muse.Candidate{ID: it.ID, Title: it.Title, Year: it.Year, Synopsis: syn[it.ID]})
+				}
+			}
+		}
+		if order, why, err := muse.Rerank(ctx, h.AI, prompt, seeds, cands); err != nil {
 			slog.WarnContext(ctx, "muse for movies: re-ranking failed; keeping the ranking", "err", err)
 		} else {
 			ranked := make([]items.Summary, 0, len(res.Items))

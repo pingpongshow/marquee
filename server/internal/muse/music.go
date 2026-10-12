@@ -5,19 +5,24 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
 	"marquee/internal/items"
+	"marquee/internal/origins"
 	"marquee/internal/soundprint"
 )
 
 // MusicLibrary is what a music prompt is matched against.
 type MusicLibrary struct {
-	Genres  []string         // genre tags, most used first
-	Artists map[int64]string // artist id → name
+	Genres    []string         // genre tags, most used first
+	Artists   map[int64]string // artist id → name
+	Countries []string         // artist countries in the library (ISO codes, from artist details)
+	Areas     []string         // artist areas and begin areas ("Manchester")
 }
 
 type musicAnswer struct {
@@ -34,29 +39,65 @@ type musicAnswer struct {
 	TotalMinutes    int      `json:"totalMinutes"`
 	Sound           string   `json:"sound"`
 	Theme           string   `json:"theme"`
+	TempoMin        int      `json:"tempoMin"`
+	TempoMax        int      `json:"tempoMax"`
+	Energy          string   `json:"energy"`
+	Mode            string   `json:"mode"`
+	Key             string   `json:"key"`
+	Popularity      string   `json:"popularity"`
+	Origins         []string `json:"origins"`
+	ArtistType      string   `json:"artistType"`
+	Gender          string   `json:"gender"`
+	ActiveFrom      int      `json:"activeFrom"`
+	ActiveTo        int      `json:"activeTo"`
+	AlbumTypes      []string `json:"albumTypes"`
+	ExcludeAlbum    []string `json:"excludeAlbumTypes"`
+	Describe        string   `json:"describe"`
 	Name            string   `json:"name"`
+}
+
+// releaseTypes are the album release types stored from MusicBrainz.
+var releaseTypes = []string{"album", "ep", "single", "live", "compilation", "soundtrack", "remix", "demo"}
+
+func enumOf(vals ...string) map[string]any {
+	return map[string]any{"type": "string", "enum": vals}
 }
 
 var musicSchema = map[string]any{
 	"type": "object",
 	"properties": map[string]any{
-		"genres":          strArray(),
-		"yearFrom":        map[string]any{"type": "integer"},
-		"yearTo":          map[string]any{"type": "integer"},
-		"artists":         strArray(),
-		"likeArtists":     strArray(),
-		"favourites":      map[string]any{"type": "boolean"},
-		"unplayed":        map[string]any{"type": "boolean"},
-		"recentlyAdded":   map[string]any{"type": "boolean"},
-		"rediscover":      map[string]any{"type": "boolean"},
-		"maxTrackMinutes": map[string]any{"type": "integer"},
-		"totalMinutes":    map[string]any{"type": "integer"},
-		"sound":           map[string]any{"type": "string"},
-		"theme":           map[string]any{"type": "string"},
-		"name":            map[string]any{"type": "string"},
+		"genres":            strArray(),
+		"yearFrom":          map[string]any{"type": "integer"},
+		"yearTo":            map[string]any{"type": "integer"},
+		"artists":           strArray(),
+		"likeArtists":       strArray(),
+		"favourites":        map[string]any{"type": "boolean"},
+		"unplayed":          map[string]any{"type": "boolean"},
+		"recentlyAdded":     map[string]any{"type": "boolean"},
+		"rediscover":        map[string]any{"type": "boolean"},
+		"maxTrackMinutes":   map[string]any{"type": "integer"},
+		"totalMinutes":      map[string]any{"type": "integer"},
+		"sound":             map[string]any{"type": "string"},
+		"theme":             map[string]any{"type": "string"},
+		"tempoMin":          map[string]any{"type": "integer"},
+		"tempoMax":          map[string]any{"type": "integer"},
+		"energy":            enumOf("", "low", "high"),
+		"mode":              enumOf("", "major", "minor"),
+		"key":               map[string]any{"type": "string"},
+		"popularity":        enumOf("", "hits", "deep cuts"),
+		"origins":           strArray(),
+		"artistType":        enumOf("", "person", "group"),
+		"gender":            enumOf("", "female", "male"),
+		"activeFrom":        map[string]any{"type": "integer"},
+		"activeTo":          map[string]any{"type": "integer"},
+		"albumTypes":        map[string]any{"type": "array", "items": enumOf(releaseTypes...)},
+		"excludeAlbumTypes": map[string]any{"type": "array", "items": enumOf(releaseTypes...)},
+		"describe":          map[string]any{"type": "string"},
+		"name":              map[string]any{"type": "string"},
 	},
 	"required": []string{"genres", "yearFrom", "yearTo", "artists", "likeArtists", "favourites", "unplayed", "recentlyAdded",
-		"rediscover", "maxTrackMinutes", "totalMinutes", "sound", "theme", "name"},
+		"rediscover", "maxTrackMinutes", "totalMinutes", "sound", "theme", "tempoMin", "tempoMax", "energy", "mode", "key", "popularity",
+		"origins", "artistType", "gender", "activeFrom", "activeTo", "albumTypes", "excludeAlbumTypes", "describe", "name"},
 }
 
 const musicSystem = `You turn a request for music into playlist filters for a home music library. Answer only with JSON.
@@ -69,6 +110,15 @@ Fields:
 - maxTrackMinutes: longest track allowed, 0 when not asked. totalMinutes: playlist length ("an hour of" = 60), 0 when not asked.
 - sound: how the music should sound or feel, in a few words for an audio model (mood, energy, instruments, tempo, setting), e.g. "mellow acoustic guitar, rainy evening". Empty when the request is only filters.
 - theme: what the LYRICS should be about when the request says so ("songs about the ocean" = "the ocean", "breakup songs" = "breakups"), else "".
+- tempoMin, tempoMax: tempo bounds in BPM when asked ("fast" = 120-0, "slow" = 0-95, "around 120 bpm" = 112-128), else 0.
+- energy: "high" for energetic/intense/workout music, "low" for calm/relaxing/sleepy music, else "".
+- mode: "major" for happy/uplifting, "minor" for sad/melancholy/dark, else "". key: a musical key only when named ("in D minor" = "D"), else "".
+- popularity: "hits" for hits/best-known/greatest songs, "deep cuts" for lesser-known/obscure tracks, else "".
+- origins: where the ARTISTS are from, as countries, nationalities or cities ("Icelandic" = ["Icelandic"], "from Manchester" = ["Manchester"]), else [].
+- artistType: "person" for solo artists/singer-songwriters, "group" for bands, else "". gender: "female" or "male" when the artists' gender is asked ("female singers"), else "".
+- activeFrom, activeTo: years the ARTISTS were active, when asked ("bands from the 70s scene"), else 0. Use yearFrom/yearTo for when the music was released.
+- albumTypes: only these release types ("live albums" = ["live"]), else []. excludeAlbumTypes: types ruled out ("no compilations" = ["compilation"]), else [].
+- describe: what the ARTISTS or albums should be like, in a few words for matching artist bios and styles (scene, style, kind of artist), e.g. "Icelandic female singer-songwriter, experimental"; empty when the request says nothing about the artists.
 - name: a short, catchy playlist name (2-5 words).`
 
 // MusicReading is a parsed music prompt.
@@ -161,12 +211,15 @@ func validateMusic(a musicAnswer, lib MusicLibrary, prompt string) (MusicReading
 		q.TotalMinutes = a.TotalMinutes
 		lbl = append(lbl, fmt.Sprintf("About %d min", q.TotalMinutes))
 	}
+	var describe []string
+	lbl = append(lbl, applyMusicDetails(&q, a, lib, &describe)...)
+	q.Describe = clip(strings.TrimSpace(strings.Join(append([]string{a.Describe}, describe...), " ")), 150)
 	q.Sound = clip(strings.TrimSpace(strings.Join(append([]string{a.Sound}, unmatched...), " ")), 150)
 	q.Theme = clip(strings.TrimSpace(a.Theme), 120)
 	if q.Sound != "" {
 		lbl = append(lbl, "Sounds "+q.Sound)
 	}
-	if len(lbl) == 0 && q.Theme == "" {
+	if len(lbl) == 0 && q.Theme == "" && q.Describe == "" {
 		return MusicReading{}, false
 	}
 	q.Title = cleanTitle(a.Name)
@@ -174,6 +227,171 @@ func validateMusic(a musicAnswer, lib MusicLibrary, prompt string) (MusicReading
 		q.Title = prompt
 	}
 	return MusicReading{Query: q, Understood: lbl, AI: true}, true
+}
+
+// applyMusicDetails validates the tempo, energy, key, popularity, origin, artist and album
+// fields; origins the library doesn't know go to describe. It returns the labels.
+func applyMusicDetails(q *soundprint.MusicQuery, a musicAnswer, lib MusicLibrary, describe *[]string) []string {
+	var lbl []string
+	lo, hi := float64(a.TempoMin), float64(a.TempoMax)
+	if lo < 40 || lo > 250 {
+		lo = 0
+	}
+	if hi < 40 || hi > 250 {
+		hi = 0
+	}
+	if lo > 0 && hi > 0 && lo > hi {
+		lo, hi = hi, lo
+	}
+	q.TempoMin, q.TempoMax = lo, hi
+	if a.Energy == "low" || a.Energy == "high" {
+		q.Energy = a.Energy
+	}
+	if a.Mode == "major" || a.Mode == "minor" {
+		q.Mode = a.Mode
+	}
+	q.Key = noteName(a.Key)
+	switch a.Popularity {
+	case "hits":
+		q.Popular = 1
+	case "deep cuts":
+		q.Popular = -1
+	}
+	for _, o := range a.Origins {
+		if !addOrigin(q, lib, o) && strings.TrimSpace(o) != "" {
+			*describe = append(*describe, "from "+strings.TrimSpace(o))
+		}
+	}
+	if a.ArtistType == "person" || a.ArtistType == "group" {
+		q.ArtistType = a.ArtistType
+	}
+	if a.Gender == "female" || a.Gender == "male" {
+		q.Gender = a.Gender
+	}
+	maxYear := time.Now().Year() + 1
+	if a.ActiveFrom >= 1900 && a.ActiveFrom <= maxYear {
+		q.ActiveFrom = a.ActiveFrom
+	}
+	if a.ActiveTo >= 1900 && a.ActiveTo <= maxYear && (q.ActiveFrom == 0 || a.ActiveTo >= q.ActiveFrom) {
+		q.ActiveTo = a.ActiveTo
+	}
+	valid := func(list []string) []string {
+		var out []string
+		for _, t := range list {
+			t = strings.ToLower(strings.TrimSpace(t))
+			if slices.Contains(releaseTypes, t) && !slices.Contains(out, t) {
+				out = append(out, t)
+			}
+		}
+		return out
+	}
+	q.AlbumTypes, q.ExcludeAlbumTypes = valid(a.AlbumTypes), valid(a.ExcludeAlbum)
+	return append(lbl, DetailLabels(*q)...)
+}
+
+// addOrigin maps a country, nationality or place onto the library's artist countries and
+// areas; false when the library has no artists from there.
+func addOrigin(q *soundprint.MusicQuery, lib MusicLibrary, o string) bool {
+	o = strings.TrimSpace(strings.TrimPrefix(strings.ToLower(strings.TrimSpace(o)), "from "))
+	if o == "" {
+		return false
+	}
+	if org, ok := origins.Lookup(o); ok && slices.Contains(lib.Countries, org.Country) {
+		if !slices.Contains(q.Countries, org.Country) {
+			q.Countries = append(q.Countries, org.Country)
+		}
+		return true
+	}
+	for _, a := range lib.Areas {
+		if strings.EqualFold(a, o) {
+			if !slices.Contains(q.Areas, a) {
+				q.Areas = append(q.Areas, a)
+			}
+			return true
+		}
+	}
+	return false
+}
+
+var notes = []string{"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"}
+
+// noteName is a key as the analysis names it ("Db" → "C#"; "" when not a key).
+func noteName(k string) string {
+	k = strings.TrimSpace(k)
+	if k == "" || len(k) > 3 {
+		return ""
+	}
+	k = strings.ToUpper(k[:1]) + strings.ToLower(k[1:])
+	k = strings.NewReplacer("♯", "#", "♭", "b", "sharp", "#").Replace(k)
+	flats := map[string]string{"Db": "C#", "Eb": "D#", "Gb": "F#", "Ab": "G#", "Bb": "A#", "Cb": "B", "Fb": "E"}
+	if f, ok := flats[k]; ok {
+		return f
+	}
+	if slices.Contains(notes, k) {
+		return k
+	}
+	return ""
+}
+
+// DetailLabels describe the tempo, energy, key, popularity, origin, artist and album fields.
+func DetailLabels(q soundprint.MusicQuery) []string {
+	var lbl []string
+	switch {
+	case q.TempoMin > 0 && q.TempoMax > 0:
+		lbl = append(lbl, fmt.Sprintf("%.0f–%.0f BPM", q.TempoMin, q.TempoMax))
+	case q.TempoMin > 0:
+		lbl = append(lbl, fmt.Sprintf("Over %.0f BPM", q.TempoMin))
+	case q.TempoMax > 0:
+		lbl = append(lbl, fmt.Sprintf("Under %.0f BPM", q.TempoMax))
+	}
+	if q.Energy != "" {
+		lbl = append(lbl, strings.ToUpper(q.Energy[:1])+q.Energy[1:]+" energy")
+	}
+	switch {
+	case q.Key != "" && q.Mode != "":
+		lbl = append(lbl, q.Key+" "+q.Mode)
+	case q.Key != "":
+		lbl = append(lbl, "Key of "+q.Key)
+	case q.Mode != "":
+		lbl = append(lbl, "Mostly "+q.Mode+" keys")
+	}
+	switch q.Popular {
+	case 1:
+		lbl = append(lbl, "Hits")
+	case -1:
+		lbl = append(lbl, "Deep cuts")
+	}
+	for _, c := range q.Countries {
+		lbl = append(lbl, "From "+strings.TrimPrefix(origins.CountryName(c), "the "))
+	}
+	for _, a := range q.Areas {
+		lbl = append(lbl, "From "+a)
+	}
+	switch {
+	case q.ArtistType == "person" && q.Gender != "":
+		lbl = append(lbl, strings.ToUpper(q.Gender[:1])+q.Gender[1:]+" solo artists")
+	case q.ArtistType == "person":
+		lbl = append(lbl, "Solo artists")
+	case q.ArtistType == "group":
+		lbl = append(lbl, "Bands")
+	case q.Gender != "":
+		lbl = append(lbl, strings.ToUpper(q.Gender[:1])+q.Gender[1:]+" artists")
+	}
+	if l := yearLabel(q.ActiveFrom, q.ActiveTo); l != "" {
+		lbl = append(lbl, "Active "+l)
+	}
+	for _, t := range q.AlbumTypes {
+		lbl = append(lbl, albumTypeLabel(t))
+	}
+	for _, t := range q.ExcludeAlbumTypes {
+		lbl = append(lbl, "No "+strings.ToLower(albumTypeLabel(t)))
+	}
+	return lbl
+}
+
+func albumTypeLabel(t string) string {
+	return map[string]string{"album": "Studio albums", "ep": "EPs", "single": "Singles", "live": "Live albums", "compilation": "Compilations",
+		"soundtrack": "Soundtracks", "remix": "Remixes", "demo": "Demos"}[t]
 }
 
 func clip(s string, n int) string {
@@ -270,6 +488,103 @@ var (
 	rediscoverWords = []string{"rediscover", "forgotten favourites", "forgotten favorites", "haven't played in a while", "haven't listened to in a while", "old favourites", "old favorites"}
 )
 
+var (
+	reBPM        = regexp.MustCompile(`\b(?:around|about|roughly|~)?\s*(\d{2,3})\s*bpm\b`)
+	reBPMBetween = regexp.MustCompile(`\b(?:between\s+)?(\d{2,3})\s*(?:-|–|to|and)\s*(\d{2,3})\s*bpm\b`)
+	reKey        = regexp.MustCompile(`\bin\s+([a-g])(#|♯|b|♭| sharp| flat)?\s+(major|minor)\b`)
+	reFromPlace  = regexp.MustCompile(`\bfrom\s+([a-z][a-z.' -]{2,40}?)(?:\s*(?:,|$| and | or | in | with | that | who ))`)
+)
+
+var (
+	fastWords       = []string{"fast", "uptempo", "up-tempo", "high tempo", "quick tempo"}
+	slowWords       = []string{"slow", "downtempo", "down-tempo", "slow tempo"}
+	highEnergyWords = []string{"high energy", "high-energy", "energetic", "intense", "pumped up", "workout", "work out", "gym"}
+	lowEnergyWords  = []string{"low energy", "low-energy", "calm", "chill", "chilled", "relaxing", "relaxed", "sleepy", "for sleep", "soothing"}
+	majorWords      = []string{"happy", "uplifting", "cheerful", "joyful", "feel good", "feel-good", "major key"}
+	minorWords      = []string{"sad", "melancholy", "melancholic", "gloomy", "minor key", "heartbroken"}
+	hitsWords       = []string{"greatest hits", "biggest hits", "best known", "best-known", "most popular", "hits", "popular songs"}
+	deepCutWords    = []string{"deep cuts", "deep cut", "b-sides", "b sides", "lesser known", "lesser-known", "obscure", "hidden gems", "rarities"}
+	femaleWords     = []string{"female singers", "female singer", "female vocalists", "female vocals", "female artists", "women singers", "women artists", "female-fronted", "female fronted", "female"}
+	maleWords       = []string{"male singers", "male singer", "male vocalists", "male artists", "male"}
+	soloWords       = []string{"singer-songwriters", "singer-songwriter", "singer songwriters", "solo artists", "solo artist", "solo singers"}
+	bandWords       = []string{"bands", "groups"}
+	liveWords       = []string{"live albums", "live recordings", "live versions", "live tracks", "live performances", "concert recordings"}
+	noCompWords     = []string{"no compilations", "without compilations", "not compilations", "no greatest hits albums", "no best-ofs"}
+)
+
+// keywordDetails reads tempo, energy, mode and key, popularity, origin, artist and album
+// words without the AI.
+func keywordDetails(q *soundprint.MusicQuery, lib MusicLibrary, low string) []string {
+	has := func(words []string) bool {
+		for _, w := range words {
+			if strings.Contains(low, " "+w+" ") {
+				return true
+			}
+		}
+		return false
+	}
+	if m := reBPMBetween.FindStringSubmatch(low); m != nil {
+		a, _ := strconv.Atoi(m[1])
+		b, _ := strconv.Atoi(m[2])
+		q.TempoMin, q.TempoMax = float64(min(a, b)), float64(max(a, b))
+	} else if m := reBPM.FindStringSubmatch(low); m != nil {
+		if n, _ := strconv.Atoi(m[1]); n >= 40 && n <= 250 {
+			q.TempoMin, q.TempoMax = float64(n-8), float64(n+8)
+		}
+	} else if has(fastWords) {
+		q.TempoMin = 120
+	} else if has(slowWords) {
+		q.TempoMax = 95
+	}
+	if has(highEnergyWords) {
+		q.Energy = "high"
+	} else if has(lowEnergyWords) {
+		q.Energy = "low"
+	}
+	if m := reKey.FindStringSubmatch(low); m != nil {
+		acc := map[string]string{"#": "#", "♯": "#", " sharp": "#", "b": "b", "♭": "b", " flat": "b"}[m[2]]
+		q.Key, q.Mode = noteName(strings.ToUpper(m[1])+acc), m[3]
+	} else if has(majorWords) {
+		q.Mode = "major"
+	} else if has(minorWords) {
+		q.Mode = "minor"
+	}
+	if has(deepCutWords) {
+		q.Popular = -1
+	} else if has(hitsWords) {
+		q.Popular = 1
+	}
+	// Countries the library's artists come from ("icelandic", "from sweden"), and places ("from manchester").
+	found, _ := origins.Find(strings.Join(strings.Fields(low), " "))
+	for _, o := range found {
+		if slices.Contains(lib.Countries, o.Country) && !slices.Contains(q.Countries, o.Country) {
+			q.Countries = append(q.Countries, o.Country)
+		}
+	}
+	for _, m := range reFromPlace.FindAllStringSubmatch(low+" ", -1) {
+		addOrigin(q, lib, strings.TrimSpace(m[1]))
+	}
+	switch {
+	case has(femaleWords):
+		q.Gender = "female"
+	case has(maleWords):
+		q.Gender = "male"
+	}
+	switch {
+	case has(soloWords):
+		q.ArtistType = "person"
+	case has(bandWords):
+		q.ArtistType = "group"
+	}
+	if has(liveWords) {
+		q.AlbumTypes = []string{"live"}
+	}
+	if has(noCompWords) {
+		q.ExcludeAlbumTypes = []string{"compilation"}
+	}
+	return DetailLabels(*q)
+}
+
 // KeywordMusic reads a prompt without the AI: decades and years, genre and artist names
 // as whole words ("like X" and bare names steer the sound; "by X" filters), history words
 // and "songs about X" themes. The whole prompt still describes the sound, as before.
@@ -346,6 +661,7 @@ func KeywordMusic(lib MusicLibrary, prompt string) MusicReading {
 			lbl = append(lbl, f.name)
 		}
 	}
+	lbl = append(lbl, keywordDetails(&q, lib, low)...)
 	if m := reAbout.FindStringSubmatch(strings.TrimSpace(low)); m != nil {
 		q.Theme = clip(strings.TrimSpace(m[1]), 120)
 	} else if m := reNoun.FindStringSubmatch(low); m != nil {

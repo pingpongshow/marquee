@@ -4251,6 +4251,7 @@ components:
       properties:
         soundprintAnalysis: { type: boolean, description: "Soundprint: analyse how tracks sound (on this server's GPU) for radios, similar music and Muse." }
         onlineLyrics: { type: boolean, description: Look up lyrics on LRCLIB when a track has none (sends artist and title). }
+        artistDetails: { type: boolean, description: "Look up artists and albums on MusicBrainz (about one request a second) and artist bios on Wikipedia: styles, solo artist or band, country, active years, album types and labels, for artist pages and Muse." }
         loudnessAnalysis: { type: boolean, deprecated: true, description: "Ignored: volume levelling is always on, so tracks without ReplayGain tags are always measured." }
 
     SecuritySettings:

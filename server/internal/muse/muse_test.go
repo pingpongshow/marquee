@@ -57,7 +57,7 @@ func TestReadVideoMapsAndValidates(t *testing.T) {
 		"excludeGenres":["comedy"],"unwatched":true,"maxMinutes":5,"minMinutes":0,"highlyRated":true,"kidFriendly":false,
 		"people":["ridley scott","Unknown Person"],"like":[{"title":"Alien","year":1979},{"title":"Not In Library","year":0}],
 		"meaning":"isolation in space","title":"\"Lonely Space Terror\""}`}
-	r := ReadVideo(context.Background(), llm, fakeLookup{}, items.Access{}, "80s sci-fi like Alien by Ridley Scott, no comedy", genres)
+	r := ReadVideo(context.Background(), llm, fakeLookup{}, items.Access{}, "80s sci-fi like Alien by Ridley Scott, no comedy", items.VideoVocab{Genres: genres})
 	q := r.Query
 	if !r.AI || r.Title != "Lonely Space Terror" {
 		t.Fatalf("reading %+v", r)
@@ -86,13 +86,13 @@ func TestReadVideoFallsBack(t *testing.T) {
 		"empty":   {answer: `{"types":[],"yearFrom":0,"yearTo":0,"genres":["Nope"],"excludeGenres":[],"people":[],"like":[],"meaning":"","title":""}`},
 		"garbage": {answer: `{"types":"movie"}`},
 	} {
-		r := ReadVideo(context.Background(), llm, fakeLookup{}, items.Access{}, "90s horror movies", genres)
+		r := ReadVideo(context.Background(), llm, fakeLookup{}, items.Access{}, "90s horror movies", items.VideoVocab{Genres: genres})
 		if r.AI || r.Query.Understood() != kw.Understood() {
 			t.Errorf("%s: got %q (AI %v), want the keyword reading %q", name, r.Query.Understood(), r.AI, kw.Understood())
 		}
 	}
 	// No AI at all.
-	if r := ReadVideo(context.Background(), nil, fakeLookup{}, items.Access{}, "90s horror movies", genres); r.AI || r.Query.Understood() != kw.Understood() {
+	if r := ReadVideo(context.Background(), nil, fakeLookup{}, items.Access{}, "90s horror movies", items.VideoVocab{Genres: genres}); r.AI || r.Query.Understood() != kw.Understood() {
 		t.Errorf("nil llm: %+v", r)
 	}
 }
@@ -107,7 +107,7 @@ func TestReadVideoThroughOllama(t *testing.T) {
 	c := &ai.Client{Config: func() ai.Config {
 		return ai.Config{Enabled: true, URL: srv.URL, ChatModel: "qwen3:8b", EmbedModel: "mxbai-embed-large"}
 	}}
-	r := ReadVideo(context.Background(), c, fakeLookup{}, items.Access{}, "cartoons about dinosaurs for the kids", genres)
+	r := ReadVideo(context.Background(), c, fakeLookup{}, items.Access{}, "cartoons about dinosaurs for the kids", items.VideoVocab{Genres: genres})
 	if !r.AI || r.Query.Understood() != "Shows · Animation · Family-friendly · like 'dinosaurs'" || r.Title != "Dino Toons" {
 		t.Fatalf("reading %q %+v", r.Query.Understood(), r)
 	}
@@ -116,7 +116,7 @@ func TestReadVideoThroughOllama(t *testing.T) {
 func TestRerank(t *testing.T) {
 	cands := []Candidate{{ID: 10, Title: "A"}, {ID: 20, Title: "B"}, {ID: 30, Title: "C"}, {ID: 40, Title: "D"}}
 	llm := &fakeLLM{answer: `{"results":[{"n":3,"reason":"Best fit."},{"n":9,"reason":"invented"},{"n":1,"reason":"Close."},{"n":3,"reason":"again"}]}`}
-	order, why, err := Rerank(context.Background(), llm, "prompt", cands)
+	order, why, err := Rerank(context.Background(), llm, "prompt", nil, cands)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,10 +129,10 @@ func TestRerank(t *testing.T) {
 	if !strings.Contains(llm.user, "3. C") {
 		t.Errorf("candidates not numbered: %q", llm.user)
 	}
-	if _, _, err := Rerank(context.Background(), &fakeLLM{answer: `{"results":[]}`}, "p", cands); err == nil {
+	if _, _, err := Rerank(context.Background(), &fakeLLM{answer: `{"results":[]}`}, "p", nil, cands); err == nil {
 		t.Fatal("an empty answer should fail so the ranking is kept")
 	}
-	if _, _, err := Rerank(context.Background(), &fakeLLM{err: errors.New("down")}, "p", cands); err == nil {
+	if _, _, err := Rerank(context.Background(), &fakeLLM{err: errors.New("down")}, "p", nil, cands); err == nil {
 		t.Fatal("want error")
 	}
 }

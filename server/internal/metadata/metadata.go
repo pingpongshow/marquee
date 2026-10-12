@@ -32,6 +32,9 @@ type Service struct {
 	Settings *settings.Store
 	// CacheDir holds downloaded reference data (the anime-lists mapping).
 	CacheDir string
+	// AfterMusicDetails runs when an artist and album lookup found something (re-indexes
+	// artist and album descriptions for Muse).
+	AfterMusicDetails func()
 
 	mu         sync.Mutex
 	omdbBudget ratingsBudget
@@ -575,6 +578,9 @@ func (s *Service) applyMovie(ctx context.Context, itemID int64, m *tmdb.Movie) e
 	if err := setCollection(ctx, tx, itemID, m.Collection); err != nil {
 		return err
 	}
+	if err := setVideoExtras(ctx, tx, itemID, movieExtras(m)); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 
@@ -613,6 +619,9 @@ func (s *Service) applyShow(ctx context.Context, itemID int64, t *tmdb.TVShow) e
 		return err
 	}
 	if err := setArtwork(ctx, tx, itemID, t.Images, t.PosterPath, t.BackdropPath); err != nil {
+		return err
+	}
+	if err := setVideoExtras(ctx, tx, itemID, showExtras(t)); err != nil {
 		return err
 	}
 	return tx.Commit()

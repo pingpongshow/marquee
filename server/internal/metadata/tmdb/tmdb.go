@@ -271,9 +271,16 @@ type Movie struct {
 	BackdropPath  string         `json:"backdrop_path"`
 	IMDBID        string         `json:"imdb_id"`
 	Collection    *CollectionRef `json:"belongs_to_collection"`
-	Credits       Credits        `json:"credits"`
-	Images        Images         `json:"images"`
-	ReleaseDates  struct {
+	// Extras for Muse: original language, production countries, keywords, recommendations.
+	OriginalLanguage string    `json:"original_language"`
+	Countries        []Country `json:"production_countries"`
+	Keywords         struct {
+		Keywords []Keyword `json:"keywords"`
+	} `json:"keywords"`
+	Recommendations Page    `json:"recommendations"`
+	Credits         Credits `json:"credits"`
+	Images          Images  `json:"images"`
+	ReleaseDates    struct {
 		Results []struct {
 			Country string `json:"iso_3166_1"`
 			Dates   []struct {
@@ -282,6 +289,78 @@ type Movie struct {
 			} `json:"release_dates"`
 		} `json:"results"`
 	} `json:"release_dates"`
+}
+
+// Country is a production country.
+type Country struct {
+	ISO  string `json:"iso_3166_1"`
+	Name string `json:"name"`
+}
+
+// Keyword is one of TMDB's plot keywords ("time loop", "heist").
+type Keyword struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+// Page is the first page of a list of movies or shows (recommendations).
+type Page struct {
+	Results []SearchResult `json:"results"`
+}
+
+// IDs are the TMDB ids on the page, in order.
+func (p Page) IDs() []int {
+	out := make([]int, 0, len(p.Results))
+	for _, r := range p.Results {
+		if r.ID > 0 {
+			out = append(out, r.ID)
+		}
+	}
+	return out
+}
+
+// KeywordNames are the movie's keywords.
+func (m *Movie) KeywordNames() []string { return keywordNames(m.Keywords.Keywords) }
+
+// CountryCodes are the movie's production countries (ISO 3166-1).
+func (m *Movie) CountryCodes() []string { return countryCodes(m.Countries, nil) }
+
+// KeywordNames are the show's keywords.
+func (t *TVShow) KeywordNames() []string { return keywordNames(t.Keywords.Results) }
+
+// CountryCodes are the show's origin and production countries (ISO 3166-1).
+func (t *TVShow) CountryCodes() []string { return countryCodes(t.Countries, t.OriginCountry) }
+
+func keywordNames(ks []Keyword) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, k := range ks {
+		n := strings.ToLower(strings.TrimSpace(k.Name))
+		if n != "" && !seen[n] {
+			seen[n] = true
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+func countryCodes(cs []Country, extra []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	add := func(c string) {
+		c = strings.ToUpper(strings.TrimSpace(c))
+		if len(c) == 2 && !seen[c] {
+			seen[c] = true
+			out = append(out, c)
+		}
+	}
+	for _, c := range extra {
+		add(c)
+	}
+	for _, c := range cs {
+		add(c.ISO)
+	}
+	return out
 }
 
 // Certification returns the content rating for country (e.g. "US" → "PG-13").
@@ -328,10 +407,25 @@ func (c *Client) MovieBasic(ctx context.Context, id int) (*Movie, error) {
 func (c *Client) Movie(ctx context.Context, id int) (*Movie, error) {
 	var m Movie
 	err := c.get(ctx, "/movie/"+strconv.Itoa(id), url.Values{
-		"append_to_response":     {"credits,images,release_dates"},
+		"append_to_response":     {"credits,images,release_dates,keywords,recommendations"},
 		"include_image_language": {c.imageLangs()},
 	}, &m)
 	return &m, err
+}
+
+// MovieExtras fetches a movie's language, countries, keywords and recommendations (and its
+// basic details), for items matched before these were stored.
+func (c *Client) MovieExtras(ctx context.Context, id int) (*Movie, error) {
+	var m Movie
+	err := c.get(ctx, "/movie/"+strconv.Itoa(id), url.Values{"append_to_response": {"keywords,recommendations"}}, &m)
+	return &m, err
+}
+
+// TVExtras is MovieExtras for a show.
+func (c *Client) TVExtras(ctx context.Context, id int) (*TVShow, error) {
+	var t TVShow
+	err := c.get(ctx, "/tv/"+strconv.Itoa(id), url.Values{"append_to_response": {"keywords,recommendations"}}, &t)
+	return &t, err
 }
 
 type SeasonSummary struct {
@@ -360,7 +454,15 @@ type TVShow struct {
 	Credits        Credits         `json:"credits"`
 	Images         Images          `json:"images"`
 	ExternalIDs    ExternalIDs     `json:"external_ids"`
-	ContentRatings struct {
+	// Extras for Muse: original language, countries, keywords, recommendations.
+	OriginalLanguage string    `json:"original_language"`
+	OriginCountry    []string  `json:"origin_country"`
+	Countries        []Country `json:"production_countries"`
+	Keywords         struct {
+		Results []Keyword `json:"results"`
+	} `json:"keywords"`
+	Recommendations Page `json:"recommendations"`
+	ContentRatings  struct {
 		Results []struct {
 			Country string `json:"iso_3166_1"`
 			Rating  string `json:"rating"`
@@ -380,7 +482,7 @@ func (t *TVShow) Certification(country string) string {
 func (c *Client) TV(ctx context.Context, id int) (*TVShow, error) {
 	var t TVShow
 	err := c.get(ctx, "/tv/"+strconv.Itoa(id), url.Values{
-		"append_to_response":     {"credits,images,external_ids,content_ratings"},
+		"append_to_response":     {"credits,images,external_ids,content_ratings,keywords,recommendations"},
 		"include_image_language": {c.imageLangs()},
 	}, &t)
 	return &t, err

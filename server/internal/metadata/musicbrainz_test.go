@@ -30,7 +30,10 @@ func fakeMusicBrainz(t *testing.T) (*httptest.Server, *int) {
 		case r.URL.Path == "/artist":
 			io.WriteString(w, `{"artists":[]}`)
 		case r.URL.Path == "/artist/lobos":
-			io.WriteString(w, `{"id":"lobos","name":"Los Lobos","sort-name":"Lobos, Los","genres":[{"name":"roots rock","count":5},{"name":"rock","count":9},{"name":"tex-mex","count":2},{"name":"chicano","count":1}],
+			io.WriteString(w, `{"id":"lobos","name":"Los Lobos","sort-name":"Lobos, Los","type":"Group","country":"US","area":{"name":"United States"},
+				"begin-area":{"name":"East Los Angeles"},"life-span":{"begin":"1973","ended":false},
+				"tags":[{"name":"chicano rock","count":4},{"name":"rock","count":3},{"name":"zero votes","count":0}],
+				"genres":[{"name":"roots rock","count":5},{"name":"rock","count":9},{"name":"tex-mex","count":2},{"name":"chicano","count":1}],
 				"relations":[{"type":"wikidata","url":{"resource":"https://www.wikidata.org/wiki/Q1"}}]}`)
 		case r.URL.Path == "/wiki/Special:EntityData/Q1.json":
 			io.WriteString(w, `{"entities":{"Q1":{"sitelinks":{"enwiki":{"title":"Los Lobos"}}}}}`)
@@ -45,7 +48,10 @@ func fakeMusicBrainz(t *testing.T) (*httptest.Server, *int) {
 		case r.URL.Path == "/artist/tagged":
 			io.WriteString(w, `{"id":"tagged","name":"Johnny Cash","sort-name":"Cash, Johnny","genres":[{"name":"country","count":7}]}`)
 		case r.URL.Path == "/release/rel1":
-			io.WriteString(w, `{"id":"rel1","release-group":{"id":"rg1"}}`)
+			io.WriteString(w, `{"id":"rel1","release-group":{"id":"rg1"},"label-info":[{"label":{"name":"Columbia"}}]}`)
+		case r.URL.Path == "/artist/hasbio" || r.URL.Path == "/artist/lockedbio":
+			io.WriteString(w, `{"id":"x","name":"Someone","type":"Person","gender":"Female","area":{"name":"Iceland","iso-3166-1-codes":["IS"]},
+				"life-span":{"begin":"1965-11-21"},"relations":[{"type":"wikidata","url":{"resource":"https://www.wikidata.org/wiki/Q1"}}]}`)
 		case r.URL.Path == "/release-group/rg1":
 			io.WriteString(w, `{"id":"rg1","title":"Live at Folsom","primary-type":"Album","secondary-types":["Live"],"first-release-date":"1968-05-06","genres":[{"name":"country","count":3}]}`)
 		case r.URL.Path == "/release-group" && strings.Contains(q, `"Kiko"`):
@@ -80,6 +86,10 @@ func TestEnrichMusic(t *testing.T) {
 	mustExec(t, d, `INSERT INTO external_ids(item_id, provider, value) VALUES (4, 'musicbrainz', 'rel1')`)
 	mustExec(t, d, `INSERT INTO items(id, library_id, type, title, sort_title) VALUES (5, 1, 'artist', 'Twins', 'Twins')`)
 	mustExec(t, d, `INSERT INTO tags(kind, name) VALUES ('genre', 'Roots-Rock')`)
+	mustExec(t, d, `INSERT INTO items(id, library_id, type, title, sort_title, summary) VALUES (6, 1, 'artist', 'Has Bio', 'Has Bio', 'Written by hand.')`)
+	mustExec(t, d, `INSERT INTO external_ids(item_id, provider, value) VALUES (6, 'musicbrainz', 'hasbio')`)
+	mustExec(t, d, `INSERT INTO items(id, library_id, type, title, sort_title, locked_fields) VALUES (7, 1, 'artist', 'Locked Bio', 'Locked Bio', '["summary"]')`)
+	mustExec(t, d, `INSERT INTO external_ids(item_id, provider, value) VALUES (7, 'musicbrainz', 'lockedbio')`)
 	mustExec(t, d, `INSERT INTO items(id, library_id, type, title, sort_title, parent_id, grandparent_id) VALUES (20, 1, 'track', 'Angels with Dirty Faces', 'a', 2, 1)`)
 	mustExec(t, d, `INSERT INTO items(id, library_id, type, title, sort_title, parent_id, grandparent_id) VALUES (21, 1, 'track', 'Kiko & the Lavender Moon (live)', 'k', 2, 1)`)
 	mustExec(t, d, `INSERT INTO external_ids(item_id, provider, value) VALUES (21, 'musicbrainz', 'r-kiko')`)
@@ -91,7 +101,7 @@ func TestEnrichMusic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(msg, "5 artists and albums (4 found)") {
+	if !strings.Contains(msg, "7 artists and albums (6 found)") {
 		t.Errorf("summary: %s", msg)
 	}
 	str := func(q string, args ...any) string {
@@ -100,7 +110,7 @@ func TestEnrichMusic(t *testing.T) {
 		return v
 	}
 	genres := func(id int) string {
-		return str(`SELECT group_concat(name, ',') FROM (SELECT t.name FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE it.item_id = ? ORDER BY t.name)`, id)
+		return str(`SELECT group_concat(name, ',') FROM (SELECT t.name FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE it.item_id = ? AND t.kind = 'genre' ORDER BY t.name)`, id)
 	}
 	if v := str(`SELECT sort_title FROM items WHERE id = 1`); v != "Lobos" {
 		t.Errorf("article dropped: %q", v)
@@ -131,9 +141,32 @@ func TestEnrichMusic(t *testing.T) {
 	if v := str(`SELECT group_concat(track_id, ',') FROM (SELECT track_id FROM music_popular WHERE artist_id = 1 ORDER BY rank)`); v != "21,20" {
 		t.Errorf("popular: %q", v)
 	}
+	// Artist and album details: type, country, area, years, styles (genres and tags by votes), label.
+	if v := str(`SELECT artist_type || ' ' || country || ' ' || begin_area || ' ' || begin_year || ' ' || COALESCE(end_year, '-') FROM music_info WHERE item_id = 1`); v != "group US East Los Angeles 1973 -" {
+		t.Errorf("artist info: %q", v)
+	}
+	if v := str(`SELECT group_concat(name, ',') FROM (SELECT t.name FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE it.item_id = 1 AND t.kind = 'style' ORDER BY t.name)`); v != "chicano,chicano rock,rock,roots rock,tex-mex" {
+		t.Errorf("styles: %q", v)
+	}
+	if v := str(`SELECT primary_type || ' ' || label FROM music_info WHERE item_id = 4`); v != "album Columbia" {
+		t.Errorf("album info: %q", v)
+	}
+	if v := str(`SELECT artist_type || ' ' || gender || ' ' || country || ' ' || begin_year FROM music_info WHERE item_id = 6`); v != "person female IS 1965" {
+		t.Errorf("country from the area: %q", v)
+	}
+	if v := str(`SELECT found FROM music_info WHERE item_id = 5`); v != "0" {
+		t.Errorf("ambiguous artist recorded as not found: %q", v)
+	}
+	// Bios only fill an empty, unlocked summary.
+	if v := str(`SELECT summary FROM items WHERE id = 6`); v != "Written by hand." {
+		t.Errorf("existing summary replaced: %q", v)
+	}
+	if v := str(`SELECT COALESCE(summary, '') FROM items WHERE id = 7`); v != "" {
+		t.Errorf("locked summary filled: %q", v)
+	}
 	// Each item is looked up once.
 	before := *hits
-	if msg, _ := s.EnrichMusic(ctx); *hits != before || !strings.Contains(msg, "0 artists") {
+	if msg, _ := s.EnrichMusic(ctx); *hits != before || !strings.Contains(msg, "Every artist") {
 		t.Errorf("second run: %s (%d requests)", msg, *hits-before)
 	}
 }

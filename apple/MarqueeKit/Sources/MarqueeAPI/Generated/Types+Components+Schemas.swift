@@ -1605,6 +1605,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MusicSettings/onlineLyrics`.
             public var onlineLyrics: Swift.Bool?
+            /// Look up artists and albums on MusicBrainz (about one request a second) and artist bios on Wikipedia: styles, solo artist or band, country, active years, album types and labels, for artist pages and Muse.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicSettings/artistDetails`.
+            public var artistDetails: Swift.Bool?
             /// Ignored: volume levelling is always on, so tracks without ReplayGain tags are always measured.
             ///
             /// - Remark: Generated from `#/components/schemas/MusicSettings/loudnessAnalysis`.
@@ -1615,19 +1619,23 @@ extension Components {
             /// - Parameters:
             ///   - soundprintAnalysis: Soundprint: analyse how tracks sound (on this server's GPU) for radios, similar music and Muse.
             ///   - onlineLyrics: Look up lyrics on LRCLIB when a track has none (sends artist and title).
+            ///   - artistDetails: Look up artists and albums on MusicBrainz (about one request a second) and artist bios on Wikipedia: styles, solo artist or band, country, active years, album types and labels, for artist pages and Muse.
             ///   - loudnessAnalysis: Ignored: volume levelling is always on, so tracks without ReplayGain tags are always measured.
             public init(
                 soundprintAnalysis: Swift.Bool? = nil,
                 onlineLyrics: Swift.Bool? = nil,
+                artistDetails: Swift.Bool? = nil,
                 loudnessAnalysis: Swift.Bool? = nil
             ) {
                 self.soundprintAnalysis = soundprintAnalysis
                 self.onlineLyrics = onlineLyrics
+                self.artistDetails = artistDetails
                 self.loudnessAnalysis = loudnessAnalysis
             }
             public enum CodingKeys: String, CodingKey {
                 case soundprintAnalysis
                 case onlineLyrics
+                case artistDetails
                 case loudnessAnalysis
             }
         }

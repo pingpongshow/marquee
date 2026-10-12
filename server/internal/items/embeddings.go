@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"marquee/internal/origins"
 )
 
 // ErrEmbedderUnavailable means the sidecar that embeds text isn't reachable.
@@ -401,25 +403,39 @@ func (e *Embedder) save(ctx context.Context, model string, chunk []embedDoc, vec
 	return nil
 }
 
-// videoDocs builds the description embedded for every movie and show (not extras): title
-// and year, genres, tagline, summary, director or creator and top cast, studio or network,
-// and the collection it belongs to.
+// docVersion is part of every description's hash: raising it re-embeds everything in the
+// background (the text changing does the same for one item).
+const docVersion = 2
+
+// docMeta is what one movie's or show's description is built from.
+type docMeta struct {
+	typ, title, tagline, summary, studio string
+	year                                 int
+	genres, keywords, directors, cast    []string
+	countries                            []string // ISO codes
+	language, contentRating              string
+	rtCritic, metacritic                 int     // 0–100, -1 unknown
+	audience                             float64 // 0–10
+	collection                           string
+}
+
+// videoDocs builds the description embedded for every movie and show (not extras).
 func videoDocs(ctx context.Context, db *sql.DB) ([]embedDoc, error) {
 	type meta struct {
 		embedDoc
-		title, tagline, summary, studio string
-		year                            int
-		genres, directors, cast         []string
-		collection                      string
+		docMeta
 	}
 	byID := map[int64]*meta{}
 	var order []int64
-	err := eachRow(ctx, db, `SELECT id, library_id, type, title, COALESCE(year, 0), COALESCE(tagline, ''), COALESCE(summary, ''), COALESCE(studio, '')
+	err := eachRow(ctx, db, `SELECT id, library_id, type, title, COALESCE(year, 0), COALESCE(tagline, ''), COALESCE(summary, ''), COALESCE(studio, ''),
+			COALESCE(original_language, ''), COALESCE(content_rating, ''), COALESCE(rt_critic, -1), COALESCE(metacritic, -1), COALESCE(audience_rating, imdb_rating, 0)
 		FROM items WHERE type IN ('movie', 'show') AND extra_type IS NULL ORDER BY id`, nil, func(r *sql.Rows) error {
 		m := &meta{}
-		if err := r.Scan(&m.id, &m.lib, &m.typ, &m.title, &m.year, &m.tagline, &m.summary, &m.studio); err != nil {
+		if err := r.Scan(&m.id, &m.lib, &m.embedDoc.typ, &m.title, &m.year, &m.tagline, &m.summary, &m.studio,
+			&m.language, &m.contentRating, &m.rtCritic, &m.metacritic, &m.audience); err != nil {
 			return err
 		}
+		m.docMeta.typ = m.embedDoc.typ
 		byID[m.id] = m
 		order = append(order, m.id)
 		return nil
@@ -427,15 +443,22 @@ func videoDocs(ctx context.Context, db *sql.DB) ([]embedDoc, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = eachRow(ctx, db, `SELECT it.item_id, t.name FROM item_tags it JOIN tags t ON t.id = it.tag_id AND t.kind = 'genre'
-		JOIN items i ON i.id = it.item_id AND i.type IN ('movie', 'show') ORDER BY it.item_id, t.name`, nil, func(r *sql.Rows) error {
+	err = eachRow(ctx, db, `SELECT it.item_id, t.kind, t.name FROM item_tags it JOIN tags t ON t.id = it.tag_id AND t.kind IN ('genre', 'keyword', 'country')
+		JOIN items i ON i.id = it.item_id AND i.type IN ('movie', 'show') ORDER BY it.item_id, t.kind, t.id`, nil, func(r *sql.Rows) error {
 		var id int64
-		var name string
-		if err := r.Scan(&id, &name); err != nil {
+		var kind, name string
+		if err := r.Scan(&id, &kind, &name); err != nil {
 			return err
 		}
-		if m := byID[id]; m != nil {
+		m := byID[id]
+		switch {
+		case m == nil:
+		case kind == "genre":
 			m.genres = append(m.genres, name)
+		case kind == "keyword":
+			m.keywords = append(m.keywords, name)
+		case kind == "country":
+			m.countries = append(m.countries, name)
 		}
 		return nil
 	})
@@ -453,7 +476,7 @@ func videoDocs(ctx context.Context, db *sql.DB) ([]embedDoc, error) {
 		m := byID[id]
 		switch {
 		case m == nil:
-		case role == "actor" && len(m.cast) < 4:
+		case role == "actor" && len(m.cast) < 3:
 			m.cast = append(m.cast, name)
 		case role != "actor" && len(m.directors) < 2:
 			m.directors = append(m.directors, name)
@@ -481,25 +504,28 @@ func videoDocs(ctx context.Context, db *sql.DB) ([]embedDoc, error) {
 	out := make([]embedDoc, 0, len(order))
 	for _, id := range order {
 		m := byID[id]
-		m.text = docText(m.typ, m.title, m.year, m.genres, m.tagline, m.summary, m.directors, m.cast, m.studio, m.collection)
-		sum := sha256.Sum256([]byte(m.text))
+		m.text = DocText(m.docMeta)
+		sum := sha256.Sum256([]byte(fmt.Sprintf("v%d\n%s", docVersion, m.text)))
 		m.hash = hex.EncodeToString(sum[:16])
 		out = append(out, m.embedDoc)
 	}
 	return out, nil
 }
 
-// docText is the description of one movie or show, in the order a person would read it.
-func docText(typ, title string, year int, genres []string, tagline, summary string, directors, cast []string, studio, collection string) string {
+// docKeywords bounds the keywords in a description (TMDB lists the most relevant first).
+const docKeywords = 12
+
+// DocText is the description of one movie or show. It leads with what the title is about
+// (genres, keywords, tagline, plot), then who made it, a few lead actors, where it's from
+// and how it's rated: similarity should follow the story, not shared actors or studios
+// (people are searched through the credits filter instead).
+func DocText(m docMeta) string {
 	var b strings.Builder
-	b.WriteString(title)
-	if year > 0 {
-		fmt.Fprintf(&b, " (%d)", year)
+	b.WriteString(m.title)
+	if m.year > 0 {
+		fmt.Fprintf(&b, " (%d)", m.year)
 	}
-	b.WriteString(map[string]string{"movie": ". A film.", "show": ". A TV series."}[typ])
-	if len(genres) > 0 {
-		b.WriteString(" " + strings.Join(genres, ", ") + ".")
-	}
+	b.WriteString(map[string]string{"movie": ". A film.", "show": ". A TV series."}[m.typ])
 	sentence := func(s string) {
 		s = strings.TrimSpace(s)
 		if s == "" {
@@ -510,27 +536,67 @@ func docText(typ, title string, year int, genres []string, tagline, summary stri
 			b.WriteString(".")
 		}
 	}
-	sentence(tagline)
-	sentence(summary)
-	if len(directors) > 0 {
+	if len(m.genres) > 0 {
+		sentence(strings.Join(m.genres, ", "))
+	}
+	if kw := m.keywords; len(kw) > 0 {
+		if len(kw) > docKeywords {
+			kw = kw[:docKeywords]
+		}
+		sentence("Themes: " + strings.Join(kw, ", "))
+	}
+	sentence(m.tagline)
+	sentence(m.summary)
+	if len(m.directors) > 0 {
 		verb := "Directed by "
-		if typ == "show" {
+		if m.typ == "show" {
 			verb = "Created by "
 		}
-		sentence(verb + strings.Join(directors, " and "))
+		sentence(verb + strings.Join(m.directors, " and "))
 	}
-	if len(cast) > 0 {
-		sentence("Starring " + strings.Join(cast, ", "))
+	if len(m.cast) > 0 {
+		sentence("Starring " + strings.Join(m.cast, ", "))
 	}
-	if studio != "" {
-		if typ == "show" {
-			sentence("On " + studio)
-		} else {
-			sentence("From " + studio)
+	var from []string
+	for _, c := range m.countries {
+		if n := origins.CountryName(c); n != "" {
+			from = append(from, n)
 		}
 	}
-	if collection != "" {
-		sentence("Part of " + collection)
+	origin := ""
+	if len(from) > 0 {
+		origin = "From " + strings.Join(from, " and ")
+	}
+	if l := origins.LanguageName(m.language); l != "" && m.language != "en" {
+		if origin == "" {
+			origin = "In " + l
+		} else {
+			origin += ", in " + l
+		}
+	}
+	sentence(origin)
+	if m.typ == "show" && m.studio != "" {
+		sentence("On " + m.studio) // the network says something about a show; a film's studio rarely does
+	}
+	if m.collection != "" {
+		sentence("Part of " + m.collection)
+	}
+	if m.contentRating != "" {
+		sentence("Rated " + m.contentRating)
+	}
+	var ratings []string
+	switch {
+	case m.rtCritic >= 0:
+		ratings = append(ratings, fmt.Sprintf("critics %d%%", m.rtCritic))
+	case m.metacritic >= 0:
+		ratings = append(ratings, fmt.Sprintf("Metacritic %d", m.metacritic))
+	}
+	if m.audience > 0 {
+		ratings = append(ratings, fmt.Sprintf("audiences %.1f/10", m.audience))
+	}
+	if len(ratings) > 0 {
+		r := strings.Join(ratings, ", ")
+		sentence(strings.ToUpper(r[:1]) + r[1:])
 	}
 	return b.String()
 }
