@@ -129,7 +129,6 @@ fun DiscoverScreen(nav: NavHostController) {
     var category by remember { mutableStateOf(RequestsApi.CategoryDiscoverRequestable.TRENDING) }
     var query by remember { mutableStateOf("") }
     var items by remember { mutableStateOf<List<DiscoverItem>?>(null) }
-    var mine by remember { mutableStateOf<List<MediaRequest>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
     var picked by remember { mutableStateOf<DiscoverItem?>(null) }
     var reload by remember { mutableIntStateOf(0) }
@@ -158,7 +157,6 @@ fun DiscoverScreen(nav: NavHostController) {
         runCatching { fetch(1) }
             .onSuccess { items = it.results; page = it.page; hasMore = it.page < it.totalPages; error = null }
             .onFailure { error = it.message }
-        mine = withContext(Dispatchers.IO) { runCatching { marquee.requests.listRequests() }.getOrDefault(emptyList()) }
     }
     fun loadMore() {
         if (!hasMore || loadingMore) return
@@ -209,18 +207,6 @@ fun DiscoverScreen(nav: NavHostController) {
                         item { PickChip("Sort", sorts, sort) { sort = it } }
                     }
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                }
-            }
-            if (mine.isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) { Text("My Requests", Modifier.padding(top = 16.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
-                items(mine, key = { "r${it.id}" }, span = { GridItemSpan(maxLineSpan) }) { r ->
-                    RequestRow(r, action = if (r.status == RequestState.PENDING) "Withdraw" else null) {
-                        scope.launch {
-                            withContext(Dispatchers.IO) { runCatching { marquee.requests.cancelRequest(r.id) } }
-                                .onSuccess { mine = mine.filterNot { it.id == r.id } } // gone at once, before Seerr's lists reload
-                            reload++
-                        }
-                    }
                 }
             }
             val list = items

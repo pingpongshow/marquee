@@ -16,12 +16,6 @@ export const requestsStatusQuery = queryOptions({
   staleTime: 60_000,
 });
 
-export const myRequestsQuery = queryOptions({
-  queryKey: ["requests", "list", "mine"],
-  queryFn: () =>
-    unwrap(api.GET("/requests", { params: { query: { scope: "mine" } } })),
-});
-
 export const allRequestsQuery = queryOptions({
   queryKey: ["requests", "list", "all"],
   queryFn: () =>

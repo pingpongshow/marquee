@@ -234,7 +234,7 @@ final class MarqueeUITests: XCTestCase {
         app.buttons["Delete Download"].tap()
     }
 
-    /// Discover (REQ-1): browse Seerr, request a title, see it under My Requests, withdraw it.
+    /// Discover (REQ-1): browse Seerr, request a title, see it marked as requested in the list.
     /// Needs the server connected to Seerr and the test profile allowed to request.
     func testDiscoverAndRequest() {
         connectAndSignIn()
@@ -253,6 +253,7 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(request.waitForExistence(timeout: 20), "Discover lists requestable titles")
         sleep(2)
         shot("r1-discover")
+        let title = String(request.label.dropFirst("Request ".count))
         request.tap()
         let confirm = app.navigationBars["Request"].buttons["Request"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 10))
@@ -262,12 +263,12 @@ final class MarqueeUITests: XCTestCase {
         waitForExpectations(timeout: 10)
         shot("r2-request-sheet")
         confirm.tap()
-        let withdraw = app.buttons["Withdraw"].firstMatch
-        XCTAssertTrue(withdraw.waitForExistence(timeout: 15), "the request shows under My Requests")
-        for _ in 0..<8 where !withdraw.isHittable { app.scrollViews.firstMatch.swipeUp() }
-        shot("r3-my-requests")
-        withdraw.tap()
-        XCTAssertTrue(withdraw.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Requested"].waitForExistence(timeout: 15), "the sheet confirms the request")
+        app.navigationBars["Request"].buttons["Cancel"].tap()
+        // Back in the list, the title is marked instead of requestable.
+        let marked = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(title), ")).firstMatch
+        XCTAssertTrue(marked.waitForExistence(timeout: 15), "the title shows as requested")
+        shot("r3-requested")
     }
 
     /// Live TV (LIVE-2/3): guide with a live preview, What's On, full-screen watching and

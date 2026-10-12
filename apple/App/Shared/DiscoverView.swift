@@ -8,7 +8,6 @@ struct DiscoverView: View {
     @State private var category: DiscoverCategory = .trending
     @State private var query = ""
     @State private var items: [DiscoverItem] = []
-    @State private var mine: [MediaRequest] = []
     @State private var error: String?
     @State private var picked: DiscoverItem?
     @State private var browse = DiscoverBrowse()
@@ -51,7 +50,6 @@ struct DiscoverView: View {
                     }
                     .padding(.horizontal, sidePadding)
                     if loadingMore { ProgressView().frame(maxWidth: .infinity) }
-                    if !mine.isEmpty { myRequests }
                 }
                 .padding(.vertical)
             }
@@ -94,30 +92,6 @@ struct DiscoverView: View {
 
     private func requestable(_ it: DiscoverItem) -> Bool {
         it.availability == Availability.none || (it.mediaType == .tv && it.availability == .partial)
-    }
-
-    private var myRequests: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("My Requests").font(.title3.bold())
-            ForEach(mine, id: \.id) { r in
-                HStack(spacing: 12) {
-                    CachedImage(fill: r.posterUrl.flatMap(URL.init(string:))).background(Color.secondary.opacity(0.2))
-                        .frame(width: 40, height: 60).clipShape(RoundedRectangle(cornerRadius: 4))
-                    VStack(alignment: .leading) {
-                        Text(r.title).lineLimit(1)
-                        Text([r.status.label, r.reason].compactMap { $0 }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    if r.status == .pending {
-                        Button("Withdraw", role: .destructive) {
-                            Task { try? await app.cancelRequest(r.id); await load() }
-                        }
-                        .font(.caption)
-                    }
-                }
-            }
-        }
-        .padding(.horizontal, sidePadding)
     }
 
     private static let categories: [(DiscoverCategory, String)] = [
@@ -221,7 +195,6 @@ struct DiscoverView: View {
             items = p.results
             page = p.page
             hasMore = p.page < p.totalPages
-            mine = (try? await app.requests()) ?? []
             error = nil
         } catch is CancellationError {
         } catch {

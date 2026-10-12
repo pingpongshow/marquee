@@ -102,10 +102,6 @@ public extension AppSession {
         try await requestsAPI.listRequests(query: .init(scope: all ? .all : .mine)).ok.body.json
     }
 
-    func cancelRequest(_ id: Int64) async throws {
-        _ = try await requestsAPI.cancelRequest(path: .init(requestId: id)).noContent
-    }
-
     func approveRequest(_ id: Int64) async throws -> MediaRequest {
         try await requestsAPI.approveRequest(path: .init(requestId: id)).ok.body.json
     }
