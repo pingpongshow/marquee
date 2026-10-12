@@ -444,6 +444,11 @@ func run() error {
 	if err := lyricThemes.Load(ctx); err != nil {
 		slog.Warn("lyric themes", "err", err)
 	}
+	// Lyrics for the whole library from LRCLIB, paced; new lyrics are then indexed for themes.
+	lyricsSvc.Fetched = func() { scheduler.RunNow(ctx, "lyric-themes") }
+	scheduler.Register(tasks.Task{ID: "lyrics-fetch", Name: "Fetch lyrics", Every: 24 * time.Hour,
+		Description: "With online lyrics on, looks up lyrics on LRCLIB for tracks that haven't been looked up yet, about one a second (the first run covers the library, later runs new tracks).",
+		Run:         lyricsSvc.FetchAll, Progress: lyricsSvc.FetchProgress})
 	scheduler.Register(tasks.Task{ID: "lyric-themes", Name: "Index lyric themes", Every: 6 * time.Hour,
 		Description: "With AI on, reads the lyrics of tracks (from their tags and .lrc files) with the embedding model, so Muse can find songs about a theme.",
 		Run:         lyricThemes.Run, Progress: lyricThemes.Progress})

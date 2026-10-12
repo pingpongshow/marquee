@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -37,6 +39,13 @@ type Service struct {
 	Online func() bool
 	// BaseURL is LRCLIB's API (overridable in tests).
 	BaseURL string
+	// FetchPause spaces FetchAll's lookups (default one a second).
+	FetchPause time.Duration
+	// Fetched, when set, runs after FetchAll found new lyrics (to index their themes).
+	Fetched func()
+
+	fetchMu               sync.Mutex
+	fetchDone, fetchTotal int
 }
 
 var lrcTime = regexp.MustCompile(`\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]`)
@@ -282,4 +291,61 @@ func PlainText(text string) string {
 		b.WriteString(l.Text)
 	}
 	return b.String()
+}
+
+// FetchAll looks every track's lyrics up (tags, .lrc, then LRCLIB when online lookups are on)
+// that hasn't been looked up online yet, about one a second so LRCLIB isn't hammered. Tracks
+// LRCLIB had nothing for are retried after a month by Get. Run as a daily task: the first
+// run covers the library, later ones only new tracks.
+func (s *Service) FetchAll(ctx context.Context) (string, error) {
+	if !s.Online() {
+		return "Online lyrics are off (Settings → Music)", nil
+	}
+	rows, err := s.DB.QueryContext(ctx, `SELECT i.id FROM items i LEFT JOIN lyrics l ON l.item_id = i.id
+		WHERE i.type = 'track' AND (l.item_id IS NULL OR (l.text = '' AND l.source != 'lrclib')) ORDER BY i.id`)
+	if err != nil {
+		return "", err
+	}
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if rows.Scan(&id) == nil {
+			ids = append(ids, id)
+		}
+	}
+	rows.Close()
+	s.fetchMu.Lock()
+	s.fetchDone, s.fetchTotal = 0, len(ids)
+	s.fetchMu.Unlock()
+	found := 0
+	pause := s.FetchPause
+	if pause == 0 {
+		pause = time.Second
+	}
+	for i, id := range ids {
+		if ctx.Err() != nil || !s.Online() {
+			return fmt.Sprintf("Stopped after %d of %d tracks (%d with lyrics); continues next run", i, len(ids), found), ctx.Err()
+		}
+		if l, err := s.Get(ctx, id); err == nil && len(l.Lines) > 0 {
+			found++
+		}
+		s.fetchMu.Lock()
+		s.fetchDone = i + 1
+		s.fetchMu.Unlock()
+		select {
+		case <-ctx.Done():
+		case <-time.After(pause):
+		}
+	}
+	if s.Fetched != nil && found > 0 {
+		s.Fetched()
+	}
+	return fmt.Sprintf("Looked up %d tracks, found lyrics for %d", len(ids), found), nil
+}
+
+// FetchProgress reports a running FetchAll.
+func (s *Service) FetchProgress() (done, total int) {
+	s.fetchMu.Lock()
+	defer s.fetchMu.Unlock()
+	return s.fetchDone, s.fetchTotal
 }
