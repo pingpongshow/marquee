@@ -184,3 +184,18 @@ func TestArticleSort(t *testing.T) {
 		}
 	}
 }
+
+// Tags of tracks by several artists hold several MBIDs; MusicBrainz takes one.
+func TestFirstMBID(t *testing.T) {
+	for in, want := range map[string]string{
+		"e4f12dfc-1ee7-4250-8e24-549b6d46676d;cc7d4686-ea02-45fd-956e-94c1a322558c": "e4f12dfc-1ee7-4250-8e24-549b6d46676d",
+		"E4F12DFC-1EE7-4250-8E24-549B6D46676D / x":                                  "e4f12dfc-1ee7-4250-8e24-549b6d46676d",
+		"not-an-id": "not-an-id",
+		"a;b":       "a",
+		"":          "",
+	} {
+		if got := firstMBID(in); got != want {
+			t.Errorf("%q → %q, want %q", in, got, want)
+		}
+	}
+}

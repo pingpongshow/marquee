@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -106,6 +107,7 @@ func (s *Service) EnrichMusic(ctx context.Context) (string, error) {
 			rows.Close()
 			return "", err
 		}
+		t.mbid = firstMBID(t.mbid)
 		list = append(list, t)
 	}
 	rows.Close()
@@ -477,4 +479,20 @@ func titleCase(s string) string {
 		up = c == ' ' || c == '-' || c == '/' || c == '&'
 	}
 	return string(r)
+}
+
+var mbidPattern = regexp.MustCompile(`[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`)
+
+// firstMBID returns the first MusicBrainz id in a tag value: tags of tracks by several
+// artists hold several ("id1;id2" or "id1/id2"), which MusicBrainz rejects as one id.
+func firstMBID(v string) string {
+	if id := mbidPattern.FindString(v); id != "" {
+		return strings.ToLower(id)
+	}
+	// Not a UUID (a hand-edited tag): the first part before a separator; a bad id is then
+	// just "not found" (MusicBrainz answers 400).
+	if i := strings.IndexAny(v, ";/,"); i >= 0 {
+		v = v[:i]
+	}
+	return strings.TrimSpace(v)
 }

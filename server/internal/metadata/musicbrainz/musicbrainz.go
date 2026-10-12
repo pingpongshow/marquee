@@ -188,7 +188,9 @@ func (c *Client) get(ctx context.Context, path string, q url.Values, out any) er
 			return err
 		}
 		switch {
-		case resp.StatusCode == http.StatusNotFound:
+		case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusBadRequest:
+			// 400: MusicBrainz rejected the id or query for this item (e.g. a malformed MBID
+			// tag); treated like "not found" so one bad item doesn't stop a whole run.
 			resp.Body.Close()
 			return ErrNotFound
 		case resp.StatusCode == http.StatusServiceUnavailable && attempt < 3:
