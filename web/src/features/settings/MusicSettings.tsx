@@ -90,6 +90,27 @@ export function MusicSettings() {
           </div>
         </Card>
         <Card
+          title="Artist and album details"
+          description="Bios, styles and facts that help artist pages and Muse."
+        >
+          <Toggle
+            label="Look up artists and albums online"
+            help="Asks MusicBrainz (an open music database) about each artist and album, about one a second, and Wikipedia for artist bios: styles, solo artist or band, country, active years, album types and labels. Only names and MusicBrainz ids are sent. The first run takes a few hours for a large library; later runs cover new music."
+            checked={!!s.draft.artistDetails}
+            onChange={(v) => s.update({ artistDetails: v })}
+          />
+          <div>
+            <Button
+              size="sm"
+              onClick={() => run.mutate("musicbrainz")}
+              disabled={!s.draft.artistDetails}
+              loading={run.isPending}
+            >
+              <Play className="size-4" /> Look up new artists and albums now
+            </Button>
+          </div>
+        </Card>
+        <Card
           title="Lyrics"
           description="Lyrics come from the files themselves and from .lrc files next to them."
         >

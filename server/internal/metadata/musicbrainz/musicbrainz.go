@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -42,12 +43,84 @@ type Artist struct {
 	SortName string  `json:"sort-name"`
 	Score    int     `json:"score"`
 	Genres   []Genre `json:"genres"`
-	Rels     []struct {
+	Tags     []Genre `json:"tags"`
+	Type     string  `json:"type"`   // Person, Group, Orchestra, Choir, Character, Other
+	Gender   string  `json:"gender"` // Male, Female, Non-binary, Other (people only)
+	Country  string  `json:"country"`
+	Area     *Area   `json:"area"`
+	Begin    *Area   `json:"begin-area"`
+	LifeSpan struct {
+		Begin string `json:"begin"`
+		End   string `json:"end"`
+		Ended bool   `json:"ended"`
+	} `json:"life-span"`
+	Disambiguation string `json:"disambiguation"`
+	Rels           []struct {
 		Type string `json:"type"`
 		URL  struct {
 			Resource string `json:"resource"`
 		} `json:"url"`
 	} `json:"relations"`
+}
+
+// Area is a country, city or region.
+type Area struct {
+	Name string `json:"name"`
+	// ISO codes, present on country areas.
+	Codes []string `json:"iso-3166-1-codes"`
+}
+
+// Years are the artist's begin and end years (0 when unknown).
+func (a Artist) Years() (begin, end int) {
+	return yearOf(a.LifeSpan.Begin), yearOf(a.LifeSpan.End)
+}
+
+// CountryCode is the artist's country (ISO 3166-1), from the country field or a country area.
+func (a Artist) CountryCode() string {
+	if len(a.Country) == 2 {
+		return strings.ToUpper(a.Country)
+	}
+	if a.Area != nil && len(a.Area.Codes) > 0 {
+		return strings.ToUpper(a.Area.Codes[0])
+	}
+	return ""
+}
+
+func yearOf(date string) int {
+	if len(date) < 4 {
+		return 0
+	}
+	y := 0
+	for _, c := range date[:4] {
+		if c < '0' || c > '9' {
+			return 0
+		}
+		y = y*10 + int(c-'0')
+	}
+	return y
+}
+
+// Styles merges MusicBrainz genres and tags: the n most-voted names (lower case), votes > 0.
+func Styles(genres, tags []Genre, n int) []string {
+	votes := map[string]int{}
+	var order []string
+	for _, list := range [][]Genre{genres, tags} {
+		for _, g := range list {
+			k := strings.ToLower(strings.TrimSpace(g.Name))
+			if k == "" || g.Count <= 0 {
+				continue
+			}
+			if _, ok := votes[k]; !ok {
+				order = append(order, k)
+			}
+			votes[k] = max(votes[k], g.Count)
+		}
+	}
+	sort.SliceStable(order, func(i, j int) bool { return votes[order[i]] > votes[order[j]] })
+	if len(order) > n {
+		order = order[:n]
+	}
+	return order
 }
 
 // Wikidata is the artist's Wikidata id (e.g. Q44190), from its links.
@@ -70,6 +143,7 @@ type ReleaseGroup struct {
 	SecondaryTypes   []string `json:"secondary-types"`
 	FirstReleaseDate string   `json:"first-release-date"`
 	Genres           []Genre  `json:"genres"`
+	Tags             []Genre  `json:"tags"`
 	ArtistCredit     []struct {
 		Name   string `json:"name"`
 		Artist struct {
@@ -145,7 +219,7 @@ func quote(s string) string {
 // Artist looks an artist up by MBID, with genres.
 func (c *Client) Artist(ctx context.Context, mbid string) (Artist, error) {
 	var a Artist
-	err := c.get(ctx, "/artist/"+url.PathEscape(mbid), url.Values{"inc": {"genres url-rels"}}, &a)
+	err := c.get(ctx, "/artist/"+url.PathEscape(mbid), url.Values{"inc": {"genres tags url-rels"}}, &a)
 	return a, err
 }
 
@@ -158,26 +232,39 @@ func (c *Client) SearchArtists(ctx context.Context, name string) ([]Artist, erro
 	return out.Artists, err
 }
 
-// ReleaseGroupOf returns the release group of a release (an album's MBID in tags).
-func (c *Client) ReleaseGroupOf(ctx context.Context, releaseID string) (string, error) {
+// ReleaseGroupOf returns the release group of a release (an album's MBID in tags), and the
+// release's first label (free in the same request).
+func (c *Client) ReleaseGroupOf(ctx context.Context, releaseID string) (string, string, error) {
 	var out struct {
 		ReleaseGroup struct {
 			ID string `json:"id"`
 		} `json:"release-group"`
+		LabelInfo []struct {
+			Label *struct {
+				Name string `json:"name"`
+			} `json:"label"`
+		} `json:"label-info"`
 	}
-	if err := c.get(ctx, "/release/"+url.PathEscape(releaseID), url.Values{"inc": {"release-groups"}}, &out); err != nil {
-		return "", err
+	if err := c.get(ctx, "/release/"+url.PathEscape(releaseID), url.Values{"inc": {"release-groups labels"}}, &out); err != nil {
+		return "", "", err
 	}
 	if out.ReleaseGroup.ID == "" {
-		return "", ErrNotFound
+		return "", "", ErrNotFound
 	}
-	return out.ReleaseGroup.ID, nil
+	label := ""
+	for _, l := range out.LabelInfo {
+		if l.Label != nil && l.Label.Name != "" && !strings.EqualFold(l.Label.Name, "[no label]") {
+			label = l.Label.Name
+			break
+		}
+	}
+	return out.ReleaseGroup.ID, label, nil
 }
 
 // ReleaseGroup looks a release group up, with genres.
 func (c *Client) ReleaseGroup(ctx context.Context, id string) (ReleaseGroup, error) {
 	var g ReleaseGroup
-	err := c.get(ctx, "/release-group/"+url.PathEscape(id), url.Values{"inc": {"genres"}}, &g)
+	err := c.get(ctx, "/release-group/"+url.PathEscape(id), url.Values{"inc": {"genres tags"}}, &g)
 	return g, err
 }
 

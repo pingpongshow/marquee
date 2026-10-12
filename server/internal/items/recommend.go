@@ -140,6 +140,11 @@ func (s *Store) BecauseYouWatched(ctx context.Context, acc Access, idx *VideoInd
 			continue
 		}
 		ranked := idx.Nearest(v.Vec, func(c *VideoVec) bool { return c.ItemID != sd.ID && !started[c.ItemID] && inLib(c) }, 0)
+		recs, err := s.TMDBRecommended(ctx, []int64{sd.ID}, relatedRecWeight)
+		if err != nil {
+			return nil, err
+		}
+		ranked = Boosted(ranked, recs)
 		ranked = PenaliseSimilar(ranked, idx, neg)
 		sort.SliceStable(ranked, func(i, j int) bool {
 			ti, tj := idx.Get(ranked[i].ItemID).Type == v.Type, idx.Get(ranked[j].ItemID).Type == v.Type
@@ -213,9 +218,29 @@ func (s *Store) RelatedByEmbedding(ctx context.Context, acc Access, idx *VideoIn
 	if v == nil {
 		return nil, false, nil
 	}
-	ranked := idx.Nearest(v.Vec, func(c *VideoVec) bool { return c.ItemID != id && c.LibraryID == v.LibraryID && c.Type == v.Type }, 400)
+	ranked := idx.Nearest(v.Vec, func(c *VideoVec) bool { return c.ItemID != id && c.LibraryID == v.LibraryID && c.Type == v.Type }, 0)
+	recs, err := s.TMDBRecommended(ctx, []int64{id}, relatedRecWeight)
+	if err != nil {
+		return nil, true, err
+	}
+	ranked = Boosted(ranked, recs)
 	list, err := s.visibleTop(ctx, acc, scoredIDs(ranked, 400), n)
 	return list, true, err
+}
+
+// Boosted adds boost to the ranked items' scores and re-sorts, best first (unchanged when
+// boost is empty). Items not in ranked aren't added.
+func Boosted(ranked []Scored, boost map[int64]float64) []Scored {
+	if len(boost) == 0 {
+		return ranked
+	}
+	out := make([]Scored, len(ranked))
+	for i, sc := range ranked {
+		sc.Score += boost[sc.ItemID]
+		out[i] = sc
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Score > out[j].Score })
+	return out
 }
 
 // within narrows acc to libIDs (nil = no further limit).

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 )
@@ -116,6 +117,10 @@ type Store struct {
 	// Learn turns on learning from abandoned and low-rated titles in recommendations
 	// (nil = off).
 	Learn func() bool
+
+	kwMu  sync.Mutex
+	kwSet map[string]bool // VideoKeywords' cache
+	kwAt  time.Time
 }
 
 func NewStore(db *sql.DB) *Store { return &Store{db: db} }

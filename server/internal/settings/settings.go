@@ -119,6 +119,8 @@ type Music struct {
 	SoundprintAnalysis bool `json:"soundprintAnalysis"`
 	OnlineLyrics       bool `json:"onlineLyrics"`
 	LoudnessAnalysis   bool `json:"loudnessAnalysis"`
+	// ArtistDetails looks artists and albums up on MusicBrainz (and bios on Wikipedia).
+	ArtistDetails bool `json:"artistDetails"`
 }
 
 type Security struct {
@@ -238,7 +240,7 @@ func Defaults() Settings {
 		},
 		Metadata:     Metadata{AnimeEpisodeOrdering: "seasonal", OMDbDailyLimit: 950},
 		Tasks:        Tasks{MaintenanceWindowStart: "03:00", MaintenanceWindowHours: 4, BackupRetention: 7},
-		Music:        Music{SoundprintAnalysis: true, OnlineLyrics: false, LoudnessAnalysis: true},
+		Music:        Music{SoundprintAnalysis: true, OnlineLyrics: false, LoudnessAnalysis: true, ArtistDetails: true},
 		Integrations: Integrations{DVRPaddingBefore: 1, DVRPaddingAfter: 3},
 		AI: AI{URL: "http://127.0.0.1:11434", ChatModel: "qwen3:8b", EmbedModel: "mxbai-embed-large", UnloadMinutes: 5,
 			UnderstandPrompts: true, RerankMovies: true, LyricsThemes: true, Reasons: true, LearnFromBehaviour: true},

@@ -211,7 +211,16 @@ func (h *Handlers) MusicMuse(ctx context.Context, req MusicMuseRequestObject) (M
 		llm = h.AI
 	}
 	lib := muse.MusicLibrary{Genres: h.Soundprint.MusicGenres(ctx), Artists: h.Soundprint.ArtistNames(ctx)}
+	lib.Countries, lib.Areas = h.Soundprint.MusicOrigins(ctx)
 	reading := muse.ReadMusic(ctx, llm, lib, prompt)
+	// Descriptive artist or album criteria ("Icelandic female singer-songwriters"): rank
+	// artists and albums by their descriptions; the best ones filter (or boost) the tracks.
+	if d := reading.Query.Describe; d != "" && h.MusicDocs != nil {
+		if artists, albums := h.MusicDocs.Rank(ctx, d); len(artists)+len(albums) > 0 {
+			reading.Query.ArtistScores, reading.Query.AlbumScores = artists, albums
+			reading.Understood = append(reading.Understood, "Artists: "+d)
+		}
+	}
 	if reading.Query.Theme != "" && cfg.On(cfg.LyricsThemes) {
 		if boost := h.LyricThemes.Boost(ctx, reading.Query.Theme); len(boost) > 0 {
 			o.Boost = boost

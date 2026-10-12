@@ -82,6 +82,8 @@ type Handlers struct {
 	AI *ai.Client
 	// LyricThemes indexes lyrics for music Muse themes (AI only); may be nil.
 	LyricThemes *muse.LyricThemes
+	// MusicDocs indexes artist and album descriptions for descriptive music Muse prompts (AI only); may be nil.
+	MusicDocs *muse.MusicDocs
 	// Reasons caches "why this" lines for recommendations.
 	Reasons *muse.Reasons
 	// Bazarr finds subtitles for movies and episodes (META-12); not set up when its

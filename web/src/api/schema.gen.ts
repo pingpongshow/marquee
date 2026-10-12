@@ -3365,6 +3365,8 @@ export interface components {
             soundprintAnalysis?: boolean;
             /** @description Look up lyrics on LRCLIB when a track has none (sends artist and title). */
             onlineLyrics?: boolean;
+            /** @description Look up artists and albums on MusicBrainz (about one request a second) and artist bios on Wikipedia: styles, solo artist or band, country, active years, album types and labels, for artist pages and Muse. */
+            artistDetails?: boolean;
             /**
              * @deprecated
              * @description Ignored: volume levelling is always on, so tracks without ReplayGain tags are always measured.
