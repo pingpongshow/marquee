@@ -7,6 +7,7 @@ import {
   Cpu,
   Database,
   Download,
+  Film,
   Globe,
   HeartPulse,
   Library,
@@ -34,6 +35,7 @@ import {
 } from "./ServerSections";
 import { StatsView } from "./StatsView";
 import { LiveTvSettings } from "./LiveTvSettings";
+import { VodSettings } from "./VodSettings";
 import { LibraryHealthSettings } from "./LibraryHealth";
 import { RequestsSettings } from "./RequestsSettings";
 import { WebhooksSettings } from "./WebhooksSettings";
@@ -153,6 +155,16 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] =
             "live tv iptv m3u xmltv epg guide dispatcharr pluto channels tuner",
           description:
             "Channels and the guide from Dispatcharr or an M3U playlist.",
+        },
+        {
+          id: "movies-on-demand",
+          label: "Movies on demand",
+          icon: Film,
+          component: VodSettings,
+          keywords:
+            "vod movies on demand pluto films m3u live tv tmdb free streaming",
+          description:
+            "Free films from Pluto TV or another M3U playlist, in a Movies tab under Live TV.",
         },
         {
           id: "requests",

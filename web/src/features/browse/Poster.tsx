@@ -22,6 +22,7 @@ export function Poster({
   width = 240,
   className,
   compact,
+  src,
 }: {
   item: Pick<ItemSummary, "title" | "type" | "available" | "images"> & Partial<Pick<ItemSummary, "viewOffsetMs" | "durationMs" | "viewCount" | "leafCount" | "watchedLeafCount">>;
   shape?: Shape;
@@ -29,10 +30,13 @@ export function Poster({
   className?: string;
   /** Thumbnail size: no placeholder text or badges. */
   compact?: boolean;
+  /** An image URL for artwork that isn't in the library (movies on demand, LIVE-6). */
+  src?: string;
 }) {
   const [failed, setFailed] = useState(false);
   const Icon = icons[item.type] ?? Film;
   const artId = shape === "wide" ? (item.images?.thumb ?? item.images?.backdrop) : item.images?.poster;
+  const url = src ?? (artId ? imageUrl(artId, width) : undefined);
   const h = hue(item.title);
   return (
     <div
@@ -44,11 +48,11 @@ export function Poster({
         !item.available && "opacity-40 grayscale",
         className,
       )}
-      style={artId && !failed ? undefined : { background: `linear-gradient(160deg, hsl(${h} 35% 28%), hsl(${(h + 40) % 360} 30% 12%))` }}
+      style={url && !failed ? undefined : { background: `linear-gradient(160deg, hsl(${h} 35% 28%), hsl(${(h + 40) % 360} 30% 12%))` }}
     >
       {!compact && <WatchBadges item={item} />}
-      {artId && !failed ? (
-        <img src={imageUrl(artId, width)} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} className="absolute inset-0 size-full object-cover" />
+      {url && !failed ? (
+        <img src={url} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} className="absolute inset-0 size-full object-cover" />
       ) : compact ? null : (
         <>
           <Icon className="absolute top-3 left-3 size-5 text-white/30" aria-hidden />

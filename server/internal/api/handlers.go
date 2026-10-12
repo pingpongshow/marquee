@@ -33,6 +33,7 @@ import (
 	"marquee/internal/syncplay"
 	"marquee/internal/tasks"
 	"marquee/internal/trickplay"
+	"marquee/internal/vod"
 	"marquee/internal/webhooks"
 )
 
@@ -64,6 +65,7 @@ type Handlers struct {
 	Requests         *requests.Service
 	LiveTV           *livetv.Service
 	DVR              *livetv.Recorder
+	VOD              *vod.Service
 	Scrobble         *scrobble.Service
 	SyncPlay         *syncplay.Service
 	// Restart stops the server gracefully; Docker starts it again.

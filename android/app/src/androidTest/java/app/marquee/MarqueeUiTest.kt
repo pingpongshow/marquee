@@ -2629,4 +2629,191 @@ class MarqueeUiTest {
         assertTrue("not back at the top", rule.onAllNodes(hasContentDescription("00 Long Test") and hasAnyAncestor(grid)).fetchSemanticsNodes().isEmpty())
         shot("lp1-kept")
     }
+
+    // ---------- Movies on demand (LIVE-6) ----------
+
+    /** The test films: an M3U on the host (scripts/e2e, `.e2e/vod/android` served on port 32611), added as a source if missing. */
+    private fun ensureVodSource() {
+        val settings = org.json.JSONObject(adminApi("GET", "/settings")).getJSONObject("integrations")
+        val sources = settings.optJSONArray("vodSources") ?: org.json.JSONArray()
+        val has = (0 until sources.length()).any { sources.getJSONObject(it).optString("url").endsWith(":32611/movies.m3u") }
+        if (!has) sources.put(org.json.JSONObject().put("name", "Android test films").put("url", "http://127.0.0.1:32611/movies.m3u").put("enabled", true))
+        if (!has || !settings.optBoolean("vodEnabled")) {
+            adminApi("PATCH", "/settings", org.json.JSONObject().put("integrations", org.json.JSONObject().put("vodEnabled", true).put("vodSources", sources)).toString())
+            adminApi("POST", "/livetv/vod/refresh")
+        }
+        val found = (1..20).any {
+            org.json.JSONObject(adminApi("GET", "/livetv/vod/movies?q=Droid")).getInt("total") >= 3 || run { Thread.sleep(500); false }
+        }
+        assumeTrue("the test films' M3U isn't being served on port 32611", found)
+    }
+
+    private fun setVodEnabled(on: Boolean) = adminApi("PATCH", "/settings", """{"integrations":{"vodEnabled":$on}}""")
+
+    private fun vodMovieId(title: String): Long {
+        val list = org.json.JSONObject(adminApi("GET", "/livetv/vod/movies?q=${java.net.URLEncoder.encode(title, "UTF-8")}")).getJSONArray("movies")
+        return (0 until list.length()).map { list.getJSONObject(it) }.first { it.getString("title") == title }.getLong("id")
+    }
+
+    private fun vodMovie(id: Long, token: String = appToken) = org.json.JSONObject(adminApi("GET", "/livetv/vod/movies/$id", asToken = token))
+
+    /** Back to unwatched with no position, as this profile. */
+    private fun resetVodMovie(id: Long) {
+        adminApi("PUT", "/livetv/vod/movies/$id/watched", "", asToken = appToken)
+        adminApi("DELETE", "/livetv/vod/movies/$id/watched", asToken = appToken)
+    }
+
+    private val moviesEntry = hasText("VOD") and hasClickAction() and !SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected)
+    private val moviesTab = hasText("VOD") and hasClickAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected)
+
+    /** Libraries' VOD entry, straight to Live TV's VOD tab, searched down to the test films. */
+    private fun openVodTestFilms() {
+        tap("Libraries")
+        rule.waitUntil(15_000) { scrollTo(moviesEntry) }
+        rule.onNode(moviesEntry).performClick()
+        rule.waitUntilAtLeastOneExists(hasSetTextAction(), 15_000)
+        rule.onNode(hasSetTextAction()).performTextInput("Droid")
+        rule.waitUntilAtLeastOneExists(hasText("3 movies"), 15_000)
+    }
+
+    /** Movies on demand show (a VOD entry after Live TV, and Live TV's VOD tab) only while the admin has them on. */
+    @Test fun vodShownOnlyWhenEnabled() {
+        ensureVodSource()
+        connectAndSignIn()
+        try {
+            tap("Libraries")
+            rule.waitUntil(15_000) { scrollTo(moviesEntry) }
+            val live = rule.onNode(hasText("Live TV") and hasClickAction()).fetchSemanticsNode().boundsInRoot
+            val movies = rule.onNode(moviesEntry).fetchSemanticsNode().boundsInRoot
+            assertTrue("VOD right after Live TV", movies.top >= live.bottom - 1 && movies.top - live.bottom < 8)
+            shot("vod0-libraries")
+            rule.onNode(hasText("Live TV") and hasClickAction()).performClick()
+            rule.waitUntilAtLeastOneExists(moviesTab, 15_000)
+            rule.waitText("Guide")
+            back()
+            // Turned off: gone from Libraries and Live TV (re-checked on opening them).
+            setVodEnabled(false)
+            rule.waitUntilAtLeastOneExists(hasText("Live TV") and hasClickAction(), 10_000)
+            back()
+            tap("Libraries")
+            rule.waitUntil(15_000) { !scrollTo(moviesEntry) && scrollTo(hasText("Live TV") and hasClickAction()) }
+            shot("vod1-off")
+            rule.onNode(hasText("Live TV") and hasClickAction()).performClick()
+            rule.waitText("What's On", 15_000)
+            Thread.sleep(1500)
+            assertTrue("no VOD tab", rule.onAllNodes(moviesTab).fetchSemanticsNodes().isEmpty())
+        } finally {
+            setVodEnabled(true)
+        }
+    }
+
+    /** With only movies on demand usable, Live TV is still listed and opens on VOD, without the guide. */
+    @Test fun liveTvWithOnlyVod() {
+        ensureVodSource()
+        connectAndSignIn()
+        val marquee = (context.applicationContext as MarqueeApplication).marquee
+        try {
+            scenario.onActivity { marquee.fakeLiveTv = false }
+            tap("Libraries")
+            rule.waitUntil(15_000) { scrollTo(hasText("Live TV") and hasClickAction()) }
+            rule.onNode(hasText("Live TV") and hasClickAction()).performClick()
+            rule.waitUntilAtLeastOneExists(hasSetTextAction(), 15_000) // the VOD tab's search
+            rule.waitUntilAtLeastOneExists(moviesTab and isSelected(), 5_000)
+            assertTrue("no guide", rule.onAllNodesWithText("What's On").fetchSemanticsNodes().isEmpty() && rule.onAllNodesWithText("Guide").fetchSemanticsNodes().isEmpty())
+            shot("vod2-only-movies")
+        } finally {
+            scenario.onActivity { marquee.fakeLiveTv = null }
+        }
+    }
+
+    /** Browse, open a film, play it; closing reports where it stopped, so the page offers Resume; back returns to Movies. */
+    @Test fun vodBrowseAndPlay() {
+        ensureVodSource()
+        connectAndSignIn()
+        val id = vodMovieId("Droid Alpha Film (1985)")
+        resetVodMovie(id)
+        try {
+            openVodTestFilms()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Droid Beta Film (1990)"), 10_000)
+            shot("vod3-browse")
+            rule.onNode(hasContentDescription("Droid Alpha Film (1985)")).performClick()
+            rule.waitUntilAtLeastOneExists(hasText("Play") and hasClickAction(), 15_000)
+            rule.waitText("Details from the source", substring = true)
+            shot("vod4-movie")
+            rule.onNode(hasText("Play") and hasClickAction()).performClick()
+            val playing = hasContentDescription("Video player") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Playing")
+            rule.waitUntilAtLeastOneExists(playing, 30_000)
+            var pos = 0L
+            rule.waitUntil(40_000) { onMainPosition { pos = it }; pos >= 14_000 } // under 10 s isn't worth resuming
+            shot("vod5-playing")
+            back()
+            rule.waitUntilAtLeastOneExists(hasText("Resume from", substring = true), 15_000)
+            rule.waitText("Play from start")
+            assertTrue("position saved", vodMovie(id).optLong("positionMs") >= 10_000)
+            shot("vod6-resume")
+            back()
+            // Back on Live TV's VOD tab, still searched.
+            rule.waitUntilAtLeastOneExists(moviesTab and isSelected(), 10_000)
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Droid Alpha Film (1985)"), 10_000)
+        } finally {
+            resetVodMovie(id)
+        }
+    }
+
+    /** A position reported to the server resumes there; Play from start doesn't. */
+    @Test fun vodResume() {
+        ensureVodSource()
+        connectAndSignIn()
+        val id = vodMovieId("Droid Beta Film (1990)")
+        resetVodMovie(id)
+        try {
+            val session = org.json.JSONObject(adminApi("POST", "/livetv/vod/movies/$id/play", asToken = appToken)).getString("id")
+            adminApi("PATCH", "/livetv/vod/sessions/$session", """{"positionMs":20000,"durationMs":45000}""", asToken = appToken)
+            adminApi("DELETE", "/livetv/vod/sessions/$session", asToken = appToken)
+            openVodTestFilms()
+            rule.onNode(hasContentDescription("Droid Beta Film (1990)")).performClick()
+            rule.waitText("Resume from 0:20", 15_000)
+            tap("Resume from 0:20")
+            val playing = hasContentDescription("Video player") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Playing")
+            rule.waitUntilAtLeastOneExists(playing, 30_000)
+            var pos = 0L
+            onMainPosition { pos = it }
+            assertTrue("resumed at $pos", pos in 18_000..32_000)
+            shot("vod7-resumed")
+            back()
+            rule.waitText("Play from start", 15_000)
+            tap("Play from start")
+            rule.waitUntilAtLeastOneExists(playing, 30_000)
+            onMainPosition { pos = it }
+            assertTrue("from the start: $pos", pos < 10_000)
+            back()
+        } finally {
+            resetVodMovie(id)
+        }
+    }
+
+    /** Mark watched and unwatched from the film's page; the server and the grid's tick follow. */
+    @Test fun vodMarkWatched() {
+        ensureVodSource()
+        connectAndSignIn()
+        val id = vodMovieId("Droid Gamma Film (1995)")
+        resetVodMovie(id)
+        try {
+            openVodTestFilms()
+            rule.onNode(hasContentDescription("Droid Gamma Film (1995)")).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Mark as watched"), 15_000)
+            rule.onNode(hasContentDescription("Mark as watched")).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Mark as unwatched"), 10_000)
+            rule.waitUntil(10_000) { vodMovie(id).getBoolean("watched") }
+            shot("vod8-watched")
+            back()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Droid Gamma Film (1995)") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Watched"), 10_000)
+            rule.onNode(hasContentDescription("Droid Gamma Film (1995)")).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Mark as unwatched"), 15_000)
+            rule.onNode(hasContentDescription("Mark as unwatched")).performClick()
+            rule.waitUntil(10_000) { !vodMovie(id).getBoolean("watched") }
+        } finally {
+            resetVodMovie(id)
+        }
+    }
 }
