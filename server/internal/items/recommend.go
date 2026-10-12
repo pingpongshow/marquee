@@ -114,6 +114,10 @@ func (s *Store) BecauseYouWatched(ctx context.Context, acc Access, idx *VideoInd
 	if err != nil {
 		return nil, err
 	}
+	neg, err := s.disliked(ctx, acc.UserID)
+	if err != nil {
+		return nil, err
+	}
 	full, acc := acc, within(acc, libIDs)
 	inLib := libraryKeep(acc.LibraryIDs)
 	var out []Because
@@ -136,6 +140,7 @@ func (s *Store) BecauseYouWatched(ctx context.Context, acc Access, idx *VideoInd
 			continue
 		}
 		ranked := idx.Nearest(v.Vec, func(c *VideoVec) bool { return c.ItemID != sd.ID && !started[c.ItemID] && inLib(c) }, 0)
+		ranked = PenaliseSimilar(ranked, idx, neg)
 		sort.SliceStable(ranked, func(i, j int) bool {
 			ti, tj := idx.Get(ranked[i].ItemID).Type == v.Type, idx.Get(ranked[j].ItemID).Type == v.Type
 			return ti && !tj
@@ -193,6 +198,11 @@ func (s *Store) Recommended(ctx context.Context, acc Access, idx *VideoIndex, li
 	acc = within(acc, libIDs)
 	inLib := libraryKeep(acc.LibraryIDs)
 	ranked := idx.Nearest(c, func(v *VideoVec) bool { return !started[v.ItemID] && inLib(v) }, 400)
+	neg, err := s.disliked(ctx, acc.UserID)
+	if err != nil {
+		return nil, err
+	}
+	ranked = PenaliseSimilar(ranked, idx, neg)
 	return s.visibleTop(ctx, acc, scoredIDs(ranked, 400), n)
 }
 
@@ -214,4 +224,104 @@ func within(acc Access, libIDs []int64) Access {
 		acc.LibraryIDs = intersect(acc.LibraryIDs, libIDs)
 	}
 	return acc
+}
+
+// ---------- learning from behaviour ----------
+
+// disliked lists the movies and shows uid turned away from (when learning is on): rated
+// 2 stars or lower, movies abandoned in the first quarter and not resumed for two weeks,
+// and shows dropped after an episode or two (nothing watched for a month), from the last
+// six months.
+func (s *Store) disliked(ctx context.Context, uid int64) ([]int64, error) {
+	if s.Learn == nil || !s.Learn() {
+		return nil, nil
+	}
+	var out []int64
+	err := eachRow(ctx, s.db, `SELECT x.item_id FROM user_item_state x JOIN items i ON i.id = x.item_id AND i.type IN ('movie', 'show')
+			WHERE x.user_id = ?1 AND x.rating IS NOT NULL AND x.rating <= 4
+		UNION SELECT x.item_id FROM user_item_state x JOIN items i ON i.id = x.item_id AND i.type = 'movie'
+			WHERE x.user_id = ?1 AND x.play_count = 0 AND x.view_offset_ms > 0 AND COALESCE(i.duration_ms, 0) > 0
+			  AND x.view_offset_ms < i.duration_ms / 4 AND x.last_viewed_at < ?2 AND x.last_viewed_at > ?3
+		UNION SELECT g.id FROM user_item_state x JOIN items e ON e.id = x.item_id AND e.type = 'episode' JOIN items g ON g.id = e.grandparent_id
+			WHERE x.user_id = ?1 AND (x.play_count > 0 OR x.view_offset_ms > 0) AND g.leaf_count > 3
+			GROUP BY g.id HAVING COUNT(*) <= 2 AND MAX(x.last_viewed_at) < ?4 AND MAX(x.last_viewed_at) > ?3`,
+		[]any{uid, isoUTC(time.Now().AddDate(0, 0, -14)), isoUTC(time.Now().AddDate(0, 0, -180)), isoUTC(time.Now().AddDate(0, 0, -30))},
+		func(r *sql.Rows) error {
+			var id int64
+			if err := r.Scan(&id); err != nil {
+				return err
+			}
+			out = append(out, id)
+			return nil
+		})
+	return out, err
+}
+
+// Similarity above dislikeFloor to something the person turned away from costs
+// dislikeWeight per unit (at most 0.2): a near-copy of an abandoned film falls behind
+// equally good matches, a film merely in the same genre barely moves.
+const (
+	dislikeFloor  = 0.6
+	dislikeWeight = 0.5
+)
+
+// PenaliseSimilar lowers each candidate by its similarity to the closest disliked title and
+// re-sorts, best first. Candidates that aren't embedded, or no dislikes, leave it unchanged.
+func PenaliseSimilar(ranked []Scored, idx *VideoIndex, disliked []int64) []Scored {
+	var negs [][]float32
+	for _, id := range disliked {
+		if v := idx.Get(id); v != nil {
+			negs = append(negs, v.Vec)
+		}
+	}
+	if len(negs) == 0 || len(ranked) == 0 {
+		return ranked
+	}
+	out := make([]Scored, len(ranked))
+	for i, sc := range ranked {
+		out[i] = sc
+		v := idx.Get(sc.ItemID)
+		if v == nil {
+			continue
+		}
+		worst := 0.0
+		for _, n := range negs {
+			worst = max(worst, dotVec(v.Vec, n))
+		}
+		if worst > dislikeFloor {
+			out[i].Score -= dislikeWeight * (worst - dislikeFloor)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Score > out[j].Score })
+	return out
+}
+
+// LikedTitles names up to n movies and shows acc's user recently finished or rated 7+, for
+// explaining recommendations.
+func (s *Store) LikedTitles(ctx context.Context, acc Access, n int) ([]string, error) {
+	seeds, err := s.recentSeeds(ctx, acc.UserID, 365, 40)
+	if err != nil {
+		return nil, err
+	}
+	var ids []int64
+	for _, sd := range seeds {
+		if seedPreferred(sd) && !(sd.Rating > 0 && sd.Rating < 5) {
+			ids = append(ids, sd.ID)
+		}
+		if len(ids) == n {
+			break
+		}
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	list, err := s.ByIDs(ctx, acc, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(list))
+	for _, it := range list {
+		out = append(out, it.Title)
+	}
+	return out, nil
 }

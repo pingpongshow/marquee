@@ -20,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"marquee/internal/ai"
 	"marquee/internal/api"
 	"marquee/internal/auth"
 	"marquee/internal/avatars"
@@ -38,6 +39,7 @@ import (
 	"marquee/internal/lyrics"
 	"marquee/internal/mediatrash"
 	"marquee/internal/metadata"
+	"marquee/internal/muse"
 	"marquee/internal/netclass"
 	"marquee/internal/playback"
 	"marquee/internal/plex"
@@ -289,7 +291,8 @@ func run() error {
 		Run:         meta.SyncCollections})
 	// Music intelligence (M6.5): the Soundprint sidecar embeds tracks; the index serves radios etc.
 	soundprintSvc := &soundprint.Service{DB: database, Client: &soundprint.Client{BaseURL: envOr("MARQUEE_SOUNDPRINT_URL", envOr("MARQUEE_SONIC_URL", "http://127.0.0.1:32501"))},
-		Index: soundprint.NewIndex(), Enabled: func() bool { return store.Get().Music.SoundprintAnalysis }}
+		Index: soundprint.NewIndex(), Enabled: func() bool { return store.Get().Music.SoundprintAnalysis },
+		Learn: func() bool { return store.Get().AI.LearnFromBehaviour }}
 	if err := soundprintSvc.Index.Load(ctx, database); err != nil {
 		slog.Warn("soundprint index", "err", err)
 	}
@@ -299,7 +302,14 @@ func run() error {
 	runSoundprint := func() { scheduler.RunNow(ctx, "soundprint") }
 	afterMusicScan.Store(&runSoundprint)
 	// Muse for movies and recommendations (USER-15, USER-16): text embeddings of movies and shows.
-	embedder := &items.Embedder{DB: database, Index: items.NewVideoIndex(), Client: soundprintSvc.Client}
+	// Optional AI (a local Ollama): smarter Muse, re-ranking, reasons and lyric themes. With
+	// it on, movies and shows are embedded by Ollama's model instead of the sidecar's.
+	aiClient := &ai.Client{Config: func() ai.Config {
+		a := store.Get().AI
+		return ai.Config{Enabled: a.Enabled, URL: a.URL, ChatModel: a.ChatModel, EmbedModel: a.EmbedModel, UnloadMinutes: a.UnloadMinutes}
+	}}
+	embedder := &items.Embedder{DB: database, Index: items.NewVideoIndex(), Client: &ai.SwitchEmbedder{AI: aiClient, Fallback: soundprintSvc.Client},
+		Pace: 200 * time.Millisecond}
 	if err := embedder.Index.Load(ctx, database); err != nil {
 		slog.Warn("video embeddings", "err", err)
 	}
@@ -429,6 +439,26 @@ func run() error {
 	remoteHub := &remote.Hub{}
 	go remoteHub.Run(ctx)
 	lyricsSvc := &lyrics.Service{DB: database, Online: func() bool { return store.Get().Music.OnlineLyrics }}
+	lyricThemes := &muse.LyricThemes{DB: database, AI: aiClient, Local: lyricsSvc.CacheLocal, Pace: 500 * time.Millisecond,
+		Enabled: func() bool { a := store.Get().AI; return a.On(a.LyricsThemes) }}
+	if err := lyricThemes.Load(ctx); err != nil {
+		slog.Warn("lyric themes", "err", err)
+	}
+	scheduler.Register(tasks.Task{ID: "lyric-themes", Name: "Index lyric themes", Every: 6 * time.Hour,
+		Description: "With AI on, reads the lyrics of tracks (from their tags and .lrc files) with the embedding model, so Muse can find songs about a theme.",
+		Run:         lyricThemes.Run, Progress: lyricThemes.Progress})
+	// Turning AI on or off, or changing the embedding model, re-indexes in the background.
+	aiIndexKey := func(s settings.Settings) string {
+		return fmt.Sprint(s.AI.Enabled, s.AI.EmbedModel, s.AI.LyricsThemes)
+	}
+	lastAIKey := aiIndexKey(store.Get())
+	store.Subscribe(func(s settings.Settings) {
+		if k := aiIndexKey(s); k != lastAIKey {
+			lastAIKey = k
+			scheduler.RunNow(ctx, "embeddings")
+			scheduler.RunNow(ctx, "lyric-themes")
+		}
+	})
 	go scheduler.Run(ctx)
 
 	// Bonjour, so LAN apps find the server (D49).
@@ -441,24 +471,29 @@ func run() error {
 	store.Subscribe(advertise)
 	defer bonjour.Stop()
 
+	itemStore := items.NewStore(database)
+	itemStore.Learn = func() bool { return store.Get().AI.LearnFromBehaviour }
 	apiHandlers := &api.Handlers{
 		DB: database, Auth: authSvc, Settings: store, Libraries: libraries,
-		Items: items.NewStore(database), Scans: scans, Version: config.Version,
+		Items: itemStore, Scans: scans, Version: config.Version,
 		Tasks: scheduler, Trickplay: trick, Webhooks: hooks, Subtitles: subs, Downloads: dl, Backups: backups, Restart: stop, Soundprint: soundprintSvc, Lyrics: lyricsSvc,
-		Requests:   &requests.Service{DB: database, Settings: store},
-		LiveTV:     live,
-		VOD:        vodSvc,
-		Scrobble:   scrobbler,
-		DVR:        dvr,
-		SyncPlay:   watchTogether,
-		Remote:     remoteHub,
-		Embeddings: embedder,
-		Trash:      mediaTrash,
-		Avatars:    &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
-		Images:     images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
-		Logs:       logs,
-		Metadata:   meta,
-		Playback:   player,
+		Requests:    &requests.Service{DB: database, Settings: store},
+		LiveTV:      live,
+		VOD:         vodSvc,
+		Scrobble:    scrobbler,
+		DVR:         dvr,
+		SyncPlay:    watchTogether,
+		Remote:      remoteHub,
+		Embeddings:  embedder,
+		AI:          aiClient,
+		LyricThemes: lyricThemes,
+		Reasons:     &muse.Reasons{},
+		Trash:       mediaTrash,
+		Avatars:     &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
+		Images:      images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
+		Logs:        logs,
+		Metadata:    meta,
+		Playback:    player,
 		Plex: &plex.Importer{DB: database, Auth: authSvc, Libraries: libraries, Matcher: meta,
 			PlexRoot: cfg.PlexDir, WorkDir: filepath.Join(cfg.ConfigDir, "plex-import"),
 			ArtDir: filepath.Join(cfg.ConfigDir, "cache", "plex-artwork")},

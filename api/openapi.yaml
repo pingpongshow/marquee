@@ -3421,6 +3421,79 @@ paths:
               schema: { $ref: "#/components/schemas/MusicStatus" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+  /ai/status:
+    get:
+      tags: [settings]
+      operationId: aiStatus
+      summary: "AI (Ollama) status (admin only): reachable, installed and loaded models, the last error and indexing progress."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /ai/test:
+    post:
+      tags: [settings]
+      operationId: testAi
+      summary: Check an Ollama address and models before saving (admin only). Omitted fields use the saved settings. Loads no model.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url: { type: string }
+                chatModel: { type: string }
+                embedModel: { type: string }
+      responses:
+        "200":
+          description: Reachable or not (see error).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /ai/lyrics/rebuild:
+    post:
+      tags: [settings]
+      operationId: rebuildLyricIndex
+      summary: Forget the lyric theme index and build it again in the background (admin only).
+      responses:
+        "202": { description: Started. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /recommendations/reasons:
+    post:
+      tags: [items]
+      operationId: recommendationReasons
+      summary: "One-line \"why this\" for up to 5 recommended movies or shows (AI, cached per person and item). Empty when AI is off or unavailable."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [itemIds]
+              properties:
+                itemIds: { type: array, maxItems: 5, items: { type: integer, format: int64 } }
+      responses:
+        "200":
+          description: Reasons for the items that have one.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RecommendationReason" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
   /items/{itemId}/sounds-like:
     parameters:
       - $ref: "#/components/parameters/ItemId"
@@ -4055,6 +4128,7 @@ components:
         music: { $ref: "#/components/schemas/MusicSettings" }
         integrations: { $ref: "#/components/schemas/IntegrationSettings" }
         cinema: { $ref: "#/components/schemas/CinemaSettings" }
+        ai: { $ref: "#/components/schemas/AiSettings" }
         webhooks:
           type: array
           description: Replaces the whole list when sent.
@@ -4074,6 +4148,7 @@ components:
         music: { $ref: "#/components/schemas/MusicSettings" }
         integrations: { $ref: "#/components/schemas/IntegrationSettingsUpdate" }
         cinema: { $ref: "#/components/schemas/CinemaSettings" }
+        ai: { $ref: "#/components/schemas/AiSettings" }
         webhooks:
           type: array
           description: Replaces the whole list when sent.
@@ -4098,6 +4173,78 @@ components:
       properties:
         trailers: { type: integer, minimum: 0, maximum: 5, description: "Trailers of other movies in the library to play first; 0 = off." }
         prerollItemId: { type: integer, format: int64, nullable: true, description: "A video (e.g. a cinema intro) played after the trailers, before the movie." }
+
+    AiSettings:
+      type: object
+      description: >-
+        Optional AI from a local Ollama, for smarter Muse and recommendations. Off by default; with it off,
+        or Ollama unreachable, everything works as without it.
+      properties:
+        enabled: { type: boolean, description: "Use AI (Ollama). Default off." }
+        url: { type: string, description: "Ollama's address. Default http://127.0.0.1:11434." }
+        chatModel: { type: string, description: "Model that reads prompts, re-ranks and writes reasons. Default qwen3:8b." }
+        embedModel: { type: string, description: "Embedding model for movies, shows and lyrics. Default mxbai-embed-large. Changing it re-indexes in the background." }
+        unloadMinutes: { type: integer, minimum: 0, maximum: 1440, description: "Sent as keep_alive on every request: Ollama unloads the models after this many idle minutes, freeing the GPU. Default 5." }
+        understandPrompts: { type: boolean, description: "Understand Muse prompts (music and movies) with the chat model. Default on." }
+        rerankMovies: { type: boolean, description: "Re-rank the top movie Muse results with the chat model. Default on." }
+        lyricsThemes: { type: boolean, description: "Index lyrics so music Muse can match themes (\"songs about the sea\"). Default on." }
+        reasons: { type: boolean, description: "Write a one-line reason for recommendations. Default on." }
+        learnFromBehaviour: { type: boolean, description: "Learn from quick skips, abandoned titles and ratings. Needs no model, so it works with AI off. Default on." }
+
+    AiStatus:
+      type: object
+      required: [enabled, reachable, models, loaded]
+      properties:
+        enabled: { type: boolean }
+        reachable: { type: boolean, description: Ollama answered. }
+        version: { type: string, description: "Ollama's version." }
+        models: { type: array, description: Installed models (from /api/tags)., items: { type: string } }
+        chatModelInstalled: { type: boolean }
+        embedModelInstalled: { type: boolean }
+        loaded:
+          type: array
+          description: Models in memory now (from /api/ps); empty means the GPU is free.
+          items: { $ref: "#/components/schemas/AiLoadedModel" }
+        paused: { type: boolean, description: "True while Marquee isn't calling Ollama after repeated failures (it retries shortly)." }
+        lastError: { type: string }
+        lastErrorAt: { type: string, format: date-time }
+        error: { type: string, description: "Why the check failed (status and test)." }
+        videos: { $ref: "#/components/schemas/AiVideoIndex" }
+        lyrics: { $ref: "#/components/schemas/AiLyricIndex" }
+
+    AiLoadedModel:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        vramBytes: { type: integer, format: int64 }
+        expiresAt: { type: string, format: date-time }
+
+    AiVideoIndex:
+      type: object
+      required: [indexed, total]
+      description: Movies and shows embedded for Muse and recommendations.
+      properties:
+        indexed: { type: integer }
+        total: { type: integer }
+        model: { type: string, description: "The model the index is from (\"ollama/<model>\" with AI on)." }
+
+    AiLyricIndex:
+      type: object
+      required: [indexed, withLyrics, tracks, running]
+      description: Lyric theme index.
+      properties:
+        indexed: { type: integer, description: Tracks whose lyrics are indexed with the current model. }
+        withLyrics: { type: integer, description: Tracks with lyrics. }
+        tracks: { type: integer, description: All tracks. }
+        running: { type: boolean }
+
+    RecommendationReason:
+      type: object
+      required: [itemId, reason]
+      properties:
+        itemId: { type: integer, format: int64 }
+        reason: { type: string }
 
     MusicSettings:
       type: object
@@ -5243,6 +5390,11 @@ components:
         items: { type: array, items: { $ref: "#/components/schemas/ItemSummary" } }
         understood: { type: string, description: "How the prompt was read, e.g. \"Movies · 1990s · Science Fiction · like 'time travel'\"." }
         analysed: { type: number, description: Share of the library ready for Muse (0–1); below 1 while it's still being indexed. }
+        title: { type: string, description: "A short title for the results (AI), or the prompt." }
+        reasons:
+          type: array
+          description: "One-line reasons for the top results, when AI re-ranked them."
+          items: { $ref: "#/components/schemas/RecommendationReason" }
 
     HealthCheck:
       type: object

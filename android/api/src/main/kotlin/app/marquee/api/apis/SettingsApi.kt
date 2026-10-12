@@ -27,9 +27,11 @@ import java.io.IOException
 import okhttp3.Call
 import okhttp3.HttpUrl
 
+import app.marquee.api.models.AiStatus
 import app.marquee.api.models.Error
 import app.marquee.api.models.ServerSettings
 import app.marquee.api.models.ServerSettingsUpdate
+import app.marquee.api.models.TestAiRequest
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -55,6 +57,76 @@ open class SettingsApi(basePath: kotlin.String = defaultBasePath, client: Call.F
         val defaultBasePath: String by lazy {
             System.getProperties().getProperty(ApiClient.BASE_URL_KEY, "/api/v1")
         }
+    }
+
+    /**
+     * GET /ai/status
+     * AI (Ollama) status (admin only): reachable, installed and loaded models, the last error and indexing progress.
+     * 
+     * @return AiStatus
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun aiStatus() : AiStatus {
+        val localVarResponse = aiStatusWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as AiStatus
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /ai/status
+     * AI (Ollama) status (admin only): reachable, installed and loaded models, the last error and indexing progress.
+     * 
+     * @return ApiResponse<AiStatus?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun aiStatusWithHttpInfo() : ApiResponse<AiStatus?> {
+        val localVariableConfig = aiStatusRequestConfig()
+
+        return request<Unit, AiStatus>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation aiStatus
+     *
+     * @return RequestConfig
+     */
+    fun aiStatusRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/ai/status",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
     }
 
     /**
@@ -120,6 +192,148 @@ open class SettingsApi(basePath: kotlin.String = defaultBasePath, client: Call.F
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/settings",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /ai/lyrics/rebuild
+     * Forget the lyric theme index and build it again in the background (admin only).
+     * 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun rebuildLyricIndex() : Unit {
+        val localVarResponse = rebuildLyricIndexWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /ai/lyrics/rebuild
+     * Forget the lyric theme index and build it again in the background (admin only).
+     * 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun rebuildLyricIndexWithHttpInfo() : ApiResponse<Unit?> {
+        val localVariableConfig = rebuildLyricIndexRequestConfig()
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation rebuildLyricIndex
+     *
+     * @return RequestConfig
+     */
+    fun rebuildLyricIndexRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/ai/lyrics/rebuild",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /ai/test
+     * Check an Ollama address and models before saving (admin only). Omitted fields use the saved settings. Loads no model.
+     * 
+     * @param testAiRequest 
+     * @return AiStatus
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun testAi(testAiRequest: TestAiRequest) : AiStatus {
+        val localVarResponse = testAiWithHttpInfo(testAiRequest = testAiRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as AiStatus
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /ai/test
+     * Check an Ollama address and models before saving (admin only). Omitted fields use the saved settings. Loads no model.
+     * 
+     * @param testAiRequest 
+     * @return ApiResponse<AiStatus?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun testAiWithHttpInfo(testAiRequest: TestAiRequest) : ApiResponse<AiStatus?> {
+        val localVariableConfig = testAiRequestConfig(testAiRequest = testAiRequest)
+
+        return request<TestAiRequest, AiStatus>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation testAi
+     *
+     * @param testAiRequest 
+     * @return RequestConfig
+     */
+    fun testAiRequestConfig(testAiRequest: TestAiRequest) : RequestConfig<TestAiRequest> {
+        val localVariableBody = testAiRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/ai/test",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

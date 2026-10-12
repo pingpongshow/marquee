@@ -111,7 +111,12 @@ type Chapter struct {
 	StartMS, EndMS int64
 }
 
-type Store struct{ db *sql.DB }
+type Store struct {
+	db *sql.DB
+	// Learn turns on learning from abandoned and low-rated titles in recommendations
+	// (nil = off).
+	Learn func() bool
+}
 
 func NewStore(db *sql.DB) *Store { return &Store{db: db} }
 
@@ -170,7 +175,7 @@ func cols(uid int64) string {
 	COALESCE((SELECT rating FROM user_item_state WHERE user_id = ` + u + ` AND item_id = i.id), 0),
 	COALESCE((SELECT watchlisted_at IS NOT NULL FROM user_item_state WHERE user_id = ` + u + ` AND item_id = i.id), 0),
 	COALESCE(i.extra_type, ''), COALESCE(i.release_type, ''),
-	`+audioFormatCol+`,
+	` + audioFormatCol + `,
 	COALESCE((SELECT AVG(rating) FROM user_item_state WHERE item_id = i.id AND rating > 0), 0),
 	(SELECT COUNT(*) FROM user_item_state WHERE item_id = i.id AND rating > 0)`
 }

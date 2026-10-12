@@ -241,3 +241,45 @@ func (s *Service) lrclib(ctx context.Context, t track) string {
 	}
 	return r.Plain
 }
+
+// CacheLocal looks for a track's lyrics in the file's tags and an .lrc next to it (never
+// online) and caches what it finds, unless the track was already looked up. The lyric
+// theme index uses it so tracks nobody has opened the lyrics of yet are included.
+func (s *Service) CacheLocal(ctx context.Context, itemID int64) error {
+	var t track
+	err := s.DB.QueryRowContext(ctx, `SELECT f.path, COALESCE(f.probe_json, '') FROM items i JOIN media_versions v ON v.item_id = i.id
+		JOIN media_files f ON f.version_id = v.id WHERE i.id = ? AND i.type = 'track'
+		AND NOT EXISTS (SELECT 1 FROM lyrics l WHERE l.item_id = i.id) LIMIT 1`, itemID).Scan(&t.path, &t.probe)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	text := embedded(t.probe)
+	if text == "" {
+		text = sidecar(t.path)
+	}
+	_, sy := Parse(text)
+	// "embedded" with no text records that only local sources were tried, so Get still asks
+	// LRCLIB later when online lookups are on.
+	_, err = s.DB.ExecContext(ctx, `INSERT INTO lyrics(item_id, synced, text, source) VALUES (?, ?, ?, ?)
+		ON CONFLICT(item_id) DO NOTHING`, itemID, sy, text, map[bool]string{true: "embedded", false: "sidecar"}[text == "" || embedded(t.probe) != ""])
+	return err
+}
+
+// PlainText is lyrics without timestamps or blank lines, for indexing.
+func PlainText(text string) string {
+	lines, _ := Parse(text)
+	var b strings.Builder
+	for _, l := range lines {
+		if l.Text == "" {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(l.Text)
+	}
+	return b.String()
+}

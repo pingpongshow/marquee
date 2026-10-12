@@ -120,6 +120,17 @@ func (s Settings) Validate() error {
 	if r := s.Tasks.BackupRetention; r < 1 || r > 365 {
 		return invalid("backup retention must be 1–365 days")
 	}
+	if s.AI.Enabled || s.AI.URL != "" {
+		if p, err := url.Parse(s.AI.URL); err != nil || (p.Scheme != "http" && p.Scheme != "https") || p.Host == "" {
+			return invalid("the Ollama address must be an http(s) URL")
+		}
+	}
+	if s.AI.Enabled && (strings.TrimSpace(s.AI.ChatModel) == "" || strings.TrimSpace(s.AI.EmbedModel) == "") {
+		return invalid("choose a chat model and an embedding model")
+	}
+	if m := s.AI.UnloadMinutes; m < 0 || m > 1440 {
+		return invalid("unload after must be 0–1440 minutes")
+	}
 	if len(s.Webhooks) > 20 {
 		return invalid("at most 20 webhooks")
 	}

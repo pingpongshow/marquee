@@ -2707,6 +2707,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ai/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** AI (Ollama) status (admin only): reachable, installed and loaded models, the last error and indexing progress. */
+        get: operations["aiStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check an Ollama address and models before saving (admin only). Omitted fields use the saved settings. Loads no model. */
+        post: operations["testAi"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/lyrics/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Forget the lyric theme index and build it again in the background (admin only). */
+        post: operations["rebuildLyricIndex"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recommendations/reasons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** One-line "why this" for up to 5 recommended movies or shows (AI, cached per person and item). Empty when AI is off or unavailable. */
+        post: operations["recommendationReasons"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/items/{itemId}/sounds-like": {
         parameters: {
             query?: never;
@@ -3174,6 +3242,7 @@ export interface components {
             music?: components["schemas"]["MusicSettings"];
             integrations?: components["schemas"]["IntegrationSettings"];
             cinema?: components["schemas"]["CinemaSettings"];
+            ai?: components["schemas"]["AiSettings"];
             /** @description Replaces the whole list when sent. */
             webhooks?: components["schemas"]["Webhook"][];
         };
@@ -3189,6 +3258,7 @@ export interface components {
             music?: components["schemas"]["MusicSettings"];
             integrations?: components["schemas"]["IntegrationSettingsUpdate"];
             cinema?: components["schemas"]["CinemaSettings"];
+            ai?: components["schemas"]["AiSettings"];
             /** @description Replaces the whole list when sent. */
             webhooks?: components["schemas"]["Webhook"][];
         };
@@ -3215,6 +3285,80 @@ export interface components {
              * @description A video (e.g. a cinema intro) played after the trailers, before the movie.
              */
             prerollItemId?: number | null;
+        };
+        /** @description Optional AI from a local Ollama, for smarter Muse and recommendations. Off by default; with it off, or Ollama unreachable, everything works as without it. */
+        AiSettings: {
+            /** @description Use AI (Ollama). Default off. */
+            enabled?: boolean;
+            /** @description Ollama's address. Default http://127.0.0.1:11434. */
+            url?: string;
+            /** @description Model that reads prompts, re-ranks and writes reasons. Default qwen3:8b. */
+            chatModel?: string;
+            /** @description Embedding model for movies, shows and lyrics. Default mxbai-embed-large. Changing it re-indexes in the background. */
+            embedModel?: string;
+            /** @description Sent as keep_alive on every request: Ollama unloads the models after this many idle minutes, freeing the GPU. Default 5. */
+            unloadMinutes?: number;
+            /** @description Understand Muse prompts (music and movies) with the chat model. Default on. */
+            understandPrompts?: boolean;
+            /** @description Re-rank the top movie Muse results with the chat model. Default on. */
+            rerankMovies?: boolean;
+            /** @description Index lyrics so music Muse can match themes ("songs about the sea"). Default on. */
+            lyricsThemes?: boolean;
+            /** @description Write a one-line reason for recommendations. Default on. */
+            reasons?: boolean;
+            /** @description Learn from quick skips, abandoned titles and ratings. Needs no model, so it works with AI off. Default on. */
+            learnFromBehaviour?: boolean;
+        };
+        AiStatus: {
+            enabled: boolean;
+            /** @description Ollama answered. */
+            reachable: boolean;
+            /** @description Ollama's version. */
+            version?: string;
+            /** @description Installed models (from /api/tags). */
+            models: string[];
+            chatModelInstalled?: boolean;
+            embedModelInstalled?: boolean;
+            /** @description Models in memory now (from /api/ps); empty means the GPU is free. */
+            loaded: components["schemas"]["AiLoadedModel"][];
+            /** @description True while Marquee isn't calling Ollama after repeated failures (it retries shortly). */
+            paused?: boolean;
+            lastError?: string;
+            /** Format: date-time */
+            lastErrorAt?: string;
+            /** @description Why the check failed (status and test). */
+            error?: string;
+            videos?: components["schemas"]["AiVideoIndex"];
+            lyrics?: components["schemas"]["AiLyricIndex"];
+        };
+        AiLoadedModel: {
+            name: string;
+            /** Format: int64 */
+            vramBytes?: number;
+            /** Format: date-time */
+            expiresAt?: string;
+        };
+        /** @description Movies and shows embedded for Muse and recommendations. */
+        AiVideoIndex: {
+            indexed: number;
+            total: number;
+            /** @description The model the index is from ("ollama/<model>" with AI on). */
+            model?: string;
+        };
+        /** @description Lyric theme index. */
+        AiLyricIndex: {
+            /** @description Tracks whose lyrics are indexed with the current model. */
+            indexed: number;
+            /** @description Tracks with lyrics. */
+            withLyrics: number;
+            /** @description All tracks. */
+            tracks: number;
+            running: boolean;
+        };
+        RecommendationReason: {
+            /** Format: int64 */
+            itemId: number;
+            reason: string;
         };
         MusicSettings: {
             /** @description Soundprint: analyse how tracks sound (on this server's GPU) for radios, similar music and Muse. */
@@ -4407,6 +4551,10 @@ export interface components {
             understood: string;
             /** @description Share of the library ready for Muse (0–1); below 1 while it's still being indexed. */
             analysed?: number;
+            /** @description A short title for the results (AI), or the prompt. */
+            title?: string;
+            /** @description One-line reasons for the top results, when AI re-ranked them. */
+            reasons?: components["schemas"]["RecommendationReason"][];
         };
         HealthCheck: {
             /** @enum {string} */
@@ -10064,6 +10212,106 @@ export interface operations {
                     "application/json": components["schemas"]["MusicStatus"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    aiStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    testAi: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    url?: string;
+                    chatModel?: string;
+                    embedModel?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Reachable or not (see error). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    rebuildLyricIndex: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Started. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    recommendationReasons: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    itemIds: number[];
+                };
+            };
+        };
+        responses: {
+            /** @description Reasons for the items that have one. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecommendationReason"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
         };
     };

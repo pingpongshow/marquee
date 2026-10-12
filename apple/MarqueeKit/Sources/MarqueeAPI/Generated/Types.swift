@@ -941,6 +941,26 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /music/status`.
     /// - Remark: Generated from `#/paths//music/status/get(musicStatus)`.
     func musicStatus(_ input: Operations.MusicStatus.Input) async throws -> Operations.MusicStatus.Output
+    /// AI (Ollama) status (admin only): reachable, installed and loaded models, the last error and indexing progress.
+    ///
+    /// - Remark: HTTP `GET /ai/status`.
+    /// - Remark: Generated from `#/paths//ai/status/get(aiStatus)`.
+    func aiStatus(_ input: Operations.AiStatus.Input) async throws -> Operations.AiStatus.Output
+    /// Check an Ollama address and models before saving (admin only). Omitted fields use the saved settings. Loads no model.
+    ///
+    /// - Remark: HTTP `POST /ai/test`.
+    /// - Remark: Generated from `#/paths//ai/test/post(testAi)`.
+    func testAi(_ input: Operations.TestAi.Input) async throws -> Operations.TestAi.Output
+    /// Forget the lyric theme index and build it again in the background (admin only).
+    ///
+    /// - Remark: HTTP `POST /ai/lyrics/rebuild`.
+    /// - Remark: Generated from `#/paths//ai/lyrics/rebuild/post(rebuildLyricIndex)`.
+    func rebuildLyricIndex(_ input: Operations.RebuildLyricIndex.Input) async throws -> Operations.RebuildLyricIndex.Output
+    /// One-line "why this" for up to 5 recommended movies or shows (AI, cached per person and item). Empty when AI is off or unavailable.
+    ///
+    /// - Remark: HTTP `POST /recommendations/reasons`.
+    /// - Remark: Generated from `#/paths//recommendations/reasons/post(recommendationReasons)`.
+    func recommendationReasons(_ input: Operations.RecommendationReasons.Input) async throws -> Operations.RecommendationReasons.Output
     /// Sounds like this (MUSIC-2) — tracks, albums or artists (matching the item's type) that sound like it.
     ///
     /// - Remark: HTTP `GET /items/{itemId}/sounds-like`.
@@ -3258,6 +3278,46 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//music/status/get(musicStatus)`.
     public func musicStatus(headers: Operations.MusicStatus.Input.Headers = .init()) async throws -> Operations.MusicStatus.Output {
         try await musicStatus(Operations.MusicStatus.Input(headers: headers))
+    }
+    /// AI (Ollama) status (admin only): reachable, installed and loaded models, the last error and indexing progress.
+    ///
+    /// - Remark: HTTP `GET /ai/status`.
+    /// - Remark: Generated from `#/paths//ai/status/get(aiStatus)`.
+    public func aiStatus(headers: Operations.AiStatus.Input.Headers = .init()) async throws -> Operations.AiStatus.Output {
+        try await aiStatus(Operations.AiStatus.Input(headers: headers))
+    }
+    /// Check an Ollama address and models before saving (admin only). Omitted fields use the saved settings. Loads no model.
+    ///
+    /// - Remark: HTTP `POST /ai/test`.
+    /// - Remark: Generated from `#/paths//ai/test/post(testAi)`.
+    public func testAi(
+        headers: Operations.TestAi.Input.Headers = .init(),
+        body: Operations.TestAi.Input.Body
+    ) async throws -> Operations.TestAi.Output {
+        try await testAi(Operations.TestAi.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Forget the lyric theme index and build it again in the background (admin only).
+    ///
+    /// - Remark: HTTP `POST /ai/lyrics/rebuild`.
+    /// - Remark: Generated from `#/paths//ai/lyrics/rebuild/post(rebuildLyricIndex)`.
+    public func rebuildLyricIndex(headers: Operations.RebuildLyricIndex.Input.Headers = .init()) async throws -> Operations.RebuildLyricIndex.Output {
+        try await rebuildLyricIndex(Operations.RebuildLyricIndex.Input(headers: headers))
+    }
+    /// One-line "why this" for up to 5 recommended movies or shows (AI, cached per person and item). Empty when AI is off or unavailable.
+    ///
+    /// - Remark: HTTP `POST /recommendations/reasons`.
+    /// - Remark: Generated from `#/paths//recommendations/reasons/post(recommendationReasons)`.
+    public func recommendationReasons(
+        headers: Operations.RecommendationReasons.Input.Headers = .init(),
+        body: Operations.RecommendationReasons.Input.Body
+    ) async throws -> Operations.RecommendationReasons.Output {
+        try await recommendationReasons(Operations.RecommendationReasons.Input(
+            headers: headers,
+            body: body
+        ))
     }
     /// Sounds like this (MUSIC-2) — tracks, albums or artists (matching the item's type) that sound like it.
     ///

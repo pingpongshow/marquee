@@ -10,6 +10,9 @@ Runs next to the Marquee server on the same host and is only reachable from it
   length) for Muse for movies, recommendations and related items (USER-15, USER-16).
 
 Nothing leaves the machine except the one-time model download from Hugging Face.
+
+Both models load on first use and unload after IDLE_UNLOAD_MINUTES (default 5) without
+requests, so the GPU is free while nothing is being analysed. /health never loads them.
 """
 
 import logging
@@ -23,7 +26,9 @@ import numpy as np
 import torch
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from transformers import AutoModel, AutoTokenizer, ClapModel, ClapProcessor
+from transformers import AutoModel, AutoTokenizer, ClapConfig, ClapModel, ClapProcessor
+
+from idle import IdleModel, start_reaper
 
 
 def env(name: str, default: str) -> str:
@@ -45,12 +50,20 @@ log = logging.getLogger("soundprint")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-log.info("loading %s on %s", MODEL_ID, device)
+IDLE_SECONDS = float(os.environ.get("IDLE_UNLOAD_MINUTES", "5")) * 60
+# The processor (tokenizer and audio features) runs on the CPU and stays; the config gives
+# the embedding size without loading the model.
 processor = ClapProcessor.from_pretrained(MODEL_ID)
-model = ClapModel.from_pretrained(MODEL_ID).to(device).eval()
-if device == "cuda":
-    model = model.half()
+CLAP_DIMS = int(ClapConfig.from_pretrained(MODEL_ID).projection_dim)
 gpu_lock = threading.Lock()
+
+
+def load_clap():
+    m = ClapModel.from_pretrained(MODEL_ID).to(device).eval()
+    return m.half() if device == "cuda" else m
+
+
+clap = IdleModel(f"{MODEL_ID} on {device}", load_clap, IDLE_SECONDS)
 decoders = ThreadPoolExecutor(max_workers=int(env("DECODERS", "8")))
 
 app = FastAPI(title="Marquee Soundprint analysis")
@@ -120,6 +133,7 @@ def energy(y: np.ndarray, sr: int) -> float:
 
 def embed_audio(clips):
     with gpu_lock, torch.inference_mode():
+        model = clap.get()
         inputs = processor(audios=clips, sampling_rate=SR, return_tensors="pt")
         inputs = {k: v.to(device) for k, v in inputs.items()}
         if device == "cuda":
@@ -147,7 +161,8 @@ def analyze_one(path: str):
 
 @app.get("/health")
 def health():
-    return {"model": ANALYSIS_ID, "device": device, "dims": int(model.config.projection_dim)}
+    return {"model": ANALYSIS_ID, "device": device, "dims": CLAP_DIMS,
+            "loaded": {"clap": clap.loaded, "docs": docs.loaded}}
 
 
 @app.post("/analyze")
@@ -169,7 +184,7 @@ def analyze(req: AnalyzeRequest):
             emb = embed_audio(clips)
         except Exception:  # noqa: BLE001 — find the bad file instead of failing the whole batch
             log.exception("batch embedding failed; retrying per file")
-            emb = np.zeros((len(clips), int(model.config.projection_dim)), dtype=np.float32)
+            emb = np.zeros((len(clips), CLAP_DIMS), dtype=np.float32)
             for p in set(owners):
                 idx = [i for i, o in enumerate(owners) if o == p]
                 try:
@@ -190,6 +205,7 @@ def embed_text(req: TextRequest):
     if not req.texts or len(req.texts) > 32:
         raise HTTPException(400, "1–32 texts")
     with gpu_lock, torch.inference_mode():
+        model = clap.get()
         inputs = processor(text=req.texts, return_tensors="pt", padding=True)
         inputs = {k: v.to(device) for k, v in inputs.items()}
         e = torch.nn.functional.normalize(model.get_text_features(**inputs).float(), dim=-1)
@@ -201,21 +217,16 @@ class DocsRequest(BaseModel):
     kind: str = "doc"  # "query" (a Muse prompt) or "doc" (a movie's or show's description)
 
 
-doc_model = None
-doc_tokenizer = None
-doc_load_lock = threading.Lock()
-
-
 def load_doc_model():
-    """Loads the text model on first use, so a music-only server never pays for it."""
-    global doc_model, doc_tokenizer
-    with doc_load_lock:
-        if doc_model is None:
-            log.info("loading %s on %s", DOC_MODEL_ID, device)
-            doc_tokenizer = AutoTokenizer.from_pretrained(DOC_MODEL_ID)
-            m = AutoModel.from_pretrained(DOC_MODEL_ID).to(device).eval()
-            doc_model = m.half() if device == "cuda" else m
-    return doc_model, doc_tokenizer
+    """Loads the text model on first use, so a music-only server (or one using Ollama for
+    movies) never pays for it."""
+    tok = AutoTokenizer.from_pretrained(DOC_MODEL_ID)
+    m = AutoModel.from_pretrained(DOC_MODEL_ID).to(device).eval()
+    return (m.half() if device == "cuda" else m), tok
+
+
+docs = IdleModel(f"{DOC_MODEL_ID} on {device}", load_doc_model, IDLE_SECONDS)
+start_reaper([clap, docs], gpu_lock)
 
 
 @app.post("/embed_docs")
@@ -229,8 +240,8 @@ def embed_docs(req: DocsRequest):
     if not req.texts:
         return {"model": DOC_MODEL_ID, "embeddings": []}
     texts = [DOC_QUERY_PREFIX + t if req.kind == "query" else t for t in req.texts]
-    m, tok = load_doc_model()
     with gpu_lock, torch.inference_mode():
+        m, tok = docs.get()
         inputs = tok(texts, padding=True, truncation=True, max_length=512, return_tensors="pt")
         inputs = {k: v.to(device) for k, v in inputs.items()}
         e = m(**inputs).last_hidden_state[:, 0].float()

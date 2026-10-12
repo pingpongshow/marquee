@@ -18,6 +18,8 @@ type Options struct {
 	// Jitter adds up to this much randomness to each candidate's score (Rand's), so picks
 	// vary between runs; 0 keeps Pick deterministic (radios, prompts).
 	Jitter float64
+	// Boost raises these tracks' scores in Pick (a lyric theme's matches); 0–~0.4 each.
+	Boost map[int64]float64
 }
 
 func (o *Options) rng() *rand.Rand {
@@ -89,7 +91,17 @@ func (x *Index) Flow(anchor []float32, first *Track, o Options) []*Track {
 // Pick chooses n diverse tracks close to v (maximal marginal relevance), then orders them
 // so each flows into the next. Used for Muse prompts and mixes.
 func (x *Index) Pick(v []float32, n int, o Options) []*Track {
-	pool := x.Nearest(v, max(300, n*10), o.allowed)
+	poolSize := max(300, n*10)
+	if len(o.Boost) > 0 {
+		poolSize = max(1000, n*30) // boosted tracks may sit further from the sound
+	}
+	pool := x.Nearest(v, poolSize, o.allowed)
+	if len(o.Boost) > 0 {
+		for i := range pool {
+			pool[i].Score += o.Boost[pool[i].ItemID]
+		}
+		sort.SliceStable(pool, func(i, j int) bool { return pool[i].Score > pool[j].Score })
+	}
 	// Drop the weakest part of the pool: in a small library (or for a prompt few tracks
 	// match) the pool reaches tracks that have nothing to do with the request. In a large
 	// library the pool is tight and this cuts almost nothing.

@@ -24,6 +24,7 @@
 package app.marquee.api.models
 
 import app.marquee.api.models.ItemSummary
+import app.marquee.api.models.RecommendationReason
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -35,6 +36,8 @@ import kotlinx.serialization.Contextual
  * @param items 
  * @param understood How the prompt was read, e.g. \"Movies · 1990s · Science Fiction · like 'time travel'\".
  * @param analysed Share of the library ready for Muse (0–1); below 1 while it's still being indexed.
+ * @param title A short title for the results (AI), or the prompt.
+ * @param reasons One-line reasons for the top results, when AI re-ranked them.
  */
 @Serializable
 
@@ -49,7 +52,15 @@ data class MuseVideoResult (
 
     /* Share of the library ready for Muse (0–1); below 1 while it's still being indexed. */
     @SerialName(value = "analysed")
-    val analysed: kotlin.Double? = null
+    val analysed: kotlin.Double? = null,
+
+    /* A short title for the results (AI), or the prompt. */
+    @SerialName(value = "title")
+    val title: kotlin.String? = null,
+
+    /* One-line reasons for the top results, when AI re-ranked them. */
+    @SerialName(value = "reasons")
+    val reasons: kotlin.collections.List<RecommendationReason>? = null
 
 ) {
 
