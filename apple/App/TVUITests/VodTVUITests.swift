@@ -1,6 +1,6 @@
 import XCTest
 
-/// Movies on demand ("VOD", LIVE-6) on Apple TV with the remote: the VOD tab after Live TV,
+/// Movies on demand ("VOD", LIVE-6) on Apple TV with the remote: VOD in the sidebar after Live TV,
 /// the film's page, playing, resuming and marking watched; hidden when not usable.
 /// Needs the local VOD source the iOS VodUITests describe (.e2e/vod-apple on :32621).
 final class VodTVUITests: XCTestCase {
@@ -141,7 +141,7 @@ final class VodTVUITests: XCTestCase {
 
     // MARK: - Tests
 
-    /// The VOD tab sits right after Live TV; a film in Continue Watching opens, resumes from
+    /// VOD sits right after Live TV in the sidebar; a film in Continue Watching opens, resumes from
     /// its point with the remote, and Menu closes the player and records where it got to;
     /// then Mark watched.
     func testVodTabPlayResumeAndMarkWatchedTV() throws {
@@ -154,20 +154,17 @@ final class VodTVUITests: XCTestCase {
         try api("DELETE", "/livetv/vod/sessions/\(session)", token: token)
         try signIn(as: token)
 
-        remote.press(.up)
-        let live = app.buttons["Live TV"].firstMatch
-        let vod = app.buttons["VOD"].firstMatch
-        XCTAssertTrue(vod.waitForExistence(timeout: 10), "VOD is a tab")
-        XCTAssertTrue(live.exists)
-        XCTAssertLessThan(live.frame.midX, vod.frame.midX, "VOD comes right after Live TV")
-        focus(vod, direction: .right, tries: 12)
-        remote.press(.select)
+        app.openSidebar()
+        let live = try XCTUnwrap(app.sidebarItem("Live TV"))
+        let vod = try XCTUnwrap(app.sidebarItem("VOD"), "VOD is in the sidebar")
+        XCTAssertLessThan(live.frame.midY, vod.frame.midY, "VOD comes right after Live TV")
+        app.openSection("VOD")
         let tile = app.buttons.matching(identifier: "vod.tile").matching(NSPredicate(format: "label == %@", film)).firstMatch
         XCTAssertTrue(tile.waitForExistence(timeout: 15), "the film is in Continue Watching")
         sleep(1)
         shot("tv-vod-browse")
         XCTAssertFalse(app.buttons["Guide"].exists, "VOD is its own page, not inside Live TV")
-        XCTAssertFalse(app.staticTexts["VOD"].exists, "no page title faded over VOD")
+        XCTAssertFalse(app.pageTitleShows("VOD"), "no page title faded over VOD")
         focus(tile, direction: .down)
         remote.press(.select)
 
@@ -197,22 +194,18 @@ final class VodTVUITests: XCTestCase {
         shot("tv-vod-watched")
     }
 
-    /// Live TV's page has no title faded over the guide (the top bar's tab names it), and no
-    /// VOD tab inside it.
+    /// Live TV's page has no title faded over the guide (the sidebar names it), and no VOD
+    /// tab inside it.
     func testLiveTVNoTitleTV() throws {
         _ = try ensureVod()
         let token = try temporaryAccount()
         try signIn(as: token)
-        remote.press(.up)
-        let live = app.buttons["Live TV"].firstMatch
-        XCTAssertTrue(live.waitForExistence(timeout: 10))
-        focus(live, direction: .right, tries: 12)
-        remote.press(.select)
+        app.openSection("Live TV")
         XCTAssertTrue(app.buttons["Guide"].firstMatch.waitForExistence(timeout: 15), "Live TV opens")
         sleep(1)
         shot("tv-livetv")
-        XCTAssertFalse(app.staticTexts["Live TV"].exists, "no Live TV title over the guide")
-        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label == 'VOD'")).count, 1, "VOD only in the top bar, not a Live TV tab")
+        XCTAssertFalse(app.pageTitleShows("Live TV"), "no Live TV title over the guide")
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label == 'VOD'")).count, 1, "VOD only in the sidebar, not a Live TV tab")
     }
 
     /// Not usable for the profile: no VOD tab.
@@ -221,9 +214,67 @@ final class VodTVUITests: XCTestCase {
         let token = try temporaryAccount()
         app.launchArguments += ["-marquee-test-vod-off"]
         try signIn(as: token)
-        remote.press(.up)
-        XCTAssertTrue(app.buttons["Live TV"].firstMatch.waitForExistence(timeout: 10))
+        app.openSidebar()
+        XCTAssertNotNil(app.sidebarItem("Live TV"))
         sleep(2)
         XCTAssertFalse(app.buttons["VOD"].exists, "no VOD tab")
+    }
+
+    /// No channels (Live TV hidden) but VOD on: VOD is still in the sidebar and opens.
+    func testVodTabWithoutChannelsTV() throws {
+        _ = try ensureVod()
+        let token = try temporaryAccount()
+        app.launchArguments += ["-marquee-test-channels-off"]
+        try signIn(as: token)
+        app.openSidebar()
+        XCTAssertTrue(app.buttons["VOD"].firstMatch.waitForExistence(timeout: 15), "VOD is listed without Live TV")
+        XCTAssertFalse(app.buttons["Live TV"].exists, "no Live TV without channels")
+        shot("tv-vod-no-live")
+        app.openSection("VOD")
+        XCTAssertTrue(app.buttons.matching(identifier: "vod.tile").firstMatch.waitForExistence(timeout: 15), "VOD opens")
+    }
+
+    /// Back opens the sidebar (the TV's tab list): Home, the Libraries section (each library,
+    /// Live TV, VOD), then Playlists, Settings and Search. Choosing VOD opens it, and Back from
+    /// there opens the sidebar again.
+    func testSidebarOpensWithBackTV() throws {
+        _ = try ensureVod()
+        let token = try temporaryAccount()
+        try signIn(as: token)
+        sleep(2)
+        // (Open while Home was still loading, with nothing to focus: Right closes it.)
+        for _ in 0..<3 where app.sidebarIsOpen {
+            remote.press(.right)
+            sleep(1)
+        }
+        XCTAssertFalse(app.sidebarIsOpen, "collapsed on Home")
+        shot("tv-sidebar-collapsed")
+
+        remote.press(.menu)
+        for _ in 0..<10 where !app.sidebarIsOpen { Thread.sleep(forTimeInterval: 0.5) }
+        XCTAssertTrue(app.sidebarIsOpen, "Back opened the sidebar")
+        XCTAssertEqual(app.state, .runningForeground, "still in the app")
+        let names = ["Home", "Anime", "Movies", "Music", "Recorded TV", "Live TV", "VOD", "Playlists", "Settings", "Search"]
+        let items = try names.map { try XCTUnwrap(app.sidebarItem($0), "\($0) is in the sidebar") }
+        for (a, b) in zip(items, items.dropFirst()) {
+            XCTAssertLessThan(a.frame.midY, b.frame.midY, "\(a.label) comes before \(b.label)")
+        }
+        let header = app.staticTexts["Libraries"].firstMatch
+        XCTAssertTrue(header.exists, "the Libraries header")
+        XCTAssertTrue(header.frame.midY > items[0].frame.midY && header.frame.midY < items[1].frame.midY, "between Home and the libraries")
+        shot("tv-sidebar-open")
+
+        app.openSection("VOD")
+        XCTAssertTrue(app.buttons.matching(identifier: "vod.tile").firstMatch.waitForExistence(timeout: 15), "VOD opens")
+        for _ in 0..<6 where app.sidebarIsOpen { Thread.sleep(forTimeInterval: 0.5) }
+        XCTAssertFalse(app.sidebarIsOpen, "the sidebar closed onto VOD")
+        sleep(1)
+        shot("tv-sidebar-vod")
+
+        remote.press(.menu)
+        for _ in 0..<10 where !app.sidebarIsOpen { Thread.sleep(forTimeInterval: 0.5) }
+        XCTAssertTrue(app.sidebarIsOpen, "Back from VOD opened the sidebar")
+        XCTAssertEqual(app.state, .runningForeground)
+        shot("tv-sidebar-open-from-vod")
     }
 }

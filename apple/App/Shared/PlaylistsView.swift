@@ -89,6 +89,11 @@ struct PlaylistsView: View {
                 ProgressView().padding(.top, 60)
             } else if playlists.isEmpty {
                 ContentUnavailableView("No playlists", systemImage: "music.note.list", description: Text("Use “Add to Playlist” on any track, album, movie or episode."))
+                    #if os(tvOS)
+                    // Something to hold focus: with nothing focusable the TV's sidebar closed
+                    // onto an empty page, and Back then left the app instead of reopening it.
+                    .focusable()
+                    #endif
             }
         }
         .navigationTitle("Playlists")

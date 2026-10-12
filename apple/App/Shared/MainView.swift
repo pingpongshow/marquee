@@ -1,8 +1,8 @@
 import MarqueeKit
 import SwiftUI
 
-/// Tabs: Home, each library, Playlists, Search and Settings. On iPad the tab bar becomes a
-/// The main sidebar.
+/// Tabs: Home, each library, Playlists, Search and Settings. On iPad and Apple TV they're
+/// the main sidebar; on iPhone a tab bar.
 struct MainView: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
@@ -31,7 +31,7 @@ struct MainView: View {
                     stack { LibrariesList(libraries: libraries, liveTV: hasLiveTV, vod: hasVod, error: librariesError, icon: icon, reload: { await loadAll() }) }
                 }
             } else {
-                // iPad sidebar and Apple TV top bar: Live TV is one of the libraries, after
+                // iPad and Apple TV sidebar: Live TV is one of the libraries, after
                 // the video ones.
                 TabSection("Libraries") {
                     ForEach(LibraryEntry.list(libraries, liveTV: hasLiveTV, vod: hasVod)) { entry in
@@ -52,27 +52,18 @@ struct MainView: View {
                     }
                 }
             }
-            Tab("Playlists", systemImage: "music.note.list") { stack { PlaylistsView() } }
-            if !compact && canDiscover {
-                Tab("Discover", systemImage: "safari") { stack { DiscoverView() } }
-            }
-            #if os(iOS)
-            if !compact {
-                // iPhone lists Downloads under Libraries (a sixth tab would spill into "More").
-                Tab("Downloads", systemImage: "arrow.down.circle") { stack { DownloadsView() } }
-            }
-            #endif
             #if os(tvOS)
-            if music.current != nil {
-                Tab("Now Playing", systemImage: "waveform") { NowPlayingView() }
-            }
+            // The TV's sidebar lists plain tabs before sections: the rest go in a section with
+            // no header so they come after Libraries (Home, Libraries, then these).
+            TabSection { otherTabs } header: { EmptyView() }
+            #else
+            otherTabs
             #endif
-            Tab("Settings", systemImage: "gearshape") { stack { SettingsView() } }
-            Tab(role: .search) { stack { SearchView() } }
         }
-        #if os(iOS)
+        // iPad and Apple TV: a sidebar (Home, the Libraries section, then the rest). On the TV a
+        // top bar fits only about six tabs; the sidebar lists them all, and Back from the top of
+        // a page (or Left from its leftmost item) opens it. iPhone keeps its tab bar.
         .tabViewStyle(.sidebarAdaptable)
-        #endif
         .environment(video)
         // A rating request after a movie or episode ended (USER-19).
         .ratingPromptOverlay(active: linkedItem == nil)
@@ -141,6 +132,28 @@ struct MainView: View {
         #endif
     }
 
+    /// Playlists, Discover, Downloads (iPad), Now Playing (TV), Settings and Search.
+    @TabContentBuilder<Never>
+    private var otherTabs: some TabContent<Never> {
+        Tab("Playlists", systemImage: "music.note.list") { stack { PlaylistsView() } }
+        if !compact && canDiscover {
+            Tab("Discover", systemImage: "safari") { stack { DiscoverView() } }
+        }
+        #if os(iOS)
+        if !compact {
+            // iPhone lists Downloads under Libraries (a sixth tab would spill into "More").
+            Tab("Downloads", systemImage: "arrow.down.circle") { stack { DownloadsView() } }
+        }
+        #endif
+        #if os(tvOS)
+        if music.current != nil {
+            Tab("Now Playing", systemImage: "waveform") { NowPlayingView() }
+        }
+        #endif
+        Tab("Settings", systemImage: "gearshape") { stack { SettingsView() } }
+        Tab(role: .search) { stack(rootTitle: true) { SearchView() } }
+    }
+
     private var compact: Bool {
         #if os(iOS)
         UIDevice.current.userInterfaceIdiom == .phone
@@ -149,10 +162,16 @@ struct MainView: View {
         #endif
     }
 
-    private func stack<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+    /// A tab's navigation stack. On the TV the root page has no navigation title: the
+    /// sidebar names it (open, and collapsed to its small button at the top left), and tvOS
+    /// otherwise keeps a faded title over the content as it scrolls. Search keeps its bar.
+    private func stack<Content: View>(rootTitle: Bool = false, @ViewBuilder _ content: () -> Content) -> some View {
         NavigationStack {
             content()
                 .miniPlayerSpace()
+                #if os(tvOS)
+                .toolbar(rootTitle ? .automatic : .hidden, for: .navigationBar)
+                #endif
                 .marqueeDestinations()
         }
         #if os(iOS)

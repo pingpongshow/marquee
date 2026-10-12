@@ -56,12 +56,8 @@ struct LiveTVView: View {
                 content
             }
         }
+        // (No title on the TV: MainView hides it there, as the sidebar names the page.)
         .navigationTitle("Live TV")
-        #if os(tvOS)
-        // Live TV is a top-bar tab on the TV, which names it; tvOS keeps the title faded over
-        // the guide while it scrolls.
-        .toolbar(.hidden, for: .navigationBar)
-        #endif
         // Checked again each time Live TV opens: channels may have been added or lost (LIVE-1).
         .task { await loadStatus() }
         .task(id: "\(filter)|\(start.timeIntervalSince1970)") { await load() }
