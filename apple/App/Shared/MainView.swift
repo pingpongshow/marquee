@@ -16,6 +16,8 @@ struct MainView: View {
     @State private var linkedItem: LinkedItem?
     @State private var canDiscover = false
     @State private var hasLiveTV = false
+    /// Movies on demand are on and usable (LIVE-6): a VOD entry right after Live TV.
+    @State private var hasVod = false
     /// Why the libraries couldn't be loaded (shown with a retry instead of an empty list).
     @State private var librariesError: String?
 
@@ -26,18 +28,20 @@ struct MainView: View {
                 // iPhone: one Libraries tab so the tab bar doesn't overflow into "More". Live TV
                 // is listed there with the libraries.
                 Tab("Libraries", systemImage: "square.stack") {
-                    stack { LibrariesList(libraries: libraries, liveTV: hasLiveTV, error: librariesError, icon: icon, reload: { await loadAll() }) }
+                    stack { LibrariesList(libraries: libraries, liveTV: hasLiveTV, vod: hasVod, error: librariesError, icon: icon, reload: { await loadAll() }) }
                 }
             } else {
                 // iPad sidebar and Apple TV top bar: Live TV is one of the libraries, after
                 // the video ones.
                 TabSection("Libraries") {
-                    ForEach(LibraryEntry.list(libraries, liveTV: hasLiveTV)) { entry in
+                    ForEach(LibraryEntry.list(libraries, liveTV: hasLiveTV, vod: hasVod)) { entry in
                         switch entry {
                         case .library(let lib):
                             Tab(lib.name, systemImage: icon(lib._type)) { stack { LibraryView(libraryID: lib.id) } }
                         case .liveTV:
                             Tab("Live TV", systemImage: "antenna.radiowaves.left.and.right") { stack { LiveTVView() } }
+                        case .vod:
+                            Tab("VOD", systemImage: "film.stack") { stack { LiveTVView(initialTab: .movies) } }
                         }
                     }
                     if libraries.isEmpty, librariesError != nil {
@@ -172,6 +176,7 @@ struct MainView: View {
         guard app.client != nil else { return }
         async let requests = try? app.requestsStatus()
         async let live = try? app.liveStatus()
+        async let vod = try? app.vodStatus()
         do {
             libraries = try await app.libraries()
             librariesError = nil
@@ -181,7 +186,10 @@ struct MainView: View {
         }
         // A failed check keeps what was known (a tab doesn't vanish on a blip).
         if let s = await requests { canDiscover = s.enabled && s.canRequest }
-        if let l = await live { hasLiveTV = l.enabled }
+        // Live TV is listed when its channels or its movies on demand (LIVE-6) are usable.
+        let l = await live, v = await vod
+        if let v { hasVod = v.enabled }
+        if l != nil || v != nil { hasLiveTV = (l?.enabled ?? false) || (v?.enabled ?? false) }
     }
 
     private func icon(_ t: Schemas.LibraryType) -> String {
@@ -213,24 +221,28 @@ extension EnvironmentValues {
 }
 
 /// A row of the Libraries list (or a sidebar / top bar tab): a library, or Live TV, which is
-/// listed after the video libraries when it's set up.
+/// listed after the video libraries when it's set up, with VOD (movies on demand, LIVE-6)
+/// right after it when those are on.
 enum LibraryEntry: Identifiable {
     case library(Library)
     case liveTV
+    case vod
 
     var id: String {
         switch self {
         case .library(let l): "library-\(l.id)"
         case .liveTV: "liveTV"
+        case .vod: "vod"
         }
     }
 
-    static func list(_ libraries: [Library], liveTV: Bool) -> [LibraryEntry] {
+    static func list(_ libraries: [Library], liveTV: Bool, vod: Bool = false) -> [LibraryEntry] {
         var out = libraries.map(LibraryEntry.library)
         guard liveTV else { return out }
         let video: Set<Schemas.LibraryType> = [.movies, .shows, .anime, .videos]
         let at = (libraries.lastIndex { video.contains($0._type) }).map { $0 + 1 } ?? libraries.count
         out.insert(.liveTV, at: at)
+        if vod { out.insert(.vod, at: at + 1) }
         return out
     }
 }
@@ -241,6 +253,8 @@ struct LibrariesList: View {
     let libraries: [Library]
     /// Live TV is set up: listed with the libraries.
     var liveTV = false
+    /// Movies on demand are on: VOD is listed right after Live TV.
+    var vod = false
     var error: String?
     let icon: (Schemas.LibraryType) -> String
     var reload: () async -> Void = {}
@@ -253,7 +267,7 @@ struct LibrariesList: View {
                         .accessibilityIdentifier("librariesRetry")
                 }
             }
-            ForEach(LibraryEntry.list(libraries, liveTV: liveTV)) { entry in
+            ForEach(LibraryEntry.list(libraries, liveTV: liveTV, vod: vod)) { entry in
                 switch entry {
                 case .library(let lib):
                     NavigationLink(value: Route.library(lib.id)) {
@@ -278,6 +292,18 @@ struct LibrariesList: View {
                         }
                     }
                     .accessibilityIdentifier("libraries.liveTV")
+                case .vod:
+                    NavigationLink(value: Route.liveTVMovies) {
+                        Label {
+                            VStack(alignment: .leading) {
+                                Text("VOD")
+                                Text("Movies on demand").font(.caption).foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "film.stack").foregroundStyle(Color.marqueeGold)
+                        }
+                    }
+                    .accessibilityIdentifier("libraries.vod")
                 }
             }
             #if os(iOS)

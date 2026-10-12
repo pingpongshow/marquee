@@ -72,7 +72,7 @@ fun MainScreen() {
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route ?: "home"
-    val fullScreen = route.startsWith("player") || route == "nowplaying" || route.startsWith("live/") || route.startsWith("recap/")
+    val fullScreen = route.startsWith("player") || route == "nowplaying" || route.startsWith("live/") || route.startsWith("vodplay/") || route.startsWith("recap/")
     // The tab whose section is showing; reselecting it goes back to its first screen.
     var tab by rememberSaveable { mutableStateOf("home") }
     LaunchedEffect(route) { if (tabs.any { it.route == route }) tab = route }
@@ -148,7 +148,9 @@ private fun Routes(nav: NavHostController) {
         composable("downloads") { DownloadsScreen(nav) }
         composable("discover") { DiscoverScreen(nav) }
         // Opened from Libraries (and by deep links); not a tab.
-        composable("livetv") { LiveTvScreen(nav) }
+        composable("livetv?tab={tab}", listOf(navArgument("tab") { type = NavType.StringType; nullable = true; defaultValue = null })) {
+            LiveTvScreen(nav, it.arguments!!.getString("tab"))
+        }
         composable("musicbrowse/{lib}/{kind}?sort={sort}", listOf(navArgument("lib") { type = NavType.LongType }, navArgument("sort") { type = NavType.StringType; nullable = true; defaultValue = null })) {
             app.marquee.music.MusicBrowseScreen(nav, it.arguments!!.getLong("lib"), it.arguments!!.getString("kind")!!, it.arguments!!.getString("sort"))
         }
@@ -156,6 +158,12 @@ private fun Routes(nav: NavHostController) {
         composable("browse/{lib}/{kind}/{name}", listOf(navArgument("lib") { type = NavType.LongType })) {
             app.marquee.music.MoodStyleScreen(nav, it.arguments!!.getLong("lib"), it.arguments!!.getString("kind")!!, it.arguments!!.getString("name")!!)
         }
+        // Movies on demand (LIVE-6): a film's page and its player.
+        composable("vod/{id}", listOf(navArgument("id") { type = NavType.LongType })) { VodMovieScreen(nav, it.arguments!!.getLong("id")) }
+        composable(
+            "vodplay/{id}?start={start}",
+            listOf(navArgument("id") { type = NavType.LongType }, navArgument("start") { type = NavType.LongType; defaultValue = -1L }),
+        ) { VodPlayerScreen(nav, it.arguments!!.getLong("id"), it.arguments!!.getLong("start").takeIf { s -> s >= 0 }) }
         composable("live/{id}", listOf(navArgument("id") { type = NavType.LongType })) { LiveWatchScreen(nav, it.arguments!!.getLong("id")) }
         composable("approvals") { ApprovalsScreen() }
         composable("stats") { StatsScreen(nav) }

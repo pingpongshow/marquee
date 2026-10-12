@@ -694,7 +694,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
 
 /** Times and a slider; while scrubbing, the preview frame floats above the thumb. */
 @Composable
-private fun ScrubBar(pos: Long, dur: Long, thumbs: TrickplayThumbs?, scrubbing: Boolean = true, onChange: (Long) -> Unit, onDone: () -> Unit) {
+internal fun ScrubBar(pos: Long, dur: Long, thumbs: TrickplayThumbs?, scrubbing: Boolean = true, onChange: (Long) -> Unit, onDone: () -> Unit) {
     val frac = if (dur > 0) pos.toFloat() / dur else 0f
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         if (scrubbing && thumbs != null && dur > 0) {

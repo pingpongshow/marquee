@@ -15,6 +15,9 @@ type Options struct {
 	Exclude map[int64]bool
 	Keep    Filter
 	Rand    *rand.Rand
+	// Jitter adds up to this much randomness to each candidate's score (Rand's), so picks
+	// vary between runs; 0 keeps Pick deterministic (radios, prompts).
+	Jitter float64
 }
 
 func (o *Options) rng() *rand.Rand {
@@ -114,6 +117,9 @@ func (x *Index) Pick(v []float32, n int, o Options) []*Track {
 				}
 			}
 			s := 0.75*c.Score - 0.25*sim - 0.3*o.Avoid[c.ItemID]
+			if o.Jitter > 0 {
+				s += o.Jitter * o.rng().Float64()
+			}
 			if s > bestScore {
 				best, bestScore = i, s
 			}

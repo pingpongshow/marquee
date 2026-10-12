@@ -705,6 +705,66 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /livetv/refresh`.
     /// - Remark: Generated from `#/paths//livetv/refresh/post(refreshLiveTv)`.
     func refreshLiveTv(_ input: Operations.RefreshLiveTv.Input) async throws -> Operations.RefreshLiveTv.Output
+    /// Movies on demand (LIVE-6): whether they're turned on and usable by the caller, and how each source loaded.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/status`.
+    /// - Remark: Generated from `#/paths//livetv/vod/status/get(vodStatus)`.
+    func vodStatus(_ input: Operations.VodStatus.Input) async throws -> Operations.VodStatus.Output
+    /// The sources' categories (e.g. "'80s Movies") with how many films the caller may see in each.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/categories`.
+    /// - Remark: Generated from `#/paths//livetv/vod/categories/get(listVodCategories)`.
+    func listVodCategories(_ input: Operations.ListVodCategories.Input) async throws -> Operations.ListVodCategories.Output
+    /// Films on demand, a page at a time.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/movies`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/get(listVodMovies)`.
+    func listVodMovies(_ input: Operations.ListVodMovies.Input) async throws -> Operations.ListVodMovies.Output
+    /// Films the caller stopped part-way through, most recent first.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/continue`.
+    /// - Remark: Generated from `#/paths//livetv/vod/continue/get(vodContinueWatching)`.
+    func vodContinueWatching(_ input: Operations.VodContinueWatching.Input) async throws -> Operations.VodContinueWatching.Output
+    /// A film's details (TMDB's once matched, else the source's).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/movies/{movieId}`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/get(getVodMovie)`.
+    func getVodMovie(_ input: Operations.GetVodMovie.Input) async throws -> Operations.GetVodMovie.Output
+    /// A film's poster or backdrop, fetched once and cached (no sign-in needed, like artwork).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/movies/{movieId}/image`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/image/get(vodMovieImage)`.
+    func vodMovieImage(_ input: Operations.VodMovieImage.Input) async throws -> Operations.VodMovieImage.Output
+    /// Mark a film watched (clears its resume point).
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/movies/{movieId}/watched`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/watched/put(markVodWatched)`.
+    func markVodWatched(_ input: Operations.MarkVodWatched.Input) async throws -> Operations.MarkVodWatched.Output
+    /// Mark a film unwatched (clears its resume point).
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/movies/{movieId}/watched`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/watched/delete(markVodUnwatched)`.
+    func markVodUnwatched(_ input: Operations.MarkVodUnwatched.Input) async throws -> Operations.MarkVodUnwatched.Output
+    /// Start watching a film. Returns an HLS session passed through from the source (seekable; no transcode).
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/movies/{movieId}/play`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/play/post(playVodMovie)`.
+    func playVodMovie(_ input: Operations.PlayVodMovie.Input) async throws -> Operations.PlayVodMovie.Output
+    /// Report the position, so the film resumes there (and counts as watched near the end).
+    ///
+    /// - Remark: HTTP `PATCH /livetv/vod/sessions/{sessionId}`.
+    /// - Remark: Generated from `#/paths//livetv/vod/sessions/{sessionId}/patch(reportVodPlayback)`.
+    func reportVodPlayback(_ input: Operations.ReportVodPlayback.Input) async throws -> Operations.ReportVodPlayback.Output
+    /// Stop watching (idle sessions also end by themselves).
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/sessions/{sessionId}`.
+    /// - Remark: Generated from `#/paths//livetv/vod/sessions/{sessionId}/delete(stopVodSession)`.
+    func stopVodSession(_ input: Operations.StopVodSession.Input) async throws -> Operations.StopVodSession.Output
+    /// Reload every movie source now and retry TMDB matching for films that didn't match (admin only). Matching continues in the background.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/refresh`.
+    /// - Remark: Generated from `#/paths//livetv/vod/refresh/post(refreshVod)`.
+    func refreshVod(_ input: Operations.RefreshVod.Input) async throws -> Operations.RefreshVod.Output
     /// Whether requests are set up and whether the caller may make them.
     ///
     /// - Remark: HTTP `GET /requests/status`.
@@ -2628,6 +2688,142 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//livetv/refresh/post(refreshLiveTv)`.
     public func refreshLiveTv(headers: Operations.RefreshLiveTv.Input.Headers = .init()) async throws -> Operations.RefreshLiveTv.Output {
         try await refreshLiveTv(Operations.RefreshLiveTv.Input(headers: headers))
+    }
+    /// Movies on demand (LIVE-6): whether they're turned on and usable by the caller, and how each source loaded.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/status`.
+    /// - Remark: Generated from `#/paths//livetv/vod/status/get(vodStatus)`.
+    public func vodStatus(headers: Operations.VodStatus.Input.Headers = .init()) async throws -> Operations.VodStatus.Output {
+        try await vodStatus(Operations.VodStatus.Input(headers: headers))
+    }
+    /// The sources' categories (e.g. "'80s Movies") with how many films the caller may see in each.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/categories`.
+    /// - Remark: Generated from `#/paths//livetv/vod/categories/get(listVodCategories)`.
+    public func listVodCategories(headers: Operations.ListVodCategories.Input.Headers = .init()) async throws -> Operations.ListVodCategories.Output {
+        try await listVodCategories(Operations.ListVodCategories.Input(headers: headers))
+    }
+    /// Films on demand, a page at a time.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/movies`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/get(listVodMovies)`.
+    public func listVodMovies(
+        query: Operations.ListVodMovies.Input.Query = .init(),
+        headers: Operations.ListVodMovies.Input.Headers = .init()
+    ) async throws -> Operations.ListVodMovies.Output {
+        try await listVodMovies(Operations.ListVodMovies.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Films the caller stopped part-way through, most recent first.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/continue`.
+    /// - Remark: Generated from `#/paths//livetv/vod/continue/get(vodContinueWatching)`.
+    public func vodContinueWatching(headers: Operations.VodContinueWatching.Input.Headers = .init()) async throws -> Operations.VodContinueWatching.Output {
+        try await vodContinueWatching(Operations.VodContinueWatching.Input(headers: headers))
+    }
+    /// A film's details (TMDB's once matched, else the source's).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/movies/{movieId}`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/get(getVodMovie)`.
+    public func getVodMovie(
+        path: Operations.GetVodMovie.Input.Path,
+        headers: Operations.GetVodMovie.Input.Headers = .init()
+    ) async throws -> Operations.GetVodMovie.Output {
+        try await getVodMovie(Operations.GetVodMovie.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// A film's poster or backdrop, fetched once and cached (no sign-in needed, like artwork).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/movies/{movieId}/image`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/image/get(vodMovieImage)`.
+    public func vodMovieImage(
+        path: Operations.VodMovieImage.Input.Path,
+        query: Operations.VodMovieImage.Input.Query = .init(),
+        headers: Operations.VodMovieImage.Input.Headers = .init()
+    ) async throws -> Operations.VodMovieImage.Output {
+        try await vodMovieImage(Operations.VodMovieImage.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Mark a film watched (clears its resume point).
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/movies/{movieId}/watched`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/watched/put(markVodWatched)`.
+    public func markVodWatched(
+        path: Operations.MarkVodWatched.Input.Path,
+        headers: Operations.MarkVodWatched.Input.Headers = .init()
+    ) async throws -> Operations.MarkVodWatched.Output {
+        try await markVodWatched(Operations.MarkVodWatched.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Mark a film unwatched (clears its resume point).
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/movies/{movieId}/watched`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/watched/delete(markVodUnwatched)`.
+    public func markVodUnwatched(
+        path: Operations.MarkVodUnwatched.Input.Path,
+        headers: Operations.MarkVodUnwatched.Input.Headers = .init()
+    ) async throws -> Operations.MarkVodUnwatched.Output {
+        try await markVodUnwatched(Operations.MarkVodUnwatched.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Start watching a film. Returns an HLS session passed through from the source (seekable; no transcode).
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/movies/{movieId}/play`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/play/post(playVodMovie)`.
+    public func playVodMovie(
+        path: Operations.PlayVodMovie.Input.Path,
+        headers: Operations.PlayVodMovie.Input.Headers = .init()
+    ) async throws -> Operations.PlayVodMovie.Output {
+        try await playVodMovie(Operations.PlayVodMovie.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Report the position, so the film resumes there (and counts as watched near the end).
+    ///
+    /// - Remark: HTTP `PATCH /livetv/vod/sessions/{sessionId}`.
+    /// - Remark: Generated from `#/paths//livetv/vod/sessions/{sessionId}/patch(reportVodPlayback)`.
+    public func reportVodPlayback(
+        path: Operations.ReportVodPlayback.Input.Path,
+        headers: Operations.ReportVodPlayback.Input.Headers = .init(),
+        body: Operations.ReportVodPlayback.Input.Body
+    ) async throws -> Operations.ReportVodPlayback.Output {
+        try await reportVodPlayback(Operations.ReportVodPlayback.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Stop watching (idle sessions also end by themselves).
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/sessions/{sessionId}`.
+    /// - Remark: Generated from `#/paths//livetv/vod/sessions/{sessionId}/delete(stopVodSession)`.
+    public func stopVodSession(
+        path: Operations.StopVodSession.Input.Path,
+        headers: Operations.StopVodSession.Input.Headers = .init()
+    ) async throws -> Operations.StopVodSession.Output {
+        try await stopVodSession(Operations.StopVodSession.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Reload every movie source now and retry TMDB matching for films that didn't match (admin only). Matching continues in the background.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/refresh`.
+    /// - Remark: Generated from `#/paths//livetv/vod/refresh/post(refreshVod)`.
+    public func refreshVod(headers: Operations.RefreshVod.Input.Headers = .init()) async throws -> Operations.RefreshVod.Output {
+        try await refreshVod(Operations.RefreshVod.Input(headers: headers))
     }
     /// Whether requests are set up and whether the caller may make them.
     ///

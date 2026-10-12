@@ -12,6 +12,10 @@ enum Route: Hashable {
     case discover
     /// Live TV, listed with the libraries.
     case liveTV
+    /// Live TV opened at its VOD tab (LIVE-6): the VOD entry right after Live TV.
+    case liveTVMovies
+    /// A film on demand under Live TV (LIVE-6).
+    case vodMovie(Int64)
     case moodStyle(library: Int64, mood: Bool, name: String)
     /// Muse for movies and shows (USER-15), optionally in one library.
     case museVideo(library: Int64?)
@@ -73,6 +77,8 @@ private func routeView(_ route: Route) -> some View {
     #endif
     case .discover: DiscoverView()
     case .liveTV: LiveTVView()
+    case .liveTVMovies: LiveTVView(initialTab: .movies)
+    case .vodMovie(let id): VodMovieView(id: id)
     case let .moodStyle(library, mood, name): MoodStyleView(libraryID: library, kind: mood ? .mood : .style, name: name)
     case let .museVideo(library): VideoMuseView(libraryID: library)
     case let .musicBrowse(library, kind):

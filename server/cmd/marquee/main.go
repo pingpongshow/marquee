@@ -53,6 +53,7 @@ import (
 	"marquee/internal/syncplay"
 	"marquee/internal/tasks"
 	"marquee/internal/trickplay"
+	"marquee/internal/vod"
 	"marquee/internal/watcher"
 	"marquee/internal/webhooks"
 )
@@ -368,6 +369,28 @@ func run() error {
 	lastSources = string(raw)
 	go live.Run(ctx, liveWake)
 
+	// Movies on demand (LIVE-6): film lists refreshed every few hours and when sources change;
+	// TMDB matching uses the library's matcher.
+	vodSvc := &vod.Service{DB: database, Settings: store, Matcher: meta, Streams: &vod.Streams{},
+		ImageDir: filepath.Join(cfg.ConfigDir, "cache", "vod-images")}
+	vodWake := make(chan struct{}, 1)
+	vodConfig := func(s settings.Settings) string {
+		raw, _ := json.Marshal([]any{s.Integrations.VODEnabled, s.Integrations.VODSources, s.Metadata.TMDBAPIKey != ""})
+		return string(raw)
+	}
+	lastVOD := vodConfig(store.Get())
+	store.Subscribe(func(s settings.Settings) {
+		if c := vodConfig(s); c != lastVOD {
+			lastVOD = c
+			select {
+			case vodWake <- struct{}{}:
+			default:
+			}
+		}
+	})
+	go vodSvc.Run(ctx, vodWake)
+	go vodSvc.Streams.Run(ctx)
+
 	// DVR (LIVE-5): recordings land in "Recorded TV" / "Recorded Movies", made on first use.
 	minutes := func(n int) time.Duration { return time.Duration(n) * time.Minute }
 	dvr := &livetv.Recorder{Live: live, FFmpeg: cfg.FFmpegPath, Dir: cfg.RecordingsDir,
@@ -424,6 +447,7 @@ func run() error {
 		Tasks: scheduler, Trickplay: trick, Webhooks: hooks, Subtitles: subs, Downloads: dl, Backups: backups, Restart: stop, Soundprint: soundprintSvc, Lyrics: lyricsSvc,
 		Requests:   &requests.Service{DB: database, Settings: store},
 		LiveTV:     live,
+		VOD:        vodSvc,
 		Scrobble:   scrobbler,
 		DVR:        dvr,
 		SyncPlay:   watchTogether,
@@ -448,6 +472,7 @@ func run() error {
 		Handlers:   apiHandlers,
 		Downloads:  apiHandlers.DownloadFiles(),
 		Live:       live.Sessions.Handler(),
+		VOD:        vodSvc.Streams.Handler(),
 		Stream:     player.StreamHandler(filepath.Join(cfg.ConfigDir, "cache", "subtitles")),
 		Auth:       authSvc,
 		Classifier: classifier,

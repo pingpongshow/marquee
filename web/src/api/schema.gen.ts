@@ -1984,6 +1984,190 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/livetv/vod/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Movies on demand (LIVE-6): whether they're turned on and usable by the caller, and how each source loaded. */
+        get: operations["vodStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The sources' categories (e.g. "'80s Movies") with how many films the caller may see in each. */
+        get: operations["listVodCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/movies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Films on demand, a page at a time. */
+        get: operations["listVodMovies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/continue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Films the caller stopped part-way through, most recent first. */
+        get: operations["vodContinueWatching"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/movies/{movieId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                movieId: number;
+            };
+            cookie?: never;
+        };
+        /** A film's details (TMDB's once matched, else the source's). */
+        get: operations["getVodMovie"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/movies/{movieId}/image": {
+        parameters: {
+            query?: {
+                kind?: "poster" | "backdrop";
+            };
+            header?: never;
+            path: {
+                movieId: number;
+            };
+            cookie?: never;
+        };
+        /** A film's poster or backdrop, fetched once and cached (no sign-in needed, like artwork). */
+        get: operations["vodMovieImage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/movies/{movieId}/watched": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                movieId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Mark a film watched (clears its resume point). */
+        put: operations["markVodWatched"];
+        post?: never;
+        /** Mark a film unwatched (clears its resume point). */
+        delete: operations["markVodUnwatched"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/movies/{movieId}/play": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                movieId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start watching a film. Returns an HLS session passed through from the source (seekable; no transcode). */
+        post: operations["playVodMovie"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Stop watching (idle sessions also end by themselves). */
+        delete: operations["stopVodSession"];
+        options?: never;
+        head?: never;
+        /** Report the position, so the film resumes there (and counts as watched near the end). */
+        patch: operations["reportVodPlayback"];
+        trace?: never;
+    };
+    "/livetv/vod/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reload every movie source now and retry TMDB matching for films that didn't match (admin only). Matching continues in the background. */
+        post: operations["refreshVod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/requests/status": {
         parameters: {
             query?: never;
@@ -3312,6 +3496,92 @@ export interface components {
             userAgent?: string;
             enabled?: boolean;
         };
+        /** @description An M3U playlist of films, e.g. Pluto TV's on-demand movies (LIVE-6). Each entry's group-title is its category. */
+        VodSource: {
+            id?: string;
+            name: string;
+            url: string;
+            userAgent?: string;
+            enabled?: boolean;
+        };
+        VodStatus: {
+            /** @description Movies on demand are turned on, a source has films, and this profile may watch Live TV. Clients show them only when true. */
+            enabled: boolean;
+            movies: number;
+            /** @description Films matched to TMDB. */
+            matched: number;
+            /** @description Films TMDB had no confident match for. */
+            unmatched: number;
+            /** @description Details and TMDB matches are being fetched now. */
+            matching: boolean;
+            /** @description A TMDB API key is set (admins only). */
+            tmdbConfigured?: boolean;
+            sources: {
+                id: string;
+                name: string;
+                movies: number;
+                /** Format: date-time */
+                refreshedAt?: string;
+                error?: string;
+            }[];
+        };
+        VodCategory: {
+            name: string;
+            count: number;
+        };
+        VodMovie: {
+            /** Format: int64 */
+            id: number;
+            title: string;
+            year?: number;
+            category?: string;
+            /** @description e.g. PG-13. */
+            contentRating?: string;
+            /** @description TMDB's average vote out of 10. */
+            rating?: number;
+            /** Format: int64 */
+            runtimeMs?: number;
+            /** @description Server-relative; no token needed. */
+            posterUrl?: string;
+            /**
+             * Format: int64
+             * @description The caller's resume point.
+             */
+            positionMs?: number;
+            watched: boolean;
+        };
+        VodMovieDetail: components["schemas"]["VodMovie"] & {
+            overview?: string;
+            tagline?: string;
+            genres: string[];
+            director?: string;
+            cast: {
+                name: string;
+                character?: string;
+            }[];
+            /** @description Server-relative; no token needed. */
+            backdropUrl?: string;
+            tmdbId?: number;
+            imdbId?: string;
+            /** @description The details are TMDB's. */
+            matched: boolean;
+        };
+        VodMoviePage: {
+            total: number;
+            movies: components["schemas"]["VodMovie"][];
+        };
+        VodSession: {
+            id: string;
+            /** @description The HLS playlist (server-relative; the session id is its credential). */
+            url: string;
+            /** Format: int64 */
+            movieId: number;
+            /**
+             * Format: int64
+             * @description Where to start (the caller's resume point).
+             */
+            startMs?: number;
+        };
         RequestsStatus: {
             /** @description Seerr is configured. */
             enabled: boolean;
@@ -3447,6 +3717,9 @@ export interface components {
             /** @description Minutes recordings run late. */
             dvrPaddingAfter?: number;
             liveTvSources?: components["schemas"]["LiveTvSource"][];
+            /** @description Movies on demand appear under Live TV (LIVE-6). */
+            vodEnabled?: boolean;
+            vodSources?: components["schemas"]["VodSource"][];
         };
         IntegrationSettingsUpdate: {
             seerrUrl?: string;
@@ -3463,6 +3736,9 @@ export interface components {
             dvrPaddingAfter?: number;
             /** @description Replaces the whole list when sent. */
             liveTvSources?: components["schemas"]["LiveTvSource"][];
+            vodEnabled?: boolean;
+            /** @description Replaces the whole list when sent. */
+            vodSources?: components["schemas"]["VodSource"][];
         };
         MetadataSettings: {
             readonly tmdbApiKeySet?: boolean;
@@ -8519,6 +8795,298 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LiveTvStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    vodStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listVodCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Categories by name. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodCategory"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listVodMovies: {
+        parameters: {
+            query?: {
+                category?: string;
+                /** @description Part of the title. */
+                q?: string;
+                sort?: "title" | "added" | "year" | "rating";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of films. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodMoviePage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    vodContinueWatching: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Films. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodMovie"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getVodMovie: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                movieId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The film. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodMovieDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    vodMovieImage: {
+        parameters: {
+            query?: {
+                kind?: "poster" | "backdrop";
+            };
+            header?: never;
+            path: {
+                movieId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    markVodWatched: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                movieId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Marked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    markVodUnwatched: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                movieId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Marked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    playVodMovie: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                movieId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodSession"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    stopVodSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stopped. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    reportVodPlayback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: int64 */
+                    positionMs: number;
+                    /**
+                     * Format: int64
+                     * @description The film's length as the player sees it.
+                     */
+                    durationMs?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Recorded. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    refreshVod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What each source returned. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodStatus"];
                 };
             };
             401: components["responses"]["Unauthorized"];

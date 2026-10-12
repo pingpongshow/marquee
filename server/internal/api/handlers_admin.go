@@ -90,6 +90,8 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			LiveTvSources:    ptr(toAPILiveSources(s.Integrations.LiveTVSources)),
 			DvrPaddingBefore: ptr(s.Integrations.DVRPaddingBefore),
 			DvrPaddingAfter:  ptr(s.Integrations.DVRPaddingAfter),
+			VodEnabled:       ptr(s.Integrations.VODEnabled),
+			VodSources:       ptr(toAPIVodSources(s.Integrations.VODSources)),
 		},
 		Webhooks: ptr(toAPIWebhooks(s.Webhooks)),
 	}
@@ -239,6 +241,10 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 				}
 				s.Integrations.LiveTVSources[k] = out
 			}
+		}
+		set(&s.Integrations.VODEnabled, i.VodEnabled)
+		if i.VodSources != nil {
+			s.Integrations.VODSources = fromAPIVodSources(*i.VodSources)
 		}
 	}
 	if u.Webhooks != nil {
