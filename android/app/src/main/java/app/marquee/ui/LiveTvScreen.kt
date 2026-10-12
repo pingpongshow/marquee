@@ -35,8 +35,14 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import kotlin.math.abs
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
@@ -120,20 +126,18 @@ private fun defaultStart(): OffsetDateTime {
     return n.withMinute(if (n.minute < 30) 0 else 30).minusMinutes(30)
 }
 
-/** Live TV (LIVE-2): Guide and What's On, a live preview on phones, full screen on TV. */
+/** Live TV (LIVE-2): Guide and What's On, a live preview on phones, full screen on TV. VOD is a page of its own. */
 @Composable
-fun LiveTvScreen(nav: NavHostController, initialTab: String? = null) {
+fun LiveTvScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
     val scope = rememberCoroutineScope()
-    // Null while loading; a failure counts as Live TV being off (movies on demand may still be on).
+    // Null while loading; a failure counts as Live TV being off.
     val statusResult by produceState<Result<app.marquee.api.models.LiveTvStatus>?>(null) { value = withContext(Dispatchers.IO) { runCatching { marquee.livetv.liveTvStatus() } } }
     val status = statusResult?.getOrNull()
     val groups by produceState(emptyList<String>()) { value = withContext(Dispatchers.IO) { runCatching { marquee.livetv.listLiveGroups().map { it.name } }.getOrDefault(emptyList()) } }
-    // VOD, movies on demand (LIVE-6), is a tab here while they're usable for this profile.
-    val vodOn by marquee.vod.collectAsState()
     LaunchedEffect(Unit) { marquee.refreshLiveTv() }
-    // Saved, so coming back from a film returns to Movies.
-    var tab by rememberSaveable { mutableStateOf(initialTab ?: "guide") }
+    // Saved, so coming back from a channel keeps the tab.
+    var tab by rememberSaveable { mutableStateOf("guide") }
     var filter by remember { mutableStateOf("all") }
     var start by remember { mutableStateOf(defaultStart()) }
     var channels by remember { mutableStateOf<List<LiveChannel>?>(null) }
@@ -157,7 +161,7 @@ fun LiveTvScreen(nav: NavHostController, initialTab: String? = null) {
     fun pick(c: LiveChannel) { if (marquee.isTv || preview == c.id) watch(c.id) else preview = c.id }
 
     val s = status
-    if (statusResult == null || (s == null && !vodOn)) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }; return }
+    if (statusResult == null) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }; return }
     val liveOn = marquee.fakeLiveTv ?: (s?.enabled == true) // the test hook stands in for the server's status
     val tabs = buildList {
         if (liveOn) {
@@ -165,7 +169,6 @@ fun LiveTvScreen(nav: NavHostController, initialTab: String? = null) {
             add("now" to "What's On")
             if (s?.canRecord == true) add("recordings" to "Recordings")
         }
-        if (vodOn) add("movies" to "VOD")
     }
     if (tabs.isEmpty()) {
         Column(Modifier.fillMaxWidth().padding(48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -185,7 +188,6 @@ fun LiveTvScreen(nav: NavHostController, initialTab: String? = null) {
             }
         }
     }
-    if (current == "movies") { VodBrowse(nav, header); return }
     if (s == null) return
     val list = channels
     LazyColumn(contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -433,14 +435,22 @@ private fun LivePreview(c: LiveChannel, onExpand: () -> Unit) {
     }
 }
 
-/** Full-screen live TV with channel up/down (buttons on phones, the D-pad on TV). */
+/**
+ * Full-screen live TV. TVs change channel with the remote's up/down; phones swipe left (next) or right
+ * (previous) on the video, and swipe down from the top to close. A tap shows or hides the info bar.
+ */
 @Composable
 fun LiveWatchScreen(nav: NavHostController, startId: Long) {
     val marquee = LocalMarquee.current
+    val scope = rememberCoroutineScope()
     val channels by produceState(emptyList<LiveChannel>()) { value = withContext(Dispatchers.IO) { runCatching { marquee.livetv.listLiveChannels() }.getOrDefault(emptyList()) } }
     var current by remember { mutableLongStateOf(startId) }
     var error by remember { mutableStateOf<String?>(null) }
     var playing by remember { mutableStateOf(false) }
+    var controls by remember { mutableStateOf(true) }
+    // The channel being switched to by a swipe, shown briefly over the video.
+    var switching by remember { mutableIntStateOf(0) }
+    val pull = remember { Animatable(0f) }
     val c = channels.firstOrNull { it.id == current }
     // Phones: full screen in landscape, as for video.
     VideoWindow()
@@ -449,7 +459,9 @@ fun LiveWatchScreen(nav: NavHostController, startId: Long) {
         val i = channels.indexOfFirst { it.id == current }.coerceAtLeast(0)
         current = channels[(i + d + channels.size) % channels.size].id
     }
-    Box(Modifier.fillMaxSize().background(Color.Black)
+    LaunchedEffect(switching) { if (switching > 0) { delay(2000); switching = 0 } }
+    // Follows a pull down from the top, which closes it.
+    Box(Modifier.fillMaxSize().graphicsLayer { translationY = pull.value }.background(Color.Black)
         .semantics { contentDescription = "Live TV"; stateDescription = if (playing) "Playing" else "Tuning" }
         .onPreviewKeyEvent { e ->
             if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -461,7 +473,14 @@ fun LiveWatchScreen(nav: NavHostController, startId: Long) {
         }
         .focusable().initialFocus(true)) {
         androidx.compose.runtime.key(current) { LiveVideo(current, false, Modifier.fillMaxSize(), onState = { error = it }, onPlaying = { playing = it }) }
-        Row(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.8f), Color.Transparent))).padding(12.dp),
+        // Over the video and under the info bar's buttons, so those keep their taps.
+        if (!marquee.isTv) Box(Modifier.fillMaxSize().liveGestures(
+            onTap = { controls = !controls },
+            onSwipe = { d -> step(d); switching++ },
+            onPull = { y -> scope.launch { pull.snapTo(y) } },
+            onPullEnd = { close -> if (close) nav.popBackStack() else scope.launch { pull.animateTo(0f) } },
+        ))
+        if (controls || marquee.isTv) Row(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.8f), Color.Transparent))).padding(12.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             if (!marquee.isTv) IconButton({ nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Close Live TV", tint = Color.White) }
             c?.let {
@@ -472,11 +491,57 @@ fun LiveWatchScreen(nav: NavHostController, startId: Long) {
                         style = MaterialTheme.typography.bodySmall, maxLines = 1)
                 }
             }
-            if (!marquee.isTv) {
-                IconButton({ step(-1) }) { Icon(Icons.Filled.KeyboardArrowUp, "Channel up", tint = Color.White) }
-                IconButton({ step(1) }) { Icon(Icons.Filled.KeyboardArrowDown, "Channel down", tint = Color.White) }
-            }
         }
+        if (switching > 0) c?.let { ChannelOverlay(it, Modifier.align(Alignment.Center)) }
         error?.let { Text(it, Modifier.align(Alignment.Center).padding(24.dp), color = MaterialTheme.colorScheme.error) }
+    }
+}
+
+/** The channel a swipe is switching to: number, logo and name. */
+@Composable
+private fun ChannelOverlay(c: LiveChannel, modifier: Modifier) {
+    Row(modifier.clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = 0.7f)).padding(horizontal = 18.dp, vertical = 12.dp)
+        .semantics(mergeDescendants = true) { contentDescription = "Switching to ${c.name}" },
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        c.number?.let { Text(it, color = Gold, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+        ChannelLogo(c, Modifier.width(64.dp).height(36.dp))
+        Text(c.name, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
+}
+
+/**
+ * The live player's touch gestures: a tap, a horizontal swipe (left is +1, the next channel; right is -1), and a
+ * pull down that starts in the top quarter ([onPull] follows the finger; [onPullEnd] says whether it went far or fast enough to close).
+ */
+private fun Modifier.liveGestures(onTap: () -> Unit, onSwipe: (Int) -> Unit, onPull: (Float) -> Unit, onPullEnd: (Boolean) -> Unit) = pointerInput(Unit) {
+    awaitEachGesture {
+        val down = awaitFirstDown()
+        val fromTop = down.position.y < size.height * 0.25f
+        val tracker = VelocityTracker().apply { addPosition(down.uptimeMillis, down.position) }
+        val slop = viewConfiguration.touchSlop
+        var mode = 0 // 0 undecided, 1 sideways, 2 pulling down, 3 neither
+        var delta = Offset.Zero
+        while (true) {
+            val e = awaitPointerEvent()
+            val ch = e.changes.firstOrNull { it.id == down.id } ?: break
+            tracker.addPosition(ch.uptimeMillis, ch.position)
+            delta = ch.position - down.position
+            if (mode == 0 && delta.getDistance() > slop) mode = when {
+                abs(delta.x) > abs(delta.y) -> 1
+                delta.y > 0 && fromTop -> 2
+                else -> 3
+            }
+            if (!ch.pressed) {
+                val v = tracker.calculateVelocity()
+                when (mode) {
+                    0 -> if (!ch.isConsumed) onTap()
+                    1 -> if (abs(delta.x) > 48.dp.toPx() || abs(v.x) > 600.dp.toPx()) onSwipe(if (delta.x < 0) 1 else -1)
+                    2 -> onPullEnd(delta.y > size.height * 0.2f || v.y > 900.dp.toPx())
+                }
+                break
+            }
+            if (mode == 1 || mode == 2) ch.consume()
+            if (mode == 2) onPull(delta.y.coerceAtLeast(0f))
+        }
     }
 }

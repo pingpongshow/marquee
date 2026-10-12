@@ -187,9 +187,17 @@ private class VodList {
     val grid = LazyGridState()
 }
 
+/** VOD (movies on demand, LIVE-6): a page of its own, opened from Libraries' VOD entry. */
+@Composable
+fun VodPage(nav: NavHostController) {
+    VodBrowse(nav) {
+        Text("VOD", Modifier.padding(horizontal = sidePadding), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+    }
+}
+
 /**
- * The VOD tab of Live TV (movies on demand): categories, search, sort, Continue Watching and a poster grid that
- * loads a page at a time. [header] is Live TV's title and tabs, scrolled with the grid.
+ * The VOD page's browse (movies on demand): categories, search, sort, Continue Watching and a poster grid that
+ * loads a page at a time. [header] is the page's title, scrolled with the grid.
  */
 @Composable
 fun VodBrowse(nav: NavHostController, header: @Composable () -> Unit) {
@@ -298,7 +306,7 @@ fun VodBrowse(nav: NavHostController, header: @Composable () -> Unit) {
     }
 }
 
-/** Live TV's header pads itself; inside the grid (which pads) it's pulled back to the edge. */
+/** The page's header pads itself; inside the grid (which pads) it's pulled back to the edge. */
 @Composable
 private fun HeaderNoPadding(header: @Composable () -> Unit) {
     Box(Modifier.layoutOffset(-sidePadding)) { header() }
