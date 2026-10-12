@@ -3,7 +3,7 @@ import MarqueeKit
 import SwiftUI
 
 /// Live TV (LIVE-2): a Guide and What's On, a live preview on iPhone/iPad, and
-/// full-screen watching with channel up/down; and movies on demand (VOD, LIVE-6) when usable.
+/// full-screen watching with channel up/down. Movies on demand (VOD) have their own page.
 struct LiveTVView: View {
     @Environment(AppSession.self) private var app
     @State private var tab: Tab
@@ -22,21 +22,13 @@ struct LiveTVView: View {
     @State private var statusError: String?
     /// Bumped by pull-to-refresh on the Recordings tab.
     @State private var recordingsRefresh = 0
-    /// Movies on demand are on and usable for this profile (LIVE-6).
-    @State private var vodEnabled = false
-    /// Bumped by pull-to-refresh on the Movies tab.
-    @State private var vodRefresh = 0
-
-    enum Tab: String, CaseIterable { case guide = "Guide", now = "What's On", recordings = "Recordings", movies = "VOD" }
-    /// Opened from the VOD entry (LIVE-6): starts at the VOD tab.
+    enum Tab: String, CaseIterable { case guide = "Guide", now = "What's On", recordings = "Recordings" }
     init(initialTab: Tab = .guide) {
         _tab = State(initialValue: initialTab)
     }
 
     private var tabs: [Tab] {
-        var out: [Tab] = enabled == true ? (canRecord ? [.guide, .now, .recordings] : [.guide, .now]) : []
-        if vodEnabled { out.append(.movies) }
-        return out
+        canRecord ? [.guide, .now, .recordings] : [.guide, .now]
     }
 
     static func defaultStart() -> Date {
@@ -58,15 +50,19 @@ struct LiveTVView: View {
                 }
             } else if enabled == nil {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if enabled == false && !vodEnabled {
+            } else if enabled == false {
                 ContentUnavailableView("Live TV isn't set up", systemImage: "tv", description: Text("An admin can add Dispatcharr or an M3U playlist in the web app's Settings → Live TV."))
             } else {
                 content
             }
         }
         .navigationTitle("Live TV")
-        // Checked again each time Live TV opens: movies on demand or channels may have been
-        // turned on or off (LIVE-1, LIVE-6).
+        #if os(tvOS)
+        // Live TV is a top-bar tab on the TV, which names it; tvOS keeps the title faded over
+        // the guide while it scrolls.
+        .toolbar(.hidden, for: .navigationBar)
+        #endif
+        // Checked again each time Live TV opens: channels may have been added or lost (LIVE-1).
         .task { await loadStatus() }
         .task(id: "\(filter)|\(start.timeIntervalSince1970)") { await load() }
         #if os(iOS)
@@ -83,14 +79,11 @@ struct LiveTVView: View {
 
     private func loadStatus() async {
         do {
-            async let vod = try? app.vodStatus()
             let status = try await app.liveStatus()
-            vodEnabled = await vod?.enabled ?? false
             enabled = status.enabled
             canRecord = status.canRecord ?? false
             statusError = nil
-            // Only movies on demand: straight to them.
-            if !tabs.contains(tab), let first = tabs.first { tab = first }
+            if !tabs.contains(tab) { tab = .guide }
             guard enabled == true else { return }
             groups = (try? await app.liveGroups()) ?? []
             if channels.isEmpty { await load() }
@@ -104,11 +97,7 @@ struct LiveTVView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 controls
-                if tab == .movies, vodEnabled {
-                    VodBrowseView(refresh: vodRefresh)
-                } else if tab != .movies {
-                    channelContent
-                }
+                channelContent
             }
             .padding(.vertical)
         }
@@ -116,7 +105,6 @@ struct LiveTVView: View {
         .refreshable {
             switch tab {
             case .recordings: recordingsRefresh += 1
-            case .movies: vodRefresh += 1
             default: await load()
             }
         }

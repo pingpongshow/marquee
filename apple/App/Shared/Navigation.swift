@@ -77,7 +77,7 @@ private func routeView(_ route: Route) -> some View {
     #endif
     case .discover: DiscoverView()
     case .liveTV: LiveTVView()
-    case .liveTVMovies: LiveTVView(initialTab: .movies)
+    case .liveTVMovies: VodPage()
     case .vodMovie(let id): VodMovieView(id: id)
     case let .moodStyle(library, mood, name): MoodStyleView(libraryID: library, kind: mood ? .mood : .style, name: name)
     case let .museVideo(library): VideoMuseView(libraryID: library)

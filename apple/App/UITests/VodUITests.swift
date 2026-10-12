@@ -162,9 +162,10 @@ final class VodUITests: XCTestCase {
 
     // MARK: - Tests
 
-    /// The VOD entry (right after Live TV) and Live TV's VOD tab show while the admin switch is
-    /// on, and go once it's off (checked again on returning to the app and opening Live TV).
-    func testVodEntryAndTabFollowAdminSwitch() throws {
+    /// The VOD entry (right after Live TV) opens VOD on its own page, never as a tab inside
+    /// Live TV; it shows while the admin switch is on and goes once it's off (checked again on
+    /// returning to the app).
+    func testVodEntryFollowsAdminSwitch() throws {
         try ensureVod()
         let admin = adminToken, url = "http://\(server)/api/v1/settings"
         addTeardownBlock { Self.send("PATCH", url, token: admin, body: ["integrations": ["vodEnabled": true]]) }
@@ -175,12 +176,14 @@ final class VodUITests: XCTestCase {
         XCTAssertTrue(vodEntry.waitForExistence(timeout: 10), "VOD is listed when on")
         XCTAssertTrue(live.exists)
         XCTAssertLessThan(live.frame.midY, vodEntry.frame.midY, "VOD comes right after Live TV")
-        live.tap()
-        XCTAssertTrue(vodTab.waitForExistence(timeout: 10), "Live TV has a VOD tab")
-        XCTAssertTrue(app.segmentedControls.buttons["Guide"].exists, "beside the guide")
-        vodTab.tap()
-        XCTAssertTrue(app.textFields["vod.search"].waitForExistence(timeout: 10))
+        vodEntry.tap()
+        XCTAssertTrue(app.textFields["vod.search"].waitForExistence(timeout: 10), "VOD opens its own page")
+        XCTAssertFalse(app.segmentedControls.buttons["Guide"].exists, "not inside Live TV")
         shot("1-vod-on")
+        openLibrariesTab()
+        live.tap()
+        XCTAssertTrue(app.segmentedControls.buttons["Guide"].waitForExistence(timeout: 10))
+        XCTAssertFalse(vodTab.exists, "Live TV has no VOD tab")
 
         try setVodEnabled(false)
         // Back in the app: checked again.
@@ -190,27 +193,20 @@ final class VodUITests: XCTestCase {
         openLibrariesTab()
         XCTAssertTrue(live.waitForExistence(timeout: 10))
         XCTAssertTrue(vodEntry.waitForNonExistence(timeout: 10), "VOD isn't listed when off")
-        live.tap()
-        XCTAssertTrue(app.segmentedControls.buttons["Guide"].waitForExistence(timeout: 10))
-        sleep(1)
-        XCTAssertFalse(vodTab.exists, "no VOD tab when off")
         shot("2-vod-off")
     }
 
-    /// With no channels usable but VOD on, Live TV is listed and opens straight to VOD.
-    func testLiveTVWithOnlyVod() throws {
+    /// With no channels usable but VOD on, Live TV isn't listed and VOD still is.
+    func testOnlyVodWithoutChannels() throws {
         try ensureVod()
         let user = try temporaryUser()
         app.launchArguments += ["-marquee-test-channels-off"]
         signIn(user)
         openLibrariesTab()
-        let live = app.buttons["libraries.liveTV"]
-        XCTAssertTrue(live.waitForExistence(timeout: 10), "Live TV is listed for VOD alone")
-        XCTAssertTrue(vodEntry.exists)
-        live.tap()
-        XCTAssertTrue(app.textFields["vod.search"].waitForExistence(timeout: 10), "Live TV opens at VOD")
-        XCTAssertFalse(app.segmentedControls.buttons["Guide"].exists, "no guide")
-        XCTAssertFalse(app.segmentedControls.buttons["What's On"].exists)
+        XCTAssertTrue(vodEntry.waitForExistence(timeout: 10), "VOD is listed on its own")
+        XCTAssertFalse(app.buttons["libraries.liveTV"].exists, "no Live TV without channels")
+        vodEntry.tap()
+        XCTAssertTrue(app.textFields["vod.search"].waitForExistence(timeout: 10))
         shot("vod-only")
     }
 
