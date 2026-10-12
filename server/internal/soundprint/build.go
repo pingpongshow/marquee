@@ -256,10 +256,35 @@ func Clusters(ts []*Track, k int, r *rand.Rand) [][]float32 {
 		return nil
 	}
 	k = min(k, len(ts))
-	centres := make([][]float32, k)
-	perm := r.Perm(len(ts))
-	for i := range centres {
-		centres[i] = ts[perm[i]].Vec
+	// k-means++ starts: the first centre at random, each next one far from those chosen
+	// (picked with probability by squared distance). Random starts could land two centres in
+	// one taste and merge two others, so a mix spanned two genres and a third went missing.
+	centres := make([][]float32, 0, k)
+	centres = append(centres, ts[r.IntN(len(ts))].Vec)
+	dist := make([]float64, len(ts))
+	for len(centres) < k {
+		total := 0.0
+		for i, t := range ts {
+			d := math.Inf(1)
+			for _, c := range centres {
+				d = math.Min(d, 1-dot(t.Vec, c))
+			}
+			d = math.Max(d, 0)
+			dist[i] = d * d
+			total += dist[i]
+		}
+		if total == 0 {
+			centres = append(centres, ts[r.IntN(len(ts))].Vec)
+			continue
+		}
+		pick, at := r.Float64()*total, len(ts)-1
+		for i, d := range dist {
+			if pick -= d; pick <= 0 {
+				at = i
+				break
+			}
+		}
+		centres = append(centres, ts[at].Vec)
 	}
 	assign := make([]int, len(ts))
 	for iter := 0; iter < 12; iter++ {

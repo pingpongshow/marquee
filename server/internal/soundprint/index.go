@@ -163,5 +163,8 @@ func (x *Index) Where(keep Filter) []*Track {
 			out = append(out, t)
 		}
 	}
+	// In id order: map order changes every run, and seeded choices over this list (clusters,
+	// shuffles) must come out the same for the same seed.
+	sort.Slice(out, func(i, j int) bool { return out[i].ItemID < out[j].ItemID })
 	return out
 }
