@@ -151,7 +151,10 @@ struct MainView: View {
         }
         #endif
         Tab("Settings", systemImage: "gearshape") { stack { SettingsView() } }
-        Tab(role: .search) { stack(rootTitle: true) { SearchView() } }
+        Tab(role: .search) {
+            stack(rootTitle: true) { SearchView() }
+
+        }
     }
 
     private var compact: Bool {
