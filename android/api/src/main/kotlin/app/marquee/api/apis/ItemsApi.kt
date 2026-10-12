@@ -48,6 +48,8 @@ import app.marquee.api.models.MuseVideoRequest
 import app.marquee.api.models.MuseVideoResult
 import app.marquee.api.models.PersonDetail
 import app.marquee.api.models.RateItemRequest
+import app.marquee.api.models.RecommendationReason
+import app.marquee.api.models.RecommendationReasonsRequest
 import app.marquee.api.models.SetReviewRequest
 import app.marquee.api.models.SmartCollectionSave
 
@@ -2266,6 +2268,80 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.PUT,
             path = "/items/{itemId}/rating".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /recommendations/reasons
+     * One-line \&quot;why this\&quot; for up to 5 recommended movies or shows (AI, cached per person and item). Empty when AI is off or unavailable.
+     * 
+     * @param recommendationReasonsRequest 
+     * @return kotlin.collections.List<RecommendationReason>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun recommendationReasons(recommendationReasonsRequest: RecommendationReasonsRequest) : kotlin.collections.List<RecommendationReason> {
+        val localVarResponse = recommendationReasonsWithHttpInfo(recommendationReasonsRequest = recommendationReasonsRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<RecommendationReason>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /recommendations/reasons
+     * One-line \&quot;why this\&quot; for up to 5 recommended movies or shows (AI, cached per person and item). Empty when AI is off or unavailable.
+     * 
+     * @param recommendationReasonsRequest 
+     * @return ApiResponse<kotlin.collections.List<RecommendationReason>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun recommendationReasonsWithHttpInfo(recommendationReasonsRequest: RecommendationReasonsRequest) : ApiResponse<kotlin.collections.List<RecommendationReason>?> {
+        val localVariableConfig = recommendationReasonsRequestConfig(recommendationReasonsRequest = recommendationReasonsRequest)
+
+        return request<RecommendationReasonsRequest, kotlin.collections.List<RecommendationReason>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation recommendationReasons
+     *
+     * @param recommendationReasonsRequest 
+     * @return RequestConfig
+     */
+    fun recommendationReasonsRequestConfig(recommendationReasonsRequest: RecommendationReasonsRequest) : RequestConfig<RecommendationReasonsRequest> {
+        val localVariableBody = recommendationReasonsRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/recommendations/reasons",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

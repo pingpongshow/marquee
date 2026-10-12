@@ -94,6 +94,11 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			VodSources:       ptr(toAPIVodSources(s.Integrations.VODSources)),
 		},
 		Webhooks: ptr(toAPIWebhooks(s.Webhooks)),
+		Ai: &AiSettings{
+			Enabled: ptr(s.AI.Enabled), Url: ptr(s.AI.URL), ChatModel: ptr(s.AI.ChatModel), EmbedModel: ptr(s.AI.EmbedModel),
+			UnloadMinutes: ptr(s.AI.UnloadMinutes), UnderstandPrompts: ptr(s.AI.UnderstandPrompts), RerankMovies: ptr(s.AI.RerankMovies),
+			LyricsThemes: ptr(s.AI.LyricsThemes), Reasons: ptr(s.AI.Reasons), LearnFromBehaviour: ptr(s.AI.LearnFromBehaviour),
+		},
 	}
 }
 
@@ -191,6 +196,24 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		set(&s.Music.SoundprintAnalysis, m.SoundprintAnalysis)
 		set(&s.Music.OnlineLyrics, m.OnlineLyrics)
 		set(&s.Music.LoudnessAnalysis, m.LoudnessAnalysis)
+	}
+	if a := u.Ai; a != nil {
+		set(&s.AI.Enabled, a.Enabled)
+		if a.Url != nil {
+			s.AI.URL = strings.TrimRight(strings.TrimSpace(*a.Url), "/")
+		}
+		if a.ChatModel != nil {
+			s.AI.ChatModel = strings.TrimSpace(*a.ChatModel)
+		}
+		if a.EmbedModel != nil {
+			s.AI.EmbedModel = strings.TrimSpace(*a.EmbedModel)
+		}
+		set(&s.AI.UnloadMinutes, a.UnloadMinutes)
+		set(&s.AI.UnderstandPrompts, a.UnderstandPrompts)
+		set(&s.AI.RerankMovies, a.RerankMovies)
+		set(&s.AI.LyricsThemes, a.LyricsThemes)
+		set(&s.AI.Reasons, a.Reasons)
+		set(&s.AI.LearnFromBehaviour, a.LearnFromBehaviour)
 	}
 	if c := u.Cinema; c != nil {
 		if c.Trailers != nil {

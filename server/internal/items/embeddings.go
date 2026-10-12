@@ -235,6 +235,8 @@ type Embedder struct {
 	DB     *sql.DB
 	Index  *VideoIndex
 	Client TextEmbedder
+	// Pace waits this long between batches, so a re-index doesn't hog the GPU.
+	Pace time.Duration
 
 	mu          sync.Mutex
 	done, total int
@@ -350,6 +352,13 @@ func (e *Embedder) pass(ctx context.Context, model string) (int, int, error) {
 			return i, len(docs), ctx.Err()
 		}
 		e.setProgress(i, len(todo))
+		if i > 0 && e.Pace > 0 {
+			select {
+			case <-ctx.Done():
+				return i, len(docs), ctx.Err()
+			case <-time.After(e.Pace):
+			}
+		}
 		chunk := todo[i:min(i+embedBatch, len(todo))]
 		texts := make([]string, len(chunk))
 		for j, d := range chunk {

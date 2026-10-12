@@ -31,7 +31,31 @@ type Settings struct {
 	Cinema       Cinema       `json:"cinema"`
 	Webhooks     []Webhook    `json:"webhooks"`
 	Integrations Integrations `json:"integrations"`
+	AI           AI           `json:"ai"`
 }
+
+// AI is the optional language model (a local Ollama) that makes Muse and recommendations
+// smarter. With Enabled off, or Ollama unreachable, everything works as without it.
+type AI struct {
+	Enabled    bool   `json:"enabled"`
+	URL        string `json:"url"`
+	ChatModel  string `json:"chatModel"`
+	EmbedModel string `json:"embedModel"`
+	// UnloadMinutes is sent as keep_alive on every request, so Ollama frees the GPU after
+	// this much idle time (0 = right after each request).
+	UnloadMinutes int `json:"unloadMinutes"`
+	// Per-feature switches, used only while Enabled is on.
+	UnderstandPrompts bool `json:"understandPrompts"`
+	RerankMovies      bool `json:"rerankMovies"`
+	LyricsThemes      bool `json:"lyricsThemes"`
+	Reasons           bool `json:"reasons"`
+	// LearnFromBehaviour uses skips, abandoned titles and ratings; it needs no model, so
+	// it works with Enabled off.
+	LearnFromBehaviour bool `json:"learnFromBehaviour"`
+}
+
+// On reports whether the model may be used for a feature switched on by flag.
+func (a AI) On(flag bool) bool { return a.Enabled && flag }
 
 // Integrations are other services on the network Marquee talks to.
 type Integrations struct {
@@ -216,6 +240,8 @@ func Defaults() Settings {
 		Tasks:        Tasks{MaintenanceWindowStart: "03:00", MaintenanceWindowHours: 4, BackupRetention: 7},
 		Music:        Music{SoundprintAnalysis: true, OnlineLyrics: false, LoudnessAnalysis: true},
 		Integrations: Integrations{DVRPaddingBefore: 1, DVRPaddingAfter: 3},
+		AI: AI{URL: "http://127.0.0.1:11434", ChatModel: "qwen3:8b", EmbedModel: "mxbai-embed-large", UnloadMinutes: 5,
+			UnderstandPrompts: true, RerankMovies: true, LyricsThemes: true, Reasons: true, LearnFromBehaviour: true},
 	}
 }
 

@@ -1,6 +1,7 @@
 import {
   Activity,
   AudioLines,
+  Sparkles,
   BarChart3,
   CalendarClock,
   Webhook,
@@ -21,6 +22,7 @@ import {
   Tv,
 } from "lucide-react";
 import type { ComponentType } from "react";
+import { AiSettings } from "./AiSettings";
 import { CinemaSettings } from "./CinemaSettings";
 import { DashboardSettings } from "./DashboardSettings";
 import { MusicSettings } from "./MusicSettings";
@@ -126,6 +128,16 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] =
           keywords:
             "soundprint analysis sound journey radio sage mixes lyrics lrclib loudness replaygain volume levelling gpu",
           description: "Soundprint analysis, lyrics and volume levelling.",
+        },
+        {
+          id: "ai",
+          label: "AI",
+          icon: Sparkles,
+          component: AiSettings,
+          keywords:
+            "ai ollama llm language model muse prompts re-rank rerank recommendations reasons why lyrics themes embeddings qwen gpu unload skips learning",
+          description:
+            "Optional local AI (Ollama) for smarter Muse and recommendations.",
         },
         {
           id: "cinema",

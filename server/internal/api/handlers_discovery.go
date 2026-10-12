@@ -11,6 +11,7 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"marquee/internal/items"
+	"marquee/internal/muse"
 )
 
 // ---------- listening recap (MUSIC-22) ----------
@@ -108,6 +109,9 @@ func (h *Handlers) videoIndex() *items.VideoIndex {
 	return h.Embeddings.Index
 }
 
+// rerankTop is how many candidates the AI re-ranks.
+const rerankTop = 30
+
 func (h *Handlers) MuseVideo(ctx context.Context, req MuseVideoRequestObject) (MuseVideoResponseObject, error) {
 	if _, ok := session(ctx); !ok {
 		return MuseVideo401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
@@ -129,7 +133,13 @@ func (h *Handlers) MuseVideo(ctx context.Context, req MuseVideoRequestObject) (M
 	if err != nil {
 		return nil, internal(ctx, "museVideo", err)
 	}
-	q := items.ParseVideoPrompt(prompt, genres)
+	cfg := h.Settings.Get().AI
+	var llm muse.LLM
+	if cfg.On(cfg.UnderstandPrompts) && h.AI != nil {
+		llm = h.AI
+	}
+	reading := muse.ReadVideo(ctx, llm, h.Items, access(ctx), prompt, genres)
+	q := reading.Query
 	if b.Types != nil && len(*b.Types) > 0 {
 		var allowed []string
 		for _, t := range *b.Types {
@@ -161,9 +171,56 @@ func (h *Handlers) MuseVideo(ctx context.Context, req MuseVideoRequestObject) (M
 			vec = v
 		}
 	}
-	res, err := h.Items.MuseVideo(ctx, access(ctx), idx, q, vec, lib, limit)
+	// With AI, the top candidates (hard filters already applied) are re-ranked by the chat model.
+	rerank := cfg.On(cfg.RerankMovies) && h.AI != nil && h.AI.Ready() && (q.Rest != "" || len(q.Seeds) > 0)
+	fetch := limit
+	if rerank {
+		fetch = max(limit, rerankTop)
+	}
+	res, err := h.Items.MuseVideo(ctx, access(ctx), idx, q, vec, lib, fetch)
 	if err != nil {
 		return nil, internal(ctx, "museVideo", err)
 	}
-	return MuseVideo200JSONResponse{Items: summaries(res.Items), Understood: q.Understood(), Analysed: ptr(float32(res.Analysed))}, nil
+	var reasons []RecommendationReason
+	if rerank && len(res.Items) > 1 {
+		top := res.Items[:min(rerankTop, len(res.Items))]
+		ids := make([]int64, len(top))
+		for i, it := range top {
+			ids[i] = it.ID
+		}
+		syn, err := h.Items.Synopses(ctx, ids)
+		if err != nil {
+			return nil, internal(ctx, "museVideo", err)
+		}
+		cands := make([]muse.Candidate, len(top))
+		byID := map[int64]items.Summary{}
+		for i, it := range top {
+			cands[i] = muse.Candidate{ID: it.ID, Title: it.Title, Year: it.Year, Synopsis: syn[it.ID]}
+			byID[it.ID] = it
+		}
+		if order, why, err := muse.Rerank(ctx, h.AI, prompt, cands); err != nil {
+			slog.WarnContext(ctx, "muse for movies: re-ranking failed; keeping the ranking", "err", err)
+		} else {
+			ranked := make([]items.Summary, 0, len(res.Items))
+			for _, id := range order {
+				ranked = append(ranked, byID[id])
+				if r, ok := why[id]; ok && len(ranked) <= limit {
+					reasons = append(reasons, RecommendationReason{ItemId: id, Reason: r})
+				}
+			}
+			res.Items = append(ranked, res.Items[len(top):]...)
+		}
+	}
+	if len(res.Items) > limit {
+		res.Items = res.Items[:limit]
+	}
+	title := reading.Title
+	if title == "" {
+		title = prompt
+	}
+	out := MuseVideo200JSONResponse{Items: summaries(res.Items), Understood: q.Understood(), Analysed: ptr(float32(res.Analysed)), Title: ptr(title)}
+	if len(reasons) > 0 {
+		out.Reasons = &reasons
+	}
+	return out, nil
 }

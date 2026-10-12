@@ -5,6 +5,7 @@ export type SystemInfo = S["SystemInfo"];
 export type User = S["User"];
 export type ServerSettings = S["ServerSettings"];
 export type ServerSettingsUpdate = S["ServerSettingsUpdate"];
+export type AiStatus = S["AiStatus"];
 export type Library = S["Library"];
 export type LibraryType = S["LibraryType"];
 export type LibraryOptions = S["LibraryOptions"];

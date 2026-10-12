@@ -8,6 +8,7 @@ import (
 	"marquee/internal/speedtest"
 	"strings"
 
+	"marquee/internal/ai"
 	"marquee/internal/auth"
 	"marquee/internal/avatars"
 	"marquee/internal/bazarr"
@@ -21,6 +22,7 @@ import (
 	"marquee/internal/lyrics"
 	"marquee/internal/mediatrash"
 	"marquee/internal/metadata"
+	"marquee/internal/muse"
 	"marquee/internal/netclass"
 	"marquee/internal/playback"
 	"marquee/internal/plex"
@@ -76,6 +78,12 @@ type Handlers struct {
 	// Embeddings indexes movies and shows for Muse for movies, recommendations and related
 	// items (USER-15, USER-16); nil without the Soundprint sidecar.
 	Embeddings *items.Embedder
+	// AI is the optional Ollama client (smarter Muse, re-ranking, reasons); off by default.
+	AI *ai.Client
+	// LyricThemes indexes lyrics for music Muse themes (AI only); may be nil.
+	LyricThemes *muse.LyricThemes
+	// Reasons caches "why this" lines for recommendations.
+	Reasons *muse.Reasons
 	// Bazarr finds subtitles for movies and episodes (META-12); not set up when its
 	// address or key is empty.
 	Bazarr *bazarr.Service

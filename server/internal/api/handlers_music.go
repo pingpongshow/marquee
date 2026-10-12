@@ -9,6 +9,7 @@ import (
 
 	"marquee/internal/items"
 	"marquee/internal/lyrics"
+	"marquee/internal/muse"
 	"marquee/internal/soundprint"
 )
 
@@ -202,7 +203,25 @@ func (h *Handlers) MusicMuse(ctx context.Context, req MusicMuseRequestObject) (M
 	n := 30
 	set(&n, req.Body.Limit)
 	o := soundprint.Options{Keep: keepFor(access(ctx), req.Body.LibraryId), Avoid: h.Soundprint.Avoid(ctx, s.User.ID)}
-	st, err := h.Soundprint.Muse(ctx, prompt, n, o)
+	// Read the prompt (AI, or keywords against the library's genres and artists), filter,
+	// then rank by sound, "like" artists, genres and, with AI, lyric themes.
+	cfg := h.Settings.Get().AI
+	var llm muse.LLM
+	if cfg.On(cfg.UnderstandPrompts) && h.AI != nil {
+		llm = h.AI
+	}
+	lib := muse.MusicLibrary{Genres: h.Soundprint.MusicGenres(ctx), Artists: h.Soundprint.ArtistNames(ctx)}
+	reading := muse.ReadMusic(ctx, llm, lib, prompt)
+	if reading.Query.Theme != "" && cfg.On(cfg.LyricsThemes) {
+		if boost := h.LyricThemes.Boost(ctx, reading.Query.Theme); len(boost) > 0 {
+			o.Boost = boost
+			reading.Understood = append(reading.Understood, "About "+reading.Query.Theme)
+		}
+	}
+	if reading.Query.Title == "" {
+		reading.Query.Title = prompt
+	}
+	st, err := h.Soundprint.MuseQuery(ctx, s.User.ID, reading.Query, n, o)
 	if err != nil {
 		if code, msg, status := soundprintErr(err); status == 503 {
 			return MusicMuse503JSONResponse{ServiceUnavailableJSONResponse(apiErr(code, msg))}, nil
@@ -212,6 +231,9 @@ func (h *Handlers) MusicMuse(ctx context.Context, req MusicMuseRequestObject) (M
 	out, err := h.station(ctx, st)
 	if err != nil {
 		return nil, internal(ctx, "muse", err)
+	}
+	if len(reading.Understood) > 0 {
+		out.Description = ptr(strings.Join(reading.Understood, " · "))
 	}
 	return MusicMuse200JSONResponse(out), nil
 }

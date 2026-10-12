@@ -1022,6 +1022,8 @@ extension Components {
             public var integrations: Components.Schemas.IntegrationSettings?
             /// - Remark: Generated from `#/components/schemas/ServerSettings/cinema`.
             public var cinema: Components.Schemas.CinemaSettings?
+            /// - Remark: Generated from `#/components/schemas/ServerSettings/ai`.
+            public var ai: Components.Schemas.AiSettings?
             /// Replaces the whole list when sent.
             ///
             /// - Remark: Generated from `#/components/schemas/ServerSettings/webhooks`.
@@ -1040,6 +1042,7 @@ extension Components {
             ///   - music:
             ///   - integrations:
             ///   - cinema:
+            ///   - ai:
             ///   - webhooks: Replaces the whole list when sent.
             public init(
                 security: Components.Schemas.SecuritySettings,
@@ -1053,6 +1056,7 @@ extension Components {
                 music: Components.Schemas.MusicSettings? = nil,
                 integrations: Components.Schemas.IntegrationSettings? = nil,
                 cinema: Components.Schemas.CinemaSettings? = nil,
+                ai: Components.Schemas.AiSettings? = nil,
                 webhooks: [Components.Schemas.Webhook]? = nil
             ) {
                 self.security = security
@@ -1066,6 +1070,7 @@ extension Components {
                 self.music = music
                 self.integrations = integrations
                 self.cinema = cinema
+                self.ai = ai
                 self.webhooks = webhooks
             }
             public enum CodingKeys: String, CodingKey {
@@ -1080,6 +1085,7 @@ extension Components {
                 case music
                 case integrations
                 case cinema
+                case ai
                 case webhooks
             }
         }
@@ -1107,6 +1113,8 @@ extension Components {
             public var integrations: Components.Schemas.IntegrationSettingsUpdate?
             /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/cinema`.
             public var cinema: Components.Schemas.CinemaSettings?
+            /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/ai`.
+            public var ai: Components.Schemas.AiSettings?
             /// Replaces the whole list when sent.
             ///
             /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/webhooks`.
@@ -1125,6 +1133,7 @@ extension Components {
             ///   - music:
             ///   - integrations:
             ///   - cinema:
+            ///   - ai:
             ///   - webhooks: Replaces the whole list when sent.
             public init(
                 security: Components.Schemas.SecuritySettings? = nil,
@@ -1138,6 +1147,7 @@ extension Components {
                 music: Components.Schemas.MusicSettings? = nil,
                 integrations: Components.Schemas.IntegrationSettingsUpdate? = nil,
                 cinema: Components.Schemas.CinemaSettings? = nil,
+                ai: Components.Schemas.AiSettings? = nil,
                 webhooks: [Components.Schemas.Webhook]? = nil
             ) {
                 self.security = security
@@ -1151,6 +1161,7 @@ extension Components {
                 self.music = music
                 self.integrations = integrations
                 self.cinema = cinema
+                self.ai = ai
                 self.webhooks = webhooks
             }
             public enum CodingKeys: String, CodingKey {
@@ -1165,6 +1176,7 @@ extension Components {
                 case music
                 case integrations
                 case cinema
+                case ai
                 case webhooks
             }
         }
@@ -1259,6 +1271,328 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case trailers
                 case prerollItemId
+            }
+        }
+        /// Optional AI from a local Ollama, for smarter Muse and recommendations. Off by default; with it off, or Ollama unreachable, everything works as without it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AiSettings`.
+        public struct AiSettings: Codable, Hashable, Sendable {
+            /// Use AI (Ollama). Default off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiSettings/enabled`.
+            public var enabled: Swift.Bool?
+            /// Ollama's address. Default http://127.0.0.1:11434.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiSettings/url`.
+            public var url: Swift.String?
+            /// Model that reads prompts, re-ranks and writes reasons. Default qwen3:8b.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiSettings/chatModel`.
+            public var chatModel: Swift.String?
+            /// Embedding model for movies, shows and lyrics. Default mxbai-embed-large. Changing it re-indexes in the background.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiSettings/embedModel`.
+            public var embedModel: Swift.String?
+            /// Sent as keep_alive on every request: Ollama unloads the models after this many idle minutes, freeing the GPU. Default 5.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiSettings/unloadMinutes`.
+            public var unloadMinutes: Swift.Int?
+            /// Understand Muse prompts (music and movies) with the chat model. Default on.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiSettings/understandPrompts`.
+            public var understandPrompts: Swift.Bool?
+            /// Re-rank the top movie Muse results with the chat model. Default on.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiSettings/rerankMovies`.
+            public var rerankMovies: Swift.Bool?
+            /// Index lyrics so music Muse can match themes ("songs about the sea"). Default on.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiSettings/lyricsThemes`.
+            public var lyricsThemes: Swift.Bool?
+            /// Write a one-line reason for recommendations. Default on.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiSettings/reasons`.
+            public var reasons: Swift.Bool?
+            /// Learn from quick skips, abandoned titles and ratings. Needs no model, so it works with AI off. Default on.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiSettings/learnFromBehaviour`.
+            public var learnFromBehaviour: Swift.Bool?
+            /// Creates a new `AiSettings`.
+            ///
+            /// - Parameters:
+            ///   - enabled: Use AI (Ollama). Default off.
+            ///   - url: Ollama's address. Default http://127.0.0.1:11434.
+            ///   - chatModel: Model that reads prompts, re-ranks and writes reasons. Default qwen3:8b.
+            ///   - embedModel: Embedding model for movies, shows and lyrics. Default mxbai-embed-large. Changing it re-indexes in the background.
+            ///   - unloadMinutes: Sent as keep_alive on every request: Ollama unloads the models after this many idle minutes, freeing the GPU. Default 5.
+            ///   - understandPrompts: Understand Muse prompts (music and movies) with the chat model. Default on.
+            ///   - rerankMovies: Re-rank the top movie Muse results with the chat model. Default on.
+            ///   - lyricsThemes: Index lyrics so music Muse can match themes ("songs about the sea"). Default on.
+            ///   - reasons: Write a one-line reason for recommendations. Default on.
+            ///   - learnFromBehaviour: Learn from quick skips, abandoned titles and ratings. Needs no model, so it works with AI off. Default on.
+            public init(
+                enabled: Swift.Bool? = nil,
+                url: Swift.String? = nil,
+                chatModel: Swift.String? = nil,
+                embedModel: Swift.String? = nil,
+                unloadMinutes: Swift.Int? = nil,
+                understandPrompts: Swift.Bool? = nil,
+                rerankMovies: Swift.Bool? = nil,
+                lyricsThemes: Swift.Bool? = nil,
+                reasons: Swift.Bool? = nil,
+                learnFromBehaviour: Swift.Bool? = nil
+            ) {
+                self.enabled = enabled
+                self.url = url
+                self.chatModel = chatModel
+                self.embedModel = embedModel
+                self.unloadMinutes = unloadMinutes
+                self.understandPrompts = understandPrompts
+                self.rerankMovies = rerankMovies
+                self.lyricsThemes = lyricsThemes
+                self.reasons = reasons
+                self.learnFromBehaviour = learnFromBehaviour
+            }
+            public enum CodingKeys: String, CodingKey {
+                case enabled
+                case url
+                case chatModel
+                case embedModel
+                case unloadMinutes
+                case understandPrompts
+                case rerankMovies
+                case lyricsThemes
+                case reasons
+                case learnFromBehaviour
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/AiStatus`.
+        public struct AiStatus: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/AiStatus/enabled`.
+            public var enabled: Swift.Bool
+            /// Ollama answered.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiStatus/reachable`.
+            public var reachable: Swift.Bool
+            /// Ollama's version.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiStatus/version`.
+            public var version: Swift.String?
+            /// Installed models (from /api/tags).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiStatus/models`.
+            public var models: [Swift.String]
+            /// - Remark: Generated from `#/components/schemas/AiStatus/chatModelInstalled`.
+            public var chatModelInstalled: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/AiStatus/embedModelInstalled`.
+            public var embedModelInstalled: Swift.Bool?
+            /// Models in memory now (from /api/ps); empty means the GPU is free.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiStatus/loaded`.
+            public var loaded: [Components.Schemas.AiLoadedModel]
+            /// True while Marquee isn't calling Ollama after repeated failures (it retries shortly).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiStatus/paused`.
+            public var paused: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/AiStatus/lastError`.
+            public var lastError: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/AiStatus/lastErrorAt`.
+            public var lastErrorAt: Foundation.Date?
+            /// Why the check failed (status and test).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiStatus/error`.
+            public var error: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/AiStatus/videos`.
+            public var videos: Components.Schemas.AiVideoIndex?
+            /// - Remark: Generated from `#/components/schemas/AiStatus/lyrics`.
+            public var lyrics: Components.Schemas.AiLyricIndex?
+            /// Creates a new `AiStatus`.
+            ///
+            /// - Parameters:
+            ///   - enabled:
+            ///   - reachable: Ollama answered.
+            ///   - version: Ollama's version.
+            ///   - models: Installed models (from /api/tags).
+            ///   - chatModelInstalled:
+            ///   - embedModelInstalled:
+            ///   - loaded: Models in memory now (from /api/ps); empty means the GPU is free.
+            ///   - paused: True while Marquee isn't calling Ollama after repeated failures (it retries shortly).
+            ///   - lastError:
+            ///   - lastErrorAt:
+            ///   - error: Why the check failed (status and test).
+            ///   - videos:
+            ///   - lyrics:
+            public init(
+                enabled: Swift.Bool,
+                reachable: Swift.Bool,
+                version: Swift.String? = nil,
+                models: [Swift.String],
+                chatModelInstalled: Swift.Bool? = nil,
+                embedModelInstalled: Swift.Bool? = nil,
+                loaded: [Components.Schemas.AiLoadedModel],
+                paused: Swift.Bool? = nil,
+                lastError: Swift.String? = nil,
+                lastErrorAt: Foundation.Date? = nil,
+                error: Swift.String? = nil,
+                videos: Components.Schemas.AiVideoIndex? = nil,
+                lyrics: Components.Schemas.AiLyricIndex? = nil
+            ) {
+                self.enabled = enabled
+                self.reachable = reachable
+                self.version = version
+                self.models = models
+                self.chatModelInstalled = chatModelInstalled
+                self.embedModelInstalled = embedModelInstalled
+                self.loaded = loaded
+                self.paused = paused
+                self.lastError = lastError
+                self.lastErrorAt = lastErrorAt
+                self.error = error
+                self.videos = videos
+                self.lyrics = lyrics
+            }
+            public enum CodingKeys: String, CodingKey {
+                case enabled
+                case reachable
+                case version
+                case models
+                case chatModelInstalled
+                case embedModelInstalled
+                case loaded
+                case paused
+                case lastError
+                case lastErrorAt
+                case error
+                case videos
+                case lyrics
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/AiLoadedModel`.
+        public struct AiLoadedModel: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/AiLoadedModel/name`.
+            public var name: Swift.String
+            /// - Remark: Generated from `#/components/schemas/AiLoadedModel/vramBytes`.
+            public var vramBytes: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/AiLoadedModel/expiresAt`.
+            public var expiresAt: Foundation.Date?
+            /// Creates a new `AiLoadedModel`.
+            ///
+            /// - Parameters:
+            ///   - name:
+            ///   - vramBytes:
+            ///   - expiresAt:
+            public init(
+                name: Swift.String,
+                vramBytes: Swift.Int64? = nil,
+                expiresAt: Foundation.Date? = nil
+            ) {
+                self.name = name
+                self.vramBytes = vramBytes
+                self.expiresAt = expiresAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case vramBytes
+                case expiresAt
+            }
+        }
+        /// Movies and shows embedded for Muse and recommendations.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AiVideoIndex`.
+        public struct AiVideoIndex: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/AiVideoIndex/indexed`.
+            public var indexed: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/AiVideoIndex/total`.
+            public var total: Swift.Int
+            /// The model the index is from ("ollama/<model>" with AI on).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiVideoIndex/model`.
+            public var model: Swift.String?
+            /// Creates a new `AiVideoIndex`.
+            ///
+            /// - Parameters:
+            ///   - indexed:
+            ///   - total:
+            ///   - model: The model the index is from ("ollama/<model>" with AI on).
+            public init(
+                indexed: Swift.Int,
+                total: Swift.Int,
+                model: Swift.String? = nil
+            ) {
+                self.indexed = indexed
+                self.total = total
+                self.model = model
+            }
+            public enum CodingKeys: String, CodingKey {
+                case indexed
+                case total
+                case model
+            }
+        }
+        /// Lyric theme index.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AiLyricIndex`.
+        public struct AiLyricIndex: Codable, Hashable, Sendable {
+            /// Tracks whose lyrics are indexed with the current model.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiLyricIndex/indexed`.
+            public var indexed: Swift.Int
+            /// Tracks with lyrics.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiLyricIndex/withLyrics`.
+            public var withLyrics: Swift.Int
+            /// All tracks.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AiLyricIndex/tracks`.
+            public var tracks: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/AiLyricIndex/running`.
+            public var running: Swift.Bool
+            /// Creates a new `AiLyricIndex`.
+            ///
+            /// - Parameters:
+            ///   - indexed: Tracks whose lyrics are indexed with the current model.
+            ///   - withLyrics: Tracks with lyrics.
+            ///   - tracks: All tracks.
+            ///   - running:
+            public init(
+                indexed: Swift.Int,
+                withLyrics: Swift.Int,
+                tracks: Swift.Int,
+                running: Swift.Bool
+            ) {
+                self.indexed = indexed
+                self.withLyrics = withLyrics
+                self.tracks = tracks
+                self.running = running
+            }
+            public enum CodingKeys: String, CodingKey {
+                case indexed
+                case withLyrics
+                case tracks
+                case running
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/RecommendationReason`.
+        public struct RecommendationReason: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/RecommendationReason/itemId`.
+            public var itemId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/RecommendationReason/reason`.
+            public var reason: Swift.String
+            /// Creates a new `RecommendationReason`.
+            ///
+            /// - Parameters:
+            ///   - itemId:
+            ///   - reason:
+            public init(
+                itemId: Swift.Int64,
+                reason: Swift.String
+            ) {
+                self.itemId = itemId
+                self.reason = reason
+            }
+            public enum CodingKeys: String, CodingKey {
+                case itemId
+                case reason
             }
         }
         /// - Remark: Generated from `#/components/schemas/MusicSettings`.
@@ -6485,25 +6819,41 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MuseVideoResult/analysed`.
             public var analysed: Swift.Double?
+            /// A short title for the results (AI), or the prompt.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MuseVideoResult/title`.
+            public var title: Swift.String?
+            /// One-line reasons for the top results, when AI re-ranked them.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MuseVideoResult/reasons`.
+            public var reasons: [Components.Schemas.RecommendationReason]?
             /// Creates a new `MuseVideoResult`.
             ///
             /// - Parameters:
             ///   - items:
             ///   - understood: How the prompt was read, e.g. "Movies · 1990s · Science Fiction · like 'time travel'".
             ///   - analysed: Share of the library ready for Muse (0–1); below 1 while it's still being indexed.
+            ///   - title: A short title for the results (AI), or the prompt.
+            ///   - reasons: One-line reasons for the top results, when AI re-ranked them.
             public init(
                 items: [Components.Schemas.ItemSummary],
                 understood: Swift.String,
-                analysed: Swift.Double? = nil
+                analysed: Swift.Double? = nil,
+                title: Swift.String? = nil,
+                reasons: [Components.Schemas.RecommendationReason]? = nil
             ) {
                 self.items = items
                 self.understood = understood
                 self.analysed = analysed
+                self.title = title
+                self.reasons = reasons
             }
             public enum CodingKeys: String, CodingKey {
                 case items
                 case understood
                 case analysed
+                case title
+                case reasons
             }
         }
         /// - Remark: Generated from `#/components/schemas/HealthCheck`.

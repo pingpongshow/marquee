@@ -23,7 +23,97 @@ type VideoQuery struct {
 	MinRating        float64 // audience/IMDb/critic rating, 0–10
 	Family           bool    // rated G/PG/TV-Y/TV-G/TV-PG (or unrated family/animation/kids titles)
 	Rest             string  // the prompt without the constraint words, for the embedding
-	labels           []string
+	// From the AI reading only (the keyword parser leaves them empty):
+	People        []string // director or cast names in the library; every one must be credited
+	Seeds         []int64  // "like <title>": library items whose meaning steers the ranking
+	SeedTitles    []string
+	ExcludeGenres []string // "not horror"
+	labels        []string
+}
+
+// GenreGroup is the set of library genre names that satisfy name (e.g. "Science Fiction"
+// also accepts "Sci-Fi & Fantasy"), or nil when the library has no such genre.
+func GenreGroup(name string, genres []string) []string {
+	k := strings.ToLower(strings.TrimSpace(name))
+	if k == "" {
+		return nil
+	}
+	have := map[string]string{}
+	for _, g := range genres {
+		have[strings.ToLower(g)] = g
+	}
+	if g, ok := have[k]; ok {
+		if syn, ok := genreSynonyms[k]; ok && len(syn) == 1 {
+			return append([]string{g}, without(syn[0], g)...)
+		}
+		return []string{g}
+	}
+	if syn, ok := genreSynonyms[k]; ok && len(syn) == 1 {
+		return syn[0]
+	}
+	return nil
+}
+
+func without(list []string, s string) []string {
+	var out []string
+	for _, x := range list {
+		if !strings.EqualFold(x, s) {
+			out = append(out, x)
+		}
+	}
+	return out
+}
+
+// Relabel rebuilds the "understood" labels from the fields (for a query filled in by the
+// AI reading rather than ParseVideoPrompt).
+func (q *VideoQuery) Relabel() {
+	var lbl []string
+	switch {
+	case len(q.Types) == 1 && q.Types[0] == "movie":
+		lbl = append(lbl, "Movies")
+	case len(q.Types) == 1 && q.Types[0] == "show":
+		lbl = append(lbl, "Shows")
+	}
+	switch {
+	case q.YearFrom > 0 && q.YearTo == q.YearFrom+9 && q.YearFrom%10 == 0:
+		lbl = append(lbl, fmt.Sprintf("%ds", q.YearFrom))
+	case q.YearFrom > 0 && q.YearFrom == q.YearTo:
+		lbl = append(lbl, strconv.Itoa(q.YearFrom))
+	case q.YearFrom > 0 && q.YearTo > 0:
+		lbl = append(lbl, fmt.Sprintf("%d–%d", q.YearFrom, q.YearTo))
+	case q.YearFrom > 0:
+		lbl = append(lbl, fmt.Sprintf("%d or later", q.YearFrom))
+	case q.YearTo > 0:
+		lbl = append(lbl, fmt.Sprintf("%d or earlier", q.YearTo))
+	}
+	for _, g := range q.Genres {
+		lbl = append(lbl, g[0])
+	}
+	for _, g := range q.ExcludeGenres {
+		lbl = append(lbl, "Not "+g)
+	}
+	for _, p := range q.People {
+		lbl = append(lbl, "With "+p)
+	}
+	for _, t := range q.SeedTitles {
+		lbl = append(lbl, "Like "+t)
+	}
+	if q.Unwatched {
+		lbl = append(lbl, "Unwatched")
+	}
+	if q.MaxMinutes > 0 {
+		lbl = append(lbl, fmt.Sprintf("Under %d min", q.MaxMinutes))
+	}
+	if q.MinMinutes > 0 {
+		lbl = append(lbl, fmt.Sprintf("Over %d min", q.MinMinutes))
+	}
+	if q.MinRating > 0 {
+		lbl = append(lbl, "Highly rated")
+	}
+	if q.Family {
+		lbl = append(lbl, "Family-friendly")
+	}
+	q.labels = lbl
 }
 
 // Understood describes the reading, e.g. "Movies · 1990s · Science Fiction · like 'time travel'".
@@ -421,6 +511,21 @@ func (s *Store) MuseVideo(ctx context.Context, acc Access, idx *VideoIndex, q Vi
 		where += ` AND (i.type != 'movie' OR COALESCE(i.duration_ms, 0) >= ?)`
 		wargs = append(wargs, int64(q.MinMinutes)*60000)
 	}
+	for _, p := range q.People {
+		where += ` AND EXISTS (SELECT 1 FROM credits c JOIN people p ON p.id = c.person_id WHERE c.item_id = i.id AND p.name = ? COLLATE NOCASE)`
+		wargs = append(wargs, p)
+	}
+	if len(q.ExcludeGenres) > 0 {
+		where += ` AND NOT EXISTS (SELECT 1 FROM item_tags it JOIN tags t ON t.id = it.tag_id AND t.kind = 'genre'
+			WHERE it.item_id = i.id AND t.name COLLATE NOCASE IN (?` + strings.Repeat(",?", len(q.ExcludeGenres)-1) + `))`
+		for _, g := range q.ExcludeGenres {
+			wargs = append(wargs, g)
+		}
+	}
+	for _, id := range q.Seeds {
+		where += ` AND i.id != ?`
+		wargs = append(wargs, id)
+	}
 	if q.Family {
 		where += ` AND (` + ratingCase("i.content_rating") + ` <= ? OR (COALESCE(i.content_rating, '') = '' AND EXISTS (SELECT 1 FROM item_tags it
 			JOIN tags t ON t.id = it.tag_id AND t.kind = 'genre' WHERE it.item_id = i.id AND t.name IN ('Family', 'Animation', 'Kids'))))`
@@ -444,6 +549,10 @@ func (s *Store) MuseVideo(ctx context.Context, acc Access, idx *VideoIndex, q Vi
 		return res, err
 	}
 	ids := make([]int64, 0, len(cands))
+	// "like <title>": the seeds' meaning, blended with the prompt's.
+	if c := idx.Centroid(q.Seeds, nil); c != nil {
+		vec = blendVecs(vec, c, 0.5)
+	}
 	if vec != nil {
 		// Embedded items by meaning; ones not embedded yet follow by rating.
 		score := map[int64]float64{}
@@ -469,4 +578,86 @@ func (s *Store) MuseVideo(ctx context.Context, acc Access, idx *VideoIndex, q Vi
 	}
 	res.Items, err = s.ByIDs(ctx, acc, ids)
 	return res, err
+}
+
+// blendVecs is the normalized w·a + (1−w)·b (b alone when a is nil).
+func blendVecs(a, b []float32, w float64) []float32 {
+	if a == nil {
+		return b
+	}
+	out := make([]float32, min(len(a), len(b)))
+	for i := range out {
+		out[i] = float32(w*float64(a[i]) + (1-w)*float64(b[i]))
+	}
+	return normalizeVec(out)
+}
+
+// VideoPerson finds a director's or actor's name as the library spells it (case-insensitive;
+// "" when nobody by that name is credited on a movie or show).
+func (s *Store) VideoPerson(ctx context.Context, name string) (string, error) {
+	var out string
+	err := s.db.QueryRowContext(ctx, `SELECT p.name FROM people p JOIN credits c ON c.person_id = p.id
+		JOIN items i ON i.id = c.item_id AND i.type IN ('movie', 'show') WHERE p.name = ? COLLATE NOCASE LIMIT 1`, strings.TrimSpace(name)).Scan(&out)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return out, err
+}
+
+// VideoByTitle finds the movie or show acc can see with this title (best rated when there
+// are several, e.g. remakes; year narrows it when given). ok=false when there's none.
+func (s *Store) VideoByTitle(ctx context.Context, acc Access, title string, year int) (int64, string, bool, error) {
+	ac, aargs := acc.clause()
+	q := `SELECT i.id, i.title` + summaryFrom + ` WHERE i.type IN ('movie', 'show') AND i.extra_type IS NULL AND (i.title = ? COLLATE NOCASE OR i.original_title = ? COLLATE NOCASE) AND ` + ac
+	args := append([]any{strings.TrimSpace(title), strings.TrimSpace(title)}, aargs...)
+	if year > 0 {
+		q += ` AND i.year = ?`
+		args = append(args, year)
+	}
+	q += ` ORDER BY COALESCE(i.audience_rating, i.imdb_rating, i.critic_rating, 0) DESC LIMIT 1`
+	var id int64
+	var t string
+	err := s.db.QueryRowContext(ctx, q, args...).Scan(&id, &t)
+	if err == sql.ErrNoRows {
+		return 0, "", false, nil
+	}
+	return id, t, err == nil, err
+}
+
+// Synopses returns a one-line description per item (tagline, or the summary's first
+// sentence), for asking the AI to re-rank.
+func (s *Store) Synopses(ctx context.Context, ids []int64) (map[int64]string, error) {
+	out := map[int64]string{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	err := eachRow(ctx, s.db, `SELECT id, COALESCE(tagline, ''), COALESCE(summary, '') FROM items WHERE id IN (?`+strings.Repeat(",?", len(ids)-1)+`)`, args, func(r *sql.Rows) error {
+		var id int64
+		var tagline, summary string
+		if err := r.Scan(&id, &tagline, &summary); err != nil {
+			return err
+		}
+		out[id] = OneLine(tagline, summary)
+		return nil
+	})
+	return out, err
+}
+
+// OneLine shortens a description to about one sentence.
+func OneLine(tagline, summary string) string {
+	s := strings.TrimSpace(summary)
+	if i := strings.Index(s, ". "); i > 0 && i < 220 {
+		s = s[:i+1]
+	}
+	if len(s) > 220 {
+		s = strings.TrimSpace(s[:220]) + "…"
+	}
+	if t := strings.TrimSpace(tagline); t != "" && len(s) < 60 {
+		s = strings.TrimSpace(t + " " + s)
+	}
+	return s
 }

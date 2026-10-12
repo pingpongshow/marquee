@@ -26,6 +26,9 @@ type Service struct {
 	Index  *Index
 	// Enabled reports the Music → Soundprint analysis setting.
 	Enabled func() bool
+	// Learn reports the "learn from skips and ratings" setting (nil = off): Avoid then uses
+	// Negatives instead of the older fixed rules.
+	Learn func() bool
 
 	mu      sync.Mutex
 	running bool
@@ -67,7 +70,7 @@ func (s *Service) Analyze(ctx context.Context) (string, error) {
 	if !s.Enabled() {
 		return "Soundprint analysis is turned off", nil
 	}
-	// The sidecar loads its model at startup; give it a few minutes.
+	// The sidecar may still be starting; give it a few minutes.
 	h, err := s.Client.Health(ctx)
 	for wait := 0; err != nil && wait < 36; wait++ {
 		select {
@@ -263,6 +266,12 @@ func (s *Service) Avoid(ctx context.Context, userID int64) map[int64]float64 {
 		}
 		rows.Close()
 	}
+	if s.Learn != nil && s.Learn() {
+		for id, w := range s.learned(ctx, userID) {
+			out[id] = max(out[id], w)
+		}
+		return out
+	}
 	// Skipped: playback stopped within 30 s (and before half way) in the last 60 days.
 	rows, err = s.DB.QueryContext(ctx, `SELECT h.item_id, COUNT(*) FROM play_history h JOIN items i ON i.id = h.item_id AND i.type = 'track'
 		WHERE h.user_id = ? AND h.stopped_at IS NOT NULL AND h.started_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-60 days')
@@ -391,15 +400,6 @@ func (s *Service) TextVector(ctx context.Context, prompt string) ([]float32, err
 		return nil, ErrUnavailable
 	}
 	return normalize(vs[0]), nil
-}
-
-// Muse builds a playlist from a description ("rainy Sunday jazz").
-func (s *Service) Muse(ctx context.Context, prompt string, n int, o Options) (Station, error) {
-	v, err := s.TextVector(ctx, prompt)
-	if err != nil {
-		return Station{}, err
-	}
-	return Station{Title: prompt, IDs: TrackIDs(s.Index.Pick(v, n, o))}, nil
 }
 
 // MeanOf averages the analysed tracks among ids (a genre's or decade's sound).
