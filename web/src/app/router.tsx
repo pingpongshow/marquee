@@ -39,6 +39,7 @@ const LiveWatchPage = lazyRouteComponent(
   () => import("@/features/livetv/LiveTvPage"),
   "LiveWatchPage",
 );
+const VodPage = lazyRouteComponent(() => import("@/features/livetv/Vod"), "VodPage");
 const VodMoviePage = lazyRouteComponent(
   () => import("@/features/livetv/Vod"),
   "VodMoviePage",
@@ -185,21 +186,26 @@ const playlistRoute = createRoute({
   path: "/playlist/$playlistId",
   component: PlaylistPage,
 });
-export type LiveTab = "guide" | "now" | "recordings" | "movies";
+export type LiveTab = "guide" | "now" | "recordings";
 const liveTvRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/livetv",
   validateSearch: (s: Record<string, unknown>): { tab?: LiveTab } => ({
-    tab: ["guide", "now", "recordings", "movies"].includes(s.tab as string)
+    tab: ["guide", "now", "recordings"].includes(s.tab as string)
       ? (s.tab as LiveTab)
       : undefined,
   }),
   component: LiveTvPage,
 });
-// Movies on demand (LIVE-6).
+// Movies on demand (LIVE-6), a page of their own beside Live TV.
+const vodRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/vod",
+  component: VodPage,
+});
 const vodMovieRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/livetv/movies/$movieId",
+  path: "/vod/$movieId",
   component: function VodMovie() {
     const { movieId } = vodMovieRoute.useParams();
     return <VodMoviePage movieId={Number(movieId)} />;
@@ -207,7 +213,7 @@ const vodMovieRoute = createRoute({
 });
 const vodPlayRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/livetv/movies/$movieId/play",
+  path: "/vod/$movieId/play",
   validateSearch: (s: Record<string, unknown>): { t?: number } => ({
     t: typeof s.t === "number" ? s.t : undefined,
   }),
@@ -282,6 +288,7 @@ const routeTree = rootRoute.addChildren([
   moodStyleRoute,
   liveTvRoute,
   liveWatchRoute,
+  vodRoute,
   vodMovieRoute,
   vodPlayRoute,
   discoverRoute,
