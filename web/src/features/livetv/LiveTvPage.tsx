@@ -33,8 +33,6 @@ import {
   useSchedule,
 } from "./api";
 import { LivePlayer } from "./LivePlayer";
-import { VodBrowse } from "./Vod";
-import { vodStatusQuery } from "./vodApi";
 import type { LiveTab } from "@/app/router";
 
 const PX_PER_MIN = 6; // 30 minutes = 180 px
@@ -42,18 +40,16 @@ const WINDOW_HOURS = 6;
 const ROW = 72;
 const CHANNEL_COL = 132;
 
-/** Live TV (LIVE-2): a guide and What's On, with a live preview, and movies on demand (LIVE-6). */
+/** Live TV (LIVE-2): a guide and What's On, with a live preview. VOD has its own page (LIVE-6). */
 export function LiveTvPage() {
   const status = useQuery(liveStatusQuery);
-  const vod = useQuery(vodStatusQuery);
   const liveOn = !!status.data?.enabled;
   const groups = useQuery({ ...liveGroupsQuery, enabled: liveOn });
   const tabs: LiveTab[] = [
     ...(liveOn ? (["guide", "now"] as const) : []),
     ...(liveOn && status.data?.canRecord ? (["recordings"] as const) : []),
-    ...(vod.data?.enabled ? (["movies"] as const) : []),
   ];
-  // The tab is in the address, so Back from a film returns to Movies.
+  // The tab is in the address, so Back returns to the same tab.
   const search = useSearch({ from: "/livetv" });
   const tab: LiveTab =
     search.tab && tabs.includes(search.tab) ? search.tab : (tabs[0] ?? "guide");
@@ -71,7 +67,7 @@ export function LiveTvPage() {
   const current =
     channels.data?.find((c) => c.id === preview) ?? channels.data?.[0];
 
-  if (status.isPending || vod.isPending) return <Spinner />;
+  if (status.isPending) return <Spinner />;
   if (!tabs.length)
     return (
       <div className="p-6">
@@ -104,16 +100,14 @@ export function LiveTvPage() {
                 ? "Guide"
                 : t === "now"
                   ? "What's On"
-                  : t === "recordings"
-                    ? "Recordings"
-                    : "VOD"}
+                  : "Recordings"}
             </button>
           ))}
         </div>
         <div
           className={clsx(
             "w-full shrink-0 sm:ml-auto sm:w-48",
-            (tab === "recordings" || tab === "movies") &&
+            tab === "recordings" &&
               "hidden sm:invisible sm:block",
           )}
         >
@@ -135,7 +129,7 @@ export function LiveTvPage() {
         </div>
       </div>
 
-      {current && tab !== "recordings" && tab !== "movies" && (
+      {current && tab !== "recordings" && (
         <div className="relative mx-auto aspect-video max-h-[42vh] overflow-hidden rounded-lg bg-black">
           <LivePlayer
             key={current.id}
@@ -180,9 +174,7 @@ export function LiveTvPage() {
         </div>
       )}
 
-      {tab === "movies" ? (
-        <VodBrowse />
-      ) : tab === "recordings" ? (
+      {tab === "recordings" ? (
         <Recordings />
       ) : channels.isPending ? (
         <Spinner />

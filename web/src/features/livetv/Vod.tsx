@@ -48,7 +48,7 @@ function posterItem(m: VodMovie) {
 
 function VodTile({ movie: m }: { movie: VodMovie }) {
   return (
-    <Link to="/livetv/movies/$movieId" params={{ movieId: String(m.id) }} className="group block">
+    <Link to="/vod/$movieId" params={{ movieId: String(m.id) }} className="group block">
       <Poster
         item={posterItem(m)}
         src={m.posterUrl}
@@ -64,7 +64,17 @@ function VodTile({ movie: m }: { movie: VodMovie }) {
   );
 }
 
-/** The Movies tab: categories, search, sort, Continue Watching and a poster grid. */
+/** The VOD page (LIVE-6). */
+export function VodPage() {
+  return (
+    <div className="space-y-4 p-4 lg:p-6">
+      <h1 className="text-2xl font-bold">VOD</h1>
+      <VodBrowse />
+    </div>
+  );
+}
+
+/** VOD browsing: categories, search, sort, Continue Watching and a poster grid. */
 export function VodBrowse() {
   const [category, setCategory] = useState(() => stored("marquee.vod.category") ?? "");
   const [sort, setSort] = useState<VodSort>(() => (stored("marquee.vod.sort") as VodSort | null) ?? "title");
@@ -186,7 +196,7 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
     );
   const m = movie.data;
   const play = (t?: number) =>
-    navigate({ to: "/livetv/movies/$movieId/play", params: { movieId: String(m.id) }, search: { t } });
+    navigate({ to: "/vod/$movieId/play", params: { movieId: String(m.id) }, search: { t } });
   const resume = (m.positionMs ?? 0) > 0;
   const isWatched = watched.isPending ? !!watched.variables : m.watched;
   const meta = [m.year ? String(m.year) : "", m.contentRating ?? "", formatDuration(m.runtimeMs)].filter(Boolean);
@@ -207,7 +217,7 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
           </div>
           <div className="min-w-0 flex-1">
             <nav aria-label="Breadcrumb" className="mb-2 flex items-center gap-1 text-sm text-muted">
-              <Link to="/livetv" search={{ tab: "movies" }} className="hover:text-text">
+              <Link to="/vod" className="hover:text-text">
                 VOD
               </Link>
               {m.category && (
@@ -287,7 +297,7 @@ export function VodPlayerPage({ movieId, startMs }: { movieId: number; startMs?:
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const back = () => navigate({ to: "/livetv/movies/$movieId", params: { movieId: String(movieId) } });
+  const back = () => navigate({ to: "/vod/$movieId", params: { movieId: String(movieId) } });
 
   useEffect(() => {
     let hls: { destroy: () => void } | null = null;
