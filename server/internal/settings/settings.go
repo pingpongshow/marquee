@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -32,6 +33,69 @@ type Settings struct {
 	Webhooks     []Webhook    `json:"webhooks"`
 	Integrations Integrations `json:"integrations"`
 	AI           AI           `json:"ai"`
+	// Notifications: outgoing email and admin alerts.
+	Notifications Notifications `json:"notifications"`
+}
+
+// Alert types an administrator can turn on (all off by default).
+const (
+	AlertTaskFailed      = "task_failed"
+	AlertDiskLow         = "disk_low"
+	AlertRecordingFailed = "recording_failed"
+	AlertSourceFailed    = "source_failed"
+	AlertIntegrationDown = "integration_down"
+	AlertFailedSignIns   = "failed_signins"
+	AlertNewAdminDevice  = "new_admin_device"
+	AlertPlaybackFailed  = "playback_failed"
+)
+
+// AlertTypes lists every alert type.
+var AlertTypes = []string{AlertTaskFailed, AlertDiskLow, AlertRecordingFailed, AlertSourceFailed,
+	AlertIntegrationDown, AlertFailedSignIns, AlertNewAdminDevice, AlertPlaybackFailed}
+
+// Notifications configures outgoing email (SMTP) and which alerts administrators get.
+type Notifications struct {
+	SMTPHost     string `json:"smtpHost"`
+	SMTPPort     int    `json:"smtpPort"`
+	SMTPSecurity string `json:"smtpSecurity"` // none, starttls, tls
+	SMTPUsername string `json:"smtpUsername"`
+	SMTPPassword string `json:"smtpPassword"`
+	FromAddress  string `json:"fromAddress"`
+	FromName     string `json:"fromName"`
+	// LinkURL is the address used in links in mail (reset links); empty = the remote URL.
+	LinkURL string `json:"linkUrl"`
+	// Alerts are the alert types that are on.
+	Alerts []string `json:"alerts"`
+	// RecipientsAllAdmins mails every administrator with an email address; otherwise
+	// Recipients lists the administrators (user ids) who get alert mail.
+	RecipientsAllAdmins bool    `json:"recipientsAllAdmins"`
+	Recipients          []int64 `json:"recipients"`
+	// DiskThresholdPercent: alert when a volume has less free space than this.
+	DiskThresholdPercent int `json:"diskThresholdPercent"`
+}
+
+// MailConfigured reports whether outgoing mail is set up.
+func (n Notifications) MailConfigured() bool {
+	return n.SMTPHost != "" && n.SMTPPort > 0 && n.FromAddress != ""
+}
+
+// AlertOn reports whether an alert type is turned on.
+func (n Notifications) AlertOn(kind string) bool {
+	for _, a := range n.Alerts {
+		if a == kind {
+			return true
+		}
+	}
+	return false
+}
+
+// LinkBase is the address links in mail start with: the link URL, else the remote URL, else
+// empty (links can't be made). It never comes from a request's Host header.
+func (s Settings) LinkBase() string {
+	if u := strings.TrimRight(strings.TrimSpace(s.Notifications.LinkURL), "/"); u != "" {
+		return u
+	}
+	return strings.TrimRight(strings.TrimSpace(s.RemoteAccess.RemoteURL), "/")
 }
 
 // AI is the optional language model (a local Ollama) that makes Muse and recommendations
@@ -242,6 +306,8 @@ func Defaults() Settings {
 		Tasks:        Tasks{MaintenanceWindowStart: "03:00", MaintenanceWindowHours: 4, BackupRetention: 7},
 		Music:        Music{SoundprintAnalysis: true, OnlineLyrics: false, LoudnessAnalysis: true, ArtistDetails: true},
 		Integrations: Integrations{DVRPaddingBefore: 1, DVRPaddingAfter: 3},
+		Notifications: Notifications{SMTPPort: 587, SMTPSecurity: "starttls", FromName: "Marquee",
+			RecipientsAllAdmins: true, DiskThresholdPercent: 10},
 		AI: AI{URL: "http://127.0.0.1:11434", ChatModel: "qwen3:8b", EmbedModel: "mxbai-embed-large", UnloadMinutes: 5,
 			UnderstandPrompts: true, RerankMovies: true, LyricsThemes: true, Reasons: true, LearnFromBehaviour: true},
 	}

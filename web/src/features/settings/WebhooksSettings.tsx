@@ -17,6 +17,7 @@ const kinds: { id: Kind; label: string }[] = [
   { id: "playback.stopped", label: "Stopped" },
   { id: "playback.watched", label: "Watched / played" },
   { id: "library.added", label: "New in a library" },
+  { id: "alert", label: "Alerts (Settings → Notifications)" },
 ];
 
 /** A random secret. getRandomValues works on plain-HTTP origins (randomUUID doesn't). */

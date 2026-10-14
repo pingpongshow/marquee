@@ -32,6 +32,7 @@ export function AccountPage() {
   const info = useQuery(systemInfoQuery);
   const update = useUpdateMe();
   const [name, setName] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
   const [cur, setCur] = useState("");
   const [next, setNext] = useState("");
   const [pin, setPin] = useState("");
@@ -80,6 +81,53 @@ export function AccountPage() {
             Save
           </Button>
         </div>
+      </Card>
+
+      <Card
+        title="Email"
+        description="For a link to reset your password or PIN if you forget it. Administrators also get alerts here."
+      >
+        <Field label="Email address">
+          {(id) =>
+            u.isManaged && !u.isAdmin ? (
+              <p id={id} className="text-sm text-muted">
+                {u.email || "None"} · Ask an administrator to change it.
+              </p>
+            ) : (
+              <Input
+                id={id}
+                type="email"
+                autoComplete="email"
+                maxLength={254}
+                placeholder="you@example.com"
+                value={email ?? u.email ?? ""}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            )
+          }
+        </Field>
+        {!(u.isManaged && !u.isAdmin) && (
+          <div className="flex justify-end">
+            <Button
+              variant="primary"
+              disabled={email === null || email.trim() === (u.email ?? "")}
+              loading={update.isPending}
+              onClick={() =>
+                update.mutate(
+                  { email: (email ?? "").trim() },
+                  {
+                    onSuccess: () => {
+                      setEmail(null);
+                      done(email?.trim() ? "Email address saved." : "Email address removed.")();
+                    },
+                  },
+                )
+              }
+            >
+              Save
+            </Button>
+          </div>
+        )}
       </Card>
 
       <LinkDeviceCard />

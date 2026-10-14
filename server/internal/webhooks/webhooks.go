@@ -29,11 +29,13 @@ const (
 	PlaybackStopped = "playback.stopped"
 	PlaybackWatched = "playback.watched"
 	LibraryAdded    = "library.added"
-	Test            = "test"
+	// AlertRaised is an admin alert (task failed, disk space low, ...); Alert describes it.
+	AlertRaised = "alert"
+	Test        = "test"
 )
 
 // Kinds lists the events a webhook can subscribe to.
-var Kinds = []string{PlaybackStarted, PlaybackPaused, PlaybackResumed, PlaybackStopped, PlaybackWatched, LibraryAdded}
+var Kinds = []string{PlaybackStarted, PlaybackPaused, PlaybackResumed, PlaybackStopped, PlaybackWatched, LibraryAdded, AlertRaised}
 
 type Server struct {
 	ID      string `json:"id"`
@@ -72,7 +74,17 @@ type Playback struct {
 	Remote     bool   `json:"remote"`
 }
 
-// Event is one notification. Item is set for playback events; Items for library.added.
+// Alert is an admin alert's payload.
+type Alert struct {
+	Type     string `json:"type"`              // task_failed, disk_low, ...
+	Subject  string `json:"subject,omitempty"` // what it is about (a task, a volume, ...)
+	Title    string `json:"title"`
+	Message  string `json:"message,omitempty"`
+	Resolved bool   `json:"resolved,omitempty"` // the problem has gone away
+}
+
+// Event is one notification. Item is set for playback events; Items for library.added;
+// Alert for alert.
 type Event struct {
 	Event    string    `json:"event"`
 	Time     time.Time `json:"time"`
@@ -82,6 +94,7 @@ type Event struct {
 	Item     *Item     `json:"item,omitempty"`
 	Items    []Item    `json:"items,omitempty"`
 	Playback *Playback `json:"playback,omitempty"`
+	Alert    *Alert    `json:"alert,omitempty"`
 }
 
 type delivery struct {

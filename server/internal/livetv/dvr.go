@@ -49,6 +49,8 @@ type Recorder struct {
 	Scan func(libraryID int64)
 	// Now is the clock (tests).
 	Now func() time.Time
+	// OnFailed, when set, hears a recording that failed (admin alerts).
+	OnFailed func(id int64, title, errMsg string)
 
 	mu     sync.Mutex
 	active map[int64]context.CancelFunc
@@ -640,6 +642,11 @@ func (r *Recorder) finish(ctx context.Context, id int64, path *string, errMsg st
 	if path == nil {
 		r.Live.DB.ExecContext(ctx, `UPDATE dvr_recordings SET status = 'failed', error = ? WHERE id = ?`, errMsg, id)
 		slog.Warn("dvr: recording failed", "id", id, "err", errMsg)
+		if r.OnFailed != nil {
+			var title string
+			r.Live.DB.QueryRowContext(ctx, `SELECT title FROM dvr_recordings WHERE id = ?`, id).Scan(&title)
+			r.OnFailed(id, title, errMsg)
+		}
 		return
 	}
 	var size int64

@@ -173,6 +173,146 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/forgot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask for a password or PIN reset link by email. Always 204, whether or not the account exists or has an email address (no user enumeration). Rate limited per address and per account. */
+        post: operations["forgotPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/reset/info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What a reset link is for (a password or a PIN, and whose), so the reset page asks for the right thing. 400 when the link is unknown, used or expired. */
+        post: operations["resetInfo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set a new password or PIN with a reset link. The link stops working, the account's other links too, and the account is signed out on every device. Two-factor sign-in stays as it is. */
+        post: operations["resetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin alerts for the bell, newest first (admin only). Kept for 30 days. */
+        get: operations["listNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark every alert read (admin only). */
+        post: operations["markAllNotificationsRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/{notificationId}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notificationId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark an alert read (admin only). */
+        post: operations["markNotificationRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/{notificationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notificationId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Dismiss (delete) an alert (admin only). */
+        delete: operations["dismissNotification"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/test-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a test email with the saved mail settings now (admin only). */
+        post: operations["testEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/logout": {
         parameters: {
             query?: never;
@@ -3088,6 +3228,8 @@ export interface components {
             id: number;
             username: string;
             displayName: string;
+            /** @description For password and PIN reset links and, for administrators, alerts. Only in /me and the admin's user list; absent when none. */
+            email?: string;
             isAdmin: boolean;
             /** @description Managed profiles (e.g. children) sign in only by switching profile with a PIN. */
             isManaged: boolean;
@@ -3155,6 +3297,7 @@ export interface components {
             displayName?: string;
             password?: string;
             pin?: string;
+            email?: string;
             isAdmin?: boolean;
             isManaged?: boolean;
             restrictions?: components["schemas"]["UserRestrictions"];
@@ -3165,6 +3308,8 @@ export interface components {
             password?: string;
             /** @description Empty string removes the PIN. */
             pin?: string;
+            /** @description Empty string removes the email address. */
+            email?: string;
             isAdmin?: boolean;
             restrictions?: components["schemas"]["UserRestrictions"];
         };
@@ -3174,6 +3319,8 @@ export interface components {
             currentPassword?: string;
             newPassword?: string;
             pin?: string;
+            /** @description Your email address, for reset links. Empty string removes it. */
+            email?: string;
             preferences?: components["schemas"]["UserPreferences"];
         };
         Profile: {
@@ -3243,6 +3390,7 @@ export interface components {
             integrations?: components["schemas"]["IntegrationSettings"];
             cinema?: components["schemas"]["CinemaSettings"];
             ai?: components["schemas"]["AiSettings"];
+            notifications?: components["schemas"]["NotificationSettings"];
             /** @description Replaces the whole list when sent. */
             webhooks?: components["schemas"]["Webhook"][];
         };
@@ -3259,8 +3407,96 @@ export interface components {
             integrations?: components["schemas"]["IntegrationSettingsUpdate"];
             cinema?: components["schemas"]["CinemaSettings"];
             ai?: components["schemas"]["AiSettings"];
+            notifications?: components["schemas"]["NotificationSettingsUpdate"];
             /** @description Replaces the whole list when sent. */
             webhooks?: components["schemas"]["Webhook"][];
+        };
+        /**
+         * @description task_failed: a scheduled task (including the nightly backup) failed.
+         *     disk_low: the config, transcode, recordings or a library folder's volume is low on space.
+         *     recording_failed: a DVR recording failed.
+         *     source_failed: a Live TV or movies-on-demand source couldn't be loaded.
+         *     integration_down: Seerr, Bazarr, Ollama or the Soundprint sidecar isn't answering (only those that are set up).
+         *     failed_signins: repeated wrong passwords for one account.
+         *     new_admin_device: an administrator signed in from a device never used before.
+         *     playback_failed: the transcoder couldn't produce video for a stream.
+         * @enum {string}
+         */
+        AlertType: "task_failed" | "disk_low" | "recording_failed" | "source_failed" | "integration_down" | "failed_signins" | "new_admin_device" | "playback_failed";
+        /** @description Outgoing email (SMTP) and admin alerts. */
+        NotificationSettings: {
+            /** @description The mail server, e.g. smtp.example.com. Empty turns email off. */
+            smtpHost?: string;
+            smtpPort?: number;
+            /** @enum {string} */
+            smtpSecurity?: "none" | "starttls" | "tls";
+            smtpUsername?: string;
+            readonly smtpPasswordSet?: boolean;
+            fromAddress?: string;
+            fromName?: string;
+            /** @description Host, port and from address are set. */
+            readonly mailConfigured?: boolean;
+            /** @description Address links in mail start with (e.g. reset links). Empty = the Remote Access URL. */
+            linkUrl?: string;
+            /** @description Alert types that are on. All are off by default. */
+            alerts?: components["schemas"]["AlertType"][];
+            /** @description Mail alerts to every administrator with an email address. */
+            recipientsAllAdmins?: boolean;
+            /** @description Administrators (user ids) who get alert mail when recipientsAllAdmins is off. */
+            recipients?: number[];
+            /** @description Alert when a volume has less free space than this. */
+            diskThresholdPercent?: number;
+        };
+        /** @description The SMTP password is write-only; send an empty string to clear it. */
+        NotificationSettingsUpdate: {
+            smtpHost?: string;
+            smtpPort?: number;
+            /** @enum {string} */
+            smtpSecurity?: "none" | "starttls" | "tls";
+            smtpUsername?: string;
+            smtpPassword?: string;
+            fromAddress?: string;
+            fromName?: string;
+            linkUrl?: string;
+            alerts?: components["schemas"]["AlertType"][];
+            recipientsAllAdmins?: boolean;
+            recipients?: number[];
+            diskThresholdPercent?: number;
+        };
+        AdminNotification: {
+            /** Format: int64 */
+            id: number;
+            /** @description An AlertType. */
+            type: string;
+            /** @description What it is about (a task, a volume, a service). */
+            subject?: string;
+            title: string;
+            message: string;
+            /** Format: date-time */
+            createdAt: string;
+            read: boolean;
+        };
+        AdminNotificationList: {
+            items: components["schemas"]["AdminNotification"][];
+            unread: number;
+        };
+        ForgotRequest: {
+            /** @description Username or email address. */
+            login: string;
+            /** @enum {string} */
+            kind: "password" | "pin";
+        };
+        ResetInfo: {
+            /** @enum {string} */
+            kind: "password" | "pin";
+            displayName: string;
+        };
+        ResetRequest: {
+            token: string;
+            /** @description For a password link. */
+            password?: string;
+            /** @description For a PIN link. */
+            pin?: string;
         };
         Webhook: {
             /** @description Assigned by the server. */
@@ -3273,7 +3509,7 @@ export interface components {
             url: string;
             /** @description When set, payloads are signed: X-Marquee-Signature: sha256=<HMAC-SHA256 of the body>. */
             secret?: string;
-            events: ("playback.started" | "playback.paused" | "playback.resumed" | "playback.stopped" | "playback.watched" | "library.added")[];
+            events: ("playback.started" | "playback.paused" | "playback.resumed" | "playback.stopped" | "playback.watched" | "library.added" | "alert")[];
             enabled: boolean;
         };
         /** @description Cinema trailers (PLAY-18) before movies that are started from the beginning. */
@@ -5594,6 +5830,201 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
+    forgotPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForgotRequest"];
+            };
+        };
+        responses: {
+            /** @description If the account has an email address, a link is on its way. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    resetInfo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    token: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The link works. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetInfo"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    resetPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetRequest"];
+            };
+        };
+        responses: {
+            /** @description Changed; sign in with the new password or PIN. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    listNotifications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminNotificationList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    markAllNotificationsRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    markNotificationRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notificationId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    dismissNotification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notificationId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dismissed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    testEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The address to send to. */
+                    to: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Sent or not. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ok: boolean;
+                        error?: string;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     logout: {
         parameters: {
             query?: never;
@@ -5829,6 +6260,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
         };
     };
     listUsers: {

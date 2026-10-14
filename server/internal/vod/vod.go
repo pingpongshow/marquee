@@ -43,6 +43,8 @@ type Service struct {
 	HTTP     *http.Client
 	// ImageDir caches posters and backdrops.
 	ImageDir string
+	// OnSourceFailed, when set, hears a source that couldn't be loaded (admin alerts).
+	OnSourceFailed func(src settings.VODSource, err error)
 
 	refreshing sync.Mutex
 	matching   atomic.Bool
@@ -134,6 +136,9 @@ func (s *Service) Refresh(ctx context.Context, retryFailed bool) {
 		if err != nil {
 			msg = err.Error()
 			slog.Warn("movie source failed", "source", src.Name, "err", err)
+			if s.OnSourceFailed != nil {
+				s.OnSourceFailed(src, err)
+			}
 		} else {
 			slog.Info("movie source loaded", "source", src.Name, "movies", n)
 		}

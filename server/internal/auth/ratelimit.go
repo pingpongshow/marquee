@@ -54,10 +54,12 @@ func (l *loginLimiter) blocked(ip, user string) time.Duration {
 	return wait
 }
 
-func (l *loginLimiter) fail(ip, user string) {
+// fail records a failure and returns the user's failures in the current window.
+func (l *loginLimiter) fail(ip, user string) int {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := time.Now()
+	userCount := 0
 	for _, entry := range []struct {
 		m   map[string]*failures
 		key string
@@ -79,7 +81,11 @@ func (l *loginLimiter) fail(ip, user string) {
 			entry.m[entry.key] = f
 		}
 		f.count++
+		if entry.key == user {
+			userCount = f.count
+		}
 	}
+	return userCount
 }
 
 func (l *loginLimiter) success(ip, user string) {

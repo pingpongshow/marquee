@@ -26,6 +26,7 @@ import (
 	"marquee/internal/items"
 	"marquee/internal/library"
 	"marquee/internal/netclass"
+	"marquee/internal/notify"
 	"marquee/internal/remote"
 	"marquee/internal/settings"
 	"marquee/internal/tasks"
@@ -69,6 +70,8 @@ func newHarness(t *testing.T) *harness {
 		Tasks:   &tasks.Scheduler{DB: database, Settings: store},
 		Backups: &tasks.Backups{DB: database, Dir: filepath.Join(dir, "backups"), ConfigDir: dir, Retention: func() int { return 3 }},
 		Remote:  &remote.Hub{},
+		Mail:    &notify.Mailer{Settings: store},
+		Alerts:  &notify.Alerts{DB: database, Settings: store, Mail: &notify.Mailer{Settings: store}, Sync: true},
 		Bazarr: &bazarr.Service{DB: database, Config: func() (string, string) {
 			return store.Get().Integrations.BazarrURL, store.Get().Integrations.BazarrAPIKey
 		}}}

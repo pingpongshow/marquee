@@ -41,6 +41,7 @@ import (
 	"marquee/internal/metadata"
 	"marquee/internal/muse"
 	"marquee/internal/netclass"
+	"marquee/internal/notify"
 	"marquee/internal/playback"
 	"marquee/internal/plex"
 	"marquee/internal/probe"
@@ -141,6 +142,9 @@ func run() error {
 		return webhooks.Server{ID: store.ServerID(), Name: store.Get().General.ServerName, Version: config.Version}
 	}}
 	go hooks.Run(ctx)
+	// Email and admin alerts.
+	mailer := &notify.Mailer{Settings: store}
+	alerts := &notify.Alerts{DB: database, Settings: store, Mail: mailer, Webhooks: hooks}
 	scrobbler := &scrobble.Service{DB: database, LastFM: func() (string, string) {
 		i := store.Get().Integrations
 		return i.LastFMAPIKey, i.LastFMSecret
@@ -386,7 +390,6 @@ func run() error {
 	})
 	raw, _ := json.Marshal(store.Get().Integrations.LiveTVSources)
 	lastSources = string(raw)
-	go live.Run(ctx, liveWake)
 
 	// Movies on demand (LIVE-6): film lists refreshed every few hours and when sources change;
 	// TMDB matching uses the library's matcher.
@@ -407,7 +410,6 @@ func run() error {
 			}
 		}
 	})
-	go vodSvc.Run(ctx, vodWake)
 	go vodSvc.Streams.Run(ctx)
 
 	// DVR (LIVE-5): recordings land in "Recorded TV" / "Recorded Movies", made on first use.
@@ -441,7 +443,6 @@ func run() error {
 		},
 		Scan: scans.Queue,
 	}
-	go dvr.Run(ctx)
 
 	watchTogether := &syncplay.Service{}
 	go watchTogether.Run(ctx)
@@ -494,6 +495,13 @@ func run() error {
 			scheduler.RunNow(ctx, "music-docs")
 		}
 	})
+	// Alerts are wired before the services that raise them start.
+	alertWatcher := wireAlerts(ctx, alertDeps{cfg: &cfg, store: store, alerts: alerts, auth: authSvc, scheduler: scheduler,
+		live: live, dvr: dvr, vod: vodSvc, player: player, libraries: libraries, ai: aiClient, soundprint: soundprintSvc})
+	go alertWatcher.Run(ctx)
+	go live.Run(ctx, liveWake)
+	go vodSvc.Run(ctx, vodWake)
+	go dvr.Run(ctx)
 	go scheduler.Run(ctx)
 
 	// Bonjour, so LAN apps find the server (D49).
@@ -525,6 +533,8 @@ func run() error {
 		MusicDocs:   musicDocs,
 		Reasons:     &muse.Reasons{},
 		Trash:       mediaTrash,
+		Mail:        mailer,
+		Alerts:      alerts,
 		Avatars:     &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},
 		Images:      images.New(database, filepath.Join(cfg.ConfigDir, "cache", "images"), cfg.FFmpegPath),
 		Logs:        logs,

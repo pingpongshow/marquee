@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/mail"
 	"strings"
 	"time"
 )
@@ -66,6 +67,7 @@ type SubtitleStyle struct {
 
 type NewUser struct {
 	Username, DisplayName, Password, PIN string
+	Email                                string // optional; NormalizeEmail it first
 	IsAdmin, IsManaged                   bool
 	Restrictions                         Restrictions
 	// Imported users (from Plex) may start without a password; they can't sign in or be
@@ -77,6 +79,7 @@ type UserUpdate struct {
 	DisplayName  *string
 	Password     *string
 	PIN          *string // "" removes
+	Email        *string // "" removes; NormalizeEmail it first
 	IsAdmin      *bool
 	Restrictions *Restrictions
 	Preferences  *Preferences
@@ -128,9 +131,12 @@ func (s *Service) Create(ctx context.Context, n NewUser) (User, error) {
 		pin = h
 	}
 	restr, _ := json.Marshal(n.Restrictions)
-	r, err := s.db.ExecContext(ctx, `INSERT INTO users(username, display_name, password_hash, pin_hash, is_admin, is_managed, restrictions)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`, n.Username, n.DisplayName, pw, pin, n.IsAdmin && !n.IsManaged, n.IsManaged, string(restr))
+	r, err := s.db.ExecContext(ctx, `INSERT INTO users(username, display_name, password_hash, pin_hash, is_admin, is_managed, restrictions, email)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, n.Username, n.DisplayName, pw, pin, n.IsAdmin && !n.IsManaged, n.IsManaged, string(restr), nullable(n.Email))
 	if err != nil {
+		if isEmailConflict(err) {
+			return User{}, ErrEmailTaken
+		}
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
 			return User{}, ErrUsernameTaken
 		}
@@ -178,6 +184,14 @@ func (s *Service) Update(ctx context.Context, id int64, u UserUpdate) (User, err
 			return User{}, err
 		}
 	}
+	if u.Email != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE users SET email = ? WHERE id = ?`, nullable(*u.Email), id); err != nil {
+			if isEmailConflict(err) {
+				return User{}, ErrEmailTaken
+			}
+			return User{}, err
+		}
+	}
 	if u.IsAdmin != nil && *u.IsAdmin != cur.IsAdmin {
 		if cur.IsManaged && *u.IsAdmin {
 			return User{}, fmt.Errorf("managed profiles cannot be administrators")
@@ -212,6 +226,30 @@ func (s *Service) Update(ctx context.Context, id int64, u UserUpdate) (User, err
 		return User{}, err
 	}
 	return getUser(ctx, s.db, id)
+}
+
+// NormalizeEmail trims an email address and checks it looks like one ("" stays "").
+func NormalizeEmail(e string) (string, error) {
+	e = strings.TrimSpace(e)
+	if e == "" {
+		return "", nil
+	}
+	a, err := mail.ParseAddress(e)
+	if err != nil || a.Address != e || len(e) > 254 || !strings.Contains(e[strings.LastIndex(e, "@")+1:], ".") {
+		return "", errors.New("enter an email address like name@example.com")
+	}
+	return e, nil
+}
+
+func nullable(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+func isEmailConflict(err error) bool {
+	return strings.Contains(err.Error(), "UNIQUE constraint failed") && strings.Contains(err.Error(), "email")
 }
 
 func ensureAnotherAdmin(ctx context.Context, q querier, excluding int64) error {

@@ -229,6 +229,145 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
 
+  /auth/forgot:
+    post:
+      tags: [auth]
+      operationId: forgotPassword
+      summary: "Ask for a password or PIN reset link by email. Always 204, whether or not the account exists or has an email address (no user enumeration). Rate limited per address and per account."
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ForgotRequest" }
+      responses:
+        "204": { description: "If the account has an email address, a link is on its way." }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /auth/reset/info:
+    post:
+      tags: [auth]
+      operationId: resetInfo
+      summary: What a reset link is for (a password or a PIN, and whose), so the reset page asks for the right thing. 400 when the link is unknown, used or expired.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "200":
+          description: The link works.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResetInfo" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /auth/reset:
+    post:
+      tags: [auth]
+      operationId: resetPassword
+      summary: "Set a new password or PIN with a reset link. The link stops working, the account's other links too, and the account is signed out on every device. Two-factor sign-in stays as it is."
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResetRequest" }
+      responses:
+        "204": { description: Changed; sign in with the new password or PIN. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /notifications:
+    get:
+      tags: [system]
+      operationId: listNotifications
+      summary: Admin alerts for the bell, newest first (admin only). Kept for 30 days.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminNotificationList" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /notifications/read-all:
+    post:
+      tags: [system]
+      operationId: markAllNotificationsRead
+      summary: Mark every alert read (admin only).
+      responses:
+        "204": { description: Done. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /notifications/{notificationId}/read:
+    parameters:
+      - name: notificationId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    post:
+      tags: [system]
+      operationId: markNotificationRead
+      summary: Mark an alert read (admin only).
+      responses:
+        "204": { description: Done. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /notifications/{notificationId}:
+    parameters:
+      - name: notificationId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    delete:
+      tags: [system]
+      operationId: dismissNotification
+      summary: Dismiss (delete) an alert (admin only).
+      responses:
+        "204": { description: Dismissed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /notifications/test-email:
+    post:
+      tags: [system]
+      operationId: testEmail
+      summary: Send a test email with the saved mail settings now (admin only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to]
+              properties:
+                to: { type: string, description: The address to send to. }
+      responses:
+        "200":
+          description: Sent or not.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+                  error: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /auth/logout:
     post:
       tags: [auth]
@@ -376,6 +515,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
   /users:
     get:
@@ -3969,6 +4109,7 @@ components:
         id: { type: integer, format: int64 }
         username: { type: string }
         displayName: { type: string }
+        email: { type: string, description: "For password and PIN reset links and, for administrators, alerts. Only in /me and the admin's user list; absent when none." }
         isAdmin: { type: boolean }
         isManaged: { type: boolean, description: Managed profiles (e.g. children) sign in only by switching profile with a PIN. }
         hasPin: { type: boolean }
@@ -4027,6 +4168,7 @@ components:
         displayName: { type: string, maxLength: 64 }
         password: { type: string, minLength: 8, maxLength: 256 }
         pin: { type: string, pattern: "^[0-9]{4}$" }
+        email: { type: string, maxLength: 254 }
         isAdmin: { type: boolean }
         isManaged: { type: boolean }
         restrictions: { $ref: "#/components/schemas/UserRestrictions" }
@@ -4038,6 +4180,7 @@ components:
         displayName: { type: string, minLength: 1, maxLength: 64 }
         password: { type: string, minLength: 8, maxLength: 256 }
         pin: { type: string, pattern: "^([0-9]{4})?$", description: Empty string removes the PIN. }
+        email: { type: string, maxLength: 254, description: Empty string removes the email address. }
         isAdmin: { type: boolean }
         restrictions: { $ref: "#/components/schemas/UserRestrictions" }
 
@@ -4048,6 +4191,7 @@ components:
         currentPassword: { type: string, description: Required to change the password. }
         newPassword: { type: string, minLength: 8, maxLength: 256 }
         pin: { type: string, pattern: "^([0-9]{4})?$" }
+        email: { type: string, maxLength: 254, description: "Your email address, for reset links. Empty string removes it." }
         preferences: { $ref: "#/components/schemas/UserPreferences" }
 
     Profile:
@@ -4129,6 +4273,7 @@ components:
         integrations: { $ref: "#/components/schemas/IntegrationSettings" }
         cinema: { $ref: "#/components/schemas/CinemaSettings" }
         ai: { $ref: "#/components/schemas/AiSettings" }
+        notifications: { $ref: "#/components/schemas/NotificationSettings" }
         webhooks:
           type: array
           description: Replaces the whole list when sent.
@@ -4149,10 +4294,112 @@ components:
         integrations: { $ref: "#/components/schemas/IntegrationSettingsUpdate" }
         cinema: { $ref: "#/components/schemas/CinemaSettings" }
         ai: { $ref: "#/components/schemas/AiSettings" }
+        notifications: { $ref: "#/components/schemas/NotificationSettingsUpdate" }
         webhooks:
           type: array
           description: Replaces the whole list when sent.
           items: { $ref: "#/components/schemas/Webhook" }
+
+    AlertType:
+      type: string
+      description: |
+        task_failed: a scheduled task (including the nightly backup) failed.
+        disk_low: the config, transcode, recordings or a library folder's volume is low on space.
+        recording_failed: a DVR recording failed.
+        source_failed: a Live TV or movies-on-demand source couldn't be loaded.
+        integration_down: Seerr, Bazarr, Ollama or the Soundprint sidecar isn't answering (only those that are set up).
+        failed_signins: repeated wrong passwords for one account.
+        new_admin_device: an administrator signed in from a device never used before.
+        playback_failed: the transcoder couldn't produce video for a stream.
+      enum: [task_failed, disk_low, recording_failed, source_failed, integration_down, failed_signins, new_admin_device, playback_failed]
+
+    NotificationSettings:
+      type: object
+      description: Outgoing email (SMTP) and admin alerts.
+      properties:
+        smtpHost: { type: string, description: "The mail server, e.g. smtp.example.com. Empty turns email off." }
+        smtpPort: { type: integer, minimum: 0, maximum: 65535 }
+        smtpSecurity: { type: string, enum: [none, starttls, tls] }
+        smtpUsername: { type: string }
+        smtpPasswordSet: { type: boolean, readOnly: true }
+        fromAddress: { type: string }
+        fromName: { type: string }
+        mailConfigured: { type: boolean, readOnly: true, description: "Host, port and from address are set." }
+        linkUrl: { type: string, description: "Address links in mail start with (e.g. reset links). Empty = the Remote Access URL." }
+        alerts:
+          type: array
+          description: Alert types that are on. All are off by default.
+          items: { $ref: "#/components/schemas/AlertType" }
+        recipientsAllAdmins: { type: boolean, description: Mail alerts to every administrator with an email address. }
+        recipients:
+          type: array
+          description: Administrators (user ids) who get alert mail when recipientsAllAdmins is off.
+          items: { type: integer, format: int64 }
+        diskThresholdPercent: { type: integer, minimum: 1, maximum: 50, description: Alert when a volume has less free space than this. }
+
+    NotificationSettingsUpdate:
+      type: object
+      description: The SMTP password is write-only; send an empty string to clear it.
+      properties:
+        smtpHost: { type: string }
+        smtpPort: { type: integer, minimum: 0, maximum: 65535 }
+        smtpSecurity: { type: string, enum: [none, starttls, tls] }
+        smtpUsername: { type: string }
+        smtpPassword: { type: string }
+        fromAddress: { type: string }
+        fromName: { type: string }
+        linkUrl: { type: string }
+        alerts:
+          type: array
+          items: { $ref: "#/components/schemas/AlertType" }
+        recipientsAllAdmins: { type: boolean }
+        recipients:
+          type: array
+          items: { type: integer, format: int64 }
+        diskThresholdPercent: { type: integer, minimum: 1, maximum: 50 }
+
+    AdminNotification:
+      type: object
+      required: [id, type, title, message, createdAt, read]
+      properties:
+        id: { type: integer, format: int64 }
+        type: { type: string, description: "An AlertType." }
+        subject: { type: string, description: "What it is about (a task, a volume, a service)." }
+        title: { type: string }
+        message: { type: string }
+        createdAt: { type: string, format: date-time }
+        read: { type: boolean }
+
+    AdminNotificationList:
+      type: object
+      required: [items, unread]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminNotification" }
+        unread: { type: integer }
+
+    ForgotRequest:
+      type: object
+      required: [login, kind]
+      properties:
+        login: { type: string, maxLength: 254, description: Username or email address. }
+        kind: { type: string, enum: [password, pin] }
+
+    ResetInfo:
+      type: object
+      required: [kind, displayName]
+      properties:
+        kind: { type: string, enum: [password, pin] }
+        displayName: { type: string }
+
+    ResetRequest:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string }
+        password: { type: string, minLength: 8, maxLength: 256, description: For a password link. }
+        pin: { type: string, pattern: "^[0-9]{4}$", description: For a PIN link. }
 
     Webhook:
       type: object
@@ -4164,7 +4411,7 @@ components:
         secret: { type: string, description: "When set, payloads are signed: X-Marquee-Signature: sha256=<HMAC-SHA256 of the body>." }
         events:
           type: array
-          items: { type: string, enum: [playback.started, playback.paused, playback.resumed, playback.stopped, playback.watched, library.added] }
+          items: { type: string, enum: [playback.started, playback.paused, playback.resumed, playback.stopped, playback.watched, library.added, alert] }
         enabled: { type: boolean }
 
     CinemaSettings:
