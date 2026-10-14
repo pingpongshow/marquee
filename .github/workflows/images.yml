@@ -1,6 +1,6 @@
 # Builds the server and Soundprint images and publishes them to GitHub Container Registry
 # (ghcr.io/<owner>/marquee and ghcr.io/<owner>/marquee-soundprint) for each release, and on
-# demand. The Unraid templates in unraid/ install from these images.
+# demand. The Unraid templates (github.com/pingpongshow/unraid-templates) install these.
 name: Container images
 
 on:

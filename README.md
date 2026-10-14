@@ -156,6 +156,21 @@ Open `http://<server>:32500` and follow the setup:
 3. Enter your TMDB key under **Settings → Metadata**. Matching and artwork start straight away.
 4. Add people under **Settings → Users**: profiles can have a PIN, rating limits and library access.
 
+### On Unraid
+
+Marquee has Unraid templates with an icon, WebUI link and every setting explained:
+
+1. Copy the templates onto the flash drive (from the Unraid terminal):
+   ```sh
+   cd /boot/config/plugins/dockerMan/templates-user
+   wget -O my-Marquee.xml https://raw.githubusercontent.com/pingpongshow/unraid-templates/main/marquee.xml
+   wget -O my-Marquee-Soundprint.xml https://raw.githubusercontent.com/pingpongshow/unraid-templates/main/marquee-soundprint.xml
+   ```
+2. **Docker** tab → **Add Container**, pick **Marquee** under *Template*, set your Video and Music folders and apply. Add **Marquee-Soundprint** the same way for music analysis.
+3. Open `http://<server>:32500`.
+
+Images are published to `ghcr.io/pingpongshow/marquee` and `ghcr.io/pingpongshow/marquee-soundprint` with each release, and Unraid shows when an update is available.
+
 ## Organising your media
 
 Marquee follows the common naming conventions, so a library that works with other media servers works here.
