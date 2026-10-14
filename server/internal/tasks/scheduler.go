@@ -60,6 +60,8 @@ type Scheduler struct {
 	DB       *sql.DB
 	Settings *settings.Store
 	Now      func() time.Time
+	// OnFailure, when set, hears a task that failed (admin alerts).
+	OnFailure func(t Task, err error)
 
 	mu      sync.Mutex
 	tasks   []Task
@@ -196,6 +198,9 @@ func (s *Scheduler) execute(ctx context.Context, t Task) {
 	if err != nil {
 		status, msg = "failed", err.Error()
 		slog.Warn("task failed", "task", t.ID, "err", err)
+		if s.OnFailure != nil {
+			s.OnFailure(t, err)
+		}
 	} else {
 		slog.Info("task finished", "task", t.ID, "result", msg)
 	}

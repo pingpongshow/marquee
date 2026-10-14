@@ -94,7 +94,8 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			VodEnabled:       ptr(s.Integrations.VODEnabled),
 			VodSources:       ptr(toAPIVodSources(s.Integrations.VODSources)),
 		},
-		Webhooks: ptr(toAPIWebhooks(s.Webhooks)),
+		Webhooks:      ptr(toAPIWebhooks(s.Webhooks)),
+		Notifications: toAPINotifications(s.Notifications),
 		Ai: &AiSettings{
 			Enabled: ptr(s.AI.Enabled), Url: ptr(s.AI.URL), ChatModel: ptr(s.AI.ChatModel), EmbedModel: ptr(s.AI.EmbedModel),
 			UnloadMinutes: ptr(s.AI.UnloadMinutes), UnderstandPrompts: ptr(s.AI.UnderstandPrompts), RerankMovies: ptr(s.AI.RerankMovies),
@@ -271,6 +272,9 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		if i.VodSources != nil {
 			s.Integrations.VODSources = fromAPIVodSources(*i.VodSources)
 		}
+	}
+	if n := u.Notifications; n != nil {
+		applyNotifications(&s.Notifications, *n)
 	}
 	if u.Webhooks != nil {
 		s.Webhooks = make([]settings.Webhook, len(*u.Webhooks))

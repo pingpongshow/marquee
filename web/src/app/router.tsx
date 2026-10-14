@@ -12,6 +12,7 @@ import { systemInfoQuery } from "@/api/queries";
 import { Alert, Spinner } from "@/components/ui";
 import { JoinPage } from "@/features/auth/JoinPage";
 import { LoginPage } from "@/features/auth/LoginPage";
+import { ResetPage } from "@/features/auth/ResetPages";
 import { SetupPage } from "@/features/auth/SetupPage";
 import { ItemPage } from "@/features/browse/ItemPage";
 import {
@@ -81,7 +82,11 @@ function Gate() {
   const joining = useRouterState({
     select: (s) => s.location.pathname.startsWith("/join/"),
   });
-  if (joining) return <Outlet />;
+  // Reset links from email (password or PIN) work signed in or not.
+  const resetting = useRouterState({
+    select: (s) => s.location.pathname === "/reset",
+  });
+  if (joining || resetting) return <Outlet />;
   if (info.isPending) return <Spinner label="Connecting to server" />;
   if (info.isError)
     return (
@@ -165,6 +170,17 @@ const joinRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/join/$token",
   component: JoinPage,
+});
+const resetRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/reset",
+  validateSearch: (s: Record<string, unknown>): { token?: string } => ({
+    token: typeof s.token === "string" ? s.token : undefined,
+  }),
+  component: function Reset() {
+    const { token } = resetRoute.useSearch();
+    return <ResetPage token={token ?? ""} />;
+  },
 });
 const linkRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -306,6 +322,7 @@ const routeTree = rootRoute.addChildren([
   personRoute,
   linkRoute,
   joinRoute,
+  resetRoute,
   settingsRoute.addChildren([settingsIndexRoute, settingsSectionRoute]),
 ]);
 

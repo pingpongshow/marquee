@@ -24,6 +24,7 @@ import (
 	"marquee/internal/metadata"
 	"marquee/internal/muse"
 	"marquee/internal/netclass"
+	"marquee/internal/notify"
 	"marquee/internal/playback"
 	"marquee/internal/plex"
 	"marquee/internal/remote"
@@ -95,6 +96,10 @@ type Handlers struct {
 	Trash *mediatrash.Service
 	// SpeedTest measures the internet speed (tests use a fake server).
 	SpeedTest *speedtest.Tester
+	// Mail sends email (reset links, test mail); Alerts is the admin alert list. Either may
+	// be nil (no mail, no alerts).
+	Mail   *notify.Mailer
+	Alerts *notify.Alerts
 }
 
 var _ StrictServerInterface = (*Handlers)(nil)
@@ -172,7 +177,7 @@ func (h *Handlers) GetHealth(ctx context.Context, _ GetHealthRequestObject) (Get
 
 func toAPIUser(u auth.User) User {
 	return User{
-		Id: u.ID, Username: u.Username, DisplayName: u.DisplayName,
+		Id: u.ID, Username: u.Username, DisplayName: u.DisplayName, Email: nz(u.Email),
 		IsAdmin: u.IsAdmin, IsManaged: u.IsManaged, HasPin: ptr(u.HasPIN), HasPassword: ptr(u.HasPassword), HasTwoFactor: ptr(u.HasTOTP), AvatarUrl: avatarURL(u),
 		CreatedAt: u.CreatedAt, LastSeenAt: u.LastSeenAt,
 		Restrictions: toAPIRestrictions(u.Restrictions), Preferences: toAPIPrefs(u.Preferences),

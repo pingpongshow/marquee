@@ -8,8 +8,9 @@ import { Alert, Button, Field, Input, Spinner } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { Avatar } from "@/features/users/Avatar";
 import { AuthLayout } from "./AuthLayout";
+import { ForgotForm, type ResetKind } from "./ResetPages";
 
-function PasswordForm({ onBack }: { onBack?: () => void }) {
+function PasswordForm({ onBack, onForgot }: { onBack?: () => void; onForgot: () => void }) {
   const { signIn } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -93,6 +94,13 @@ function PasswordForm({ onBack }: { onBack?: () => void }) {
       >
         Sign in
       </Button>
+      <button
+        type="button"
+        onClick={onForgot}
+        className="w-full text-center text-sm text-muted hover:text-text"
+      >
+        Forgot password?
+      </button>
       {onBack && (
         <button
           type="button"
@@ -110,9 +118,11 @@ function PasswordForm({ onBack }: { onBack?: () => void }) {
 function ProfilePicker({
   profiles,
   onUsePassword,
+  onForgot,
 }: {
   profiles: Profile[];
   onUsePassword: () => void;
+  onForgot: (kind: ResetKind) => void;
 }) {
   const { signIn } = useAuth();
   const [chosen, setChosen] = useState<Profile | null>(null);
@@ -235,6 +245,12 @@ function ProfilePicker({
       )}
       {login.isPending && <Spinner label="Signing in" />}
       <button
+        onClick={() => onForgot(chosen.requires === "pin" ? "pin" : "password")}
+        className="w-full text-center text-sm text-muted hover:text-text"
+      >
+        {chosen.requires === "pin" ? "Forgot PIN?" : "Forgot password?"}
+      </button>
+      <button
         onClick={() => (setChosen(null), setPassword(""), login.reset())}
         className="w-full text-center text-sm text-muted hover:text-text"
       >
@@ -252,6 +268,7 @@ export function LoginPage({
   pinSignIn: boolean;
 }) {
   const [usePassword, setUsePassword] = useState(false);
+  const [forgot, setForgot] = useState<ResetKind | null>(null);
   const profiles = useQuery({
     queryKey: ["auth", "profiles"],
     queryFn: () => unwrap(api.GET("/auth/profiles")),
@@ -259,6 +276,15 @@ export function LoginPage({
   });
   const showPicker =
     pinSignIn && !usePassword && (profiles.data?.length ?? 0) > 0;
+  if (forgot)
+    return (
+      <AuthLayout
+        title={forgot === "pin" ? "Forgot your PIN?" : "Forgot your password?"}
+        subtitle={serverName}
+      >
+        <ForgotForm kind={forgot} onBack={() => setForgot(null)} />
+      </AuthLayout>
+    );
   return (
     <AuthLayout
       title={showPicker ? "Who's watching?" : `Sign in to ${serverName}`}
@@ -270,9 +296,11 @@ export function LoginPage({
         <ProfilePicker
           profiles={profiles.data!}
           onUsePassword={() => setUsePassword(true)}
+          onForgot={setForgot}
         />
       ) : (
         <PasswordForm
+          onForgot={() => setForgot("password")}
           onBack={
             pinSignIn && (profiles.data?.length ?? 0) > 0
               ? () => setUsePassword(false)

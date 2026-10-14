@@ -26,6 +26,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { librariesQuery, meQuery, systemInfoQuery } from "@/api/queries";
 import type { LibraryType } from "@/api/types";
 import { ActivityIndicator } from "@/features/activity/ActivityIndicator";
+import { NotificationBell } from "@/features/activity/NotificationBell";
 import { UpdateBanner } from "@/features/activity/UpdateBanner";
 import { SearchBox } from "@/features/search/SearchBox";
 import { Avatar } from "@/features/users/Avatar";
@@ -289,6 +290,7 @@ export function Shell({ children }: { children: ReactNode }) {
               <Settings className="size-5" aria-hidden />
             </Link>
           )}
+          {me.data?.isAdmin && <NotificationBell />}
           {me.data?.isAdmin && <ActivityIndicator />}
           <UserMenu
             name={me.data?.displayName ?? ""}

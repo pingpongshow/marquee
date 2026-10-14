@@ -1,6 +1,7 @@
 import {
   Activity,
   AudioLines,
+  Bell,
   Sparkles,
   BarChart3,
   CalendarClock,
@@ -26,6 +27,7 @@ import { AiSettings } from "./AiSettings";
 import { CinemaSettings } from "./CinemaSettings";
 import { DashboardSettings } from "./DashboardSettings";
 import { MusicSettings } from "./MusicSettings";
+import { NotificationsSettings } from "./NotificationsSettings";
 import { LibrariesSettings } from "./LibrariesSettings";
 import { LogsSettings } from "./LogsSettings";
 import { PlexImportSettings } from "./PlexImportSettings";
@@ -197,6 +199,16 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] =
             "webhooks notifications home assistant discord integrations events play stop new",
           description:
             "Tell other services when something plays or new titles arrive.",
+        },
+        {
+          id: "notifications",
+          label: "Notifications",
+          icon: Bell,
+          component: NotificationsSettings,
+          keywords:
+            "email smtp mail alerts notifications disk space task failed backup recording sign-in password reset forgot pin link",
+          description:
+            "Email for password resets, and alerts when something goes wrong.",
         },
         {
           id: "plex-import",

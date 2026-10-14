@@ -148,13 +148,13 @@ export function RemoteAccessSettings() {
   );
 }
 
-function SecretField({ label, help, isSet, value, onChange }: { label: string; help: React.ReactNode; isSet: boolean; value: string | undefined; onChange: (v: string | undefined) => void }) {
+export function SecretField({ label, help, isSet, value, onChange, placeholder = "Paste API key" }: { label: string; help: React.ReactNode; isSet: boolean; value: string | undefined; onChange: (v: string | undefined) => void; placeholder?: string }) {
   const [editing, setEditing] = useState(false);
   return (
     <Field label={label} help={help}>
       {(id) =>
         editing || !isSet ? (
-          <Input id={id} type="password" autoComplete="off" placeholder="Paste API key" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />
+          <Input id={id} type="password" autoComplete="off" placeholder={placeholder} value={value ?? ""} onChange={(e) => onChange(e.target.value)} />
         ) : (
           <div className="flex items-center gap-3">
             {value === "" ? (

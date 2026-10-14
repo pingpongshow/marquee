@@ -288,6 +288,9 @@ func (m *Manager) serveFromTranscoder(w http.ResponseWriter, r *http.Request, s 
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
 			slog.Warn("segment failed", "session", s.ID, "segment", k, "err", err)
+			if m.OnFailure != nil {
+				m.OnFailure(s, err)
+			}
 		}
 		http.Error(w, "segment unavailable", http.StatusServiceUnavailable)
 		return

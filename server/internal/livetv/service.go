@@ -32,6 +32,8 @@ type Service struct {
 	HTTP     *http.Client
 	// Sessions plays channels; set by the caller.
 	Sessions *Sessions
+	// OnSourceFailed, when set, hears a source that couldn't be loaded (admin alerts).
+	OnSourceFailed func(src settings.LiveTVSource, err error)
 
 	refreshing sync.Mutex
 }
@@ -104,6 +106,9 @@ func (s *Service) Refresh(ctx context.Context) {
 		if err != nil {
 			msg = err.Error()
 			slog.Warn("live TV source failed", "source", src.Name, "err", err)
+			if s.OnSourceFailed != nil {
+				s.OnSourceFailed(src, err)
+			}
 		} else {
 			slog.Info("live TV source loaded", "source", src.Name, "channels", ch, "programmes", pr)
 		}

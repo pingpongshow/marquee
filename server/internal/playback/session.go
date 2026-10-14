@@ -154,6 +154,8 @@ type Manager struct {
 	IFrames func(fileID, durationMS int64) (file string, playlist []byte, ok bool)
 	// Events, when set, hears playback.started/paused/resumed/watched/stopped (webhooks).
 	Events func(kind string, s *Session, positionMS int64)
+	// OnFailure, when set, hears a transcode that failed to produce video (admin alerts).
+	OnFailure func(s *Session, err error)
 
 	mu       sync.Mutex
 	sessions map[string]*Session

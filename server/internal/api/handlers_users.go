@@ -253,7 +253,21 @@ func (h *Handlers) UpdateMe(ctx context.Context, req UpdateMeRequestObject) (Upd
 		}
 		upd.Preferences = &p
 	}
+	if b.Email != nil {
+		if s.User.IsManaged && !s.User.IsAdmin {
+			// Reset links go to this address, so a child mustn't be able to point it at themselves.
+			return UpdateMe403JSONResponse{ForbiddenJSONResponse(apiErr("forbidden", "ask an administrator to change this email address"))}, nil
+		}
+		e, err := auth.NormalizeEmail(*b.Email)
+		if err != nil {
+			return UpdateMe400JSONResponse{BadRequestJSONResponse(apiErr("invalid", err.Error()))}, nil
+		}
+		upd.Email = &e
+	}
 	u, err := h.Auth.Update(ctx, s.User.ID, upd)
+	if errors.Is(err, auth.ErrEmailTaken) {
+		return UpdateMe409JSONResponse{ConflictJSONResponse(apiErr("email_taken", err.Error()))}, nil
+	}
 	if err != nil {
 		return nil, internal(ctx, "updateMe", err)
 	}
@@ -307,6 +321,13 @@ func (h *Handlers) CreateUser(ctx context.Context, req CreateUserRequestObject) 
 	if n.PIN != "" && !validPIN(n.PIN) {
 		return bad("PIN must be 4 digits")
 	}
+	if b.Email != nil {
+		e, err := auth.NormalizeEmail(*b.Email)
+		if err != nil {
+			return bad(err.Error())
+		}
+		n.Email = e
+	}
 	r, err := fromAPIRestrictions(b.Restrictions)
 	if err != nil {
 		return bad(err.Error())
@@ -316,6 +337,8 @@ func (h *Handlers) CreateUser(ctx context.Context, req CreateUserRequestObject) 
 	switch {
 	case errors.Is(err, auth.ErrUsernameTaken):
 		return CreateUser409JSONResponse{ConflictJSONResponse(apiErr("username_taken", err.Error()))}, nil
+	case errors.Is(err, auth.ErrEmailTaken):
+		return CreateUser409JSONResponse{ConflictJSONResponse(apiErr("email_taken", err.Error()))}, nil
 	case errors.Is(err, auth.ErrNoAuthMeans):
 		return bad(err.Error())
 	case err != nil:
@@ -342,6 +365,13 @@ func (h *Handlers) UpdateUser(ctx context.Context, req UpdateUserRequestObject) 
 	if b.Pin != nil && *b.Pin != "" && !validPIN(*b.Pin) {
 		return bad("PIN must be 4 digits")
 	}
+	if b.Email != nil {
+		e, err := auth.NormalizeEmail(*b.Email)
+		if err != nil {
+			return bad(err.Error())
+		}
+		upd.Email = &e
+	}
 	if b.Restrictions != nil {
 		r, err := fromAPIRestrictions(b.Restrictions)
 		if err != nil {
@@ -361,6 +391,8 @@ func (h *Handlers) UpdateUser(ctx context.Context, req UpdateUserRequestObject) 
 		return UpdateUser404JSONResponse{NotFoundJSONResponse(apiErr("not_found", err.Error()))}, nil
 	case errors.Is(err, auth.ErrLastAdmin):
 		return UpdateUser409JSONResponse{ConflictJSONResponse(apiErr("last_admin", err.Error()))}, nil
+	case errors.Is(err, auth.ErrEmailTaken):
+		return UpdateUser409JSONResponse{ConflictJSONResponse(apiErr("email_taken", err.Error()))}, nil
 	case errors.Is(err, auth.ErrNoAuthMeans):
 		return bad("set a password to make this user an administrator")
 	case err != nil && strings.Contains(err.Error(), "managed profiles"):

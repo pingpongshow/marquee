@@ -20,12 +20,14 @@ var (
 	ErrInvalidCredentials = errors.New("invalid username or password")
 	ErrUsernameTaken      = errors.New("username already exists")
 	ErrUserNotFound       = errors.New("user not found")
+	ErrEmailTaken         = errors.New("another account uses this email address")
 )
 
 type User struct {
 	ID           int64
 	Username     string
 	DisplayName  string
+	Email        string // empty = none
 	IsAdmin      bool
 	IsManaged    bool
 	HasPIN       bool
@@ -49,18 +51,28 @@ type Session struct {
 }
 
 type Service struct {
-	db        *sql.DB
-	limiter   *loginLimiter
-	pins      *loginLimiter
-	totp      *loginLimiter
-	invites   *loginLimiter
-	seenMu    sync.Mutex
-	lastSeen  map[int64]time.Time // device id → last persisted last_seen_at
-	imgSecret []byte
+	db      *sql.DB
+	limiter *loginLimiter
+	pins    *loginLimiter
+	totp    *loginLimiter
+	invites *loginLimiter
+	// Password and PIN reset requests (forgot): per address and per account.
+	forgotIP, forgotUser *loginLimiter
+	seenMu               sync.Mutex
+	lastSeen             map[int64]time.Time // device id → last persisted last_seen_at
+	imgSecret            []byte
+
+	// OnFailedLogin, when set, hears a wrong password for an account that exists, with the
+	// account's failures in the lockout window (possible brute force).
+	OnFailedLogin func(username, ip string, failures int)
+	// OnNewDevice, when set, hears a sign-in from a device the user hasn't signed in from
+	// before (a user's very first device doesn't count).
+	OnNewDevice func(userID int64, d Device, ip string)
 }
 
 func NewService(db *sql.DB) *Service {
-	return &Service{db: db, limiter: newLoginLimiter(), pins: newLimiter(5), totp: newLimiter(5), invites: newLimiter(10), lastSeen: map[int64]time.Time{}}
+	return &Service{db: db, limiter: newLoginLimiter(), pins: newLimiter(5), totp: newLimiter(5), invites: newLimiter(10),
+		forgotIP: newLimiter(10), forgotUser: newLimiter(3), lastSeen: map[int64]time.Time{}}
 }
 
 // UserCount returns the number of users; zero means first-run setup is required.
@@ -112,7 +124,10 @@ func (s *Service) Authenticate(ctx context.Context, clientIP, username, password
 		return User{}, err
 	}
 	if !ok {
-		s.limiter.fail(clientIP, key)
+		n := s.limiter.fail(clientIP, key)
+		if s.OnFailedLogin != nil {
+			s.OnFailedLogin(username, clientIP, n)
+		}
 		return User{}, ErrInvalidCredentials
 	}
 	s.limiter.success(clientIP, key)
@@ -126,6 +141,7 @@ func (s *Service) IssueToken(ctx context.Context, q querier, userID int64, d Dev
 		return "", err
 	}
 	token := base64.RawURLEncoding.EncodeToString(raw)
+	newDevice := s.rememberDevice(ctx, q, userID, d.ClientID)
 	_, err := q.ExecContext(ctx, `
 		INSERT INTO devices(user_id, client_id, name, platform, product, version, token_hash, last_ip)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -134,7 +150,25 @@ func (s *Service) IssueToken(ctx context.Context, q querier, userID int64, d Dev
 			version = excluded.version, token_hash = excluded.token_hash, last_ip = excluded.last_ip,
 			last_seen_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
 		userID, d.ClientID, d.Name, d.Platform, d.Product, d.Version, hashToken(token), ip)
+	if err == nil && newDevice && s.OnNewDevice != nil {
+		go s.OnNewDevice(userID, d, ip) // the caller may hold a transaction
+	}
 	return token, err
+}
+
+// rememberDevice records that the user signed in from clientID, reporting whether it's a
+// device they haven't used before (and not their first device).
+func (s *Service) rememberDevice(ctx context.Context, q querier, userID int64, clientID string) bool {
+	var known int
+	if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM known_devices WHERE user_id = ?`, userID).Scan(&known); err != nil {
+		return false
+	}
+	r, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO known_devices (user_id, client_id) VALUES (?, ?)`, userID, clientID)
+	if err != nil {
+		return false
+	}
+	n, _ := r.RowsAffected()
+	return n > 0 && known > 0
 }
 
 // ResolveToken returns the session for a bearer token, or ok=false if it is unknown.
@@ -178,7 +212,7 @@ type querier interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
-const userCols = `u.id, u.username, u.display_name, u.is_admin, u.is_managed, u.pin_hash IS NOT NULL,
+const userCols = `u.id, u.username, u.display_name, COALESCE(u.email, ''), u.is_admin, u.is_managed, u.pin_hash IS NOT NULL,
 	u.password_hash IS NOT NULL, u.avatar_version, u.created_at, u.restrictions, u.preferences,
 	(SELECT MAX(last_seen_at) FROM devices d WHERE d.user_id = u.id),
 	EXISTS(SELECT 1 FROM user_totp t WHERE t.user_id = u.id AND t.secret IS NOT NULL)`
@@ -187,7 +221,7 @@ func scanUser(row interface{ Scan(...any) error }) (User, error) {
 	var u User
 	var created, restr, prefs string
 	var seen sql.NullString
-	if err := row.Scan(&u.ID, &u.Username, &u.DisplayName, &u.IsAdmin, &u.IsManaged, &u.HasPIN, &u.HasPassword, &u.Avatar,
+	if err := row.Scan(&u.ID, &u.Username, &u.DisplayName, &u.Email, &u.IsAdmin, &u.IsManaged, &u.HasPIN, &u.HasPassword, &u.Avatar,
 		&created, &restr, &prefs, &seen, &u.HasTOTP); err != nil {
 		return User{}, err
 	}

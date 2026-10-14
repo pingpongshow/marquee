@@ -299,6 +299,7 @@ function AddUserDialog({ onClose }: { onClose: () => void }) {
   const [managed, setManaged] = useState(false);
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pin, setPin] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
@@ -330,6 +331,7 @@ function AddUserDialog({ onClose }: { onClose: () => void }) {
                 {
                   username: username.trim(),
                   displayName: displayName.trim() || undefined,
+                  email: email.trim() || undefined,
                   password: managed ? undefined : password,
                   pin: pin || undefined,
                   isManaged: managed,
@@ -406,6 +408,18 @@ function AddUserDialog({ onClose }: { onClose: () => void }) {
               />
             )}
           </Field>
+          <Field label="Email" help="Optional. For reset links if they forget their password or PIN.">
+            {(id) => (
+              <Input
+                id={id}
+                type="email"
+                maxLength={254}
+                autoComplete="off"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            )}
+          </Field>
           {!managed && (
             <Field
               label="Password"
@@ -469,6 +483,7 @@ function EditUserDialog({
   const update = useUpdateUser();
   const live = useQuery(usersQuery).data?.find((u) => u.id === user.id) ?? user; // picture changes save immediately
   const [displayName, setDisplayName] = useState(user.displayName);
+  const [email, setEmail] = useState(user.email ?? "");
   const [password, setPassword] = useState("");
   const [pin, setPin] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(user.isAdmin);
@@ -503,6 +518,7 @@ function EditUserDialog({
                   id: user.id,
                   body: {
                     displayName: displayName.trim(),
+                    email: email.trim() !== (user.email ?? "") ? email.trim() : undefined,
                     password: password || undefined,
                     pin: pin ?? undefined,
                     isAdmin: user.isManaged ? undefined : isAdmin,
@@ -529,6 +545,18 @@ function EditUserDialog({
                 maxLength={64}
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
+              />
+            )}
+          </Field>
+          <Field label="Email" help="For reset links, and alerts for administrators. Empty removes it.">
+            {(id) => (
+              <Input
+                id={id}
+                type="email"
+                maxLength={254}
+                autoComplete="off"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             )}
           </Field>
@@ -703,6 +731,7 @@ export function UsersSettings() {
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{u.displayName}</span>
           <span className="text-xs text-faint">@{u.username}</span>
+          {u.email && <span className="text-xs text-faint">{u.email}</span>}
           {u.isAdmin && (
             <Badge tone="accent">
               <Shield className="mr-0.5 inline size-3" aria-hidden />{" "}

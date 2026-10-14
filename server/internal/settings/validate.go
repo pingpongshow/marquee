@@ -2,6 +2,7 @@ package settings
 
 import (
 	"fmt"
+	"net/mail"
 	"net/netip"
 	"net/url"
 	"path"
@@ -131,6 +132,9 @@ func (s Settings) Validate() error {
 	if m := s.AI.UnloadMinutes; m < 0 || m > 1440 {
 		return invalid("unload after must be 0–1440 minutes")
 	}
+	if err := s.Notifications.validate(); err != nil {
+		return err
+	}
 	if len(s.Webhooks) > 20 {
 		return invalid("at most 20 webhooks")
 	}
@@ -149,7 +153,52 @@ func (s Settings) Validate() error {
 }
 
 var validWebhookEvents = map[string]bool{"playback.started": true, "playback.paused": true, "playback.resumed": true,
-	"playback.stopped": true, "playback.watched": true, "library.added": true}
+	"playback.stopped": true, "playback.watched": true, "library.added": true, "alert": true}
+
+func (n Notifications) validate() error {
+	switch n.SMTPSecurity {
+	case "none", "starttls", "tls":
+	default:
+		return invalid("mail security must be none, starttls or tls")
+	}
+	if n.SMTPPort < 0 || n.SMTPPort > 65535 {
+		return invalid("the mail server port must be 1–65535")
+	}
+	if strings.ContainsAny(n.SMTPHost, " /\r\n") {
+		return invalid("the mail server must be a host name or address")
+	}
+	if n.SMTPHost != "" && n.SMTPPort == 0 {
+		return invalid("the mail server needs a port")
+	}
+	for _, v := range []string{n.FromAddress, n.FromName, n.SMTPUsername} {
+		if strings.ContainsAny(v, "\r\n") {
+			return invalid("mail settings can't contain line breaks")
+		}
+	}
+	if n.FromAddress != "" {
+		if a, err := mail.ParseAddress(n.FromAddress); err != nil || a.Address != n.FromAddress {
+			return invalid("the from address must be an email address like marquee@example.com")
+		}
+	}
+	if n.LinkURL != "" {
+		if p, err := url.Parse(n.LinkURL); err != nil || (p.Scheme != "http" && p.Scheme != "https") || p.Host == "" {
+			return invalid("the link address must be an http(s) URL")
+		}
+	}
+	valid := map[string]bool{}
+	for _, t := range AlertTypes {
+		valid[t] = true
+	}
+	for _, a := range n.Alerts {
+		if !valid[a] {
+			return invalid("unknown alert type %q", a)
+		}
+	}
+	if t := n.DiskThresholdPercent; t < 1 || t > 50 {
+		return invalid("the disk space threshold must be 1–50%%")
+	}
+	return nil
+}
 
 func parseClock(s string) (int, error) {
 	var h, m int
