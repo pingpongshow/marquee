@@ -206,3 +206,52 @@ type fallbackEmbedder struct{}
 func (fallbackEmbedder) EmbedDocs(_ context.Context, texts []string, _ string) (string, [][]float32, error) {
 	return "bge", make([][]float32, len(texts)), nil
 }
+
+// A cold model load that outlasts the request's budget gives up in time, doesn't count as
+// Ollama failing, and keeps loading the models in the background.
+func TestBudgetWhileLoading(t *testing.T) {
+	var warmed atomic.Int32
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/generate":
+			warmed.Add(1)
+			w.Write([]byte(`{}`))
+		case "/api/chat":
+			select { // "loading": answers only after the caller gave up
+			case <-release:
+			case <-r.Context().Done():
+			}
+		default:
+			w.Write([]byte(`{"embeddings":[[1]]}`))
+		}
+	}))
+	defer srv.Close()
+	defer close(release)
+	c := &Client{Config: cfgFor(srv.URL)}
+	ctx := WithBudget(context.Background(), 300*time.Millisecond)
+	start := time.Now()
+	var out map[string]any
+	for i := 0; i < breakerAfter+1; i++ {
+		if err := c.Chat(ctx, "s", "u", map[string]any{}, &out); !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("call %d: %v", i, err)
+		}
+	}
+	if d := time.Since(start); d > time.Second {
+		t.Fatalf("took %s, past the budget", d)
+	}
+	if !c.Ready() {
+		t.Fatal("running out of budget shouldn't pause AI")
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for warmed.Load() == 0 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if warmed.Load() == 0 {
+		t.Fatal("the model wasn't loaded in the background")
+	}
+	// Calls without a budget keep their own timeout.
+	if d, b := limit(context.Background(), time.Minute); d != time.Minute || b {
+		t.Fatalf("limit without budget: %s %v", d, b)
+	}
+}

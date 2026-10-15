@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -51,6 +52,61 @@ type Client struct {
 	openUntil time.Time // no calls before this
 	lastErr   string
 	lastErrAt time.Time
+	warming   atomic.Bool
+}
+
+type budgetKey struct{}
+
+// WithBudget gives the model calls made with the returned context d in all, so a person
+// waiting on an answer isn't kept past the app's request timeout while Ollama loads a model
+// from cold. A call that runs out of budget fails with ErrUnavailable (the caller falls
+// back) and leaves the models loading in the background, so the next request has them.
+func WithBudget(ctx context.Context, d time.Duration) context.Context {
+	return context.WithValue(ctx, budgetKey{}, time.Now().Add(d))
+}
+
+// limit returns the timeout for one call: t, or less when the budget ends sooner.
+// budgeted reports that the budget set it.
+func limit(ctx context.Context, t time.Duration) (_ time.Duration, budgeted bool) {
+	dl, ok := ctx.Value(budgetKey{}).(time.Time)
+	if !ok {
+		return t, false
+	}
+	if left := time.Until(dl); left < t {
+		return left, true
+	}
+	return t, false
+}
+
+// minCall is the least time worth starting a call with.
+const minCall = 500 * time.Millisecond
+
+// warm loads the chat and embedding models in the background (once at a time), for
+// requests that gave up while they were loading.
+func (c *Client) warm(cfg Config) {
+	if !c.warming.CompareAndSwap(false, true) {
+		return
+	}
+	go func() {
+		defer c.warming.Store(false)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		var out map[string]any
+		// /api/generate with no prompt only loads the model.
+		if cfg.ChatModel != "" {
+			c.post(ctx, cfg.URL, "/api/generate", map[string]any{"model": cfg.ChatModel, "keep_alive": keepAlive(cfg)}, &out)
+		}
+		if cfg.EmbedModel != "" {
+			c.post(ctx, cfg.URL, "/api/embed", map[string]any{"model": cfg.EmbedModel, "input": []string{"warm"}, "keep_alive": keepAlive(cfg)}, &out)
+		}
+	}()
+}
+
+// outOfTime handles a call stopped by the request's budget rather than by Ollama: it
+// isn't counted as a failure, and the models carry on loading for the next request.
+func (c *Client) outOfTime(cfg Config, err error) error {
+	c.warm(cfg)
+	return fmt.Errorf("%w: still loading the model (%v)", ErrUnavailable, err)
 }
 
 // breaker settings: after breakerAfter consecutive failures, calls fail at once for a
@@ -195,6 +251,10 @@ func (c *Client) Chat(ctx context.Context, system, user string, schema any, out 
 	if t == 0 {
 		t = 25 * time.Second
 	}
+	t, budgeted := limit(ctx, t)
+	if budgeted && t < minCall {
+		return c.outOfTime(cfg, context.DeadlineExceeded)
+	}
 	cctx, cancel := context.WithTimeout(ctx, t)
 	defer cancel()
 	in := map[string]any{
@@ -210,6 +270,9 @@ func (c *Client) Chat(ctx context.Context, system, user string, schema any, out 
 		Message Message `json:"message"`
 	}
 	err = c.post(cctx, cfg.URL, "/api/chat", in, &resp)
+	if err != nil && budgeted && ctx.Err() == nil && cctx.Err() != nil {
+		return c.outOfTime(cfg, err)
+	}
 	c.done(ctx, err)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrUnavailable, err)
@@ -234,6 +297,10 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 	if t == 0 {
 		t = 60 * time.Second
 	}
+	t, budgeted := limit(ctx, t)
+	if budgeted && t < minCall {
+		return nil, c.outOfTime(cfg, context.DeadlineExceeded)
+	}
 	cctx, cancel := context.WithTimeout(ctx, t)
 	defer cancel()
 	var resp struct {
@@ -244,6 +311,9 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 	}, &resp)
 	if err == nil && len(resp.Embeddings) != len(texts) {
 		err = fmt.Errorf("ollama /api/embed: %d embeddings for %d texts", len(resp.Embeddings), len(texts))
+	}
+	if err != nil && budgeted && ctx.Err() == nil && cctx.Err() != nil {
+		return nil, c.outOfTime(cfg, err)
 	}
 	c.done(ctx, err)
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"marquee/internal/ai"
 	"marquee/internal/items"
 	"marquee/internal/lyrics"
 	"marquee/internal/muse"
@@ -205,6 +206,7 @@ func (h *Handlers) MusicMuse(ctx context.Context, req MusicMuseRequestObject) (M
 	o := soundprint.Options{Keep: keepFor(access(ctx), req.Body.LibraryId), Avoid: h.Soundprint.Avoid(ctx, s.User.ID)}
 	// Read the prompt (AI, or keywords against the library's genres and artists), filter,
 	// then rank by sound, "like" artists, genres and, with AI, lyric themes.
+	ctx = ai.WithBudget(ctx, museAIBudget) // see museAIBudget
 	cfg := h.Settings.Get().AI
 	var llm muse.LLM
 	if cfg.On(cfg.UnderstandPrompts) && h.AI != nil {
