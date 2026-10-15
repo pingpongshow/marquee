@@ -10,6 +10,7 @@ import (
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
+	"marquee/internal/ai"
 	"marquee/internal/items"
 	"marquee/internal/muse"
 )
@@ -112,6 +113,11 @@ func (h *Handlers) videoIndex() *items.VideoIndex {
 // rerankTop is how many candidates the AI re-ranks.
 const rerankTop = 30
 
+// museAIBudget is how long Muse's model calls may take in all. The apps give up on a
+// request after 20 s, and loading a model from cold can take about that long, so past this
+// Muse answers without the model (which keeps loading for the next request).
+const museAIBudget = 12 * time.Second
+
 func (h *Handlers) MuseVideo(ctx context.Context, req MuseVideoRequestObject) (MuseVideoResponseObject, error) {
 	if _, ok := session(ctx); !ok {
 		return MuseVideo401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
@@ -129,6 +135,7 @@ func (h *Handlers) MuseVideo(ctx context.Context, req MuseVideoRequestObject) (M
 	if lib > 0 && !canSeeLibrary(ctx, lib) {
 		return MuseVideo400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "library not found"))}, nil
 	}
+	ctx = ai.WithBudget(ctx, museAIBudget) // see museAIBudget
 	genres, err := h.Items.VideoGenres(ctx)
 	if err != nil {
 		return nil, internal(ctx, "museVideo", err)
