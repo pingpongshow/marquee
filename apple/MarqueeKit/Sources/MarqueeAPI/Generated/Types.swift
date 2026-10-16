@@ -567,6 +567,16 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /items/{itemId}/trailer`.
     /// - Remark: Generated from `#/paths//items/{itemId}/trailer/get(getItemTrailer)`.
     func getItemTrailer(_ input: Operations.GetItemTrailer.Input) async throws -> Operations.GetItemTrailer.Output
+    /// All of the caller's Continue Watching, newest first, a page at a time: in-progress library movies, episodes and videos, the next episode of every show they've watched (no time limit), and films and episodes on demand stopped part-way through (when on demand is on and theirs to watch). Home's row is the first 20.
+    ///
+    /// - Remark: HTTP `GET /hubs/continue-watching`.
+    /// - Remark: Generated from `#/paths//hubs/continue-watching/get(continueWatching)`.
+    func continueWatching(_ input: Operations.ContinueWatching.Input) async throws -> Operations.ContinueWatching.Output
+    /// Removes a film on demand, or an episode's series, from your Continue Watching. The resume point is kept; it comes back once you play it (or, for a series, any of its episodes) again.
+    ///
+    /// - Remark: HTTP `DELETE /hubs/continue-watching/vod/{kind}/{vodId}`.
+    /// - Remark: Generated from `#/paths//hubs/continue-watching/vod/{kind}/{vodId}/delete(removeVodFromContinueWatching)`.
+    func removeVodFromContinueWatching(_ input: Operations.RemoveVodFromContinueWatching.Input) async throws -> Operations.RemoveVodFromContinueWatching.Output
     /// Removes a movie, episode or show from your Continue Watching (USER-6). The resume position is kept; it comes back once you play it (or, for a show, any of its episodes) again.
     ///
     /// - Remark: HTTP `DELETE /hubs/continue-watching/{itemId}`.
@@ -880,6 +890,66 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /livetv/vod/refresh`.
     /// - Remark: Generated from `#/paths//livetv/vod/refresh/post(refreshVod)`.
     func refreshVod(_ input: Operations.RefreshVod.Input) async throws -> Operations.RefreshVod.Output
+    /// Save a film into the library (admin only; Xtream Codes sources). Queued, downloaded, converted per Settings → vodSave, verified, moved into vodSave.moviesFolder and scanned. A film already queued or saved isn't queued again. One the library already has (VodMovieDetail.library) is refused with 409: in_library when the library's copy is as good or better, upgrade_available when this copy is better and upgrade wasn't set. With upgrade, a better copy replaces the library's: saved into the same folder, the old file(s) moved to the media trash, the item (and its watch history) kept.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/movies/{movieId}/save`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/save/post(saveVodMovie)`.
+    func saveVodMovie(_ input: Operations.SaveVodMovie.Input) async throws -> Operations.SaveVodMovie.Output
+    /// Save one episode into the library (admin only), into vodSave.showsFolder: {Show (Year)}/Season N/{Show} - SxxEyy - {Title} WEBDL-1080p.ext. Like a film: 409 in_library or upgrade_available when the library has it; upgrade replaces the library's copy when this one is better.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/episodes/{episodeId}/save`.
+    /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/save/post(saveVodEpisode)`.
+    func saveVodEpisode(_ input: Operations.SaveVodEpisode.Input) async throws -> Operations.SaveVodEpisode.Output
+    /// Save a whole series, or one season, into the library (admin only). The episodes are fetched from the source first when they haven't been; ones already queued or saved are left out. Only episodes the library doesn't have are queued, plus (includeUpgrades) those better than the library's copies, which they replace; the rest count as skipped.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/series/{seriesId}/save`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/save/post(saveVodSeries)`.
+    func saveVodSeries(_ input: Operations.SaveVodSeries.Input) async throws -> Operations.SaveVodSeries.Output
+    /// The save queue (admin only): unfinished saves in the order they run, then finished ones, newest first, with live progress, speed and ETA. Poll while active is true.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/saves`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/get(listVodSaves)`.
+    func listVodSaves(_ input: Operations.ListVodSaves.Input) async throws -> Operations.ListVodSaves.Output
+    /// Remove finished saves (done, failed, cancelled, skipped) from the list (admin only). Failed saves' partial files are deleted.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/saves/clear`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/clear/post(clearVodSaves)`.
+    func clearVodSaves(_ input: Operations.ClearVodSaves.Input) async throws -> Operations.ClearVodSaves.Output
+    /// Pause the whole queue (admin only). Running saves stop and keep their partial files; resuming continues them with Range requests.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/saves/pause`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/pause/post(pauseVodSaves)`.
+    func pauseVodSaves(_ input: Operations.PauseVodSaves.Input) async throws -> Operations.PauseVodSaves.Output
+    /// Resume the whole queue (admin only).
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/saves/resume`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/resume/post(resumeVodSaves)`.
+    func resumeVodSaves(_ input: Operations.ResumeVodSaves.Input) async throws -> Operations.ResumeVodSaves.Output
+    /// Cancel a save (admin only); its partial files are deleted.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/saves/{saveId}`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/{saveId}/delete(cancelVodSave)`.
+    func cancelVodSave(_ input: Operations.CancelVodSave.Input) async throws -> Operations.CancelVodSave.Output
+    /// Queue a failed or cancelled save again (admin only); a failed one continues from what it downloaded.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/saves/{saveId}/retry`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/{saveId}/retry/post(retryVodSave)`.
+    func retryVodSave(_ input: Operations.RetryVodSave.Input) async throws -> Operations.RetryVodSave.Output
+    /// Make a waiting save the next to run (admin only).
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/saves/{saveId}/top`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/{saveId}/top/post(moveVodSaveToTop)`.
+    func moveVodSaveToTop(_ input: Operations.MoveVodSaveToTop.Input) async throws -> Operations.MoveVodSaveToTop.Output
+    /// Pause one save (admin only); it keeps what it downloaded.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/saves/{saveId}/pause`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/{saveId}/pause/post(pauseVodSave)`.
+    func pauseVodSave(_ input: Operations.PauseVodSave.Input) async throws -> Operations.PauseVodSave.Output
+    /// Resume a paused save (admin only); it continues from where it stopped.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/saves/{saveId}/resume`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/{saveId}/resume/post(resumeVodSave)`.
+    func resumeVodSave(_ input: Operations.ResumeVodSave.Input) async throws -> Operations.ResumeVodSave.Output
     /// Whether requests are set up and whether the caller may make them.
     ///
     /// - Remark: HTTP `GET /requests/status`.
@@ -2500,6 +2570,32 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// All of the caller's Continue Watching, newest first, a page at a time: in-progress library movies, episodes and videos, the next episode of every show they've watched (no time limit), and films and episodes on demand stopped part-way through (when on demand is on and theirs to watch). Home's row is the first 20.
+    ///
+    /// - Remark: HTTP `GET /hubs/continue-watching`.
+    /// - Remark: Generated from `#/paths//hubs/continue-watching/get(continueWatching)`.
+    public func continueWatching(
+        query: Operations.ContinueWatching.Input.Query = .init(),
+        headers: Operations.ContinueWatching.Input.Headers = .init()
+    ) async throws -> Operations.ContinueWatching.Output {
+        try await continueWatching(Operations.ContinueWatching.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Removes a film on demand, or an episode's series, from your Continue Watching. The resume point is kept; it comes back once you play it (or, for a series, any of its episodes) again.
+    ///
+    /// - Remark: HTTP `DELETE /hubs/continue-watching/vod/{kind}/{vodId}`.
+    /// - Remark: Generated from `#/paths//hubs/continue-watching/vod/{kind}/{vodId}/delete(removeVodFromContinueWatching)`.
+    public func removeVodFromContinueWatching(
+        path: Operations.RemoveVodFromContinueWatching.Input.Path,
+        headers: Operations.RemoveVodFromContinueWatching.Input.Headers = .init()
+    ) async throws -> Operations.RemoveVodFromContinueWatching.Output {
+        try await removeVodFromContinueWatching(Operations.RemoveVodFromContinueWatching.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// Removes a movie, episode or show from your Continue Watching (USER-6). The resume position is kept; it comes back once you play it (or, for a show, any of its episodes) again.
     ///
     /// - Remark: HTTP `DELETE /hubs/continue-watching/{itemId}`.
@@ -3234,6 +3330,144 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//livetv/vod/refresh/post(refreshVod)`.
     public func refreshVod(headers: Operations.RefreshVod.Input.Headers = .init()) async throws -> Operations.RefreshVod.Output {
         try await refreshVod(Operations.RefreshVod.Input(headers: headers))
+    }
+    /// Save a film into the library (admin only; Xtream Codes sources). Queued, downloaded, converted per Settings → vodSave, verified, moved into vodSave.moviesFolder and scanned. A film already queued or saved isn't queued again. One the library already has (VodMovieDetail.library) is refused with 409: in_library when the library's copy is as good or better, upgrade_available when this copy is better and upgrade wasn't set. With upgrade, a better copy replaces the library's: saved into the same folder, the old file(s) moved to the media trash, the item (and its watch history) kept.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/movies/{movieId}/save`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/save/post(saveVodMovie)`.
+    public func saveVodMovie(
+        path: Operations.SaveVodMovie.Input.Path,
+        query: Operations.SaveVodMovie.Input.Query = .init(),
+        headers: Operations.SaveVodMovie.Input.Headers = .init()
+    ) async throws -> Operations.SaveVodMovie.Output {
+        try await saveVodMovie(Operations.SaveVodMovie.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Save one episode into the library (admin only), into vodSave.showsFolder: {Show (Year)}/Season N/{Show} - SxxEyy - {Title} WEBDL-1080p.ext. Like a film: 409 in_library or upgrade_available when the library has it; upgrade replaces the library's copy when this one is better.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/episodes/{episodeId}/save`.
+    /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/save/post(saveVodEpisode)`.
+    public func saveVodEpisode(
+        path: Operations.SaveVodEpisode.Input.Path,
+        query: Operations.SaveVodEpisode.Input.Query = .init(),
+        headers: Operations.SaveVodEpisode.Input.Headers = .init()
+    ) async throws -> Operations.SaveVodEpisode.Output {
+        try await saveVodEpisode(Operations.SaveVodEpisode.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Save a whole series, or one season, into the library (admin only). The episodes are fetched from the source first when they haven't been; ones already queued or saved are left out. Only episodes the library doesn't have are queued, plus (includeUpgrades) those better than the library's copies, which they replace; the rest count as skipped.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/series/{seriesId}/save`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/save/post(saveVodSeries)`.
+    public func saveVodSeries(
+        path: Operations.SaveVodSeries.Input.Path,
+        query: Operations.SaveVodSeries.Input.Query = .init(),
+        headers: Operations.SaveVodSeries.Input.Headers = .init()
+    ) async throws -> Operations.SaveVodSeries.Output {
+        try await saveVodSeries(Operations.SaveVodSeries.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// The save queue (admin only): unfinished saves in the order they run, then finished ones, newest first, with live progress, speed and ETA. Poll while active is true.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/saves`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/get(listVodSaves)`.
+    public func listVodSaves(headers: Operations.ListVodSaves.Input.Headers = .init()) async throws -> Operations.ListVodSaves.Output {
+        try await listVodSaves(Operations.ListVodSaves.Input(headers: headers))
+    }
+    /// Remove finished saves (done, failed, cancelled, skipped) from the list (admin only). Failed saves' partial files are deleted.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/saves/clear`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/clear/post(clearVodSaves)`.
+    public func clearVodSaves(headers: Operations.ClearVodSaves.Input.Headers = .init()) async throws -> Operations.ClearVodSaves.Output {
+        try await clearVodSaves(Operations.ClearVodSaves.Input(headers: headers))
+    }
+    /// Pause the whole queue (admin only). Running saves stop and keep their partial files; resuming continues them with Range requests.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/saves/pause`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/pause/post(pauseVodSaves)`.
+    public func pauseVodSaves(headers: Operations.PauseVodSaves.Input.Headers = .init()) async throws -> Operations.PauseVodSaves.Output {
+        try await pauseVodSaves(Operations.PauseVodSaves.Input(headers: headers))
+    }
+    /// Resume the whole queue (admin only).
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/saves/resume`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/resume/post(resumeVodSaves)`.
+    public func resumeVodSaves(headers: Operations.ResumeVodSaves.Input.Headers = .init()) async throws -> Operations.ResumeVodSaves.Output {
+        try await resumeVodSaves(Operations.ResumeVodSaves.Input(headers: headers))
+    }
+    /// Cancel a save (admin only); its partial files are deleted.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/saves/{saveId}`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/{saveId}/delete(cancelVodSave)`.
+    public func cancelVodSave(
+        path: Operations.CancelVodSave.Input.Path,
+        headers: Operations.CancelVodSave.Input.Headers = .init()
+    ) async throws -> Operations.CancelVodSave.Output {
+        try await cancelVodSave(Operations.CancelVodSave.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Queue a failed or cancelled save again (admin only); a failed one continues from what it downloaded.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/saves/{saveId}/retry`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/{saveId}/retry/post(retryVodSave)`.
+    public func retryVodSave(
+        path: Operations.RetryVodSave.Input.Path,
+        headers: Operations.RetryVodSave.Input.Headers = .init()
+    ) async throws -> Operations.RetryVodSave.Output {
+        try await retryVodSave(Operations.RetryVodSave.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Make a waiting save the next to run (admin only).
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/saves/{saveId}/top`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/{saveId}/top/post(moveVodSaveToTop)`.
+    public func moveVodSaveToTop(
+        path: Operations.MoveVodSaveToTop.Input.Path,
+        headers: Operations.MoveVodSaveToTop.Input.Headers = .init()
+    ) async throws -> Operations.MoveVodSaveToTop.Output {
+        try await moveVodSaveToTop(Operations.MoveVodSaveToTop.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Pause one save (admin only); it keeps what it downloaded.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/saves/{saveId}/pause`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/{saveId}/pause/post(pauseVodSave)`.
+    public func pauseVodSave(
+        path: Operations.PauseVodSave.Input.Path,
+        headers: Operations.PauseVodSave.Input.Headers = .init()
+    ) async throws -> Operations.PauseVodSave.Output {
+        try await pauseVodSave(Operations.PauseVodSave.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Resume a paused save (admin only); it continues from where it stopped.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/saves/{saveId}/resume`.
+    /// - Remark: Generated from `#/paths//livetv/vod/saves/{saveId}/resume/post(resumeVodSave)`.
+    public func resumeVodSave(
+        path: Operations.ResumeVodSave.Input.Path,
+        headers: Operations.ResumeVodSave.Input.Headers = .init()
+    ) async throws -> Operations.ResumeVodSave.Output {
+        try await resumeVodSave(Operations.ResumeVodSave.Input(
+            path: path,
+            headers: headers
+        ))
     }
     /// Whether requests are set up and whether the caller may make them.
     ///
