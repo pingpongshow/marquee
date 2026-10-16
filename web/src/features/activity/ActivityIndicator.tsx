@@ -11,6 +11,8 @@ type Task = components["schemas"]["ActivityTask"];
 
 function taskDetail(t: Task) {
   const p = t.progress;
+  // VOD downloads: sizes, speed and time left, or why the queue waits.
+  if (t.kind === "download") return p?.current ?? (t.state === "queued" ? "Waiting…" : "");
   if (t.state === "queued" || !p) return "Waiting…";
   if (t.kind === "stream") {
     const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -118,7 +120,14 @@ export function ActivityIndicator() {
                       />
                     </div>
                   )}
-                  {t.progress?.current && <div className="mt-1 truncate text-[11px] text-faint">{t.progress.current}</div>}
+                  {t.progress?.current && t.kind !== "download" && (
+                    <div className="mt-1 truncate text-[11px] text-faint">{t.progress.current}</div>
+                  )}
+                  {t.kind === "download" && (
+                    <Link to="/vod/saves" onClick={() => setOpen(false)} className="mt-1 inline-block text-[11px] text-muted hover:text-text">
+                      Open VOD Downloads
+                    </Link>
+                  )}
                 </li>
               );
             })}

@@ -5896,7 +5896,7 @@ components:
       required: [id, kind, title, state]
       properties:
         id: { type: string, description: "Stable id, e.g. scan:3" }
-        kind: { type: string, enum: [scan, import, stream, task] }
+        kind: { type: string, enum: [scan, import, stream, task, download], description: "download: a VOD title being saved to the library (admins)." }
         title: { type: string, example: Scanning Movies }
         state: { type: string, enum: [queued, running] }
         libraryId: { type: integer, format: int64 }

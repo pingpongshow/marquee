@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"marquee/internal/vod"
@@ -165,5 +166,54 @@ func TestVodSaveAdminOnlyAndFolders(t *testing.T) {
 	}
 	if code := h.do("GET", "/livetv/vod/saves", nil, nil); code != 200 {
 		t.Errorf("admin, set up: %d", code)
+	}
+}
+
+// Admins see running VOD downloads in Activity, and one line for those waiting.
+func TestVodSaveActivity(t *testing.T) {
+	h := newHarness(t)
+	var res struct {
+		Token string `json:"token"`
+	}
+	h.do("POST", "/setup", map[string]any{"serverName": "T", "username": "admin", "password": "correct horse", "device": device}, &res)
+	h.token = res.Token
+	h.handlers.VOD = &vod.Service{DB: h.db, Settings: h.store, Streams: &vod.Streams{}}
+	h.handlers.VODSaves = &vodsave.Service{DB: h.db, Settings: h.store, VOD: h.handlers.VOD}
+	add := func(title, state string, done, total int64, pos int) {
+		t.Helper()
+		if _, err := h.db.Exec(`INSERT INTO vod_saves (source_id, kind, vod_id, source_key, file, title, target_path, quality, state,
+			queue_pos, bytes_done, bytes_total, created_at) VALUES ('s', 'movie', 1, 'k', '1.mkv', ?, '/x', 'original', ?, ?, ?, ?, '2026-01-01T00:00:00Z')`,
+			title, state, pos, done, total); err != nil {
+			t.Fatal(err)
+		}
+	}
+	add("Arrival (2016)", "downloading", 1<<30, 4<<30, 1)
+	add("Heat (1995)", "queued", 0, 0, 2)
+	add("Ran (1985)", "paused", 0, 0, 3)
+	add("Old (2021)", "done", 1, 1, 4)
+	var act struct {
+		Tasks []struct {
+			ID, Kind, Title, State string
+			Progress               *struct {
+				Done, Total int
+				Current     string
+			}
+		}
+	}
+	if code := h.do("GET", "/activity", nil, &act); code != 200 {
+		t.Fatalf("activity: %d", code)
+	}
+	var got []string
+	for _, x := range act.Tasks {
+		if x.Kind == "download" {
+			got = append(got, x.State+" "+x.Title)
+			if x.State == "running" && (x.Progress == nil || x.Progress.Done != 1024 || x.Progress.Total != 4096 ||
+				!strings.Contains(x.Progress.Current, "1.0 of 4.0 GB")) {
+				t.Errorf("progress: %+v", x.Progress)
+			}
+		}
+	}
+	if strings.Join(got, "|") != "running Downloading Arrival (2016)|queued 2 VOD downloads waiting" {
+		t.Errorf("tasks: %q", got)
 	}
 }
