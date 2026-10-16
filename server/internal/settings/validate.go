@@ -144,6 +144,9 @@ func (s Settings) Validate() error {
 	if err := s.Notifications.validate(); err != nil {
 		return err
 	}
+	if err := s.VODSave.validate(); err != nil {
+		return err
+	}
 	if len(s.Webhooks) > 20 {
 		return invalid("at most 20 webhooks")
 	}
@@ -215,4 +218,49 @@ func parseClock(s string) (int, error) {
 		return 0, fmt.Errorf("bad clock %q", s)
 	}
 	return h*60 + m, nil
+}
+
+func (v VODSave) validate() error {
+	for _, f := range []string{v.MoviesFolder, v.ShowsFolder} {
+		if f != "" && !filepath.IsAbs(f) {
+			return invalid("the folder %q to save to must be an absolute path", f)
+		}
+	}
+	switch v.Quality {
+	case VODSaveOriginal, VODSaveRemux, VODSaveTranscode:
+	default:
+		return invalid("saving quality must be original, remux or transcode")
+	}
+	switch v.MaxHeight {
+	case 2160, 1080, 720, 480:
+	default:
+		return invalid("the resolution to save at must be 2160, 1080, 720 or 480")
+	}
+	switch v.VideoCodec {
+	case "hevc", "h264":
+	default:
+		return invalid("the video codec to save with must be hevc or h264")
+	}
+	switch v.VideoQuality {
+	case "high", "balanced", "small":
+	default:
+		return invalid("the video quality to save at must be high, balanced or small")
+	}
+	if v.VideoKbps < 0 || v.VideoKbps > 200000 {
+		return invalid("the video bitrate to save at must be 0 (use the quality) to 200000 kbps")
+	}
+	switch v.Audio {
+	case "copy", "aac_stereo", "aac_51":
+	default:
+		return invalid("the audio to save must be copy, aac_stereo or aac_51")
+	}
+	if c := v.ConcurrentPerSource; c < 1 || c > 5 {
+		return invalid("saves at once per source must be 1–5")
+	}
+	switch v.PauseScope {
+	case "source", "any":
+	default:
+		return invalid("pause while watching must be source or any")
+	}
+	return nil
 }

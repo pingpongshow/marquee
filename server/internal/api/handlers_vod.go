@@ -281,6 +281,14 @@ func (h *Handlers) GetVodMovie(ctx context.Context, req GetVodMovieRequestObject
 	if m.HasBackdrop {
 		out.BackdropUrl = ptr(vodImageURL(m.ID, "backdrop"))
 	}
+	// Admins see whether it's saved into the library.
+	if s.User.IsAdmin && h.VODSaves != nil {
+		movies, _ := h.VODSaves.Configured()
+		out.CanSave = ptr(movies && h.VOD.Savable(m.SourceID))
+		if st, err := h.VODSaves.MovieState(ctx, m.ID); err == nil {
+			out.Save = toAPIVodSaveState(st)
+		}
+	}
 	out.Cast = make([]struct {
 		Character *string `json:"character,omitempty"`
 		Name      string  `json:"name"`

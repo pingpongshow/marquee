@@ -50,6 +50,7 @@ const VodPlayerPage = lazyRouteComponent(
   "VodPlayerPage",
 );
 const VodShowsPage = lazyRouteComponent(() => import("@/features/livetv/Vod"), "VodShowsPage");
+const VodSavesPage = lazyRouteComponent(() => import("@/features/livetv/VodSaves"), "VodSavesPage");
 const VodShowPage = lazyRouteComponent(() => import("@/features/livetv/VodShows"), "VodShowPage");
 const VodEpisodePlayerPage = lazyRouteComponent(
   () => import("@/features/livetv/VodShows"),
@@ -252,6 +253,12 @@ const vodShowsRoute = createRoute({
   path: "/vod/shows",
   component: VodShowsPage,
 });
+// The save queue (admins only); "saves" ranks above /vod/$movieId like "shows".
+const vodSavesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/vod/saves",
+  component: VodSavesPage,
+});
 const vodShowRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/vod/shows/$seriesId",
@@ -341,6 +348,7 @@ const routeTree = rootRoute.addChildren([
   vodMovieRoute,
   vodPlayRoute,
   vodShowsRoute,
+  vodSavesRoute,
   vodShowRoute,
   vodEpisodePlayRoute,
   discoverRoute,

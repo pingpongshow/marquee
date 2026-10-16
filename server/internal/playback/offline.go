@@ -124,3 +124,6 @@ func (l *limitWriter) Write(p []byte) (int, error) {
 	}
 	return len(p), nil
 }
+
+// EncoderPreset is the encoder's own preset name for a speed/balanced/quality preset.
+func EncoderPreset(encoder, preset string) string { return presetFor(encoder, preset) }

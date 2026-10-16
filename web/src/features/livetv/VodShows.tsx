@@ -8,8 +8,10 @@ import { formatDuration, formatTrackTime } from "@/features/browse/format";
 import { Poster } from "@/features/browse/Poster";
 import { deviceProfile } from "@/features/player/deviceProfile";
 import { VodVideo, showPosterItem, store, stored } from "./Vod";
+import { SaveEpisodeIcon, SaveSeriesButton } from "./VodSaves";
 import {
   type VodEpisode,
+  saveActive,
   useVodEpisodeWatched,
   useVodSeriesWatched,
   vodSeriesQuery,
@@ -24,7 +26,11 @@ function epLabel(e: VodEpisode) {
 
 /** A show's page: backdrop, poster, overview, a season picker and its episodes. */
 export function VodShowPage({ seriesId }: { seriesId: number }) {
-  const show = useQuery(vodSeriesQuery(seriesId));
+  // While episodes are being saved, their icons follow along.
+  const show = useQuery({
+    ...vodSeriesQuery(seriesId),
+    refetchInterval: (q) => (q.state.data?.episodes.some((e) => saveActive(e.save?.state)) ? 3000 : false),
+  });
   const seriesWatched = useVodSeriesWatched(seriesId);
   const episodeWatched = useVodEpisodeWatched();
   const navigate = useNavigate();
@@ -126,6 +132,7 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
                   <Check className={s.watched ? "size-4 text-success" : "size-4"} /> {s.watched ? "Watched" : "Mark watched"}
                 </Button>
               )}
+              {s.canSave && <SaveSeriesButton seriesId={s.id} label="Save show" />}
             </div>
             {s.overview && <p className="mt-5 max-w-3xl leading-relaxed text-text/90">{s.overview}</p>}
             {s.cast.length > 0 && (
@@ -163,6 +170,7 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
                   {seasonDone ? "Season watched" : "Mark season watched"}
                 </Button>
               )}
+              {seasonInfo && s.canSave && <SaveSeriesButton seriesId={s.id} season={seasonInfo.season} label="Save season" />}
             </div>
           )}
           {seasonInfo?.overview && <p className="mb-4 max-w-3xl text-sm text-muted">{seasonInfo.overview}</p>}
@@ -204,6 +212,7 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
                           {[e.airDate, formatDuration(e.runtimeMs)].filter(Boolean).join(" · ")}
                         </div>
                       </div>
+                      {s.canSave && <SaveEpisodeIcon episodeId={e.id} save={e.save} />}
                       <button
                         onClick={() => episodeWatched.mutate({ id: e.id, watched: !watched })}
                         className="rounded-full p-1.5 hover:bg-surface-2"

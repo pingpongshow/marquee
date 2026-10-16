@@ -3165,6 +3165,188 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /livetv/vod/movies/{movieId}/save:
+    parameters:
+      - { name: movieId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [livetv]
+      operationId: saveVodMovie
+      summary: "Save a film into the library (admin only; Xtream Codes sources). Queued, downloaded, converted per Settings → vodSave, verified, moved into vodSave.moviesFolder and scanned. A film already queued or saved isn't queued again; one in the library is skipped (vodSave.skipExisting)."
+      responses:
+        "200":
+          description: What was queued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VodSaveResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /livetv/vod/episodes/{episodeId}/save:
+    parameters:
+      - { name: episodeId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [livetv]
+      operationId: saveVodEpisode
+      summary: "Save one episode into the library (admin only), into vodSave.showsFolder: {Show (Year)}/Season N/{Show} - SxxEyy - {Title} WEBDL-1080p.ext."
+      responses:
+        "200":
+          description: What was queued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VodSaveResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /livetv/vod/series/{seriesId}/save:
+    parameters:
+      - { name: seriesId, in: path, required: true, schema: { type: integer, format: int64 } }
+      - { name: season, in: query, description: Only this season's episodes., schema: { type: integer } }
+    post:
+      tags: [livetv]
+      operationId: saveVodSeries
+      summary: "Save a whole series, or one season, into the library (admin only). The episodes are fetched from the source first when they haven't been; ones already queued or saved are left out."
+      responses:
+        "200":
+          description: What was queued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VodSaveResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /livetv/vod/saves:
+    get:
+      tags: [livetv]
+      operationId: listVodSaves
+      summary: "The save queue (admin only): unfinished saves in the order they run, then finished ones, newest first, with live progress, speed and ETA. Poll while active is true."
+      responses:
+        "200":
+          description: The queue.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VodSaveQueue" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /livetv/vod/saves/clear:
+    post:
+      tags: [livetv]
+      operationId: clearVodSaves
+      summary: "Remove finished saves (done, failed, cancelled, skipped) from the list (admin only). Failed saves' partial files are deleted."
+      responses:
+        "204": { description: Cleared. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /livetv/vod/saves/pause:
+    post:
+      tags: [livetv]
+      operationId: pauseVodSaves
+      summary: "Pause the whole queue (admin only). Running saves stop and keep their partial files; resuming continues them with Range requests."
+      responses:
+        "204": { description: Paused. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /livetv/vod/saves/resume:
+    post:
+      tags: [livetv]
+      operationId: resumeVodSaves
+      summary: Resume the whole queue (admin only).
+      responses:
+        "204": { description: Resumed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /livetv/vod/saves/{saveId}:
+    parameters:
+      - { name: saveId, in: path, required: true, schema: { type: integer, format: int64 } }
+    delete:
+      tags: [livetv]
+      operationId: cancelVodSave
+      summary: Cancel a save (admin only); its partial files are deleted.
+      responses:
+        "204": { description: Cancelled. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /livetv/vod/saves/{saveId}/retry:
+    parameters:
+      - { name: saveId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [livetv]
+      operationId: retryVodSave
+      summary: "Queue a failed or cancelled save again (admin only); a failed one continues from what it downloaded."
+      responses:
+        "204": { description: Queued. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /livetv/vod/saves/{saveId}/top:
+    parameters:
+      - { name: saveId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [livetv]
+      operationId: moveVodSaveToTop
+      summary: Make a waiting save the next to run (admin only).
+      responses:
+        "204": { description: Moved. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /livetv/vod/saves/{saveId}/pause:
+    parameters:
+      - { name: saveId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [livetv]
+      operationId: pauseVodSave
+      summary: Pause one save (admin only); it keeps what it downloaded.
+      responses:
+        "204": { description: Paused. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /livetv/vod/saves/{saveId}/resume:
+    parameters:
+      - { name: saveId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [livetv]
+      operationId: resumeVodSave
+      summary: Resume a paused save (admin only); it continues from where it stopped.
+      responses:
+        "204": { description: Queued. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
   /requests/status:
     get:
       tags: [requests]
@@ -4560,6 +4742,7 @@ components:
         cinema: { $ref: "#/components/schemas/CinemaSettings" }
         ai: { $ref: "#/components/schemas/AiSettings" }
         notifications: { $ref: "#/components/schemas/NotificationSettings" }
+        vodSave: { $ref: "#/components/schemas/VodSaveSettings" }
         webhooks:
           type: array
           description: Replaces the whole list when sent.
@@ -4581,6 +4764,7 @@ components:
         cinema: { $ref: "#/components/schemas/CinemaSettings" }
         ai: { $ref: "#/components/schemas/AiSettings" }
         notifications: { $ref: "#/components/schemas/NotificationSettingsUpdate" }
+        vodSave: { $ref: "#/components/schemas/VodSaveSettings" }
         webhooks:
           type: array
           description: Replaces the whole list when sent.
@@ -4597,7 +4781,9 @@ components:
         failed_signins: repeated wrong passwords for one account.
         new_admin_device: an administrator signed in from a device never used before.
         playback_failed: the transcoder couldn't produce video for a stream.
-      enum: [task_failed, disk_low, recording_failed, source_failed, integration_down, failed_signins, new_admin_device, playback_failed]
+        vod_save_failed: saving a film or episode on demand into the library failed.
+        vod_save_done: the save queue finished (one summary, not one per episode).
+      enum: [task_failed, disk_low, recording_failed, source_failed, integration_down, failed_signins, new_admin_device, playback_failed, vod_save_failed, vod_save_done]
 
     NotificationSettings:
       type: object
@@ -5103,6 +5289,8 @@ components:
             tmdbId: { type: integer }
             imdbId: { type: string }
             matched: { type: boolean, description: The details are TMDB's. }
+            canSave: { type: boolean, description: "The caller (an admin) can save it into the library: an Xtream Codes film with a movies folder set." }
+            save: { $ref: "#/components/schemas/VodSaveState" }
 
     VodMoviePage:
       type: object
@@ -5172,6 +5360,7 @@ components:
               description: Every episode in viewing order (seasons in turn, specials last); filter by season for a season's list.
               items: { $ref: "#/components/schemas/VodEpisode" }
             episodesError: { type: string, description: "The source didn't give the episodes (and none were kept from before)." }
+            canSave: { type: boolean, description: "The caller (an admin) can save its episodes into the library (shows folder set). Each episode's save is in episodes[].save." }
 
     VodSeason:
       type: object
@@ -5202,6 +5391,96 @@ components:
         stillUrl: { type: string, description: Server-relative; no token needed. }
         positionMs: { type: integer, format: int64, description: The caller's resume point. }
         watched: { type: boolean }
+        save: { $ref: "#/components/schemas/VodSaveState" }
+
+    VodSaveSettings:
+      type: object
+      description: "Saving films and episodes on demand (Xtream Codes sources) into the library (admins only). Partial sends keep the other fields."
+      properties:
+        moviesFolder: { type: string, description: "Where films are saved, as the server sees it (must exist and be writable). Empty turns saving films off." }
+        showsFolder: { type: string, description: "Where episodes are saved. Empty turns saving episodes off." }
+        quality: { type: string, enum: [original, remux, transcode], description: "original: the file as it is (MPEG-TS, FLV and other unusual containers are remuxed to MKV). remux: to MKV, every stream copied. transcode: the settings below." }
+        maxHeight: { type: integer, enum: [2160, 1080, 720, 480], description: "Transcode: resolution cap (never upscaled)." }
+        videoCodec: { type: string, enum: [hevc, h264] }
+        videoQuality: { type: string, enum: [high, balanced, small], description: "Transcode: constant quality (CRF/CQ), used unless videoKbps is set." }
+        videoKbps: { type: integer, minimum: 0, maximum: 200000, description: "Transcode: target video bitrate; 0 = use videoQuality." }
+        audio: { type: string, enum: [copy, aac_stereo, aac_51], description: "Transcode: audio copied, or AAC stereo, or AAC up to 5.1." }
+        concurrentPerSource: { type: integer, minimum: 1, maximum: 5, description: Saves at once per source. Default 1. }
+        scanAfterSave: { type: boolean, description: Scan the library whose folder holds a saved file. Default on. }
+        skipExisting: { type: boolean, description: "Skip a title already in a library (by TMDB id) or whose file is already there. Default on." }
+        pauseWhileWatching: { type: boolean, description: "Pause saves while someone watches (see pauseScope), resuming 60 s after. Default on." }
+        pauseScope: { type: string, enum: [source, any], description: "source: something from the same source, or Live TV from the same host (Dispatcharr). any: any playback on the server." }
+        retryFailed: { type: boolean, description: "Queue failed saves again every few hours. Default on." }
+
+    VodSaveState:
+      type: object
+      description: The latest save of a film or episode (admins only).
+      required: [id, state, progress, verified]
+      properties:
+        id: { type: integer, format: int64 }
+        state: { $ref: "#/components/schemas/VodSaveStateName" }
+        progress: { type: number, description: "0–1: downloaded share, or the conversion's progress while processing." }
+        verified: { type: boolean }
+        error: { type: string }
+
+    VodSaveStateName:
+      type: string
+      description: "queued (waiting; see pauseReason), downloading, processing (remux or transcode), verifying, paused (by an admin), done, failed, cancelled, skipped (already in the library)."
+      enum: [queued, downloading, processing, verifying, paused, done, failed, cancelled, skipped]
+
+    VodSave:
+      type: object
+      required: [id, sourceId, kind, title, targetPath, quality, state, bytesDone, bytesTotal, progress, attempts, verified, createdAt]
+      properties:
+        id: { type: integer, format: int64 }
+        sourceId: { type: string }
+        sourceName: { type: string }
+        kind: { type: string, enum: [movie, episode] }
+        movieId: { type: integer, format: int64, description: The film (kind movie). }
+        episodeId: { type: integer, format: int64, description: The episode (kind episode). }
+        seriesId: { type: integer, format: int64, description: The episode's series. }
+        title: { type: string, description: "e.g. Archer - S01E01 - Mole Hunt." }
+        targetPath: { type: string, description: "Where it goes (the final name, with its quality tag, once done)." }
+        quality: { type: string, enum: [original, remux, transcode] }
+        state: { $ref: "#/components/schemas/VodSaveStateName" }
+        bytesDone: { type: integer, format: int64 }
+        bytesTotal: { type: integer, format: int64, description: 0 = unknown. }
+        progress: { type: number, description: "0–1 of the current step: download, or conversion while processing." }
+        speedBps: { type: number, description: Download speed in bytes a second (while downloading). }
+        etaSeconds: { type: integer, format: int64, description: Time left for the download. }
+        pauseReason: { type: string, description: "Why a queued save isn't running: the queue is paused, something is being watched, or the source is unreachable." }
+        attempts: { type: integer, description: Network failures in a row. }
+        nextAttemptAt: { type: string, format: date-time, description: When a save waiting after a network error tries again. }
+        error: { type: string }
+        verified: { type: boolean, description: "The file passed verification (size, ffprobe, length, start and end decode)." }
+        verifyNote: { type: string }
+        sha256: { type: string, description: The saved file's SHA-256. }
+        createdAt: { type: string, format: date-time }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time }
+
+    VodSaveQueue:
+      type: object
+      required: [saves, active, paused, moviesFolderSet, showsFolderSet]
+      properties:
+        saves:
+          type: array
+          items: { $ref: "#/components/schemas/VodSave" }
+        active: { type: boolean, description: Something is queued or running (poll while true). }
+        paused: { type: boolean, description: The whole queue is paused. }
+        moviesFolderSet: { type: boolean }
+        showsFolderSet: { type: boolean }
+
+    VodSaveResult:
+      type: object
+      required: [queued, already, skipped, saves]
+      properties:
+        queued: { type: integer, description: Saves added (or failed ones queued again). }
+        already: { type: integer, description: Already queued or saved. }
+        skipped: { type: integer, description: Already in the library. }
+        saves:
+          type: array
+          items: { $ref: "#/components/schemas/VodSave" }
 
     VodSeriesPage:
       type: object

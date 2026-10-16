@@ -341,6 +341,18 @@ func (m *Sessions) Get(id string) *Session {
 	return m.live[id]
 }
 
+// List returns the running streams.
+func (m *Sessions) List() []*Session {
+	m.init()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]*Session, 0, len(m.live))
+	for _, s := range m.live {
+		out = append(out, s)
+	}
+	return out
+}
+
 // Count is the number of running streams.
 func (m *Sessions) Count() int {
 	m.init()

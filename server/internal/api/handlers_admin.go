@@ -96,6 +96,7 @@ func toAPISettings(s settings.Settings) ServerSettings {
 		},
 		Webhooks:      ptr(toAPIWebhooks(s.Webhooks)),
 		Notifications: toAPINotifications(s.Notifications),
+		VodSave:       toAPIVodSaveSettings(s.VODSave),
 		Ai: &AiSettings{
 			Enabled: ptr(s.AI.Enabled), Url: ptr(s.AI.URL), ChatModel: ptr(s.AI.ChatModel), EmbedModel: ptr(s.AI.EmbedModel),
 			UnloadMinutes: ptr(s.AI.UnloadMinutes), UnderstandPrompts: ptr(s.AI.UnderstandPrompts), RerankMovies: ptr(s.AI.RerankMovies),
@@ -276,6 +277,9 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 	if n := u.Notifications; n != nil {
 		applyNotifications(&s.Notifications, *n)
 	}
+	if v := u.VodSave; v != nil {
+		applyVodSaveSettings(&s.VODSave, *v)
+	}
 	if u.Webhooks != nil {
 		s.Webhooks = make([]settings.Webhook, len(*u.Webhooks))
 		for i, w := range *u.Webhooks {
@@ -322,7 +326,19 @@ func (h *Handlers) UpdateSettings(ctx context.Context, req UpdateSettingsRequest
 		return UpdateSettings403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
 	}
 	next, err := h.Settings.Update(ctx, func(s *settings.Settings) error {
+		before := s.VODSave
 		applySettingsUpdate(s, *req.Body)
+		// Folders to save to must be there and writable; checked when they change.
+		if f := s.VODSave.MoviesFolder; f != "" && f != before.MoviesFolder {
+			if err := checkSaveFolder("movies", f); err != nil {
+				return err
+			}
+		}
+		if f := s.VODSave.ShowsFolder; f != "" && f != before.ShowsFolder {
+			if err := checkSaveFolder("shows", f); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 	var ve *settings.ValidationError

@@ -192,3 +192,68 @@ export function useVodEpisodeWatched() {
     onSettled: () => qc.invalidateQueries({ queryKey: ["vod"] }),
   });
 }
+
+// ---- saving into the library (admins only)
+
+export type VodSave = components["schemas"]["VodSave"];
+export type VodSaveState = components["schemas"]["VodSaveState"];
+export type VodSaveStateName = components["schemas"]["VodSaveStateName"];
+
+/** States in which a save is still on its way (the page polls while one is). */
+export const saveActive = (s?: VodSaveStateName) =>
+  s === "queued" || s === "downloading" || s === "processing" || s === "verifying";
+
+export const vodSavesQuery = queryOptions({
+  queryKey: ["vod", "saves"],
+  queryFn: () => unwrap(api.GET("/livetv/vod/saves")),
+  refetchInterval: (q) => (q.state.data?.active ? 2000 : 15_000),
+});
+
+/** Queues a film, an episode, a season or a whole show. */
+export function useSaveVod() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (what: { movieId: number } | { episodeId: number } | { seriesId: number; season?: number }) => {
+      if ("movieId" in what)
+        return unwrap(api.POST("/livetv/vod/movies/{movieId}/save", { params: { path: { movieId: what.movieId } } }));
+      if ("episodeId" in what)
+        return unwrap(api.POST("/livetv/vod/episodes/{episodeId}/save", { params: { path: { episodeId: what.episodeId } } }));
+      return unwrap(
+        api.POST("/livetv/vod/series/{seriesId}/save", {
+          params: { path: { seriesId: what.seriesId }, query: { season: what.season } },
+        }),
+      );
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["vod"] }),
+  });
+}
+
+type SaveAction = "cancel" | "retry" | "top" | "pause" | "resume";
+
+/** One action on a save, or (id omitted) pausing, resuming or clearing the whole queue. */
+export function useSaveAction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action }: { id?: number; action: SaveAction | "clear" }) => {
+      if (id == null) {
+        if (action === "clear") return unwrap(api.POST("/livetv/vod/saves/clear"));
+        if (action === "pause") return unwrap(api.POST("/livetv/vod/saves/pause"));
+        return unwrap(api.POST("/livetv/vod/saves/resume"));
+      }
+      const params = { params: { path: { saveId: id } } };
+      switch (action) {
+        case "cancel":
+          return unwrap(api.DELETE("/livetv/vod/saves/{saveId}", params));
+        case "retry":
+          return unwrap(api.POST("/livetv/vod/saves/{saveId}/retry", params));
+        case "top":
+          return unwrap(api.POST("/livetv/vod/saves/{saveId}/top", params));
+        case "pause":
+          return unwrap(api.POST("/livetv/vod/saves/{saveId}/pause", params));
+        default:
+          return unwrap(api.POST("/livetv/vod/saves/{saveId}/resume", params));
+      }
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["vod"] }),
+  });
+}

@@ -176,7 +176,7 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] =
           icon: Film,
           component: VodSettings,
           keywords:
-            "vod movies on demand pluto films m3u live tv tmdb free streaming",
+            "vod movies on demand pluto films m3u live tv tmdb free streaming save download library queue",
           description:
             "Films from an M3U playlist such as Pluto TV's, or from Dispatcharr (Xtream Codes), on the VOD page.",
         },
