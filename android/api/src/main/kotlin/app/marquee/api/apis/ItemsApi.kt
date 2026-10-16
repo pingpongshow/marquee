@@ -32,6 +32,7 @@ import app.marquee.api.models.BazarrCandidate
 import app.marquee.api.models.BazarrDownloadRequest
 import app.marquee.api.models.BazarrPick
 import app.marquee.api.models.BazarrStatus
+import app.marquee.api.models.CommercialScan
 import app.marquee.api.models.CreateCollectionRequest
 import app.marquee.api.models.Error
 import app.marquee.api.models.ItemDetail
@@ -1056,6 +1057,79 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/items/{itemId}".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /items/{itemId}/commercials
+     * Commercials in a Live TV recording: found, cut or not (admin only). 404 for items that aren&#39;t recordings.
+     * 
+     * @param itemId 
+     * @return CommercialScan
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getItemCommercials(itemId: kotlin.Long) : CommercialScan {
+        val localVarResponse = getItemCommercialsWithHttpInfo(itemId = itemId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as CommercialScan
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /items/{itemId}/commercials
+     * Commercials in a Live TV recording: found, cut or not (admin only). 404 for items that aren&#39;t recordings.
+     * 
+     * @param itemId 
+     * @return ApiResponse<CommercialScan?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getItemCommercialsWithHttpInfo(itemId: kotlin.Long) : ApiResponse<CommercialScan?> {
+        val localVariableConfig = getItemCommercialsRequestConfig(itemId = itemId)
+
+        return request<Unit, CommercialScan>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getItemCommercials
+     *
+     * @param itemId 
+     * @return RequestConfig
+     */
+    fun getItemCommercialsRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/items/{itemId}/commercials".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -2641,6 +2715,152 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.DELETE,
             path = "/items/{itemId}/watchlist".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /items/{itemId}/commercials/remove
+     * Find and cut the commercials out of a Live TV recording now, whatever the setting (admin only). Queued and done in the background, one at a time; a recording being watched waits.
+     * 
+     * @param itemId 
+     * @return CommercialScan
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun removeItemCommercials(itemId: kotlin.Long) : CommercialScan {
+        val localVarResponse = removeItemCommercialsWithHttpInfo(itemId = itemId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as CommercialScan
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /items/{itemId}/commercials/remove
+     * Find and cut the commercials out of a Live TV recording now, whatever the setting (admin only). Queued and done in the background, one at a time; a recording being watched waits.
+     * 
+     * @param itemId 
+     * @return ApiResponse<CommercialScan?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun removeItemCommercialsWithHttpInfo(itemId: kotlin.Long) : ApiResponse<CommercialScan?> {
+        val localVariableConfig = removeItemCommercialsRequestConfig(itemId = itemId)
+
+        return request<Unit, CommercialScan>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation removeItemCommercials
+     *
+     * @param itemId 
+     * @return RequestConfig
+     */
+    fun removeItemCommercialsRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/items/{itemId}/commercials/remove".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /items/{itemId}/commercials/restore
+     * Put back the original of a recording whose commercials were cut, while it&#39;s still in the media trash (admin only). The cut file goes to the trash instead.
+     * 
+     * @param itemId 
+     * @return CommercialScan
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun restoreItemCommercials(itemId: kotlin.Long) : CommercialScan {
+        val localVarResponse = restoreItemCommercialsWithHttpInfo(itemId = itemId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as CommercialScan
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /items/{itemId}/commercials/restore
+     * Put back the original of a recording whose commercials were cut, while it&#39;s still in the media trash (admin only). The cut file goes to the trash instead.
+     * 
+     * @param itemId 
+     * @return ApiResponse<CommercialScan?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun restoreItemCommercialsWithHttpInfo(itemId: kotlin.Long) : ApiResponse<CommercialScan?> {
+        val localVariableConfig = restoreItemCommercialsRequestConfig(itemId = itemId)
+
+        return request<Unit, CommercialScan>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation restoreItemCommercials
+     *
+     * @param itemId 
+     * @return RequestConfig
+     */
+    fun restoreItemCommercialsRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/items/{itemId}/commercials/restore".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

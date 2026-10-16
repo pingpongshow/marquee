@@ -37,6 +37,7 @@ import kotlinx.serialization.Contextual
  * @param sources 
  * @param dvrAvailable Recordings can be written (LIVE-5).
  * @param canRecord The caller may schedule recordings.
+ * @param canViewRecordings The caller may see and play recordings (the Recordings tab). Absent from older servers: then assume canRecord.
  * @param recordingsActive Recordings in progress.
  * @param guideUntil The end of the loaded guide.
  */
@@ -61,6 +62,10 @@ data class LiveTvStatus (
     /* The caller may schedule recordings. */
     @SerialName(value = "canRecord")
     val canRecord: kotlin.Boolean? = null,
+
+    /* The caller may see and play recordings (the Recordings tab). Absent from older servers: then assume canRecord. */
+    @SerialName(value = "canViewRecordings")
+    val canViewRecordings: kotlin.Boolean? = null,
 
     /* Recordings in progress. */
     @SerialName(value = "recordingsActive")

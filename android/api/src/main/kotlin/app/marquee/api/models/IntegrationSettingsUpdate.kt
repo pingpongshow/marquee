@@ -41,6 +41,10 @@ import kotlinx.serialization.Contextual
  * @param bazarrApiKey Bazarr's API key (Settings → General in Bazarr). Write-only.
  * @param dvrPaddingBefore 
  * @param dvrPaddingAfter 
+ * @param commercials 
+ * @param dvrDefaultQuotaGb 
+ * @param dvrQuotaAction 
+ * @param dvrFolder Checked when it changes: it must exist and be writable.
  * @param liveTvSources Replaces the whole list when sent.
  * @param vodEnabled 
  * @param vodSources Replaces the whole list when sent.
@@ -77,6 +81,19 @@ data class IntegrationSettingsUpdate (
     @SerialName(value = "dvrPaddingAfter")
     val dvrPaddingAfter: kotlin.Int? = null,
 
+    @SerialName(value = "commercials")
+    val commercials: IntegrationSettingsUpdate.Commercials? = null,
+
+    @SerialName(value = "dvrDefaultQuotaGb")
+    val dvrDefaultQuotaGb: kotlin.Int? = null,
+
+    @SerialName(value = "dvrQuotaAction")
+    val dvrQuotaAction: IntegrationSettingsUpdate.DvrQuotaAction? = null,
+
+    /* Checked when it changes: it must exist and be writable. */
+    @SerialName(value = "dvrFolder")
+    val dvrFolder: kotlin.String? = null,
+
     /* Replaces the whole list when sent. */
     @SerialName(value = "liveTvSources")
     val liveTvSources: kotlin.collections.List<LiveTvSource>? = null,
@@ -90,6 +107,27 @@ data class IntegrationSettingsUpdate (
 
 ) {
 
+    /**
+     * 
+     *
+     * Values: OFF,DETECT,REMOVE
+     */
+    @Serializable
+    enum class Commercials(val value: kotlin.String) {
+        @SerialName(value = "off") OFF("off"),
+        @SerialName(value = "detect") DETECT("detect"),
+        @SerialName(value = "remove") REMOVE("remove");
+    }
+    /**
+     * 
+     *
+     * Values: BLOCK,DELETE_OLDEST
+     */
+    @Serializable
+    enum class DvrQuotaAction(val value: kotlin.String) {
+        @SerialName(value = "block") BLOCK("block"),
+        @SerialName(value = "deleteOldest") DELETE_OLDEST("deleteOldest");
+    }
 
 }
 

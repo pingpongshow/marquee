@@ -167,7 +167,8 @@ fun LiveTvScreen(nav: NavHostController) {
         if (liveOn) {
             add("guide" to "Guide")
             add("now" to "What's On")
-            if (s?.canRecord == true) add("recordings" to "Recordings")
+            // Older servers don't send canViewRecordings: recording implied seeing recordings.
+            if ((s?.canViewRecordings ?: s?.canRecord) == true) add("recordings" to "Recordings")
         }
     }
     if (tabs.isEmpty()) {
@@ -193,7 +194,7 @@ fun LiveTvScreen(nav: NavHostController) {
     LazyColumn(contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { header() }
         if (current == "recordings") {
-            item { RecordingsList(nav) }
+            item { RecordingsList(nav, canRecord = s.canRecord == true) }
             return@LazyColumn
         }
         item {

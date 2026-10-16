@@ -36,7 +36,10 @@ import kotlinx.serialization.Contextual
  * @param allowRemote May stream from outside the home network. Default true.
  * @param remoteQualityKbps Cap for remote streams. 0 = server default.
  * @param canRequest May request titles through Seerr (REQ-1). Default false; admins always may.
- * @param canRecord May schedule Live TV recordings (LIVE-5). Default false; admins always may.
+ * @param canRecord Deprecated: the same as canRecordDVR (kept for older clients). Read only when canRecordDVR isn't sent.
+ * @param canRecordDVR May schedule Live TV recordings (LIVE-5). Default true; admins always may. A user who may not has their series paused.
+ * @param canViewDVR May see and play the household's Live TV recordings (the DVR list and the recordings libraries). Default true; admins always may.
+ * @param dvrQuotaGb This user's DVR quota in GB (10^9 bytes). Null or absent = the server default (integrations.dvrDefaultQuotaGb); 0 = unlimited.
  * @param liveTv May watch Live TV (LIVE-4). Default true.
  * @param liveTvGroups Channel groups this user may watch. Null or absent = all.
  * @param seerrUserId The Seerr user requests are made as. Null = Seerr's API key owner.
@@ -66,9 +69,21 @@ data class UserRestrictions (
     @SerialName(value = "canRequest")
     val canRequest: kotlin.Boolean? = null,
 
-    /* May schedule Live TV recordings (LIVE-5). Default false; admins always may. */
+    /* Deprecated: the same as canRecordDVR (kept for older clients). Read only when canRecordDVR isn't sent. */
     @SerialName(value = "canRecord")
     val canRecord: kotlin.Boolean? = null,
+
+    /* May schedule Live TV recordings (LIVE-5). Default true; admins always may. A user who may not has their series paused. */
+    @SerialName(value = "canRecordDVR")
+    val canRecordDVR: kotlin.Boolean? = null,
+
+    /* May see and play the household's Live TV recordings (the DVR list and the recordings libraries). Default true; admins always may. */
+    @SerialName(value = "canViewDVR")
+    val canViewDVR: kotlin.Boolean? = null,
+
+    /* This user's DVR quota in GB (10^9 bytes). Null or absent = the server default (integrations.dvrDefaultQuotaGb); 0 = unlimited. */
+    @SerialName(value = "dvrQuotaGb")
+    val dvrQuotaGb: kotlin.Int? = null,
 
     /* May watch Live TV (LIVE-4). Default true. */
     @SerialName(value = "liveTv")

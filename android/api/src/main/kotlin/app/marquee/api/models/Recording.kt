@@ -23,6 +23,7 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.CommercialScan
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -49,6 +50,10 @@ import kotlinx.serialization.Contextual
  * @param sizeBytes 
  * @param itemId The library item once the recording has been scanned.
  * @param userId Who scheduled it.
+ * @param ownerName Who scheduled it, by name (\"Recorded by Alex\").
+ * @param canDelete The caller may cancel or delete it (whoever scheduled it, or an admin).
+ * @param rating The guide's content rating for the programme, e.g. TV-14, when it gave one.
+ * @param commercials 
  */
 @Serializable
 
@@ -111,7 +116,22 @@ data class Recording (
 
     /* Who scheduled it. */
     @SerialName(value = "userId")
-    val userId: kotlin.Long? = null
+    val userId: kotlin.Long? = null,
+
+    /* Who scheduled it, by name (\"Recorded by Alex\"). */
+    @SerialName(value = "ownerName")
+    val ownerName: kotlin.String? = null,
+
+    /* The caller may cancel or delete it (whoever scheduled it, or an admin). */
+    @SerialName(value = "canDelete")
+    val canDelete: kotlin.Boolean? = null,
+
+    /* The guide's content rating for the programme, e.g. TV-14, when it gave one. */
+    @SerialName(value = "rating")
+    val rating: kotlin.String? = null,
+
+    @SerialName(value = "commercials")
+    val commercials: CommercialScan? = null
 
 ) {
 
