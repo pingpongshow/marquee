@@ -52,6 +52,17 @@ func (s Settings) Validate() error {
 	default:
 		return invalid("commercials must be off, detect or remove")
 	}
+	if q := s.Integrations.DVRDefaultQuotaGB; q < 0 || q > 1_000_000 {
+		return invalid("the recording quota must be 0 (unlimited) to 1,000,000 GB")
+	}
+	switch s.Integrations.DVRQuotaAction {
+	case DVRQuotaBlock, DVRQuotaDeleteOldest:
+	default:
+		return invalid("the quota action must be block or deleteOldest")
+	}
+	if f := s.Integrations.DVRFolder; f != "" && !filepath.IsAbs(f) {
+		return invalid("the recordings folder must be a full path, e.g. /recordings")
+	}
 	switch s.Security.PinSignIn {
 	case "off", "local", "everywhere":
 	default:

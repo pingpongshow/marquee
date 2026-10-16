@@ -41,6 +41,7 @@ export function NotificationsSettings() {
       fromName: x.fromName,
       linkUrl: x.linkUrl,
       alerts: x.alerts,
+      dvrQuotaAlert: x.dvrQuotaAlert,
       recipientsAllAdmins: x.recipientsAllAdmins,
       recipients: x.recipients,
       diskThresholdPercent: x.diskThresholdPercent,
@@ -120,6 +121,12 @@ export function NotificationsSettings() {
             {alertTypes.map((a) => (
               <Toggle key={a.id} label={a.label} help={a.help} checked={alerts.includes(a.id)} onChange={(v) => toggleAlert(a.id, v)} />
             ))}
+            <Toggle
+              label="Someone is over their recording quota"
+              help="A recording wasn't made, or their oldest watched recordings went to the media trash to make room."
+              checked={!!d.dvrQuotaAlert}
+              onChange={(v) => update({ dvrQuotaAlert: v })}
+            />
           </div>
           {alerts.includes("disk_low") && (
             <Field label="Low disk space threshold" help="Alert when a volume has less free space than this.">

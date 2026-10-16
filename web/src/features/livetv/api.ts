@@ -173,3 +173,26 @@ export function formatSize(bytes?: number) {
   const gb = bytes / 1e9;
   return gb >= 1 ? `${gb.toFixed(1)} GB` : `${Math.round(bytes / 1e6)} MB`;
 }
+
+export type DvrUsage = components["schemas"]["DvrUsage"];
+
+/** The signed-in user's DVR usage and quota (LIVE-5). */
+export const recordingUsageQuery = queryOptions({
+  queryKey: ["livetv", "usage"],
+  queryFn: () => unwrap(api.GET("/livetv/recordings/usage")),
+  refetchInterval: 60_000,
+});
+
+/** Admins: every user's DVR usage and quota. */
+export const allRecordingUsageQuery = queryOptions({
+  queryKey: ["livetv", "usage", "all"],
+  queryFn: () => unwrap(api.GET("/admin/dvr/usage")),
+});
+
+/** "12.4 of 50 GB", or "12.4 GB" with no quota. */
+export function usageLabel(u: DvrUsage) {
+  const gb = (b: number) => (b / 1e9).toFixed(b >= 10e9 ? 0 : 1);
+  return u.quotaBytes > 0
+    ? `${gb(u.usedBytes)} of ${gb(u.quotaBytes)} GB`
+    : `${gb(u.usedBytes)} GB (no limit)`;
+}

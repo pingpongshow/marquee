@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -69,6 +70,9 @@ type Service struct {
 	QSVDevice string
 	// Dir holds recordings: only files inside it are looked at. Work files go in Dir/.commercials.
 	Dir string
+	// Roots, when set, are more folders holding recordings (the recordings folder chosen in
+	// the settings, and earlier ones whose recordings are still in the library).
+	Roots func() []string
 	// Mode is the admin's setting: settings.CommercialsOff, ...Detect or ...Remove.
 	Mode func() string
 	// Trash takes the originals of cut recordings.
@@ -147,13 +151,57 @@ func (s *Service) Command(path, outDir string) (name string, args []string) {
 	return s.lowPriority(s.Comskip, cs...)
 }
 
-func (s *Service) prefix() string {
-	return strings.TrimRight(s.Dir, string(filepath.Separator)) + string(filepath.Separator)
+// prefixes are the recordings folders, each ending in a separator.
+func (s *Service) prefixes() []string {
+	dirs := []string{s.Dir}
+	if s.Roots != nil {
+		dirs = append(dirs, s.Roots()...)
+	}
+	var out []string
+	for _, d := range dirs {
+		if d == "" {
+			continue
+		}
+		p := strings.TrimRight(d, string(filepath.Separator)) + string(filepath.Separator)
+		if !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
-// inside is the SQL test for a file inside the recordings folder, and its argument.
-func (s *Service) inside() (string, string) {
-	return `substr(f.path, 1, length(?)) = ?`, s.prefix()
+func (s *Service) isRecording(path string) bool {
+	for _, p := range s.prefixes() {
+		if strings.HasPrefix(path, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// rootOf is the recordings folder holding path (work files go there, on its filesystem).
+func (s *Service) rootOf(path string) string {
+	for _, p := range s.prefixes() {
+		if strings.HasPrefix(path, p) {
+			return filepath.Clean(p)
+		}
+	}
+	return s.Dir
+}
+
+// inside is the SQL test for a file inside a recordings folder, and its arguments.
+func (s *Service) inside() (string, []any) {
+	ps := s.prefixes()
+	if len(ps) == 0 {
+		return "0", nil
+	}
+	conds := make([]string, len(ps))
+	args := make([]any, 0, 2*len(ps))
+	for i, p := range ps {
+		conds[i] = `substr(f.path, 1, length(?)) = ?`
+		args = append(args, p, p)
+	}
+	return "(" + strings.Join(conds, " OR ") + ")", args
 }
 
 type file struct {
@@ -162,11 +210,11 @@ type file struct {
 }
 
 func (s *Service) file(ctx context.Context, fileID int64) (file, error) {
-	cond, dir := s.inside()
+	cond, args := s.inside()
 	var f file
 	var dur sql.NullInt64
 	err := s.DB.QueryRowContext(ctx, `SELECT f.id, f.path, f.mtime, f.duration_ms, f.library_id FROM media_files f WHERE f.id = ? AND `+cond,
-		fileID, dir, dir).Scan(&f.id, &f.path, &f.mtime, &dur, &f.libID)
+		append([]any{fileID}, args...)...).Scan(&f.id, &f.path, &f.mtime, &dur, &f.libID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return f, ErrNotRecording
 	}
@@ -176,10 +224,10 @@ func (s *Service) file(ctx context.Context, fileID int64) (file, error) {
 
 // FileForItem is the recording file of a library item (its first part).
 func (s *Service) FileForItem(ctx context.Context, itemID int64) (int64, error) {
-	cond, dir := s.inside()
+	cond, args := s.inside()
 	var id int64
 	err := s.DB.QueryRowContext(ctx, `SELECT f.id FROM media_versions v JOIN media_files f ON f.version_id = v.id AND f.part_index = 0
-		WHERE v.item_id = ? AND `+cond+` ORDER BY f.available DESC, v.id LIMIT 1`, itemID, dir, dir).Scan(&id)
+		WHERE v.item_id = ? AND `+cond+` ORDER BY f.available DESC, v.id LIMIT 1`, append([]any{itemID}, args...)...).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrNotRecording
 	}
@@ -318,7 +366,7 @@ func (s *Service) Queue(ctx context.Context, fileID int64, cut bool) (Status, er
 // RecordingFinished queues a recording that just finished, once the library has it.
 func (s *Service) RecordingFinished(ctx context.Context, path string) {
 	mode := s.mode()
-	if mode == settings.CommercialsOff || !s.Available() || !strings.HasPrefix(path, s.prefix()) {
+	if mode == settings.CommercialsOff || !s.Available() || !s.isRecording(path) {
 		return
 	}
 	s.waiting.Add(1)
@@ -615,7 +663,7 @@ func (s *Service) cut(ctx context.Context, f file, breaks []Break) (int64, error
 	if len(plan.Removed) == 0 {
 		return 0, errors.New("nothing to cut")
 	}
-	work := filepath.Join(s.Dir, ".commercials", strconv.FormatInt(f.id, 10))
+	work := filepath.Join(s.rootOf(f.path), ".commercials", strconv.FormatInt(f.id, 10))
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		return 0, err
 	}
@@ -810,7 +858,7 @@ func (s *Service) Progress() (done, total int) { return int(s.done.Load()), int(
 // changed since, and with remove on, ones found but not cut yet. Failures aren't retried
 // by themselves (an admin can ask again), and cut or restored recordings are left alone.
 func (s *Service) pending(ctx context.Context, cut bool) ([]file, error) {
-	cond, dir := s.inside()
+	cond, cargs := s.inside()
 	q := `SELECT f.id, f.path, f.mtime, COALESCE(f.duration_ms, 0), f.library_id FROM media_files f
 		LEFT JOIN commercial_scans c ON c.file_id = f.id
 		WHERE f.available = 1 AND f.duration_ms > 0 AND ` + cond + `
@@ -819,7 +867,7 @@ func (s *Service) pending(ctx context.Context, cut bool) ([]file, error) {
 		q += ` OR (c.mtime = f.mtime AND c.status IN ('detected', 'waiting') AND c.breaks > 0)`
 	}
 	q += `) ORDER BY f.id DESC`
-	rows, err := s.DB.QueryContext(ctx, q, dir, dir)
+	rows, err := s.DB.QueryContext(ctx, q, cargs...)
 	if err != nil {
 		return nil, err
 	}

@@ -8,8 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 )
 
@@ -71,12 +73,14 @@ func (o Options) WithDefaults(t Type, metadataLanguage string) Options {
 }
 
 type Library struct {
-	ID            int64
-	Name          string
-	Type          Type
-	Paths         []string
-	Options       Options
-	ItemCount     int
+	ID        int64
+	Name      string
+	Type      Type
+	Paths     []string
+	Options   Options
+	ItemCount int
+	// Recordings: a library Live TV recordings are filed in (LIVE-5).
+	Recordings    bool
 	LastScannedAt *time.Time
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
@@ -119,15 +123,29 @@ func (s *Store) List(ctx context.Context) ([]Library, error) {
 	return libs, nil
 }
 
+// MarkRecordings flags a library as one Live TV recordings are filed in, so profiles that
+// may not view recordings don't see it.
+func (s *Store) MarkRecordings(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE libraries SET recordings = 1 WHERE id = ?`, id)
+	return err
+}
+
+// IsRecordings reports whether a library holds Live TV recordings.
+func (s *Store) IsRecordings(ctx context.Context, id int64) bool {
+	var n int
+	s.db.QueryRowContext(ctx, `SELECT recordings FROM libraries WHERE id = ?`, id).Scan(&n)
+	return n == 1
+}
+
 func (s *Store) Get(ctx context.Context, id int64) (Library, error) {
 	var l Library
 	var opts, created, updated string
 	var scanned sql.NullString
 	err := s.db.QueryRowContext(ctx, `
 		SELECT id, name, type, options, last_scanned_at, created_at, updated_at,
-		       (SELECT COUNT(*) FROM items i WHERE i.library_id = l.id AND i.parent_id IS NULL AND i.extra_type IS NULL)
+		       (SELECT COUNT(*) FROM items i WHERE i.library_id = l.id AND i.parent_id IS NULL AND i.extra_type IS NULL), recordings
 		FROM libraries l WHERE id = ?`, id).
-		Scan(&l.ID, &l.Name, &l.Type, &opts, &scanned, &created, &updated, &l.ItemCount)
+		Scan(&l.ID, &l.Name, &l.Type, &opts, &scanned, &created, &updated, &l.ItemCount, &l.Recordings)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Library{}, ErrNotFound
 	}
@@ -340,4 +358,49 @@ func mergeOptions(cur, patch Options) Options {
 		cur.ScanIntervalHours = patch.ScanIntervalHours
 	}
 	return cur
+}
+
+// RecordingsLibrary returns the library Live TV recordings in dir are filed in (dir is the
+// recordings folder's TV or Movies folder, LIVE-5): the one holding dir; else the existing
+// Recorded TV / Recorded Movies library, which takes dir as another folder (a recordings
+// folder chosen in the settings); else a new one.
+func (s *Store) RecordingsLibrary(ctx context.Context, movies bool, dir string) (int64, error) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return 0, err
+	}
+	libs, err := s.List(ctx)
+	if err != nil {
+		return 0, err
+	}
+	for _, l := range libs {
+		if slices.Contains(l.Paths, dir) {
+			if !l.Recordings {
+				s.MarkRecordings(ctx, l.ID)
+			}
+			return l.ID, nil
+		}
+	}
+	name, t := "Recorded TV", Shows
+	if movies {
+		name, t = "Recorded Movies", Movies
+	}
+	for _, l := range libs {
+		if l.Recordings && l.Type == t {
+			paths := append(slices.Clone(l.Paths), dir)
+			if _, err := s.Update(ctx, l.ID, nil, &paths, nil); err != nil {
+				return 0, err
+			}
+			slog.Info("dvr: added the recordings folder to a library", "name", l.Name, "path", dir)
+			return l.ID, nil
+		}
+	}
+	l, err := s.Create(ctx, name, t, []string{dir}, Options{})
+	if err != nil {
+		return 0, err
+	}
+	if err := s.MarkRecordings(ctx, l.ID); err != nil {
+		return 0, err
+	}
+	slog.Info("dvr: created library", "name", name, "path", dir)
+	return l.ID, nil
 }

@@ -149,7 +149,7 @@ func (h *Handlers) ListLibraryItems(ctx context.Context, req ListLibraryItemsReq
 		return ListLibraryItems401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	lib, err := h.Libraries.Get(ctx, req.LibraryId)
-	if errors.Is(err, library.ErrNotFound) || (err == nil && !canSeeLibrary(ctx, req.LibraryId)) {
+	if errors.Is(err, library.ErrNotFound) || (err == nil && !h.canSeeLibrary(ctx, req.LibraryId)) {
 		return ListLibraryItems404JSONResponse{NotFoundJSONResponse(apiErr("not_found", library.ErrNotFound.Error()))}, nil
 	}
 	if err != nil {

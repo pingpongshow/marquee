@@ -27,6 +27,8 @@ import {
   type Recording,
   recordingRulesQuery,
   recordingsQuery,
+  recordingUsageQuery,
+  usageLabel,
   formatSize,
   useCancelRecording,
   useDeleteRule,
@@ -56,7 +58,10 @@ export function LiveTvPage() {
   const groups = useQuery({ ...liveGroupsQuery, enabled: liveOn });
   const tabs: LiveTab[] = [
     ...(liveOn ? (["guide", "now"] as const) : []),
-    ...(liveOn && status.data?.canRecord ? (["recordings"] as const) : []),
+    // Older servers don't send canViewRecordings: recording implied seeing recordings.
+    ...(liveOn && (status.data?.canViewRecordings ?? status.data?.canRecord)
+      ? (["recordings"] as const)
+      : []),
   ];
   // The tab is in the address, so Back returns to the same tab.
   const search = useSearch({ from: "/livetv" });
@@ -81,8 +86,8 @@ export function LiveTvPage() {
     return (
       <div className="p-6">
         <Alert>
-          Live TV isn't available: there are no channels you can watch. An
-          admin can add an M3U playlist or Dispatcharr in Settings → Live TV.
+          Live TV isn't available: there are no channels you can watch. An admin
+          can add an M3U playlist or Dispatcharr in Settings → Live TV.
         </Alert>
       </div>
     );
@@ -116,8 +121,7 @@ export function LiveTvPage() {
         <div
           className={clsx(
             "w-full shrink-0 sm:ml-auto sm:w-48",
-            tab === "recordings" &&
-              "hidden sm:invisible sm:block",
+            tab === "recordings" && "hidden sm:invisible sm:block",
           )}
         >
           <Select
@@ -184,7 +188,7 @@ export function LiveTvPage() {
       )}
 
       {tab === "recordings" ? (
-        <Recordings />
+        <Recordings canRecord={!!status.data?.canRecord} />
       ) : channels.isPending ? (
         <Spinner />
       ) : !channels.data?.length ? (
@@ -701,8 +705,10 @@ function RecordButtons({
       new Date(r.start).getTime() === new Date(p.start).getTime() &&
       (r.status === "scheduled" || r.status === "recording"),
   );
+  const usage = useQuery(recordingUsageQuery);
   const error = schedule.error ?? cancel.error;
   if (recordings.isPending) return <Spinner />;
+  const theirs = rec && rec.canDelete === false;
   return (
     <div className="space-y-2 pt-2">
       {p.series && (
@@ -710,8 +716,22 @@ function RecordButtons({
           A series recording covers this title.
         </p>
       )}
+      {theirs && (
+        <p className="text-xs text-muted">
+          {rec.status === "recording" ? "Being recorded" : "Will be recorded"}
+          {rec.ownerName ? ` by ${rec.ownerName}` : ""}.
+        </p>
+      )}
+      {!rec && usage.data?.overQuota && (
+        <Alert tone="error">
+          You're using {usageLabel(usage.data)} of recording space.{" "}
+          {usage.data.quotaAction === "deleteOldest"
+            ? "Your oldest watched recordings will be removed to make room; if there aren't enough, new recordings won't be made."
+            : "Delete some recordings to record more."}
+        </Alert>
+      )}
       <div className="flex flex-wrap gap-2">
-        {rec ? (
+        {theirs ? null : rec ? (
           <Button
             variant="ghost"
             loading={cancel.isPending}
@@ -764,9 +784,10 @@ function when(r: Recording) {
 }
 
 /** The DVR: in progress, upcoming, series and finished recordings (LIVE-5). */
-function Recordings() {
+function Recordings({ canRecord }: { canRecord: boolean }) {
   const recordings = useQuery(recordingsQuery);
   const rules = useQuery(recordingRulesQuery);
+  const usage = useQuery({ ...recordingUsageQuery, enabled: canRecord });
   const cancel = useCancelRecording();
   const stopSeries = useDeleteRule();
   if (recordings.isPending) return <Spinner />;
@@ -806,6 +827,7 @@ function Recordings() {
           {(r.episode || r.subtitle) && " · "}
           {r.channelName} · {when(r)}
           {r.sizeBytes ? ` · ${formatSize(r.sizeBytes)}` : ""}
+          {r.ownerName ? ` · Recorded by ${r.ownerName}` : ""}
         </div>
         {r.status === "failed" && (
           <div className="truncate text-sm text-danger">
@@ -828,23 +850,43 @@ function Recordings() {
         <ul className="space-y-2">{items}</ul>
       </section>
     );
+  // Only whoever scheduled a recording or series, or an admin, may cancel or delete it.
+  const mine = (x: { canDelete?: boolean }) => x.canDelete !== false;
+  const meter = usage.data && (
+    <UsageMeter
+      used={usage.data.usedBytes}
+      quota={usage.data.quotaBytes}
+      label={usageLabel(usage.data)}
+      over={usage.data.overQuota}
+      action={usage.data.quotaAction}
+    />
+  );
   if (!list.length && !rules.data?.length)
     return (
-      <p className="text-muted">
-        Nothing recorded yet. Pick a programme in the guide and choose Record.
-      </p>
+      <div className="space-y-4">
+        {meter}
+        <p className="text-muted">
+          Nothing recorded yet. Pick a programme in the guide and choose Record.
+        </p>
+      </div>
     );
   return (
     <div className="space-y-6">
+      {meter}
       {cancel.error && <Alert tone="error">{cancel.error.message}</Alert>}
       {section(
         "Recording now",
         active.map((r) =>
           row(
             r,
-            <Button variant="ghost" onClick={() => cancel.mutate({ id: r.id })}>
-              Stop
-            </Button>,
+            mine(r) && (
+              <Button
+                variant="ghost"
+                onClick={() => cancel.mutate({ id: r.id })}
+              >
+                Stop
+              </Button>
+            ),
           ),
         ),
       )}
@@ -853,9 +895,14 @@ function Recordings() {
         upcoming.map((r) =>
           row(
             r,
-            <Button variant="ghost" onClick={() => cancel.mutate({ id: r.id })}>
-              Cancel
-            </Button>,
+            mine(r) && (
+              <Button
+                variant="ghost"
+                onClick={() => cancel.mutate({ id: r.id })}
+              >
+                Cancel
+              </Button>
+            ),
           ),
         ),
       )}
@@ -870,11 +917,19 @@ function Recordings() {
               <div className="truncate font-medium">{s.title}</div>
               <div className="text-sm text-muted">
                 {s.channelName || "Any channel"} · {s.upcoming} upcoming
+                {s.ownerName ? ` · ${s.ownerName}` : ""}
               </div>
+              {s.paused && (
+                <div className="text-sm text-danger">
+                  Paused: {s.ownerName || "its owner"} may no longer record
+                </div>
+              )}
             </div>
-            <Button variant="ghost" onClick={() => stopSeries.mutate(s.id)}>
-              Stop series
-            </Button>
+            {mine(s) && (
+              <Button variant="ghost" onClick={() => stopSeries.mutate(s.id)}>
+                Stop series
+              </Button>
+            )}
           </li>
         )),
       )}
@@ -883,23 +938,78 @@ function Recordings() {
         done.map((r) =>
           row(
             r,
-            <Button
-              variant="ghost"
-              onClick={() => {
-                if (
-                  r.status === "failed" ||
-                  window.confirm(`Delete the recording of ${r.title}?`)
-                )
-                  cancel.mutate({
-                    id: r.id,
-                    deleteFile: r.status !== "failed",
-                  });
-              }}
-            >
-              {r.status === "failed" ? "Dismiss" : "Delete"}
-            </Button>,
+            mine(r) && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  if (
+                    r.status === "failed" ||
+                    window.confirm(`Delete the recording of ${r.title}?`)
+                  )
+                    cancel.mutate({
+                      id: r.id,
+                      deleteFile: r.status !== "failed",
+                    });
+                }}
+              >
+                {r.status === "failed" ? "Dismiss" : "Delete"}
+              </Button>
+            ),
           ),
         ),
+      )}
+    </div>
+  );
+}
+
+/** The signed-in person's recording space: "12.4 of 50 GB", with a bar when there's a quota. */
+function UsageMeter({
+  used,
+  quota,
+  label,
+  over,
+  action,
+}: {
+  used: number;
+  quota: number;
+  label: string;
+  over: boolean;
+  action?: string;
+}) {
+  const pct = quota > 0 ? Math.min(100, (used / quota) * 100) : 0;
+  return (
+    <div className="max-w-md space-y-1.5">
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="text-muted">Your recordings</span>
+        <span className={clsx(over ? "text-danger" : "text-text")}>
+          {label}
+        </span>
+      </div>
+      {quota > 0 && (
+        <div
+          className="h-1.5 overflow-hidden rounded-full bg-surface-2"
+          role="meter"
+          aria-label="Recording space used"
+          aria-valuemin={0}
+          aria-valuemax={quota}
+          aria-valuenow={Math.min(used, quota)}
+        >
+          <div
+            className={clsx(
+              "h-full rounded-full",
+              over ? "bg-danger" : pct > 85 ? "bg-amber-500" : "bg-accent",
+            )}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+      {over && (
+        <p className="text-sm text-danger">
+          You're over your recording quota.{" "}
+          {action === "deleteOldest"
+            ? "Your oldest watched recordings are removed to make room for new ones; if there aren't enough, new recordings aren't made."
+            : "New recordings won't be made until you delete some."}
+        </p>
       )}
     </div>
   );

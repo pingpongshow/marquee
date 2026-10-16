@@ -132,7 +132,7 @@ func (h *Handlers) MuseVideo(ctx context.Context, req MuseVideoRequestObject) (M
 	limit = min(max(limit, 1), 100)
 	var lib int64
 	set(&lib, b.LibraryId)
-	if lib > 0 && !canSeeLibrary(ctx, lib) {
+	if lib > 0 && !h.canSeeLibrary(ctx, lib) {
 		return MuseVideo400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "library not found"))}, nil
 	}
 	ctx = ai.WithBudget(ctx, museAIBudget) // see museAIBudget

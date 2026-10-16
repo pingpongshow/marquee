@@ -12,6 +12,9 @@ type Access struct {
 	LibraryIDs []int64
 	// MaxRating hides movies/TV rated above it (and unrated ones). "" = no limit.
 	MaxRating string
+	// HideRecordings hides the libraries Live TV recordings are filed in (a profile that may
+	// not view DVR recordings, LIVE-5).
+	HideRecordings bool
 }
 
 // Unrestricted sees everything (admins, and internal use).
@@ -58,9 +61,18 @@ func (a Access) clause() (string, []any) {
 			}
 		}
 	}
+	if a.HideRecordings {
+		conds = append(conds, "i.library_id NOT IN (SELECT id FROM libraries WHERE recordings = 1)")
+	}
 	if lvl := RatingLevel(a.MaxRating); lvl > 0 {
+		// A Live TV recording with no rating of its own (or its show's) has the guide's rating
+		// for the programme, when the guide gave one (LIVE-5).
 		conds = append(conds, "(i.type NOT IN ('movie','show','season','episode') OR "+
-			ratingCase("COALESCE(i.content_rating, p.content_rating, g.content_rating)")+" <= ?)")
+			"(CASE WHEN COALESCE(i.content_rating, p.content_rating, g.content_rating) IS NOT NULL THEN "+
+			ratingCase("COALESCE(i.content_rating, p.content_rating, g.content_rating)")+
+			" WHEN i.library_id IN (SELECT id FROM libraries WHERE recordings = 1) THEN COALESCE((SELECT MAX("+ratingCase("r.rating")+
+			") FROM dvr_recordings r JOIN media_files f ON f.path = r.path JOIN media_versions v ON v.id = f.version_id JOIN items e ON e.id = v.item_id"+
+			" WHERE r.path <> '' AND r.rating <> '' AND (e.id = i.id OR e.parent_id = i.id OR e.grandparent_id = i.id)), 99) ELSE 99 END) <= ?)")
 		args = append(args, lvl)
 	}
 	if len(conds) == 0 {

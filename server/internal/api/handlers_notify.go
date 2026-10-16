@@ -16,15 +16,19 @@ import (
 // ---------- settings ----------
 
 func toAPINotifications(n settings.Notifications) *NotificationSettings {
-	alerts := make([]AlertType, len(n.Alerts))
-	for i, a := range n.Alerts {
-		alerts[i] = AlertType(a)
+	// dvr_quota isn't an AlertType value (shipped apps decode the enum strictly): it's
+	// dvrQuotaAlert instead.
+	alerts := make([]AlertType, 0, len(n.Alerts))
+	for _, a := range n.Alerts {
+		if a != settings.AlertDVRQuota {
+			alerts = append(alerts, AlertType(a))
+		}
 	}
 	return &NotificationSettings{
 		SmtpHost: ptr(n.SMTPHost), SmtpPort: ptr(n.SMTPPort), SmtpSecurity: ptr(NotificationSettingsSmtpSecurity(n.SMTPSecurity)),
 		SmtpUsername: ptr(n.SMTPUsername), SmtpPasswordSet: ptr(n.SMTPPassword != ""),
 		FromAddress: ptr(n.FromAddress), FromName: ptr(n.FromName), MailConfigured: ptr(n.MailConfigured()),
-		LinkUrl: ptr(n.LinkURL), Alerts: &alerts, RecipientsAllAdmins: ptr(n.RecipientsAllAdmins),
+		LinkUrl: ptr(n.LinkURL), Alerts: &alerts, DvrQuotaAlert: ptr(n.AlertOn(settings.AlertDVRQuota)), RecipientsAllAdmins: ptr(n.RecipientsAllAdmins),
 		Recipients: ptr(append([]int64{}, n.Recipients...)), DiskThresholdPercent: ptr(n.DiskThresholdPercent),
 	}
 }
@@ -47,11 +51,29 @@ func applyNotifications(n *settings.Notifications, u NotificationSettingsUpdate)
 	if u.LinkUrl != nil {
 		n.LinkURL = strings.TrimRight(strings.TrimSpace(*u.LinkUrl), "/")
 	}
+	dvrQuota := n.AlertOn(settings.AlertDVRQuota)
+	if u.DvrQuotaAlert != nil {
+		dvrQuota = *u.DvrQuotaAlert
+	}
 	if u.Alerts != nil {
 		n.Alerts = []string{}
 		for _, a := range *u.Alerts {
-			n.Alerts = append(n.Alerts, string(a))
+			if string(a) != settings.AlertDVRQuota {
+				n.Alerts = append(n.Alerts, string(a))
+			}
 		}
+	}
+	if u.Alerts != nil || u.DvrQuotaAlert != nil {
+		kept := n.Alerts[:0:0]
+		for _, a := range n.Alerts {
+			if a != settings.AlertDVRQuota {
+				kept = append(kept, a)
+			}
+		}
+		if dvrQuota {
+			kept = append(kept, settings.AlertDVRQuota)
+		}
+		n.Alerts = kept
 	}
 	set(&n.RecipientsAllAdmins, u.RecipientsAllAdmins)
 	if u.Recipients != nil {

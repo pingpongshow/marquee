@@ -22,7 +22,7 @@ func (h *Handlers) LibraryFilters(ctx context.Context, req LibraryFiltersRequest
 		return LibraryFilters401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	lib, err := h.Libraries.Get(ctx, req.LibraryId)
-	if errors.Is(err, library.ErrNotFound) || (err == nil && !canSeeLibrary(ctx, req.LibraryId)) {
+	if errors.Is(err, library.ErrNotFound) || (err == nil && !h.canSeeLibrary(ctx, req.LibraryId)) {
 		return LibraryFilters404JSONResponse{NotFoundJSONResponse(apiErr("not_found", library.ErrNotFound.Error()))}, nil
 	}
 	if err != nil {

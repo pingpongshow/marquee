@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,6 +26,14 @@ var (
 	ErrRecordingNotFound = errors.New("recording not found")
 	ErrProgrammeNotFound = errors.New("that programme isn't in the guide")
 	ErrDVRUnavailable    = errors.New("recording isn't available: the recordings folder can't be written")
+	ErrQuotaExceeded     = errors.New("you're at your recording quota: delete some recordings to record more")
+)
+
+// Messages for recordings that weren't made.
+const (
+	msgOverQuota    = "Over your recording quota"
+	msgRecordingOff = "Recording is turned off for this profile"
+	bytesPerGB      = 1_000_000_000
 )
 
 // Recording statuses.
@@ -40,7 +49,10 @@ const (
 type Recorder struct {
 	Live   *Service
 	FFmpeg string
-	Dir    string // the recordings folder
+	Dir    string // the default recordings folder (the server's configuration)
+	// Folder, when set and not empty, is the recordings folder chosen in the settings; new
+	// recordings go there. Recordings made elsewhere stay where they are.
+	Folder func() string
 	// Padding before and after each programme.
 	Before, After func() time.Duration
 	// Library returns the library for recorded shows or movies at dir, creating it if needed.
@@ -54,6 +66,23 @@ type Recorder struct {
 	// OnRecorded, when set, hears a recording that finished, with its file (commercial
 	// detection). It's called after the library rescan is queued.
 	OnRecorded func(path string)
+
+	// Quotas and permissions (LIVE-5). Each is optional: without them everyone may record
+	// and nobody has a quota.
+	// CanRecord reports whether a user may record now; a user who may not has their series
+	// paused (kept, but nothing new is scheduled or recorded).
+	CanRecord func(ctx context.Context, userID int64) bool
+	// QuotaBytes is a user's recording quota in bytes (0 = unlimited).
+	QuotaBytes func(ctx context.Context, userID int64) int64
+	// QuotaAction is settings.DVRQuotaBlock or settings.DVRQuotaDeleteOldest.
+	QuotaAction func() string
+	// Playing reports whether someone is watching the file at path now.
+	Playing func(path string) bool
+	// Trash moves a recording's file to the media trash and out of the library.
+	Trash func(ctx context.Context, path string) error
+	// OnQuota hears a recording that wasn't made, or recordings removed to make room
+	// (admin alerts).
+	OnQuota func(userID int64, owner, title, msg string)
 
 	mu     sync.Mutex
 	active map[int64]context.CancelFunc
@@ -71,6 +100,8 @@ type Recording struct {
 	Path, Error                                                    string
 	Size                                                           int64
 	ItemID                                                         *int64
+	// Rating is the guide's content rating ("" = unknown); OwnerName is who scheduled it.
+	Rating, OwnerName string
 }
 
 // Rule records every airing of a title.
@@ -81,6 +112,9 @@ type Rule struct {
 	ChannelName string
 	CreatedAt   time.Time
 	Upcoming    int
+	OwnerName   string
+	// Paused: its owner may no longer record, so nothing new is scheduled.
+	Paused bool
 }
 
 func (r *Recorder) now() time.Time {
@@ -103,19 +137,82 @@ func (r *Recorder) pad() (time.Duration, time.Duration) {
 
 // Available reports whether recordings can be written.
 func (r *Recorder) Available() bool {
-	if r == nil || r.Dir == "" {
+	if r == nil || r.dir() == "" {
 		return false
 	}
-	if err := os.MkdirAll(r.Dir, 0o755); err != nil {
+	dir := r.dir()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return false
 	}
-	f, err := os.CreateTemp(r.Dir, ".probe-*")
+	f, err := os.CreateTemp(dir, ".probe-*")
 	if err != nil {
 		return false
 	}
 	f.Close()
 	os.Remove(f.Name())
 	return true
+}
+
+// dir is the folder new recordings go in.
+func (r *Recorder) dir() string {
+	if r.Folder != nil {
+		if f := strings.TrimSpace(r.Folder()); f != "" {
+			return filepath.Clean(f)
+		}
+	}
+	return r.Dir
+}
+
+// Roots are the folders that hold recordings: the one new recordings go in, the server's
+// default, and earlier ones a recordings library still covers.
+func (r *Recorder) Roots(ctx context.Context) []string {
+	var out []string
+	add := func(d string) {
+		if d = filepath.Clean(d); d != "." && d != "" && !slices.Contains(out, d) {
+			out = append(out, d)
+		}
+	}
+	add(r.dir())
+	if r.Dir != "" {
+		add(r.Dir)
+	}
+	rows, err := r.Live.DB.QueryContext(ctx, `SELECT p.path FROM library_paths p JOIN libraries l ON l.id = p.library_id WHERE l.recordings = 1`)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var p string
+			if rows.Scan(&p) == nil {
+				if b := filepath.Base(p); b == "TV" || b == "Movies" {
+					add(filepath.Dir(p))
+				}
+			}
+		}
+	}
+	return out
+}
+
+// rootOf is the recordings folder holding p ("" when none does).
+func (r *Recorder) rootOf(ctx context.Context, p string) string {
+	for _, root := range r.Roots(ctx) {
+		if rel, err := filepath.Rel(root, p); err == nil && rel != "." && !strings.HasPrefix(rel, "..") && !filepath.IsAbs(rel) {
+			return root
+		}
+	}
+	return ""
+}
+
+// workDir is where a recording's parts are written: where they already are (a recording
+// resumed after a restart, even if the folder setting changed since), else the folder new
+// recordings go in.
+func (r *Recorder) workDir(ctx context.Context, id int64) string {
+	name := strconv.FormatInt(id, 10)
+	for _, root := range r.Roots(ctx) {
+		w := filepath.Join(root, ".recording", name)
+		if fi, err := os.Stat(w); err == nil && fi.IsDir() {
+			return w
+		}
+	}
+	return filepath.Join(r.dir(), ".recording", name)
 }
 
 // Wake makes the scheduler look again now.
@@ -191,6 +288,10 @@ func (r *Recorder) Tick(ctx context.Context) {
 			r.finish(ctx, d.id, nil, "missed: the server wasn't running")
 			continue
 		}
+		if msg := r.mayStart(ctx, d.id); msg != "" {
+			r.finish(ctx, d.id, nil, msg)
+			continue
+		}
 		r.start(ctx, d.id, end)
 	}
 }
@@ -205,17 +306,29 @@ func (r *Recorder) followGuide(ctx context.Context) error {
 		return err
 	}
 	_, err := r.Live.DB.ExecContext(ctx, `UPDATE dvr_recordings SET title = p.title, subtitle = p.subtitle, description = p.description,
-			category = p.category, episode = p.episode, image_url = p.image_url, stop = p.stop
+			category = p.category, episode = p.episode, image_url = p.image_url, stop = p.stop, rating = p.rating
 		FROM live_programmes p
 		WHERE dvr_recordings.status = 'scheduled' AND p.channel_id = dvr_recordings.channel_id AND p.start = dvr_recordings.start
-		  AND (p.title <> dvr_recordings.title OR p.stop <> dvr_recordings.stop OR p.subtitle <> dvr_recordings.subtitle OR p.episode <> dvr_recordings.episode)`)
+		  AND (p.title <> dvr_recordings.title OR p.stop <> dvr_recordings.stop OR p.subtitle <> dvr_recordings.subtitle OR p.episode <> dvr_recordings.episode
+		       OR p.rating <> dvr_recordings.rating)`)
 	return err
 }
 
 // expandRules schedules every guide airing that matches a series rule.
 func (r *Recorder) expandRules(ctx context.Context) error {
 	now := r.now().UTC().Format(time.RFC3339)
-	rows, err := r.Live.DB.QueryContext(ctx, `SELECT d.id, d.user_id, p.channel_id, c.name, p.start, p.stop, p.title, p.subtitle, p.description, p.category, p.episode, p.image_url
+	paused, err := r.pausedOwners(ctx)
+	if err != nil {
+		return err
+	}
+	// A paused series records nothing: airings it scheduled that haven't started are dropped
+	// (they come back if its owner may record again).
+	for uid := range paused {
+		if _, err := r.Live.DB.ExecContext(ctx, `DELETE FROM dvr_recordings WHERE status = 'scheduled' AND rule_id IN (SELECT id FROM dvr_rules WHERE user_id = ?)`, uid); err != nil {
+			return err
+		}
+	}
+	rows, err := r.Live.DB.QueryContext(ctx, `SELECT d.id, d.user_id, p.channel_id, c.name, p.start, p.stop, p.title, p.subtitle, p.description, p.category, p.episode, p.image_url, p.rating
 		FROM dvr_rules d
 		JOIN live_programmes p ON lower(p.title) = lower(d.title) AND (d.channel_id IS NULL OR d.channel_id = p.channel_id)
 		JOIN live_channels c ON c.id = p.channel_id AND c.present = 1
@@ -229,15 +342,18 @@ func (r *Recorder) expandRules(ctx context.Context) error {
 		rule, user, channel                               int64
 		channelName, start, stop                          string
 		title, subtitle, description, category, ep, image string
+		rating                                            string
 	}
 	var list []cand
 	for rows.Next() {
 		var c cand
-		if err := rows.Scan(&c.rule, &c.user, &c.channel, &c.channelName, &c.start, &c.stop, &c.title, &c.subtitle, &c.description, &c.category, &c.ep, &c.image); err != nil {
+		if err := rows.Scan(&c.rule, &c.user, &c.channel, &c.channelName, &c.start, &c.stop, &c.title, &c.subtitle, &c.description, &c.category, &c.ep, &c.image, &c.rating); err != nil {
 			rows.Close()
 			return err
 		}
-		list = append(list, c)
+		if !paused[c.user] {
+			list = append(list, c)
+		}
 	}
 	rows.Close()
 	for _, c := range list {
@@ -251,9 +367,9 @@ func (r *Recorder) expandRules(ctx context.Context) error {
 				continue
 			}
 		}
-		if _, err := r.Live.DB.ExecContext(ctx, `INSERT OR IGNORE INTO dvr_recordings (rule_id, user_id, channel_id, channel_name, start, stop, title, subtitle, description, category, episode, image_url, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			c.rule, c.user, c.channel, c.channelName, c.start, c.stop, c.title, c.subtitle, c.description, c.category, c.ep, c.image, now); err != nil {
+		if _, err := r.Live.DB.ExecContext(ctx, `INSERT OR IGNORE INTO dvr_recordings (rule_id, user_id, channel_id, channel_name, start, stop, title, subtitle, description, category, episode, image_url, rating, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			c.rule, c.user, c.channel, c.channelName, c.start, c.stop, c.title, c.subtitle, c.description, c.category, c.ep, c.image, c.rating, now); err != nil {
 			return err
 		}
 	}
@@ -271,6 +387,9 @@ func (r *Recorder) Schedule(ctx context.Context, userID, channelID int64, start 
 	}
 	if err != nil {
 		return nil, nil, err
+	}
+	if r.atQuota(ctx, userID) {
+		return nil, nil, ErrQuotaExceeded
 	}
 	now := r.now().UTC().Format(time.RFC3339)
 	if series {
@@ -305,12 +424,12 @@ func (r *Recorder) Schedule(ctx context.Context, userID, channelID int64, start 
 		return nil, nil, ErrRecordingNotFound
 	}
 	// A one-off: a programme cancelled earlier can be scheduled again.
-	_, err = r.Live.DB.ExecContext(ctx, `INSERT INTO dvr_recordings (user_id, channel_id, channel_name, start, stop, title, subtitle, description, category, episode, image_url, created_at)
-		SELECT ?, p.channel_id, ?, p.start, p.stop, p.title, p.subtitle, p.description, p.category, p.episode, p.image_url, ?
+	_, err = r.Live.DB.ExecContext(ctx, `INSERT INTO dvr_recordings (user_id, channel_id, channel_name, start, stop, title, subtitle, description, category, episode, image_url, rating, created_at)
+		SELECT ?, p.channel_id, ?, p.start, p.stop, p.title, p.subtitle, p.description, p.category, p.episode, p.image_url, p.rating, ?
 		FROM live_programmes p WHERE p.channel_id = ? AND p.start = ?
 		ON CONFLICT (channel_id, start) DO UPDATE SET status = 'scheduled', error = '', user_id = excluded.user_id, rule_id = NULL,
 			title = excluded.title, subtitle = excluded.subtitle, description = excluded.description, category = excluded.category,
-			episode = excluded.episode, image_url = excluded.image_url, stop = excluded.stop
+			episode = excluded.episode, image_url = excluded.image_url, stop = excluded.stop, rating = excluded.rating
 		WHERE status IN ('cancelled', 'failed')`,
 		userID, chName, now, channelID, start.UTC().Format(time.RFC3339))
 	if err != nil {
@@ -327,13 +446,14 @@ func (r *Recorder) Schedule(ctx context.Context, userID, channelID int64, start 
 
 const recCols = `r.id, r.user_id, r.rule_id, r.channel_id, r.channel_name, r.start, r.stop, r.title, r.subtitle, r.description, r.category, r.episode,
 	r.image_url, r.status, r.path, r.error, r.size,
-	(SELECT v.item_id FROM media_files f JOIN media_versions v ON v.id = f.version_id WHERE r.path <> '' AND f.path = r.path)`
+	(SELECT v.item_id FROM media_files f JOIN media_versions v ON v.id = f.version_id WHERE r.path <> '' AND f.path = r.path),
+	r.rating, COALESCE((SELECT u.display_name FROM users u WHERE u.id = r.user_id), '')`
 
 func scanRec(row interface{ Scan(...any) error }) (Recording, error) {
 	var x Recording
 	var start, stop string
 	err := row.Scan(&x.ID, &x.UserID, &x.RuleID, &x.ChannelID, &x.ChannelName, &start, &stop, &x.Title, &x.Subtitle, &x.Description, &x.Category,
-		&x.Episode, &x.Image, &x.Status, &x.Path, &x.Error, &x.Size, &x.ItemID)
+		&x.Episode, &x.Image, &x.Status, &x.Path, &x.Error, &x.Size, &x.ItemID, &x.Rating, &x.OwnerName)
 	x.Start, _ = time.Parse(time.RFC3339, start)
 	x.Stop, _ = time.Parse(time.RFC3339, stop)
 	return x, err
@@ -370,6 +490,7 @@ func (r *Recorder) List(ctx context.Context) ([]Recording, error) {
 				continue
 			}
 		}
+		x.Size = r.sizeOf(x)
 		out = append(out, x)
 	}
 	return out, rows.Err()
@@ -377,8 +498,13 @@ func (r *Recorder) List(ctx context.Context) ([]Recording, error) {
 
 // Rules lists series rules with how many airings are scheduled.
 func (r *Recorder) Rules(ctx context.Context) ([]Rule, error) {
+	paused, err := r.pausedOwners(ctx)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := r.Live.DB.QueryContext(ctx, `SELECT d.id, d.user_id, d.title, d.channel_id, COALESCE(c.name, ''), d.created_at,
-		(SELECT COUNT(*) FROM dvr_recordings x WHERE x.rule_id = d.id AND x.status IN ('scheduled', 'recording'))
+		(SELECT COUNT(*) FROM dvr_recordings x WHERE x.rule_id = d.id AND x.status IN ('scheduled', 'recording')),
+		COALESCE((SELECT u.display_name FROM users u WHERE u.id = d.user_id), '')
 		FROM dvr_rules d LEFT JOIN live_channels c ON c.id = d.channel_id ORDER BY lower(d.title)`)
 	if err != nil {
 		return nil, err
@@ -388,10 +514,11 @@ func (r *Recorder) Rules(ctx context.Context) ([]Rule, error) {
 	for rows.Next() {
 		var x Rule
 		var created string
-		if err := rows.Scan(&x.ID, &x.UserID, &x.Title, &x.ChannelID, &x.ChannelName, &created, &x.Upcoming); err != nil {
+		if err := rows.Scan(&x.ID, &x.UserID, &x.Title, &x.ChannelID, &x.ChannelName, &created, &x.Upcoming, &x.OwnerName); err != nil {
 			return nil, err
 		}
 		x.CreatedAt, _ = time.Parse(time.RFC3339, created)
+		x.Paused = paused[x.UserID]
 		out = append(out, x)
 	}
 	return out, rows.Err()
@@ -440,25 +567,25 @@ func (r *Recorder) Cancel(ctx context.Context, id int64, deleteFile bool) error 
 		}
 		return nil
 	}
-	if deleteFile && x.Path != "" && r.inside(x.Path) {
+	if deleteFile && x.Path != "" && r.rootOf(ctx, x.Path) != "" {
 		if err := os.Remove(x.Path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 		os.Remove(filepath.Dir(x.Path)) // only when empty
 		r.rescan(ctx, x.Path)
 	}
-	if x.RuleID != nil {
-		// Keep the row (hidden) so the series doesn't record this airing again.
-		_, err = r.Live.DB.ExecContext(ctx, `UPDATE dvr_recordings SET status = 'cancelled', path = '' WHERE id = ?`, id)
-		return err
-	}
-	_, err = r.Live.DB.ExecContext(ctx, `DELETE FROM dvr_recordings WHERE id = ?`, id)
-	return err
+	return r.forget(ctx, x)
 }
 
-func (r *Recorder) inside(p string) bool {
-	rel, err := filepath.Rel(r.Dir, p)
-	return err == nil && !strings.HasPrefix(rel, "..") && !filepath.IsAbs(rel)
+// forget removes a finished recording from the list.
+func (r *Recorder) forget(ctx context.Context, x Recording) error {
+	if x.RuleID != nil {
+		// Keep the row (hidden) so the series doesn't record this airing again.
+		_, err := r.Live.DB.ExecContext(ctx, `UPDATE dvr_recordings SET status = 'cancelled', path = '' WHERE id = ?`, x.ID)
+		return err
+	}
+	_, err := r.Live.DB.ExecContext(ctx, `DELETE FROM dvr_recordings WHERE id = ?`, x.ID)
+	return err
 }
 
 // Active is the number of recordings in progress.
@@ -510,7 +637,8 @@ func (r *Recorder) record(rctx, ctx context.Context, id int64) {
 		r.finish(ctx, id, nil, "the channel is gone")
 		return
 	}
-	work := filepath.Join(r.Dir, ".recording", strconv.FormatInt(id, 10))
+	work := r.workDir(ctx, id)
+	root := filepath.Dir(filepath.Dir(work))
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		r.finish(ctx, id, nil, err.Error())
 		return
@@ -567,7 +695,7 @@ func (r *Recorder) record(rctx, ctx context.Context, id int64) {
 		r.finish(ctx, id, nil, lastErr)
 		return
 	}
-	dest, movies := r.destination(x)
+	dest, movies := destination(root, x)
 	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 		r.finish(ctx, id, nil, err.Error())
 		return
@@ -583,7 +711,7 @@ func (r *Recorder) record(rctx, ctx context.Context, id int64) {
 		if movies {
 			sub = "Movies"
 		}
-		if lib, err := r.Library(ctx, movies, filepath.Join(r.Dir, sub)); err != nil {
+		if lib, err := r.Library(ctx, movies, filepath.Join(root, sub)); err != nil {
 			slog.Warn("dvr: library", "err", err)
 		} else if r.Scan != nil {
 			r.Scan(lib)
@@ -667,12 +795,16 @@ func (r *Recorder) rescan(ctx context.Context, path string) {
 	if r.Library == nil || r.Scan == nil {
 		return
 	}
-	movies := strings.HasPrefix(path, filepath.Join(r.Dir, "Movies")+string(filepath.Separator))
+	root := r.rootOf(ctx, path)
+	if root == "" {
+		return
+	}
+	movies := strings.HasPrefix(path, filepath.Join(root, "Movies")+string(filepath.Separator))
 	sub := "TV"
 	if movies {
 		sub = "Movies"
 	}
-	if lib, err := r.Library(ctx, movies, filepath.Join(r.Dir, sub)); err == nil {
+	if lib, err := r.Library(ctx, movies, filepath.Join(root, sub)); err == nil {
 		r.Scan(lib)
 	}
 }
@@ -703,13 +835,13 @@ func clean(s string) string {
 // destination names a recording the way the scanner expects: Movies/Title/Title.mkv, or
 // TV/Show/Season N/Show - S01E02 - Name.mkv, or TV/Show/Show - 2026-10-02 - Name.mkv when
 // the guide has no episode number.
-func (r *Recorder) destination(x Recording) (string, bool) {
+func destination(root string, x Recording) (string, bool) {
 	title := clean(x.Title)
 	var p string
 	movie := isMovie(x)
 	switch m := reEpisode.FindStringSubmatch(x.Episode); {
 	case movie:
-		p = filepath.Join(r.Dir, "Movies", title, title+".mkv")
+		p = filepath.Join(root, "Movies", title, title+".mkv")
 	case m != nil:
 		s, _ := strconv.Atoi(m[1])
 		e, _ := strconv.Atoi(m[2])
@@ -717,13 +849,13 @@ func (r *Recorder) destination(x Recording) (string, bool) {
 		if x.Subtitle != "" {
 			name += " - " + clean(x.Subtitle)
 		}
-		p = filepath.Join(r.Dir, "TV", title, fmt.Sprintf("Season %d", s), name+".mkv")
+		p = filepath.Join(root, "TV", title, fmt.Sprintf("Season %d", s), name+".mkv")
 	default:
 		name := title + " - " + x.Start.Local().Format("2006-01-02")
 		if x.Subtitle != "" {
 			name += " - " + clean(x.Subtitle)
 		}
-		p = filepath.Join(r.Dir, "TV", title, name+".mkv")
+		p = filepath.Join(root, "TV", title, name+".mkv")
 	}
 	// Never overwrite an earlier recording.
 	base := strings.TrimSuffix(p, ".mkv")
@@ -734,3 +866,6 @@ func (r *Recorder) destination(x Recording) (string, bool) {
 		p = fmt.Sprintf("%s (%d).mkv", base, i)
 	}
 }
+
+// NewFolder is the folder new recordings go in.
+func (r *Recorder) NewFolder() string { return r.dir() }

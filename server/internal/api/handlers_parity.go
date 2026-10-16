@@ -151,7 +151,7 @@ func (h *Handlers) pinnedRow(ctx context.Context, uid int64, id string) (homeRow
 	switch kind {
 	case "collection":
 		d, err := h.Items.Get(ctx, acc, n, false)
-		if err != nil || d.Type != "collection" || !canSeeLibrary(ctx, d.LibraryID) {
+		if err != nil || d.Type != "collection" || !h.canSeeLibrary(ctx, d.LibraryID) {
 			return homeRow{}, false
 		}
 		return homeRow{id: id, title: d.Title, lib: d.LibraryID, pinned: true, fill: func() ([]items.Summary, error) {
@@ -184,7 +184,7 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow) ([
 	}
 	var home []int64
 	for _, l := range libs {
-		if canSeeLibrary(ctx, l.ID) && (l.Options.IncludeInHome == nil || *l.Options.IncludeInHome) {
+		if h.canSeeLibrary(ctx, l.ID) && (l.Options.IncludeInHome == nil || *l.Options.IncludeInHome) {
 			home = append(home, l.ID)
 		}
 	}
@@ -220,7 +220,7 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow) ([
 			}})
 	}
 	for _, l := range libs {
-		if !canSeeLibrary(ctx, l.ID) || (l.Options.IncludeInHome != nil && !*l.Options.IncludeInHome) {
+		if !h.canSeeLibrary(ctx, l.ID) || (l.Options.IncludeInHome != nil && !*l.Options.IncludeInHome) {
 			continue
 		}
 		defaults = append(defaults, homeRow{id: fmt.Sprintf("recent-%d", l.ID), title: "Recently Added " + l.Name, lib: l.ID,

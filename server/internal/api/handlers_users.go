@@ -25,6 +25,7 @@ func userAccess(u auth.User) items.Access {
 	if u.IsAdmin {
 		return acc
 	}
+	acc.HideRecordings = !u.Restrictions.DVRViewAllowed()
 	if r := u.Restrictions; r.LibraryIDs != nil {
 		acc.LibraryIDs = append([]int64{}, *r.LibraryIDs...)
 	}
@@ -34,8 +35,11 @@ func userAccess(u auth.User) items.Access {
 	return acc
 }
 
-func canSeeLibrary(ctx context.Context, id int64) bool {
+func (h *Handlers) canSeeLibrary(ctx context.Context, id int64) bool {
 	acc := access(ctx)
+	if acc.HideRecordings && h.Libraries != nil && h.Libraries.IsRecordings(ctx, id) {
+		return false
+	}
 	if acc.LibraryIDs == nil {
 		return true
 	}
@@ -49,7 +53,8 @@ func canSeeLibrary(ctx context.Context, id int64) bool {
 
 func toAPIRestrictions(r auth.Restrictions) UserRestrictions {
 	out := UserRestrictions{LibraryIds: r.LibraryIDs, AllowRemote: ptr(r.RemoteAllowed()), RemoteQualityKbps: ptr(r.RemoteQualityKbps),
-		CanRequest: ptr(r.CanRequest), CanRecord: ptr(r.CanRecord), SeerrUserId: r.SeerrUserID,
+		CanRequest: ptr(r.CanRequest), CanRecord: ptr(r.DVRRecordAllowed()), SeerrUserId: r.SeerrUserID,
+		CanRecordDVR: ptr(r.DVRRecordAllowed()), CanViewDVR: ptr(r.DVRViewAllowed()), DvrQuotaGb: r.DVRQuotaGB,
 		LiveTv: ptr(r.LiveTVAllowed()), LiveTvGroups: r.LiveTVGroups, Friend: ptr(r.Friend)}
 	if r.MaxContentRating != nil {
 		out.MaxContentRating = ptr(UserRestrictionsMaxContentRating(*r.MaxContentRating))
@@ -80,8 +85,21 @@ func fromAPIRestrictions(r *UserRestrictions) (auth.Restrictions, error) {
 	if r.CanRequest != nil {
 		out.CanRequest = *r.CanRequest
 	}
-	if r.CanRecord != nil {
-		out.CanRecord = *r.CanRecord
+	// Only "no" is stored; canRecord is the old name, read when canRecordDVR isn't sent.
+	switch {
+	case r.CanRecordDVR != nil && !*r.CanRecordDVR:
+		out.RecordDVR = r.CanRecordDVR
+	case r.CanRecordDVR == nil && r.CanRecord != nil && !*r.CanRecord:
+		out.RecordDVR = r.CanRecord
+	}
+	if r.CanViewDVR != nil && !*r.CanViewDVR {
+		out.ViewDVR = r.CanViewDVR
+	}
+	if q := r.DvrQuotaGb; q != nil {
+		if *q < 0 || *q > 1_000_000 {
+			return out, errors.New("the DVR quota must be 0 (unlimited) to 1,000,000 GB")
+		}
+		out.DVRQuotaGB = ptr(*q)
 	}
 	if r.LiveTv != nil && !*r.LiveTv {
 		out.LiveTV = r.LiveTv // only "no" is stored; absent means allowed
@@ -562,7 +580,7 @@ func (h *Handlers) Search(ctx context.Context, req SearchRequestObject) (SearchR
 	}
 	ids := []int64{}
 	for _, l := range libs {
-		if (l.Options.IncludeInSearch == nil || *l.Options.IncludeInSearch) && canSeeLibrary(ctx, l.ID) {
+		if (l.Options.IncludeInSearch == nil || *l.Options.IncludeInSearch) && h.canSeeLibrary(ctx, l.ID) {
 			ids = append(ids, l.ID)
 		}
 	}

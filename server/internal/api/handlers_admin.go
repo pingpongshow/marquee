@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"marquee/internal/speedtest"
+	"path/filepath"
 	"strings"
 
 	"marquee/internal/library"
@@ -83,17 +84,20 @@ func toAPISettings(s settings.Settings) ServerSettings {
 		},
 		Cinema: &CinemaSettings{Trailers: ptr(s.Cinema.Trailers), PrerollItemId: s.Cinema.PrerollItemID},
 		Integrations: &IntegrationSettings{
-			SeerrUrl:         ptr(s.Integrations.SeerrURL),
-			SeerrApiKeySet:   ptr(s.Integrations.SeerrAPIKey != ""),
-			LastFmConfigured: ptr(s.Integrations.LastFMAPIKey != "" && s.Integrations.LastFMSecret != ""),
-			BazarrUrl:        ptr(s.Integrations.BazarrURL),
-			BazarrApiKeySet:  ptr(s.Integrations.BazarrAPIKey != ""),
-			LiveTvSources:    ptr(toAPILiveSources(s.Integrations.LiveTVSources)),
-			DvrPaddingBefore: ptr(s.Integrations.DVRPaddingBefore),
-			DvrPaddingAfter:  ptr(s.Integrations.DVRPaddingAfter),
-			Commercials:      ptr(IntegrationSettingsCommercials(s.Integrations.Commercials)),
-			VodEnabled:       ptr(s.Integrations.VODEnabled),
-			VodSources:       ptr(toAPIVodSources(s.Integrations.VODSources)),
+			SeerrUrl:          ptr(s.Integrations.SeerrURL),
+			SeerrApiKeySet:    ptr(s.Integrations.SeerrAPIKey != ""),
+			LastFmConfigured:  ptr(s.Integrations.LastFMAPIKey != "" && s.Integrations.LastFMSecret != ""),
+			BazarrUrl:         ptr(s.Integrations.BazarrURL),
+			BazarrApiKeySet:   ptr(s.Integrations.BazarrAPIKey != ""),
+			LiveTvSources:     ptr(toAPILiveSources(s.Integrations.LiveTVSources)),
+			DvrPaddingBefore:  ptr(s.Integrations.DVRPaddingBefore),
+			DvrPaddingAfter:   ptr(s.Integrations.DVRPaddingAfter),
+			Commercials:       ptr(IntegrationSettingsCommercials(s.Integrations.Commercials)),
+			DvrDefaultQuotaGb: ptr(s.Integrations.DVRDefaultQuotaGB),
+			DvrQuotaAction:    ptr(IntegrationSettingsDvrQuotaAction(s.Integrations.DVRQuotaAction)),
+			DvrFolder:         ptr(s.Integrations.DVRFolder),
+			VodEnabled:        ptr(s.Integrations.VODEnabled),
+			VodSources:        ptr(toAPIVodSources(s.Integrations.VODSources)),
 		},
 		Webhooks:      ptr(toAPIWebhooks(s.Webhooks)),
 		Notifications: toAPINotifications(s.Notifications),
@@ -253,6 +257,13 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		if i.Commercials != nil {
 			s.Integrations.Commercials = string(*i.Commercials)
 		}
+		set(&s.Integrations.DVRDefaultQuotaGB, i.DvrDefaultQuotaGb)
+		if i.DvrQuotaAction != nil {
+			s.Integrations.DVRQuotaAction = string(*i.DvrQuotaAction)
+		}
+		if i.DvrFolder != nil {
+			s.Integrations.DVRFolder = cleanFolder(*i.DvrFolder)
+		}
 		if i.LiveTvSources != nil {
 			s.Integrations.LiveTVSources = make([]settings.LiveTVSource, len(*i.LiveTvSources))
 			for k, src := range *i.LiveTvSources {
@@ -323,6 +334,7 @@ func (h *Handlers) GetSettings(ctx context.Context, _ GetSettingsRequestObject) 
 	out := toAPISettings(cur)
 	h.fillVodSaveCoverage(ctx, &out, cur)
 	h.fillComskipAvailable(&out)
+	h.fillDVRFolder(ctx, &out)
 	return GetSettings200JSONResponse(out), nil
 }
 
@@ -333,9 +345,18 @@ func (h *Handlers) UpdateSettings(ctx context.Context, req UpdateSettingsRequest
 	case !admin:
 		return UpdateSettings403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
 	}
+	var folderChanged bool
 	next, err := h.Settings.Update(ctx, func(s *settings.Settings) error {
 		before := s.VODSave
+		beforeDVR := s.Integrations.DVRFolder
 		applySettingsUpdate(s, *req.Body)
+		// The recordings folder must be there and writable; checked when it changes.
+		folderChanged = s.Integrations.DVRFolder != beforeDVR
+		if f := s.Integrations.DVRFolder; folderChanged && f != "" && filepath.IsAbs(f) {
+			if err := checkSaveFolder("recordings", f); err != nil {
+				return err
+			}
+		}
 		// Folders to save to must be there and writable; checked when they change.
 		if f := s.VODSave.MoviesFolder; f != "" && f != before.MoviesFolder {
 			if err := checkSaveFolder("movies", f); err != nil {
@@ -357,8 +378,12 @@ func (h *Handlers) UpdateSettings(ctx context.Context, req UpdateSettingsRequest
 		return nil, internal(ctx, "updateSettings", err)
 	}
 	out := toAPISettings(next)
+	if folderChanged {
+		h.coverDVRFolder(ctx)
+	}
 	h.fillVodSaveCoverage(ctx, &out, next)
 	h.fillComskipAvailable(&out)
+	h.fillDVRFolder(ctx, &out)
 	return UpdateSettings200JSONResponse(out), nil
 }
 
@@ -418,7 +443,7 @@ func (h *Handlers) ListLibraries(ctx context.Context, _ ListLibrariesRequestObje
 	}
 	out := ListLibraries200JSONResponse{}
 	for _, l := range libs {
-		if canSeeLibrary(ctx, l.ID) {
+		if h.canSeeLibrary(ctx, l.ID) {
 			out = append(out, h.toAPILibrary(l))
 		}
 	}
@@ -430,7 +455,7 @@ func (h *Handlers) GetLibrary(ctx context.Context, req GetLibraryRequestObject) 
 		return GetLibrary401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	l, err := h.Libraries.Get(ctx, req.LibraryId)
-	if errors.Is(err, library.ErrNotFound) || (err == nil && !canSeeLibrary(ctx, req.LibraryId)) {
+	if errors.Is(err, library.ErrNotFound) || (err == nil && !h.canSeeLibrary(ctx, req.LibraryId)) {
 		return GetLibrary404JSONResponse{NotFoundJSONResponse(apiErr("not_found", library.ErrNotFound.Error()))}, nil
 	}
 	if err != nil {

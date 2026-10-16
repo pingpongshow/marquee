@@ -124,16 +124,16 @@ func TestDVRNames(t *testing.T) {
 		{Recording{Title: "The Film", Category: "Movie"}, "Movies/The Film/The Film.mkv", true},
 		{Recording{Title: "Drama", Category: "Movie", Episode: "S1 E1"}, "TV/Drama/Season 1/Drama - S01E01.mkv", false},
 	} {
-		got, movie := r.destination(c.x)
+		got, movie := destination(r.Dir, c.x)
 		if rel, _ := filepath.Rel(dir, got); rel != c.want || movie != c.movie {
 			t.Errorf("%q: got %q %v, want %q", c.x.Title, rel, movie, c.want)
 		}
 	}
 	// Never overwrites.
-	p, _ := r.destination(Recording{Title: "The Film", Category: "Movie"})
+	p, _ := destination(r.Dir, Recording{Title: "The Film", Category: "Movie"})
 	os.MkdirAll(filepath.Dir(p), 0o755)
 	os.WriteFile(p, []byte("x"), 0o644)
-	if p2, _ := r.destination(Recording{Title: "The Film", Category: "Movie"}); !strings.HasSuffix(p2, "The Film (2).mkv") {
+	if p2, _ := destination(r.Dir, Recording{Title: "The Film", Category: "Movie"}); !strings.HasSuffix(p2, "The Film (2).mkv") {
 		t.Errorf("second copy: %s", p2)
 	}
 }
