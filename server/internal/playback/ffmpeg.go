@@ -88,6 +88,9 @@ type Job struct {
 	// SubForceStyle restyles burned-in text subtitles (PLAY-20): a libass style override list
 	// (see SubtitleStyle.ForceStyle); "" keeps FFmpeg's defaults.
 	SubForceStyle string
+	// InputArgs are input options for a remote Input (reconnecting, user agent), placed
+	// before it.
+	InputArgs []string
 }
 
 func presetFor(encoder, p string) string {
@@ -152,6 +155,7 @@ func (j Job) Args() []string {
 	} else if j.Encoder == "qsv" && !d.VideoCopy {
 		a = append(a, "-init_hw_device", "qsv=qs:"+j.QSVDevice, "-filter_hw_device", "qs")
 	}
+	a = append(a, j.InputArgs...)
 	if start > 0 {
 		a = append(a, "-ss", strconv.FormatFloat(start, 'f', 3, 64))
 	}

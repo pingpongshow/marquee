@@ -34,6 +34,15 @@ func (s Settings) Validate() error {
 		if strings.TrimSpace(src.Name) == "" || !(strings.HasPrefix(src.URL, "http://") || strings.HasPrefix(src.URL, "https://")) {
 			return invalid("each movie source needs a name and an http(s) address")
 		}
+		switch src.Kind {
+		case "", "m3u":
+		case VODKindXtream:
+			if strings.TrimSpace(src.Username) == "" || src.Password == "" {
+				return invalid("the Xtream Codes source %q needs a username and password", src.Name)
+			}
+		default:
+			return invalid("a movie source must be an M3U playlist or an Xtream Codes server")
+		}
 	}
 	if s.Integrations.DVRPaddingBefore < 0 || s.Integrations.DVRPaddingBefore > 60 || s.Integrations.DVRPaddingAfter < 0 || s.Integrations.DVRPaddingAfter > 120 {
 		return invalid("recording padding must be 0–60 minutes before and 0–120 after")

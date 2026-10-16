@@ -179,6 +179,11 @@ func matroskaKeyframes(path string) ([]float64, error) {
 		return nil, err
 	}
 	defer f.Close()
+	return matroskaKeyframesFrom(f)
+}
+
+// matroskaKeyframesFrom reads the Cues of a Matroska file (local, or remote by Range requests).
+func matroskaKeyframesFrom(f io.ReadSeeker) ([]float64, error) {
 	cr := &countingReader{r: bufio.NewReader(f)}
 	readHeader := func() (uint64, uint64, error) {
 		id, _, err := ebmlVint(cr, true)
@@ -347,6 +352,11 @@ func mp4Keyframes(path string) ([]float64, error) {
 		return nil, err
 	}
 	defer f.Close()
+	return mp4KeyframesFrom(f)
+}
+
+// mp4KeyframesFrom reads the sync samples of an MP4 file (local, or remote by Range requests).
+func mp4KeyframesFrom(f io.ReaderAt) ([]float64, error) {
 	// Walk top-level boxes to moov without reading mdat.
 	var moov []byte
 	var off int64

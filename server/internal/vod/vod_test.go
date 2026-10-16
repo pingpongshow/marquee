@@ -2,6 +2,7 @@ package vod
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -40,6 +41,7 @@ const plutoItems = `[{"_id":"` + alphaID + `","description":"Pluto's plot.","rat
 type fakeMatcher struct {
 	mu    sync.Mutex
 	calls map[string]int // title -> year asked
+	byID  []int
 }
 
 func (f *fakeMatcher) MatchMovie(_ context.Context, title string, year int) (*tmdb.Movie, error) {
@@ -54,6 +56,17 @@ func (f *fakeMatcher) MatchMovie(_ context.Context, title string, year int) (*tm
 	m.Credits.Cast = []tmdb.Cast{{Name: "Josh", Character: "Matt"}}
 	m.Credits.Crew = []tmdb.Crew{{Name: "Michael", Job: "Director"}}
 	return m, nil
+}
+
+func (f *fakeMatcher) MovieByID(_ context.Context, id int) (*tmdb.Movie, error) {
+	f.mu.Lock()
+	f.byID = append(f.byID, id)
+	f.mu.Unlock()
+	if id != 603 {
+		return nil, errors.New("not found")
+	}
+	return &tmdb.Movie{ID: 603, Title: "The Matrix", Overview: "TMDB's Matrix.", ReleaseDate: "1999-03-31", Runtime: 136,
+		VoteAverage: 8.2, PosterPath: "/m.jpg"}, nil
 }
 
 func setup(t *testing.T) (*Service, *httptest.Server, *fakeMatcher, int64) {

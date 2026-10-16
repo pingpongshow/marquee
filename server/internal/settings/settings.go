@@ -142,14 +142,26 @@ type Integrations struct {
 	VODSources []VODSource `json:"vodSources"`
 }
 
-// VODSource is an M3U playlist of films (e.g. Pluto TV's on-demand movies).
+// VODSource is an M3U playlist of films (e.g. Pluto TV's on-demand movies), or an Xtream
+// Codes server's VOD (e.g. Dispatcharr's, with a user and its XC password).
 type VODSource struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	URL       string `json:"url"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Kind string `json:"kind,omitempty"` // m3u ("" before Xtream Codes sources existed), xtream
+	URL  string `json:"url"`
+	// Username and Password sign in to an Xtream Codes server. The password is a secret:
+	// never returned by the API, never logged.
+	Username  string `json:"username,omitempty"`
+	Password  string `json:"password,omitempty"`
 	UserAgent string `json:"userAgent"`
 	Enabled   bool   `json:"enabled"`
 }
+
+// VODKindXtream is an Xtream Codes source; anything else is an M3U playlist.
+const VODKindXtream = "xtream"
+
+// Xtream reports whether the source is an Xtream Codes server.
+func (s VODSource) Xtream() bool { return s.Kind == VODKindXtream }
 
 // LiveTVSource is an M3U playlist with its XMLTV guide, or a Dispatcharr server.
 type LiveTVSource struct {

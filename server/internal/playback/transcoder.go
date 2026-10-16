@@ -25,6 +25,9 @@ type Transcoder struct {
 	Encoders      []string // fallback order, e.g. nvenc, qsv, software
 	TotalSegments int
 	ThrottleAhead int // segments allowed ahead of the last request before pausing
+	// Redact, when set, cleans FFmpeg's messages before they are logged or returned: a
+	// remote input's link may hold a password (movies on demand).
+	Redact func(string) string
 
 	mu          sync.Mutex
 	encIdx      int
@@ -253,7 +256,7 @@ func (t *Transcoder) waitFor(ctx context.Context, p string, k int) error {
 		noOutput := t.produced < t.startSeg && !exists(t.segPath(t.startSeg))
 		if failed && noOutput && t.encIdx+1 < len(t.Encoders) {
 			slog.Warn("encoder failed; falling back", "encoder", t.Encoders[t.encIdx], "next", t.Encoders[t.encIdx+1],
-				"err", t.exitErr, "ffmpeg", t.stderr.String())
+				"err", t.exitErr, "ffmpeg", t.stderrText())
 			t.encIdx++
 			os.RemoveAll(t.Job.Dir) // the new encoder's init segment won't match old segments
 			start := k
@@ -269,7 +272,7 @@ func (t *Transcoder) waitFor(ctx context.Context, p string, k int) error {
 		}
 		if exited && !exists(p) {
 			err := t.exitErr
-			msg := t.stderr.String()
+			msg := t.stderrText()
 			t.mu.Unlock()
 			if err == nil {
 				return fmt.Errorf("transcoder finished without producing %s", filepath.Base(p))
@@ -318,6 +321,26 @@ func (t *Transcoder) throttleLoop() {
 			}
 		}
 		t.mu.Unlock()
+	}
+}
+
+// stderrText is the end of FFmpeg's messages, redacted. Caller holds t.mu.
+func (t *Transcoder) stderrText() string {
+	msg := t.stderr.String()
+	if t.Redact != nil {
+		msg = t.Redact(msg)
+	}
+	return msg
+}
+
+// Suspend ends FFmpeg but keeps the session's segments; the next request starts it again
+// where the viewer is (a film left paused shouldn't hold a transcode, or the source's
+// connection, open).
+func (t *Transcoder) Suspend() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.stopped {
+		t.killLocked()
 	}
 }
 

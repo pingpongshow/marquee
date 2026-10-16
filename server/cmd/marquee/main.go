@@ -136,6 +136,7 @@ func run() error {
 	authSvc := auth.NewService(database)
 	player := &playback.Manager{DB: database, Settings: store, FFmpeg: cfg.FFmpegPath, TranscodeDir: cfg.TranscodeDir,
 		Encoders: playback.DetectEncoders(ctx, cfg.FFmpegPath)}
+	player.RemoteFFprobe = cfg.FFprobePath // movies on demand from Xtream Codes servers
 	go player.Run(ctx)
 	// Webhooks (ADM-5).
 	hooks := &webhooks.Dispatcher{DB: database, Settings: store, Server: func() webhooks.Server {
@@ -395,6 +396,13 @@ func run() error {
 	// TMDB matching uses the library's matcher.
 	vodSvc := &vod.Service{DB: database, Settings: store, Matcher: meta, Streams: &vod.Streams{},
 		ImageDir: filepath.Join(cfg.ConfigDir, "cache", "vod-images")}
+	// Films that are files (Xtream Codes) play through the player's own HLS sessions.
+	vodSvc.Streams.OnEnd = func(st *vod.Stream) {
+		if st.PlaybackID != "" {
+			player.Stop(context.Background(), st.PlaybackID)
+		}
+	}
+	vodSvc.Streams.Active = func(st *vod.Stream) bool { return player.Exists(st.PlaybackID) }
 	vodWake := make(chan struct{}, 1)
 	vodConfig := func(s settings.Settings) string {
 		raw, _ := json.Marshal([]any{s.Integrations.VODEnabled, s.Integrations.VODSources, s.Metadata.TMDBAPIKey != ""})
