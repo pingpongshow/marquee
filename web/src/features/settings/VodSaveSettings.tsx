@@ -1,5 +1,4 @@
-import { Link } from "@tanstack/react-router";
-import { AlertTriangle, HardDriveDownload, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { components } from "@/api/schema.gen";
 import { Button, Card, Field, Input, Select, Spinner, Toggle } from "@/components/ui";
@@ -145,17 +144,8 @@ export function VodSaveSettings() {
           <>
             Administrators can save films and episodes from Dispatcharr (Xtream Codes) sources into the library: a queue
             downloads them, verifies each file and moves it into these folders under the library&apos;s naming, then scans the
-            library. See the{" "}
-            <Link to="/vod/saves" className="underline">
-              save queue
-            </Link>
-            .
+            library. The queue is under Downloads, above.
           </>
-        }
-        actions={
-          <Link to="/vod/saves" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-text">
-            <HardDriveDownload className="size-4" /> Saves
-          </Link>
         }
       >
         <div className="space-y-4">
