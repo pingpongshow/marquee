@@ -36,6 +36,9 @@ type Importer struct {
 	PlexRoot  string // folder containing Plex's "Library" folder (mounted at /plex)
 	WorkDir   string // scratch space for the database snapshot
 	ArtDir    string // where imported posters are kept
+	// OnMapped, when set, hears the folder mappings and the Plex account → Marquee user
+	// pairs an import used (with the accounts' names), so two-way sync can reuse them.
+	OnMapped func(ctx context.Context, mappings []PathMapping, users map[int64]int64, names map[int64]string)
 
 	mu       sync.Mutex
 	running  bool
@@ -157,6 +160,16 @@ func (im *Importer) marqueeFiles(ctx context.Context) (map[string]int64, error) 
 		out[p] = id
 	}
 	return out, rows.Err()
+}
+
+// Remap rewrites a Plex path to Marquee's with the longest matching mapping.
+func Remap(p string, mappings []PathMapping) (string, bool) { return remap(p, mappings) }
+
+// DefaultMappings suggests folder mappings: each Plex section's folders paired with the
+// Marquee library of a compatible type, preferring the same name.
+func DefaultMappings(sections []Section, libs []library.Library) []PathMapping {
+	m, _ := defaultMappings(sections, libs)
+	return m
 }
 
 func remap(p string, mappings []PathMapping) (string, bool) {
@@ -423,6 +436,16 @@ func (im *Importer) run(ctx context.Context, opts Options) (*Report, error) {
 		} else {
 			rep.Warnings = append(rep.Warnings, fmt.Sprintf("account %d: merge target %d isn't being imported", a.PlexID, a.MergeInto))
 		}
+	}
+
+	if im.OnMapped != nil {
+		names := map[int64]string{}
+		if accounts, err := src.Accounts(ctx); err == nil {
+			for _, a := range accounts {
+				names[a.ID] = a.Name
+			}
+		}
+		im.OnMapped(ctx, opts.Mappings, userFor, names)
 	}
 
 	if opts.Matches {

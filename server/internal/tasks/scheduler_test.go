@@ -1,8 +1,12 @@
 package tasks
 
 import (
+	"context"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"marquee/internal/db"
 )
 
 func TestInWindow(t *testing.T) {
@@ -27,5 +31,33 @@ func TestInWindow(t *testing.T) {
 	// A window that crosses midnight.
 	if in, _ := inWindow(at(1, 0), "23:00", 4); !in {
 		t.Error("01:00 should be inside a 23:00 + 4 h window")
+	}
+}
+
+func TestEveryFunc(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	d, err := db.Open(ctx, filepath.Join(dir, "t.db"), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	every := time.Duration(0)
+	task := Task{ID: "x", EveryFunc: func() time.Duration { return every }}
+	s := &Scheduler{DB: d}
+	now := time.Now().UTC()
+	if s.due(ctx, task, now) || task.Schedule() != "Manual" {
+		t.Errorf("off: due %v, schedule %q", s.due(ctx, task, now), task.Schedule())
+	}
+	every = 30 * time.Minute
+	if !s.due(ctx, task, now) || task.Schedule() != "Every 30 minutes" {
+		t.Errorf("never run: due %v, schedule %q", s.due(ctx, task, now), task.Schedule())
+	}
+	d.Exec(`INSERT INTO task_runs (task, status, started_at) VALUES ('x', 'succeeded', ?)`, now.Add(-10*time.Minute).Format(time.RFC3339Nano))
+	if s.due(ctx, task, now) {
+		t.Error("due 10 minutes after the last run with a 30-minute interval")
+	}
+	if !s.due(ctx, task, now.Add(21*time.Minute)) {
+		t.Error("not due 31 minutes after the last run")
 	}
 }

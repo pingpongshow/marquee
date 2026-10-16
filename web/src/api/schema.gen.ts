@@ -1004,6 +1004,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plex-sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Two-way Plex sync settings, status, Plex accounts and the last run (admin only). */
+        get: operations["getPlexSync"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change two-way Plex sync settings (admin only). Fields left out stay as they are. */
+        patch: operations["updatePlexSync"];
+        trace?: never;
+    };
+    "/plex-sync/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sync with Plex now, in the background (admin only). Works whether automatic sync is on or off. */
+        post: operations["runPlexSync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plex-sync/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Work out what a sync would change each way, without changing anything in Marquee or Plex (admin only). Can take a while on a large library. */
+        post: operations["previewPlexSync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plex-sync/users/{plexAccountId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plexAccountId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Choose the Marquee user a Plex account syncs with (admin only). */
+        put: operations["setPlexSyncUser"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plex-sync/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Sign in with Plex: open authUrl (or enter the code at plex.tv/link), then poll the PIN (admin only). */
+        post: operations["startPlexSignIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plex-sync/pin/{pinId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pinId: number;
+            };
+            cookie?: never;
+        };
+        /** Whether Sign in with Plex finished; once it has, the token is saved for sync (admin only). */
+        get: operations["checkPlexSignIn"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/playback/sessions": {
         parameters: {
             query?: never;
@@ -4051,6 +4158,8 @@ export interface components {
             alerts?: components["schemas"]["AlertType"][];
             /** @description The dvr_quota alert is on: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Off by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.) */
             dvrQuotaAlert?: boolean;
+            /** @description The plex_sync alert is on: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Off by default. (Not in AlertType; notifications carry type plex_sync.) */
+            plexSyncAlert?: boolean;
             /** @description Mail alerts to every administrator with an email address. */
             recipientsAllAdmins?: boolean;
             /** @description Administrators (user ids) who get alert mail when recipientsAllAdmins is off. */
@@ -4069,9 +4178,10 @@ export interface components {
             fromAddress?: string;
             fromName?: string;
             linkUrl?: string;
-            /** @description Replaces the list; the dvr_quota alert is kept as it was unless dvrQuotaAlert is sent. */
+            /** @description Replaces the list; the dvr_quota and plex_sync alerts are kept as they were unless dvrQuotaAlert or plexSyncAlert is sent. */
             alerts?: components["schemas"]["AlertType"][];
             dvrQuotaAlert?: boolean;
+            plexSyncAlert?: boolean;
             recipientsAllAdmins?: boolean;
             recipients?: number[];
             diskThresholdPercent?: number;
@@ -5400,6 +5510,121 @@ export interface components {
             };
             lastError?: string;
             lastReport?: components["schemas"]["PlexImportReport"];
+        };
+        PlexSyncSettings: {
+            /** @description The Plex server's address, e.g. http://192.168.1.10:32400. */
+            url: string;
+            /** @description A Plex token is saved (it is never returned). */
+            tokenSet: boolean;
+            /** @description Automatic sync every intervalMinutes. Off by default; Sync now works either way. */
+            enabled: boolean;
+            intervalMinutes: number;
+            /** @description Watched and unwatched */
+            watchState: boolean;
+            ratings: boolean;
+            resumePositions: boolean;
+            /** @description Plays recorded in Plex come into Marquee's history. Plays made in Marquee reach Plex as a play at sync time. */
+            playHistory: boolean;
+            /** @description Plex folders and the Marquee folders they correspond to (from the Plex import); empty uses suggested ones. */
+            pathMappings: components["schemas"]["PlexPathMapping"][];
+        };
+        PlexSyncSettingsUpdate: {
+            url?: string;
+            /** @description The server owner's Plex token. An empty string removes it. */
+            token?: string;
+            enabled?: boolean;
+            intervalMinutes?: number;
+            watchState?: boolean;
+            ratings?: boolean;
+            resumePositions?: boolean;
+            playHistory?: boolean;
+            pathMappings?: components["schemas"]["PlexPathMapping"][];
+        };
+        PlexSyncUser: {
+            /**
+             * Format: int64
+             * @description Plex's account id (1 is the server owner).
+             */
+            plexAccountId: number;
+            name: string;
+            /**
+             * @description home and managed are Plex Home users; shared are friends the server is shared with.
+             * @enum {string}
+             */
+            kind: "owner" | "home" | "managed" | "shared" | "unknown";
+            /**
+             * Format: int64
+             * @description Marquee user it syncs with.
+             */
+            userId?: number;
+            /** @description As of the last sync or preview. */
+            canSync: boolean;
+            /** @description Why it can't sync, e.g. a friend the owner's token can't act for. */
+            reason?: string;
+        };
+        PlexSyncChange: {
+            /** @enum {string} */
+            direction: "toPlex" | "toMarquee";
+            /** @description Plex account name. */
+            user: string;
+            title: string;
+            /** @enum {string} */
+            kind: "watched" | "unwatched" | "plays" | "lastPlayed" | "position" | "rating" | "history";
+            from?: string;
+            to?: string;
+            /** @description Changed on both sides since the last sync; the newer change won (ties go to Marquee). */
+            conflict?: boolean;
+        };
+        PlexSyncReport: {
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            finishedAt: string;
+            /** @description A preview; nothing was changed. */
+            dryRun: boolean;
+            /** @description Plex wasn't reachable, so nothing changed; the sync tries again at the next run. */
+            waiting: boolean;
+            toPlex: number;
+            toMarquee: number;
+            historyPulled: number;
+            conflicts: number;
+            /** @description Changes that can't be made in Plex, e.g. a resume position past 90%. */
+            skipped: number;
+            failed: number;
+            unchanged: number;
+            /** @description Plex items whose files Marquee doesn't have. */
+            notInMarquee: number;
+            usersSynced: number;
+            changes: components["schemas"]["PlexSyncChange"][];
+            changesTruncated: boolean;
+            errors: string[];
+        };
+        PlexSyncStatus: {
+            settings: components["schemas"]["PlexSyncSettings"];
+            /** @description A sync or preview is running. */
+            running: boolean;
+            progress?: {
+                step: string;
+                done: number;
+                total: number;
+            };
+            /** @description Plex answers with the token (checked at most once a minute); absent until a server and token are set. */
+            reachable?: boolean;
+            /** @description Why the last sync failed, e.g. Plex rejected the token. */
+            lastError?: string;
+            lastRun?: components["schemas"]["PlexSyncReport"];
+            /**
+             * Format: date-time
+             * @description When automatic sync runs next; absent while it's off.
+             */
+            nextRunAt?: string;
+            users: components["schemas"]["PlexSyncUser"][];
+        };
+        PlexSignIn: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            authUrl: string;
         };
         /** @description What the client can play. Codec names follow ffprobe (h264, hevc, av1, vp9, aac, ac3, eac3, opus, flac, mp3…). */
         DeviceProfile: {
@@ -8531,6 +8756,189 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getPlexSync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlexSyncStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updatePlexSync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlexSyncSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlexSyncStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    runPlexSync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Started. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlexSyncStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    previewPlexSync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlexSyncReport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    setPlexSyncUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plexAccountId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: int64
+                     * @description Marquee user; leave out to stop syncing this account.
+                     */
+                    userId?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlexSyncStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    startPlexSignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlexSignIn"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            502: components["responses"]["BadGateway"];
+        };
+    };
+    checkPlexSignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pinId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        signedIn: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            502: components["responses"]["BadGateway"];
         };
     };
     listPlaybackSessions: {

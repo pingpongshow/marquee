@@ -34,3 +34,6 @@ deploy/models/
 deploy/recordings/
 deploy/empty-music/
 deploy/empty-plex/
+
+# Agent worktrees (local only)
+.claude/worktrees/

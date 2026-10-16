@@ -1353,6 +1353,132 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /plex-sync:
+    get:
+      tags: [plex]
+      operationId: getPlexSync
+      summary: Two-way Plex sync settings, status, Plex accounts and the last run (admin only).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlexSyncStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    patch:
+      tags: [plex]
+      operationId: updatePlexSync
+      summary: Change two-way Plex sync settings (admin only). Fields left out stay as they are.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlexSyncSettingsUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlexSyncStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /plex-sync/run:
+    post:
+      tags: [plex]
+      operationId: runPlexSync
+      summary: "Sync with Plex now, in the background (admin only). Works whether automatic sync is on or off."
+      responses:
+        "202":
+          description: Started.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlexSyncStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /plex-sync/preview:
+    post:
+      tags: [plex]
+      operationId: previewPlexSync
+      summary: "Work out what a sync would change each way, without changing anything in Marquee or Plex (admin only). Can take a while on a large library."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlexSyncReport" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /plex-sync/users/{plexAccountId}:
+    parameters:
+      - { name: plexAccountId, in: path, required: true, schema: { type: integer, format: int64 } }
+    put:
+      tags: [plex]
+      operationId: setPlexSyncUser
+      summary: Choose the Marquee user a Plex account syncs with (admin only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId: { type: integer, format: int64, description: "Marquee user; leave out to stop syncing this account." }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlexSyncStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /plex-sync/pin:
+    post:
+      tags: [plex]
+      operationId: startPlexSignIn
+      summary: "Start Sign in with Plex: open authUrl (or enter the code at plex.tv/link), then poll the PIN (admin only)."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlexSignIn" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
+  /plex-sync/pin/{pinId}:
+    parameters:
+      - { name: pinId, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      tags: [plex]
+      operationId: checkPlexSignIn
+      summary: "Whether Sign in with Plex finished; once it has, the token is saved for sync (admin only)."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [signedIn]
+                properties:
+                  signedIn: { type: boolean }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
   /playback/sessions:
     get:
       tags: [playback]
@@ -4935,6 +5061,7 @@ components:
           description: Alert types that are on. All are off by default.
           items: { $ref: "#/components/schemas/AlertType" }
         dvrQuotaAlert: { type: boolean, description: "The dvr_quota alert is on: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Off by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.)" }
+        plexSyncAlert: { type: boolean, description: "The plex_sync alert is on: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Off by default. (Not in AlertType; notifications carry type plex_sync.)" }
         recipientsAllAdmins: { type: boolean, description: Mail alerts to every administrator with an email address. }
         recipients:
           type: array
@@ -4956,9 +5083,10 @@ components:
         linkUrl: { type: string }
         alerts:
           type: array
-          description: "Replaces the list; the dvr_quota alert is kept as it was unless dvrQuotaAlert is sent."
+          description: "Replaces the list; the dvr_quota and plex_sync alerts are kept as they were unless dvrQuotaAlert or plexSyncAlert is sent."
           items: { $ref: "#/components/schemas/AlertType" }
         dvrQuotaAlert: { type: boolean }
+        plexSyncAlert: { type: boolean }
         recipientsAllAdmins: { type: boolean }
         recipients:
           type: array
@@ -6169,6 +6297,109 @@ components:
             total: { type: integer }
         lastError: { type: string }
         lastReport: { $ref: "#/components/schemas/PlexImportReport" }
+
+    # ---------- Plex sync ----------
+    PlexSyncSettings:
+      type: object
+      required: [url, tokenSet, enabled, intervalMinutes, watchState, ratings, resumePositions, playHistory, pathMappings]
+      properties:
+        url: { type: string, description: "The Plex server's address, e.g. http://192.168.1.10:32400." }
+        tokenSet: { type: boolean, description: A Plex token is saved (it is never returned). }
+        enabled: { type: boolean, description: "Automatic sync every intervalMinutes. Off by default; Sync now works either way." }
+        intervalMinutes: { type: integer, minimum: 5, maximum: 1440 }
+        watchState: { type: boolean, description: Watched and unwatched, play counts and last played. }
+        ratings: { type: boolean }
+        resumePositions: { type: boolean }
+        playHistory: { type: boolean, description: "Plays recorded in Plex come into Marquee's history. Plays made in Marquee reach Plex as a play at sync time." }
+        pathMappings:
+          type: array
+          description: "Plex folders and the Marquee folders they correspond to (from the Plex import); empty uses suggested ones."
+          items: { $ref: "#/components/schemas/PlexPathMapping" }
+
+    PlexSyncSettingsUpdate:
+      type: object
+      properties:
+        url: { type: string }
+        token: { type: string, writeOnly: true, description: "The server owner's Plex token. An empty string removes it." }
+        enabled: { type: boolean }
+        intervalMinutes: { type: integer, minimum: 5, maximum: 1440 }
+        watchState: { type: boolean }
+        ratings: { type: boolean }
+        resumePositions: { type: boolean }
+        playHistory: { type: boolean }
+        pathMappings: { type: array, items: { $ref: "#/components/schemas/PlexPathMapping" } }
+
+    PlexSyncUser:
+      type: object
+      required: [plexAccountId, name, kind, canSync]
+      properties:
+        plexAccountId: { type: integer, format: int64, description: "Plex's account id (1 is the server owner)." }
+        name: { type: string }
+        kind: { type: string, enum: [owner, home, managed, shared, unknown], description: "home and managed are Plex Home users; shared are friends the server is shared with." }
+        userId: { type: integer, format: int64, description: Marquee user it syncs with. }
+        canSync: { type: boolean, description: As of the last sync or preview. }
+        reason: { type: string, description: "Why it can't sync, e.g. a friend the owner's token can't act for." }
+
+    PlexSyncChange:
+      type: object
+      required: [direction, user, title, kind]
+      properties:
+        direction: { type: string, enum: [toPlex, toMarquee] }
+        user: { type: string, description: Plex account name. }
+        title: { type: string }
+        kind: { type: string, enum: [watched, unwatched, plays, lastPlayed, position, rating, history] }
+        from: { type: string }
+        to: { type: string }
+        conflict: { type: boolean, description: "Changed on both sides since the last sync; the newer change won (ties go to Marquee)." }
+
+    PlexSyncReport:
+      type: object
+      required: [startedAt, finishedAt, dryRun, waiting, toPlex, toMarquee, historyPulled, conflicts, skipped, failed, unchanged,
+        notInMarquee, usersSynced, changes, changesTruncated, errors]
+      properties:
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time }
+        dryRun: { type: boolean, description: A preview; nothing was changed. }
+        waiting: { type: boolean, description: "Plex wasn't reachable, so nothing changed; the sync tries again at the next run." }
+        toPlex: { type: integer }
+        toMarquee: { type: integer }
+        historyPulled: { type: integer }
+        conflicts: { type: integer }
+        skipped: { type: integer, description: "Changes that can't be made in Plex, e.g. a resume position past 90%." }
+        failed: { type: integer }
+        unchanged: { type: integer }
+        notInMarquee: { type: integer, description: Plex items whose files Marquee doesn't have. }
+        usersSynced: { type: integer }
+        changes: { type: array, items: { $ref: "#/components/schemas/PlexSyncChange" } }
+        changesTruncated: { type: boolean }
+        errors: { type: array, items: { type: string } }
+
+    PlexSyncStatus:
+      type: object
+      required: [settings, running, users]
+      properties:
+        settings: { $ref: "#/components/schemas/PlexSyncSettings" }
+        running: { type: boolean, description: A sync or preview is running. }
+        progress:
+          type: object
+          required: [step, done, total]
+          properties:
+            step: { type: string }
+            done: { type: integer }
+            total: { type: integer }
+        reachable: { type: boolean, description: "Plex answers with the token (checked at most once a minute); absent until a server and token are set." }
+        lastError: { type: string, description: "Why the last sync failed, e.g. Plex rejected the token." }
+        lastRun: { $ref: "#/components/schemas/PlexSyncReport" }
+        nextRunAt: { type: string, format: date-time, description: When automatic sync runs next; absent while it's off. }
+        users: { type: array, items: { $ref: "#/components/schemas/PlexSyncUser" } }
+
+    PlexSignIn:
+      type: object
+      required: [id, code, authUrl]
+      properties:
+        id: { type: integer, format: int64 }
+        code: { type: string }
+        authUrl: { type: string }
 
     # ---------- Playback ----------
     DeviceProfile:

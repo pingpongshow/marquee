@@ -437,6 +437,13 @@ func (h *Handlers) GetActivity(ctx context.Context, _ GetActivityRequestObject) 
 				Progress: &ScanProgress{Phase: Metadata, Done: p.Done, Total: p.Total}})
 		}
 	}
+	if h.PlexSync != nil {
+		if running, p := h.PlexSync.Running(); running {
+			out.Tasks = append(out.Tasks, ActivityTask{Id: "import:plex-sync", Kind: ActivityTaskKindImport, State: ActivityTaskStateRunning,
+				Title:    "Syncing with Plex: " + p.Step,
+				Progress: &ScanProgress{Phase: Metadata, Done: p.Done, Total: p.Total}})
+		}
+	}
 	if h.Tasks != nil {
 		for _, t := range h.Tasks.Running() {
 			if t.Progress == nil {

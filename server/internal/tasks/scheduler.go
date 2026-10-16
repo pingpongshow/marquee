@@ -26,19 +26,33 @@ type Task struct {
 	// pick up where they left off next time. Run Now ignores the window.
 	Bounded bool
 	Every   time.Duration
-	Run     func(ctx context.Context) (string, error)
+	// EveryFunc, when set, replaces Every with a value read at each check, for intervals
+	// the admin configures; 0 means the task only runs when started by hand.
+	EveryFunc func() time.Duration
+	Run       func(ctx context.Context) (string, error)
 	// Progress, when set, reports a running task's progress for the activity indicator.
 	Progress func() (done, total int)
 }
 
+// interval is how often an interval task runs (0 = not on a timer).
+func (t Task) interval() time.Duration {
+	if t.EveryFunc != nil {
+		return t.EveryFunc()
+	}
+	return t.Every
+}
+
 func (t Task) Schedule() string {
+	every := t.interval()
 	switch {
 	case t.Window:
 		return "Daily in the maintenance window"
-	case t.Every >= 24*time.Hour:
-		return fmt.Sprintf("Every %d days", int(t.Every/(24*time.Hour)))
-	case t.Every > 0:
-		return fmt.Sprintf("Every %d hours", int(t.Every/time.Hour))
+	case every >= 24*time.Hour:
+		return fmt.Sprintf("Every %d days", int(every/(24*time.Hour)))
+	case every >= time.Hour && every%time.Hour == 0:
+		return fmt.Sprintf("Every %d hours", int(every/time.Hour))
+	case every > 0:
+		return fmt.Sprintf("Every %d minutes", int(every/time.Minute))
 	default:
 		return "Manual"
 	}
@@ -244,7 +258,8 @@ func (s *Scheduler) due(ctx context.Context, t Task, now time.Time) bool {
 		// Run once per window; if the server was down for a whole window, catch up within a day.
 		return (in && last.Before(ws)) || now.Sub(last) > 36*time.Hour
 	}
-	return t.Every > 0 && now.Sub(last) >= t.Every
+	every := t.interval()
+	return every > 0 && now.Sub(last) >= every
 }
 
 // Run checks every minute for due tasks until ctx is cancelled.

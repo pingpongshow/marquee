@@ -212,12 +212,12 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] =
         },
         {
           id: "plex-import",
-          label: "Plex Import",
+          label: "Plex",
           icon: Download,
           component: PlexImportSettings,
-          keywords: "plex import watch history migrate accounts path mapping",
+          keywords: "plex import sync two-way watch history ratings resume scrobble migrate accounts path mapping",
           description:
-            "Bring over watch history, playlists and customisations from Plex.",
+            "Keep watch status and ratings in step with Plex, and import from it.",
         },
       ],
     },

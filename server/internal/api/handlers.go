@@ -28,6 +28,7 @@ import (
 	"marquee/internal/notify"
 	"marquee/internal/playback"
 	"marquee/internal/plex"
+	"marquee/internal/plexsync"
 	"marquee/internal/remote"
 	"marquee/internal/requests"
 	"marquee/internal/scrobble"
@@ -54,6 +55,7 @@ type Handlers struct {
 	Logs      *logbuf.Buffer
 	Metadata  *metadata.Service
 	Plex      *plex.Importer
+	PlexSync  *plexsync.Service
 	Playback  *playback.Manager
 	// LibrariesChanged is called after a library is created, edited or deleted.
 	LibrariesChanged func()

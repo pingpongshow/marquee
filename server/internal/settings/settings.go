@@ -37,7 +37,38 @@ type Settings struct {
 	Notifications Notifications `json:"notifications"`
 	// VODSave saves movies-on-demand films and episodes into the library (admins only).
 	VODSave VODSave `json:"vodSave"`
+	// PlexSync keeps watch state, ratings, resume positions and plays in step with a Plex
+	// Media Server, both ways. Exposed through /plex-sync, not /settings.
+	PlexSync PlexSync `json:"plexSync"`
 }
+
+// PlexSync configures two-way sync with a Plex Media Server through its HTTP API.
+type PlexSync struct {
+	// URL is the Plex server's address (http://host:32400).
+	URL string `json:"url"`
+	// Token is the server owner's Plex token. A secret: never returned by the API, never logged.
+	Token string `json:"token"`
+	// Enabled turns automatic sync on (every IntervalMinutes). Manual runs work either way.
+	Enabled         bool `json:"enabled"`
+	IntervalMinutes int  `json:"intervalMinutes"`
+	// What syncs.
+	WatchState      bool `json:"watchState"`
+	Ratings         bool `json:"ratings"`
+	ResumePositions bool `json:"resumePositions"`
+	PlayHistory     bool `json:"playHistory"`
+	// PathMappings pair Plex folders with Marquee's (saved by the Plex import); empty uses
+	// suggested ones.
+	PathMappings []PlexPathMapping `json:"pathMappings,omitempty"`
+}
+
+// PlexPathMapping rewrites a Plex path prefix to a Marquee one.
+type PlexPathMapping struct {
+	Plex    string `json:"plex"`
+	Marquee string `json:"marquee"`
+}
+
+// Configured reports whether a Plex server and token are set.
+func (p PlexSync) Configured() bool { return p.URL != "" && p.Token != "" }
 
 // VODSave configures saving films and episodes from movies-on-demand (Xtream Codes) sources
 // into the library's folders. An empty folder turns saving of that kind off.
@@ -129,11 +160,15 @@ const (
 	// is over their DVR quota. It isn't in the API's AlertType enum (shipped apps decode it
 	// strictly); the API exposes it as NotificationSettings.dvrQuotaAlert.
 	AlertDVRQuota = "dvr_quota"
+	// AlertPlexSync: two-way Plex sync is failing (Plex rejects the token, or has been
+	// unreachable for several runs). Like dvr_quota it isn't in the API's AlertType enum; the
+	// API exposes it as NotificationSettings.plexSyncAlert.
+	AlertPlexSync = "plex_sync"
 )
 
 // AlertTypes lists every alert type.
 var AlertTypes = []string{AlertTaskFailed, AlertDiskLow, AlertRecordingFailed, AlertSourceFailed,
-	AlertIntegrationDown, AlertFailedSignIns, AlertNewAdminDevice, AlertPlaybackFailed, AlertVODSaveFailed, AlertVODSaveDone, AlertDVRQuota}
+	AlertIntegrationDown, AlertFailedSignIns, AlertNewAdminDevice, AlertPlaybackFailed, AlertVODSaveFailed, AlertVODSaveDone, AlertDVRQuota, AlertPlexSync}
 
 // Notifications configures outgoing email (SMTP) and which alerts administrators get.
 type Notifications struct {
@@ -432,6 +467,7 @@ func Defaults() Settings {
 		VODSave: VODSave{Quality: VODSaveOriginal, MaxHeight: 1080, VideoCodec: "hevc", VideoQuality: "balanced",
 			Audio: "copy", ConcurrentPerSource: 1, ScanAfterSave: true, SkipExisting: true,
 			PauseWhileWatching: true, PauseScope: "source", RetryFailed: true},
+		PlexSync: PlexSync{IntervalMinutes: 30, WatchState: true, Ratings: true, ResumePositions: true, PlayHistory: true},
 		AI: AI{URL: "http://127.0.0.1:11434", ChatModel: "qwen3:8b", EmbedModel: "mxbai-embed-large", UnloadMinutes: 5,
 			UnderstandPrompts: true, RerankMovies: true, LyricsThemes: true, Reasons: true, LearnFromBehaviour: true},
 	}

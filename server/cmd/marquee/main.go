@@ -44,6 +44,7 @@ import (
 	"marquee/internal/notify"
 	"marquee/internal/playback"
 	"marquee/internal/plex"
+	"marquee/internal/plexsync"
 	"marquee/internal/probe"
 	"marquee/internal/remote"
 	"marquee/internal/requests"
@@ -597,6 +598,9 @@ func run() error {
 		live: live, dvr: dvr, vod: vodSvc, saves: vodSaves, player: player, libraries: libraries, ai: aiClient, soundprint: soundprintSvc})
 	go alertWatcher.Run(ctx)
 	go live.Run(ctx, liveWake)
+	// Two-way Plex sync (watch state, plays, ratings): off until the admin turns it on.
+	plexSync := &plexsync.Service{DB: database, Settings: store, Alerts: alerts}
+	scheduler.Register(plexSync.Task())
 	go vodSvc.Run(ctx, vodWake)
 	go vodSaves.Run(ctx)
 	go dvr.Run(ctx)
@@ -642,7 +646,8 @@ func run() error {
 		Playback:    player,
 		Plex: &plex.Importer{DB: database, Auth: authSvc, Libraries: libraries, Matcher: meta,
 			PlexRoot: cfg.PlexDir, WorkDir: filepath.Join(cfg.ConfigDir, "plex-import"),
-			ArtDir: filepath.Join(cfg.ConfigDir, "cache", "plex-artwork")},
+			ArtDir: filepath.Join(cfg.ConfigDir, "cache", "plex-artwork"), OnMapped: plexSync.SaveImport},
+		PlexSync:         plexSync,
 		LibrariesChanged: func() { watch.Sync(ctx, store.Get().Library.WatchFilesystem) },
 		Bazarr: &bazarr.Service{DB: database, Config: func() (string, string) {
 			i := store.Get().Integrations
