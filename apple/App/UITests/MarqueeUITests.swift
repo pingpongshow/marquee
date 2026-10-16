@@ -871,6 +871,51 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Upcoming"].waitForNonExistence(timeout: 10))
     }
 
+    /// Shared DVR (LIVE-5): someone else's recording says who recorded it and can't be
+    /// cancelled; the signed-in user's space against their quota; no Recordings tab for a
+    /// user who may not see recordings.
+    func testSharedRecordings() throws {
+        // The admin records an upcoming programme: someone else's for the test user.
+        let channel = try XCTUnwrap(try adminList("/livetv/channels").first { ($0["next"] as? [String: Any])?["start"] != nil })
+        let next = try XCTUnwrap(channel["next"] as? [String: Any])
+        let scheduled = try adminAPI("POST", "/livetv/recordings", ["channelId": channel["id"] as! Int, "start": next["start"] as! String])
+        if let id = (scheduled["recording"] as? [String: Any])?["id"] as? Int {
+            let url = "http://\(server)/api/v1/livetv/recordings/\(id)", token = adminToken
+            addTeardownBlock { Self.send("DELETE", url, token: token) }
+        }
+        let title = try XCTUnwrap(next["title"] as? String)
+        let admin = try XCTUnwrap(try adminAPI("GET", "/me")["displayName"] as? String)
+
+        let user = try temporaryUser()
+        let id = try XCTUnwrap(try adminList("/users").first { $0["username"] as? String == user.name }?["id"] as? Int)
+        func restrict(_ changes: [String: Any]) throws {
+            var r = try adminList("/users").first { $0["id"] as? Int == id }?["restrictions"] as? [String: Any] ?? [:]
+            r.merge(changes) { $1 }
+            try adminAPI("PATCH", "/users/\(id)", ["restrictions": r])
+        }
+        try restrict(["canRecordDVR": true, "canViewDVR": true, "dvrQuotaGb": 50])
+
+        signIn(username: user.name, password: user.password)
+        openLibrary("Live TV")
+        XCTAssertTrue(app.navigationBars["Live TV"].waitForExistence(timeout: 10))
+        let tab = app.buttons["Recordings"].firstMatch
+        XCTAssertTrue(tab.waitForExistence(timeout: 10))
+        tab.tap()
+        XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Recorded by \(admin)")).firstMatch.exists, "who recorded it")
+        XCTAssertFalse(app.buttons["Cancel"].exists, "someone else's recording can't be cancelled")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label ENDSWITH 'of 50 GB used'")).firstMatch.exists, "the usage line")
+        shot("dvr1-shared-recording")
+
+        // Not allowed to see recordings: no Recordings tab.
+        try restrict(["canViewDVR": false])
+        app.navigationBars.buttons["Libraries"].tap()
+        openLibrary("Live TV")
+        XCTAssertTrue(app.buttons["What's On"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["Recordings"].exists, "no Recordings tab")
+        shot("dvr2-no-recordings-tab")
+    }
+
     // MARK: - Playback and Home extras (PLAY-17/18/19, USER-12/13, META-7, equaliser)
 
     /// Opens a movie by title from the Movies library.
