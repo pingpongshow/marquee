@@ -10822,6 +10822,643 @@ public enum Operations {
             }
         }
     }
+    /// Commercials in a Live TV recording: found, cut or not (admin only). 404 for items that aren't recordings.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/commercials`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/commercials/get(getItemCommercials)`.
+    public enum GetItemCommercials {
+        public static let id: Swift.String = "getItemCommercials"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/items/{itemId}/commercials/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/commercials/GET/path/itemId`.
+                public var itemId: Components.Parameters.ItemId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - itemId:
+                public init(itemId: Components.Parameters.ItemId) {
+                    self.itemId = itemId
+                }
+            }
+            public var path: Operations.GetItemCommercials.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/commercials/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetItemCommercials.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetItemCommercials.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetItemCommercials.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.GetItemCommercials.Input.Path,
+                headers: Operations.GetItemCommercials.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/commercials/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{itemId}/commercials/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.CommercialScan)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.CommercialScan {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetItemCommercials.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.GetItemCommercials.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Status.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/commercials/get(getItemCommercials)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetItemCommercials.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetItemCommercials.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/commercials/get(getItemCommercials)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/commercials/get(getItemCommercials)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/commercials/get(getItemCommercials)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Find and cut the commercials out of a Live TV recording now, whatever the setting (admin only). Queued and done in the background, one at a time; a recording being watched waits.
+    ///
+    /// - Remark: HTTP `POST /items/{itemId}/commercials/remove`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/commercials/remove/post(removeItemCommercials)`.
+    public enum RemoveItemCommercials {
+        public static let id: Swift.String = "removeItemCommercials"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/items/{itemId}/commercials/remove/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/commercials/remove/POST/path/itemId`.
+                public var itemId: Components.Parameters.ItemId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - itemId:
+                public init(itemId: Components.Parameters.ItemId) {
+                    self.itemId = itemId
+                }
+            }
+            public var path: Operations.RemoveItemCommercials.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/commercials/remove/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RemoveItemCommercials.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RemoveItemCommercials.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.RemoveItemCommercials.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.RemoveItemCommercials.Input.Path,
+                headers: Operations.RemoveItemCommercials.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Accepted: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/commercials/remove/POST/responses/202/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{itemId}/commercials/remove/POST/responses/202/content/application\/json`.
+                    case json(Components.Schemas.CommercialScan)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.CommercialScan {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RemoveItemCommercials.Output.Accepted.Body
+                /// Creates a new `Accepted`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.RemoveItemCommercials.Output.Accepted.Body) {
+                    self.body = body
+                }
+            }
+            /// Queued.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/commercials/remove/post(removeItemCommercials)/responses/202`.
+            ///
+            /// HTTP response code: `202 accepted`.
+            case accepted(Operations.RemoveItemCommercials.Output.Accepted)
+            /// The associated value of the enum case if `self` is `.accepted`.
+            ///
+            /// - Throws: An error if `self` is not `.accepted`.
+            /// - SeeAlso: `.accepted`.
+            public var accepted: Operations.RemoveItemCommercials.Output.Accepted {
+                get throws {
+                    switch self {
+                    case let .accepted(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "accepted",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/commercials/remove/post(removeItemCommercials)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/commercials/remove/post(removeItemCommercials)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/commercials/remove/post(removeItemCommercials)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// A helper service isn't running.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/commercials/remove/post(removeItemCommercials)/responses/503`.
+            ///
+            /// HTTP response code: `503 serviceUnavailable`.
+            case serviceUnavailable(Components.Responses.ServiceUnavailable)
+            /// The associated value of the enum case if `self` is `.serviceUnavailable`.
+            ///
+            /// - Throws: An error if `self` is not `.serviceUnavailable`.
+            /// - SeeAlso: `.serviceUnavailable`.
+            public var serviceUnavailable: Components.Responses.ServiceUnavailable {
+                get throws {
+                    switch self {
+                    case let .serviceUnavailable(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "serviceUnavailable",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Put back the original of a recording whose commercials were cut, while it's still in the media trash (admin only). The cut file goes to the trash instead.
+    ///
+    /// - Remark: HTTP `POST /items/{itemId}/commercials/restore`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/commercials/restore/post(restoreItemCommercials)`.
+    public enum RestoreItemCommercials {
+        public static let id: Swift.String = "restoreItemCommercials"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/items/{itemId}/commercials/restore/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/commercials/restore/POST/path/itemId`.
+                public var itemId: Components.Parameters.ItemId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - itemId:
+                public init(itemId: Components.Parameters.ItemId) {
+                    self.itemId = itemId
+                }
+            }
+            public var path: Operations.RestoreItemCommercials.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/commercials/restore/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RestoreItemCommercials.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RestoreItemCommercials.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.RestoreItemCommercials.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.RestoreItemCommercials.Input.Path,
+                headers: Operations.RestoreItemCommercials.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/commercials/restore/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{itemId}/commercials/restore/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.CommercialScan)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.CommercialScan {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RestoreItemCommercials.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.RestoreItemCommercials.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Restored.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/commercials/restore/post(restoreItemCommercials)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.RestoreItemCommercials.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.RestoreItemCommercials.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/commercials/restore/post(restoreItemCommercials)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/commercials/restore/post(restoreItemCommercials)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/commercials/restore/post(restoreItemCommercials)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Conflicts with current state.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/commercials/restore/post(restoreItemCommercials)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Components.Responses.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Components.Responses.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
     /// Seasons of a show, episodes of a season, albums of an artist, tracks of an album.
     ///
     /// - Remark: HTTP `GET /items/{itemId}/children`.
@@ -12522,6 +13159,1393 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Two-way Plex sync settings, status, Plex accounts and the last run (admin only).
+    ///
+    /// - Remark: HTTP `GET /plex-sync`.
+    /// - Remark: Generated from `#/paths//plex-sync/get(getPlexSync)`.
+    public enum GetPlexSync {
+        public static let id: Swift.String = "getPlexSync"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/plex-sync/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetPlexSync.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetPlexSync.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetPlexSync.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.GetPlexSync.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/plex-sync/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/plex-sync/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.PlexSyncStatus)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.PlexSyncStatus {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetPlexSync.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.GetPlexSync.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/get(getPlexSync)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetPlexSync.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetPlexSync.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/get(getPlexSync)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/get(getPlexSync)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Change two-way Plex sync settings (admin only). Fields left out stay as they are.
+    ///
+    /// - Remark: HTTP `PATCH /plex-sync`.
+    /// - Remark: Generated from `#/paths//plex-sync/patch(updatePlexSync)`.
+    public enum UpdatePlexSync {
+        public static let id: Swift.String = "updatePlexSync"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/plex-sync/PATCH/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdatePlexSync.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdatePlexSync.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.UpdatePlexSync.Input.Headers
+            /// - Remark: Generated from `#/paths/plex-sync/PATCH/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/plex-sync/PATCH/requestBody/content/application\/json`.
+                case json(Components.Schemas.PlexSyncSettingsUpdate)
+            }
+            public var body: Operations.UpdatePlexSync.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            ///   - body:
+            public init(
+                headers: Operations.UpdatePlexSync.Input.Headers = .init(),
+                body: Operations.UpdatePlexSync.Input.Body
+            ) {
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/plex-sync/PATCH/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/plex-sync/PATCH/responses/200/content/application\/json`.
+                    case json(Components.Schemas.PlexSyncStatus)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.PlexSyncStatus {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UpdatePlexSync.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.UpdatePlexSync.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/patch(updatePlexSync)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.UpdatePlexSync.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.UpdatePlexSync.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/patch(updatePlexSync)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/patch(updatePlexSync)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/patch(updatePlexSync)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Sync with Plex now, in the background (admin only). Works whether automatic sync is on or off.
+    ///
+    /// - Remark: HTTP `POST /plex-sync/run`.
+    /// - Remark: Generated from `#/paths//plex-sync/run/post(runPlexSync)`.
+    public enum RunPlexSync {
+        public static let id: Swift.String = "runPlexSync"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/plex-sync/run/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RunPlexSync.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RunPlexSync.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.RunPlexSync.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.RunPlexSync.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Accepted: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/plex-sync/run/POST/responses/202/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/plex-sync/run/POST/responses/202/content/application\/json`.
+                    case json(Components.Schemas.PlexSyncStatus)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.PlexSyncStatus {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RunPlexSync.Output.Accepted.Body
+                /// Creates a new `Accepted`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.RunPlexSync.Output.Accepted.Body) {
+                    self.body = body
+                }
+            }
+            /// Started.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/run/post(runPlexSync)/responses/202`.
+            ///
+            /// HTTP response code: `202 accepted`.
+            case accepted(Operations.RunPlexSync.Output.Accepted)
+            /// The associated value of the enum case if `self` is `.accepted`.
+            ///
+            /// - Throws: An error if `self` is not `.accepted`.
+            /// - SeeAlso: `.accepted`.
+            public var accepted: Operations.RunPlexSync.Output.Accepted {
+                get throws {
+                    switch self {
+                    case let .accepted(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "accepted",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/run/post(runPlexSync)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/run/post(runPlexSync)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/run/post(runPlexSync)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Conflicts with current state.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/run/post(runPlexSync)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Components.Responses.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Components.Responses.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Work out what a sync would change each way, without changing anything in Marquee or Plex (admin only). Can take a while on a large library.
+    ///
+    /// - Remark: HTTP `POST /plex-sync/preview`.
+    /// - Remark: Generated from `#/paths//plex-sync/preview/post(previewPlexSync)`.
+    public enum PreviewPlexSync {
+        public static let id: Swift.String = "previewPlexSync"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/plex-sync/preview/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.PreviewPlexSync.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.PreviewPlexSync.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.PreviewPlexSync.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.PreviewPlexSync.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/plex-sync/preview/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/plex-sync/preview/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.PlexSyncReport)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.PlexSyncReport {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.PreviewPlexSync.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.PreviewPlexSync.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/preview/post(previewPlexSync)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.PreviewPlexSync.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.PreviewPlexSync.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/preview/post(previewPlexSync)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/preview/post(previewPlexSync)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/preview/post(previewPlexSync)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Conflicts with current state.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/preview/post(previewPlexSync)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Components.Responses.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Components.Responses.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Choose the Marquee user a Plex account syncs with (admin only).
+    ///
+    /// - Remark: HTTP `PUT /plex-sync/users/{plexAccountId}`.
+    /// - Remark: Generated from `#/paths//plex-sync/users/{plexAccountId}/put(setPlexSyncUser)`.
+    public enum SetPlexSyncUser {
+        public static let id: Swift.String = "setPlexSyncUser"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/plex-sync/users/{plexAccountId}/PUT/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/plex-sync/users/{plexAccountId}/PUT/path/plexAccountId`.
+                public var plexAccountId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - plexAccountId:
+                public init(plexAccountId: Swift.Int64) {
+                    self.plexAccountId = plexAccountId
+                }
+            }
+            public var path: Operations.SetPlexSyncUser.Input.Path
+            /// - Remark: Generated from `#/paths/plex-sync/users/{plexAccountId}/PUT/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SetPlexSyncUser.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SetPlexSyncUser.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.SetPlexSyncUser.Input.Headers
+            /// - Remark: Generated from `#/paths/plex-sync/users/{plexAccountId}/PUT/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/plex-sync/users/{plexAccountId}/PUT/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// Marquee user; leave out to stop syncing this account.
+                    ///
+                    /// - Remark: Generated from `#/paths/plex-sync/users/{plexAccountId}/PUT/requestBody/json/userId`.
+                    public var userId: Swift.Int64?
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - userId: Marquee user; leave out to stop syncing this account.
+                    public init(userId: Swift.Int64? = nil) {
+                        self.userId = userId
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case userId
+                    }
+                }
+                /// - Remark: Generated from `#/paths/plex-sync/users/{plexAccountId}/PUT/requestBody/content/application\/json`.
+                case json(Operations.SetPlexSyncUser.Input.Body.JsonPayload)
+            }
+            public var body: Operations.SetPlexSyncUser.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.SetPlexSyncUser.Input.Path,
+                headers: Operations.SetPlexSyncUser.Input.Headers = .init(),
+                body: Operations.SetPlexSyncUser.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/plex-sync/users/{plexAccountId}/PUT/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/plex-sync/users/{plexAccountId}/PUT/responses/200/content/application\/json`.
+                    case json(Components.Schemas.PlexSyncStatus)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.PlexSyncStatus {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.SetPlexSyncUser.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.SetPlexSyncUser.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/users/{plexAccountId}/put(setPlexSyncUser)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.SetPlexSyncUser.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.SetPlexSyncUser.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/users/{plexAccountId}/put(setPlexSyncUser)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/users/{plexAccountId}/put(setPlexSyncUser)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/users/{plexAccountId}/put(setPlexSyncUser)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/users/{plexAccountId}/put(setPlexSyncUser)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Start Sign in with Plex: open authUrl (or enter the code at plex.tv/link), then poll the PIN (admin only).
+    ///
+    /// - Remark: HTTP `POST /plex-sync/pin`.
+    /// - Remark: Generated from `#/paths//plex-sync/pin/post(startPlexSignIn)`.
+    public enum StartPlexSignIn {
+        public static let id: Swift.String = "startPlexSignIn"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/plex-sync/pin/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.StartPlexSignIn.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.StartPlexSignIn.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.StartPlexSignIn.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.StartPlexSignIn.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/plex-sync/pin/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/plex-sync/pin/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.PlexSignIn)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.PlexSignIn {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.StartPlexSignIn.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.StartPlexSignIn.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/pin/post(startPlexSignIn)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.StartPlexSignIn.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.StartPlexSignIn.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/pin/post(startPlexSignIn)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/pin/post(startPlexSignIn)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// An outside service (e.g. OpenSubtitles) failed or refused the request.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/pin/post(startPlexSignIn)/responses/502`.
+            ///
+            /// HTTP response code: `502 badGateway`.
+            case badGateway(Components.Responses.BadGateway)
+            /// The associated value of the enum case if `self` is `.badGateway`.
+            ///
+            /// - Throws: An error if `self` is not `.badGateway`.
+            /// - SeeAlso: `.badGateway`.
+            public var badGateway: Components.Responses.BadGateway {
+                get throws {
+                    switch self {
+                    case let .badGateway(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badGateway",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Whether Sign in with Plex finished; once it has, the token is saved for sync (admin only).
+    ///
+    /// - Remark: HTTP `GET /plex-sync/pin/{pinId}`.
+    /// - Remark: Generated from `#/paths//plex-sync/pin/{pinId}/get(checkPlexSignIn)`.
+    public enum CheckPlexSignIn {
+        public static let id: Swift.String = "checkPlexSignIn"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/plex-sync/pin/{pinId}/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/plex-sync/pin/{pinId}/GET/path/pinId`.
+                public var pinId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - pinId:
+                public init(pinId: Swift.Int64) {
+                    self.pinId = pinId
+                }
+            }
+            public var path: Operations.CheckPlexSignIn.Input.Path
+            /// - Remark: Generated from `#/paths/plex-sync/pin/{pinId}/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CheckPlexSignIn.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CheckPlexSignIn.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.CheckPlexSignIn.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.CheckPlexSignIn.Input.Path,
+                headers: Operations.CheckPlexSignIn.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/plex-sync/pin/{pinId}/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/plex-sync/pin/{pinId}/GET/responses/200/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/plex-sync/pin/{pinId}/GET/responses/200/content/json/signedIn`.
+                        public var signedIn: Swift.Bool
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - signedIn:
+                        public init(signedIn: Swift.Bool) {
+                            self.signedIn = signedIn
+                        }
+                        public enum CodingKeys: String, CodingKey {
+                            case signedIn
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/plex-sync/pin/{pinId}/GET/responses/200/content/application\/json`.
+                    case json(Operations.CheckPlexSignIn.Output.Ok.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.CheckPlexSignIn.Output.Ok.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CheckPlexSignIn.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.CheckPlexSignIn.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/pin/{pinId}/get(checkPlexSignIn)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.CheckPlexSignIn.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.CheckPlexSignIn.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/pin/{pinId}/get(checkPlexSignIn)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/pin/{pinId}/get(checkPlexSignIn)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// An outside service (e.g. OpenSubtitles) failed or refused the request.
+            ///
+            /// - Remark: Generated from `#/paths//plex-sync/pin/{pinId}/get(checkPlexSignIn)/responses/502`.
+            ///
+            /// HTTP response code: `502 badGateway`.
+            case badGateway(Components.Responses.BadGateway)
+            /// The associated value of the enum case if `self` is `.badGateway`.
+            ///
+            /// - Throws: An error if `self` is not `.badGateway`.
+            /// - SeeAlso: `.badGateway`.
+            public var badGateway: Components.Responses.BadGateway {
+                get throws {
+                    switch self {
+                    case let .badGateway(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badGateway",
                             response: self
                         )
                     }
@@ -19441,6 +21465,1408 @@ public enum Operations {
             }
         }
     }
+    /// Movie and episode files matching the Large files filters, biggest first, with the size each would be after a preset and totals for all that match (admin only). Read from what the library knows; nothing is probed.
+    ///
+    /// - Remark: HTTP `GET /optimize/files`.
+    /// - Remark: Generated from `#/paths//optimize/files/get(listLargeFiles)`.
+    public enum ListLargeFiles {
+        public static let id: Swift.String = "listLargeFiles"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/optimize/files/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/libraryId`.
+                public var libraryId: Swift.Int64?
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/type`.
+                @frozen public enum _TypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case movie = "movie"
+                    case episode = "episode"
+                }
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/type`.
+                public var _type: Operations.ListLargeFiles.Input.Query._TypePayload?
+                /// At least this many GB (10^9 bytes).
+                ///
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/minSizeGb`.
+                public var minSizeGb: Swift.Double?
+                /// At least this overall bitrate.
+                ///
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/minBitrateMbps`.
+                public var minBitrateMbps: Swift.Double?
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/resolution`.
+                @frozen public enum ResolutionPayload: Int, Codable, Hashable, Sendable, CaseIterable {
+                    case _2160 = 2160
+                    case _1080 = 1080
+                    case _720 = 720
+                    case _480 = 480
+                }
+                /// Only this resolution class (by width or height, so letterboxed films count): 2160 = 4K, 480 = SD.
+                ///
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/resolution`.
+                public var resolution: Operations.ListLargeFiles.Input.Query.ResolutionPayload?
+                /// Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9).
+                ///
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/codecs`.
+                public var codecs: Swift.String?
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/hdr`.
+                @frozen public enum HdrPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case yes = "yes"
+                    case no = "no"
+                }
+                /// Only HDR (yes) or only SDR (no) files.
+                ///
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/hdr`.
+                public var hdr: Operations.ListLargeFiles.Input.Query.HdrPayload?
+                /// The preset the estimates are for (default: the default preset).
+                ///
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/presetId`.
+                public var presetId: Swift.String?
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/sort`.
+                @frozen public enum SortPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case size = "size"
+                    case bitrate = "bitrate"
+                    case title = "title"
+                    case savings = "savings"
+                }
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/sort`.
+                public var sort: Operations.ListLargeFiles.Input.Query.SortPayload?
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/offset`.
+                public var offset: Components.Parameters.Offset?
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/limit`.
+                public var limit: Components.Parameters.Limit?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - libraryId:
+                ///   - _type:
+                ///   - minSizeGb: At least this many GB (10^9 bytes).
+                ///   - minBitrateMbps: At least this overall bitrate.
+                ///   - resolution: Only this resolution class (by width or height, so letterboxed films count): 2160 = 4K, 480 = SD.
+                ///   - codecs: Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9).
+                ///   - hdr: Only HDR (yes) or only SDR (no) files.
+                ///   - presetId: The preset the estimates are for (default: the default preset).
+                ///   - sort:
+                ///   - offset:
+                ///   - limit:
+                public init(
+                    libraryId: Swift.Int64? = nil,
+                    _type: Operations.ListLargeFiles.Input.Query._TypePayload? = nil,
+                    minSizeGb: Swift.Double? = nil,
+                    minBitrateMbps: Swift.Double? = nil,
+                    resolution: Operations.ListLargeFiles.Input.Query.ResolutionPayload? = nil,
+                    codecs: Swift.String? = nil,
+                    hdr: Operations.ListLargeFiles.Input.Query.HdrPayload? = nil,
+                    presetId: Swift.String? = nil,
+                    sort: Operations.ListLargeFiles.Input.Query.SortPayload? = nil,
+                    offset: Components.Parameters.Offset? = nil,
+                    limit: Components.Parameters.Limit? = nil
+                ) {
+                    self.libraryId = libraryId
+                    self._type = _type
+                    self.minSizeGb = minSizeGb
+                    self.minBitrateMbps = minBitrateMbps
+                    self.resolution = resolution
+                    self.codecs = codecs
+                    self.hdr = hdr
+                    self.presetId = presetId
+                    self.sort = sort
+                    self.offset = offset
+                    self.limit = limit
+                }
+            }
+            public var query: Operations.ListLargeFiles.Input.Query
+            /// - Remark: Generated from `#/paths/optimize/files/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListLargeFiles.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListLargeFiles.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ListLargeFiles.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - query:
+            ///   - headers:
+            public init(
+                query: Operations.ListLargeFiles.Input.Query = .init(),
+                headers: Operations.ListLargeFiles.Input.Headers = .init()
+            ) {
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/optimize/files/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/optimize/files/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.LargeFilePage)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.LargeFilePage {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListLargeFiles.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ListLargeFiles.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//optimize/files/get(listLargeFiles)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ListLargeFiles.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ListLargeFiles.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/files/get(listLargeFiles)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/files/get(listLargeFiles)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/files/get(listLargeFiles)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// The optimizer queue (running and queued jobs first, then finished ones not cleared) or its history (optimized and restored files, newest first), with the space saved so far (admin only).
+    ///
+    /// - Remark: HTTP `GET /optimize/jobs`.
+    /// - Remark: Generated from `#/paths//optimize/jobs/get(listOptimizeJobs)`.
+    public enum ListOptimizeJobs {
+        public static let id: Swift.String = "listOptimizeJobs"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/optimize/jobs/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/optimize/jobs/GET/query/view`.
+                @frozen public enum ViewPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case queue = "queue"
+                    case history = "history"
+                }
+                /// - Remark: Generated from `#/paths/optimize/jobs/GET/query/view`.
+                public var view: Operations.ListOptimizeJobs.Input.Query.ViewPayload?
+                /// - Remark: Generated from `#/paths/optimize/jobs/GET/query/offset`.
+                public var offset: Components.Parameters.Offset?
+                /// - Remark: Generated from `#/paths/optimize/jobs/GET/query/limit`.
+                public var limit: Components.Parameters.Limit?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - view:
+                ///   - offset:
+                ///   - limit:
+                public init(
+                    view: Operations.ListOptimizeJobs.Input.Query.ViewPayload? = nil,
+                    offset: Components.Parameters.Offset? = nil,
+                    limit: Components.Parameters.Limit? = nil
+                ) {
+                    self.view = view
+                    self.offset = offset
+                    self.limit = limit
+                }
+            }
+            public var query: Operations.ListOptimizeJobs.Input.Query
+            /// - Remark: Generated from `#/paths/optimize/jobs/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListOptimizeJobs.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListOptimizeJobs.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ListOptimizeJobs.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - query:
+            ///   - headers:
+            public init(
+                query: Operations.ListOptimizeJobs.Input.Query = .init(),
+                headers: Operations.ListOptimizeJobs.Input.Headers = .init()
+            ) {
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/optimize/jobs/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/optimize/jobs/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.OptimizeJobPage)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.OptimizeJobPage {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListOptimizeJobs.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ListOptimizeJobs.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//optimize/jobs/get(listOptimizeJobs)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ListOptimizeJobs.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ListOptimizeJobs.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/jobs/get(listOptimizeJobs)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/jobs/get(listOptimizeJobs)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren't available movies or episodes, are skipped.
+    ///
+    /// - Remark: HTTP `POST /optimize/jobs`.
+    /// - Remark: Generated from `#/paths//optimize/jobs/post(queueOptimizeJobs)`.
+    public enum QueueOptimizeJobs {
+        public static let id: Swift.String = "queueOptimizeJobs"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/optimize/jobs/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.QueueOptimizeJobs.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.QueueOptimizeJobs.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.QueueOptimizeJobs.Input.Headers
+            /// - Remark: Generated from `#/paths/optimize/jobs/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/optimize/jobs/POST/requestBody/content/application\/json`.
+                case json(Components.Schemas.OptimizeQueueRequest)
+            }
+            public var body: Operations.QueueOptimizeJobs.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            ///   - body:
+            public init(
+                headers: Operations.QueueOptimizeJobs.Input.Headers = .init(),
+                body: Operations.QueueOptimizeJobs.Input.Body
+            ) {
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Accepted: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/optimize/jobs/POST/responses/202/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/optimize/jobs/POST/responses/202/content/application\/json`.
+                    case json(Components.Schemas.OptimizeQueueResult)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.OptimizeQueueResult {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.QueueOptimizeJobs.Output.Accepted.Body
+                /// Creates a new `Accepted`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.QueueOptimizeJobs.Output.Accepted.Body) {
+                    self.body = body
+                }
+            }
+            /// Queued.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/jobs/post(queueOptimizeJobs)/responses/202`.
+            ///
+            /// HTTP response code: `202 accepted`.
+            case accepted(Operations.QueueOptimizeJobs.Output.Accepted)
+            /// The associated value of the enum case if `self` is `.accepted`.
+            ///
+            /// - Throws: An error if `self` is not `.accepted`.
+            /// - SeeAlso: `.accepted`.
+            public var accepted: Operations.QueueOptimizeJobs.Output.Accepted {
+                get throws {
+                    switch self {
+                    case let .accepted(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "accepted",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/jobs/post(queueOptimizeJobs)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/jobs/post(queueOptimizeJobs)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/jobs/post(queueOptimizeJobs)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Remove finished jobs from the queue view; optimized files stay in the history (admin only).
+    ///
+    /// - Remark: HTTP `POST /optimize/jobs/clear`.
+    /// - Remark: Generated from `#/paths//optimize/jobs/clear/post(clearOptimizeJobs)`.
+    public enum ClearOptimizeJobs {
+        public static let id: Swift.String = "clearOptimizeJobs"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/optimize/jobs/clear/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ClearOptimizeJobs.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ClearOptimizeJobs.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ClearOptimizeJobs.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.ClearOptimizeJobs.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/optimize/jobs/clear/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/optimize/jobs/clear/POST/responses/200/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/optimize/jobs/clear/POST/responses/200/content/json/cleared`.
+                        public var cleared: Swift.Int
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - cleared:
+                        public init(cleared: Swift.Int) {
+                            self.cleared = cleared
+                        }
+                        public enum CodingKeys: String, CodingKey {
+                            case cleared
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/optimize/jobs/clear/POST/responses/200/content/application\/json`.
+                    case json(Operations.ClearOptimizeJobs.Output.Ok.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.ClearOptimizeJobs.Output.Ok.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ClearOptimizeJobs.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ClearOptimizeJobs.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Cleared.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/jobs/clear/post(clearOptimizeJobs)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ClearOptimizeJobs.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ClearOptimizeJobs.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/jobs/clear/post(clearOptimizeJobs)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/jobs/clear/post(clearOptimizeJobs)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Cancel, retry or restore an optimizer job (admin only).
+    ///
+    /// - Remark: HTTP `POST /optimize/jobs/{jobId}/{action}`.
+    /// - Remark: Generated from `#/paths//optimize/jobs/{jobId}/{action}/post(optimizeJobAction)`.
+    public enum OptimizeJobAction {
+        public static let id: Swift.String = "optimizeJobAction"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/optimize/jobs/{jobId}/{action}/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/optimize/jobs/{jobId}/{action}/POST/path/jobId`.
+                public var jobId: Swift.Int64
+                /// - Remark: Generated from `#/paths/optimize/jobs/{jobId}/{action}/POST/path/action`.
+                @frozen public enum ActionPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case cancel = "cancel"
+                    case retry = "retry"
+                    case restore = "restore"
+                }
+                /// cancel = stop a queued or running job (the original stays as it is); retry = queue a failed, cancelled or skipped job again; restore = put an optimized file's original back from the media trash (the optimized file goes there instead).
+                ///
+                /// - Remark: Generated from `#/paths/optimize/jobs/{jobId}/{action}/POST/path/action`.
+                public var action: Operations.OptimizeJobAction.Input.Path.ActionPayload
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - jobId:
+                ///   - action: cancel = stop a queued or running job (the original stays as it is); retry = queue a failed, cancelled or skipped job again; restore = put an optimized file's original back from the media trash (the optimized file goes there instead).
+                public init(
+                    jobId: Swift.Int64,
+                    action: Operations.OptimizeJobAction.Input.Path.ActionPayload
+                ) {
+                    self.jobId = jobId
+                    self.action = action
+                }
+            }
+            public var path: Operations.OptimizeJobAction.Input.Path
+            /// - Remark: Generated from `#/paths/optimize/jobs/{jobId}/{action}/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.OptimizeJobAction.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.OptimizeJobAction.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.OptimizeJobAction.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.OptimizeJobAction.Input.Path,
+                headers: Operations.OptimizeJobAction.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Done.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/jobs/{jobId}/{action}/post(optimizeJobAction)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.OptimizeJobAction.Output.NoContent)
+            /// Done.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/jobs/{jobId}/{action}/post(optimizeJobAction)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.OptimizeJobAction.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/jobs/{jobId}/{action}/post(optimizeJobAction)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/jobs/{jobId}/{action}/post(optimizeJobAction)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/jobs/{jobId}/{action}/post(optimizeJobAction)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Conflicts with current state.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/jobs/{jobId}/{action}/post(optimizeJobAction)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Components.Responses.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Components.Responses.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// The optimizer's settings and every preset, built-in and custom (admin only).
+    ///
+    /// - Remark: HTTP `GET /optimize/settings`.
+    /// - Remark: Generated from `#/paths//optimize/settings/get(getOptimizeSettings)`.
+    public enum GetOptimizeSettings {
+        public static let id: Swift.String = "getOptimizeSettings"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/optimize/settings/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetOptimizeSettings.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetOptimizeSettings.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetOptimizeSettings.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.GetOptimizeSettings.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/optimize/settings/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/optimize/settings/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.OptimizeConfig)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.OptimizeConfig {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetOptimizeSettings.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.GetOptimizeSettings.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//optimize/settings/get(getOptimizeSettings)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetOptimizeSettings.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetOptimizeSettings.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/settings/get(getOptimizeSettings)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/settings/get(getOptimizeSettings)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Change the optimizer's settings and custom presets (admin only). Built-in presets in the list are ignored.
+    ///
+    /// - Remark: HTTP `PUT /optimize/settings`.
+    /// - Remark: Generated from `#/paths//optimize/settings/put(updateOptimizeSettings)`.
+    public enum UpdateOptimizeSettings {
+        public static let id: Swift.String = "updateOptimizeSettings"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/optimize/settings/PUT/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateOptimizeSettings.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateOptimizeSettings.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.UpdateOptimizeSettings.Input.Headers
+            /// - Remark: Generated from `#/paths/optimize/settings/PUT/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/optimize/settings/PUT/requestBody/content/application\/json`.
+                case json(Components.Schemas.OptimizeSettings)
+            }
+            public var body: Operations.UpdateOptimizeSettings.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            ///   - body:
+            public init(
+                headers: Operations.UpdateOptimizeSettings.Input.Headers = .init(),
+                body: Operations.UpdateOptimizeSettings.Input.Body
+            ) {
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/optimize/settings/PUT/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/optimize/settings/PUT/responses/200/content/application\/json`.
+                    case json(Components.Schemas.OptimizeConfig)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.OptimizeConfig {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UpdateOptimizeSettings.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.UpdateOptimizeSettings.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//optimize/settings/put(updateOptimizeSettings)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.UpdateOptimizeSettings.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.UpdateOptimizeSettings.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/settings/put(updateOptimizeSettings)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/settings/put(updateOptimizeSettings)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/settings/put(updateOptimizeSettings)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
     /// Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
     ///
     /// The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item's last file the item goes too, along with a season or show left empty.
@@ -24242,7 +27668,7 @@ public enum Operations {
             }
         }
     }
-    /// DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first).
+    /// DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone's recordings are listed to every profile that may view DVR recordings, within the profile's content rating limit (the library item's rating once filed, else the guide's; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings.
     ///
     /// - Remark: HTTP `GET /livetv/recordings`.
     /// - Remark: Generated from `#/paths//livetv/recordings/get(listRecordings)`.
@@ -24644,6 +28070,57 @@ public enum Operations {
                     }
                 }
             }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/recordings/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/recordings/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas._Error)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas._Error {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ScheduleRecording.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ScheduleRecording.Output.Conflict.Body) {
+                    self.body = body
+                }
+            }
+            /// quota_exceeded: the caller is at or over their DVR quota.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/recordings/post(scheduleRecording)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.ScheduleRecording.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.ScheduleRecording.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
             /// A helper service isn't running.
             ///
             /// - Remark: Generated from `#/paths//livetv/recordings/post(scheduleRecording)/responses/503`.
@@ -24698,7 +28175,319 @@ public enum Operations {
             }
         }
     }
-    /// Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list.
+    /// How much space the caller's recordings take (finished and in progress, actual sizes) and their DVR quota (LIVE-5).
+    ///
+    /// - Remark: HTTP `GET /livetv/recordings/usage`.
+    /// - Remark: Generated from `#/paths//livetv/recordings/usage/get(getRecordingUsage)`.
+    public enum GetRecordingUsage {
+        public static let id: Swift.String = "getRecordingUsage"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/recordings/usage/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetRecordingUsage.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetRecordingUsage.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetRecordingUsage.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.GetRecordingUsage.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/recordings/usage/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/recordings/usage/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.DvrUsage)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.DvrUsage {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetRecordingUsage.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.GetRecordingUsage.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Usage.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/recordings/usage/get(getRecordingUsage)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetRecordingUsage.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetRecordingUsage.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/recordings/usage/get(getRecordingUsage)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/recordings/usage/get(getRecordingUsage)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Admins: every user's DVR usage and quota (LIVE-5), including users with no recordings.
+    ///
+    /// - Remark: HTTP `GET /admin/dvr/usage`.
+    /// - Remark: Generated from `#/paths//admin/dvr/usage/get(listRecordingUsage)`.
+    public enum ListRecordingUsage {
+        public static let id: Swift.String = "listRecordingUsage"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/admin/dvr/usage/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListRecordingUsage.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListRecordingUsage.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ListRecordingUsage.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.ListRecordingUsage.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/admin/dvr/usage/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/admin/dvr/usage/GET/responses/200/content/application\/json`.
+                    case json([Components.Schemas.DvrUsage])
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: [Components.Schemas.DvrUsage] {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListRecordingUsage.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ListRecordingUsage.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Usage per user.
+            ///
+            /// - Remark: Generated from `#/paths//admin/dvr/usage/get(listRecordingUsage)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ListRecordingUsage.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ListRecordingUsage.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//admin/dvr/usage/get(listRecordingUsage)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//admin/dvr/usage/get(listRecordingUsage)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list. Only whoever scheduled it, or an admin.
     ///
     /// - Remark: HTTP `DELETE /livetv/recordings/{recordingId}`.
     /// - Remark: Generated from `#/paths//livetv/recordings/{recordingId}/delete(cancelRecording)`.
@@ -24720,14 +28509,14 @@ public enum Operations {
             public var path: Operations.CancelRecording.Input.Path
             /// - Remark: Generated from `#/paths/livetv/recordings/{recordingId}/DELETE/query`.
             public struct Query: Sendable, Hashable {
-                /// Finished recordings: delete the file too (admins, or whoever scheduled it).
+                /// Finished recordings: delete the file too.
                 ///
                 /// - Remark: Generated from `#/paths/livetv/recordings/{recordingId}/DELETE/query/deleteFile`.
                 public var deleteFile: Swift.Bool?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
-                ///   - deleteFile: Finished recordings: delete the file too (admins, or whoever scheduled it).
+                ///   - deleteFile: Finished recordings: delete the file too.
                 public init(deleteFile: Swift.Bool? = nil) {
                     self.deleteFile = deleteFile
                 }
@@ -25053,7 +28842,7 @@ public enum Operations {
             }
         }
     }
-    /// Stop recording a series. Its upcoming airings are dropped; recordings already made stay.
+    /// Stop recording a series. Its upcoming airings are dropped; recordings already made stay. Only whoever made it, or an admin.
     ///
     /// - Remark: HTTP `DELETE /livetv/recording-rules/{ruleId}`.
     /// - Remark: Generated from `#/paths//livetv/recording-rules/{ruleId}/delete(deleteRecordingRule)`.

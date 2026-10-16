@@ -763,3 +763,64 @@ extension MarqueeTVUITests {
         XCTAssertTrue(card.waitForNonExistence(timeout: 6), "the card goes")
     }
 }
+
+// MARK: - Shared DVR (LIVE-5)
+
+extension MarqueeTVUITests {
+    /// Someone else's recording says who recorded it and can't be cancelled; the signed-in
+    /// user's space against their quota; no Recordings tab for a user who may not see them.
+    func testSharedRecordingsTV() throws {
+        // The admin records an upcoming programme: someone else's for the test user.
+        var channels: [[String: Any]] = []
+        let done = expectation(description: "channels")
+        var req = URLRequest(url: URL(string: server + "/api/v1/livetv/channels")!)
+        req.setValue("Bearer \(adminToken ?? "")", forHTTPHeaderField: "Authorization")
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            channels = (data.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [[String: Any]]) ?? []
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 30)
+        let channel = try XCTUnwrap(channels.first { ($0["next"] as? [String: Any])?["start"] != nil })
+        let next = try XCTUnwrap(channel["next"] as? [String: Any])
+        let scheduled = try api("POST", "/livetv/recordings", ["channelId": channel["id"] as! Int, "start": next["start"] as! String])
+        if let id = (scheduled["recording"] as? [String: Any])?["id"] as? Int {
+            let url = server + "/api/v1/livetv/recordings/\(id)", admin = adminToken
+            addTeardownBlock { Self.send("DELETE", url, token: admin) }
+        }
+        let title = try XCTUnwrap(next["title"] as? String)
+        let adminName = try XCTUnwrap(try api("GET", "/me")["displayName"] as? String)
+
+        let token = try signInTemporaryUser()
+        let id = try XCTUnwrap(try api("GET", "/me", token: token)["id"] as? Int)
+        // A new user's restrictions, kept here (there's no single-user GET).
+        var r: [String: Any] = ["allowRemote": true, "liveTv": true]
+        func restrict(_ changes: [String: Any]) throws {
+            r.merge(changes) { $1 }
+            try api("PATCH", "/users/\(id)", ["restrictions": r])
+        }
+        try restrict(["canRecordDVR": true, "canViewDVR": true, "dvrQuotaGb": 50])
+
+        app.openSection("Live TV")
+        let tab = app.buttons["Recordings"].firstMatch
+        XCTAssertTrue(tab.waitForExistence(timeout: 15))
+        let segments = ["Guide", "What's On", "Recordings"]
+        for _ in 0..<10 where !segments.contains(focused.label) { remote.press(.up) }
+        for _ in 0..<3 where !tab.hasFocus { remote.press(.right) }
+        XCTAssertTrue(tab.hasFocus, "focus is on \(focused.label)")
+        remote.press(.select)
+        XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Recorded by \(adminName)")).firstMatch.exists, "who recorded it")
+        XCTAssertFalse(app.buttons["Cancel"].exists, "someone else's recording can't be cancelled")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label ENDSWITH 'of 50 GB used'")).firstMatch.exists, "the usage line")
+        sleep(1)
+        shot("tv-dvr1-shared-recording")
+
+        // Not allowed to see recordings: no Recordings tab.
+        try restrict(["canViewDVR": false])
+        app.openSection("Home")
+        app.openSection("Live TV")
+        XCTAssertTrue(app.buttons["What's On"].firstMatch.waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["Recordings"].exists, "no Recordings tab")
+        shot("tv-dvr2-no-recordings-tab")
+    }
+}

@@ -468,10 +468,22 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/canRequest`.
             public var canRequest: Swift.Bool?
-            /// May schedule Live TV recordings (LIVE-5). Default false; admins always may.
+            /// Deprecated: the same as canRecordDVR (kept for older clients). Read only when canRecordDVR isn't sent.
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/canRecord`.
             public var canRecord: Swift.Bool?
+            /// May schedule Live TV recordings (LIVE-5). Default true; admins always may. A user who may not has their series paused.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserRestrictions/canRecordDVR`.
+            public var canRecordDVR: Swift.Bool?
+            /// May see and play the household's Live TV recordings (the DVR list and the recordings libraries). Default true; admins always may.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserRestrictions/canViewDVR`.
+            public var canViewDVR: Swift.Bool?
+            /// This user's DVR quota in GB (10^9 bytes). Null or absent = the server default (integrations.dvrDefaultQuotaGb); 0 = unlimited.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserRestrictions/dvrQuotaGb`.
+            public var dvrQuotaGb: Swift.Int?
             /// May watch Live TV (LIVE-4). Default true.
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/liveTv`.
@@ -496,7 +508,10 @@ extension Components {
             ///   - allowRemote: May stream from outside the home network. Default true.
             ///   - remoteQualityKbps: Cap for remote streams. 0 = server default.
             ///   - canRequest: May request titles through Seerr (REQ-1). Default false; admins always may.
-            ///   - canRecord: May schedule Live TV recordings (LIVE-5). Default false; admins always may.
+            ///   - canRecord: Deprecated: the same as canRecordDVR (kept for older clients). Read only when canRecordDVR isn't sent.
+            ///   - canRecordDVR: May schedule Live TV recordings (LIVE-5). Default true; admins always may. A user who may not has their series paused.
+            ///   - canViewDVR: May see and play the household's Live TV recordings (the DVR list and the recordings libraries). Default true; admins always may.
+            ///   - dvrQuotaGb: This user's DVR quota in GB (10^9 bytes). Null or absent = the server default (integrations.dvrDefaultQuotaGb); 0 = unlimited.
             ///   - liveTv: May watch Live TV (LIVE-4). Default true.
             ///   - liveTvGroups: Channel groups this user may watch. Null or absent = all.
             ///   - seerrUserId: The Seerr user requests are made as. Null = Seerr's API key owner.
@@ -508,6 +523,9 @@ extension Components {
                 remoteQualityKbps: Swift.Int? = nil,
                 canRequest: Swift.Bool? = nil,
                 canRecord: Swift.Bool? = nil,
+                canRecordDVR: Swift.Bool? = nil,
+                canViewDVR: Swift.Bool? = nil,
+                dvrQuotaGb: Swift.Int? = nil,
                 liveTv: Swift.Bool? = nil,
                 liveTvGroups: [Swift.String]? = nil,
                 seerrUserId: Swift.Int64? = nil,
@@ -519,6 +537,9 @@ extension Components {
                 self.remoteQualityKbps = remoteQualityKbps
                 self.canRequest = canRequest
                 self.canRecord = canRecord
+                self.canRecordDVR = canRecordDVR
+                self.canViewDVR = canViewDVR
+                self.dvrQuotaGb = dvrQuotaGb
                 self.liveTv = liveTv
                 self.liveTvGroups = liveTvGroups
                 self.seerrUserId = seerrUserId
@@ -531,6 +552,9 @@ extension Components {
                 case remoteQualityKbps
                 case canRequest
                 case canRecord
+                case canRecordDVR
+                case canViewDVR
+                case dvrQuotaGb
                 case liveTv
                 case liveTvGroups
                 case seerrUserId
@@ -1297,6 +1321,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/NotificationSettings/alerts`.
             public var alerts: [Components.Schemas.AlertType]?
+            /// The dvr_quota alert is on: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Off by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.)
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/dvrQuotaAlert`.
+            public var dvrQuotaAlert: Swift.Bool?
+            /// The plex_sync alert is on: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Off by default. (Not in AlertType; notifications carry type plex_sync.)
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/plexSyncAlert`.
+            public var plexSyncAlert: Swift.Bool?
             /// Mail alerts to every administrator with an email address.
             ///
             /// - Remark: Generated from `#/components/schemas/NotificationSettings/recipientsAllAdmins`.
@@ -1322,6 +1354,8 @@ extension Components {
             ///   - mailConfigured: Host, port and from address are set.
             ///   - linkUrl: Address links in mail start with (e.g. reset links). Empty = the Remote Access URL.
             ///   - alerts: Alert types that are on. All are off by default.
+            ///   - dvrQuotaAlert: The dvr_quota alert is on: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Off by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.)
+            ///   - plexSyncAlert: The plex_sync alert is on: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Off by default. (Not in AlertType; notifications carry type plex_sync.)
             ///   - recipientsAllAdmins: Mail alerts to every administrator with an email address.
             ///   - recipients: Administrators (user ids) who get alert mail when recipientsAllAdmins is off.
             ///   - diskThresholdPercent: Alert when a volume has less free space than this.
@@ -1336,6 +1370,8 @@ extension Components {
                 mailConfigured: Swift.Bool? = nil,
                 linkUrl: Swift.String? = nil,
                 alerts: [Components.Schemas.AlertType]? = nil,
+                dvrQuotaAlert: Swift.Bool? = nil,
+                plexSyncAlert: Swift.Bool? = nil,
                 recipientsAllAdmins: Swift.Bool? = nil,
                 recipients: [Swift.Int64]? = nil,
                 diskThresholdPercent: Swift.Int? = nil
@@ -1350,6 +1386,8 @@ extension Components {
                 self.mailConfigured = mailConfigured
                 self.linkUrl = linkUrl
                 self.alerts = alerts
+                self.dvrQuotaAlert = dvrQuotaAlert
+                self.plexSyncAlert = plexSyncAlert
                 self.recipientsAllAdmins = recipientsAllAdmins
                 self.recipients = recipients
                 self.diskThresholdPercent = diskThresholdPercent
@@ -1365,6 +1403,8 @@ extension Components {
                 case mailConfigured
                 case linkUrl
                 case alerts
+                case dvrQuotaAlert
+                case plexSyncAlert
                 case recipientsAllAdmins
                 case recipients
                 case diskThresholdPercent
@@ -1396,8 +1436,14 @@ extension Components {
             public var fromName: Swift.String?
             /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/linkUrl`.
             public var linkUrl: Swift.String?
+            /// Replaces the list; the dvr_quota and plex_sync alerts are kept as they were unless dvrQuotaAlert or plexSyncAlert is sent.
+            ///
             /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/alerts`.
             public var alerts: [Components.Schemas.AlertType]?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/dvrQuotaAlert`.
+            public var dvrQuotaAlert: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/plexSyncAlert`.
+            public var plexSyncAlert: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/recipientsAllAdmins`.
             public var recipientsAllAdmins: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/recipients`.
@@ -1415,7 +1461,9 @@ extension Components {
             ///   - fromAddress:
             ///   - fromName:
             ///   - linkUrl:
-            ///   - alerts:
+            ///   - alerts: Replaces the list; the dvr_quota and plex_sync alerts are kept as they were unless dvrQuotaAlert or plexSyncAlert is sent.
+            ///   - dvrQuotaAlert:
+            ///   - plexSyncAlert:
             ///   - recipientsAllAdmins:
             ///   - recipients:
             ///   - diskThresholdPercent:
@@ -1429,6 +1477,8 @@ extension Components {
                 fromName: Swift.String? = nil,
                 linkUrl: Swift.String? = nil,
                 alerts: [Components.Schemas.AlertType]? = nil,
+                dvrQuotaAlert: Swift.Bool? = nil,
+                plexSyncAlert: Swift.Bool? = nil,
                 recipientsAllAdmins: Swift.Bool? = nil,
                 recipients: [Swift.Int64]? = nil,
                 diskThresholdPercent: Swift.Int? = nil
@@ -1442,6 +1492,8 @@ extension Components {
                 self.fromName = fromName
                 self.linkUrl = linkUrl
                 self.alerts = alerts
+                self.dvrQuotaAlert = dvrQuotaAlert
+                self.plexSyncAlert = plexSyncAlert
                 self.recipientsAllAdmins = recipientsAllAdmins
                 self.recipients = recipients
                 self.diskThresholdPercent = diskThresholdPercent
@@ -1456,6 +1508,8 @@ extension Components {
                 case fromName
                 case linkUrl
                 case alerts
+                case dvrQuotaAlert
+                case plexSyncAlert
                 case recipientsAllAdmins
                 case recipients
                 case diskThresholdPercent
@@ -2560,6 +2614,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/LiveTvStatus/canRecord`.
             public var canRecord: Swift.Bool?
+            /// The caller may see and play recordings (the Recordings tab). Absent from older servers: then assume canRecord.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTvStatus/canViewRecordings`.
+            public var canViewRecordings: Swift.Bool?
             /// Recordings in progress.
             ///
             /// - Remark: Generated from `#/components/schemas/LiveTvStatus/recordingsActive`.
@@ -2626,6 +2684,7 @@ extension Components {
             ///   - channels:
             ///   - dvrAvailable: Recordings can be written (LIVE-5).
             ///   - canRecord: The caller may schedule recordings.
+            ///   - canViewRecordings: The caller may see and play recordings (the Recordings tab). Absent from older servers: then assume canRecord.
             ///   - recordingsActive: Recordings in progress.
             ///   - guideUntil: The end of the loaded guide.
             ///   - sources:
@@ -2634,6 +2693,7 @@ extension Components {
                 channels: Swift.Int,
                 dvrAvailable: Swift.Bool? = nil,
                 canRecord: Swift.Bool? = nil,
+                canViewRecordings: Swift.Bool? = nil,
                 recordingsActive: Swift.Int? = nil,
                 guideUntil: Foundation.Date? = nil,
                 sources: Components.Schemas.LiveTvStatus.SourcesPayload
@@ -2642,6 +2702,7 @@ extension Components {
                 self.channels = channels
                 self.dvrAvailable = dvrAvailable
                 self.canRecord = canRecord
+                self.canViewRecordings = canViewRecordings
                 self.recordingsActive = recordingsActive
                 self.guideUntil = guideUntil
                 self.sources = sources
@@ -2651,6 +2712,7 @@ extension Components {
                 case channels
                 case dvrAvailable
                 case canRecord
+                case canViewRecordings
                 case recordingsActive
                 case guideUntil
                 case sources
@@ -2711,6 +2773,20 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Recording/userId`.
             public var userId: Swift.Int64?
+            /// Who scheduled it, by name ("Recorded by Alex").
+            ///
+            /// - Remark: Generated from `#/components/schemas/Recording/ownerName`.
+            public var ownerName: Swift.String?
+            /// The caller may cancel or delete it (whoever scheduled it, or an admin).
+            ///
+            /// - Remark: Generated from `#/components/schemas/Recording/canDelete`.
+            public var canDelete: Swift.Bool?
+            /// The guide's content rating for the programme, e.g. TV-14, when it gave one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Recording/rating`.
+            public var rating: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Recording/commercials`.
+            public var commercials: Components.Schemas.CommercialScan?
             /// Creates a new `Recording`.
             ///
             /// - Parameters:
@@ -2732,6 +2808,10 @@ extension Components {
             ///   - sizeBytes:
             ///   - itemId: The library item once the recording has been scanned.
             ///   - userId: Who scheduled it.
+            ///   - ownerName: Who scheduled it, by name ("Recorded by Alex").
+            ///   - canDelete: The caller may cancel or delete it (whoever scheduled it, or an admin).
+            ///   - rating: The guide's content rating for the programme, e.g. TV-14, when it gave one.
+            ///   - commercials:
             public init(
                 id: Swift.Int64,
                 channelId: Swift.Int64? = nil,
@@ -2750,7 +2830,11 @@ extension Components {
                 error: Swift.String? = nil,
                 sizeBytes: Swift.Int64? = nil,
                 itemId: Swift.Int64? = nil,
-                userId: Swift.Int64? = nil
+                userId: Swift.Int64? = nil,
+                ownerName: Swift.String? = nil,
+                canDelete: Swift.Bool? = nil,
+                rating: Swift.String? = nil,
+                commercials: Components.Schemas.CommercialScan? = nil
             ) {
                 self.id = id
                 self.channelId = channelId
@@ -2770,6 +2854,10 @@ extension Components {
                 self.sizeBytes = sizeBytes
                 self.itemId = itemId
                 self.userId = userId
+                self.ownerName = ownerName
+                self.canDelete = canDelete
+                self.rating = rating
+                self.commercials = commercials
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -2790,6 +2878,10 @@ extension Components {
                 case sizeBytes
                 case itemId
                 case userId
+                case ownerName
+                case canDelete
+                case rating
+                case commercials
             }
         }
         /// - Remark: Generated from `#/components/schemas/RecordingRule`.
@@ -2810,6 +2902,18 @@ extension Components {
             public var upcoming: Swift.Int
             /// - Remark: Generated from `#/components/schemas/RecordingRule/userId`.
             public var userId: Swift.Int64?
+            /// Who made it, by name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingRule/ownerName`.
+            public var ownerName: Swift.String?
+            /// Its owner may no longer record, so nothing new is scheduled (it resumes if they may again).
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingRule/paused`.
+            public var paused: Swift.Bool?
+            /// The caller may stop it (whoever made it, or an admin).
+            ///
+            /// - Remark: Generated from `#/components/schemas/RecordingRule/canDelete`.
+            public var canDelete: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/RecordingRule/createdAt`.
             public var createdAt: Foundation.Date
             /// Creates a new `RecordingRule`.
@@ -2821,6 +2925,9 @@ extension Components {
             ///   - channelName:
             ///   - upcoming: Airings scheduled now.
             ///   - userId:
+            ///   - ownerName: Who made it, by name.
+            ///   - paused: Its owner may no longer record, so nothing new is scheduled (it resumes if they may again).
+            ///   - canDelete: The caller may stop it (whoever made it, or an admin).
             ///   - createdAt:
             public init(
                 id: Swift.Int64,
@@ -2829,6 +2936,9 @@ extension Components {
                 channelName: Swift.String? = nil,
                 upcoming: Swift.Int,
                 userId: Swift.Int64? = nil,
+                ownerName: Swift.String? = nil,
+                paused: Swift.Bool? = nil,
+                canDelete: Swift.Bool? = nil,
                 createdAt: Foundation.Date
             ) {
                 self.id = id
@@ -2837,6 +2947,9 @@ extension Components {
                 self.channelName = channelName
                 self.upcoming = upcoming
                 self.userId = userId
+                self.ownerName = ownerName
+                self.paused = paused
+                self.canDelete = canDelete
                 self.createdAt = createdAt
             }
             public enum CodingKeys: String, CodingKey {
@@ -2846,7 +2959,115 @@ extension Components {
                 case channelName
                 case upcoming
                 case userId
+                case ownerName
+                case paused
+                case canDelete
                 case createdAt
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/DvrUsage`.
+        public struct DvrUsage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/DvrUsage/userId`.
+            public var userId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/DvrUsage/displayName`.
+            public var displayName: Swift.String?
+            /// Space the user's recordings take now: finished ones' files and in-progress ones' parts, wherever they are.
+            ///
+            /// - Remark: Generated from `#/components/schemas/DvrUsage/usedBytes`.
+            public var usedBytes: Swift.Int64
+            /// Recordings counted.
+            ///
+            /// - Remark: Generated from `#/components/schemas/DvrUsage/recordings`.
+            public var recordings: Swift.Int
+            /// The quota in bytes; 0 = unlimited.
+            ///
+            /// - Remark: Generated from `#/components/schemas/DvrUsage/quotaBytes`.
+            public var quotaBytes: Swift.Int64
+            /// The quota in GB; 0 = unlimited.
+            ///
+            /// - Remark: Generated from `#/components/schemas/DvrUsage/quotaGb`.
+            public var quotaGb: Swift.Int?
+            /// default = the server default applies; user = the user's own quota (which may be 0, unlimited).
+            ///
+            /// - Remark: Generated from `#/components/schemas/DvrUsage/quotaSource`.
+            @frozen public enum QuotaSourcePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case _default = "default"
+                case user = "user"
+            }
+            /// default = the server default applies; user = the user's own quota (which may be 0, unlimited).
+            ///
+            /// - Remark: Generated from `#/components/schemas/DvrUsage/quotaSource`.
+            public var quotaSource: Components.Schemas.DvrUsage.QuotaSourcePayload
+            /// At or over the quota.
+            ///
+            /// - Remark: Generated from `#/components/schemas/DvrUsage/overQuota`.
+            public var overQuota: Swift.Bool
+            /// What happens to new recordings over quota.
+            ///
+            /// - Remark: Generated from `#/components/schemas/DvrUsage/quotaAction`.
+            @frozen public enum QuotaActionPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case block = "block"
+                case deleteOldest = "deleteOldest"
+            }
+            /// What happens to new recordings over quota.
+            ///
+            /// - Remark: Generated from `#/components/schemas/DvrUsage/quotaAction`.
+            public var quotaAction: Components.Schemas.DvrUsage.QuotaActionPayload?
+            /// - Remark: Generated from `#/components/schemas/DvrUsage/canRecord`.
+            public var canRecord: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/DvrUsage/canView`.
+            public var canView: Swift.Bool?
+            /// Creates a new `DvrUsage`.
+            ///
+            /// - Parameters:
+            ///   - userId:
+            ///   - displayName:
+            ///   - usedBytes: Space the user's recordings take now: finished ones' files and in-progress ones' parts, wherever they are.
+            ///   - recordings: Recordings counted.
+            ///   - quotaBytes: The quota in bytes; 0 = unlimited.
+            ///   - quotaGb: The quota in GB; 0 = unlimited.
+            ///   - quotaSource: default = the server default applies; user = the user's own quota (which may be 0, unlimited).
+            ///   - overQuota: At or over the quota.
+            ///   - quotaAction: What happens to new recordings over quota.
+            ///   - canRecord:
+            ///   - canView:
+            public init(
+                userId: Swift.Int64,
+                displayName: Swift.String? = nil,
+                usedBytes: Swift.Int64,
+                recordings: Swift.Int,
+                quotaBytes: Swift.Int64,
+                quotaGb: Swift.Int? = nil,
+                quotaSource: Components.Schemas.DvrUsage.QuotaSourcePayload,
+                overQuota: Swift.Bool,
+                quotaAction: Components.Schemas.DvrUsage.QuotaActionPayload? = nil,
+                canRecord: Swift.Bool? = nil,
+                canView: Swift.Bool? = nil
+            ) {
+                self.userId = userId
+                self.displayName = displayName
+                self.usedBytes = usedBytes
+                self.recordings = recordings
+                self.quotaBytes = quotaBytes
+                self.quotaGb = quotaGb
+                self.quotaSource = quotaSource
+                self.overQuota = overQuota
+                self.quotaAction = quotaAction
+                self.canRecord = canRecord
+                self.canView = canView
+            }
+            public enum CodingKeys: String, CodingKey {
+                case userId
+                case displayName
+                case usedBytes
+                case recordings
+                case quotaBytes
+                case quotaGb
+                case quotaSource
+                case overQuota
+                case quotaAction
+                case canRecord
+                case canView
             }
         }
         /// - Remark: Generated from `#/components/schemas/LiveChannel`.
@@ -4385,7 +4606,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/VodSaveSettings/skipExisting`.
             public var skipExisting: Swift.Bool?
-            /// Pause saves while someone watches (see pauseScope), resuming 60 s after. Default on.
+            /// Pause saves while someone watches (see pauseScope), resuming 15 s after. Default on.
             ///
             /// - Remark: Generated from `#/components/schemas/VodSaveSettings/pauseWhileWatching`.
             public var pauseWhileWatching: Swift.Bool?
@@ -4422,7 +4643,7 @@ extension Components {
             ///   - concurrentPerSource: Saves at once per source. Default 1.
             ///   - scanAfterSave: Scan the library whose folder holds a saved file. Default on.
             ///   - skipExisting: Skip a title whose file is already in its folder. Default on. (A title the library already has is never saved again, unless as an upgrade: see VodLibraryMatch.)
-            ///   - pauseWhileWatching: Pause saves while someone watches (see pauseScope), resuming 60 s after. Default on.
+            ///   - pauseWhileWatching: Pause saves while someone watches (see pauseScope), resuming 15 s after. Default on.
             ///   - pauseScope: source: something from the same source, or Live TV from the same host (Dispatcharr). any: any playback on the server.
             ///   - retryFailed: Queue failed saves again every few hours. Default on.
             ///   - destinations: More save folders besides moviesFolder and showsFolder (e.g. Anime), offered as "Save to {name}". Sending the list replaces it; an item without an id is new.
@@ -5568,6 +5789,49 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/IntegrationSettings/dvrPaddingAfter`.
             public var dvrPaddingAfter: Swift.Int?
+            /// Every user's DVR quota in GB unless their own overrides it. 0 = unlimited (the default).
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/dvrDefaultQuotaGb`.
+            public var dvrDefaultQuotaGb: Swift.Int?
+            /// When a recording is due and its owner is at or over quota: block = it isn't recorded (default); deleteOldest = their oldest recordings they've watched (never one being watched or recorded) go to the media trash to make room.
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/dvrQuotaAction`.
+            @frozen public enum DvrQuotaActionPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case block = "block"
+                case deleteOldest = "deleteOldest"
+            }
+            /// When a recording is due and its owner is at or over quota: block = it isn't recorded (default); deleteOldest = their oldest recordings they've watched (never one being watched or recorded) go to the media trash to make room.
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/dvrQuotaAction`.
+            public var dvrQuotaAction: Components.Schemas.IntegrationSettings.DvrQuotaActionPayload?
+            /// Where new recordings go: an absolute folder that exists and the server can write in. Empty = the server's configured recordings folder (dvrFolderDefault). Recordings made earlier stay where they are.
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/dvrFolder`.
+            public var dvrFolder: Swift.String?
+            /// The server's configured recordings folder.
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/dvrFolderDefault`.
+            public var dvrFolderDefault: Swift.String?
+            /// A library covers the recordings folder's TV and Movies folders (recordings appear in the library).
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/dvrFolderInLibrary`.
+            public var dvrFolderInLibrary: Swift.Bool?
+            /// What happens to finished recordings and, nightly, older ones: off; detect = find the commercial breaks with Comskip but leave the files alone; remove = find them and cut them out (the original goes to the media trash and can be restored while it's there). Default off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/commercials`.
+            @frozen public enum CommercialsPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case off = "off"
+                case detect = "detect"
+                case remove = "remove"
+            }
+            /// What happens to finished recordings and, nightly, older ones: off; detect = find the commercial breaks with Comskip but leave the files alone; remove = find them and cut them out (the original goes to the media trash and can be restored while it's there). Default off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/commercials`.
+            public var commercials: Components.Schemas.IntegrationSettings.CommercialsPayload?
+            /// This server's build includes Comskip, so commercials can be found.
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/comskipAvailable`.
+            public var comskipAvailable: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/IntegrationSettings/liveTvSources`.
             public var liveTvSources: [Components.Schemas.LiveTvSource]?
             /// Movies on demand appear under Live TV (LIVE-6).
@@ -5586,6 +5850,13 @@ extension Components {
             ///   - bazarrApiKeySet:
             ///   - dvrPaddingBefore: Minutes recordings start early.
             ///   - dvrPaddingAfter: Minutes recordings run late.
+            ///   - dvrDefaultQuotaGb: Every user's DVR quota in GB unless their own overrides it. 0 = unlimited (the default).
+            ///   - dvrQuotaAction: When a recording is due and its owner is at or over quota: block = it isn't recorded (default); deleteOldest = their oldest recordings they've watched (never one being watched or recorded) go to the media trash to make room.
+            ///   - dvrFolder: Where new recordings go: an absolute folder that exists and the server can write in. Empty = the server's configured recordings folder (dvrFolderDefault). Recordings made earlier stay where they are.
+            ///   - dvrFolderDefault: The server's configured recordings folder.
+            ///   - dvrFolderInLibrary: A library covers the recordings folder's TV and Movies folders (recordings appear in the library).
+            ///   - commercials: What happens to finished recordings and, nightly, older ones: off; detect = find the commercial breaks with Comskip but leave the files alone; remove = find them and cut them out (the original goes to the media trash and can be restored while it's there). Default off.
+            ///   - comskipAvailable: This server's build includes Comskip, so commercials can be found.
             ///   - liveTvSources:
             ///   - vodEnabled: Movies on demand appear under Live TV (LIVE-6).
             ///   - vodSources:
@@ -5597,6 +5868,13 @@ extension Components {
                 bazarrApiKeySet: Swift.Bool? = nil,
                 dvrPaddingBefore: Swift.Int? = nil,
                 dvrPaddingAfter: Swift.Int? = nil,
+                dvrDefaultQuotaGb: Swift.Int? = nil,
+                dvrQuotaAction: Components.Schemas.IntegrationSettings.DvrQuotaActionPayload? = nil,
+                dvrFolder: Swift.String? = nil,
+                dvrFolderDefault: Swift.String? = nil,
+                dvrFolderInLibrary: Swift.Bool? = nil,
+                commercials: Components.Schemas.IntegrationSettings.CommercialsPayload? = nil,
+                comskipAvailable: Swift.Bool? = nil,
                 liveTvSources: [Components.Schemas.LiveTvSource]? = nil,
                 vodEnabled: Swift.Bool? = nil,
                 vodSources: [Components.Schemas.VodSource]? = nil
@@ -5608,6 +5886,13 @@ extension Components {
                 self.bazarrApiKeySet = bazarrApiKeySet
                 self.dvrPaddingBefore = dvrPaddingBefore
                 self.dvrPaddingAfter = dvrPaddingAfter
+                self.dvrDefaultQuotaGb = dvrDefaultQuotaGb
+                self.dvrQuotaAction = dvrQuotaAction
+                self.dvrFolder = dvrFolder
+                self.dvrFolderDefault = dvrFolderDefault
+                self.dvrFolderInLibrary = dvrFolderInLibrary
+                self.commercials = commercials
+                self.comskipAvailable = comskipAvailable
                 self.liveTvSources = liveTvSources
                 self.vodEnabled = vodEnabled
                 self.vodSources = vodSources
@@ -5620,6 +5905,13 @@ extension Components {
                 case bazarrApiKeySet
                 case dvrPaddingBefore
                 case dvrPaddingAfter
+                case dvrDefaultQuotaGb
+                case dvrQuotaAction
+                case dvrFolder
+                case dvrFolderDefault
+                case dvrFolderInLibrary
+                case commercials
+                case comskipAvailable
                 case liveTvSources
                 case vodEnabled
                 case vodSources
@@ -5651,6 +5943,27 @@ extension Components {
             public var dvrPaddingBefore: Swift.Int?
             /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/dvrPaddingAfter`.
             public var dvrPaddingAfter: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/commercials`.
+            @frozen public enum CommercialsPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case off = "off"
+                case detect = "detect"
+                case remove = "remove"
+            }
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/commercials`.
+            public var commercials: Components.Schemas.IntegrationSettingsUpdate.CommercialsPayload?
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/dvrDefaultQuotaGb`.
+            public var dvrDefaultQuotaGb: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/dvrQuotaAction`.
+            @frozen public enum DvrQuotaActionPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case block = "block"
+                case deleteOldest = "deleteOldest"
+            }
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/dvrQuotaAction`.
+            public var dvrQuotaAction: Components.Schemas.IntegrationSettingsUpdate.DvrQuotaActionPayload?
+            /// Checked when it changes: it must exist and be writable.
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/dvrFolder`.
+            public var dvrFolder: Swift.String?
             /// Replaces the whole list when sent.
             ///
             /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/liveTvSources`.
@@ -5672,6 +5985,10 @@ extension Components {
             ///   - bazarrApiKey: Bazarr's API key (Settings → General in Bazarr). Write-only.
             ///   - dvrPaddingBefore:
             ///   - dvrPaddingAfter:
+            ///   - commercials:
+            ///   - dvrDefaultQuotaGb:
+            ///   - dvrQuotaAction:
+            ///   - dvrFolder: Checked when it changes: it must exist and be writable.
             ///   - liveTvSources: Replaces the whole list when sent.
             ///   - vodEnabled:
             ///   - vodSources: Replaces the whole list when sent.
@@ -5684,6 +6001,10 @@ extension Components {
                 bazarrApiKey: Swift.String? = nil,
                 dvrPaddingBefore: Swift.Int? = nil,
                 dvrPaddingAfter: Swift.Int? = nil,
+                commercials: Components.Schemas.IntegrationSettingsUpdate.CommercialsPayload? = nil,
+                dvrDefaultQuotaGb: Swift.Int? = nil,
+                dvrQuotaAction: Components.Schemas.IntegrationSettingsUpdate.DvrQuotaActionPayload? = nil,
+                dvrFolder: Swift.String? = nil,
                 liveTvSources: [Components.Schemas.LiveTvSource]? = nil,
                 vodEnabled: Swift.Bool? = nil,
                 vodSources: [Components.Schemas.VodSource]? = nil
@@ -5696,6 +6017,10 @@ extension Components {
                 self.bazarrApiKey = bazarrApiKey
                 self.dvrPaddingBefore = dvrPaddingBefore
                 self.dvrPaddingAfter = dvrPaddingAfter
+                self.commercials = commercials
+                self.dvrDefaultQuotaGb = dvrDefaultQuotaGb
+                self.dvrQuotaAction = dvrQuotaAction
+                self.dvrFolder = dvrFolder
                 self.liveTvSources = liveTvSources
                 self.vodEnabled = vodEnabled
                 self.vodSources = vodSources
@@ -5709,6 +6034,10 @@ extension Components {
                 case bazarrApiKey
                 case dvrPaddingBefore
                 case dvrPaddingAfter
+                case commercials
+                case dvrDefaultQuotaGb
+                case dvrQuotaAction
+                case dvrFolder
                 case liveTvSources
                 case vodEnabled
                 case vodSources
@@ -6183,7 +6512,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ActivityTask/id`.
             public var id: Swift.String
-            /// download: a VOD title being saved to the library (admins).
+            /// download: a VOD title being saved to the library (admins). optimize: a library file being re-encoded by the optimizer (admins).
             ///
             /// - Remark: Generated from `#/components/schemas/ActivityTask/kind`.
             @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -6192,8 +6521,9 @@ extension Components {
                 case stream = "stream"
                 case task = "task"
                 case download = "download"
+                case optimize = "optimize"
             }
-            /// download: a VOD title being saved to the library (admins).
+            /// download: a VOD title being saved to the library (admins). optimize: a library file being re-encoded by the optimizer (admins).
             ///
             /// - Remark: Generated from `#/components/schemas/ActivityTask/kind`.
             public var kind: Components.Schemas.ActivityTask.KindPayload
@@ -6214,7 +6544,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id: Stable id, e.g. scan:3
-            ///   - kind: download: a VOD title being saved to the library (admins).
+            ///   - kind: download: a VOD title being saved to the library (admins). optimize: a library file being re-encoded by the optimizer (admins).
             ///   - title:
             ///   - state:
             ///   - libraryId:
@@ -6877,6 +7207,529 @@ extension Components {
                 case lastReport
             }
         }
+        /// - Remark: Generated from `#/components/schemas/PlexSyncSettings`.
+        public struct PlexSyncSettings: Codable, Hashable, Sendable {
+            /// The Plex server's address, e.g. http://192.168.1.10:32400.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettings/url`.
+            public var url: Swift.String
+            /// A Plex token is saved (it is never returned).
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettings/tokenSet`.
+            public var tokenSet: Swift.Bool
+            /// Automatic sync every intervalMinutes. Off by default; Sync now works either way.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettings/enabled`.
+            public var enabled: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettings/intervalMinutes`.
+            public var intervalMinutes: Swift.Int
+            /// Watched and unwatched, play counts and last played.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettings/watchState`.
+            public var watchState: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettings/ratings`.
+            public var ratings: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettings/resumePositions`.
+            public var resumePositions: Swift.Bool
+            /// Plays recorded in Plex come into Marquee's history. Plays made in Marquee reach Plex as a play at sync time.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettings/playHistory`.
+            public var playHistory: Swift.Bool
+            /// Plex folders and the Marquee folders they correspond to (from the Plex import); empty uses suggested ones.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettings/pathMappings`.
+            public var pathMappings: [Components.Schemas.PlexPathMapping]
+            /// Creates a new `PlexSyncSettings`.
+            ///
+            /// - Parameters:
+            ///   - url: The Plex server's address, e.g. http://192.168.1.10:32400.
+            ///   - tokenSet: A Plex token is saved (it is never returned).
+            ///   - enabled: Automatic sync every intervalMinutes. Off by default; Sync now works either way.
+            ///   - intervalMinutes:
+            ///   - watchState: Watched and unwatched, play counts and last played.
+            ///   - ratings:
+            ///   - resumePositions:
+            ///   - playHistory: Plays recorded in Plex come into Marquee's history. Plays made in Marquee reach Plex as a play at sync time.
+            ///   - pathMappings: Plex folders and the Marquee folders they correspond to (from the Plex import); empty uses suggested ones.
+            public init(
+                url: Swift.String,
+                tokenSet: Swift.Bool,
+                enabled: Swift.Bool,
+                intervalMinutes: Swift.Int,
+                watchState: Swift.Bool,
+                ratings: Swift.Bool,
+                resumePositions: Swift.Bool,
+                playHistory: Swift.Bool,
+                pathMappings: [Components.Schemas.PlexPathMapping]
+            ) {
+                self.url = url
+                self.tokenSet = tokenSet
+                self.enabled = enabled
+                self.intervalMinutes = intervalMinutes
+                self.watchState = watchState
+                self.ratings = ratings
+                self.resumePositions = resumePositions
+                self.playHistory = playHistory
+                self.pathMappings = pathMappings
+            }
+            public enum CodingKeys: String, CodingKey {
+                case url
+                case tokenSet
+                case enabled
+                case intervalMinutes
+                case watchState
+                case ratings
+                case resumePositions
+                case playHistory
+                case pathMappings
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PlexSyncSettingsUpdate`.
+        public struct PlexSyncSettingsUpdate: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettingsUpdate/url`.
+            public var url: Swift.String?
+            /// The server owner's Plex token. An empty string removes it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettingsUpdate/token`.
+            public var token: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettingsUpdate/enabled`.
+            public var enabled: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettingsUpdate/intervalMinutes`.
+            public var intervalMinutes: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettingsUpdate/watchState`.
+            public var watchState: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettingsUpdate/ratings`.
+            public var ratings: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettingsUpdate/resumePositions`.
+            public var resumePositions: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettingsUpdate/playHistory`.
+            public var playHistory: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettingsUpdate/pathMappings`.
+            public var pathMappings: [Components.Schemas.PlexPathMapping]?
+            /// Creates a new `PlexSyncSettingsUpdate`.
+            ///
+            /// - Parameters:
+            ///   - url:
+            ///   - token: The server owner's Plex token. An empty string removes it.
+            ///   - enabled:
+            ///   - intervalMinutes:
+            ///   - watchState:
+            ///   - ratings:
+            ///   - resumePositions:
+            ///   - playHistory:
+            ///   - pathMappings:
+            public init(
+                url: Swift.String? = nil,
+                token: Swift.String? = nil,
+                enabled: Swift.Bool? = nil,
+                intervalMinutes: Swift.Int? = nil,
+                watchState: Swift.Bool? = nil,
+                ratings: Swift.Bool? = nil,
+                resumePositions: Swift.Bool? = nil,
+                playHistory: Swift.Bool? = nil,
+                pathMappings: [Components.Schemas.PlexPathMapping]? = nil
+            ) {
+                self.url = url
+                self.token = token
+                self.enabled = enabled
+                self.intervalMinutes = intervalMinutes
+                self.watchState = watchState
+                self.ratings = ratings
+                self.resumePositions = resumePositions
+                self.playHistory = playHistory
+                self.pathMappings = pathMappings
+            }
+            public enum CodingKeys: String, CodingKey {
+                case url
+                case token
+                case enabled
+                case intervalMinutes
+                case watchState
+                case ratings
+                case resumePositions
+                case playHistory
+                case pathMappings
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PlexSyncUser`.
+        public struct PlexSyncUser: Codable, Hashable, Sendable {
+            /// Plex's account id (1 is the server owner).
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncUser/plexAccountId`.
+            public var plexAccountId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/PlexSyncUser/name`.
+            public var name: Swift.String
+            /// home and managed are Plex Home users; shared are friends the server is shared with.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncUser/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case owner = "owner"
+                case home = "home"
+                case managed = "managed"
+                case shared = "shared"
+                case unknown = "unknown"
+            }
+            /// home and managed are Plex Home users; shared are friends the server is shared with.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncUser/kind`.
+            public var kind: Components.Schemas.PlexSyncUser.KindPayload
+            /// Marquee user it syncs with.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncUser/userId`.
+            public var userId: Swift.Int64?
+            /// As of the last sync or preview.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncUser/canSync`.
+            public var canSync: Swift.Bool
+            /// Why it can't sync, e.g. a friend the owner's token can't act for.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncUser/reason`.
+            public var reason: Swift.String?
+            /// Creates a new `PlexSyncUser`.
+            ///
+            /// - Parameters:
+            ///   - plexAccountId: Plex's account id (1 is the server owner).
+            ///   - name:
+            ///   - kind: home and managed are Plex Home users; shared are friends the server is shared with.
+            ///   - userId: Marquee user it syncs with.
+            ///   - canSync: As of the last sync or preview.
+            ///   - reason: Why it can't sync, e.g. a friend the owner's token can't act for.
+            public init(
+                plexAccountId: Swift.Int64,
+                name: Swift.String,
+                kind: Components.Schemas.PlexSyncUser.KindPayload,
+                userId: Swift.Int64? = nil,
+                canSync: Swift.Bool,
+                reason: Swift.String? = nil
+            ) {
+                self.plexAccountId = plexAccountId
+                self.name = name
+                self.kind = kind
+                self.userId = userId
+                self.canSync = canSync
+                self.reason = reason
+            }
+            public enum CodingKeys: String, CodingKey {
+                case plexAccountId
+                case name
+                case kind
+                case userId
+                case canSync
+                case reason
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PlexSyncChange`.
+        public struct PlexSyncChange: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/PlexSyncChange/direction`.
+            @frozen public enum DirectionPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case toPlex = "toPlex"
+                case toMarquee = "toMarquee"
+            }
+            /// - Remark: Generated from `#/components/schemas/PlexSyncChange/direction`.
+            public var direction: Components.Schemas.PlexSyncChange.DirectionPayload
+            /// Plex account name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncChange/user`.
+            public var user: Swift.String
+            /// - Remark: Generated from `#/components/schemas/PlexSyncChange/title`.
+            public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/PlexSyncChange/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case watched = "watched"
+                case unwatched = "unwatched"
+                case plays = "plays"
+                case lastPlayed = "lastPlayed"
+                case position = "position"
+                case rating = "rating"
+                case history = "history"
+            }
+            /// - Remark: Generated from `#/components/schemas/PlexSyncChange/kind`.
+            public var kind: Components.Schemas.PlexSyncChange.KindPayload
+            /// - Remark: Generated from `#/components/schemas/PlexSyncChange/from`.
+            public var from: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/PlexSyncChange/to`.
+            public var to: Swift.String?
+            /// Changed on both sides since the last sync; the newer change won (ties go to Marquee).
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncChange/conflict`.
+            public var conflict: Swift.Bool?
+            /// Creates a new `PlexSyncChange`.
+            ///
+            /// - Parameters:
+            ///   - direction:
+            ///   - user: Plex account name.
+            ///   - title:
+            ///   - kind:
+            ///   - from:
+            ///   - to:
+            ///   - conflict: Changed on both sides since the last sync; the newer change won (ties go to Marquee).
+            public init(
+                direction: Components.Schemas.PlexSyncChange.DirectionPayload,
+                user: Swift.String,
+                title: Swift.String,
+                kind: Components.Schemas.PlexSyncChange.KindPayload,
+                from: Swift.String? = nil,
+                to: Swift.String? = nil,
+                conflict: Swift.Bool? = nil
+            ) {
+                self.direction = direction
+                self.user = user
+                self.title = title
+                self.kind = kind
+                self.from = from
+                self.to = to
+                self.conflict = conflict
+            }
+            public enum CodingKeys: String, CodingKey {
+                case direction
+                case user
+                case title
+                case kind
+                case from
+                case to
+                case conflict
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PlexSyncReport`.
+        public struct PlexSyncReport: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/PlexSyncReport/startedAt`.
+            public var startedAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/PlexSyncReport/finishedAt`.
+            public var finishedAt: Foundation.Date
+            /// A preview; nothing was changed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncReport/dryRun`.
+            public var dryRun: Swift.Bool
+            /// Plex wasn't reachable, so nothing changed; the sync tries again at the next run.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncReport/waiting`.
+            public var waiting: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/PlexSyncReport/toPlex`.
+            public var toPlex: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/PlexSyncReport/toMarquee`.
+            public var toMarquee: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/PlexSyncReport/historyPulled`.
+            public var historyPulled: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/PlexSyncReport/conflicts`.
+            public var conflicts: Swift.Int
+            /// Changes that can't be made in Plex, e.g. a resume position past 90%.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncReport/skipped`.
+            public var skipped: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/PlexSyncReport/failed`.
+            public var failed: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/PlexSyncReport/unchanged`.
+            public var unchanged: Swift.Int
+            /// Plex items whose files Marquee doesn't have.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncReport/notInMarquee`.
+            public var notInMarquee: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/PlexSyncReport/usersSynced`.
+            public var usersSynced: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/PlexSyncReport/changes`.
+            public var changes: [Components.Schemas.PlexSyncChange]
+            /// - Remark: Generated from `#/components/schemas/PlexSyncReport/changesTruncated`.
+            public var changesTruncated: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/PlexSyncReport/errors`.
+            public var errors: [Swift.String]
+            /// Creates a new `PlexSyncReport`.
+            ///
+            /// - Parameters:
+            ///   - startedAt:
+            ///   - finishedAt:
+            ///   - dryRun: A preview; nothing was changed.
+            ///   - waiting: Plex wasn't reachable, so nothing changed; the sync tries again at the next run.
+            ///   - toPlex:
+            ///   - toMarquee:
+            ///   - historyPulled:
+            ///   - conflicts:
+            ///   - skipped: Changes that can't be made in Plex, e.g. a resume position past 90%.
+            ///   - failed:
+            ///   - unchanged:
+            ///   - notInMarquee: Plex items whose files Marquee doesn't have.
+            ///   - usersSynced:
+            ///   - changes:
+            ///   - changesTruncated:
+            ///   - errors:
+            public init(
+                startedAt: Foundation.Date,
+                finishedAt: Foundation.Date,
+                dryRun: Swift.Bool,
+                waiting: Swift.Bool,
+                toPlex: Swift.Int,
+                toMarquee: Swift.Int,
+                historyPulled: Swift.Int,
+                conflicts: Swift.Int,
+                skipped: Swift.Int,
+                failed: Swift.Int,
+                unchanged: Swift.Int,
+                notInMarquee: Swift.Int,
+                usersSynced: Swift.Int,
+                changes: [Components.Schemas.PlexSyncChange],
+                changesTruncated: Swift.Bool,
+                errors: [Swift.String]
+            ) {
+                self.startedAt = startedAt
+                self.finishedAt = finishedAt
+                self.dryRun = dryRun
+                self.waiting = waiting
+                self.toPlex = toPlex
+                self.toMarquee = toMarquee
+                self.historyPulled = historyPulled
+                self.conflicts = conflicts
+                self.skipped = skipped
+                self.failed = failed
+                self.unchanged = unchanged
+                self.notInMarquee = notInMarquee
+                self.usersSynced = usersSynced
+                self.changes = changes
+                self.changesTruncated = changesTruncated
+                self.errors = errors
+            }
+            public enum CodingKeys: String, CodingKey {
+                case startedAt
+                case finishedAt
+                case dryRun
+                case waiting
+                case toPlex
+                case toMarquee
+                case historyPulled
+                case conflicts
+                case skipped
+                case failed
+                case unchanged
+                case notInMarquee
+                case usersSynced
+                case changes
+                case changesTruncated
+                case errors
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PlexSyncStatus`.
+        public struct PlexSyncStatus: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/PlexSyncStatus/settings`.
+            public var settings: Components.Schemas.PlexSyncSettings
+            /// A sync or preview is running.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncStatus/running`.
+            public var running: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/PlexSyncStatus/progress`.
+            public struct ProgressPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/PlexSyncStatus/progress/step`.
+                public var step: Swift.String
+                /// - Remark: Generated from `#/components/schemas/PlexSyncStatus/progress/done`.
+                public var done: Swift.Int
+                /// - Remark: Generated from `#/components/schemas/PlexSyncStatus/progress/total`.
+                public var total: Swift.Int
+                /// Creates a new `ProgressPayload`.
+                ///
+                /// - Parameters:
+                ///   - step:
+                ///   - done:
+                ///   - total:
+                public init(
+                    step: Swift.String,
+                    done: Swift.Int,
+                    total: Swift.Int
+                ) {
+                    self.step = step
+                    self.done = done
+                    self.total = total
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case step
+                    case done
+                    case total
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/PlexSyncStatus/progress`.
+            public var progress: Components.Schemas.PlexSyncStatus.ProgressPayload?
+            /// Plex answers with the token (checked at most once a minute); absent until a server and token are set.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncStatus/reachable`.
+            public var reachable: Swift.Bool?
+            /// Why the last sync failed, e.g. Plex rejected the token.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncStatus/lastError`.
+            public var lastError: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/PlexSyncStatus/lastRun`.
+            public var lastRun: Components.Schemas.PlexSyncReport?
+            /// When automatic sync runs next; absent while it's off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncStatus/nextRunAt`.
+            public var nextRunAt: Foundation.Date?
+            /// - Remark: Generated from `#/components/schemas/PlexSyncStatus/users`.
+            public var users: [Components.Schemas.PlexSyncUser]
+            /// Creates a new `PlexSyncStatus`.
+            ///
+            /// - Parameters:
+            ///   - settings:
+            ///   - running: A sync or preview is running.
+            ///   - progress:
+            ///   - reachable: Plex answers with the token (checked at most once a minute); absent until a server and token are set.
+            ///   - lastError: Why the last sync failed, e.g. Plex rejected the token.
+            ///   - lastRun:
+            ///   - nextRunAt: When automatic sync runs next; absent while it's off.
+            ///   - users:
+            public init(
+                settings: Components.Schemas.PlexSyncSettings,
+                running: Swift.Bool,
+                progress: Components.Schemas.PlexSyncStatus.ProgressPayload? = nil,
+                reachable: Swift.Bool? = nil,
+                lastError: Swift.String? = nil,
+                lastRun: Components.Schemas.PlexSyncReport? = nil,
+                nextRunAt: Foundation.Date? = nil,
+                users: [Components.Schemas.PlexSyncUser]
+            ) {
+                self.settings = settings
+                self.running = running
+                self.progress = progress
+                self.reachable = reachable
+                self.lastError = lastError
+                self.lastRun = lastRun
+                self.nextRunAt = nextRunAt
+                self.users = users
+            }
+            public enum CodingKeys: String, CodingKey {
+                case settings
+                case running
+                case progress
+                case reachable
+                case lastError
+                case lastRun
+                case nextRunAt
+                case users
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PlexSignIn`.
+        public struct PlexSignIn: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/PlexSignIn/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/PlexSignIn/code`.
+            public var code: Swift.String
+            /// - Remark: Generated from `#/components/schemas/PlexSignIn/authUrl`.
+            public var authUrl: Swift.String
+            /// Creates a new `PlexSignIn`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - code:
+            ///   - authUrl:
+            public init(
+                id: Swift.Int64,
+                code: Swift.String,
+                authUrl: Swift.String
+            ) {
+                self.id = id
+                self.code = code
+                self.authUrl = authUrl
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case code
+                case authUrl
+            }
+        }
         /// What the client can play. Codec names follow ffprobe (h264, hevc, av1, vp9, aac, ac3, eac3, opus, flac, mp3…).
         ///
         /// - Remark: Generated from `#/components/schemas/DeviceProfile`.
@@ -7207,6 +8060,107 @@ extension Components {
                 case kind
                 case startMs
                 case endMs
+            }
+        }
+        /// A commercial break in a Live TV recording, in milliseconds from the start of the original recording. Once cut, what was actually removed (aligned to keyframes).
+        ///
+        /// - Remark: Generated from `#/components/schemas/CommercialBreak`.
+        public struct CommercialBreak: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/CommercialBreak/startMs`.
+            public var startMs: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/CommercialBreak/endMs`.
+            public var endMs: Swift.Int64
+            /// Creates a new `CommercialBreak`.
+            ///
+            /// - Parameters:
+            ///   - startMs:
+            ///   - endMs:
+            public init(
+                startMs: Swift.Int64,
+                endMs: Swift.Int64
+            ) {
+                self.startMs = startMs
+                self.endMs = endMs
+            }
+            public enum CodingKeys: String, CodingKey {
+                case startMs
+                case endMs
+            }
+        }
+        /// Admins only: commercials in a recording. pending = not checked yet; queued/running = being checked or cut; detected = found (breaks may be empty), file unchanged; waiting = to be cut once nobody is watching it; cut = removed from the file (removedMs); restored = the original was put back; failed = see error.
+        ///
+        /// - Remark: Generated from `#/components/schemas/CommercialScan`.
+        public struct CommercialScan: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/CommercialScan/status`.
+            @frozen public enum StatusPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case pending = "pending"
+                case queued = "queued"
+                case running = "running"
+                case detected = "detected"
+                case waiting = "waiting"
+                case cut = "cut"
+                case restored = "restored"
+                case failed = "failed"
+            }
+            /// - Remark: Generated from `#/components/schemas/CommercialScan/status`.
+            public var status: Components.Schemas.CommercialScan.StatusPayload
+            /// - Remark: Generated from `#/components/schemas/CommercialScan/breaks`.
+            public var breaks: [Components.Schemas.CommercialBreak]
+            /// With cut: how much was removed in all.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CommercialScan/removedMs`.
+            public var removedMs: Swift.Int64?
+            /// With failed, why.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CommercialScan/error`.
+            public var error: Swift.String?
+            /// When it was last checked or cut.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CommercialScan/scannedAt`.
+            public var scannedAt: Foundation.Date?
+            /// The original is still in the media trash, so it can be put back.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CommercialScan/canRestore`.
+            public var canRestore: Swift.Bool?
+            /// Comskip is in this server's build, so commercials can be removed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CommercialScan/available`.
+            public var available: Swift.Bool?
+            /// Creates a new `CommercialScan`.
+            ///
+            /// - Parameters:
+            ///   - status:
+            ///   - breaks:
+            ///   - removedMs: With cut: how much was removed in all.
+            ///   - error: With failed, why.
+            ///   - scannedAt: When it was last checked or cut.
+            ///   - canRestore: The original is still in the media trash, so it can be put back.
+            ///   - available: Comskip is in this server's build, so commercials can be removed.
+            public init(
+                status: Components.Schemas.CommercialScan.StatusPayload,
+                breaks: [Components.Schemas.CommercialBreak],
+                removedMs: Swift.Int64? = nil,
+                error: Swift.String? = nil,
+                scannedAt: Foundation.Date? = nil,
+                canRestore: Swift.Bool? = nil,
+                available: Swift.Bool? = nil
+            ) {
+                self.status = status
+                self.breaks = breaks
+                self.removedMs = removedMs
+                self.error = error
+                self.scannedAt = scannedAt
+                self.canRestore = canRestore
+                self.available = available
+            }
+            public enum CodingKeys: String, CodingKey {
+                case status
+                case breaks
+                case removedMs
+                case error
+                case scannedAt
+                case canRestore
+                case available
             }
         }
         /// - Remark: Generated from `#/components/schemas/PlaybackSession`.
@@ -12193,6 +13147,750 @@ extension Components {
                 case path
                 case parent
                 case entries
+            }
+        }
+        /// A movie or episode file in the Large files list.
+        ///
+        /// - Remark: Generated from `#/components/schemas/LargeFile`.
+        public struct LargeFile: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LargeFile/fileId`.
+            public var fileId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/LargeFile/itemId`.
+            public var itemId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/LargeFile/title`.
+            public var title: Swift.String
+            /// The show and episode number, or the year.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LargeFile/subtitle`.
+            public var subtitle: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/LargeFile/type`.
+            @frozen public enum _TypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case movie = "movie"
+                case episode = "episode"
+            }
+            /// - Remark: Generated from `#/components/schemas/LargeFile/type`.
+            public var _type: Components.Schemas.LargeFile._TypePayload
+            /// - Remark: Generated from `#/components/schemas/LargeFile/path`.
+            public var path: Swift.String
+            /// Bytes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LargeFile/size`.
+            public var size: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/LargeFile/width`.
+            public var width: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/LargeFile/height`.
+            public var height: Swift.Int
+            /// FFprobe's name, e.g. h264, hevc, vc1.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LargeFile/videoCodec`.
+            public var videoCodec: Swift.String
+            /// HDR format (hdr10, hlg, dolby_vision, …); empty for SDR.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LargeFile/hdr`.
+            public var hdr: Swift.String
+            /// - Remark: Generated from `#/components/schemas/LargeFile/bitrateKbps`.
+            public var bitrateKbps: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/LargeFile/durationMs`.
+            public var durationMs: Swift.Int64
+            /// About how big it would be after the preset asked for.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LargeFile/estimatedSize`.
+            public var estimatedSize: Swift.Int64
+            /// The file's latest optimizer job, if any.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LargeFile/jobId`.
+            public var jobId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/LargeFile/jobState`.
+            public var jobState: Components.Schemas.OptimizeJobState?
+            /// Creates a new `LargeFile`.
+            ///
+            /// - Parameters:
+            ///   - fileId:
+            ///   - itemId:
+            ///   - title:
+            ///   - subtitle: The show and episode number, or the year.
+            ///   - _type:
+            ///   - path:
+            ///   - size: Bytes.
+            ///   - width:
+            ///   - height:
+            ///   - videoCodec: FFprobe's name, e.g. h264, hevc, vc1.
+            ///   - hdr: HDR format (hdr10, hlg, dolby_vision, …); empty for SDR.
+            ///   - bitrateKbps:
+            ///   - durationMs:
+            ///   - estimatedSize: About how big it would be after the preset asked for.
+            ///   - jobId: The file's latest optimizer job, if any.
+            ///   - jobState:
+            public init(
+                fileId: Swift.Int64,
+                itemId: Swift.Int64,
+                title: Swift.String,
+                subtitle: Swift.String? = nil,
+                _type: Components.Schemas.LargeFile._TypePayload,
+                path: Swift.String,
+                size: Swift.Int64,
+                width: Swift.Int,
+                height: Swift.Int,
+                videoCodec: Swift.String,
+                hdr: Swift.String,
+                bitrateKbps: Swift.Int,
+                durationMs: Swift.Int64,
+                estimatedSize: Swift.Int64,
+                jobId: Swift.Int64? = nil,
+                jobState: Components.Schemas.OptimizeJobState? = nil
+            ) {
+                self.fileId = fileId
+                self.itemId = itemId
+                self.title = title
+                self.subtitle = subtitle
+                self._type = _type
+                self.path = path
+                self.size = size
+                self.width = width
+                self.height = height
+                self.videoCodec = videoCodec
+                self.hdr = hdr
+                self.bitrateKbps = bitrateKbps
+                self.durationMs = durationMs
+                self.estimatedSize = estimatedSize
+                self.jobId = jobId
+                self.jobState = jobState
+            }
+            public enum CodingKeys: String, CodingKey {
+                case fileId
+                case itemId
+                case title
+                case subtitle
+                case _type = "type"
+                case path
+                case size
+                case width
+                case height
+                case videoCodec
+                case hdr
+                case bitrateKbps
+                case durationMs
+                case estimatedSize
+                case jobId
+                case jobState
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/LargeFilePage`.
+        public struct LargeFilePage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LargeFilePage/items`.
+            public var items: [Components.Schemas.LargeFile]
+            /// Files matching the filters.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LargeFilePage/total`.
+            public var total: Swift.Int
+            /// Bytes, all matching files.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LargeFilePage/totalSize`.
+            public var totalSize: Swift.Int64
+            /// About how big all matching files would be after the preset.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LargeFilePage/estimatedSize`.
+            public var estimatedSize: Swift.Int64
+            /// Creates a new `LargeFilePage`.
+            ///
+            /// - Parameters:
+            ///   - items:
+            ///   - total: Files matching the filters.
+            ///   - totalSize: Bytes, all matching files.
+            ///   - estimatedSize: About how big all matching files would be after the preset.
+            public init(
+                items: [Components.Schemas.LargeFile],
+                total: Swift.Int,
+                totalSize: Swift.Int64,
+                estimatedSize: Swift.Int64
+            ) {
+                self.items = items
+                self.total = total
+                self.totalSize = totalSize
+                self.estimatedSize = estimatedSize
+            }
+            public enum CodingKeys: String, CodingKey {
+                case items
+                case total
+                case totalSize
+                case estimatedSize
+            }
+        }
+        /// verifying = the new file is being checked (or waits for nobody to be watching before it's swapped in); done = optimized, the original is in the media trash; skipped = not worth it (see error); restored = the original was put back.
+        ///
+        /// - Remark: Generated from `#/components/schemas/OptimizeJobState`.
+        @frozen public enum OptimizeJobState: String, Codable, Hashable, Sendable, CaseIterable {
+            case queued = "queued"
+            case running = "running"
+            case verifying = "verifying"
+            case done = "done"
+            case failed = "failed"
+            case cancelled = "cancelled"
+            case skipped = "skipped"
+            case restored = "restored"
+        }
+        /// - Remark: Generated from `#/components/schemas/OptimizeJob`.
+        public struct OptimizeJob: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/fileId`.
+            public var fileId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/itemId`.
+            public var itemId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/title`.
+            public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/path`.
+            public var path: Swift.String
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/presetId`.
+            public var presetId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/presetName`.
+            public var presetName: Swift.String
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/state`.
+            public var state: Components.Schemas.OptimizeJobState
+            /// 0–1.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/progress`.
+            public var progress: Swift.Double
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/fps`.
+            public var fps: Swift.Double?
+            /// × real time.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/speed`.
+            public var speed: Swift.Double?
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/etaSeconds`.
+            public var etaSeconds: Swift.Int64?
+            /// nvenc, qsv or software.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/encoder`.
+            public var encoder: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/beforeSize`.
+            public var beforeSize: Swift.Int64
+            /// The new file's size (also for a skipped job, showing why).
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/afterSize`.
+            public var afterSize: Swift.Int64
+            /// Why it failed or was skipped.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/error`.
+            public var error: Swift.String?
+            /// Why it's waiting (paused while someone is watching, outside the maintenance window, waiting for a viewer to stop before the swap).
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/paused`.
+            public var paused: Swift.String?
+            /// The original is still in the media trash.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/canRestore`.
+            public var canRestore: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/createdAt`.
+            public var createdAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/startedAt`.
+            public var startedAt: Foundation.Date?
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/finishedAt`.
+            public var finishedAt: Foundation.Date?
+            /// Creates a new `OptimizeJob`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - fileId:
+            ///   - itemId:
+            ///   - title:
+            ///   - path:
+            ///   - presetId:
+            ///   - presetName:
+            ///   - state:
+            ///   - progress: 0–1.
+            ///   - fps:
+            ///   - speed: × real time.
+            ///   - etaSeconds:
+            ///   - encoder: nvenc, qsv or software.
+            ///   - beforeSize:
+            ///   - afterSize: The new file's size (also for a skipped job, showing why).
+            ///   - error: Why it failed or was skipped.
+            ///   - paused: Why it's waiting (paused while someone is watching, outside the maintenance window, waiting for a viewer to stop before the swap).
+            ///   - canRestore: The original is still in the media trash.
+            ///   - createdAt:
+            ///   - startedAt:
+            ///   - finishedAt:
+            public init(
+                id: Swift.Int64,
+                fileId: Swift.Int64? = nil,
+                itemId: Swift.Int64? = nil,
+                title: Swift.String,
+                path: Swift.String,
+                presetId: Swift.String,
+                presetName: Swift.String,
+                state: Components.Schemas.OptimizeJobState,
+                progress: Swift.Double,
+                fps: Swift.Double? = nil,
+                speed: Swift.Double? = nil,
+                etaSeconds: Swift.Int64? = nil,
+                encoder: Swift.String? = nil,
+                beforeSize: Swift.Int64,
+                afterSize: Swift.Int64,
+                error: Swift.String? = nil,
+                paused: Swift.String? = nil,
+                canRestore: Swift.Bool,
+                createdAt: Foundation.Date,
+                startedAt: Foundation.Date? = nil,
+                finishedAt: Foundation.Date? = nil
+            ) {
+                self.id = id
+                self.fileId = fileId
+                self.itemId = itemId
+                self.title = title
+                self.path = path
+                self.presetId = presetId
+                self.presetName = presetName
+                self.state = state
+                self.progress = progress
+                self.fps = fps
+                self.speed = speed
+                self.etaSeconds = etaSeconds
+                self.encoder = encoder
+                self.beforeSize = beforeSize
+                self.afterSize = afterSize
+                self.error = error
+                self.paused = paused
+                self.canRestore = canRestore
+                self.createdAt = createdAt
+                self.startedAt = startedAt
+                self.finishedAt = finishedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case fileId
+                case itemId
+                case title
+                case path
+                case presetId
+                case presetName
+                case state
+                case progress
+                case fps
+                case speed
+                case etaSeconds
+                case encoder
+                case beforeSize
+                case afterSize
+                case error
+                case paused
+                case canRestore
+                case createdAt
+                case startedAt
+                case finishedAt
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/OptimizeJobPage`.
+        public struct OptimizeJobPage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/OptimizeJobPage/items`.
+            public var items: [Components.Schemas.OptimizeJob]
+            /// - Remark: Generated from `#/components/schemas/OptimizeJobPage/total`.
+            public var total: Swift.Int
+            /// Space saved by every optimized file (not restored).
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeJobPage/savedBytes`.
+            public var savedBytes: Swift.Int64
+            /// How many files are optimized.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeJobPage/optimized`.
+            public var optimized: Swift.Int
+            /// Why the queue isn't running now, if it isn't.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeJobPage/paused`.
+            public var paused: Swift.String?
+            /// Creates a new `OptimizeJobPage`.
+            ///
+            /// - Parameters:
+            ///   - items:
+            ///   - total:
+            ///   - savedBytes: Space saved by every optimized file (not restored).
+            ///   - optimized: How many files are optimized.
+            ///   - paused: Why the queue isn't running now, if it isn't.
+            public init(
+                items: [Components.Schemas.OptimizeJob],
+                total: Swift.Int,
+                savedBytes: Swift.Int64,
+                optimized: Swift.Int,
+                paused: Swift.String? = nil
+            ) {
+                self.items = items
+                self.total = total
+                self.savedBytes = savedBytes
+                self.optimized = optimized
+                self.paused = paused
+            }
+            public enum CodingKeys: String, CodingKey {
+                case items
+                case total
+                case savedBytes
+                case optimized
+                case paused
+            }
+        }
+        /// The Large files filters (as the list's query parameters).
+        ///
+        /// - Remark: Generated from `#/components/schemas/OptimizeFilter`.
+        public struct OptimizeFilter: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/OptimizeFilter/libraryId`.
+            public var libraryId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/OptimizeFilter/type`.
+            @frozen public enum _TypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case movie = "movie"
+                case episode = "episode"
+            }
+            /// - Remark: Generated from `#/components/schemas/OptimizeFilter/type`.
+            public var _type: Components.Schemas.OptimizeFilter._TypePayload?
+            /// - Remark: Generated from `#/components/schemas/OptimizeFilter/minSizeGb`.
+            public var minSizeGb: Swift.Double?
+            /// - Remark: Generated from `#/components/schemas/OptimizeFilter/minBitrateMbps`.
+            public var minBitrateMbps: Swift.Double?
+            /// - Remark: Generated from `#/components/schemas/OptimizeFilter/resolution`.
+            @frozen public enum ResolutionPayload: Int, Codable, Hashable, Sendable, CaseIterable {
+                case _2160 = 2160
+                case _1080 = 1080
+                case _720 = 720
+                case _480 = 480
+            }
+            /// - Remark: Generated from `#/components/schemas/OptimizeFilter/resolution`.
+            public var resolution: Components.Schemas.OptimizeFilter.ResolutionPayload?
+            /// - Remark: Generated from `#/components/schemas/OptimizeFilter/codecs`.
+            public var codecs: [Swift.String]?
+            /// - Remark: Generated from `#/components/schemas/OptimizeFilter/hdr`.
+            @frozen public enum HdrPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case yes = "yes"
+                case no = "no"
+            }
+            /// - Remark: Generated from `#/components/schemas/OptimizeFilter/hdr`.
+            public var hdr: Components.Schemas.OptimizeFilter.HdrPayload?
+            /// Creates a new `OptimizeFilter`.
+            ///
+            /// - Parameters:
+            ///   - libraryId:
+            ///   - _type:
+            ///   - minSizeGb:
+            ///   - minBitrateMbps:
+            ///   - resolution:
+            ///   - codecs:
+            ///   - hdr:
+            public init(
+                libraryId: Swift.Int64? = nil,
+                _type: Components.Schemas.OptimizeFilter._TypePayload? = nil,
+                minSizeGb: Swift.Double? = nil,
+                minBitrateMbps: Swift.Double? = nil,
+                resolution: Components.Schemas.OptimizeFilter.ResolutionPayload? = nil,
+                codecs: [Swift.String]? = nil,
+                hdr: Components.Schemas.OptimizeFilter.HdrPayload? = nil
+            ) {
+                self.libraryId = libraryId
+                self._type = _type
+                self.minSizeGb = minSizeGb
+                self.minBitrateMbps = minBitrateMbps
+                self.resolution = resolution
+                self.codecs = codecs
+                self.hdr = hdr
+            }
+            public enum CodingKeys: String, CodingKey {
+                case libraryId
+                case _type = "type"
+                case minSizeGb
+                case minBitrateMbps
+                case resolution
+                case codecs
+                case hdr
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/OptimizeQueueRequest`.
+        public struct OptimizeQueueRequest: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/OptimizeQueueRequest/presetId`.
+            public var presetId: Swift.String
+            /// The files to queue; or
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeQueueRequest/fileIds`.
+            public var fileIds: [Swift.Int64]?
+            /// - Remark: Generated from `#/components/schemas/OptimizeQueueRequest/filter`.
+            public var filter: Components.Schemas.OptimizeFilter?
+            /// Creates a new `OptimizeQueueRequest`.
+            ///
+            /// - Parameters:
+            ///   - presetId:
+            ///   - fileIds: The files to queue; or
+            ///   - filter:
+            public init(
+                presetId: Swift.String,
+                fileIds: [Swift.Int64]? = nil,
+                filter: Components.Schemas.OptimizeFilter? = nil
+            ) {
+                self.presetId = presetId
+                self.fileIds = fileIds
+                self.filter = filter
+            }
+            public enum CodingKeys: String, CodingKey {
+                case presetId
+                case fileIds
+                case filter
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/OptimizeQueueResult`.
+        public struct OptimizeQueueResult: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/OptimizeQueueResult/queued`.
+            public var queued: Swift.Int
+            /// Already queued, or not an available movie or episode.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeQueueResult/skipped`.
+            public var skipped: Swift.Int
+            /// Creates a new `OptimizeQueueResult`.
+            ///
+            /// - Parameters:
+            ///   - queued:
+            ///   - skipped: Already queued, or not an available movie or episode.
+            public init(
+                queued: Swift.Int,
+                skipped: Swift.Int
+            ) {
+                self.queued = queued
+                self.skipped = skipped
+            }
+            public enum CodingKeys: String, CodingKey {
+                case queued
+                case skipped
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/OptimizePreset`.
+        public struct OptimizePreset: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/name`.
+            public var name: Swift.String
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/builtIn`.
+            public var builtIn: Swift.Bool?
+            /// Resolution cap (never upscaled; letterboxed films fit the frame by width); 0 keeps it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/maxHeight`.
+            @frozen public enum MaxHeightPayload: Int, Codable, Hashable, Sendable, CaseIterable {
+                case _0 = 0
+                case _2160 = 2160
+                case _1080 = 1080
+                case _720 = 720
+                case _480 = 480
+            }
+            /// Resolution cap (never upscaled; letterboxed films fit the frame by width); 0 keeps it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/maxHeight`.
+            public var maxHeight: Components.Schemas.OptimizePreset.MaxHeightPayload
+            /// AV1 only when the server has an AV1 encoder (av1Available).
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/codec`.
+            @frozen public enum CodecPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case hevc = "hevc"
+                case h264 = "h264"
+                case av1 = "av1"
+            }
+            /// AV1 only when the server has an AV1 encoder (av1Available).
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/codec`.
+            public var codec: Components.Schemas.OptimizePreset.CodecPayload
+            /// Constant-quality level, unless videoKbps is set.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/quality`.
+            @frozen public enum QualityPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case high = "high"
+                case balanced = "balanced"
+                case small = "small"
+            }
+            /// Constant-quality level, unless videoKbps is set.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/quality`.
+            public var quality: Components.Schemas.OptimizePreset.QualityPayload
+            /// A target video bitrate instead of a quality; 0 = use the quality.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/videoKbps`.
+            public var videoKbps: Swift.Int?
+            /// copy = every track as it is; default = only the default track, as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1).
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/audio`.
+            @frozen public enum AudioPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case copy = "copy"
+                case _default = "default"
+                case aacStereo = "aac_stereo"
+                case aac51 = "aac_51"
+            }
+            /// copy = every track as it is; default = only the default track, as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1).
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/audio`.
+            public var audio: Components.Schemas.OptimizePreset.AudioPayload
+            /// Leave out commentary tracks.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/dropCommentary`.
+            public var dropCommentary: Swift.Bool?
+            /// Picture subtitles (PGS, VobSub); text subtitles are always kept. MP4 files can't hold picture subtitles.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/imageSubtitles`.
+            @frozen public enum ImageSubtitlesPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case keep = "keep"
+                case drop = "drop"
+            }
+            /// Picture subtitles (PGS, VobSub); text subtitles are always kept. MP4 files can't hold picture subtitles.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/imageSubtitles`.
+            public var imageSubtitles: Components.Schemas.OptimizePreset.ImageSubtitlesPayload
+            /// keep = HDR stays HDR (10-bit HEVC or AV1; H.264 always tone-maps); tonemap = converted to SDR.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/hdr`.
+            @frozen public enum HdrPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case keep = "keep"
+                case tonemap = "tonemap"
+            }
+            /// keep = HDR stays HDR (10-bit HEVC or AV1; H.264 always tone-maps); tonemap = converted to SDR.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/hdr`.
+            public var hdr: Components.Schemas.OptimizePreset.HdrPayload
+            /// Creates a new `OptimizePreset`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - name:
+            ///   - builtIn:
+            ///   - maxHeight: Resolution cap (never upscaled; letterboxed films fit the frame by width); 0 keeps it.
+            ///   - codec: AV1 only when the server has an AV1 encoder (av1Available).
+            ///   - quality: Constant-quality level, unless videoKbps is set.
+            ///   - videoKbps: A target video bitrate instead of a quality; 0 = use the quality.
+            ///   - audio: copy = every track as it is; default = only the default track, as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1).
+            ///   - dropCommentary: Leave out commentary tracks.
+            ///   - imageSubtitles: Picture subtitles (PGS, VobSub); text subtitles are always kept. MP4 files can't hold picture subtitles.
+            ///   - hdr: keep = HDR stays HDR (10-bit HEVC or AV1; H.264 always tone-maps); tonemap = converted to SDR.
+            public init(
+                id: Swift.String,
+                name: Swift.String,
+                builtIn: Swift.Bool? = nil,
+                maxHeight: Components.Schemas.OptimizePreset.MaxHeightPayload,
+                codec: Components.Schemas.OptimizePreset.CodecPayload,
+                quality: Components.Schemas.OptimizePreset.QualityPayload,
+                videoKbps: Swift.Int? = nil,
+                audio: Components.Schemas.OptimizePreset.AudioPayload,
+                dropCommentary: Swift.Bool? = nil,
+                imageSubtitles: Components.Schemas.OptimizePreset.ImageSubtitlesPayload,
+                hdr: Components.Schemas.OptimizePreset.HdrPayload
+            ) {
+                self.id = id
+                self.name = name
+                self.builtIn = builtIn
+                self.maxHeight = maxHeight
+                self.codec = codec
+                self.quality = quality
+                self.videoKbps = videoKbps
+                self.audio = audio
+                self.dropCommentary = dropCommentary
+                self.imageSubtitles = imageSubtitles
+                self.hdr = hdr
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case name
+                case builtIn
+                case maxHeight
+                case codec
+                case quality
+                case videoKbps
+                case audio
+                case dropCommentary
+                case imageSubtitles
+                case hdr
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/OptimizeSettings`.
+        public struct OptimizeSettings: Codable, Hashable, Sendable {
+            /// Custom presets (built-in ones sent back are ignored).
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeSettings/presets`.
+            public var presets: [Components.Schemas.OptimizePreset]
+            /// - Remark: Generated from `#/components/schemas/OptimizeSettings/defaultPreset`.
+            public var defaultPreset: Swift.String
+            /// Files optimized at once. Default 1.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeSettings/concurrency`.
+            public var concurrency: Swift.Int
+            /// A new file replaces the original only when it's at least this much smaller; otherwise it's thrown away and the job skipped. Default 20.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeSettings/minSavingsPercent`.
+            public var minSavingsPercent: Swift.Int
+            /// Pause while anyone is watching anything, resuming about 15 s after. Default on.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeSettings/pauseWhileWatching`.
+            public var pauseWhileWatching: Swift.Bool
+            /// Only run inside the maintenance window.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeSettings/windowOnly`.
+            public var windowOnly: Swift.Bool
+            /// The queue is paused by an admin.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeSettings/paused`.
+            public var paused: Swift.Bool
+            /// Creates a new `OptimizeSettings`.
+            ///
+            /// - Parameters:
+            ///   - presets: Custom presets (built-in ones sent back are ignored).
+            ///   - defaultPreset:
+            ///   - concurrency: Files optimized at once. Default 1.
+            ///   - minSavingsPercent: A new file replaces the original only when it's at least this much smaller; otherwise it's thrown away and the job skipped. Default 20.
+            ///   - pauseWhileWatching: Pause while anyone is watching anything, resuming about 15 s after. Default on.
+            ///   - windowOnly: Only run inside the maintenance window.
+            ///   - paused: The queue is paused by an admin.
+            public init(
+                presets: [Components.Schemas.OptimizePreset],
+                defaultPreset: Swift.String,
+                concurrency: Swift.Int,
+                minSavingsPercent: Swift.Int,
+                pauseWhileWatching: Swift.Bool,
+                windowOnly: Swift.Bool,
+                paused: Swift.Bool
+            ) {
+                self.presets = presets
+                self.defaultPreset = defaultPreset
+                self.concurrency = concurrency
+                self.minSavingsPercent = minSavingsPercent
+                self.pauseWhileWatching = pauseWhileWatching
+                self.windowOnly = windowOnly
+                self.paused = paused
+            }
+            public enum CodingKeys: String, CodingKey {
+                case presets
+                case defaultPreset
+                case concurrency
+                case minSavingsPercent
+                case pauseWhileWatching
+                case windowOnly
+                case paused
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/OptimizeConfig`.
+        public struct OptimizeConfig: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/OptimizeConfig/settings`.
+            public var settings: Components.Schemas.OptimizeSettings
+            /// Every preset, built-in first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeConfig/presets`.
+            public var presets: [Components.Schemas.OptimizePreset]
+            /// - Remark: Generated from `#/components/schemas/OptimizeConfig/av1Available`.
+            public var av1Available: Swift.Bool
+            /// Creates a new `OptimizeConfig`.
+            ///
+            /// - Parameters:
+            ///   - settings:
+            ///   - presets: Every preset, built-in first.
+            ///   - av1Available:
+            public init(
+                settings: Components.Schemas.OptimizeSettings,
+                presets: [Components.Schemas.OptimizePreset],
+                av1Available: Swift.Bool
+            ) {
+                self.settings = settings
+                self.presets = presets
+                self.av1Available = av1Available
+            }
+            public enum CodingKeys: String, CodingKey {
+                case settings
+                case presets
+                case av1Available
             }
         }
     }

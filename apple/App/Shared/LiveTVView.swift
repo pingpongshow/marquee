@@ -18,6 +18,8 @@ struct LiveTVView: View {
     @State private var error: String?
     @State private var enabled: Bool?
     @State private var canRecord = false
+    /// May see the Recordings tab (separate from recording since LIVE-5 sharing).
+    @State private var canViewRecordings = false
     /// Why the Live TV status couldn't be read (not the same as "not set up").
     @State private var statusError: String?
     /// Bumped by pull-to-refresh on the Recordings tab.
@@ -28,7 +30,7 @@ struct LiveTVView: View {
     }
 
     private var tabs: [Tab] {
-        canRecord ? [.guide, .now, .recordings] : [.guide, .now]
+        canViewRecordings ? [.guide, .now, .recordings] : [.guide, .now]
     }
 
     static func defaultStart() -> Date {
@@ -78,6 +80,7 @@ struct LiveTVView: View {
             let status = try await app.liveStatus()
             enabled = status.enabled
             canRecord = status.canRecord ?? false
+            canViewRecordings = status.mayViewRecordings
             statusError = nil
             if !tabs.contains(tab) { tab = .guide }
             guard enabled == true else { return }
@@ -112,7 +115,7 @@ struct LiveTVView: View {
         #endif
         if let error { Text(error).foregroundStyle(.red).padding(.horizontal, sidePadding) }
         if tab == .recordings {
-            RecordingsList(refresh: recordingsRefresh).padding(.horizontal, sidePadding)
+            RecordingsList(refresh: recordingsRefresh, canRecord: canRecord).padding(.horizontal, sidePadding)
         } else if channels.isEmpty, enabled == true {
             Text(filter == "favorites" ? "No favourites yet. Add some with the heart next to a channel."
                 : filter == "recent" ? "Channels you watch will appear here."
@@ -677,7 +680,11 @@ struct ProgrammeSheet: View {
                 if canRecord, programme.end > .now, loaded {
                     Section {
                         if programme.series == true { Text("A series recording covers this title.").font(.footnote).foregroundStyle(.secondary) }
-                        if let recording {
+                        if let recording, recording.canDelete == false {
+                            // Someone else's: they (or an admin) decide, so no cancel here.
+                            Text("\(recording.status == .recording ? "Being recorded" : "Will be recorded")\(recording.ownerName.map { " by \($0)" } ?? "")")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        } else if let recording {
                             Button(recording.status == .recording ? "Stop Recording" : "Don't Record", role: .destructive) {
                                 act { try await app.cancelRecording(recording.id) }
                             }
@@ -723,7 +730,10 @@ struct RecordingsList: View {
     @Environment(AppSession.self) private var app
     /// Changed by the page's pull-to-refresh.
     var refresh = 0
+    /// Show the signed-in user's recording space (only for those who may record).
+    var canRecord = false
     @State private var recordings: [Recording] = []
+    @State private var usage: DvrUsage?
     @State private var rules: [RecordingRule] = []
     @State private var loaded = false
     @State private var error: String?
@@ -731,15 +741,16 @@ struct RecordingsList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
+            if let usage, usage.quotaBytes > 0 || usage.usedBytes > 0 { usageMeter(usage) }
             if let error { Text(error).foregroundStyle(.red) }
             if loaded && recordings.isEmpty && rules.isEmpty {
                 Text("Nothing recorded yet. Pick a programme in the guide and choose Record.").foregroundStyle(.secondary)
             }
             section("Recording Now", recordings.filter { $0.status == .recording }) { r in
-                Button("Stop") { act { try await app.cancelRecording(r.id) } }
+                if mine(r.canDelete) { Button("Stop") { act { try await app.cancelRecording(r.id) } } }
             }
             section("Upcoming", recordings.filter { $0.status == .scheduled }) { r in
-                Button("Cancel") { act { try await app.cancelRecording(r.id) } }
+                if mine(r.canDelete) { Button("Cancel") { act { try await app.cancelRecording(r.id) } } }
             }
             if !rules.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
@@ -748,10 +759,14 @@ struct RecordingsList: View {
                         HStack {
                             VStack(alignment: .leading) {
                                 Text(s.title).font(.body.weight(.medium))
-                                Text("\(s.channelName ?? "Any channel") · \(s.upcoming) upcoming").font(.caption).foregroundStyle(.secondary)
+                                Text(([s.channelName ?? "Any channel", "\(s.upcoming) upcoming"] + [owner(s.ownerName, userId: s.userId)].compactMap { $0 })
+                                    .joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
+                                if s.paused == true {
+                                    Text("Paused: \(s.ownerName ?? "its owner") may no longer record").font(.caption).foregroundStyle(.orange)
+                                }
                             }
                             Spacer()
-                            Button("Stop Series") { act { try await app.stopSeries(s.id) } }
+                            if mine(s.canDelete) { Button("Stop Series") { act { try await app.stopSeries(s.id) } } }
                         }
                         .padding(12)
                         .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
@@ -759,7 +774,9 @@ struct RecordingsList: View {
                 }
             }
             section("Recorded", recordings.filter { $0.status == .completed || $0.status == .failed }) { r in
-                if r.status == .failed {
+                if !mine(r.canDelete) {
+                    EmptyView()
+                } else if r.status == .failed {
                     Button("Dismiss") { act { try await app.cancelRecording(r.id) } }
                 } else {
                     Button("Delete", role: .destructive) { deleting = r }
@@ -805,13 +822,41 @@ struct RecordingsList: View {
         parts.append(r.channelName)
         parts.append("\(r.start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))–\(r.end.formatted(date: .omitted, time: .shortened))")
         if let b = r.sizeBytes, b > 0 { parts.append(ByteCountFormatter.string(fromByteCount: b, countStyle: .file)) }
+        if let o = owner(r.ownerName, userId: r.userId) { parts.append(o) }
         return parts.joined(separator: " · ")
+    }
+
+    /// Only whoever scheduled it, or an admin, may cancel or delete (older servers don't say: allow).
+    private func mine(_ canDelete: Bool?) -> Bool { canDelete != false }
+
+    /// "Recorded by Alex"; nothing when it's the signed-in user's own.
+    private func owner(_ name: String?, userId: Int64?) -> String? {
+        guard let name, !name.isEmpty else { return nil }
+        if let userId, userId == app.me?.id { return nil }
+        if userId == nil, name == app.me?.displayName { return nil }
+        return "Recorded by \(name)"
+    }
+
+    /// "12.4 of 50 GB used" with a thin bar when there's a quota, and what being over it means.
+    private func usageMeter(_ u: DvrUsage) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(u.label).font(.subheadline).foregroundStyle(u.overQuota ? Color.red : Color.secondary)
+            if u.quotaBytes > 0 {
+                ProgressView(value: u.fraction)
+                    .tint(u.overQuota ? .red : u.fraction > 0.85 ? .orange : Color.marqueeGold)
+                    .accessibilityLabel("Recording space used")
+            }
+            if let m = u.overQuotaMessage { Text(m).font(.caption).foregroundStyle(.red) }
+        }
+        .frame(maxWidth: 420, alignment: .leading)
+        .accessibilityIdentifier("recordings.usage")
     }
 
     private func load() async {
         do {
             recordings = try await app.recordings()
             rules = try await app.recordingRules()
+            usage = canRecord ? try? await app.recordingUsage() : nil
             error = nil
         } catch {
             self.error = error.localizedDescription

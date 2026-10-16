@@ -7,6 +7,7 @@ public typealias LiveTvStatus = Components.Schemas.LiveTvStatus
 public typealias LiveGuideRow = Operations.LiveGuide.Output.Ok.Body.JsonPayloadPayload
 public typealias Recording = Components.Schemas.Recording
 public typealias RecordingRule = Components.Schemas.RecordingRule
+public typealias DvrUsage = Components.Schemas.DvrUsage
 
 /// Live TV (LIVE-1..4): channels, the guide, favourites and live streams.
 @MainActor
@@ -97,6 +98,8 @@ public extension AppSession {
         case .created: return
         case let .serviceUnavailable(e): throw MarqueeError((try? e.body.json.message) ?? "Recording isn't available")
         case let .notFound(e): throw MarqueeError((try? e.body.json.message) ?? "That programme isn't in the guide")
+        // quota_exceeded: the server says how much space is used and what to do.
+        case let .conflict(e): throw MarqueeError((try? e.body.json.message) ?? "You're out of recording space. Delete some recordings to record more.")
         case .forbidden: throw MarqueeError("You can't record. An admin can allow it in Settings → Users.")
         default: throw MarqueeError("Couldn't schedule the recording")
         }
@@ -112,7 +115,43 @@ public extension AppSession {
     }
 
     func stopSeries(_ id: Int64) async throws {
-        _ = try await liveAPI.deleteRecordingRule(path: .init(ruleId: id)).noContent
+        switch try await liveAPI.deleteRecordingRule(path: .init(ruleId: id)) {
+        case .noContent: return
+        case let .forbidden(e): throw MarqueeError((try? e.body.json.message) ?? "Only whoever set up this series, or an admin, can stop it")
+        default: throw MarqueeError("Couldn't stop the series")
+        }
+    }
+
+    /// The signed-in user's recording space and quota (LIVE-5).
+    func recordingUsage() async throws -> DvrUsage {
+        try await liveAPI.getRecordingUsage().ok.body.json
+    }
+}
+
+public extension LiveTvStatus {
+    /// May see the Recordings tab; older servers don't say, and recording implied it.
+    var mayViewRecordings: Bool { canViewRecordings ?? canRecord ?? false }
+}
+
+public extension DvrUsage {
+    private static func gb(_ b: Int64) -> String {
+        String(format: b >= 10_000_000_000 ? "%.0f" : "%.1f", Double(b) / 1e9)
+    }
+
+    /// "12.4 of 50 GB used", or "12.4 GB used" with no quota.
+    var label: String {
+        quotaBytes > 0 ? "\(Self.gb(usedBytes)) of \(Self.gb(quotaBytes)) GB used" : "\(Self.gb(usedBytes)) GB used"
+    }
+
+    /// Share of the quota used, 0...1 (0 with no quota).
+    var fraction: Double { quotaBytes > 0 ? min(1, Double(usedBytes) / Double(quotaBytes)) : 0 }
+
+    /// What being over the quota means, or nil while under it.
+    var overQuotaMessage: String? {
+        guard overQuota else { return nil }
+        return quotaAction == .deleteOldest
+            ? "You're over your recording space; your oldest watched recordings will be removed to make room."
+            : "You're over your recording space; new recordings won't start until you delete some."
     }
 }
 

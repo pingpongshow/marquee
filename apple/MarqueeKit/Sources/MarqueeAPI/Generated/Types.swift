@@ -312,6 +312,21 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /items/{itemId}/refresh`.
     /// - Remark: Generated from `#/paths//items/{itemId}/refresh/post(refreshItem)`.
     func refreshItem(_ input: Operations.RefreshItem.Input) async throws -> Operations.RefreshItem.Output
+    /// Commercials in a Live TV recording: found, cut or not (admin only). 404 for items that aren't recordings.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/commercials`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/commercials/get(getItemCommercials)`.
+    func getItemCommercials(_ input: Operations.GetItemCommercials.Input) async throws -> Operations.GetItemCommercials.Output
+    /// Find and cut the commercials out of a Live TV recording now, whatever the setting (admin only). Queued and done in the background, one at a time; a recording being watched waits.
+    ///
+    /// - Remark: HTTP `POST /items/{itemId}/commercials/remove`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/commercials/remove/post(removeItemCommercials)`.
+    func removeItemCommercials(_ input: Operations.RemoveItemCommercials.Input) async throws -> Operations.RemoveItemCommercials.Output
+    /// Put back the original of a recording whose commercials were cut, while it's still in the media trash (admin only). The cut file goes to the trash instead.
+    ///
+    /// - Remark: HTTP `POST /items/{itemId}/commercials/restore`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/commercials/restore/post(restoreItemCommercials)`.
+    func restoreItemCommercials(_ input: Operations.RestoreItemCommercials.Input) async throws -> Operations.RestoreItemCommercials.Output
     /// Seasons of a show, episodes of a season, albums of an artist, tracks of an album.
     ///
     /// - Remark: HTTP `GET /items/{itemId}/children`.
@@ -359,6 +374,41 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /plex-import/preview`.
     /// - Remark: Generated from `#/paths//plex-import/preview/post(previewPlexImport)`.
     func previewPlexImport(_ input: Operations.PreviewPlexImport.Input) async throws -> Operations.PreviewPlexImport.Output
+    /// Two-way Plex sync settings, status, Plex accounts and the last run (admin only).
+    ///
+    /// - Remark: HTTP `GET /plex-sync`.
+    /// - Remark: Generated from `#/paths//plex-sync/get(getPlexSync)`.
+    func getPlexSync(_ input: Operations.GetPlexSync.Input) async throws -> Operations.GetPlexSync.Output
+    /// Change two-way Plex sync settings (admin only). Fields left out stay as they are.
+    ///
+    /// - Remark: HTTP `PATCH /plex-sync`.
+    /// - Remark: Generated from `#/paths//plex-sync/patch(updatePlexSync)`.
+    func updatePlexSync(_ input: Operations.UpdatePlexSync.Input) async throws -> Operations.UpdatePlexSync.Output
+    /// Sync with Plex now, in the background (admin only). Works whether automatic sync is on or off.
+    ///
+    /// - Remark: HTTP `POST /plex-sync/run`.
+    /// - Remark: Generated from `#/paths//plex-sync/run/post(runPlexSync)`.
+    func runPlexSync(_ input: Operations.RunPlexSync.Input) async throws -> Operations.RunPlexSync.Output
+    /// Work out what a sync would change each way, without changing anything in Marquee or Plex (admin only). Can take a while on a large library.
+    ///
+    /// - Remark: HTTP `POST /plex-sync/preview`.
+    /// - Remark: Generated from `#/paths//plex-sync/preview/post(previewPlexSync)`.
+    func previewPlexSync(_ input: Operations.PreviewPlexSync.Input) async throws -> Operations.PreviewPlexSync.Output
+    /// Choose the Marquee user a Plex account syncs with (admin only).
+    ///
+    /// - Remark: HTTP `PUT /plex-sync/users/{plexAccountId}`.
+    /// - Remark: Generated from `#/paths//plex-sync/users/{plexAccountId}/put(setPlexSyncUser)`.
+    func setPlexSyncUser(_ input: Operations.SetPlexSyncUser.Input) async throws -> Operations.SetPlexSyncUser.Output
+    /// Start Sign in with Plex: open authUrl (or enter the code at plex.tv/link), then poll the PIN (admin only).
+    ///
+    /// - Remark: HTTP `POST /plex-sync/pin`.
+    /// - Remark: Generated from `#/paths//plex-sync/pin/post(startPlexSignIn)`.
+    func startPlexSignIn(_ input: Operations.StartPlexSignIn.Input) async throws -> Operations.StartPlexSignIn.Output
+    /// Whether Sign in with Plex finished; once it has, the token is saved for sync (admin only).
+    ///
+    /// - Remark: HTTP `GET /plex-sync/pin/{pinId}`.
+    /// - Remark: Generated from `#/paths//plex-sync/pin/{pinId}/get(checkPlexSignIn)`.
+    func checkPlexSignIn(_ input: Operations.CheckPlexSignIn.Input) async throws -> Operations.CheckPlexSignIn.Output
     /// Active playback sessions. Administrators see everyone's; others see their own.
     ///
     /// - Remark: HTTP `GET /playback/sessions`.
@@ -540,6 +590,41 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /library-health/{checkId}/ignored/{itemId}`.
     /// - Remark: Generated from `#/paths//library-health/{checkId}/ignored/{itemId}/delete(unignoreHealthIssue)`.
     func unignoreHealthIssue(_ input: Operations.UnignoreHealthIssue.Input) async throws -> Operations.UnignoreHealthIssue.Output
+    /// Movie and episode files matching the Large files filters, biggest first, with the size each would be after a preset and totals for all that match (admin only). Read from what the library knows; nothing is probed.
+    ///
+    /// - Remark: HTTP `GET /optimize/files`.
+    /// - Remark: Generated from `#/paths//optimize/files/get(listLargeFiles)`.
+    func listLargeFiles(_ input: Operations.ListLargeFiles.Input) async throws -> Operations.ListLargeFiles.Output
+    /// The optimizer queue (running and queued jobs first, then finished ones not cleared) or its history (optimized and restored files, newest first), with the space saved so far (admin only).
+    ///
+    /// - Remark: HTTP `GET /optimize/jobs`.
+    /// - Remark: Generated from `#/paths//optimize/jobs/get(listOptimizeJobs)`.
+    func listOptimizeJobs(_ input: Operations.ListOptimizeJobs.Input) async throws -> Operations.ListOptimizeJobs.Output
+    /// Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren't available movies or episodes, are skipped.
+    ///
+    /// - Remark: HTTP `POST /optimize/jobs`.
+    /// - Remark: Generated from `#/paths//optimize/jobs/post(queueOptimizeJobs)`.
+    func queueOptimizeJobs(_ input: Operations.QueueOptimizeJobs.Input) async throws -> Operations.QueueOptimizeJobs.Output
+    /// Remove finished jobs from the queue view; optimized files stay in the history (admin only).
+    ///
+    /// - Remark: HTTP `POST /optimize/jobs/clear`.
+    /// - Remark: Generated from `#/paths//optimize/jobs/clear/post(clearOptimizeJobs)`.
+    func clearOptimizeJobs(_ input: Operations.ClearOptimizeJobs.Input) async throws -> Operations.ClearOptimizeJobs.Output
+    /// Cancel, retry or restore an optimizer job (admin only).
+    ///
+    /// - Remark: HTTP `POST /optimize/jobs/{jobId}/{action}`.
+    /// - Remark: Generated from `#/paths//optimize/jobs/{jobId}/{action}/post(optimizeJobAction)`.
+    func optimizeJobAction(_ input: Operations.OptimizeJobAction.Input) async throws -> Operations.OptimizeJobAction.Output
+    /// The optimizer's settings and every preset, built-in and custom (admin only).
+    ///
+    /// - Remark: HTTP `GET /optimize/settings`.
+    /// - Remark: Generated from `#/paths//optimize/settings/get(getOptimizeSettings)`.
+    func getOptimizeSettings(_ input: Operations.GetOptimizeSettings.Input) async throws -> Operations.GetOptimizeSettings.Output
+    /// Change the optimizer's settings and custom presets (admin only). Built-in presets in the list are ignored.
+    ///
+    /// - Remark: HTTP `PUT /optimize/settings`.
+    /// - Remark: Generated from `#/paths//optimize/settings/put(updateOptimizeSettings)`.
+    func updateOptimizeSettings(_ input: Operations.UpdateOptimizeSettings.Input) async throws -> Operations.UpdateOptimizeSettings.Output
     /// Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
     ///
     /// The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item's last file the item goes too, along with a season or show left empty.
@@ -675,7 +760,7 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /livetv/status`.
     /// - Remark: Generated from `#/paths//livetv/status/get(liveTvStatus)`.
     func liveTvStatus(_ input: Operations.LiveTvStatus.Input) async throws -> Operations.LiveTvStatus.Output
-    /// DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first).
+    /// DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone's recordings are listed to every profile that may view DVR recordings, within the profile's content rating limit (the library item's rating once filed, else the guide's; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings.
     ///
     /// - Remark: HTTP `GET /livetv/recordings`.
     /// - Remark: Generated from `#/paths//livetv/recordings/get(listRecordings)`.
@@ -685,7 +770,17 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /livetv/recordings`.
     /// - Remark: Generated from `#/paths//livetv/recordings/post(scheduleRecording)`.
     func scheduleRecording(_ input: Operations.ScheduleRecording.Input) async throws -> Operations.ScheduleRecording.Output
-    /// Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list.
+    /// How much space the caller's recordings take (finished and in progress, actual sizes) and their DVR quota (LIVE-5).
+    ///
+    /// - Remark: HTTP `GET /livetv/recordings/usage`.
+    /// - Remark: Generated from `#/paths//livetv/recordings/usage/get(getRecordingUsage)`.
+    func getRecordingUsage(_ input: Operations.GetRecordingUsage.Input) async throws -> Operations.GetRecordingUsage.Output
+    /// Admins: every user's DVR usage and quota (LIVE-5), including users with no recordings.
+    ///
+    /// - Remark: HTTP `GET /admin/dvr/usage`.
+    /// - Remark: Generated from `#/paths//admin/dvr/usage/get(listRecordingUsage)`.
+    func listRecordingUsage(_ input: Operations.ListRecordingUsage.Input) async throws -> Operations.ListRecordingUsage.Output
+    /// Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list. Only whoever scheduled it, or an admin.
     ///
     /// - Remark: HTTP `DELETE /livetv/recordings/{recordingId}`.
     /// - Remark: Generated from `#/paths//livetv/recordings/{recordingId}/delete(cancelRecording)`.
@@ -695,7 +790,7 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /livetv/recording-rules`.
     /// - Remark: Generated from `#/paths//livetv/recording-rules/get(listRecordingRules)`.
     func listRecordingRules(_ input: Operations.ListRecordingRules.Input) async throws -> Operations.ListRecordingRules.Output
-    /// Stop recording a series. Its upcoming airings are dropped; recordings already made stay.
+    /// Stop recording a series. Its upcoming airings are dropped; recordings already made stay. Only whoever made it, or an admin.
     ///
     /// - Remark: HTTP `DELETE /livetv/recording-rules/{ruleId}`.
     /// - Remark: Generated from `#/paths//livetv/recording-rules/{ruleId}/delete(deleteRecordingRule)`.
@@ -1917,6 +2012,45 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// Commercials in a Live TV recording: found, cut or not (admin only). 404 for items that aren't recordings.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/commercials`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/commercials/get(getItemCommercials)`.
+    public func getItemCommercials(
+        path: Operations.GetItemCommercials.Input.Path,
+        headers: Operations.GetItemCommercials.Input.Headers = .init()
+    ) async throws -> Operations.GetItemCommercials.Output {
+        try await getItemCommercials(Operations.GetItemCommercials.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Find and cut the commercials out of a Live TV recording now, whatever the setting (admin only). Queued and done in the background, one at a time; a recording being watched waits.
+    ///
+    /// - Remark: HTTP `POST /items/{itemId}/commercials/remove`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/commercials/remove/post(removeItemCommercials)`.
+    public func removeItemCommercials(
+        path: Operations.RemoveItemCommercials.Input.Path,
+        headers: Operations.RemoveItemCommercials.Input.Headers = .init()
+    ) async throws -> Operations.RemoveItemCommercials.Output {
+        try await removeItemCommercials(Operations.RemoveItemCommercials.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Put back the original of a recording whose commercials were cut, while it's still in the media trash (admin only). The cut file goes to the trash instead.
+    ///
+    /// - Remark: HTTP `POST /items/{itemId}/commercials/restore`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/commercials/restore/post(restoreItemCommercials)`.
+    public func restoreItemCommercials(
+        path: Operations.RestoreItemCommercials.Input.Path,
+        headers: Operations.RestoreItemCommercials.Input.Headers = .init()
+    ) async throws -> Operations.RestoreItemCommercials.Output {
+        try await restoreItemCommercials(Operations.RestoreItemCommercials.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// Seasons of a show, episodes of a season, albums of an artist, tracks of an album.
     ///
     /// - Remark: HTTP `GET /items/{itemId}/children`.
@@ -2028,6 +2162,75 @@ extension APIProtocol {
         try await previewPlexImport(Operations.PreviewPlexImport.Input(
             headers: headers,
             body: body
+        ))
+    }
+    /// Two-way Plex sync settings, status, Plex accounts and the last run (admin only).
+    ///
+    /// - Remark: HTTP `GET /plex-sync`.
+    /// - Remark: Generated from `#/paths//plex-sync/get(getPlexSync)`.
+    public func getPlexSync(headers: Operations.GetPlexSync.Input.Headers = .init()) async throws -> Operations.GetPlexSync.Output {
+        try await getPlexSync(Operations.GetPlexSync.Input(headers: headers))
+    }
+    /// Change two-way Plex sync settings (admin only). Fields left out stay as they are.
+    ///
+    /// - Remark: HTTP `PATCH /plex-sync`.
+    /// - Remark: Generated from `#/paths//plex-sync/patch(updatePlexSync)`.
+    public func updatePlexSync(
+        headers: Operations.UpdatePlexSync.Input.Headers = .init(),
+        body: Operations.UpdatePlexSync.Input.Body
+    ) async throws -> Operations.UpdatePlexSync.Output {
+        try await updatePlexSync(Operations.UpdatePlexSync.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Sync with Plex now, in the background (admin only). Works whether automatic sync is on or off.
+    ///
+    /// - Remark: HTTP `POST /plex-sync/run`.
+    /// - Remark: Generated from `#/paths//plex-sync/run/post(runPlexSync)`.
+    public func runPlexSync(headers: Operations.RunPlexSync.Input.Headers = .init()) async throws -> Operations.RunPlexSync.Output {
+        try await runPlexSync(Operations.RunPlexSync.Input(headers: headers))
+    }
+    /// Work out what a sync would change each way, without changing anything in Marquee or Plex (admin only). Can take a while on a large library.
+    ///
+    /// - Remark: HTTP `POST /plex-sync/preview`.
+    /// - Remark: Generated from `#/paths//plex-sync/preview/post(previewPlexSync)`.
+    public func previewPlexSync(headers: Operations.PreviewPlexSync.Input.Headers = .init()) async throws -> Operations.PreviewPlexSync.Output {
+        try await previewPlexSync(Operations.PreviewPlexSync.Input(headers: headers))
+    }
+    /// Choose the Marquee user a Plex account syncs with (admin only).
+    ///
+    /// - Remark: HTTP `PUT /plex-sync/users/{plexAccountId}`.
+    /// - Remark: Generated from `#/paths//plex-sync/users/{plexAccountId}/put(setPlexSyncUser)`.
+    public func setPlexSyncUser(
+        path: Operations.SetPlexSyncUser.Input.Path,
+        headers: Operations.SetPlexSyncUser.Input.Headers = .init(),
+        body: Operations.SetPlexSyncUser.Input.Body
+    ) async throws -> Operations.SetPlexSyncUser.Output {
+        try await setPlexSyncUser(Operations.SetPlexSyncUser.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Start Sign in with Plex: open authUrl (or enter the code at plex.tv/link), then poll the PIN (admin only).
+    ///
+    /// - Remark: HTTP `POST /plex-sync/pin`.
+    /// - Remark: Generated from `#/paths//plex-sync/pin/post(startPlexSignIn)`.
+    public func startPlexSignIn(headers: Operations.StartPlexSignIn.Input.Headers = .init()) async throws -> Operations.StartPlexSignIn.Output {
+        try await startPlexSignIn(Operations.StartPlexSignIn.Input(headers: headers))
+    }
+    /// Whether Sign in with Plex finished; once it has, the token is saved for sync (admin only).
+    ///
+    /// - Remark: HTTP `GET /plex-sync/pin/{pinId}`.
+    /// - Remark: Generated from `#/paths//plex-sync/pin/{pinId}/get(checkPlexSignIn)`.
+    public func checkPlexSignIn(
+        path: Operations.CheckPlexSignIn.Input.Path,
+        headers: Operations.CheckPlexSignIn.Input.Headers = .init()
+    ) async throws -> Operations.CheckPlexSignIn.Output {
+        try await checkPlexSignIn(Operations.CheckPlexSignIn.Input(
+            path: path,
+            headers: headers
         ))
     }
     /// Active playback sessions. Administrators see everyone's; others see their own.
@@ -2509,6 +2712,85 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// Movie and episode files matching the Large files filters, biggest first, with the size each would be after a preset and totals for all that match (admin only). Read from what the library knows; nothing is probed.
+    ///
+    /// - Remark: HTTP `GET /optimize/files`.
+    /// - Remark: Generated from `#/paths//optimize/files/get(listLargeFiles)`.
+    public func listLargeFiles(
+        query: Operations.ListLargeFiles.Input.Query = .init(),
+        headers: Operations.ListLargeFiles.Input.Headers = .init()
+    ) async throws -> Operations.ListLargeFiles.Output {
+        try await listLargeFiles(Operations.ListLargeFiles.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// The optimizer queue (running and queued jobs first, then finished ones not cleared) or its history (optimized and restored files, newest first), with the space saved so far (admin only).
+    ///
+    /// - Remark: HTTP `GET /optimize/jobs`.
+    /// - Remark: Generated from `#/paths//optimize/jobs/get(listOptimizeJobs)`.
+    public func listOptimizeJobs(
+        query: Operations.ListOptimizeJobs.Input.Query = .init(),
+        headers: Operations.ListOptimizeJobs.Input.Headers = .init()
+    ) async throws -> Operations.ListOptimizeJobs.Output {
+        try await listOptimizeJobs(Operations.ListOptimizeJobs.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren't available movies or episodes, are skipped.
+    ///
+    /// - Remark: HTTP `POST /optimize/jobs`.
+    /// - Remark: Generated from `#/paths//optimize/jobs/post(queueOptimizeJobs)`.
+    public func queueOptimizeJobs(
+        headers: Operations.QueueOptimizeJobs.Input.Headers = .init(),
+        body: Operations.QueueOptimizeJobs.Input.Body
+    ) async throws -> Operations.QueueOptimizeJobs.Output {
+        try await queueOptimizeJobs(Operations.QueueOptimizeJobs.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Remove finished jobs from the queue view; optimized files stay in the history (admin only).
+    ///
+    /// - Remark: HTTP `POST /optimize/jobs/clear`.
+    /// - Remark: Generated from `#/paths//optimize/jobs/clear/post(clearOptimizeJobs)`.
+    public func clearOptimizeJobs(headers: Operations.ClearOptimizeJobs.Input.Headers = .init()) async throws -> Operations.ClearOptimizeJobs.Output {
+        try await clearOptimizeJobs(Operations.ClearOptimizeJobs.Input(headers: headers))
+    }
+    /// Cancel, retry or restore an optimizer job (admin only).
+    ///
+    /// - Remark: HTTP `POST /optimize/jobs/{jobId}/{action}`.
+    /// - Remark: Generated from `#/paths//optimize/jobs/{jobId}/{action}/post(optimizeJobAction)`.
+    public func optimizeJobAction(
+        path: Operations.OptimizeJobAction.Input.Path,
+        headers: Operations.OptimizeJobAction.Input.Headers = .init()
+    ) async throws -> Operations.OptimizeJobAction.Output {
+        try await optimizeJobAction(Operations.OptimizeJobAction.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// The optimizer's settings and every preset, built-in and custom (admin only).
+    ///
+    /// - Remark: HTTP `GET /optimize/settings`.
+    /// - Remark: Generated from `#/paths//optimize/settings/get(getOptimizeSettings)`.
+    public func getOptimizeSettings(headers: Operations.GetOptimizeSettings.Input.Headers = .init()) async throws -> Operations.GetOptimizeSettings.Output {
+        try await getOptimizeSettings(Operations.GetOptimizeSettings.Input(headers: headers))
+    }
+    /// Change the optimizer's settings and custom presets (admin only). Built-in presets in the list are ignored.
+    ///
+    /// - Remark: HTTP `PUT /optimize/settings`.
+    /// - Remark: Generated from `#/paths//optimize/settings/put(updateOptimizeSettings)`.
+    public func updateOptimizeSettings(
+        headers: Operations.UpdateOptimizeSettings.Input.Headers = .init(),
+        body: Operations.UpdateOptimizeSettings.Input.Body
+    ) async throws -> Operations.UpdateOptimizeSettings.Output {
+        try await updateOptimizeSettings(Operations.UpdateOptimizeSettings.Input(
+            headers: headers,
+            body: body
+        ))
+    }
     /// Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
     ///
     /// The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item's last file the item goes too, along with a season or show left empty.
@@ -2824,7 +3106,7 @@ extension APIProtocol {
     public func liveTvStatus(headers: Operations.LiveTvStatus.Input.Headers = .init()) async throws -> Operations.LiveTvStatus.Output {
         try await liveTvStatus(Operations.LiveTvStatus.Input(headers: headers))
     }
-    /// DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first).
+    /// DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone's recordings are listed to every profile that may view DVR recordings, within the profile's content rating limit (the library item's rating once filed, else the guide's; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings.
     ///
     /// - Remark: HTTP `GET /livetv/recordings`.
     /// - Remark: Generated from `#/paths//livetv/recordings/get(listRecordings)`.
@@ -2844,7 +3126,21 @@ extension APIProtocol {
             body: body
         ))
     }
-    /// Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list.
+    /// How much space the caller's recordings take (finished and in progress, actual sizes) and their DVR quota (LIVE-5).
+    ///
+    /// - Remark: HTTP `GET /livetv/recordings/usage`.
+    /// - Remark: Generated from `#/paths//livetv/recordings/usage/get(getRecordingUsage)`.
+    public func getRecordingUsage(headers: Operations.GetRecordingUsage.Input.Headers = .init()) async throws -> Operations.GetRecordingUsage.Output {
+        try await getRecordingUsage(Operations.GetRecordingUsage.Input(headers: headers))
+    }
+    /// Admins: every user's DVR usage and quota (LIVE-5), including users with no recordings.
+    ///
+    /// - Remark: HTTP `GET /admin/dvr/usage`.
+    /// - Remark: Generated from `#/paths//admin/dvr/usage/get(listRecordingUsage)`.
+    public func listRecordingUsage(headers: Operations.ListRecordingUsage.Input.Headers = .init()) async throws -> Operations.ListRecordingUsage.Output {
+        try await listRecordingUsage(Operations.ListRecordingUsage.Input(headers: headers))
+    }
+    /// Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list. Only whoever scheduled it, or an admin.
     ///
     /// - Remark: HTTP `DELETE /livetv/recordings/{recordingId}`.
     /// - Remark: Generated from `#/paths//livetv/recordings/{recordingId}/delete(cancelRecording)`.
@@ -2866,7 +3162,7 @@ extension APIProtocol {
     public func listRecordingRules(headers: Operations.ListRecordingRules.Input.Headers = .init()) async throws -> Operations.ListRecordingRules.Output {
         try await listRecordingRules(Operations.ListRecordingRules.Input(headers: headers))
     }
-    /// Stop recording a series. Its upcoming airings are dropped; recordings already made stay.
+    /// Stop recording a series. Its upcoming airings are dropped; recordings already made stay. Only whoever made it, or an admin.
     ///
     /// - Remark: HTTP `DELETE /livetv/recording-rules/{ruleId}`.
     /// - Remark: Generated from `#/paths//livetv/recording-rules/{ruleId}/delete(deleteRecordingRule)`.
