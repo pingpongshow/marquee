@@ -6441,7 +6441,7 @@ components:
         tokenSet: { type: boolean, description: A Plex token is saved (it is never returned). }
         enabled: { type: boolean, description: "Automatic sync every intervalMinutes. Off by default; Sync now works either way." }
         intervalMinutes: { type: integer, minimum: 5, maximum: 1440 }
-        watchState: { type: boolean, description: Watched and unwatched, play counts and last played. }
+        watchState: { type: boolean, description: "Watched and unwatched, play counts and last played." }
         ratings: { type: boolean }
         resumePositions: { type: boolean }
         playHistory: { type: boolean, description: "Plays recorded in Plex come into Marquee's history. Plays made in Marquee reach Plex as a play at sync time." }

@@ -5610,7 +5610,7 @@ export interface components {
             /** @description Automatic sync every intervalMinutes. Off by default; Sync now works either way. */
             enabled: boolean;
             intervalMinutes: number;
-            /** @description Watched and unwatched */
+            /** @description Watched and unwatched, play counts and last played. */
             watchState: boolean;
             ratings: boolean;
             resumePositions: boolean;

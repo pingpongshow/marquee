@@ -27,12 +27,19 @@ import java.io.IOException
 import okhttp3.Call
 import okhttp3.HttpUrl
 
+import app.marquee.api.models.ClearOptimizeJobs200Response
 import app.marquee.api.models.Error
 import app.marquee.api.models.HealthCheck
 import app.marquee.api.models.HealthIssuePage
+import app.marquee.api.models.LargeFilePage
 import app.marquee.api.models.Library
 import app.marquee.api.models.LibraryCreate
 import app.marquee.api.models.LibraryUpdate
+import app.marquee.api.models.OptimizeConfig
+import app.marquee.api.models.OptimizeJobPage
+import app.marquee.api.models.OptimizeQueueRequest
+import app.marquee.api.models.OptimizeQueueResult
+import app.marquee.api.models.OptimizeSettings
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -124,6 +131,76 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
         return RequestConfig(
             method = RequestMethod.DELETE,
             path = "/libraries/{libraryId}/scan".replace("{"+"libraryId"+"}", encodeURIComponent(libraryId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /optimize/jobs/clear
+     * Remove finished jobs from the queue view; optimized files stay in the history (admin only).
+     * 
+     * @return ClearOptimizeJobs200Response
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun clearOptimizeJobs() : ClearOptimizeJobs200Response {
+        val localVarResponse = clearOptimizeJobsWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ClearOptimizeJobs200Response
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /optimize/jobs/clear
+     * Remove finished jobs from the queue view; optimized files stay in the history (admin only).
+     * 
+     * @return ApiResponse<ClearOptimizeJobs200Response?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun clearOptimizeJobsWithHttpInfo() : ApiResponse<ClearOptimizeJobs200Response?> {
+        val localVariableConfig = clearOptimizeJobsRequestConfig()
+
+        return request<Unit, ClearOptimizeJobs200Response>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation clearOptimizeJobs
+     *
+     * @return RequestConfig
+     */
+    fun clearOptimizeJobsRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/optimize/jobs/clear",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -421,6 +498,76 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
     }
 
     /**
+     * GET /optimize/settings
+     * The optimizer&#39;s settings and every preset, built-in and custom (admin only).
+     * 
+     * @return OptimizeConfig
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getOptimizeSettings() : OptimizeConfig {
+        val localVarResponse = getOptimizeSettingsWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as OptimizeConfig
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /optimize/settings
+     * The optimizer&#39;s settings and every preset, built-in and custom (admin only).
+     * 
+     * @return ApiResponse<OptimizeConfig?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getOptimizeSettingsWithHttpInfo() : ApiResponse<OptimizeConfig?> {
+        val localVariableConfig = getOptimizeSettingsRequestConfig()
+
+        return request<Unit, OptimizeConfig>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getOptimizeSettings
+     *
+     * @return RequestConfig
+     */
+    fun getOptimizeSettingsRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/optimize/settings",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * PUT /library-health/{checkId}/ignored/{itemId}
      * Stop reporting this item for this check (admin only).
      * 
@@ -652,6 +799,216 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
     }
 
     /**
+     * enum for parameter type
+     */
+     enum class TypeListLargeFiles(val value: kotlin.String) {
+         @SerialName(value = "movie") MOVIE("movie"),
+         @SerialName(value = "episode") EPISODE("episode");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * enum for parameter resolution
+     */
+     enum class ResolutionListLargeFiles(val value: kotlin.Int) {
+         @SerialName(value = "2160") _2160(2160),
+         @SerialName(value = "1080") _1080(1080),
+         @SerialName(value = "720") _720(720),
+         @SerialName(value = "480") _480(480);
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * enum for parameter hdr
+     */
+     enum class HdrListLargeFiles(val value: kotlin.String) {
+         @SerialName(value = "yes") YES("yes"),
+         @SerialName(value = "no") NO("no");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * enum for parameter sort
+     */
+     enum class SortListLargeFiles(val value: kotlin.String) {
+         @SerialName(value = "size") SIZE("size"),
+         @SerialName(value = "bitrate") BITRATE("bitrate"),
+         @SerialName(value = "title") TITLE("title"),
+         @SerialName(value = "savings") SAVINGS("savings");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * GET /optimize/files
+     * Movie and episode files matching the Large files filters, biggest first, with the size each would be after a preset and totals for all that match (admin only). Read from what the library knows; nothing is probed.
+     * 
+     * @param libraryId  (optional)
+     * @param type  (optional)
+     * @param minSizeGb At least this many GB (10^9 bytes). (optional)
+     * @param minBitrateMbps At least this overall bitrate. (optional)
+     * @param resolution Only this resolution class (by width or height, so letterboxed films count): 2160 &#x3D; 4K, 480 &#x3D; SD. (optional)
+     * @param codecs Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9). (optional)
+     * @param hdr Only HDR (yes) or only SDR (no) files. (optional)
+     * @param presetId The preset the estimates are for (default: the default preset). (optional)
+     * @param sort  (optional, default to Sort.SIZE)
+     * @param offset  (optional, default to 0)
+     * @param limit  (optional, default to 100)
+     * @return LargeFilePage
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listLargeFiles(libraryId: kotlin.Long? = null, type: TypeListLargeFiles? = null, minSizeGb: kotlin.Double? = null, minBitrateMbps: kotlin.Double? = null, resolution: ResolutionListLargeFiles? = null, codecs: kotlin.String? = null, hdr: HdrListLargeFiles? = null, presetId: kotlin.String? = null, sort: SortListLargeFiles? = SortListLargeFiles.SIZE, offset: kotlin.Int? = 0, limit: kotlin.Int? = 100) : LargeFilePage {
+        val localVarResponse = listLargeFilesWithHttpInfo(libraryId = libraryId, type = type, minSizeGb = minSizeGb, minBitrateMbps = minBitrateMbps, resolution = resolution, codecs = codecs, hdr = hdr, presetId = presetId, sort = sort, offset = offset, limit = limit)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as LargeFilePage
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /optimize/files
+     * Movie and episode files matching the Large files filters, biggest first, with the size each would be after a preset and totals for all that match (admin only). Read from what the library knows; nothing is probed.
+     * 
+     * @param libraryId  (optional)
+     * @param type  (optional)
+     * @param minSizeGb At least this many GB (10^9 bytes). (optional)
+     * @param minBitrateMbps At least this overall bitrate. (optional)
+     * @param resolution Only this resolution class (by width or height, so letterboxed films count): 2160 &#x3D; 4K, 480 &#x3D; SD. (optional)
+     * @param codecs Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9). (optional)
+     * @param hdr Only HDR (yes) or only SDR (no) files. (optional)
+     * @param presetId The preset the estimates are for (default: the default preset). (optional)
+     * @param sort  (optional, default to Sort.SIZE)
+     * @param offset  (optional, default to 0)
+     * @param limit  (optional, default to 100)
+     * @return ApiResponse<LargeFilePage?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listLargeFilesWithHttpInfo(libraryId: kotlin.Long?, type: TypeListLargeFiles?, minSizeGb: kotlin.Double?, minBitrateMbps: kotlin.Double?, resolution: ResolutionListLargeFiles?, codecs: kotlin.String?, hdr: HdrListLargeFiles?, presetId: kotlin.String?, sort: SortListLargeFiles?, offset: kotlin.Int?, limit: kotlin.Int?) : ApiResponse<LargeFilePage?> {
+        val localVariableConfig = listLargeFilesRequestConfig(libraryId = libraryId, type = type, minSizeGb = minSizeGb, minBitrateMbps = minBitrateMbps, resolution = resolution, codecs = codecs, hdr = hdr, presetId = presetId, sort = sort, offset = offset, limit = limit)
+
+        return request<Unit, LargeFilePage>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listLargeFiles
+     *
+     * @param libraryId  (optional)
+     * @param type  (optional)
+     * @param minSizeGb At least this many GB (10^9 bytes). (optional)
+     * @param minBitrateMbps At least this overall bitrate. (optional)
+     * @param resolution Only this resolution class (by width or height, so letterboxed films count): 2160 &#x3D; 4K, 480 &#x3D; SD. (optional)
+     * @param codecs Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9). (optional)
+     * @param hdr Only HDR (yes) or only SDR (no) files. (optional)
+     * @param presetId The preset the estimates are for (default: the default preset). (optional)
+     * @param sort  (optional, default to Sort.SIZE)
+     * @param offset  (optional, default to 0)
+     * @param limit  (optional, default to 100)
+     * @return RequestConfig
+     */
+    fun listLargeFilesRequestConfig(libraryId: kotlin.Long?, type: TypeListLargeFiles?, minSizeGb: kotlin.Double?, minBitrateMbps: kotlin.Double?, resolution: ResolutionListLargeFiles?, codecs: kotlin.String?, hdr: HdrListLargeFiles?, presetId: kotlin.String?, sort: SortListLargeFiles?, offset: kotlin.Int?, limit: kotlin.Int?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (libraryId != null) {
+                    put("libraryId", listOf(libraryId.toString()))
+                }
+                if (type != null) {
+                    put("type", listOf(type.value))
+                }
+                if (minSizeGb != null) {
+                    put("minSizeGb", listOf(minSizeGb.toString()))
+                }
+                if (minBitrateMbps != null) {
+                    put("minBitrateMbps", listOf(minBitrateMbps.toString()))
+                }
+                if (resolution != null) {
+                    put("resolution", listOf(resolution.toString()))
+                }
+                if (codecs != null) {
+                    put("codecs", listOf(codecs.toString()))
+                }
+                if (hdr != null) {
+                    put("hdr", listOf(hdr.value))
+                }
+                if (presetId != null) {
+                    put("presetId", listOf(presetId.toString()))
+                }
+                if (sort != null) {
+                    put("sort", listOf(sort.value))
+                }
+                if (offset != null) {
+                    put("offset", listOf(offset.toString()))
+                }
+                if (limit != null) {
+                    put("limit", listOf(limit.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/optimize/files",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * GET /libraries
      * Libraries visible to the current user.
      * 
@@ -714,6 +1071,279 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/libraries",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * enum for parameter view
+     */
+     enum class ViewListOptimizeJobs(val value: kotlin.String) {
+         @SerialName(value = "queue") QUEUE("queue"),
+         @SerialName(value = "history") HISTORY("history");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * GET /optimize/jobs
+     * The optimizer queue (running and queued jobs first, then finished ones not cleared) or its history (optimized and restored files, newest first), with the space saved so far (admin only).
+     * 
+     * @param view  (optional, default to View.QUEUE)
+     * @param offset  (optional, default to 0)
+     * @param limit  (optional, default to 100)
+     * @return OptimizeJobPage
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listOptimizeJobs(view: ViewListOptimizeJobs? = ViewListOptimizeJobs.QUEUE, offset: kotlin.Int? = 0, limit: kotlin.Int? = 100) : OptimizeJobPage {
+        val localVarResponse = listOptimizeJobsWithHttpInfo(view = view, offset = offset, limit = limit)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as OptimizeJobPage
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /optimize/jobs
+     * The optimizer queue (running and queued jobs first, then finished ones not cleared) or its history (optimized and restored files, newest first), with the space saved so far (admin only).
+     * 
+     * @param view  (optional, default to View.QUEUE)
+     * @param offset  (optional, default to 0)
+     * @param limit  (optional, default to 100)
+     * @return ApiResponse<OptimizeJobPage?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listOptimizeJobsWithHttpInfo(view: ViewListOptimizeJobs?, offset: kotlin.Int?, limit: kotlin.Int?) : ApiResponse<OptimizeJobPage?> {
+        val localVariableConfig = listOptimizeJobsRequestConfig(view = view, offset = offset, limit = limit)
+
+        return request<Unit, OptimizeJobPage>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listOptimizeJobs
+     *
+     * @param view  (optional, default to View.QUEUE)
+     * @param offset  (optional, default to 0)
+     * @param limit  (optional, default to 100)
+     * @return RequestConfig
+     */
+    fun listOptimizeJobsRequestConfig(view: ViewListOptimizeJobs?, offset: kotlin.Int?, limit: kotlin.Int?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (view != null) {
+                    put("view", listOf(view.value))
+                }
+                if (offset != null) {
+                    put("offset", listOf(offset.toString()))
+                }
+                if (limit != null) {
+                    put("limit", listOf(limit.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/optimize/jobs",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * enum for parameter action
+     */
+     enum class ActionOptimizeJobAction(val value: kotlin.String) {
+         @SerialName(value = "cancel") CANCEL("cancel"),
+         @SerialName(value = "retry") RETRY("retry"),
+         @SerialName(value = "restore") RESTORE("restore");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * POST /optimize/jobs/{jobId}/{action}
+     * Cancel, retry or restore an optimizer job (admin only).
+     * 
+     * @param jobId 
+     * @param action cancel &#x3D; stop a queued or running job (the original stays as it is); retry &#x3D; queue a failed, cancelled or skipped job again; restore &#x3D; put an optimized file&#39;s original back from the media trash (the optimized file goes there instead).
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun optimizeJobAction(jobId: kotlin.Long, action: ActionOptimizeJobAction) : Unit {
+        val localVarResponse = optimizeJobActionWithHttpInfo(jobId = jobId, action = action)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /optimize/jobs/{jobId}/{action}
+     * Cancel, retry or restore an optimizer job (admin only).
+     * 
+     * @param jobId 
+     * @param action cancel &#x3D; stop a queued or running job (the original stays as it is); retry &#x3D; queue a failed, cancelled or skipped job again; restore &#x3D; put an optimized file&#39;s original back from the media trash (the optimized file goes there instead).
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun optimizeJobActionWithHttpInfo(jobId: kotlin.Long, action: ActionOptimizeJobAction) : ApiResponse<Unit?> {
+        val localVariableConfig = optimizeJobActionRequestConfig(jobId = jobId, action = action)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation optimizeJobAction
+     *
+     * @param jobId 
+     * @param action cancel &#x3D; stop a queued or running job (the original stays as it is); retry &#x3D; queue a failed, cancelled or skipped job again; restore &#x3D; put an optimized file&#39;s original back from the media trash (the optimized file goes there instead).
+     * @return RequestConfig
+     */
+    fun optimizeJobActionRequestConfig(jobId: kotlin.Long, action: ActionOptimizeJobAction) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/optimize/jobs/{jobId}/{action}".replace("{"+"jobId"+"}", encodeURIComponent(jobId.toString())).replace("{"+"action"+"}", encodeURIComponent(action.value.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /optimize/jobs
+     * Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren&#39;t available movies or episodes, are skipped.
+     * 
+     * @param optimizeQueueRequest 
+     * @return OptimizeQueueResult
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun queueOptimizeJobs(optimizeQueueRequest: OptimizeQueueRequest) : OptimizeQueueResult {
+        val localVarResponse = queueOptimizeJobsWithHttpInfo(optimizeQueueRequest = optimizeQueueRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as OptimizeQueueResult
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /optimize/jobs
+     * Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren&#39;t available movies or episodes, are skipped.
+     * 
+     * @param optimizeQueueRequest 
+     * @return ApiResponse<OptimizeQueueResult?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun queueOptimizeJobsWithHttpInfo(optimizeQueueRequest: OptimizeQueueRequest) : ApiResponse<OptimizeQueueResult?> {
+        val localVariableConfig = queueOptimizeJobsRequestConfig(optimizeQueueRequest = optimizeQueueRequest)
+
+        return request<OptimizeQueueRequest, OptimizeQueueResult>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation queueOptimizeJobs
+     *
+     * @param optimizeQueueRequest 
+     * @return RequestConfig
+     */
+    fun queueOptimizeJobsRequestConfig(optimizeQueueRequest: OptimizeQueueRequest) : RequestConfig<OptimizeQueueRequest> {
+        val localVariableBody = optimizeQueueRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/optimize/jobs",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -1006,6 +1636,80 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
         return RequestConfig(
             method = RequestMethod.PATCH,
             path = "/libraries/{libraryId}".replace("{"+"libraryId"+"}", encodeURIComponent(libraryId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /optimize/settings
+     * Change the optimizer&#39;s settings and custom presets (admin only). Built-in presets in the list are ignored.
+     * 
+     * @param optimizeSettings 
+     * @return OptimizeConfig
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun updateOptimizeSettings(optimizeSettings: OptimizeSettings) : OptimizeConfig {
+        val localVarResponse = updateOptimizeSettingsWithHttpInfo(optimizeSettings = optimizeSettings)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as OptimizeConfig
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /optimize/settings
+     * Change the optimizer&#39;s settings and custom presets (admin only). Built-in presets in the list are ignored.
+     * 
+     * @param optimizeSettings 
+     * @return ApiResponse<OptimizeConfig?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun updateOptimizeSettingsWithHttpInfo(optimizeSettings: OptimizeSettings) : ApiResponse<OptimizeConfig?> {
+        val localVariableConfig = updateOptimizeSettingsRequestConfig(optimizeSettings = optimizeSettings)
+
+        return request<OptimizeSettings, OptimizeConfig>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation updateOptimizeSettings
+     *
+     * @param optimizeSettings 
+     * @return RequestConfig
+     */
+    fun updateOptimizeSettingsRequestConfig(optimizeSettings: OptimizeSettings) : RequestConfig<OptimizeSettings> {
+        val localVariableBody = optimizeSettings
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/optimize/settings",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

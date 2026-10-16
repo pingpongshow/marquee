@@ -27,11 +27,17 @@ import java.io.IOException
 import okhttp3.Call
 import okhttp3.HttpUrl
 
+import app.marquee.api.models.CheckPlexSignIn200Response
 import app.marquee.api.models.Error
 import app.marquee.api.models.PlexImportPreview
 import app.marquee.api.models.PlexImportRequest
 import app.marquee.api.models.PlexImportStatus
+import app.marquee.api.models.PlexSignIn
+import app.marquee.api.models.PlexSyncReport
+import app.marquee.api.models.PlexSyncSettingsUpdate
+import app.marquee.api.models.PlexSyncStatus
 import app.marquee.api.models.PreviewPlexImportRequest
+import app.marquee.api.models.SetPlexSyncUserRequest
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -57,6 +63,79 @@ open class PlexApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
         val defaultBasePath: String by lazy {
             System.getProperties().getProperty(ApiClient.BASE_URL_KEY, "/api/v1")
         }
+    }
+
+    /**
+     * GET /plex-sync/pin/{pinId}
+     * Whether Sign in with Plex finished; once it has, the token is saved for sync (admin only).
+     * 
+     * @param pinId 
+     * @return CheckPlexSignIn200Response
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun checkPlexSignIn(pinId: kotlin.Long) : CheckPlexSignIn200Response {
+        val localVarResponse = checkPlexSignInWithHttpInfo(pinId = pinId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as CheckPlexSignIn200Response
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /plex-sync/pin/{pinId}
+     * Whether Sign in with Plex finished; once it has, the token is saved for sync (admin only).
+     * 
+     * @param pinId 
+     * @return ApiResponse<CheckPlexSignIn200Response?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun checkPlexSignInWithHttpInfo(pinId: kotlin.Long) : ApiResponse<CheckPlexSignIn200Response?> {
+        val localVariableConfig = checkPlexSignInRequestConfig(pinId = pinId)
+
+        return request<Unit, CheckPlexSignIn200Response>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation checkPlexSignIn
+     *
+     * @param pinId 
+     * @return RequestConfig
+     */
+    fun checkPlexSignInRequestConfig(pinId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/plex-sync/pin/{pinId}".replace("{"+"pinId"+"}", encodeURIComponent(pinId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
     }
 
     /**
@@ -122,6 +201,76 @@ open class PlexApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/plex-import",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /plex-sync
+     * Two-way Plex sync settings, status, Plex accounts and the last run (admin only).
+     * 
+     * @return PlexSyncStatus
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getPlexSync() : PlexSyncStatus {
+        val localVarResponse = getPlexSyncWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as PlexSyncStatus
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /plex-sync
+     * Two-way Plex sync settings, status, Plex accounts and the last run (admin only).
+     * 
+     * @return ApiResponse<PlexSyncStatus?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getPlexSyncWithHttpInfo() : ApiResponse<PlexSyncStatus?> {
+        val localVariableConfig = getPlexSyncRequestConfig()
+
+        return request<Unit, PlexSyncStatus>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getPlexSync
+     *
+     * @return RequestConfig
+     */
+    fun getPlexSyncRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/plex-sync",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -204,6 +353,223 @@ open class PlexApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
     }
 
     /**
+     * POST /plex-sync/preview
+     * Work out what a sync would change each way, without changing anything in Marquee or Plex (admin only). Can take a while on a large library.
+     * 
+     * @return PlexSyncReport
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun previewPlexSync() : PlexSyncReport {
+        val localVarResponse = previewPlexSyncWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as PlexSyncReport
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /plex-sync/preview
+     * Work out what a sync would change each way, without changing anything in Marquee or Plex (admin only). Can take a while on a large library.
+     * 
+     * @return ApiResponse<PlexSyncReport?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun previewPlexSyncWithHttpInfo() : ApiResponse<PlexSyncReport?> {
+        val localVariableConfig = previewPlexSyncRequestConfig()
+
+        return request<Unit, PlexSyncReport>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation previewPlexSync
+     *
+     * @return RequestConfig
+     */
+    fun previewPlexSyncRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/plex-sync/preview",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /plex-sync/run
+     * Sync with Plex now, in the background (admin only). Works whether automatic sync is on or off.
+     * 
+     * @return PlexSyncStatus
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun runPlexSync() : PlexSyncStatus {
+        val localVarResponse = runPlexSyncWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as PlexSyncStatus
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /plex-sync/run
+     * Sync with Plex now, in the background (admin only). Works whether automatic sync is on or off.
+     * 
+     * @return ApiResponse<PlexSyncStatus?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun runPlexSyncWithHttpInfo() : ApiResponse<PlexSyncStatus?> {
+        val localVariableConfig = runPlexSyncRequestConfig()
+
+        return request<Unit, PlexSyncStatus>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation runPlexSync
+     *
+     * @return RequestConfig
+     */
+    fun runPlexSyncRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/plex-sync/run",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /plex-sync/users/{plexAccountId}
+     * Choose the Marquee user a Plex account syncs with (admin only).
+     * 
+     * @param plexAccountId 
+     * @param setPlexSyncUserRequest 
+     * @return PlexSyncStatus
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun setPlexSyncUser(plexAccountId: kotlin.Long, setPlexSyncUserRequest: SetPlexSyncUserRequest) : PlexSyncStatus {
+        val localVarResponse = setPlexSyncUserWithHttpInfo(plexAccountId = plexAccountId, setPlexSyncUserRequest = setPlexSyncUserRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as PlexSyncStatus
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /plex-sync/users/{plexAccountId}
+     * Choose the Marquee user a Plex account syncs with (admin only).
+     * 
+     * @param plexAccountId 
+     * @param setPlexSyncUserRequest 
+     * @return ApiResponse<PlexSyncStatus?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun setPlexSyncUserWithHttpInfo(plexAccountId: kotlin.Long, setPlexSyncUserRequest: SetPlexSyncUserRequest) : ApiResponse<PlexSyncStatus?> {
+        val localVariableConfig = setPlexSyncUserRequestConfig(plexAccountId = plexAccountId, setPlexSyncUserRequest = setPlexSyncUserRequest)
+
+        return request<SetPlexSyncUserRequest, PlexSyncStatus>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation setPlexSyncUser
+     *
+     * @param plexAccountId 
+     * @param setPlexSyncUserRequest 
+     * @return RequestConfig
+     */
+    fun setPlexSyncUserRequestConfig(plexAccountId: kotlin.Long, setPlexSyncUserRequest: SetPlexSyncUserRequest) : RequestConfig<SetPlexSyncUserRequest> {
+        val localVariableBody = setPlexSyncUserRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/plex-sync/users/{plexAccountId}".replace("{"+"plexAccountId"+"}", encodeURIComponent(plexAccountId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * POST /plex-import
      * Start an import in the background (admin only). Safe to run again; nothing is duplicated.
      * 
@@ -270,6 +636,150 @@ open class PlexApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/plex-import",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /plex-sync/pin
+     * Start Sign in with Plex: open authUrl (or enter the code at plex.tv/link), then poll the PIN (admin only).
+     * 
+     * @return PlexSignIn
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun startPlexSignIn() : PlexSignIn {
+        val localVarResponse = startPlexSignInWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as PlexSignIn
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /plex-sync/pin
+     * Start Sign in with Plex: open authUrl (or enter the code at plex.tv/link), then poll the PIN (admin only).
+     * 
+     * @return ApiResponse<PlexSignIn?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun startPlexSignInWithHttpInfo() : ApiResponse<PlexSignIn?> {
+        val localVariableConfig = startPlexSignInRequestConfig()
+
+        return request<Unit, PlexSignIn>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation startPlexSignIn
+     *
+     * @return RequestConfig
+     */
+    fun startPlexSignInRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/plex-sync/pin",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PATCH /plex-sync
+     * Change two-way Plex sync settings (admin only). Fields left out stay as they are.
+     * 
+     * @param plexSyncSettingsUpdate 
+     * @return PlexSyncStatus
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun updatePlexSync(plexSyncSettingsUpdate: PlexSyncSettingsUpdate) : PlexSyncStatus {
+        val localVarResponse = updatePlexSyncWithHttpInfo(plexSyncSettingsUpdate = plexSyncSettingsUpdate)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as PlexSyncStatus
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PATCH /plex-sync
+     * Change two-way Plex sync settings (admin only). Fields left out stay as they are.
+     * 
+     * @param plexSyncSettingsUpdate 
+     * @return ApiResponse<PlexSyncStatus?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun updatePlexSyncWithHttpInfo(plexSyncSettingsUpdate: PlexSyncSettingsUpdate) : ApiResponse<PlexSyncStatus?> {
+        val localVariableConfig = updatePlexSyncRequestConfig(plexSyncSettingsUpdate = plexSyncSettingsUpdate)
+
+        return request<PlexSyncSettingsUpdate, PlexSyncStatus>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation updatePlexSync
+     *
+     * @param plexSyncSettingsUpdate 
+     * @return RequestConfig
+     */
+    fun updatePlexSyncRequestConfig(plexSyncSettingsUpdate: PlexSyncSettingsUpdate) : RequestConfig<PlexSyncSettingsUpdate> {
+        val localVariableBody = plexSyncSettingsUpdate
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PATCH,
+            path = "/plex-sync",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
