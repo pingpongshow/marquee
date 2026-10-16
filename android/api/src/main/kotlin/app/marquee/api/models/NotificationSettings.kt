@@ -43,6 +43,7 @@ import kotlinx.serialization.Contextual
  * @param linkUrl Address links in mail start with (e.g. reset links). Empty = the Remote Access URL.
  * @param alerts Alert types that are on. All are off by default.
  * @param dvrQuotaAlert The dvr_quota alert is on: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Off by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.)
+ * @param plexSyncAlert The plex_sync alert is on: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Off by default. (Not in AlertType; notifications carry type plex_sync.)
  * @param recipientsAllAdmins Mail alerts to every administrator with an email address.
  * @param recipients Administrators (user ids) who get alert mail when recipientsAllAdmins is off.
  * @param diskThresholdPercent Alert when a volume has less free space than this.
@@ -88,6 +89,10 @@ data class NotificationSettings (
     /* The dvr_quota alert is on: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Off by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.) */
     @SerialName(value = "dvrQuotaAlert")
     val dvrQuotaAlert: kotlin.Boolean? = null,
+
+    /* The plex_sync alert is on: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Off by default. (Not in AlertType; notifications carry type plex_sync.) */
+    @SerialName(value = "plexSyncAlert")
+    val plexSyncAlert: kotlin.Boolean? = null,
 
     /* Mail alerts to every administrator with an email address. */
     @SerialName(value = "recipientsAllAdmins")

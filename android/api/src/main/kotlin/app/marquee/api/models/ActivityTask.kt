@@ -33,7 +33,7 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param id Stable id, e.g. scan:3
- * @param kind download: a VOD title being saved to the library (admins).
+ * @param kind download: a VOD title being saved to the library (admins). optimize: a library file being re-encoded by the optimizer (admins).
  * @param title 
  * @param state 
  * @param libraryId 
@@ -47,7 +47,7 @@ data class ActivityTask (
     @SerialName(value = "id")
     val id: kotlin.String,
 
-    /* download: a VOD title being saved to the library (admins). */
+    /* download: a VOD title being saved to the library (admins). optimize: a library file being re-encoded by the optimizer (admins). */
     @SerialName(value = "kind")
     val kind: ActivityTask.Kind,
 
@@ -66,9 +66,9 @@ data class ActivityTask (
 ) {
 
     /**
-     * download: a VOD title being saved to the library (admins).
+     * download: a VOD title being saved to the library (admins). optimize: a library file being re-encoded by the optimizer (admins).
      *
-     * Values: SCAN,IMPORT,STREAM,TASK,DOWNLOAD
+     * Values: SCAN,IMPORT,STREAM,TASK,DOWNLOAD,OPTIMIZE
      */
     @Serializable
     enum class Kind(val value: kotlin.String) {
@@ -76,7 +76,8 @@ data class ActivityTask (
         @SerialName(value = "import") IMPORT("import"),
         @SerialName(value = "stream") STREAM("stream"),
         @SerialName(value = "task") TASK("task"),
-        @SerialName(value = "download") DOWNLOAD("download");
+        @SerialName(value = "download") DOWNLOAD("download"),
+        @SerialName(value = "optimize") OPTIMIZE("optimize");
     }
     /**
      * 
