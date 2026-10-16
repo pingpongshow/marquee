@@ -23,6 +23,8 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.VodLibraryMatch
+import app.marquee.api.models.VodSaveState
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -44,6 +46,8 @@ import kotlinx.serialization.Contextual
  * @param rating 
  * @param stillUrl Server-relative; no token needed.
  * @param positionMs The caller's resume point.
+ * @param save 
+ * @param library 
  */
 @Serializable
 
@@ -90,7 +94,13 @@ data class VodEpisode (
 
     /* The caller's resume point. */
     @SerialName(value = "positionMs")
-    val positionMs: kotlin.Long? = null
+    val positionMs: kotlin.Long? = null,
+
+    @SerialName(value = "save")
+    val save: VodSaveState? = null,
+
+    @SerialName(value = "library")
+    val library: VodLibraryMatch? = null
 
 ) {
 

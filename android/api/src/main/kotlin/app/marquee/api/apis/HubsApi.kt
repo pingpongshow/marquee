@@ -27,6 +27,7 @@ import java.io.IOException
 import okhttp3.Call
 import okhttp3.HttpUrl
 
+import app.marquee.api.models.ContinueWatchingPage
 import app.marquee.api.models.Error
 import app.marquee.api.models.HomeLayout
 import app.marquee.api.models.Hub
@@ -55,6 +56,90 @@ open class HubsApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
         val defaultBasePath: String by lazy {
             System.getProperties().getProperty(ApiClient.BASE_URL_KEY, "/api/v1")
         }
+    }
+
+    /**
+     * GET /hubs/continue-watching
+     * All of the caller&#39;s Continue Watching, newest first, a page at a time: in-progress library movies, episodes and videos, the next episode of every show they&#39;ve watched (no time limit), and films and episodes on demand stopped part-way through (when on demand is on and theirs to watch). Home&#39;s row is the first 20.
+     * 
+     * @param offset  (optional, default to 0)
+     * @param limit  (optional, default to 50)
+     * @return ContinueWatchingPage
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun continueWatching(offset: kotlin.Int? = 0, limit: kotlin.Int? = 50) : ContinueWatchingPage {
+        val localVarResponse = continueWatchingWithHttpInfo(offset = offset, limit = limit)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ContinueWatchingPage
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /hubs/continue-watching
+     * All of the caller&#39;s Continue Watching, newest first, a page at a time: in-progress library movies, episodes and videos, the next episode of every show they&#39;ve watched (no time limit), and films and episodes on demand stopped part-way through (when on demand is on and theirs to watch). Home&#39;s row is the first 20.
+     * 
+     * @param offset  (optional, default to 0)
+     * @param limit  (optional, default to 50)
+     * @return ApiResponse<ContinueWatchingPage?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun continueWatchingWithHttpInfo(offset: kotlin.Int?, limit: kotlin.Int?) : ApiResponse<ContinueWatchingPage?> {
+        val localVariableConfig = continueWatchingRequestConfig(offset = offset, limit = limit)
+
+        return request<Unit, ContinueWatchingPage>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation continueWatching
+     *
+     * @param offset  (optional, default to 0)
+     * @param limit  (optional, default to 50)
+     * @return RequestConfig
+     */
+    fun continueWatchingRequestConfig(offset: kotlin.Int?, limit: kotlin.Int?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (offset != null) {
+                    put("offset", listOf(offset.toString()))
+                }
+                if (limit != null) {
+                    put("limit", listOf(limit.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/hubs/continue-watching",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
     }
 
     /**
@@ -261,6 +346,97 @@ open class HubsApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
         return RequestConfig(
             method = RequestMethod.DELETE,
             path = "/hubs/continue-watching/{itemId}".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * enum for parameter kind
+     */
+     enum class KindRemoveVodFromContinueWatching(val value: kotlin.String) {
+         @SerialName(value = "movie") MOVIE("movie"),
+         @SerialName(value = "episode") EPISODE("episode");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * DELETE /hubs/continue-watching/vod/{kind}/{vodId}
+     * Removes a film on demand, or an episode&#39;s series, from your Continue Watching. The resume point is kept; it comes back once you play it (or, for a series, any of its episodes) again.
+     * 
+     * @param kind 
+     * @param vodId The film&#39;s or episode&#39;s id.
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun removeVodFromContinueWatching(kind: KindRemoveVodFromContinueWatching, vodId: kotlin.Long) : Unit {
+        val localVarResponse = removeVodFromContinueWatchingWithHttpInfo(kind = kind, vodId = vodId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /hubs/continue-watching/vod/{kind}/{vodId}
+     * Removes a film on demand, or an episode&#39;s series, from your Continue Watching. The resume point is kept; it comes back once you play it (or, for a series, any of its episodes) again.
+     * 
+     * @param kind 
+     * @param vodId The film&#39;s or episode&#39;s id.
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun removeVodFromContinueWatchingWithHttpInfo(kind: KindRemoveVodFromContinueWatching, vodId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = removeVodFromContinueWatchingRequestConfig(kind = kind, vodId = vodId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation removeVodFromContinueWatching
+     *
+     * @param kind 
+     * @param vodId The film&#39;s or episode&#39;s id.
+     * @return RequestConfig
+     */
+    fun removeVodFromContinueWatchingRequestConfig(kind: KindRemoveVodFromContinueWatching, vodId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/hubs/continue-watching/vod/{kind}/{vodId}".replace("{"+"kind"+"}", encodeURIComponent(kind.value.toString())).replace("{"+"vodId"+"}", encodeURIComponent(vodId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

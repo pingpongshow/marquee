@@ -1,0 +1,292 @@
+package app.marquee.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavHostController
+import app.marquee.api.apis.HubsApi
+import app.marquee.api.models.ContinueEntry
+import app.marquee.api.models.Hub
+import app.marquee.api.models.ItemSummary
+import coil3.compose.AsyncImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+// Continue Watching (USER-12, LIVE-6): library titles and films and episodes on demand together,
+// newest first: Home's row (the first 20, ending in View more when there are others) and a page
+// with all of them.
+
+const val CONTINUE_HUB = "continue-watching"
+const val CONTINUE_ROUTE = "continue"
+
+/** The row's entries: the hub's own when the server sends them, else its library items (an older server). */
+fun continueEntries(hub: Hub): List<ContinueEntry> = hub.propertyEntries ?: hub.items.map(::itemEntry)
+
+/** A library item as an entry. */
+fun itemEntry(item: ItemSummary) = ContinueEntry(
+    kind = ContinueEntry.Kind.ITEM, key = "item:${item.id}", positionMs = item.viewOffsetMs ?: 0, durationMs = item.durationMs ?: 0,
+    lastWatchedAt = item.lastViewedAt ?: java.time.OffsetDateTime.MIN, item = item,
+)
+
+/** Whether the row ends in View more: there are more entries than it holds. */
+fun continueHasMore(hub: Hub): Boolean = (hub.total ?: 0) > (hub.propertyEntries?.size ?: Int.MAX_VALUE)
+
+/** What removing a VOD entry from Continue Watching sends: the film, or the episode (whose series goes). */
+fun vodRemoval(e: ContinueEntry): Pair<HubsApi.KindRemoveVodFromContinueWatching, Long>? = when {
+    e.vodMovie != null -> HubsApi.KindRemoveVodFromContinueWatching.MOVIE to e.vodMovie!!.id
+    e.vodEpisode != null -> HubsApi.KindRemoveVodFromContinueWatching.EPISODE to e.vodEpisode!!.id
+    else -> null
+}
+
+/** Where opening an entry goes: library videos play (as Home always did), films and episodes on demand resume in their player. */
+fun continueRoute(e: ContinueEntry): String? {
+    e.item?.let { return null }
+    e.vodMovie?.let { return "vodplay/${it.id}" }
+    e.vodEpisode?.let { return "vodepplay/${it.seriesId}/${it.id}" }
+    return null
+}
+
+/** How far through an entry, while it's partly watched (an episode's duration may be unknown: then its runtime). */
+fun continueProgress(e: ContinueEntry): Float? {
+    if (e.positionMs <= 0) return null
+    val dur = e.durationMs.takeIf { it > 0 } ?: e.vodMovie?.runtimeMs ?: e.vodEpisode?.runtimeMs ?: return null
+    if (dur <= 0) return null
+    return (e.positionMs.toFloat() / dur).coerceIn(0f, 1f)
+}
+
+/** A VOD entry's title and the line under it: the film and its year, or the show and "S1 · E3 · Title". */
+fun vodTitles(e: ContinueEntry): Pair<String, String> {
+    e.vodMovie?.let { m -> return m.title to listOfNotNull("On demand", m.year?.toString()).joinToString(" · ") }
+    e.vodEpisode?.let { ep -> return ep.seriesTitle to listOf(ep.label(), ep.title).filter { it.isNotBlank() }.joinToString(" · ") }
+    return "" to ""
+}
+
+/**
+ * One Continue Watching tile: a library item as Home has always shown it, or a film or episode
+ * on demand. The context menu removes it from Continue Watching ([onRemoved] gets its key).
+ */
+@Composable
+fun ContinueTile(nav: NavHostController, e: ContinueEntry, width: Dp, autoFocus: Boolean, onOpen: () -> Unit, onRemoved: (String) -> Unit) {
+    val marquee = LocalMarquee.current
+    val item = e.item
+    if (item != null) {
+        PosterCard(item, marquee.imageUrl(item.images?.thumb ?: item.images?.backdrop, 300), width, { onOpen(); openItem(nav, item, play = true) },
+            shape = Shape.Wide, autoFocus = autoFocus, actions = tileActions(item, continueWatching = true) { id -> onRemoved("item:$id") })
+        return
+    }
+    VodContinueTile(nav, e, width, autoFocus, onOpen, onRemoved)
+}
+
+@Composable
+private fun VodContinueTile(nav: NavHostController, e: ContinueEntry, width: Dp, autoFocus: Boolean, onOpen: () -> Unit, onRemoved: (String) -> Unit) {
+    val marquee = LocalMarquee.current
+    val context = LocalContext.current
+    var menu by remember { mutableStateOf(false) }
+    val m = e.vodMovie
+    val ep = e.vodEpisode
+    val (title, sub) = vodTitles(e)
+    // Wide artwork: the film's backdrop over its poster, or the episode's still over the series poster.
+    val under = marquee.absolute(m?.posterUrl ?: e.seriesPosterUrl)
+    val over = marquee.absolute(if (m != null) "/api/v1/livetv/vod/movies/${m.id}/image?kind=backdrop" else ep?.stillUrl)
+    val actions = buildList {
+        if (!marquee.isOffline) add(TileAction("Remove from Continue Watching") {
+            val (kind, id) = vodRemoval(e) ?: return@TileAction
+            marquee.scope.launch {
+                withContext(Dispatchers.IO) { runCatching { marquee.hubs.removeVodFromContinueWatching(kind, id) } }
+                    .onSuccess { withContext(Dispatchers.Main) { onRemoved(e.key) }; marquee.watch.changed(); VodChanges.bump() }
+                    .onFailure { toast(context, "Couldn't remove “$title”: ${it.message ?: ""}") }
+            }
+        })
+        if (m != null) add(TileAction("Go to film") { nav.navigate("vod/${m.id}") })
+        if (ep != null) add(TileAction("Go to show") { nav.navigate("vodshow/${ep.seriesId}") })
+    }
+    Column(Modifier.width(width)) {
+        Box {
+            Box(Modifier.fillMaxWidth().initialFocus(autoFocus).focusCard({ onOpen(); continueRoute(e)?.let { nav.navigate(it) } }, onLongClick = { menu = true })
+                .semantics {
+                    contentDescription = listOf(title, sub).filter { it.isNotBlank() }.joinToString(", ")
+                    customActions = actions.map { a -> CustomAccessibilityAction(a.label) { a.run(); true } }
+                }) {
+                Artwork(under, title, Shape.Wide, Modifier.fillMaxWidth())
+                if (over != null) AsyncImage(over, null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
+            }
+            continueProgress(e)?.let {
+                LinearProgressIndicator(progress = { it }, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(6.dp).height(3.dp),
+                    color = Gold, trackColor = Color.White.copy(alpha = 0.3f), drawStopIndicator = {})
+            }
+            DropdownMenu(menu, { menu = false }) {
+                actions.forEach { a -> DropdownMenuItem({ Text(a.label) }, { menu = false; a.run() }) }
+            }
+        }
+        Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(if (m != null) Icons.Filled.Movie else Icons.Filled.Tv, null, Modifier.padding(end = 4.dp).size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+        }
+        Text(sub, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** The row's last tile when there's more than it shows (as tall as the row's artwork): opens the Continue Watching page. */
+@Composable
+fun ViewMoreTile(total: Int, width: Dp, height: Dp, onClick: () -> Unit) {
+    Column(Modifier.width(width)) {
+        Column(Modifier.fillMaxWidth().height(height).focusCard(onClick).background(MaterialTheme.colorScheme.surfaceVariant)
+            .semantics { contentDescription = "View more, $total in all" },
+            verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("View more", fontWeight = FontWeight.SemiBold)
+            Text("$total in all", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.Filled.ChevronRight, null)
+        }
+    }
+}
+
+/**
+ * Home's Continue Watching row: [hub]'s entries less those removed here ([removed], keys) or just
+ * marked watched, ending in View more (and with a title that opens the page) when there are more.
+ */
+@Composable
+fun ContinueRow(nav: NavHostController, hub: Hub, removed: List<String>, width: Dp, focusFirst: Boolean, openedKey: String?,
+    onOpen: (String) -> Unit, onRemoved: (String) -> Unit) {
+    val marquee = LocalMarquee.current
+    val marks by marquee.watch.marks.collectAsState()
+    val shown = continueEntries(hub).filter { e -> e.key !in removed && e.item?.let { marquee.watch.markFor(it, marks)?.on == true } != true }
+    if (shown.isEmpty()) return
+    val more = continueHasMore(hub)
+    val openPage = { nav.navigate(CONTINUE_ROUTE) }
+    // null: the View more tile.
+    Shelf<ContinueEntry?>(hub.title, if (more) shown + null else shown, sidePadding, onTitle = if (more) openPage else null) { i, e ->
+        if (e == null) ViewMoreTile(hub.total ?: 0, width * 0.7f, width / Shape.Wide.ratio, openPage)
+        else ContinueTile(nav, e, width, autoFocus = marquee.isTv && (if (openedKey != null) e.key == openedKey else focusFirst && i == 0),
+            onOpen = { onOpen(e.key) }, onRemoved = onRemoved)
+    }
+}
+
+/** What the Continue Watching page has loaded, kept while it's on the back stack (so Back returns to the same place). */
+private class ContinuePage {
+    val entries = mutableStateListOf<ContinueEntry>()
+    var total by mutableIntStateOf(-1)
+    var loading by mutableStateOf(false)
+    var error by mutableStateOf<String?>(null)
+    var opened by mutableStateOf<String?>(null)
+    var generation = 0
+}
+
+private const val CONTINUE_PAGE = 60
+
+/** All of Continue Watching, a page at a time as you scroll: the row's tiles, taps and removal. */
+@Composable
+fun ContinueWatchingScreen(nav: NavHostController) {
+    val marquee = LocalMarquee.current
+    val scope = rememberCoroutineScope()
+    val page = rememberCached("continue-page") { ContinuePage() }
+    val changes by marquee.watch.changes.collectAsState()
+    val vodChanged by VodChanges.version.collectAsState()
+    val marks by marquee.watch.marks.collectAsState()
+    val removed = remember { mutableStateListOf<String>() }
+
+    fun loadMore() {
+        if (page.loading || (page.total >= 0 && page.entries.size >= page.total)) return
+        page.loading = true
+        val gen = page.generation
+        scope.launch {
+            withContext(Dispatchers.IO) { runCatching { marquee.hubs.continueWatching(page.entries.size, CONTINUE_PAGE) } }
+                .onSuccess { p ->
+                    if (gen == page.generation) {
+                        val have = page.entries.map { it.key }.toSet()
+                        page.entries.addAll(p.propertyEntries.filter { it.key !in have }); page.total = p.total; page.error = null
+                    }
+                }
+                .onFailure { if (gen == page.generation) page.error = it.message ?: "Couldn't load" }
+            if (gen == page.generation) page.loading = false
+        }
+    }
+    // Opened, and after playback or a change: the first pages again (as many as were loaded), replacing what's shown.
+    LaunchedEffect(changes, vodChanged) {
+        val gen = ++page.generation
+        page.loading = true
+        val n = page.entries.size.coerceIn(CONTINUE_PAGE, 200)
+        withContext(Dispatchers.IO) { runCatching { marquee.hubs.continueWatching(0, n) } }
+            .onSuccess { p ->
+                if (gen == page.generation) { page.entries.clear(); page.entries.addAll(p.propertyEntries); page.total = p.total; page.error = null; removed.clear() }
+            }
+            .onFailure { if (gen == page.generation && page.total < 0) page.error = it.message ?: "Couldn't load" }
+        if (gen == page.generation) page.loading = false
+    }
+    val width = if (marquee.isTv) 240.dp else 168.dp
+    val shown = page.entries.filter { e -> e.key !in removed && e.item?.let { marquee.watch.markFor(it, marks)?.on == true } != true }
+    val full: androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan = { GridItemSpan(maxLineSpan) }
+    LazyVerticalGrid(GridCells.Adaptive(width), Modifier.fillMaxSize().semantics { contentDescription = "Continue Watching" },
+        contentPadding = PaddingValues(start = sidePadding, end = sidePadding, top = 16.dp, bottom = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        item(span = full, key = "header") {
+            Column {
+                Text("Continue Watching", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                if (page.total > 0) Text("${page.total} in all", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        page.error?.takeIf { shown.isEmpty() }?.let { e -> item(span = full, key = "error") { Text(e, color = MaterialTheme.colorScheme.error) } }
+        if (page.total == 0 || (page.total > 0 && shown.isEmpty() && !page.loading)) item(span = full, key = "empty") {
+            Text("Nothing to continue.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        itemsIndexed(shown, key = { _, e -> e.key }) { i, e ->
+            if (i >= shown.size - 12) LaunchedEffect(i, shown.size) { loadMore() }
+            // The cell's width: a tile fills it.
+            androidx.compose.foundation.layout.BoxWithConstraints {
+                ContinueTile(nav, e, maxWidth, autoFocus = marquee.isTv && (if (page.opened != null) e.key == page.opened else i == 0),
+                    onOpen = { page.opened = e.key }, onRemoved = { removed.add(it) })
+            }
+        }
+        if (page.loading && page.entries.isEmpty()) item(span = full, key = "loading") {
+            Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        }
+    }
+}

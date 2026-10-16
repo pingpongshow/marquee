@@ -105,16 +105,19 @@ fun HomeScreen(nav: NavHostController) {
     // Reloads after watched marks or a removal from Continue Watching (USER-6), keeping the rows shown meanwhile.
     val changes by marquee.watch.changes.collectAsState()
     // Removed from Continue Watching: gone at once, until the row reloads.
-    val removed = remember { mutableStateListOf<Long>() }
+    val removed = remember { mutableStateListOf<String>() }
     // Kept while Home is on the back stack: coming back shows the same rows at once (refreshed in place), so it keeps its place.
     val hubsState = rememberCached("home-hubs") { mutableStateOf<Result<List<Hub>>?>(null) }
     val hubs by hubsState
     var opened by rememberLastOpened("home")
-    LaunchedEffect(connection, changes) {
+    // A Continue Watching tile opened last (its key: films and episodes on demand have no item id), for the D-pad's return.
+    var openedKey by rememberCached("home:openedKey") { mutableStateOf<String?>(null) }
+    // Films and episodes on demand report where they stopped as their player closes.
+    val vodChanged by VodChanges.version.collectAsState()
+    LaunchedEffect(connection, changes, vodChanged) {
         val fresh = withContext(Dispatchers.IO) { runCatching { marquee.hubs.homeHubs() } }
         if (fresh.isSuccess || hubsState.value?.isSuccess != true) { hubsState.value = fresh; if (fresh.isSuccess) removed.clear() }
     }
-    val marks by marquee.watch.marks.collectAsState()
     val cardWidth = if (marquee.isTv) 130.dp else 120.dp
     when (val h = hubs) {
         null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -155,15 +158,18 @@ fun HomeScreen(nav: NavHostController) {
             }
             if (!marquee.isOffline) h.exceptionOrNull()?.let { e -> item { Text("Couldn't load: ${e.message}", Modifier.padding(horizontal = sidePadding), color = MaterialTheme.colorScheme.error) } }
             itemsIndexed(h.getOrDefault(emptyList()), key = { _, it -> it.id }) { hi, hub ->
-                val wide = hub.id == "continue-watching"
-                // Continue Watching drops what was removed or just marked watched here, before the row reloads.
-                val shown = if (!wide) hub.items else hub.items.filter { it.id !in removed && marquee.watch.markFor(it, marks)?.on != true }
-                if (shown.isEmpty()) return@itemsIndexed
-                Shelf(hub.title, shown, sidePadding, onTitle = HomeRows.route(hub.id)?.let { r -> { nav.navigate(r) } }) { i, it ->
-                    val art = if (wide) it.images?.thumb ?: it.images?.backdrop else it.images?.poster
-                    PosterCard(it, marquee.imageUrl(art, 300), if (wide) cardWidth * 1.6f else cardWidth, { opened = it.id; openItem(nav, it, play = wide) },
-                        shape = if (wide) Shape.Wide else shapeFor(it), autoFocus = marquee.isTv && (if (opened != null) it.id == opened else hi == 0 && i == 0),
-                        actions = tileActions(it, continueWatching = wide) { id -> removed.add(id) })
+                val first = opened == null && openedKey == null && hi == 0
+                // Continue Watching: library titles and films and episodes on demand together, with View more (LIVE-6).
+                if (hub.id == CONTINUE_HUB) {
+                    ContinueRow(nav, hub, removed, cardWidth * 1.6f, focusFirst = first, openedKey = openedKey,
+                        onOpen = { k -> openedKey = k; opened = null }, onRemoved = { k -> removed.add(k) })
+                    return@itemsIndexed
+                }
+                if (hub.items.isEmpty()) return@itemsIndexed
+                Shelf(hub.title, hub.items, sidePadding, onTitle = HomeRows.route(hub.id)?.let { r -> { nav.navigate(r) } }) { i, it ->
+                    PosterCard(it, marquee.imageUrl(it.images?.poster, 300), cardWidth, { opened = it.id; openedKey = null; openItem(nav, it) },
+                        shape = shapeFor(it), autoFocus = marquee.isTv && (if (opened != null) it.id == opened else first && i == 0),
+                        actions = tileActions(it))
                 }
             }
         }

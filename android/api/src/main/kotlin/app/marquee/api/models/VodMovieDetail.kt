@@ -23,7 +23,10 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.VodLibraryMatch
 import app.marquee.api.models.VodMovieDetailAllOfCast
+import app.marquee.api.models.VodSaveDestinationRef
+import app.marquee.api.models.VodSaveState
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -51,6 +54,11 @@ import kotlinx.serialization.Contextual
  * @param backdropUrl Server-relative; no token needed.
  * @param tmdbId 
  * @param imdbId 
+ * @param canSave The caller (an admin) can save it into the library: an Xtream Codes film with a movies folder or a movies save folder (saveDestinations) set.
+ * @param saveDefault Admins: saving without a destination works (vodSave.moviesFolder is set).
+ * @param saveDestinations Admins: the extra save folders a film can go to (vodSave.destinations of kind movies or both).
+ * @param save 
+ * @param library 
  */
 @Serializable
 
@@ -117,7 +125,25 @@ data class VodMovieDetail (
     val tmdbId: kotlin.Int? = null,
 
     @SerialName(value = "imdbId")
-    val imdbId: kotlin.String? = null
+    val imdbId: kotlin.String? = null,
+
+    /* The caller (an admin) can save it into the library: an Xtream Codes film with a movies folder or a movies save folder (saveDestinations) set. */
+    @SerialName(value = "canSave")
+    val canSave: kotlin.Boolean? = null,
+
+    /* Admins: saving without a destination works (vodSave.moviesFolder is set). */
+    @SerialName(value = "saveDefault")
+    val saveDefault: kotlin.Boolean? = null,
+
+    /* Admins: the extra save folders a film can go to (vodSave.destinations of kind movies or both). */
+    @SerialName(value = "saveDestinations")
+    val saveDestinations: kotlin.collections.List<VodSaveDestinationRef>? = null,
+
+    @SerialName(value = "save")
+    val save: VodSaveState? = null,
+
+    @SerialName(value = "library")
+    val library: VodLibraryMatch? = null
 
 ) {
 

@@ -23,6 +23,7 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.ContinueEntry
 import app.marquee.api.models.ItemSummary
 
 import kotlinx.serialization.Serializable
@@ -36,6 +37,8 @@ import kotlinx.serialization.Contextual
  * @param title 
  * @param items 
  * @param libraryId 
+ * @param propertyEntries Continue Watching only: the row's entries, library items and films and episodes on demand together, newest first (up to 20; items stays library-only for older apps). When it's present show it instead of items. The row is sent when either has something.
+ * @param total Continue Watching only: how many entries there are in all (GET /hubs/continue-watching); more than entries holds means a View more link.
  */
 @Serializable
 
@@ -51,7 +54,15 @@ data class Hub (
     val items: kotlin.collections.List<ItemSummary>,
 
     @SerialName(value = "libraryId")
-    val libraryId: kotlin.Long? = null
+    val libraryId: kotlin.Long? = null,
+
+    /* Continue Watching only: the row's entries, library items and films and episodes on demand together, newest first (up to 20; items stays library-only for older apps). When it's present show it instead of items. The row is sent when either has something. */
+    @SerialName(value = "entries")
+    val propertyEntries: kotlin.collections.List<ContinueEntry>? = null,
+
+    /* Continue Watching only: how many entries there are in all (GET /hubs/continue-watching); more than entries holds means a View more link. */
+    @SerialName(value = "total")
+    val total: kotlin.Int? = null
 
 ) {
 
