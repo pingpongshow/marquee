@@ -21,6 +21,7 @@ import (
 	"marquee/internal/soundprint"
 	"marquee/internal/tasks"
 	"marquee/internal/vod"
+	"marquee/internal/vodsave"
 )
 
 // Failed sign-ins for one account in the lockout window before an alert (the account is
@@ -36,6 +37,7 @@ type alertDeps struct {
 	live       *livetv.Service
 	dvr        *livetv.Recorder
 	vod        *vod.Service
+	saves      *vodsave.Service
 	player     *playback.Manager
 	libraries  *library.Store
 	ai         *ai.Client
@@ -61,6 +63,24 @@ func wireAlerts(ctx context.Context, d alertDeps) *notify.Watcher {
 	d.vod.OnSourceFailed = func(src settings.VODSource, err error) {
 		raise(notify.Alert{Type: settings.AlertSourceFailed, Subject: "vod:" + src.ID, Title: "Movie source failed: " + src.Name,
 			Message: fmt.Sprintf("Couldn't load the movies-on-demand source %q: %v", src.Name, err)})
+	}
+	d.saves.OnFailed = func(v vodsave.Save) {
+		raise(notify.Alert{Type: settings.AlertVODSaveFailed, Subject: "vodsave:" + strconv.FormatInt(v.ID, 10),
+			Title: "Saving failed: " + v.Title, Message: fmt.Sprintf("Saving %q into the library failed: %s", v.Title, v.Error)})
+	}
+	d.saves.OnDrained = func(done, failed int, titles []string) {
+		msg := fmt.Sprintf("%d saved into the library", done)
+		if failed > 0 {
+			msg += fmt.Sprintf(", %d failed (see Movies on demand → Saves)", failed)
+		}
+		if len(titles) > 0 {
+			msg += ": " + strings.Join(titles, ", ")
+			if done > len(titles) {
+				msg += ", …"
+			}
+		}
+		raise(notify.Alert{Type: settings.AlertVODSaveDone, Subject: "vodsave:" + time.Now().UTC().Format(time.RFC3339),
+			Title: "Saving finished", Message: msg + "."})
 	}
 	d.dvr.OnFailed = func(id int64, title, errMsg string) {
 		if title == "" {

@@ -37,6 +37,7 @@ import (
 	"marquee/internal/tasks"
 	"marquee/internal/trickplay"
 	"marquee/internal/vod"
+	"marquee/internal/vodsave"
 	"marquee/internal/webhooks"
 )
 
@@ -100,6 +101,8 @@ type Handlers struct {
 	// be nil (no mail, no alerts).
 	Mail   *notify.Mailer
 	Alerts *notify.Alerts
+	// VODSaves saves films and episodes on demand into the library (admins only); may be nil.
+	VODSaves *vodsave.Service
 }
 
 var _ StrictServerInterface = (*Handlers)(nil)

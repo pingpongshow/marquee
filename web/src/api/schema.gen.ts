@@ -2555,6 +2555,229 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/livetv/vod/movies/{movieId}/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                movieId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save a film into the library (admin only; Xtream Codes sources). Queued, downloaded, converted per Settings → vodSave, verified, moved into vodSave.moviesFolder and scanned. A film already queued or saved isn't queued again; one in the library is skipped (vodSave.skipExisting). */
+        post: operations["saveVodMovie"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/episodes/{episodeId}/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                episodeId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save one episode into the library (admin only), into vodSave.showsFolder: {Show (Year)}/Season N/{Show} - SxxEyy - {Title} WEBDL-1080p.ext. */
+        post: operations["saveVodEpisode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/series/{seriesId}/save": {
+        parameters: {
+            query?: {
+                /** @description Only this season's episodes. */
+                season?: number;
+            };
+            header?: never;
+            path: {
+                seriesId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save a whole series, or one season, into the library (admin only). The episodes are fetched from the source first when they haven't been; ones already queued or saved are left out. */
+        post: operations["saveVodSeries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/saves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The save queue (admin only): unfinished saves in the order they run, then finished ones, newest first, with live progress, speed and ETA. Poll while active is true. */
+        get: operations["listVodSaves"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/saves/clear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove finished saves (done, failed, cancelled, skipped) from the list (admin only). Failed saves' partial files are deleted. */
+        post: operations["clearVodSaves"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/saves/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pause the whole queue (admin only). Running saves stop and keep their partial files; resuming continues them with Range requests. */
+        post: operations["pauseVodSaves"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/saves/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume the whole queue (admin only). */
+        post: operations["resumeVodSaves"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/saves/{saveId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                saveId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Cancel a save (admin only); its partial files are deleted. */
+        delete: operations["cancelVodSave"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/saves/{saveId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                saveId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Queue a failed or cancelled save again (admin only); a failed one continues from what it downloaded. */
+        post: operations["retryVodSave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/saves/{saveId}/top": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                saveId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Make a waiting save the next to run (admin only). */
+        post: operations["moveVodSaveToTop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/saves/{saveId}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                saveId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pause one save (admin only); it keeps what it downloaded. */
+        post: operations["pauseVodSave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/saves/{saveId}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                saveId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume a paused save (admin only); it continues from where it stopped. */
+        post: operations["resumeVodSave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/requests/status": {
         parameters: {
             query?: never;
@@ -3638,6 +3861,7 @@ export interface components {
             cinema?: components["schemas"]["CinemaSettings"];
             ai?: components["schemas"]["AiSettings"];
             notifications?: components["schemas"]["NotificationSettings"];
+            vodSave?: components["schemas"]["VodSaveSettings"];
             /** @description Replaces the whole list when sent. */
             webhooks?: components["schemas"]["Webhook"][];
         };
@@ -3655,6 +3879,7 @@ export interface components {
             cinema?: components["schemas"]["CinemaSettings"];
             ai?: components["schemas"]["AiSettings"];
             notifications?: components["schemas"]["NotificationSettingsUpdate"];
+            vodSave?: components["schemas"]["VodSaveSettings"];
             /** @description Replaces the whole list when sent. */
             webhooks?: components["schemas"]["Webhook"][];
         };
@@ -3667,9 +3892,11 @@ export interface components {
          *     failed_signins: repeated wrong passwords for one account.
          *     new_admin_device: an administrator signed in from a device never used before.
          *     playback_failed: the transcoder couldn't produce video for a stream.
+         *     vod_save_failed: saving a film or episode on demand into the library failed.
+         *     vod_save_done: the save queue finished (one summary, not one per episode).
          * @enum {string}
          */
-        AlertType: "task_failed" | "disk_low" | "recording_failed" | "source_failed" | "integration_down" | "failed_signins" | "new_admin_device" | "playback_failed";
+        AlertType: "task_failed" | "disk_low" | "recording_failed" | "source_failed" | "integration_down" | "failed_signins" | "new_admin_device" | "playback_failed" | "vod_save_failed" | "vod_save_done";
         /** @description Outgoing email (SMTP) and admin alerts. */
         NotificationSettings: {
             /** @description The mail server, e.g. smtp.example.com. Empty turns email off. */
@@ -4209,6 +4436,9 @@ export interface components {
             imdbId?: string;
             /** @description The details are TMDB's. */
             matched: boolean;
+            /** @description The caller (an admin) can save it into the library: an Xtream Codes film with a movies folder set. */
+            canSave?: boolean;
+            save?: components["schemas"]["VodSaveState"];
         };
         VodMoviePage: {
             total: number;
@@ -4276,6 +4506,8 @@ export interface components {
             episodes: components["schemas"]["VodEpisode"][];
             /** @description The source didn't give the episodes (and none were kept from before). */
             episodesError?: string;
+            /** @description The caller (an admin) can save its episodes into the library (shows folder set). Each episode's save is in episodes[].save. */
+            canSave?: boolean;
         };
         VodSeason: {
             /** @description The season number (0 = specials). */
@@ -4315,6 +4547,153 @@ export interface components {
              */
             positionMs?: number;
             watched: boolean;
+            save?: components["schemas"]["VodSaveState"];
+        };
+        /** @description Saving films and episodes on demand (Xtream Codes sources) into the library (admins only). Partial sends keep the other fields. */
+        VodSaveSettings: {
+            /** @description Where films are saved, as the server sees it (must exist and be writable). Empty turns saving films off. */
+            moviesFolder?: string;
+            /** @description Where episodes are saved. Empty turns saving episodes off. */
+            showsFolder?: string;
+            /**
+             * @description original: the file as it is (MPEG-TS, FLV and other unusual containers are remuxed to MKV). remux: to MKV, every stream copied. transcode: the settings below.
+             * @enum {string}
+             */
+            quality?: "original" | "remux" | "transcode";
+            /**
+             * @description Transcode: resolution cap (never upscaled).
+             * @enum {integer}
+             */
+            maxHeight?: 2160 | 1080 | 720 | 480;
+            /** @enum {string} */
+            videoCodec?: "hevc" | "h264";
+            /**
+             * @description Transcode: constant quality (CRF/CQ), used unless videoKbps is set.
+             * @enum {string}
+             */
+            videoQuality?: "high" | "balanced" | "small";
+            /** @description Transcode: target video bitrate; 0 = use videoQuality. */
+            videoKbps?: number;
+            /**
+             * @description Transcode: audio copied, or AAC stereo, or AAC up to 5.1.
+             * @enum {string}
+             */
+            audio?: "copy" | "aac_stereo" | "aac_51";
+            /** @description Saves at once per source. Default 1. */
+            concurrentPerSource?: number;
+            /** @description Scan the library whose folder holds a saved file. Default on. */
+            scanAfterSave?: boolean;
+            /** @description Skip a title already in a library (by TMDB id) or whose file is already there. Default on. */
+            skipExisting?: boolean;
+            /** @description Pause saves while someone watches (see pauseScope), resuming 60 s after. Default on. */
+            pauseWhileWatching?: boolean;
+            /**
+             * @description source: something from the same source, or Live TV from the same host (Dispatcharr). any: any playback on the server.
+             * @enum {string}
+             */
+            pauseScope?: "source" | "any";
+            /** @description Queue failed saves again every few hours. Default on. */
+            retryFailed?: boolean;
+        };
+        /** @description The latest save of a film or episode (admins only). */
+        VodSaveState: {
+            /** Format: int64 */
+            id: number;
+            state: components["schemas"]["VodSaveStateName"];
+            /** @description 0–1: downloaded share, or the conversion's progress while processing. */
+            progress: number;
+            verified: boolean;
+            error?: string;
+        };
+        /**
+         * @description queued (waiting; see pauseReason), downloading, processing (remux or transcode), verifying, paused (by an admin), done, failed, cancelled, skipped (already in the library).
+         * @enum {string}
+         */
+        VodSaveStateName: "queued" | "downloading" | "processing" | "verifying" | "paused" | "done" | "failed" | "cancelled" | "skipped";
+        VodSave: {
+            /** Format: int64 */
+            id: number;
+            sourceId: string;
+            sourceName?: string;
+            /** @enum {string} */
+            kind: "movie" | "episode";
+            /**
+             * Format: int64
+             * @description The film (kind movie).
+             */
+            movieId?: number;
+            /**
+             * Format: int64
+             * @description The episode (kind episode).
+             */
+            episodeId?: number;
+            /**
+             * Format: int64
+             * @description The episode's series.
+             */
+            seriesId?: number;
+            /** @description e.g. Archer - S01E01 - Mole Hunt. */
+            title: string;
+            /** @description Where it goes (the final name, with its quality tag, once done). */
+            targetPath: string;
+            /** @enum {string} */
+            quality: "original" | "remux" | "transcode";
+            state: components["schemas"]["VodSaveStateName"];
+            /** Format: int64 */
+            bytesDone: number;
+            /**
+             * Format: int64
+             * @description 0 = unknown.
+             */
+            bytesTotal: number;
+            /** @description 0–1 of the current step: download, or conversion while processing. */
+            progress: number;
+            /** @description Download speed in bytes a second (while downloading). */
+            speedBps?: number;
+            /**
+             * Format: int64
+             * @description Time left for the download.
+             */
+            etaSeconds?: number;
+            /** @description Why a queued save isn't running: the queue is paused, something is being watched, or the source is unreachable. */
+            pauseReason?: string;
+            /** @description Network failures in a row. */
+            attempts: number;
+            /**
+             * Format: date-time
+             * @description When a save waiting after a network error tries again.
+             */
+            nextAttemptAt?: string;
+            error?: string;
+            /** @description The file passed verification (size, ffprobe, length, start and end decode). */
+            verified: boolean;
+            verifyNote?: string;
+            /** @description The saved file's SHA-256. */
+            sha256?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: date-time */
+            finishedAt?: string;
+        };
+        VodSaveQueue: {
+            saves: components["schemas"]["VodSave"][];
+            /** @description Something is queued or running (poll while true). */
+            active: boolean;
+            /** @description The whole queue is paused. */
+            paused: boolean;
+            moviesFolderSet: boolean;
+            showsFolderSet: boolean;
+        };
+        VodSaveResult: {
+            /** @description Saves added (or failed ones queued again). */
+            queued: number;
+            /** @description Already queued or saved. */
+            already: number;
+            /** @description Already in the library. */
+            skipped: number;
+            saves: components["schemas"]["VodSave"][];
         };
         VodSeriesPage: {
             total: number;
@@ -10469,6 +10848,302 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    saveVodMovie: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                movieId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What was queued. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodSaveResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    saveVodEpisode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                episodeId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What was queued. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodSaveResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    saveVodSeries: {
+        parameters: {
+            query?: {
+                /** @description Only this season's episodes. */
+                season?: number;
+            };
+            header?: never;
+            path: {
+                seriesId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What was queued. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodSaveResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listVodSaves: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The queue. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodSaveQueue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    clearVodSaves: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cleared. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    pauseVodSaves: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paused. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    resumeVodSaves: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Resumed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    cancelVodSave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                saveId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    retryVodSave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                saveId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    moveVodSaveToTop: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                saveId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Moved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    pauseVodSave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                saveId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paused. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    resumeVodSave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                saveId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     requestsStatus: {

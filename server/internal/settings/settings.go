@@ -35,7 +35,49 @@ type Settings struct {
 	AI           AI           `json:"ai"`
 	// Notifications: outgoing email and admin alerts.
 	Notifications Notifications `json:"notifications"`
+	// VODSave saves movies-on-demand films and episodes into the library (admins only).
+	VODSave VODSave `json:"vodSave"`
 }
+
+// VODSave configures saving films and episodes from movies-on-demand (Xtream Codes) sources
+// into the library's folders. An empty folder turns saving of that kind off.
+type VODSave struct {
+	// MoviesFolder and ShowsFolder are paths as the server sees them.
+	MoviesFolder string `json:"moviesFolder"`
+	ShowsFolder  string `json:"showsFolder"`
+	// Quality: original (the file as it is; only an unusual container is changed, to MKV),
+	// remux (to MKV, every stream copied) or transcode (the settings below).
+	Quality string `json:"quality"`
+	// Transcode: MaxHeight caps the resolution (never upscaled): 2160, 1080, 720 or 480.
+	MaxHeight int `json:"maxHeight"`
+	// VideoCodec is hevc or h264.
+	VideoCodec string `json:"videoCodec"`
+	// VideoQuality is a constant-quality level (high, balanced, small), used unless
+	// VideoKbps (a target bitrate) is set.
+	VideoQuality string `json:"videoQuality"`
+	VideoKbps    int    `json:"videoKbps"`
+	// Audio: copy, aac_stereo or aac_51 (at most 5.1; stereo stays stereo).
+	Audio string `json:"audio"`
+	// ConcurrentPerSource is how many saves run at once per source (1–5).
+	ConcurrentPerSource int `json:"concurrentPerSource"`
+	// ScanAfterSave scans the library whose folder holds a saved file.
+	ScanAfterSave bool `json:"scanAfterSave"`
+	// SkipExisting skips a title already in a library (by TMDB id) or whose file exists.
+	SkipExisting bool `json:"skipExisting"`
+	// PauseWhileWatching pauses saves while someone watches: from the same source (source:
+	// a film or episode from it, or Live TV from the same host) or anything at all (any).
+	PauseWhileWatching bool   `json:"pauseWhileWatching"`
+	PauseScope         string `json:"pauseScope"`
+	// RetryFailed queues failed saves again every few hours.
+	RetryFailed bool `json:"retryFailed"`
+}
+
+// VODSave quality modes.
+const (
+	VODSaveOriginal  = "original"
+	VODSaveRemux     = "remux"
+	VODSaveTranscode = "transcode"
+)
 
 // Alert types an administrator can turn on (all off by default).
 const (
@@ -47,11 +89,13 @@ const (
 	AlertFailedSignIns   = "failed_signins"
 	AlertNewAdminDevice  = "new_admin_device"
 	AlertPlaybackFailed  = "playback_failed"
+	AlertVODSaveFailed   = "vod_save_failed"
+	AlertVODSaveDone     = "vod_save_done"
 )
 
 // AlertTypes lists every alert type.
 var AlertTypes = []string{AlertTaskFailed, AlertDiskLow, AlertRecordingFailed, AlertSourceFailed,
-	AlertIntegrationDown, AlertFailedSignIns, AlertNewAdminDevice, AlertPlaybackFailed}
+	AlertIntegrationDown, AlertFailedSignIns, AlertNewAdminDevice, AlertPlaybackFailed, AlertVODSaveFailed, AlertVODSaveDone}
 
 // Notifications configures outgoing email (SMTP) and which alerts administrators get.
 type Notifications struct {
@@ -320,6 +364,9 @@ func Defaults() Settings {
 		Integrations: Integrations{DVRPaddingBefore: 1, DVRPaddingAfter: 3},
 		Notifications: Notifications{SMTPPort: 587, SMTPSecurity: "starttls", FromName: "Marquee",
 			RecipientsAllAdmins: true, DiskThresholdPercent: 10},
+		VODSave: VODSave{Quality: VODSaveOriginal, MaxHeight: 1080, VideoCodec: "hevc", VideoQuality: "balanced",
+			Audio: "copy", ConcurrentPerSource: 1, ScanAfterSave: true, SkipExisting: true,
+			PauseWhileWatching: true, PauseScope: "source", RetryFailed: true},
 		AI: AI{URL: "http://127.0.0.1:11434", ChatModel: "qwen3:8b", EmbedModel: "mxbai-embed-large", UnloadMinutes: 5,
 			UnderstandPrompts: true, RerankMovies: true, LyricsThemes: true, Reasons: true, LearnFromBehaviour: true},
 	}

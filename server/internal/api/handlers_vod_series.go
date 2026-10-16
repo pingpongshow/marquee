@@ -206,6 +206,16 @@ func (h *Handlers) GetVodSeries(ctx context.Context, req GetVodSeriesRequestObje
 	for i, e := range eps {
 		out.Episodes[i] = toAPIVodEpisode(e)
 	}
+	// Admins see what's saved into the library.
+	if s.User.IsAdmin && h.VODSaves != nil {
+		_, shows := h.VODSaves.Configured()
+		out.CanSave = ptr(shows && h.VOD.Savable(m.SourceID))
+		if states, err := h.VODSaves.EpisodeStates(ctx, m.ID); err == nil {
+			for i := range out.Episodes {
+				out.Episodes[i].Save = toAPIVodSaveState(states[out.Episodes[i].Id])
+			}
+		}
+	}
 	if next != nil {
 		out.NextEpisode = ptr(toAPIVodEpisode(*next))
 	}

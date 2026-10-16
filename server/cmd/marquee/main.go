@@ -57,6 +57,7 @@ import (
 	"marquee/internal/tasks"
 	"marquee/internal/trickplay"
 	"marquee/internal/vod"
+	"marquee/internal/vodsave"
 	"marquee/internal/watcher"
 	"marquee/internal/webhooks"
 )
@@ -420,6 +421,45 @@ func run() error {
 	})
 	go vodSvc.Streams.Run(ctx)
 
+	// Saving films and episodes on demand into the library (admins only): a queue per
+	// source that pauses while someone watches.
+	vodSaves := &vodsave.Service{DB: database, Settings: store, VOD: vodSvc, Titles: meta,
+		FFmpeg: cfg.FFmpegPath, FFprobe: cfg.FFprobePath, Encoders: player.EncoderChoices, QSVDevice: player.Encoders.QSVDevice,
+		Libraries: libraries.List,
+		Scan: func(id int64) {
+			go func() {
+				// A scan already running may have missed the new file: queue one after it.
+				for scans.Status(id).State == tasks.Scanning {
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(10 * time.Second):
+					}
+				}
+				scans.Queue(id)
+			}()
+		},
+		Activity: func(ctx context.Context) []vodsave.Playing {
+			var out []vodsave.Playing
+			for _, src := range vodSvc.WatchingSources(ctx, 2*time.Minute) {
+				out = append(out, vodsave.Playing{Kind: "vod", SourceID: src, Host: vodSvc.SourceHost(src)})
+			}
+			for _, ls := range live.Sessions.List() {
+				host := ""
+				if ch, err := live.Channel(ctx, ls.ChannelID); err == nil {
+					host = vodsave.HostOf(ch.StreamURL)
+				}
+				out = append(out, vodsave.Playing{Kind: "live", Host: host})
+			}
+			for _, ps := range player.List() {
+				if !ps.External && !ps.Preloading() {
+					out = append(out, vodsave.Playing{Kind: "library"})
+				}
+			}
+			return out
+		},
+	}
+
 	// DVR (LIVE-5): recordings land in "Recorded TV" / "Recorded Movies", made on first use.
 	minutes := func(n int) time.Duration { return time.Duration(n) * time.Minute }
 	dvr := &livetv.Recorder{Live: live, FFmpeg: cfg.FFmpegPath, Dir: cfg.RecordingsDir,
@@ -505,10 +545,11 @@ func run() error {
 	})
 	// Alerts are wired before the services that raise them start.
 	alertWatcher := wireAlerts(ctx, alertDeps{cfg: &cfg, store: store, alerts: alerts, auth: authSvc, scheduler: scheduler,
-		live: live, dvr: dvr, vod: vodSvc, player: player, libraries: libraries, ai: aiClient, soundprint: soundprintSvc})
+		live: live, dvr: dvr, vod: vodSvc, saves: vodSaves, player: player, libraries: libraries, ai: aiClient, soundprint: soundprintSvc})
 	go alertWatcher.Run(ctx)
 	go live.Run(ctx, liveWake)
 	go vodSvc.Run(ctx, vodWake)
+	go vodSaves.Run(ctx)
 	go dvr.Run(ctx)
 	go scheduler.Run(ctx)
 
@@ -531,6 +572,7 @@ func run() error {
 		Requests:    &requests.Service{DB: database, Settings: store},
 		LiveTV:      live,
 		VOD:         vodSvc,
+		VODSaves:    vodSaves,
 		Scrobble:    scrobbler,
 		DVR:         dvr,
 		SyncPlay:    watchTogether,

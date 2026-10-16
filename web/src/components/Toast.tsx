@@ -4,7 +4,8 @@ import { useSyncExternalStore } from "react";
 
 type ToastLink =
   | { label: string; to: "/playlist/$playlistId"; params: { playlistId: string } }
-  | { label: string; to: "/item/$itemId"; params: { itemId: string } };
+  | { label: string; to: "/item/$itemId"; params: { itemId: string } }
+  | { label: string; to: "/vod/saves" };
 
 type ToastAction = { label: string; onClick: () => void };
 type Toast = { id: number; message: string; link?: ToastLink; action?: ToastAction; tone?: "info" | "error" };
@@ -52,6 +53,11 @@ export function Toaster() {
           <span className="min-w-0 flex-1">{t.message}</span>
           {t.link?.to === "/playlist/$playlistId" && (
             <Link to={t.link.to} params={t.link.params} className="shrink-0 font-semibold text-accent hover:underline" onClick={() => dismiss(t.id)}>
+              {t.link.label}
+            </Link>
+          )}
+          {t.link?.to === "/vod/saves" && (
+            <Link to={t.link.to} className="shrink-0 font-semibold text-accent hover:underline" onClick={() => dismiss(t.id)}>
               {t.link.label}
             </Link>
           )}

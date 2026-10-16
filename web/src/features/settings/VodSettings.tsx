@@ -8,6 +8,7 @@ import type { components } from "@/api/schema.gen";
 import { Alert, Button, Card, Field, Input, Select, Spinner, Toggle } from "@/components/ui";
 import { vodStatusQuery } from "../livetv/vodApi";
 import { SaveBar } from "./SaveBar";
+import { VodSaveSettings } from "./VodSaveSettings";
 
 type Source = components["schemas"]["VodSource"];
 type Draft = { enabled: boolean; sources: Source[] };
@@ -238,6 +239,7 @@ export function VodSettings() {
         }
         onReset={() => setDraft(null)}
       />
+      <VodSaveSettings />
     </div>
   );
 }

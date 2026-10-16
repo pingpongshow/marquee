@@ -12,6 +12,7 @@ import {
   type VodMovie,
   type VodSeries,
   type VodSort,
+  saveActive,
   useVodWatched,
   vodCategoriesQuery,
   vodContinueQuery,
@@ -24,6 +25,7 @@ import {
   vodSeriesListQuery,
   vodStatusQuery,
 } from "./vodApi";
+import { SaveMovieButton, SavesLink } from "./VodSaves";
 
 // Movies and shows on demand (LIVE-6): two pages, VOD Movies (/vod) and VOD Shows
 // (/vod/shows), each browsed by category, search, sort and filters; a film's page; and the
@@ -114,7 +116,10 @@ function ShowTile({ show: m }: { show: VodSeries }) {
 export function VodPage() {
   return (
     <div className="space-y-4 p-4 lg:p-6">
-      <h1 className="text-2xl font-bold">VOD Movies</h1>
+      <div className="flex items-center gap-4">
+        <h1 className="text-2xl font-bold">VOD Movies</h1>
+        <SavesLink />
+      </div>
       <VodBrowse kind="movies" />
     </div>
   );
@@ -124,7 +129,10 @@ export function VodPage() {
 export function VodShowsPage() {
   return (
     <div className="space-y-4 p-4 lg:p-6">
-      <h1 className="text-2xl font-bold">VOD Shows</h1>
+      <div className="flex items-center gap-4">
+        <h1 className="text-2xl font-bold">VOD Shows</h1>
+        <SavesLink />
+      </div>
       <VodBrowse kind="shows" />
     </div>
   );
@@ -382,7 +390,11 @@ export function VodBrowse({ kind }: { kind: "movies" | "shows" }) {
 
 /** A film's page: backdrop, poster, details from TMDB (or the source), and Play. */
 export function VodMoviePage({ movieId }: { movieId: number }) {
-  const movie = useQuery(vodMovieQuery(movieId));
+  // While it's being saved, the button's state follows along.
+  const movie = useQuery({
+    ...vodMovieQuery(movieId),
+    refetchInterval: (q) => (saveActive(q.state.data?.save?.state) ? 2000 : false),
+  });
   const watched = useVodWatched(movieId);
   const navigate = useNavigate();
   if (movie.isPending) return <Spinner />;
@@ -453,6 +465,7 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
               >
                 <Check className={isWatched ? "size-4 text-success" : "size-4"} /> {isWatched ? "Watched" : "Mark watched"}
               </Button>
+              {m.canSave && <SaveMovieButton movieId={m.id} save={m.save} />}
             </div>
             {m.tagline && <p className="mt-4 text-lg text-muted italic">{m.tagline}</p>}
             {m.overview && <p className="mt-5 max-w-3xl leading-relaxed text-text/90">{m.overview}</p>}

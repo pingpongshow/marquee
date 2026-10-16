@@ -22,6 +22,8 @@ export const alertTypes: { id: AlertType; label: string; help: string }[] = [
   { id: "failed_signins", label: "Repeated failed sign-ins", help: "Five wrong passwords for one account within 15 minutes." },
   { id: "new_admin_device", label: "An administrator signed in from a new device", help: "A browser or app that account hasn't used before." },
   { id: "playback_failed", label: "Playback failed", help: "The transcoder couldn't produce video for a stream." },
+  { id: "vod_save_failed", label: "Saving a movie or episode on demand failed", help: "After its retries; see VOD → Saves." },
+  { id: "vod_save_done", label: "Saving to the library finished", help: "One summary when the save queue empties, not one per episode." },
 ];
 
 /** Email (SMTP) for reset links, and which alerts administrators get. */
