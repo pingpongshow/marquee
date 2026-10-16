@@ -177,14 +177,14 @@ func (s *Service) runQuality(ctx context.Context) {
 func (s *Service) vodQuality(ctx context.Context, k qualityKey, stored *vod.Quality, sync bool) (q Quality, known, pending bool, note string) {
 	if stored != nil && fresh(*stored) {
 		if stored.Error != "" {
-			return Quality{}, false, false, "Couldn't check the quality of the copy on demand: " + stored.Error
+			return Quality{}, false, false, "Couldn't check the quality of the VOD copy: " + stored.Error
 		}
 		return toQuality(*stored), stored.Known(), false, ""
 	}
 	if sync {
 		vq, err := s.checkQuality(ctx, k)
 		if err != nil {
-			return Quality{}, false, false, "Couldn't check the quality of the copy on demand: " + strings.TrimSpace(err.Error())
+			return Quality{}, false, false, "Couldn't check the quality of the VOD copy: " + strings.TrimSpace(err.Error())
 		}
 		return toQuality(vq), vq.Known(), false, ""
 	}
@@ -192,5 +192,5 @@ func (s *Service) vodQuality(ctx context.Context, k qualityKey, stored *vod.Qual
 	if stored != nil && stored.Error == "" && stored.Known() {
 		return toQuality(*stored), true, true, "" // the old answer while a new one comes
 	}
-	return Quality{}, false, true, "Checking the quality of the copy on demand…"
+	return Quality{}, false, true, "Checking the quality of the VOD copy…"
 }

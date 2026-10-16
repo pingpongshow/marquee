@@ -1,13 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { liveStatusQuery } from "@/features/livetv/api";
-import { vodStatusQuery } from "@/features/livetv/vodApi";
+import { saveActive, vodSavesQuery, vodStatusQuery } from "@/features/livetv/vodApi";
 import { requestsStatusQuery } from "@/features/requests/api";
 import { clsx } from "clsx";
 import { Search as SearchIcon, Compass } from "lucide-react";
 import {
   Clapperboard,
   Film,
+  HardDriveDownload,
   Home,
   Image,
   ListMusic,
@@ -169,7 +170,11 @@ export function Shell({ children }: { children: ReactNode }) {
   const onLive = location.pathname.startsWith("/livetv");
   // /vod/shows… is VOD Shows; the rest of /vod… (films and their pages) is VOD Movies.
   const onVodShows = location.pathname === "/vod/shows" || location.pathname.startsWith("/vod/shows/");
-  const onVod = !onVodShows && (location.pathname === "/vod" || location.pathname.startsWith("/vod/"));
+  const onVodSaves = location.pathname === "/vod/saves";
+  const onVod = !onVodShows && !onVodSaves && (location.pathname === "/vod" || location.pathname.startsWith("/vod/"));
+  // Admins: the VOD download queue, with how many downloads are on their way.
+  const saves = useQuery({ ...vodSavesQuery, refetchInterval: 15_000, enabled: !!me.data?.isAdmin && !!vod.data?.enabled });
+  const savesActive = saves.data?.saves.filter((x) => saveActive(x.state) || x.state === "paused").length ?? 0;
   const sidebar = (
     <nav aria-label="Libraries" className="flex h-full flex-col gap-1 overflow-y-auto p-3">
       <Link
@@ -236,6 +241,20 @@ export function Shell({ children }: { children: ReactNode }) {
           onClick={() => setNavOpen(false)}
         >
           <MonitorPlay className="size-5" aria-hidden /> VOD Shows
+        </Link>
+      )}
+      {me.data?.isAdmin && vod.data?.enabled && (
+        <Link
+          to="/vod/saves"
+          className={clsx(navItem, onVodSaves && navActive.className)}
+          onClick={() => setNavOpen(false)}
+        >
+          <HardDriveDownload className="size-5" aria-hidden /> VOD Downloads
+          {savesActive > 0 && (
+            <span className="ml-auto rounded-full bg-accent px-2 text-xs font-semibold text-black" aria-label={`${savesActive} in the queue`}>
+              {savesActive}
+            </span>
+          )}
         </Link>
       )}
       <Link

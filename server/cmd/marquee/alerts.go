@@ -62,7 +62,7 @@ func wireAlerts(ctx context.Context, d alertDeps) *notify.Watcher {
 	}
 	d.vod.OnSourceFailed = func(src settings.VODSource, err error) {
 		raise(notify.Alert{Type: settings.AlertSourceFailed, Subject: "vod:" + src.ID, Title: "Movie source failed: " + src.Name,
-			Message: fmt.Sprintf("Couldn't load the movies-on-demand source %q: %v", src.Name, err)})
+			Message: fmt.Sprintf("Couldn't load the VOD source %q: %v", src.Name, err)})
 	}
 	d.saves.OnFailed = func(v vodsave.Save) {
 		raise(notify.Alert{Type: settings.AlertVODSaveFailed, Subject: "vodsave:" + strconv.FormatInt(v.ID, 10),
@@ -71,7 +71,7 @@ func wireAlerts(ctx context.Context, d alertDeps) *notify.Watcher {
 	d.saves.OnDrained = func(done, failed int, titles []string) {
 		msg := fmt.Sprintf("%d saved into the library", done)
 		if failed > 0 {
-			msg += fmt.Sprintf(", %d failed (see Movies on demand → Saves)", failed)
+			msg += fmt.Sprintf(", %d failed (see VOD → Saves)", failed)
 		}
 		if len(titles) > 0 {
 			msg += ": " + strings.Join(titles, ", ")

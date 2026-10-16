@@ -1,8 +1,12 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Check, ChevronLeft, ChevronRight, Filter, Play, RotateCcw, Search, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, EyeOff, Filter, MoreHorizontal, Play, RotateCcw, Search, X } from "lucide-react";
+import { clsx } from "clsx";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { api, unwrap } from "@/api/client";
+import type { ContinueEntry } from "@/api/types";
+import { Menu, MenuItem } from "@/components/Menu";
+import { useRemoveVodFromContinue } from "@/features/home/ContinueWatching";
 import { Alert, Button, Input, Select, Spinner } from "@/components/ui";
 import { formatDuration, formatTrackTime } from "@/features/browse/format";
 import { Poster } from "@/features/browse/Poster";
@@ -163,6 +167,39 @@ function readFilters(key: string): VodFilters {
   } catch {
     return {};
   }
+}
+
+/** A tile in a VOD page's Continue Watching row, with a "…" menu (hover, or right-click) to
+ * remove it, as on Home. For a show, removing hides the show until it's watched again. */
+function ResumeTile({ title, entry, children }: { title: string; entry?: ContinueEntry; children: ReactNode }) {
+  const remove = useRemoveVodFromContinue();
+  const [open, setOpen] = useState(false);
+  return (
+    <li
+      className="group/tile relative w-36 shrink-0"
+      onContextMenu={(ev) => {
+        if (!entry) return;
+        ev.preventDefault();
+        setOpen(true);
+      }}
+    >
+      {children}
+      {entry && (
+        <div
+          className={clsx(
+            "absolute top-1.5 right-1.5 z-20 rounded-full bg-black/70 text-white transition-opacity [&>div>button]:text-white",
+            open ? "opacity-100" : "opacity-0 group-hover/tile:opacity-100 focus-within:opacity-100",
+          )}
+        >
+          <Menu label={`More actions for ${title}`} trigger={<MoreHorizontal className="size-4" />} open={open} onOpenChange={setOpen} floating>
+            <MenuItem icon={<EyeOff />} onClick={() => remove.mutate(entry)}>
+              Remove from Continue Watching
+            </MenuItem>
+          </Menu>
+        </div>
+      )}
+    </li>
+  );
 }
 
 /** Browsing films or shows: categories, search, sort, filters, Continue Watching and a poster grid. */
@@ -347,14 +384,14 @@ export function VodBrowse({ kind }: { kind: "movies" | "shows" }) {
           <ul className="flex gap-4 overflow-x-auto pb-2">
             {shows
               ? resumeShows.map((m) => (
-                  <li key={m.id} className="w-36 shrink-0">
+                  <ResumeTile key={m.id} title={m.title} entry={m.nextEpisode ? ({ key: `vodEpisode:${m.nextEpisode.id}`, vodEpisode: m.nextEpisode } as ContinueEntry) : undefined}>
                     <ShowTile show={m} />
-                  </li>
+                  </ResumeTile>
                 ))
               : resumeMovies.map((m) => (
-                  <li key={m.id} className="w-36 shrink-0">
+                  <ResumeTile key={m.id} title={m.title} entry={{ key: `vodMovie:${m.id}`, vodMovie: m } as ContinueEntry}>
                     <VodTile movie={m} />
-                  </li>
+                  </ResumeTile>
                 ))}
           </ul>
         </section>

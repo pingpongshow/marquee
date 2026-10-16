@@ -74,14 +74,15 @@ export function VodSettings() {
     <div className="space-y-6">
       <p className="text-sm text-muted">
         Films from an M3U playlist, such as Pluto TV&apos;s free movies, or from a Dispatcharr (Xtream Codes) server appear
-        on the VOD Movies page (and a Dispatcharr server&apos;s series on VOD Shows) for everyone who may watch Live TV (and within each profile&apos;s rating limit). Nothing is
-        downloaded: a film streams from the source while someone watches it. Marquee reloads the lists every six hours and
+        on the VOD Movies page (and a Dispatcharr server&apos;s series on VOD Shows) for everyone who may watch Live TV (and within each profile&apos;s rating limit). Titles
+        stream from the source while someone watches; nothing is downloaded unless an admin saves it to the library
+        (below). Marquee reloads the lists every six hours and
         matches each film to TMDB.
       </p>
       <Card>
         <Toggle
-          label="Show movies on demand"
-          help="Off hides the Movies tab everywhere; the films and everyone's progress are kept."
+          label="Show VOD"
+          help="Off hides VOD Movies and VOD Shows everywhere; the titles and everyone's progress are kept."
           checked={d.enabled}
           onChange={(v) => setDraft({ ...d, enabled: v })}
         />

@@ -626,7 +626,9 @@ func (s *Service) Movies(ctx context.Context, f Filter) ([]Movie, int, error) {
 func (s *Service) ContinueWatching(ctx context.Context, userID int64, maxRating string) ([]Movie, error) {
 	where, args := ratingClause(maxRating)
 	rows, err := s.DB.QueryContext(ctx, "SELECT "+movieCols+` FROM vod_movies m JOIN vod_progress p ON p.movie_id=m.id AND p.user_id=?
-		WHERE p.position_ms>0 AND `+where+" ORDER BY p.updated_at DESC LIMIT 20", append([]any{userID}, args...)...)
+		WHERE p.position_ms>0 AND `+where+`
+		AND NOT EXISTS (SELECT 1 FROM vod_continue_hidden h WHERE h.user_id=p.user_id AND h.movie_id=m.id AND h.hidden_at>=p.updated_at)
+		ORDER BY p.updated_at DESC LIMIT 20`, append([]any{userID}, args...)...)
 	if err != nil {
 		return nil, err
 	}

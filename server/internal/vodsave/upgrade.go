@@ -44,7 +44,7 @@ func (s *Service) replace(ctx context.Context, v Save, from, to string) (final, 
 	if s.Trash == nil {
 		return "", "", permError{errors.New("replacing the library's copy isn't available"), false}
 	}
-	paths, undo, err := s.Trash.Trash(ctx, ids, "replaced by a better copy on demand: "+v.Title)
+	paths, undo, err := s.Trash.Trash(ctx, ids, "replaced by a better VOD copy: "+v.Title)
 	if err != nil {
 		return "", "", permError{fmt.Errorf("couldn't move the library's copy to the media trash: %w", err), true}
 	}
