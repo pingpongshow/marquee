@@ -7845,7 +7845,7 @@ components:
 
     OptimizePreset:
       type: object
-      required: [id, name, maxHeight, codec, quality, audio, imageSubtitles, hdr]
+      required: [id, name, maxHeight, codec, quality, audio, hdr]
       properties:
         id: { type: string }
         name: { type: string }
@@ -7854,9 +7854,7 @@ components:
         codec: { type: string, enum: [hevc, h264, av1], description: "AV1 only when the server has an AV1 encoder (av1Available)." }
         quality: { type: string, enum: [high, balanced, small], description: "Constant-quality level, unless videoKbps is set." }
         videoKbps: { type: integer, minimum: 0, maximum: 100000, description: "A target video bitrate instead of a quality; 0 = use the quality." }
-        audio: { type: string, enum: [copy, default, aac_stereo, aac_51], description: "copy = every track as it is; default = only the default track, as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1)." }
-        dropCommentary: { type: boolean, description: "Leave out commentary tracks." }
-        imageSubtitles: { type: string, enum: [keep, drop], description: "Picture subtitles (PGS, VobSub); text subtitles are always kept. MP4 files can't hold picture subtitles." }
+        audio: { type: string, enum: [copy, aac_stereo, aac_51], description: "copy = every track as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1). Every audio track (all languages, commentary) and every subtitle is always kept; an MP4 with picture subtitles becomes MKV." }
         hdr: { type: string, enum: [keep, tonemap], description: "keep = HDR stays HDR (10-bit HEVC or AV1; H.264 always tone-maps); tonemap = converted to SDR." }
 
     OptimizeSettings:

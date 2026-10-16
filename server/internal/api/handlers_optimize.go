@@ -236,18 +236,15 @@ func (h *Handlers) OptimizeJobAction(ctx context.Context, req OptimizeJobActionR
 
 func toAPIOptimizePreset(p settings.OptimizePreset) OptimizePreset {
 	return OptimizePreset{Id: p.ID, Name: p.Name, BuiltIn: ptr(p.BuiltIn), MaxHeight: OptimizePresetMaxHeight(p.MaxHeight), Codec: OptimizePresetCodec(p.Codec),
-		Quality: OptimizePresetQuality(p.Quality), VideoKbps: nz(p.VideoKbps), Audio: OptimizePresetAudio(p.Audio), DropCommentary: ptr(p.DropCommentary),
-		ImageSubtitles: OptimizePresetImageSubtitles(p.ImageSubtitles), Hdr: OptimizePresetHdr(p.HDR)}
+		Quality: OptimizePresetQuality(p.Quality), VideoKbps: nz(p.VideoKbps), Audio: OptimizePresetAudio(p.Audio),
+		Hdr: OptimizePresetHdr(p.HDR)}
 }
 
 func fromAPIOptimizePreset(p OptimizePreset) settings.OptimizePreset {
 	out := settings.OptimizePreset{ID: strings.TrimSpace(p.Id), Name: strings.TrimSpace(p.Name), MaxHeight: int(p.MaxHeight), Codec: string(p.Codec),
-		Quality: string(p.Quality), Audio: string(p.Audio), ImageSubtitles: string(p.ImageSubtitles), HDR: string(p.Hdr)}
+		Quality: string(p.Quality), Audio: string(p.Audio), HDR: string(p.Hdr)}
 	if p.VideoKbps != nil {
 		out.VideoKbps = *p.VideoKbps
-	}
-	if p.DropCommentary != nil {
-		out.DropCommentary = *p.DropCommentary
 	}
 	return out
 }

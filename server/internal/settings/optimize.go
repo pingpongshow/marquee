@@ -37,14 +37,10 @@ type OptimizePreset struct {
 	// (a target bitrate) is set.
 	Quality   string `json:"quality"`
 	VideoKbps int    `json:"videoKbps"`
-	// Audio: copy (every track), default (only the default track, copied), aac_stereo or
-	// aac_51 (every track converted, at most 5.1).
+	// Audio: copy (every track as it is), aac_stereo or aac_51 (every track converted, at
+	// most 5.1). Every audio track (all languages, commentary) and every subtitle is always
+	// kept.
 	Audio string `json:"audio"`
-	// DropCommentary leaves out commentary audio tracks.
-	DropCommentary bool `json:"dropCommentary"`
-	// ImageSubtitles: keep or drop picture-based subtitles (PGS, VobSub); text subtitles
-	// are always kept.
-	ImageSubtitles string `json:"imageSubtitles"`
 	// HDR: keep (HDR10, 10-bit HEVC or AV1) or tonemap (to SDR).
 	HDR string `json:"hdr"`
 	// BuiltIn marks Marquee's own presets (not stored).
@@ -55,13 +51,13 @@ type OptimizePreset struct {
 func BuiltInOptimizePresets() []OptimizePreset {
 	return []OptimizePreset{
 		{ID: "1080p-hevc-balanced", Name: "1080p HEVC (balanced)", MaxHeight: 1080, Codec: "hevc", Quality: "balanced",
-			Audio: "copy", ImageSubtitles: "keep", HDR: "keep", BuiltIn: true},
+			Audio: "copy", HDR: "keep", BuiltIn: true},
 		{ID: "1080p-hevc-small", Name: "1080p HEVC (small)", MaxHeight: 1080, Codec: "hevc", Quality: "small",
-			Audio: "aac_51", DropCommentary: true, ImageSubtitles: "keep", HDR: "keep", BuiltIn: true},
+			Audio: "aac_51", HDR: "keep", BuiltIn: true},
 		{ID: "720p-hevc", Name: "720p HEVC", MaxHeight: 720, Codec: "hevc", Quality: "balanced",
-			Audio: "aac_51", ImageSubtitles: "keep", HDR: "tonemap", BuiltIn: true},
+			Audio: "aac_51", HDR: "tonemap", BuiltIn: true},
 		{ID: "same-hevc", Name: "Same resolution, HEVC", MaxHeight: 0, Codec: "hevc", Quality: "balanced",
-			Audio: "copy", ImageSubtitles: "keep", HDR: "keep", BuiltIn: true},
+			Audio: "copy", HDR: "keep", BuiltIn: true},
 	}
 }
 
@@ -145,14 +141,9 @@ func (p OptimizePreset) Validate() error {
 		return invalid("the preset %q: the video bitrate must be 0 (use the quality) to 100000 kbps", p.Name)
 	}
 	switch p.Audio {
-	case "copy", "default", "aac_stereo", "aac_51":
+	case "copy", "aac_stereo", "aac_51":
 	default:
-		return invalid("the preset %q: the audio must be copy, default, aac_stereo or aac_51", p.Name)
-	}
-	switch p.ImageSubtitles {
-	case "keep", "drop":
-	default:
-		return invalid("the preset %q: picture subtitles must be keep or drop", p.Name)
+		return invalid("the preset %q: the audio must be copy, aac_stereo or aac_51", p.Name)
 	}
 	switch p.HDR {
 	case "keep", "tonemap":

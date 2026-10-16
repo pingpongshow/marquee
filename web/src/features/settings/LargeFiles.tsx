@@ -630,8 +630,6 @@ const presetSummary = (p: Preset) =>
     { hevc: "HEVC", h264: "H.264", av1: "AV1" }[p.codec],
     p.videoKbps ? `${(p.videoKbps / 1000).toFixed(1)} Mb/s` : `${p.quality} quality`,
     { copy: "audio copied", default: "default audio track only", aac_stereo: "AAC stereo", aac_51: "AAC up to 5.1" }[p.audio],
-    p.dropCommentary ? "no commentary" : "",
-    p.imageSubtitles === "drop" ? "picture subtitles dropped" : "",
     p.hdr === "tonemap" ? "HDR to SDR" : "HDR kept",
   ]
     .filter(Boolean)
@@ -783,7 +781,7 @@ function randomId() {
 }
 
 function newPreset(): Preset {
-  return { id: randomId(), name: "", maxHeight: 1080, codec: "hevc", quality: "balanced", videoKbps: 0, audio: "copy", dropCommentary: false, imageSubtitles: "keep", hdr: "keep" };
+  return { id: randomId(), name: "", maxHeight: 1080, codec: "hevc", quality: "balanced", videoKbps: 0, audio: "copy", hdr: "keep" };
 }
 
 function PresetDialog({ preset, av1, onSave, onClose }: { preset: Preset; av1: boolean; onSave: (p: Preset) => void; onClose: () => void }) {
@@ -859,17 +857,8 @@ function PresetDialog({ preset, av1, onSave, onClose }: { preset: Preset; av1: b
             {(id) => (
               <Select id={id} value={p.audio} onChange={(e) => set({ audio: e.target.value as Preset["audio"] })}>
                 <option value="copy">Copy every track</option>
-                <option value="default">Only the default track (copied)</option>
                 <option value="aac_stereo">AAC stereo</option>
                 <option value="aac_51">AAC up to 5.1</option>
-              </Select>
-            )}
-          </Field>
-          <Field label="Picture subtitles (PGS, VobSub)" help="Text subtitles are always kept.">
-            {(id) => (
-              <Select id={id} value={p.imageSubtitles} onChange={(e) => set({ imageSubtitles: e.target.value as Preset["imageSubtitles"] })}>
-                <option value="keep">Keep</option>
-                <option value="drop">Drop</option>
               </Select>
             )}
           </Field>
@@ -882,7 +871,6 @@ function PresetDialog({ preset, av1, onSave, onClose }: { preset: Preset; av1: b
             )}
           </Field>
         </div>
-        <Toggle label="Leave out commentary tracks" checked={!!p.dropCommentary} onChange={(v) => set({ dropCommentary: v })} />
       </div>
     </Dialog>
   );
