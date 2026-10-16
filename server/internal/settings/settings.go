@@ -125,11 +125,15 @@ const (
 	AlertPlaybackFailed  = "playback_failed"
 	AlertVODSaveFailed   = "vod_save_failed"
 	AlertVODSaveDone     = "vod_save_done"
+	// AlertDVRQuota: a recording wasn't made, or older ones were removed, because its owner
+	// is over their DVR quota. It isn't in the API's AlertType enum (shipped apps decode it
+	// strictly); the API exposes it as NotificationSettings.dvrQuotaAlert.
+	AlertDVRQuota = "dvr_quota"
 )
 
 // AlertTypes lists every alert type.
 var AlertTypes = []string{AlertTaskFailed, AlertDiskLow, AlertRecordingFailed, AlertSourceFailed,
-	AlertIntegrationDown, AlertFailedSignIns, AlertNewAdminDevice, AlertPlaybackFailed, AlertVODSaveFailed, AlertVODSaveDone}
+	AlertIntegrationDown, AlertFailedSignIns, AlertNewAdminDevice, AlertPlaybackFailed, AlertVODSaveFailed, AlertVODSaveDone, AlertDVRQuota}
 
 // Notifications configures outgoing email (SMTP) and which alerts administrators get.
 type Notifications struct {
@@ -220,6 +224,15 @@ type Integrations struct {
 	// CommercialsRemove (cut them out; the original goes to the media trash). Off by default,
 	// since removing changes files.
 	Commercials string `json:"commercials"`
+	// DVRDefaultQuotaGB is every user's recording quota unless their own overrides it
+	// (0 = unlimited). DVRQuotaAction is what happens when a recording is due and its owner
+	// is at or over quota: DVRQuotaBlock (it isn't recorded) or DVRQuotaDeleteOldest (their
+	// oldest recordings they've watched go to the media trash to make room).
+	DVRDefaultQuotaGB int    `json:"dvrDefaultQuotaGB"`
+	DVRQuotaAction    string `json:"dvrQuotaAction"`
+	// DVRFolder is where new recordings go ("" = the server's configured recordings
+	// folder). Recordings made before a change stay where they are.
+	DVRFolder string `json:"dvrFolder"`
 	// Movies on demand under Live TV (LIVE-6): off until the admin turns it on.
 	VODEnabled bool        `json:"vodEnabled"`
 	VODSources []VODSource `json:"vodSources"`
@@ -239,6 +252,12 @@ type VODSource struct {
 	UserAgent string `json:"userAgent"`
 	Enabled   bool   `json:"enabled"`
 }
+
+// DVR quota actions.
+const (
+	DVRQuotaBlock        = "block"
+	DVRQuotaDeleteOldest = "deleteOldest"
+)
 
 // Commercials settings.
 const (
@@ -407,7 +426,7 @@ func Defaults() Settings {
 		Metadata:     Metadata{AnimeEpisodeOrdering: "seasonal", OMDbDailyLimit: 950},
 		Tasks:        Tasks{MaintenanceWindowStart: "03:00", MaintenanceWindowHours: 4, BackupRetention: 7},
 		Music:        Music{SoundprintAnalysis: true, OnlineLyrics: false, LoudnessAnalysis: true, ArtistDetails: true},
-		Integrations: Integrations{DVRPaddingBefore: 1, DVRPaddingAfter: 3, Commercials: CommercialsOff},
+		Integrations: Integrations{DVRPaddingBefore: 1, DVRPaddingAfter: 3, Commercials: CommercialsOff, DVRQuotaAction: DVRQuotaBlock},
 		Notifications: Notifications{SMTPPort: 587, SMTPSecurity: "starttls", FromName: "Marquee",
 			RecipientsAllAdmins: true, DiskThresholdPercent: 10},
 		VODSave: VODSave{Quality: VODSaveOriginal, MaxHeight: 1080, VideoCodec: "hevc", VideoQuality: "balanced",

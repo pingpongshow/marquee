@@ -3,6 +3,7 @@ package livetv
 import (
 	"encoding/xml"
 	"io"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -17,7 +18,11 @@ type Programme struct {
 	Category    string
 	Episode     string
 	Image       string
+	Rating      string // content rating, e.g. TV-14 ("" = unknown)
 }
+
+// usRating is a rating the library's rating limits understand (a guide may list several).
+var usRating = regexp.MustCompile(`^(TV-(Y|Y7|Y7-FV|G|PG|14|MA)|G|PG|PG-13|R|NC-17)$`)
 
 // GuideChannel is a channel as the guide names it.
 type GuideChannel struct {
@@ -86,6 +91,9 @@ func ParseXMLTV(r io.Reader, from, until time.Time, fn func(Programme)) ([]Guide
 				Icon struct {
 					Src string `xml:"src,attr"`
 				} `xml:"icon"`
+				Ratings []struct {
+					Value string `xml:"value"`
+				} `xml:"rating"`
 			}
 			if dec.DecodeElement(&p, &se) != nil {
 				continue
@@ -110,6 +118,16 @@ func ParseXMLTV(r io.Reader, from, until time.Time, fn func(Programme)) ([]Guide
 				prog.Category = strings.TrimSpace(p.Category[0])
 			}
 			prog.Episode = episode(p.Episodes)
+			for _, r := range p.Ratings {
+				v := strings.ToUpper(strings.TrimSpace(r.Value))
+				if usRating.MatchString(v) {
+					prog.Rating = v
+					break
+				}
+				if prog.Rating == "" {
+					prog.Rating = v
+				}
+			}
 			fn(prog)
 		}
 	}

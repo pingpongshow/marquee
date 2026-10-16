@@ -51,7 +51,7 @@ func guideXML(now time.Time) string {
   <channel id="news.1"><display-name>News One</display-name><icon src="http://logo/news-guide.png"/></channel>
   <channel id="kids"><display-name>Cartoons</display-name><icon src="http://logo/kids.png"/></channel>
   <programme start="%s" stop="%s" channel="news.1"><title>Morning News</title><desc>Headlines.</desc><category>News</category></programme>
-  <programme start="%s" stop="%s" channel="news.1"><title>Weather</title><episode-num system="xmltv_ns">1.4.0/1</episode-num></programme>
+  <programme start="%s" stop="%s" channel="news.1"><title>Weather</title><episode-num system="xmltv_ns">1.4.0/1</episode-num><rating system="MPAA"><value>NR</value></rating><rating system="VCHIP"><value>tv-pg</value></rating></programme>
   <programme start="%s" stop="%s" channel="kids"><title>Old Cartoon</title></programme>
   <programme start="%s" stop="%s" channel="kids"><title>Far Future</title></programme>
 </tv>`, f(h), f(h.Add(time.Hour)), f(h.Add(time.Hour)), f(h.Add(90*time.Minute)),

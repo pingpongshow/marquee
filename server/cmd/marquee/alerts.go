@@ -89,6 +89,10 @@ func wireAlerts(ctx context.Context, d alertDeps) *notify.Watcher {
 		raise(notify.Alert{Type: settings.AlertRecordingFailed, Subject: strconv.FormatInt(id, 10), Title: "Recording failed: " + title,
 			Message: fmt.Sprintf("The recording of %q failed: %s", title, errMsg)})
 	}
+	d.dvr.OnQuota = func(userID int64, owner, title, msg string) {
+		raise(notify.Alert{Type: settings.AlertDVRQuota, Subject: "dvr-quota:" + strconv.FormatInt(userID, 10) + ":" + title,
+			Title: "Over DVR quota: " + owner, Message: msg})
+	}
 	d.player.OnFailure = func(s *playback.Session, err error) {
 		raise(notify.Alert{Type: settings.AlertPlaybackFailed, Subject: s.ID, Title: "Playback failed: " + s.Title,
 			Message: fmt.Sprintf("The transcoder couldn't produce video of %q for %s on %s: %v", s.Title, s.UserName, s.DeviceName, err)})

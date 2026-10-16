@@ -1988,11 +1988,45 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). */
+        /** DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone's recordings are listed to every profile that may view DVR recordings, within the profile's content rating limit (the library item's rating once filed, else the guide's; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings. */
         get: operations["listRecordings"];
         put?: never;
         /** Record a programme from the guide, or every airing of its title (a series). */
         post: operations["scheduleRecording"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/recordings/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How much space the caller's recordings take (finished and in progress, actual sizes) and their DVR quota (LIVE-5). */
+        get: operations["getRecordingUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/dvr/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admins: every user's DVR usage and quota (LIVE-5), including users with no recordings. */
+        get: operations["listRecordingUsage"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2011,7 +2045,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list. */
+        /** Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list. Only whoever scheduled it, or an admin. */
         delete: operations["cancelRecording"];
         options?: never;
         head?: never;
@@ -2047,7 +2081,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Stop recording a series. Its upcoming airings are dropped; recordings already made stay. */
+        /** Stop recording a series. Its upcoming airings are dropped; recordings already made stay. Only whoever made it, or an admin. */
         delete: operations["deleteRecordingRule"];
         options?: never;
         head?: never;
@@ -3827,8 +3861,14 @@ export interface components {
             remoteQualityKbps?: number;
             /** @description May request titles through Seerr (REQ-1). Default false; admins always may. */
             canRequest?: boolean;
-            /** @description May schedule Live TV recordings (LIVE-5). Default false; admins always may. */
+            /** @description Deprecated: the same as canRecordDVR (kept for older clients). Read only when canRecordDVR isn't sent. */
             canRecord?: boolean;
+            /** @description May schedule Live TV recordings (LIVE-5). Default true; admins always may. A user who may not has their series paused. */
+            canRecordDVR?: boolean;
+            /** @description May see and play the household's Live TV recordings (the DVR list and the recordings libraries). Default true; admins always may. */
+            canViewDVR?: boolean;
+            /** @description This user's DVR quota in GB (10^9 bytes). Null or absent = the server default (integrations.dvrDefaultQuotaGb); 0 = unlimited. */
+            dvrQuotaGb?: number | null;
             /** @description May watch Live TV (LIVE-4). Default true. */
             liveTv?: boolean;
             /** @description Channel groups this user may watch. Null or absent = all. */
@@ -4009,6 +4049,8 @@ export interface components {
             linkUrl?: string;
             /** @description Alert types that are on. All are off by default. */
             alerts?: components["schemas"]["AlertType"][];
+            /** @description The dvr_quota alert is on: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Off by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.) */
+            dvrQuotaAlert?: boolean;
             /** @description Mail alerts to every administrator with an email address. */
             recipientsAllAdmins?: boolean;
             /** @description Administrators (user ids) who get alert mail when recipientsAllAdmins is off. */
@@ -4027,7 +4069,9 @@ export interface components {
             fromAddress?: string;
             fromName?: string;
             linkUrl?: string;
+            /** @description Replaces the list; the dvr_quota alert is kept as it was unless dvrQuotaAlert is sent. */
             alerts?: components["schemas"]["AlertType"][];
+            dvrQuotaAlert?: boolean;
             recipientsAllAdmins?: boolean;
             recipients?: number[];
             diskThresholdPercent?: number;
@@ -4309,6 +4353,8 @@ export interface components {
             dvrAvailable?: boolean;
             /** @description The caller may schedule recordings. */
             canRecord?: boolean;
+            /** @description The caller may see and play recordings (the Recordings tab). Absent from older servers: then assume canRecord. */
+            canViewRecordings?: boolean;
             /** @description Recordings in progress. */
             recordingsActive?: number;
             /**
@@ -4365,6 +4411,12 @@ export interface components {
              * @description Who scheduled it.
              */
             userId?: number;
+            /** @description Who scheduled it, by name ("Recorded by Alex"). */
+            ownerName?: string;
+            /** @description The caller may cancel or delete it (whoever scheduled it */
+            canDelete?: boolean;
+            /** @description The guide's content rating for the programme, e.g. TV-14, when it gave one. */
+            rating?: string;
             commercials?: components["schemas"]["CommercialScan"];
         };
         RecordingRule: {
@@ -4381,8 +4433,47 @@ export interface components {
             upcoming: number;
             /** Format: int64 */
             userId?: number;
+            /** @description Who made it */
+            ownerName?: string;
+            /** @description Its owner may no longer record, so nothing new is scheduled (it resumes if they may again). */
+            paused?: boolean;
+            /** @description The caller may stop it (whoever made it */
+            canDelete?: boolean;
             /** Format: date-time */
             createdAt: string;
+        };
+        DvrUsage: {
+            /** Format: int64 */
+            userId: number;
+            displayName?: string;
+            /**
+             * Format: int64
+             * @description Space the user's recordings take now: finished ones' files and in-progress ones' parts, wherever they are.
+             */
+            usedBytes: number;
+            /** @description Recordings counted. */
+            recordings: number;
+            /**
+             * Format: int64
+             * @description The quota in bytes; 0 = unlimited.
+             */
+            quotaBytes: number;
+            /** @description The quota in GB; 0 = unlimited. */
+            quotaGb?: number;
+            /**
+             * @description default = the server default applies; user = the user's own quota (which may be 0, unlimited).
+             * @enum {string}
+             */
+            quotaSource: "default" | "user";
+            /** @description At or over the quota. */
+            overQuota: boolean;
+            /**
+             * @description What happens to new recordings over quota.
+             * @enum {string}
+             */
+            quotaAction?: "block" | "deleteOldest";
+            canRecord?: boolean;
+            canView?: boolean;
         };
         LiveChannel: {
             /** Format: int64 */
@@ -4735,7 +4826,7 @@ export interface components {
             scanAfterSave?: boolean;
             /** @description Skip a title whose file is already in its folder. Default on. (A title the library already has is never saved again, unless as an upgrade: see VodLibraryMatch.) */
             skipExisting?: boolean;
-            /** @description Pause saves while someone watches (see pauseScope), resuming 60 s after. Default on. */
+            /** @description Pause saves while someone watches (see pauseScope), resuming 15 s after. Default on. */
             pauseWhileWatching?: boolean;
             /**
              * @description source: something from the same source, or Live TV from the same host (Dispatcharr). any: any playback on the server.
@@ -5020,6 +5111,19 @@ export interface components {
             dvrPaddingBefore?: number;
             /** @description Minutes recordings run late. */
             dvrPaddingAfter?: number;
+            /** @description Every user's DVR quota in GB unless their own overrides it. 0 = unlimited (the default). */
+            dvrDefaultQuotaGb?: number;
+            /**
+             * @description When a recording is due and its owner is at or over quota: block = it isn't recorded (default); deleteOldest = their oldest recordings they've watched (never one being watched or recorded) go to the media trash to make room.
+             * @enum {string}
+             */
+            dvrQuotaAction?: "block" | "deleteOldest";
+            /** @description Where new recordings go: an absolute folder that exists and the server can write in. Empty = the server's configured recordings folder (dvrFolderDefault). Recordings made earlier stay where they are. */
+            dvrFolder?: string;
+            /** @description The server's configured recordings folder. */
+            readonly dvrFolderDefault?: string;
+            /** @description A library covers the recordings folder's TV and Movies folders (recordings appear in the library). */
+            readonly dvrFolderInLibrary?: boolean;
             /**
              * @description What happens to finished recordings and, nightly, older ones: off; detect = find the commercial breaks with Comskip but leave the files alone; remove = find them and cut them out (the original goes to the media trash and can be restored while it's there). Default off.
              * @enum {string}
@@ -5047,6 +5151,11 @@ export interface components {
             dvrPaddingAfter?: number;
             /** @enum {string} */
             commercials?: "off" | "detect" | "remove";
+            dvrDefaultQuotaGb?: number;
+            /** @enum {string} */
+            dvrQuotaAction?: "block" | "deleteOldest";
+            /** @description Checked when it changes: it must exist and be writable. */
+            dvrFolder?: string;
             /** @description Replaces the whole list when sent. */
             liveTvSources?: components["schemas"]["LiveTvSource"][];
             vodEnabled?: boolean;
@@ -10157,13 +10266,66 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            /** @description quota_exceeded: the caller is at or over their DVR quota. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getRecordingUsage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Usage. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DvrUsage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listRecordingUsage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Usage per user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DvrUsage"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     cancelRecording: {
         parameters: {
             query?: {
-                /** @description Finished recordings: delete the file too (admins, or whoever scheduled it). */
+                /** @description Finished recordings: delete the file too. */
                 deleteFile?: boolean;
             };
             header?: never;

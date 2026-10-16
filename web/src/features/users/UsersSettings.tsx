@@ -11,11 +11,12 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { api, unwrap } from "@/api/client";
-import { liveGroupsQuery, liveStatusQuery } from "../livetv/api";
+import { allRecordingUsageQuery, liveGroupsQuery, liveStatusQuery, usageLabel } from "../livetv/api";
 import { requestsStatusQuery } from "../requests/api";
 import {
   librariesQuery,
   meQuery,
+  settingsQuery,
   useCreateUser,
   useDeleteUser,
   usersQuery,
@@ -55,6 +56,8 @@ function describe(r: UserRestrictions, libraryNames: Map<number, string>) {
   if (r.liveTv === false) parts.push("No Live TV");
   else if (r.liveTvGroups)
     parts.push(`Live TV: ${r.liveTvGroups.join(", ") || "none"}`);
+  if ((r.canRecordDVR ?? r.canRecord) === false) parts.push("No recording");
+  if (r.canViewDVR === false) parts.push("Can't watch recordings");
   return parts.join(" · ");
 }
 
@@ -169,8 +172,9 @@ function LiveTvPermission({
   );
 }
 
-/** May this person schedule Live TV recordings (LIVE-5). */
-function RecordPermission({
+/** DVR (LIVE-5): may this person record, may they see the household's recordings, and
+ * their recording quota (the server default, unlimited, or their own). */
+function DvrPermissions({
   value,
   onChange,
 }: {
@@ -178,14 +182,73 @@ function RecordPermission({
   onChange: (r: UserRestrictions) => void;
 }) {
   const status = useQuery(liveStatusQuery);
-  if (!status.data?.enabled || !status.data.dvrAvailable) return null;
+  const settings = useQuery({ ...settingsQuery, retry: false });
+  if (!status.data?.dvrAvailable) return null;
+  const record = value.canRecordDVR ?? value.canRecord ?? true;
+  const quota = value.dvrQuotaGb;
+  const mode = quota == null ? "default" : quota === 0 ? "unlimited" : "own";
+  const def = settings.data?.integrations?.dvrDefaultQuotaGb ?? 0;
   return (
-    <Toggle
-      label="Can record Live TV"
-      help="Schedule recordings and series, and cancel upcoming ones."
-      checked={!!value.canRecord}
-      onChange={(v) => onChange({ ...value, canRecord: v })}
-    />
+    <div className="space-y-3">
+      <Toggle
+        label="Can record Live TV"
+        help="Schedule recordings and series. When off, their series are paused (kept) and nothing new is recorded for them."
+        checked={record}
+        onChange={(v) => onChange({ ...value, canRecordDVR: v, canRecord: v })}
+      />
+      <Toggle
+        label="Can watch recordings"
+        help="See and play the household's recordings (within their rating limit): the Recordings tab and the Recorded TV and Recorded Movies libraries."
+        checked={value.canViewDVR !== false}
+        onChange={(v) => onChange({ ...value, canViewDVR: v })}
+      />
+      <Field
+        label="Recording quota"
+        help="Space their recordings may take. Recordings in progress always finish."
+      >
+        {(id) => (
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              id={id}
+              className="w-auto"
+              value={mode}
+              onChange={(e) => {
+                const m = e.target.value;
+                const next = { ...value };
+                if (m === "default") delete next.dvrQuotaGb;
+                else next.dvrQuotaGb = m === "unlimited" ? 0 : quota || def || 50;
+                onChange(next);
+              }}
+            >
+              <option value="default">
+                Use the default ({def ? `${def} GB` : "no limit"})
+              </option>
+              <option value="unlimited">No limit</option>
+              <option value="own">Their own</option>
+            </Select>
+            {mode === "own" && (
+              <>
+                <Input
+                  type="number"
+                  min={1}
+                  inputMode="numeric"
+                  aria-label="Quota in GB"
+                  className="w-28"
+                  value={quota ?? ""}
+                  onChange={(e) =>
+                    onChange({
+                      ...value,
+                      dvrQuotaGb: Math.max(1, Math.floor(Number(e.target.value) || 1)),
+                    })
+                  }
+                />
+                <span className="text-sm text-muted">GB</span>
+              </>
+            )}
+          </div>
+        )}
+      </Field>
+    </div>
   );
 }
 
@@ -266,7 +329,7 @@ function RestrictionsEditor({
       </Field>
       <RequestPermission value={value} onChange={onChange} />
       <LiveTvPermission value={value} onChange={onChange} />
-      <RecordPermission value={value} onChange={onChange} />
+      <DvrPermissions value={value} onChange={onChange} />
       <Toggle
         label="Allow streaming away from home"
         help="Over Tailscale. Turn off to limit this person to the home network."
@@ -709,6 +772,8 @@ export function UsersSettings() {
   const users = useQuery(usersQuery);
   const me = useQuery(meQuery);
   const libraries = useQuery(librariesQuery);
+  const dvrUsage = useQuery({ ...allRecordingUsageQuery, retry: false });
+  const usageOf = new Map((dvrUsage.data ?? []).map((u) => [u.userId, u]));
   const del = useDeleteUser();
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
@@ -754,6 +819,17 @@ export function UsersSettings() {
           {u.lastSeenAt &&
             ` · Last active ${new Date(u.lastSeenAt).toLocaleDateString()}`}
         </div>
+        {(() => {
+          const du = usageOf.get(u.id);
+          if (!du || (du.recordings === 0 && du.quotaSource === "default" && du.quotaBytes === 0)) return null;
+          return (
+            <div className={du.overQuota ? "text-xs text-danger" : "text-xs text-muted"}>
+              Recordings: {usageLabel(du)}
+              {du.quotaSource === "user" ? " (own quota)" : ""}
+              {du.overQuota ? " · over quota" : ""}
+            </div>
+          );
+        })()}
       </div>
       <Button
         size="sm"

@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -464,33 +463,58 @@ func run() error {
 	// DVR (LIVE-5): recordings land in "Recorded TV" / "Recorded Movies", made on first use.
 	minutes := func(n int) time.Duration { return time.Duration(n) * time.Minute }
 	dvr := &livetv.Recorder{Live: live, FFmpeg: cfg.FFmpegPath, Dir: cfg.RecordingsDir,
-		Before: func() time.Duration { return minutes(store.Get().Integrations.DVRPaddingBefore) },
-		After:  func() time.Duration { return minutes(store.Get().Integrations.DVRPaddingAfter) },
-		Library: func(ctx context.Context, movies bool, dir string) (int64, error) {
-			if err := os.MkdirAll(dir, 0o755); err != nil {
-				return 0, err
-			}
-			libs, err := libraries.List(ctx)
+		Before:  func() time.Duration { return minutes(store.Get().Integrations.DVRPaddingBefore) },
+		After:   func() time.Duration { return minutes(store.Get().Integrations.DVRPaddingAfter) },
+		Folder:  func() string { return store.Get().Integrations.DVRFolder },
+		Library: libraries.RecordingsLibrary,
+		// Quotas and DVR permissions (LIVE-5).
+		CanRecord: func(ctx context.Context, userID int64) bool {
+			u, err := authSvc.GetUser(ctx, userID)
+			return err == nil && (u.IsAdmin || u.Restrictions.DVRRecordAllowed())
+		},
+		QuotaBytes: func(ctx context.Context, userID int64) int64 {
+			u, err := authSvc.GetUser(ctx, userID)
 			if err != nil {
-				return 0, err
+				return 0
 			}
-			for _, l := range libs {
-				if slices.Contains(l.Paths, dir) {
-					return l.ID, nil
+			b, _, _ := api.DVRQuota(u, store.Get())
+			return b
+		},
+		QuotaAction: func() string { return store.Get().Integrations.DVRQuotaAction },
+		Playing: func(path string) bool {
+			var id int64
+			if database.QueryRowContext(ctx, `SELECT id FROM media_files WHERE path = ?`, path).Scan(&id) != nil {
+				return false
+			}
+			for _, ps := range player.List() {
+				if ps.FileID == id {
+					return true
 				}
 			}
-			name, t := "Recorded TV", library.Shows
-			if movies {
-				name, t = "Recorded Movies", library.Movies
+			return false
+		},
+		Trash: func(ctx context.Context, path string) error {
+			var id int64
+			if err := database.QueryRowContext(ctx, `SELECT id FROM media_files WHERE path = ?`, path).Scan(&id); err != nil {
+				return err
 			}
-			l, err := libraries.Create(ctx, name, t, []string{dir}, library.Options{})
-			if err != nil {
-				return 0, err
-			}
-			slog.Info("dvr: created library", "name", name, "path", dir)
-			return l.ID, nil
+			return mediaTrash.Delete(ctx, id, "DVR quota")
 		},
 		Scan: scans.Queue,
+	}
+	// Libraries made for recordings before they were flagged (migration 41) are found by
+	// their folders: TV or Movies in the recordings folder.
+	if libs, err := libraries.List(ctx); err == nil {
+		for _, l := range libs {
+			for _, p := range l.Paths {
+				for _, root := range []string{cfg.RecordingsDir, store.Get().Integrations.DVRFolder} {
+					if root != "" && !l.Recordings && (p == filepath.Join(root, "TV") || p == filepath.Join(root, "Movies")) {
+						libraries.MarkRecordings(ctx, l.ID)
+						l.Recordings = true
+					}
+				}
+			}
+		}
 	}
 	// Commercials in recordings (Comskip, then FFmpeg; one at a time, lowest priority): when a
 	// recording finishes, on an admin's request, and nightly for older recordings.
@@ -499,6 +523,7 @@ func run() error {
 		Preset: func() string { return store.Get().Transcoder.Preset },
 		Mode:   func() string { return store.Get().Integrations.Commercials },
 		Trash:  mediaTrash, Rescan: scans.Queue, Pace: 30 * time.Second,
+		Roots: func() []string { return dvr.Roots(ctx) },
 		Playing: func(fileID int64) bool {
 			for _, ps := range player.List() {
 				if ps.FileID == fileID {

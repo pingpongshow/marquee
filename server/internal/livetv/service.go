@@ -211,14 +211,14 @@ func (s *Service) refreshSource(ctx context.Context, src settings.LiveTVSource) 
 	defer tx.Rollback()
 	// Replace the guide for this source's channels.
 	tx.ExecContext(ctx, `DELETE FROM live_programmes WHERE channel_id IN (SELECT id FROM live_channels WHERE source_id = ?)`, src.ID)
-	ins, err := tx.PrepareContext(ctx, `INSERT INTO live_programmes (channel_id, start, stop, title, subtitle, description, category, episode, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	ins, err := tx.PrepareContext(ctx, `INSERT INTO live_programmes (channel_id, start, stop, title, subtitle, description, category, episode, image_url, rating) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return channels, 0, err
 	}
 	defer ins.Close()
 	for _, p := range progs {
 		for _, id := range byEPG[p.Channel] {
-			if _, err := ins.ExecContext(ctx, id, p.Start.UTC().Format(time.RFC3339), p.Stop.UTC().Format(time.RFC3339), p.Title, p.Subtitle, p.Description, p.Category, p.Episode, p.Image); err != nil {
+			if _, err := ins.ExecContext(ctx, id, p.Start.UTC().Format(time.RFC3339), p.Stop.UTC().Format(time.RFC3339), p.Title, p.Subtitle, p.Description, p.Category, p.Episode, p.Image, p.Rating); err != nil {
 				return channels, programmes, err
 			}
 			programmes++

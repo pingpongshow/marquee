@@ -23,7 +23,7 @@ func (h *Handlers) homeLibraries(ctx context.Context) ([]int64, error) {
 	}
 	home := []int64{} // none means none, not all
 	for _, l := range libs {
-		if canSeeLibrary(ctx, l.ID) && (l.Options.IncludeInHome == nil || *l.Options.IncludeInHome) {
+		if h.canSeeLibrary(ctx, l.ID) && (l.Options.IncludeInHome == nil || *l.Options.IncludeInHome) {
 			home = append(home, l.ID)
 		}
 	}

@@ -79,6 +79,7 @@ func (h *Handlers) liveStatus(ctx context.Context) LiveTvStatus {
 		out.RecordingsActive = ptr(h.DVR.Active())
 		if s, ok := session(ctx); ok {
 			out.CanRecord = ptr(canRecord(s) && *out.DvrAvailable)
+			out.CanViewRecordings = ptr(canViewDVR(s))
 		}
 	}
 	out.Sources = make([]struct {

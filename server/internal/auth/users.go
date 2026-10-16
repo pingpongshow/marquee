@@ -26,8 +26,13 @@ type Restrictions struct {
 	RemoteQualityKbps int      `json:"remoteQualityKbps,omitempty"`
 	// CanRequest lets the user ask for titles through Seerr (REQ-1); admins always may.
 	CanRequest bool `json:"canRequest,omitempty"`
-	// CanRecord lets the user schedule Live TV recordings (LIVE-5); admins always may.
-	CanRecord bool `json:"canRecord,omitempty"`
+	// RecordDVR: nil or true = may schedule Live TV recordings (LIVE-5); ViewDVR: nil or
+	// true = may see and play the household's recordings. Admins always may. Only "no" is
+	// stored. (Recording used to be opt-in as "canRecord"; migration 41 converted it.)
+	RecordDVR *bool `json:"canRecordDVR,omitempty"`
+	ViewDVR   *bool `json:"canViewDVR,omitempty"`
+	// DVRQuotaGB is this user's recording quota: nil = the server default, 0 = unlimited.
+	DVRQuotaGB *int `json:"dvrQuotaGB,omitempty"`
 	// LiveTV: nil or true = may watch Live TV (LIVE-4); LiveTVGroups limits it to these
 	// channel groups (nil = all).
 	LiveTV       *bool     `json:"liveTv,omitempty"`
@@ -40,6 +45,12 @@ type Restrictions struct {
 
 // LiveTVAllowed reports whether the user may watch Live TV at all.
 func (r Restrictions) LiveTVAllowed() bool { return r.LiveTV == nil || *r.LiveTV }
+
+// DVRRecordAllowed reports whether a non-admin may schedule recordings.
+func (r Restrictions) DVRRecordAllowed() bool { return r.RecordDVR == nil || *r.RecordDVR }
+
+// DVRViewAllowed reports whether a non-admin may see and play recordings.
+func (r Restrictions) DVRViewAllowed() bool { return r.ViewDVR == nil || *r.ViewDVR }
 
 // RemoteAllowed reports whether the user may stream outside the LAN.
 func (r Restrictions) RemoteAllowed() bool { return r.AllowRemote == nil || *r.AllowRemote }

@@ -14,12 +14,16 @@ import {
   Spinner,
   Toggle,
 } from "@/components/ui";
-import { liveStatusQuery } from "../livetv/api";
+import { allRecordingUsageQuery, liveStatusQuery, usageLabel } from "../livetv/api";
+import { FolderBrowser } from "./FolderBrowser";
 import { SaveBar } from "./SaveBar";
 
 type Source = components["schemas"]["LiveTvSource"];
 type Commercials = NonNullable<
   components["schemas"]["IntegrationSettingsUpdate"]["commercials"]
+>;
+type QuotaAction = NonNullable<
+  components["schemas"]["IntegrationSettingsUpdate"]["dvrQuotaAction"]
 >;
 
 /** Live TV sources (LIVE-1): M3U playlists with XMLTV guides, or Dispatcharr. */
@@ -201,6 +205,7 @@ export function LiveTvSettings() {
       )}
       {refresh.error && <Alert tone="error">{refresh.error.message}</Alert>}
       {server.length > 0 && <RecordingSettings />}
+      {server.length > 0 && <DvrUsageList />}
       <SaveBar
         dirty={dirty}
         saving={save.isPending}
@@ -236,10 +241,10 @@ function RecordingSettings() {
       title="Recording"
       description={
         status.data?.dvrAvailable ? (
-          "Recordings go to the recordings folder and appear in the Recorded TV and Recorded Movies libraries. Allow people to record in Settings → Users."
+          "Recordings appear in the Recorded TV and Recorded Movies libraries, and everyone who may view recordings sees them (within their rating limit). Who may record or view, and per-person quotas, are in Settings → Users."
         ) : (
           <span className="text-danger">
-            The recordings folder (/recordings in the container) can't be
+            The recordings folder ({i?.dvrFolder || i?.dvrFolderDefault || "/recordings"}) can't be
             written, so recording is off.
           </span>
         )
@@ -316,8 +321,163 @@ function RecordingSettings() {
             </Select>
           )}
         </Field>
+        <Field
+          label="Recording quota per person"
+          help="Space each person's recordings may take (finished and in progress). 0 = no limit. A person's own quota in Settings → Users overrides it."
+        >
+          {(id) => (
+            <QuotaInput
+              id={id}
+              value={i?.dvrDefaultQuotaGb ?? 0}
+              onSave={(gb) => save.mutate({ integrations: { dvrDefaultQuotaGb: gb } })}
+            />
+          )}
+        </Field>
+        <Field
+          label="When someone is over quota"
+          help="Recordings in progress always finish. Removed recordings go to the media trash (restorable for 30 days); one being watched is never removed."
+        >
+          {(id) => (
+            <Select
+              id={id}
+              value={i?.dvrQuotaAction ?? "block"}
+              onChange={(e) =>
+                save.mutate({
+                  integrations: { dvrQuotaAction: e.target.value as QuotaAction },
+                })
+              }
+            >
+              <option value="block">Don't record anything new</option>
+              <option value="deleteOldest">Remove their oldest watched recordings to make room</option>
+            </Select>
+          )}
+        </Field>
       </div>
+      <DvrFolderField
+        value={i?.dvrFolder ?? ""}
+        fallback={i?.dvrFolderDefault ?? ""}
+        inLibrary={i?.dvrFolderInLibrary}
+      />
       {save.error && <Alert tone="error">{save.error.message}</Alert>}
+    </Card>
+  );
+}
+
+/** A whole number of GB, saved when it changes and the field loses focus. */
+function QuotaInput({ id, value, onSave }: { id: string; value: number; onSave: (gb: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft === null) return;
+    const n = Math.max(0, Math.floor(Number(draft)));
+    if (Number.isFinite(n) && n !== value) onSave(n);
+    setDraft(null);
+  };
+  return (
+    <div className="flex items-center gap-2">
+      <Input
+        id={id}
+        type="number"
+        min={0}
+        inputMode="numeric"
+        className="w-32"
+        value={draft ?? String(value)}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === "Enter" && commit()}
+      />
+      <span className="text-sm text-muted">GB</span>
+    </div>
+  );
+}
+
+/** Where new recordings go: empty = the server's configured folder. Checked on save. */
+function DvrFolderField({ value, fallback, inLibrary }: { value: string; fallback: string; inLibrary?: boolean }) {
+  const save = useUpdateSettings();
+  const [draft, setDraft] = useState<string | null>(null);
+  const [browsing, setBrowsing] = useState(false);
+  const current = draft ?? value;
+  const dirty = draft !== null && draft.trim() !== value;
+  const commit = (folder: string) =>
+    save.mutate({ integrations: { dvrFolder: folder } }, { onSuccess: () => setDraft(null) });
+  return (
+    <div className="mt-4">
+      <Field
+        label="Recordings folder"
+        help={`Where new recordings go. Empty = the server's folder${fallback ? ` (${fallback})` : ""}. Recordings already made stay where they are and keep working; the Recorded TV library takes the new folder too.`}
+      >
+        {(id) => (
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <Input
+                id={id}
+                value={current}
+                placeholder={fallback || "/recordings"}
+                onChange={(e) => setDraft(e.target.value)}
+                className="min-w-0 flex-1 font-mono"
+              />
+              <Button size="sm" variant="secondary" className="h-10" onClick={() => setBrowsing((b) => !b)}>
+                {browsing ? "Close" : "Browse"}
+              </Button>
+              {value && (
+                <Button size="sm" variant="ghost" className="h-10" onClick={() => commit("")}>
+                  Use default
+                </Button>
+              )}
+              {dirty && (
+                <Button size="sm" variant="primary" className="h-10" disabled={save.isPending} onClick={() => commit(current.trim())}>
+                  Save
+                </Button>
+              )}
+            </div>
+            {browsing && (
+              <FolderBrowser
+                initialPath={current || null}
+                onPick={(p) => {
+                  setDraft(p);
+                  setBrowsing(false);
+                }}
+              />
+            )}
+          </div>
+        )}
+      </Field>
+      {inLibrary === false && (
+        <Alert tone="error">
+          No library includes this folder's TV (and Movies) folder, so new recordings won't appear in the library. Add it to the Recorded TV library in Settings → Libraries.
+        </Alert>
+      )}
+      {save.error && <Alert tone="error">{save.error.message}</Alert>}
+    </div>
+  );
+}
+
+/** Admins: how much space each person's recordings take, against their quota. */
+function DvrUsageList() {
+  const usage = useQuery(allRecordingUsageQuery);
+  const rows = (usage.data ?? []).filter((u) => u.recordings > 0 || u.quotaSource === "user");
+  return (
+    <Card title="Recording space" description="Each person's recordings (finished and in progress), against their quota.">
+      {usage.isPending ? (
+        <Spinner />
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-faint">No recordings yet.</p>
+      ) : (
+        <ul className="divide-y divide-border">
+          {rows.map((u) => (
+            <li key={u.userId} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2 text-sm">
+              <span className="min-w-0 flex-1 truncate font-medium">{u.displayName}</span>
+              <span className="text-muted">
+                {u.recordings} recording{u.recordings === 1 ? "" : "s"}
+              </span>
+              <span className={u.overQuota ? "text-danger" : "text-muted"}>
+                {usageLabel(u)}
+                {u.quotaSource === "default" && u.quotaBytes > 0 ? " (default)" : ""}
+                {u.overQuota ? " · over quota" : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </Card>
   );
 }
