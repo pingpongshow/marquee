@@ -29,6 +29,12 @@ const idleAfter = 3 * time.Hour
 
 type Streams struct {
 	HTTP *http.Client
+	// OnEnd, when set, hears a session that ended (stopped or idle), e.g. to stop the
+	// transcode behind an Xtream Codes film.
+	OnEnd func(*Stream)
+	// Active, when set, keeps a session the server makes the HLS of while that is in use
+	// (its segments aren't fetched from here).
+	Active func(*Stream) bool
 
 	mu       sync.Mutex
 	sessions map[string]*Stream
@@ -41,6 +47,9 @@ type Stream struct {
 	MovieID   int64
 	userAgent string
 	master    string
+	// PlaybackID is the server's own HLS session (playback.Manager) for a film that is a
+	// file (Xtream Codes); "" when the source's HLS is passed through.
+	PlaybackID string
 
 	mu    sync.Mutex
 	urls  []string
@@ -80,10 +89,28 @@ func (st *Streams) Get(id string) *Stream {
 	return st.sessions[id]
 }
 
+// StartPlayback records a session whose HLS the server makes itself (playbackID).
+func (st *Streams) StartPlayback(userID, movieID int64, playbackID string) *Stream {
+	s := st.Start(userID, movieID, "", "")
+	s.PlaybackID = playbackID
+	return s
+}
+
 func (st *Streams) Stop(id string) {
 	st.mu.Lock()
-	defer st.mu.Unlock()
+	s := st.sessions[id]
 	delete(st.sessions, id)
+	st.mu.Unlock()
+	if s != nil && st.OnEnd != nil {
+		st.OnEnd(s)
+	}
+}
+
+// Touch keeps a session alive (its player reported its position).
+func (s *Stream) Touch() {
+	s.mu.Lock()
+	s.last = time.Now()
+	s.mu.Unlock()
 }
 
 // Run ends idle sessions until ctx ends.
@@ -97,15 +124,25 @@ func (st *Streams) Run(ctx context.Context) {
 		case <-t.C:
 		}
 		st.mu.Lock()
+		var ended []*Stream
 		for id, s := range st.sessions {
 			s.mu.Lock()
 			idle := time.Since(s.last) > idleAfter
 			s.mu.Unlock()
+			if idle && s.PlaybackID != "" && st.Active != nil && st.Active(s) {
+				idle = false
+			}
 			if idle {
 				delete(st.sessions, id)
+				ended = append(ended, s)
 			}
 		}
 		st.mu.Unlock()
+		for _, s := range ended {
+			if st.OnEnd != nil {
+				st.OnEnd(s)
+			}
+		}
 	}
 }
 
@@ -169,7 +206,7 @@ func (st *Streams) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, name, ok := strings.Cut(strings.TrimPrefix(r.URL.Path, StreamPrefix), "/")
 		s := st.Get(id)
-		if !ok || s == nil {
+		if !ok || s == nil || s.master == "" {
 			http.NotFound(w, r)
 			return
 		}

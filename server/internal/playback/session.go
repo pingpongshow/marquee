@@ -86,8 +86,13 @@ type Session struct {
 	Remote           bool
 	ClientIP         string
 	StartedAt        time.Time
+	// External is a remote file that isn't a library item (movies on demand): no history,
+	// watch state or webhooks here; its owner keeps progress.
+	External bool
 
 	mu         sync.Mutex
+	suspended  bool                // External: idle, FFmpeg ended until the viewer comes back
+	redact     func(string) string // External: cleans messages that may name the link
 	lastActive time.Time
 	positionMS int64
 	state      string
@@ -121,7 +126,14 @@ func (s *Session) Snapshot() Snapshot {
 func (s *Session) touch() {
 	s.mu.Lock()
 	s.lastActive = time.Now()
+	s.suspended = false
 	s.mu.Unlock()
+}
+
+func (s *Session) isSuspended() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.suspended
 }
 
 // Transcoder returns the session's transcoder, or nil for direct play.
@@ -149,6 +161,8 @@ type Manager struct {
 	TranscodeDir string
 	Encoders     Encoders
 	FFprobe      string
+	// RemoteFFprobe probes remote files (movies on demand); FFprobe when empty.
+	RemoteFFprobe string
 	// IFrames, when set, returns a file's scrubbing-thumbnail stream (an all-keyframe MP4
 	// and its HLS I-frame playlist) for Apple players.
 	IFrames func(fileID, durationMS int64) (file string, playlist []byte, ok bool)
@@ -230,6 +244,14 @@ func (m *Manager) Get(id string) (*Session, bool) {
 	return s, ok
 }
 
+// Exists reports whether a session is active, without counting as activity.
+func (m *Manager) Exists(id string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, ok := m.sessions[id]
+	return ok
+}
+
 // List returns active sessions, newest first.
 func (m *Manager) List() []*Session {
 	m.mu.Lock()
@@ -259,7 +281,7 @@ func (m *Manager) transcodeCount() int {
 	defer m.mu.Unlock()
 	n := 0
 	for _, s := range m.sessions {
-		if s.transcoder != nil {
+		if s.transcoder != nil && !s.isSuspended() {
 			n++
 		}
 	}
@@ -691,6 +713,9 @@ func (m *Manager) Progress(ctx context.Context, id string, positionMS int64, sta
 	}
 	s.positionMS, s.state = positionMS, state
 	s.mu.Unlock()
+	if s.External {
+		return nil // its owner records progress (movies on demand)
+	}
 	if takeOver {
 		m.stopOthers(ctx, s)
 	}
@@ -799,6 +824,18 @@ func (m *Manager) Reap(ctx context.Context, idle time.Duration) {
 	for _, s := range sessions {
 		quiet := time.Since(s.Snapshot().LastActive)
 		if s.Preloading() && activeDevice[s.DeviceID] && quiet <= preloadLimit {
+			continue
+		}
+		// A film left paused keeps its session (and segments) for a while, without FFmpeg.
+		if s.External && quiet > idle && quiet <= ExternalIdle {
+			s.mu.Lock()
+			suspend := !s.suspended
+			s.suspended = true
+			s.mu.Unlock()
+			if suspend && s.transcoder != nil {
+				slog.Info("pausing idle stream", "user", s.UserName, "title", s.Title)
+				s.transcoder.Suspend()
+			}
 			continue
 		}
 		if quiet > idle {

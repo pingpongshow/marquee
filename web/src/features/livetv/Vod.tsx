@@ -6,6 +6,7 @@ import { api, unwrap } from "@/api/client";
 import { Alert, Button, Input, Select, Spinner } from "@/components/ui";
 import { formatDuration, formatTrackTime } from "@/features/browse/format";
 import { Poster } from "@/features/browse/Poster";
+import { deviceProfile } from "@/features/player/deviceProfile";
 import {
   type VodMovie,
   type VodSort,
@@ -289,7 +290,7 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
   );
 }
 
-/** Full-screen playback of a film: the source's own HLS through the server, seekable. */
+/** Full-screen playback of a film through the server (the source's own HLS, or a file made into HLS), seekable. */
 export function VodPlayerPage({ movieId, startMs }: { movieId: number; startMs?: number }) {
   const movie = useQuery(vodMovieQuery(movieId));
   const video = useRef<HTMLVideoElement>(null);
@@ -325,7 +326,13 @@ export function VodPlayerPage({ movieId, startMs }: { movieId: number; startMs?:
     v?.addEventListener("ended", onEnded);
     (async () => {
       const [s, { default: Hls }] = await Promise.all([
-        unwrap(api.POST("/livetv/vod/movies/{movieId}/play", { params: { path: { movieId } } })),
+        unwrap(
+          api.POST("/livetv/vod/movies/{movieId}/play", {
+            params: { path: { movieId } },
+            // Films that are files are made into HLS for this browser (copied when it plays the codec).
+            body: { profile: deviceProfile() },
+          }),
+        ),
         import("hls.js"),
       ]);
       if (cancelled) return stop(s.id);

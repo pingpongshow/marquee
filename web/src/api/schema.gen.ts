@@ -2263,7 +2263,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start watching a film. Returns an HLS session passed through from the source (seekable; no transcode). */
+        /** Start watching a film. Returns a seekable HLS session: an M3U source's own HLS passed through, or (Xtream Codes sources, whose films are files) the file made into HLS by the server, video copied when the device plays it and audio converted when needed. */
         post: operations["playVodMovie"];
         delete?: never;
         options?: never;
@@ -2289,6 +2289,23 @@ export interface paths {
         head?: never;
         /** Report the position, so the film resumes there (and counts as watched near the end). */
         patch: operations["reportVodPlayback"];
+        trace?: never;
+    };
+    "/livetv/vod/sources/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check a movie source before saving it (admin only): an M3U playlist's film count, or an Xtream Codes account's status and film count. Without a password, a saved source's (same id) is used. */
+        post: operations["testVodSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/livetv/vod/refresh": {
@@ -3878,11 +3895,22 @@ export interface components {
             userAgent?: string;
             enabled?: boolean;
         };
-        /** @description An M3U playlist of films, e.g. Pluto TV's on-demand movies (LIVE-6). Each entry's group-title is its category. */
+        /** @description A source of films (LIVE-6): an M3U playlist, e.g. Pluto TV's on-demand movies (each entry's group-title is its category), or an Xtream Codes server such as Dispatcharr (its VOD categories and movies). */
         VodSource: {
             id?: string;
             name: string;
+            /**
+             * @description m3u: url is the playlist. xtream: url is the server's address (e.g. Dispatcharr's), with a username and password (Dispatcharr: a user's XC password).
+             * @default m3u
+             * @enum {string}
+             */
+            kind: "m3u" | "xtream";
             url: string;
+            /** @description Xtream Codes username. */
+            username?: string;
+            /** @description Xtream Codes password. Write-only; omit to keep the saved one. */
+            password?: string;
+            readonly passwordSet?: boolean;
             userAgent?: string;
             enabled?: boolean;
         };
@@ -9582,7 +9610,16 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description What the device plays (Xtream Codes films). Without it, H.264 video and AAC/MP3 audio are copied and anything else is converted to them. */
+                    profile?: components["schemas"]["DeviceProfile"];
+                    /** @description The app's quality setting; 0/omitted = original (home) or automatic (remote). */
+                    maxBitrateKbps?: number;
+                };
+            };
+        };
         responses: {
             /** @description The session. */
             200: {
@@ -9596,6 +9633,8 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     stopVodSession: {
@@ -9651,6 +9690,47 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    testVodSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VodSource"];
+            };
+        };
+        responses: {
+            /** @description Reachable or not. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ok: boolean;
+                        /** @description Films the source lists. */
+                        movies?: number;
+                        /** @description Categories (Xtream Codes). */
+                        categories?: number;
+                        /** @description The account's status as the server reports it, e.g. Active (Xtream Codes). */
+                        account?: string;
+                        /**
+                         * Format: date-time
+                         * @description When the account expires, if it does (Xtream Codes).
+                         */
+                        expiresAt?: string;
+                        error?: string;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     refreshVod: {

@@ -270,7 +270,7 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		}
 		set(&s.Integrations.VODEnabled, i.VodEnabled)
 		if i.VodSources != nil {
-			s.Integrations.VODSources = fromAPIVodSources(*i.VodSources)
+			s.Integrations.VODSources = fromAPIVodSources(*i.VodSources, s.Integrations.VODSources)
 		}
 	}
 	if n := u.Notifications; n != nil {

@@ -178,7 +178,7 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] =
           keywords:
             "vod movies on demand pluto films m3u live tv tmdb free streaming",
           description:
-            "Free films from Pluto TV or another M3U playlist, in a Movies tab under Live TV.",
+            "Films from an M3U playlist such as Pluto TV's, or from Dispatcharr (Xtream Codes), on the VOD page.",
         },
         {
           id: "requests",

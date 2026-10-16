@@ -81,7 +81,7 @@ func (m *Manager) RungTranscoder(s *Session, n int) (*Transcoder, error) {
 		job.Decision.VideoKbps = r.VideoKbps
 		job.Dir = filepath.Join(base.Job.Dir, fmt.Sprintf("r%d", n))
 		r.t = &Transcoder{FFmpeg: base.FFmpeg, Job: job, Encoders: enc,
-			TotalSegments: base.TotalSegments, ThrottleAhead: base.ThrottleAhead}
+			TotalSegments: base.TotalSegments, ThrottleAhead: base.ThrottleAhead, Redact: base.Redact}
 		r.t.lastRequest = base.lastRequestSnapshot()
 	}
 	return r.t, nil

@@ -33,6 +33,8 @@ var ErrNotFound = errors.New("vod: not found")
 // Matcher finds a film on TMDB (metadata.Service).
 type Matcher interface {
 	MatchMovie(ctx context.Context, title string, year int) (*tmdb.Movie, error)
+	// MovieByID returns a film the source already named by its TMDB id.
+	MovieByID(ctx context.Context, id int) (*tmdb.Movie, error)
 }
 
 type Service struct {
@@ -180,6 +182,9 @@ func sourceKey(link string) string {
 }
 
 func (s *Service) refreshSource(ctx context.Context, src settings.VODSource) (int, error) {
+	if src.Xtream() {
+		return s.refreshXtream(ctx, src)
+	}
 	body, err := s.get(ctx, src.URL, src.UserAgent)
 	if err != nil {
 		return 0, err
@@ -252,9 +257,9 @@ func (s *Service) match(ctx context.Context, retryFailed bool) {
 	if s.Matcher == nil {
 		return
 	}
-	q := "SELECT id, title, COALESCE(year, 0) FROM vod_movies WHERE match_state='pending'"
+	q := "SELECT id, title, COALESCE(year, 0), COALESCE(tmdb_id, 0) FROM vod_movies WHERE match_state='pending'"
 	if retryFailed {
-		q = "SELECT id, title, COALESCE(year, 0) FROM vod_movies WHERE match_state IN ('pending','failed')"
+		q = "SELECT id, title, COALESCE(year, 0), COALESCE(tmdb_id, 0) FROM vod_movies WHERE match_state IN ('pending','failed')"
 	}
 	rows, err := s.DB.QueryContext(ctx, q+" ORDER BY id")
 	if err != nil {
@@ -264,11 +269,12 @@ func (s *Service) match(ctx context.Context, retryFailed bool) {
 		id    int64
 		title string
 		year  int
+		tmdb  int
 	}
 	var list []todo
 	for rows.Next() {
 		var t todo
-		rows.Scan(&t.id, &t.title, &t.year)
+		rows.Scan(&t.id, &t.title, &t.year, &t.tmdb)
 		list = append(list, t)
 	}
 	rows.Close()
@@ -284,7 +290,19 @@ func (s *Service) match(ctx context.Context, retryFailed bool) {
 				t.year, _ = strconv.Atoi(m[2])
 			}
 		}
-		m, err := s.Matcher.MatchMovie(ctx, title, t.year)
+		var m *tmdb.Movie
+		var err error
+		if t.tmdb > 0 {
+			// The source named the film (Xtream Codes): no guessing by title.
+			m, err = s.Matcher.MovieByID(ctx, t.tmdb)
+			if err != nil && !errors.Is(err, tmdb.ErrNoKey) && !errors.Is(err, tmdb.ErrInvalidKey) {
+				slog.Debug("movie by TMDB id", "title", t.title, "tmdb", t.tmdb, "err", err)
+				m, err = nil, nil
+			}
+		}
+		if m == nil && err == nil {
+			m, err = s.Matcher.MatchMovie(ctx, title, t.year)
+		}
 		if errors.Is(err, tmdb.ErrNoKey) || errors.Is(err, tmdb.ErrInvalidKey) {
 			return // films stay pending until a key is set
 		}

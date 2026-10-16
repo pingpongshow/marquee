@@ -10,6 +10,7 @@ import (
 
 	"marquee/internal/auth"
 	"marquee/internal/netclass"
+	"marquee/internal/playback"
 	"marquee/internal/settings"
 	"marquee/internal/vod"
 )
@@ -69,25 +70,60 @@ func toAPIVodMovies(ms []vod.Movie) []VodMovie {
 func toAPIVodSources(in []settings.VODSource) []VodSource {
 	out := make([]VodSource, len(in))
 	for i, s := range in {
-		out[i] = VodSource{Id: ptr(s.ID), Name: s.Name, Url: s.URL, UserAgent: nz(s.UserAgent), Enabled: ptr(s.Enabled)}
+		kind := VodSourceKindM3u
+		if s.Xtream() {
+			kind = VodSourceKindXtream
+		}
+		out[i] = VodSource{Id: ptr(s.ID), Name: s.Name, Kind: &kind, Url: s.URL, UserAgent: nz(s.UserAgent), Enabled: ptr(s.Enabled)}
+		if s.Xtream() {
+			out[i].Username, out[i].PasswordSet = ptr(s.Username), ptr(s.Password != "")
+		}
 	}
 	return out
 }
 
-func fromAPIVodSources(in []VodSource) []settings.VODSource {
+// fromAPIVodSource reads one source. The password is write-only: without one, the saved
+// source's (same id) is kept.
+func fromAPIVodSource(src VodSource, saved []settings.VODSource) settings.VODSource {
+	id := ""
+	if src.Id != nil {
+		id = *src.Id
+	}
+	out := settings.VODSource{ID: id, Name: strings.TrimSpace(src.Name), Kind: "m3u",
+		URL: strings.TrimRight(strings.TrimSpace(src.Url), "/"), Enabled: src.Enabled == nil || *src.Enabled}
+	if src.Kind != nil && *src.Kind == VodSourceKindXtream {
+		out.Kind = settings.VODKindXtream
+	} else {
+		out.URL = strings.TrimSpace(src.Url) // a playlist's address is kept as given
+	}
+	if src.UserAgent != nil {
+		out.UserAgent = strings.TrimSpace(*src.UserAgent)
+	}
+	if out.Xtream() {
+		if src.Username != nil {
+			out.Username = strings.TrimSpace(*src.Username)
+		}
+		if src.Password != nil && *src.Password != "" {
+			out.Password = *src.Password
+		} else {
+			// The saved password is only reused for the same server, so changing the address
+			// can't send it somewhere else.
+			for _, old := range saved {
+				if old.ID == id && id != "" && strings.TrimRight(old.URL, "/") == strings.TrimRight(out.URL, "/") {
+					out.Password = old.Password
+				}
+			}
+		}
+	}
+	return out
+}
+
+func fromAPIVodSources(in []VodSource, saved []settings.VODSource) []settings.VODSource {
 	out := make([]settings.VODSource, len(in))
 	for i, src := range in {
-		id := ""
-		if src.Id != nil {
-			id = *src.Id
-		}
-		if id == "" {
-			id = newWebhookID()
-		}
-		out[i] = settings.VODSource{ID: id, Name: strings.TrimSpace(src.Name), URL: strings.TrimSpace(src.Url),
-			Enabled: src.Enabled == nil || *src.Enabled}
-		if src.UserAgent != nil {
-			out[i].UserAgent = strings.TrimSpace(*src.UserAgent)
+		out[i] = fromAPIVodSource(src, saved)
+		if out[i].ID == "" {
+			out[i].ID = newWebhookID()
 		}
 	}
 	return out
@@ -221,6 +257,10 @@ func (h *Handlers) GetVodMovie(ctx context.Context, req GetVodMovieRequestObject
 		return GetVodMovie403JSONResponse{ForbiddenJSONResponse(errVodNotAllowed)}, nil
 	}
 	m, err := h.vodMovie(ctx, s, maxRating, req.MovieId)
+	if err == nil && m != nil && !m.Matched && m.Overview == "" {
+		h.VOD.Details(ctx, m.ID) // an Xtream Codes film's details, the first time it's opened
+		m, err = h.vodMovie(ctx, s, maxRating, req.MovieId)
+	}
 	if err != nil {
 		return nil, internal(ctx, "getVodMovie", err)
 	}
@@ -323,9 +363,53 @@ func (h *Handlers) PlayVodMovie(ctx context.Context, req PlayVodMovieRequestObje
 	if m == nil {
 		return PlayVodMovie404JSONResponse{NotFoundJSONResponse(errVodNotFound)}, nil
 	}
-	st := h.VOD.Streams.Start(s.User.ID, m.ID, m.StreamURL, h.VOD.UserAgent(m.SourceID))
-	return PlayVodMovie200JSONResponse(VodSession{Id: st.ID, Url: vod.StreamPrefix + st.ID + "/master.m3u8", MovieId: m.ID,
-		StartMs: nz(m.PositionMS)}), nil
+	link, ua, hls := h.VOD.PlayLink(*m)
+	if hls {
+		st := h.VOD.Streams.Start(s.User.ID, m.ID, link, ua)
+		return PlayVodMovie200JSONResponse(VodSession{Id: st.ID, Url: vod.StreamPrefix + st.ID + "/master.m3u8", MovieId: m.ID,
+			StartMs: nz(m.PositionMS)}), nil
+	}
+	// A file (Xtream Codes): the server makes it into HLS, like a library transcode.
+	if h.Playback == nil {
+		return PlayVodMovie503JSONResponse{ServiceUnavailableJSONResponse(apiErr("unavailable", "playback isn't available"))}, nil
+	}
+	ri := requestInfo(ctx)
+	r := playback.ExternalRequest{UserID: s.User.ID, UserName: s.User.DisplayName, DeviceID: s.DeviceID, Title: m.Title,
+		URL: link, UserAgent: ua, StartMS: m.PositionMS, Remote: ri.Class == netclass.Remote, ClientIP: ri.ClientIP,
+		Redact: func(msg string) string { return h.VOD.Redact(m.SourceID, msg) }}
+	for _, d := range must(h.Auth.ListDevices(ctx, s.User.ID)) {
+		if d.ID == s.DeviceID {
+			r.DeviceName = d.Name
+		}
+	}
+	if b := req.Body; b != nil {
+		if b.Profile != nil {
+			p := toProfile(*b.Profile)
+			r.Profile = &p
+		}
+		set(&r.Quality.RequestedKbps, b.MaxBitrateKbps)
+	}
+	if r.Remote {
+		r.Quality.UserPrefKbps = s.User.Preferences.RemoteQualityKbps
+		r.Quality.UserCapKbps = s.User.Restrictions.RemoteQualityKbps
+	} else {
+		r.Quality.UserPrefKbps = s.User.Preferences.LocalQualityKbps
+	}
+	ps, err := h.Playback.StartExternal(ctx, r)
+	switch {
+	case errors.Is(err, playback.ErrBusy):
+		return PlayVodMovie503JSONResponse{ServiceUnavailableJSONResponse(apiErr("busy", err.Error()))}, nil
+	case errors.Is(err, playback.ErrUnavailable):
+		return PlayVodMovie502JSONResponse{BadGatewayJSONResponse(apiErr("unavailable", "The film didn't load from its source: "+err.Error()))}, nil
+	case err != nil:
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, internal(ctx, "playVodMovie", errors.New(h.VOD.Redact(m.SourceID, err.Error())))
+	}
+	st := h.VOD.Streams.StartPlayback(s.User.ID, m.ID, ps.ID)
+	return PlayVodMovie200JSONResponse(VodSession{Id: st.ID, Url: playback.StreamPrefix + ps.ID + "/master.m3u8", MovieId: m.ID,
+		StartMs: nz(ps.StartMS)}), nil
 }
 
 func (h *Handlers) ReportVodPlayback(ctx context.Context, req ReportVodPlaybackRequestObject) (ReportVodPlaybackResponseObject, error) {
@@ -343,6 +427,10 @@ func (h *Handlers) ReportVodPlayback(ctx context.Context, req ReportVodPlaybackR
 	var dur int64
 	if req.Body.DurationMs != nil {
 		dur = *req.Body.DurationMs
+	}
+	st.Touch()
+	if st.PlaybackID != "" && h.Playback != nil {
+		h.Playback.Progress(ctx, st.PlaybackID, req.Body.PositionMs, "playing") // keeps it alive; shows where they are
 	}
 	if err := h.VOD.SetProgress(ctx, s.User.ID, st.MovieID, req.Body.PositionMs, dur); err != nil {
 		return nil, internal(ctx, "reportVodPlayback", err)
@@ -377,4 +465,37 @@ func (h *Handlers) RefreshVod(ctx context.Context, _ RefreshVodRequestObject) (R
 		return nil, internal(ctx, "refreshVod", err)
 	}
 	return RefreshVod200JSONResponse(st), nil
+}
+
+func (h *Handlers) TestVodSource(ctx context.Context, req TestVodSourceRequestObject) (TestVodSourceResponseObject, error) {
+	switch authed, admin := isAdmin(ctx); {
+	case !authed:
+		return TestVodSource401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !admin:
+		return TestVodSource403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	if req.Body == nil || h.VOD == nil {
+		return TestVodSource400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "a source is required"))}, nil
+	}
+	src := fromAPIVodSource(*req.Body, h.Settings.Get().Integrations.VODSources)
+	if !(strings.HasPrefix(src.URL, "http://") || strings.HasPrefix(src.URL, "https://")) {
+		return TestVodSource400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "the address must start with http:// or https://"))}, nil
+	}
+	if src.Xtream() && (src.Username == "" || src.Password == "") {
+		return TestVodSource400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "a username and password are needed"))}, nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	r, err := h.VOD.Test(ctx, src)
+	if err != nil {
+		return TestVodSource200JSONResponse{Ok: false, Error: ptr(err.Error())}, nil
+	}
+	out := TestVodSource200JSONResponse{Ok: true, Movies: ptr(r.Movies), Account: nz(r.Account)}
+	if src.Xtream() {
+		out.Categories = ptr(r.Categories)
+	}
+	if !r.ExpiresAt.IsZero() {
+		out.ExpiresAt = ptr(r.ExpiresAt)
+	}
+	return out, nil
 }

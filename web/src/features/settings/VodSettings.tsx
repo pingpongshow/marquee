@@ -5,12 +5,41 @@ import { useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { settingsQuery, useUpdateSettings } from "@/api/queries";
 import type { components } from "@/api/schema.gen";
-import { Alert, Button, Card, Field, Input, Spinner, Toggle } from "@/components/ui";
+import { Alert, Button, Card, Field, Input, Select, Spinner, Toggle } from "@/components/ui";
 import { vodStatusQuery } from "../livetv/vodApi";
 import { SaveBar } from "./SaveBar";
 
 type Source = components["schemas"]["VodSource"];
 type Draft = { enabled: boolean; sources: Source[] };
+
+/** Checks a source as it stands in the form (a saved password is used when none is typed). */
+function SourceTest({ source }: { source: Source }) {
+  const test = useMutation({
+    mutationFn: () => unwrap(api.POST("/livetv/vod/sources/test", { body: source })),
+  });
+  const r = test.data;
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <Button size="sm" variant="ghost" onClick={() => test.mutate()} disabled={test.isPending || !source.url}>
+        {test.isPending ? "Testing…" : "Test"}
+      </Button>
+      {r?.ok && (
+        <span className="text-sm text-success">
+          {[
+            r.account && `Account ${r.account.toLowerCase()}`,
+            r.expiresAt && `expires ${new Date(r.expiresAt).toLocaleDateString()}`,
+            `${r.movies ?? 0} films`,
+            r.categories !== undefined && `${r.categories} categories`,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+      )}
+      {r && !r.ok && <span className="text-sm text-danger">{r.error}</span>}
+      {test.error && <span className="text-sm text-danger">{test.error.message}</span>}
+    </div>
+  );
+}
 
 /** Movies on demand (LIVE-6): film playlists such as Pluto TV's, shown under Live TV. */
 export function VodSettings() {
@@ -42,9 +71,10 @@ export function VodSettings() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted">
-        Films from an M3U playlist, such as Pluto TV&apos;s free movies, appear as a Movies tab in Live TV for everyone who
-        may watch Live TV (and within each profile&apos;s rating limit). Nothing is downloaded: a film streams from the
-        source while someone watches it. Marquee reloads the lists every six hours and matches each film to TMDB.
+        Films from an M3U playlist, such as Pluto TV&apos;s free movies, or from a Dispatcharr (Xtream Codes) server appear
+        on the VOD page for everyone who may watch Live TV (and within each profile&apos;s rating limit). Nothing is
+        downloaded: a film streams from the source while someone watches it. Marquee reloads the lists every six hours and
+        matches each film to TMDB.
       </p>
       <Card>
         <Toggle
@@ -93,21 +123,73 @@ export function VodSettings() {
               <Field label="Name">
                 {(id) => <Input id={id} value={s.name} onChange={(e) => edit(i, { name: e.target.value })} />}
               </Field>
-              <Field label="Playlist URL" help="Each film's group (group-title) becomes its category.">
+              <Field label="Type">
                 {(id) => (
-                  <Input
+                  <Select
                     id={id}
-                    value={s.url}
-                    onChange={(e) => edit(i, { url: e.target.value })}
-                    placeholder="https://…/pluto-vod-US.m3u"
-                  />
+                    value={s.kind ?? "m3u"}
+                    onChange={(e) => edit(i, { kind: e.target.value as Source["kind"] })}
+                  >
+                    <option value="m3u">M3U playlist</option>
+                    <option value="xtream">Dispatcharr / Xtream Codes</option>
+                  </Select>
                 )}
               </Field>
+              {s.kind === "xtream" ? (
+                <>
+                  <Field label="Server URL" help="Dispatcharr's address, as the apps use it.">
+                    {(id) => (
+                      <Input
+                        id={id}
+                        value={s.url}
+                        onChange={(e) => edit(i, { url: e.target.value })}
+                        placeholder="http://dispatcharr:9191"
+                      />
+                    )}
+                  </Field>
+                  <Field label="Username" help="A Dispatcharr user with an XC password.">
+                    {(id) => (
+                      <Input
+                        id={id}
+                        value={s.username ?? ""}
+                        autoComplete="off"
+                        onChange={(e) => edit(i, { username: e.target.value })}
+                      />
+                    )}
+                  </Field>
+                  <Field label="Password" help="The user's XC password.">
+                    {(id) => (
+                      <Input
+                        id={id}
+                        type="password"
+                        autoComplete="new-password"
+                        value={s.password ?? ""}
+                        placeholder={s.passwordSet ? "Saved — type to change" : ""}
+                        onChange={(e) => edit(i, { password: e.target.value || undefined })}
+                      />
+                    )}
+                  </Field>
+                </>
+              ) : (
+                <Field label="Playlist URL" help="Each film's group (group-title) becomes its category.">
+                  {(id) => (
+                    <Input
+                      id={id}
+                      value={s.url}
+                      onChange={(e) => edit(i, { url: e.target.value })}
+                      placeholder="https://…/pluto-vod-US.m3u"
+                    />
+                  )}
+                </Field>
+              )}
               <Field label="User agent" help="Only if the provider needs a particular one.">
                 {(id) => (
                   <Input id={id} value={s.userAgent ?? ""} onChange={(e) => edit(i, { userAgent: e.target.value })} />
                 )}
               </Field>
+            </div>
+            <div className="mt-4">
+              <SourceTest source={s} />
             </div>
             <div className="mt-4">
               <Toggle label="Enabled" checked={s.enabled !== false} onChange={(v) => edit(i, { enabled: v })} />
@@ -117,7 +199,7 @@ export function VodSettings() {
       })}
       <div className="flex flex-wrap gap-3">
         <Button
-          onClick={() => setDraft({ ...d, sources: [...d.sources, { name: "Pluto TV movies", url: "", enabled: true }] })}
+          onClick={() => setDraft({ ...d, sources: [...d.sources, { name: "Pluto TV movies", kind: "m3u", url: "", enabled: true }] })}
         >
           <Plus className="size-4" /> Add source
         </Button>

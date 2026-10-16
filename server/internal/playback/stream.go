@@ -242,7 +242,7 @@ func (m *Manager) serveMaster(w http.ResponseWriter, s *Session) {
 	b.WriteString("\nindex.m3u8\n")
 	// Scrubbing thumbnails for Apple players (PLAY-13): an I-frame-only rendition made from
 	// the seek previews, one small keyframe every 10 s.
-	if m.IFrames != nil && s.Media.Video != nil {
+	if m.IFrames != nil && s.Media.Video != nil && !s.External {
 		if _, _, ok := m.IFrames(s.FileID, s.Media.DurationMS); ok {
 			v := s.Media.Video
 			h := 180
@@ -287,6 +287,9 @@ func (m *Manager) serveFromTranscoder(w http.ResponseWriter, r *http.Request, s 
 	}
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
+			if s.redact != nil {
+				err = errors.New(s.redact(err.Error()))
+			}
 			slog.Warn("segment failed", "session", s.ID, "segment", k, "err", err)
 			if m.OnFailure != nil {
 				m.OnFailure(s, err)

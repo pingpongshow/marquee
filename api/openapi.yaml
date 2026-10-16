@@ -2825,7 +2825,19 @@ paths:
     post:
       tags: [livetv]
       operationId: playVodMovie
-      summary: Start watching a film. Returns an HLS session passed through from the source (seekable; no transcode).
+      summary: "Start watching a film. Returns a seekable HLS session: an M3U source's own HLS passed through, or (Xtream Codes sources, whose films are files) the file made into HLS by the server, video copied when the device plays it and audio converted when needed."
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                profile:
+                  allOf:
+                    - $ref: "#/components/schemas/DeviceProfile"
+                  description: "What the device plays (Xtream Codes films). Without it, H.264 video and AAC/MP3 audio are copied and anything else is converted to them."
+                maxBitrateKbps: { type: integer, minimum: 0, description: "The app's quality setting; 0/omitted = original (home) or automatic (remote)." }
       responses:
         "200":
           description: The session.
@@ -2835,6 +2847,8 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
 
   /livetv/vod/sessions/{sessionId}:
     parameters:
@@ -2864,6 +2878,35 @@ paths:
       responses:
         "204": { description: Stopped. }
         "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /livetv/vod/sources/test:
+    post:
+      tags: [livetv]
+      operationId: testVodSource
+      summary: "Check a movie source before saving it (admin only): an M3U playlist's film count, or an Xtream Codes account's status and film count. Without a password, a saved source's (same id) is used."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VodSource" }
+      responses:
+        "200":
+          description: Reachable or not.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+                  movies: { type: integer, description: Films the source lists. }
+                  categories: { type: integer, description: Categories (Xtream Codes). }
+                  account: { type: string, description: "The account's status as the server reports it, e.g. Active (Xtream Codes)." }
+                  expiresAt: { type: string, format: date-time, description: "When the account expires, if it does (Xtream Codes)." }
+                  error: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /livetv/vod/refresh:
     post:
@@ -4733,11 +4776,19 @@ components:
     VodSource:
       type: object
       required: [name, url]
-      description: "An M3U playlist of films, e.g. Pluto TV's on-demand movies (LIVE-6). Each entry's group-title is its category."
+      description: "A source of films (LIVE-6): an M3U playlist, e.g. Pluto TV's on-demand movies (each entry's group-title is its category), or an Xtream Codes server such as Dispatcharr (its VOD categories and movies)."
       properties:
         id: { type: string }
         name: { type: string }
+        kind:
+          type: string
+          enum: [m3u, xtream]
+          default: m3u
+          description: "m3u: url is the playlist. xtream: url is the server's address (e.g. Dispatcharr's), with a username and password (Dispatcharr: a user's XC password)."
         url: { type: string }
+        username: { type: string, description: Xtream Codes username. }
+        password: { type: string, writeOnly: true, description: "Xtream Codes password. Write-only; omit to keep the saved one." }
+        passwordSet: { type: boolean, readOnly: true }
         userAgent: { type: string }
         enabled: { type: boolean }
 
