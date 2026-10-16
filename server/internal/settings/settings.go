@@ -37,6 +37,8 @@ type Settings struct {
 	Notifications Notifications `json:"notifications"`
 	// VODSave saves movies-on-demand films and episodes into the library (admins only).
 	VODSave VODSave `json:"vodSave"`
+	// Optimize re-encodes oversized library files to save space (admins only).
+	Optimize Optimize `json:"optimize"`
 }
 
 // VODSave configures saving films and episodes from movies-on-demand (Xtream Codes) sources
@@ -413,6 +415,7 @@ func Defaults() Settings {
 		VODSave: VODSave{Quality: VODSaveOriginal, MaxHeight: 1080, VideoCodec: "hevc", VideoQuality: "balanced",
 			Audio: "copy", ConcurrentPerSource: 1, ScanAfterSave: true, SkipExisting: true,
 			PauseWhileWatching: true, PauseScope: "source", RetryFailed: true},
+		Optimize: defaultOptimize(),
 		AI: AI{URL: "http://127.0.0.1:11434", ChatModel: "qwen3:8b", EmbedModel: "mxbai-embed-large", UnloadMinutes: 5,
 			UnderstandPrompts: true, RerankMovies: true, LyricsThemes: true, Reasons: true, LearnFromBehaviour: true},
 	}

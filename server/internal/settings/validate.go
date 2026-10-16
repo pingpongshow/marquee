@@ -152,6 +152,9 @@ func (s Settings) Validate() error {
 	if err := s.VODSave.validate(); err != nil {
 		return err
 	}
+	if err := s.Optimize.validate(); err != nil {
+		return err
+	}
 	if len(s.Webhooks) > 20 {
 		return invalid("at most 20 webhooks")
 	}

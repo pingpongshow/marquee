@@ -13,6 +13,7 @@ function taskDetail(t: Task) {
   const p = t.progress;
   // VOD downloads: sizes, speed and time left, or why the queue waits.
   if (t.kind === "download") return p?.current ?? (t.state === "queued" ? "Waiting…" : "");
+  if (t.kind === "optimize") return p && p.total > 0 ? `${Math.round((p.done / p.total) * 100)}%` : "";
   if (t.state === "queued" || !p) return "Waiting…";
   if (t.kind === "stream") {
     const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -122,6 +123,11 @@ export function ActivityIndicator() {
                   )}
                   {t.progress?.current && t.kind !== "download" && (
                     <div className="mt-1 truncate text-[11px] text-faint">{t.progress.current}</div>
+                  )}
+                  {t.kind === "optimize" && (
+                    <Link to="/settings/$section" params={{ section: "library-health" }} onClick={() => setOpen(false)} className="mt-1 inline-block text-[11px] text-muted hover:text-text">
+                      Open Library Health
+                    </Link>
                   )}
                   {t.kind === "download" && (
                     <Link to="/settings/$section" params={{ section: "vod" }} hash="downloads" onClick={() => setOpen(false)} className="mt-1 inline-block text-[11px] text-muted hover:text-text">
