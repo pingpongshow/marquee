@@ -26,6 +26,7 @@ import (
 	"marquee/internal/muse"
 	"marquee/internal/netclass"
 	"marquee/internal/notify"
+	"marquee/internal/optimize"
 	"marquee/internal/playback"
 	"marquee/internal/plex"
 	"marquee/internal/remote"
@@ -105,6 +106,8 @@ type Handlers struct {
 	Alerts *notify.Alerts
 	// VODSaves saves films and episodes on demand into the library (admins only); may be nil.
 	VODSaves *vodsave.Service
+	// Optimize is the library optimizer (Library Health → Large files, admins only); may be nil.
+	Optimize *optimize.Service
 }
 
 var _ StrictServerInterface = (*Handlers)(nil)

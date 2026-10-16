@@ -448,6 +448,7 @@ func (h *Handlers) GetActivity(ctx context.Context, _ GetActivityRequestObject) 
 		}
 	}
 	out.Tasks = append(out.Tasks, h.vodSaveActivity(ctx)...)
+	out.Tasks = append(out.Tasks, h.optimizeActivity(ctx)...)
 	if h.Scans == nil {
 		return GetActivity200JSONResponse(out), nil
 	}

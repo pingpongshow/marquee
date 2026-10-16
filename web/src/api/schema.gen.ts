@@ -1560,6 +1560,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/optimize/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Movie and episode files matching the Large files filters, biggest first, with the size each would be after a preset and totals for all that match (admin only). Read from what the library knows; nothing is probed. */
+        get: operations["listLargeFiles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/optimize/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The optimizer queue (running and queued jobs first, then finished ones not cleared) or its history (optimized and restored files, newest first), with the space saved so far (admin only). */
+        get: operations["listOptimizeJobs"];
+        put?: never;
+        /** Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren't available movies or episodes, are skipped. */
+        post: operations["queueOptimizeJobs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/optimize/jobs/clear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove finished jobs from the queue view; optimized files stay in the history (admin only). */
+        post: operations["clearOptimizeJobs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/optimize/jobs/{jobId}/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: number;
+                /** @description cancel = stop a queued or running job (the original stays as it is); retry = queue a failed, cancelled or skipped job again; restore = put an optimized file's original back from the media trash (the optimized file goes there instead). */
+                action: "cancel" | "retry" | "restore";
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel, retry or restore an optimizer job (admin only). */
+        post: operations["optimizeJobAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/optimize/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The optimizer's settings and every preset, built-in and custom (admin only). */
+        get: operations["getOptimizeSettings"];
+        /** Change the optimizer's settings and custom presets (admin only). Built-in presets in the list are ignored. */
+        put: operations["updateOptimizeSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/files/{fileId}": {
         parameters: {
             query?: never;
@@ -4735,7 +4826,7 @@ export interface components {
             scanAfterSave?: boolean;
             /** @description Skip a title whose file is already in its folder. Default on. (A title the library already has is never saved again, unless as an upgrade: see VodLibraryMatch.) */
             skipExisting?: boolean;
-            /** @description Pause saves while someone watches (see pauseScope), resuming 60 s after. Default on. */
+            /** @description Pause saves while someone watches (see pauseScope), resuming 15 s after. Default on. */
             pauseWhileWatching?: boolean;
             /**
              * @description source: something from the same source, or Live TV from the same host (Dispatcharr). any: any playback on the server.
@@ -5150,10 +5241,10 @@ export interface components {
             /** @description Stable id, e.g. scan:3 */
             id: string;
             /**
-             * @description download: a VOD title being saved to the library (admins).
+             * @description download: a VOD title being saved to the library (admins). optimize: a library file being re-encoded by the optimizer (admins).
              * @enum {string}
              */
-            kind: "scan" | "import" | "stream" | "task" | "download";
+            kind: "scan" | "import" | "stream" | "task" | "download" | "optimize";
             /** @example Scanning Movies */
             title: string;
             /** @enum {string} */
@@ -6478,6 +6569,203 @@ export interface components {
             /** @description Null at a browse root. */
             parent?: string | null;
             entries: components["schemas"]["DirectoryEntry"][];
+        };
+        /** @description A movie or episode file in the Large files list. */
+        LargeFile: {
+            /** Format: int64 */
+            fileId: number;
+            /** Format: int64 */
+            itemId: number;
+            title: string;
+            /** @description The show and episode number, or the year. */
+            subtitle?: string;
+            /** @enum {string} */
+            type: "movie" | "episode";
+            path: string;
+            /**
+             * Format: int64
+             * @description Bytes.
+             */
+            size: number;
+            width: number;
+            height: number;
+            /** @description FFprobe's name, e.g. h264, hevc, vc1. */
+            videoCodec: string;
+            /** @description HDR format (hdr10, hlg, dolby_vision, …); empty for SDR. */
+            hdr: string;
+            bitrateKbps: number;
+            /** Format: int64 */
+            durationMs: number;
+            /**
+             * Format: int64
+             * @description About how big it would be after the preset asked for.
+             */
+            estimatedSize: number;
+            /**
+             * Format: int64
+             * @description The file's latest optimizer job, if any.
+             */
+            jobId?: number;
+            jobState?: components["schemas"]["OptimizeJobState"];
+        };
+        LargeFilePage: {
+            items: components["schemas"]["LargeFile"][];
+            /** @description Files matching the filters. */
+            total: number;
+            /**
+             * Format: int64
+             * @description Bytes, all matching files.
+             */
+            totalSize: number;
+            /**
+             * Format: int64
+             * @description About how big all matching files would be after the preset.
+             */
+            estimatedSize: number;
+        };
+        /**
+         * @description verifying = the new file is being checked (or waits for nobody to be watching before it's swapped in); done = optimized, the original is in the media trash; skipped = not worth it (see error); restored = the original was put back.
+         * @enum {string}
+         */
+        OptimizeJobState: "queued" | "running" | "verifying" | "done" | "failed" | "cancelled" | "skipped" | "restored";
+        OptimizeJob: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            fileId?: number;
+            /** Format: int64 */
+            itemId?: number;
+            title: string;
+            path: string;
+            presetId: string;
+            presetName: string;
+            state: components["schemas"]["OptimizeJobState"];
+            /** @description 0–1. */
+            progress: number;
+            fps?: number;
+            /** @description × real time. */
+            speed?: number;
+            /** Format: int64 */
+            etaSeconds?: number;
+            /** @description nvenc, qsv or software. */
+            encoder?: string;
+            /** Format: int64 */
+            beforeSize: number;
+            /**
+             * Format: int64
+             * @description The new file's size (also for a skipped job, showing why).
+             */
+            afterSize: number;
+            /** @description Why it failed or was skipped. */
+            error?: string;
+            /** @description Why it's waiting (paused while someone is watching, outside the maintenance window, waiting for a viewer to stop before the swap). */
+            paused?: string;
+            /** @description The original is still in the media trash. */
+            canRestore: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: date-time */
+            finishedAt?: string;
+        };
+        OptimizeJobPage: {
+            items: components["schemas"]["OptimizeJob"][];
+            total: number;
+            /**
+             * Format: int64
+             * @description Space saved by every optimized file (not restored).
+             */
+            savedBytes: number;
+            /** @description How many files are optimized. */
+            optimized: number;
+            /** @description Why the queue isn't running now, if it isn't. */
+            paused?: string;
+        };
+        /** @description The Large files filters (as the list's query parameters). */
+        OptimizeFilter: {
+            /** Format: int64 */
+            libraryId?: number;
+            /** @enum {string} */
+            type?: "movie" | "episode";
+            minSizeGb?: number;
+            minBitrateMbps?: number;
+            /** @enum {integer} */
+            resolution?: 2160 | 1080 | 720 | 480;
+            codecs?: string[];
+            /** @enum {string} */
+            hdr?: "yes" | "no";
+        };
+        OptimizeQueueRequest: {
+            presetId: string;
+            /** @description The files to queue; or */
+            fileIds?: number[];
+            filter?: components["schemas"]["OptimizeFilter"];
+        };
+        OptimizeQueueResult: {
+            queued: number;
+            /** @description Already queued, or not an available movie or episode. */
+            skipped: number;
+        };
+        OptimizePreset: {
+            id: string;
+            name: string;
+            readonly builtIn?: boolean;
+            /**
+             * @description Resolution cap (never upscaled; letterboxed films fit the frame by width); 0 keeps it.
+             * @enum {integer}
+             */
+            maxHeight: 0 | 2160 | 1080 | 720 | 480;
+            /**
+             * @description AV1 only when the server has an AV1 encoder (av1Available).
+             * @enum {string}
+             */
+            codec: "hevc" | "h264" | "av1";
+            /**
+             * @description Constant-quality level, unless videoKbps is set.
+             * @enum {string}
+             */
+            quality: "high" | "balanced" | "small";
+            /** @description A target video bitrate instead of a quality; 0 = use the quality. */
+            videoKbps?: number;
+            /**
+             * @description copy = every track as it is; default = only the default track, as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1).
+             * @enum {string}
+             */
+            audio: "copy" | "default" | "aac_stereo" | "aac_51";
+            /** @description Leave out commentary tracks. */
+            dropCommentary?: boolean;
+            /**
+             * @description Picture subtitles (PGS, VobSub); text subtitles are always kept. MP4 files can't hold picture subtitles.
+             * @enum {string}
+             */
+            imageSubtitles: "keep" | "drop";
+            /**
+             * @description keep = HDR stays HDR (10-bit HEVC or AV1; H.264 always tone-maps); tonemap = converted to SDR.
+             * @enum {string}
+             */
+            hdr: "keep" | "tonemap";
+        };
+        OptimizeSettings: {
+            /** @description Custom presets (built-in ones sent back are ignored). */
+            presets: components["schemas"]["OptimizePreset"][];
+            defaultPreset: string;
+            /** @description Files optimized at once. Default 1. */
+            concurrency: number;
+            /** @description A new file replaces the original only when it's at least this much smaller; otherwise it's thrown away and the job skipped. Default 20. */
+            minSavingsPercent: number;
+            /** @description Pause while anyone is watching anything, resuming about 15 s after. Default on. */
+            pauseWhileWatching: boolean;
+            /** @description Only run inside the maintenance window. */
+            windowOnly: boolean;
+            /** @description The queue is paused by an admin. */
+            paused: boolean;
+        };
+        OptimizeConfig: {
+            settings: components["schemas"]["OptimizeSettings"];
+            /** @description Every preset, built-in first. */
+            presets: components["schemas"]["OptimizePreset"][];
+            av1Available: boolean;
         };
     };
     responses: {
@@ -9389,6 +9677,199 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    listLargeFiles: {
+        parameters: {
+            query?: {
+                libraryId?: number;
+                type?: "movie" | "episode";
+                /** @description At least this many GB (10^9 bytes). */
+                minSizeGb?: number;
+                /** @description At least this overall bitrate. */
+                minBitrateMbps?: number;
+                /** @description Only this resolution class (by width or height, so letterboxed films count): 2160 = 4K, 480 = SD. */
+                resolution?: 2160 | 1080 | 720 | 480;
+                /** @description Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9). */
+                codecs?: string;
+                /** @description Only HDR (yes) or only SDR (no) files. */
+                hdr?: "yes" | "no";
+                /** @description The preset the estimates are for (default: the default preset). */
+                presetId?: string;
+                sort?: "size" | "bitrate" | "title" | "savings";
+                offset?: components["parameters"]["Offset"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LargeFilePage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listOptimizeJobs: {
+        parameters: {
+            query?: {
+                view?: "queue" | "history";
+                offset?: components["parameters"]["Offset"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OptimizeJobPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    queueOptimizeJobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OptimizeQueueRequest"];
+            };
+        };
+        responses: {
+            /** @description Queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OptimizeQueueResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    clearOptimizeJobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cleared. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        cleared: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    optimizeJobAction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: number;
+                /** @description cancel = stop a queued or running job (the original stays as it is); retry = queue a failed, cancelled or skipped job again; restore = put an optimized file's original back from the media trash (the optimized file goes there instead). */
+                action: "cancel" | "retry" | "restore";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getOptimizeSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OptimizeConfig"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateOptimizeSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OptimizeSettings"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OptimizeConfig"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     deleteMediaFile: {

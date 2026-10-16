@@ -235,6 +235,12 @@ func inWindow(now time.Time, start string, hours int) (bool, time.Time) {
 	return now.Before(ws.Add(time.Duration(hours) * time.Hour)), ws
 }
 
+// InWindow reports whether now is inside the maintenance window the settings describe.
+func InWindow(now time.Time, cfg settings.Tasks) bool {
+	in, _ := inWindow(now, cfg.MaintenanceWindowStart, cfg.MaintenanceWindowHours)
+	return in
+}
+
 // due reports whether t should run now.
 func (s *Scheduler) due(ctx context.Context, t Task, now time.Time) bool {
 	last := s.lastStart(ctx, t.ID)

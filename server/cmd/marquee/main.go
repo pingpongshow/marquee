@@ -30,6 +30,7 @@ import (
 	"marquee/internal/db"
 	"marquee/internal/discovery"
 	"marquee/internal/downloads"
+	"marquee/internal/encode"
 	"marquee/internal/images"
 	"marquee/internal/introdetect"
 	"marquee/internal/items"
@@ -43,6 +44,7 @@ import (
 	"marquee/internal/muse"
 	"marquee/internal/netclass"
 	"marquee/internal/notify"
+	"marquee/internal/optimize"
 	"marquee/internal/playback"
 	"marquee/internal/plex"
 	"marquee/internal/probe"
@@ -56,6 +58,7 @@ import (
 	"marquee/internal/subtitles"
 	"marquee/internal/syncplay"
 	"marquee/internal/tasks"
+	"marquee/internal/thumbs"
 	"marquee/internal/trickplay"
 	"marquee/internal/vod"
 	"marquee/internal/vodsave"
@@ -332,7 +335,10 @@ func run() error {
 	scheduler.Register(tasks.Task{ID: "embeddings", Name: "Index movies and shows", Window: true, Bounded: true,
 		Description: "Reads the descriptions of new and changed movies and shows so Muse, recommendations and related items include them.",
 		Run:         embedder.Run, Progress: embedder.Progress})
-	runEmbed := func() { scheduler.RunNow(ctx, "embeddings") }
+	runEmbed := func() {
+		scheduler.RunNow(ctx, "embeddings")
+		scheduler.RunNow(ctx, "thumbnails") // thumbnails for new episodes TMDB has no still for
+	}
 	afterVideoScan.Store(&runEmbed)
 	loud := &loudness.Service{DB: database, FFmpeg: cfg.FFmpegPath, Workers: 4, Analyse: func() bool { return true }} // volume levelling is always on, so every track is measured
 	scheduler.Register(tasks.Task{ID: "loudness", Name: "Measure music loudness", Window: true,
@@ -351,6 +357,13 @@ func run() error {
 	scheduler.Register(tasks.Task{ID: "trickplay", Name: "Make seek previews", Window: true, Bounded: true,
 		Description: "Makes the thumbnails shown while seeking through videos. A large library takes a few nights; it continues where it stopped.",
 		Run:         trick.Run, Progress: trick.Progress})
+	// Thumbnails for episodes and personal videos without a still (a frame from the file);
+	// nightly, and after a scan of a video library.
+	thumbnails := &thumbs.Service{DB: database, FFmpeg: cfg.FFmpegPath, CacheDir: filepath.Join(cfg.ConfigDir, "cache", "images"),
+		CUDA: player.Encoders.NVENC, Pace: 2 * time.Second}
+	scheduler.Register(tasks.Task{ID: "thumbnails", Name: "Generate missing thumbnails", Window: true, Bounded: true,
+		Description: "Takes a frame from episodes and personal videos that have no thumbnail (TMDB has no still for many episodes). A real still found later replaces it.",
+		Run:         thumbnails.Run, Progress: thumbnails.Progress})
 	intros := &introdetect.Service{DB: database, FFmpeg: cfg.FFmpegPath, Dir: filepath.Join(cfg.ConfigDir, "cache", "fingerprints"),
 		Enabled: func() bool { return store.Get().Library.DetectIntros }, CUDA: player.Encoders.NVENC}
 	scheduler.Register(tasks.Task{ID: "intros", Name: "Find intros and credits", Window: true, Bounded: true,
@@ -516,6 +529,15 @@ func run() error {
 		Description: "Finds the commercials in Live TV recordings not looked at yet and, when Settings → Live TV says so, cuts them out (the original goes to the media trash). One at a time.",
 		Run:         ads.Backlog, Progress: ads.Progress})
 
+	// The library optimizer (Library Health → Large files): re-encodes oversized files queued
+	// by an admin, giving way to playback.
+	optimizer := &optimize.Service{DB: database, Settings: store.Get, FFmpeg: cfg.FFmpegPath, FFprobe: cfg.FFprobePath,
+		Encoders: player.EncoderChoices, QSVDevice: player.Encoders.QSVDevice, PlaybackNVENC: player.NVENCJobs,
+		HasEncoder: encode.Available(cfg.FFmpegPath), Trash: mediaTrash, Rescan: scans.Queue,
+		Playing:  ads.Playing,
+		Watching: func() bool { return len(vodSaves.Activity(ctx)) > 0 }}
+	go optimizer.Run(ctx)
+
 	watchTogether := &syncplay.Service{}
 	go watchTogether.Run(ctx)
 	remoteHub := &remote.Hub{}
@@ -600,6 +622,7 @@ func run() error {
 		Scrobble:    scrobbler,
 		DVR:         dvr,
 		Commercials: ads,
+		Optimize:    optimizer,
 		SyncPlay:    watchTogether,
 		Remote:      remoteHub,
 		Embeddings:  embedder,
