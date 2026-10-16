@@ -4413,7 +4413,7 @@ export interface components {
             userId?: number;
             /** @description Who scheduled it, by name ("Recorded by Alex"). */
             ownerName?: string;
-            /** @description The caller may cancel or delete it (whoever scheduled it */
+            /** @description The caller may cancel or delete it (whoever scheduled it, or an admin). */
             canDelete?: boolean;
             /** @description The guide's content rating for the programme, e.g. TV-14, when it gave one. */
             rating?: string;
@@ -4433,11 +4433,11 @@ export interface components {
             upcoming: number;
             /** Format: int64 */
             userId?: number;
-            /** @description Who made it */
+            /** @description Who made it, by name. */
             ownerName?: string;
             /** @description Its owner may no longer record, so nothing new is scheduled (it resumes if they may again). */
             paused?: boolean;
-            /** @description The caller may stop it (whoever made it */
+            /** @description The caller may stop it (whoever made it, or an admin). */
             canDelete?: boolean;
             /** Format: date-time */
             createdAt: string;
@@ -5496,7 +5496,7 @@ export interface components {
              * @description With cut: how much was removed in all.
              */
             removedMs?: number;
-            /** @description With failed */
+            /** @description With failed, why. */
             error?: string;
             /**
              * Format: date-time

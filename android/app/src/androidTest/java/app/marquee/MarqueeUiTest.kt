@@ -768,6 +768,7 @@ class MarqueeUiTest {
         val kid = (0 until users.length()).map { users.getJSONObject(it) }.first { it.getString("displayName") == profile }
         val restrictions = kid.optJSONObject("restrictions") ?: org.json.JSONObject()
         restrictions.put("canRecord", true)
+        restrictions.put("canRecordDVR", true) // newer servers send both; canRecordDVR wins
         adminApi("PATCH", "/users/${kid.getLong("id")}", org.json.JSONObject().put("restrictions", restrictions).toString())
 
         connectAndSignIn()

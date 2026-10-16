@@ -5270,7 +5270,7 @@ components:
         itemId: { type: integer, format: int64, description: The library item once the recording has been scanned. }
         userId: { type: integer, format: int64, description: Who scheduled it. }
         ownerName: { type: string, description: "Who scheduled it, by name (\"Recorded by Alex\")." }
-        canDelete: { type: boolean, description: The caller may cancel or delete it (whoever scheduled it, or an admin). }
+        canDelete: { type: boolean, description: "The caller may cancel or delete it (whoever scheduled it, or an admin)." }
         rating: { type: string, description: "The guide's content rating for the programme, e.g. TV-14, when it gave one." }
         commercials: { $ref: "#/components/schemas/CommercialScan" }
 
@@ -5284,9 +5284,9 @@ components:
         channelName: { type: string }
         upcoming: { type: integer, description: Airings scheduled now. }
         userId: { type: integer, format: int64 }
-        ownerName: { type: string, description: Who made it, by name. }
+        ownerName: { type: string, description: "Who made it, by name." }
         paused: { type: boolean, description: "Its owner may no longer record, so nothing new is scheduled (it resumes if they may again)." }
-        canDelete: { type: boolean, description: The caller may stop it (whoever made it, or an admin). }
+        canDelete: { type: boolean, description: "The caller may stop it (whoever made it, or an admin)." }
         createdAt: { type: string, format: date-time }
 
     DvrUsage:
@@ -6258,7 +6258,7 @@ components:
         status: { type: string, enum: [pending, queued, running, detected, waiting, cut, restored, failed] }
         breaks: { type: array, items: { $ref: "#/components/schemas/CommercialBreak" } }
         removedMs: { type: integer, format: int64, description: "With cut: how much was removed in all." }
-        error: { type: string, description: With failed, why. }
+        error: { type: string, description: "With failed, why." }
         scannedAt: { type: string, format: date-time, description: When it was last checked or cut. }
         canRestore: { type: boolean, description: "The original is still in the media trash, so it can be put back." }
         available: { type: boolean, description: "Comskip is in this server's build, so commercials can be removed." }

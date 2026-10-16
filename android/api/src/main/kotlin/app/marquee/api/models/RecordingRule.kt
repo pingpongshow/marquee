@@ -38,6 +38,9 @@ import kotlinx.serialization.Contextual
  * @param channelId Absent = any channel.
  * @param channelName 
  * @param userId 
+ * @param ownerName Who made it, by name.
+ * @param paused Its owner may no longer record, so nothing new is scheduled (it resumes if they may again).
+ * @param canDelete The caller may stop it (whoever made it, or an admin).
  */
 @Serializable
 
@@ -64,7 +67,19 @@ data class RecordingRule (
     val channelName: kotlin.String? = null,
 
     @SerialName(value = "userId")
-    val userId: kotlin.Long? = null
+    val userId: kotlin.Long? = null,
+
+    /* Who made it, by name. */
+    @SerialName(value = "ownerName")
+    val ownerName: kotlin.String? = null,
+
+    /* Its owner may no longer record, so nothing new is scheduled (it resumes if they may again). */
+    @SerialName(value = "paused")
+    val paused: kotlin.Boolean? = null,
+
+    /* The caller may stop it (whoever made it, or an admin). */
+    @SerialName(value = "canDelete")
+    val canDelete: kotlin.Boolean? = null
 
 ) {
 

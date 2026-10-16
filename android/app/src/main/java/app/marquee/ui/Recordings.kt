@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -32,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import app.marquee.api.models.DvrUsage
 import app.marquee.api.models.LiveChannel
 import app.marquee.api.models.LiveProgramme
 import app.marquee.api.models.Recording
@@ -61,15 +63,21 @@ fun RecordActions(p: LiveProgramme, c: LiveChannel, onDone: () -> Unit) {
         }
         loaded = true
     }
+    // A 409 quota_exceeded (and other refusals) carry the server's own message.
     fun act(f: suspend () -> Unit) = scope.launch {
-        runCatching { withContext(Dispatchers.IO) { f() } }.onSuccess { onDone() }.onFailure { error = it.message ?: "That didn't work" }
+        runCatching { withContext(Dispatchers.IO) { f() } }.onSuccess { onDone() }.onFailure { error = serverMessage(it) }
     }
     if (!loaded) return
+    val e = existing
+    // Someone else's recording: say who, and leave it to them (or an admin) to cancel.
+    val theirs = e != null && e.canDelete == false
     Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (p.series == true) Text("A series recording covers this title.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (theirs) Text((if (e?.status == Recording.Status.RECORDING) "Being recorded" else "Will be recorded") + (e?.ownerName?.let { " by $it" } ?: "") + ".",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            val e = existing
-            if (e != null) {
+            if (theirs) Unit
+            else if (e != null) {
                 OutlinedButton({ act { marquee.livetv.cancelRecording(e.id) } }, Modifier.focusRing()) {
                     Text(if (e.status == Recording.Status.RECORDING) "Stop recording" else "Don't record")
                 }
@@ -86,9 +94,40 @@ fun RecordActions(p: LiveProgramme, c: LiveChannel, onDone: () -> Unit) {
 private val whenFormat = DateTimeFormatter.ofPattern("EEE MMM d, h:mm a")
 private val clockFormat = DateTimeFormatter.ofPattern("h:mm a")
 
-/** Recording now, upcoming, series and finished recordings. */
+/** "Recorded by Alex", or null for the signed-in user's own. */
+fun recordedBy(ownerId: Long?, ownerName: String?, me: Long?): String? =
+    ownerName?.takeIf { it.isNotBlank() && (ownerId == null || ownerId != me) }?.let { "Recorded by $it" }
+
+/** Bytes as GB for the usage line: "12.4", or "50" when whole. */
+private fun gb(bytes: Long): String {
+    val v = bytes / 1e9
+    return if (v >= 100 || kotlin.math.abs(v - Math.round(v)) < 0.05) Math.round(v).toString() else String.format(java.util.Locale.US, "%.1f", v)
+}
+
+/** The signed-in person's recording space: "12.4 of 50 GB used" with a thin bar, and the over-quota note. */
 @Composable
-fun RecordingsList(nav: NavHostController) {
+private fun UsageLine(u: DvrUsage) {
+    val quota = u.quotaBytes
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(if (quota > 0) "${gb(u.usedBytes)} of ${gb(quota)} GB used" else "${gb(u.usedBytes)} GB used",
+            style = MaterialTheme.typography.bodyMedium, color = if (u.overQuota) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+        if (quota > 0) {
+            val frac = (u.usedBytes.toFloat() / quota).coerceIn(0f, 1f)
+            Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(Surface2)) {
+                Box(Modifier.fillMaxWidth(frac).height(4.dp).clip(CircleShape)
+                    .background(if (u.overQuota) MaterialTheme.colorScheme.error else if (frac > 0.85f) Color(0xFFF59E0B) else Gold))
+            }
+        }
+        if (u.overQuota) Text(
+            if (u.quotaAction == DvrUsage.QuotaAction.DELETE_OLDEST) "You're over your recording space; your oldest watched recordings will be removed to make room."
+            else "You're over your recording space; new recordings won't start until you delete some.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+    }
+}
+
+/** Recording now, upcoming, series and finished recordings: everyone's, as the server allows. */
+@Composable
+fun RecordingsList(nav: NavHostController, canRecord: Boolean) {
     val marquee = LocalMarquee.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -97,21 +136,27 @@ fun RecordingsList(nav: NavHostController) {
     var reload by remember { mutableIntStateOf(0) }
     var error by remember { mutableStateOf<String?>(null) }
     var deleting by remember { mutableStateOf<Recording?>(null) }
+    var usage by remember { mutableStateOf<DvrUsage?>(null) }
+    val me = marquee.userId
     LaunchedEffect(reload) {
         withContext(Dispatchers.IO) {
             runCatching { marquee.livetv.listRecordings() to marquee.livetv.listRecordingRules() }
                 .onSuccess { (r, s) -> recordings = r; rules = s; error = null }
-                .onFailure { error = it.message; if (recordings == null) recordings = emptyList() }
+                .onFailure { error = serverMessage(it); if (recordings == null) recordings = emptyList() }
+            if (canRecord) usage = runCatching { marquee.livetv.getRecordingUsage() }.getOrNull()
         }
     }
     fun act(f: suspend () -> Unit) = scope.launch {
-        runCatching { withContext(Dispatchers.IO) { f() } }.onFailure { error = it.message }
+        runCatching { withContext(Dispatchers.IO) { f() } }.onFailure { error = serverMessage(it) }
         reload++
     }
+    // Only whoever scheduled a recording or series, or an admin, may cancel or delete it.
+    fun mine(canDelete: Boolean?) = canDelete != false
     val list = recordings ?: return
     Column(Modifier.padding(horizontal = sidePadding), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        usage?.takeIf { canRecord }?.let { UsageLine(it) }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        if (list.isEmpty() && rules.isEmpty()) Text("Nothing recorded yet. Pick a programme in the guide and choose Record.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (list.isEmpty() && rules.isEmpty()) Text(if (canRecord) "Nothing recorded yet. Pick a programme in the guide and choose Record." else "Nothing recorded yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         @Composable
         fun section(title: String, items: List<Recording>, action: @Composable (Recording) -> Unit) {
@@ -129,6 +174,7 @@ fun RecordingsList(nav: NavHostController) {
                                 "${r.start.atZoneSameInstant(ZoneId.systemDefault()).format(whenFormat)}–${r.end.atZoneSameInstant(ZoneId.systemDefault()).format(clockFormat)}" +
                                 listOfNotNull(r.sizeBytes?.takeIf { it > 0 }?.let { Formatter.formatShortFileSize(context, it) })
                             Text(bits.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            recordedBy(r.userId, r.ownerName, me)?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                             if (r.status == Recording.Status.FAILED) Text("Failed: ${r.error ?: "unknown error"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                         }
                         action(r)
@@ -138,10 +184,10 @@ fun RecordingsList(nav: NavHostController) {
         }
 
         section("Recording now", list.filter { it.status == Recording.Status.RECORDING }) { r ->
-            TextButton({ act { marquee.livetv.cancelRecording(r.id) } }, Modifier.focusRing()) { Text("Stop") }
+            if (mine(r.canDelete)) TextButton({ act { marquee.livetv.cancelRecording(r.id) } }, Modifier.focusRing()) { Text("Stop") }
         }
         section("Upcoming", list.filter { it.status == Recording.Status.SCHEDULED }) { r ->
-            TextButton({ act { marquee.livetv.cancelRecording(r.id) } }, Modifier.focusRing()) { Text("Cancel") }
+            if (mine(r.canDelete)) TextButton({ act { marquee.livetv.cancelRecording(r.id) } }, Modifier.focusRing()) { Text("Cancel") }
         }
         if (rules.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Series", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -150,13 +196,16 @@ fun RecordingsList(nav: NavHostController) {
                     Column(Modifier.weight(1f)) {
                         Text(s.title, fontWeight = FontWeight.Medium)
                         Text("${s.channelName ?: "Any channel"} · ${s.upcoming} upcoming", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        recordedBy(s.userId, s.ownerName, me)?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        if (s.paused == true) Text("Paused: ${s.ownerName ?: "its owner"} may no longer record", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
-                    TextButton({ act { marquee.livetv.deleteRecordingRule(s.id) } }, Modifier.focusRing()) { Text("Stop series") }
+                    if (mine(s.canDelete)) TextButton({ act { marquee.livetv.deleteRecordingRule(s.id) } }, Modifier.focusRing()) { Text("Stop series") }
                 }
             }
         }
         section("Recorded", list.filter { it.status == Recording.Status.COMPLETED || it.status == Recording.Status.FAILED }) { r ->
-            if (r.status == Recording.Status.FAILED) TextButton({ act { marquee.livetv.cancelRecording(r.id) } }, Modifier.focusRing()) { Text("Dismiss") }
+            if (!mine(r.canDelete)) Unit
+            else if (r.status == Recording.Status.FAILED) TextButton({ act { marquee.livetv.cancelRecording(r.id) } }, Modifier.focusRing()) { Text("Dismiss") }
             else TextButton({ deleting = r }, Modifier.focusRing()) { Text("Delete", color = MaterialTheme.colorScheme.error) }
         }
     }

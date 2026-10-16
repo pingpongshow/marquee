@@ -43,7 +43,7 @@ import kotlinx.serialization.Contextual
  * @param concurrentPerSource Saves at once per source. Default 1.
  * @param scanAfterSave Scan the library whose folder holds a saved file. Default on.
  * @param skipExisting Skip a title whose file is already in its folder. Default on. (A title the library already has is never saved again, unless as an upgrade: see VodLibraryMatch.)
- * @param pauseWhileWatching Pause saves while someone watches (see pauseScope), resuming 60 s after. Default on.
+ * @param pauseWhileWatching Pause saves while someone watches (see pauseScope), resuming 15 s after. Default on.
  * @param pauseScope source: something from the same source, or Live TV from the same host (Dispatcharr). any: any playback on the server.
  * @param retryFailed Queue failed saves again every few hours. Default on.
  * @param destinations More save folders besides moviesFolder and showsFolder (e.g. Anime), offered as \"Save to {name}\". Sending the list replaces it; an item without an id is new.
@@ -95,7 +95,7 @@ data class VodSaveSettings (
     @SerialName(value = "skipExisting")
     val skipExisting: kotlin.Boolean? = null,
 
-    /* Pause saves while someone watches (see pauseScope), resuming 60 s after. Default on. */
+    /* Pause saves while someone watches (see pauseScope), resuming 15 s after. Default on. */
     @SerialName(value = "pauseWhileWatching")
     val pauseWhileWatching: kotlin.Boolean? = null,
 

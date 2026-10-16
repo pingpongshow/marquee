@@ -40,6 +40,13 @@ import kotlinx.serialization.Contextual
  * @param bazarrApiKeySet 
  * @param dvrPaddingBefore Minutes recordings start early.
  * @param dvrPaddingAfter Minutes recordings run late.
+ * @param dvrDefaultQuotaGb Every user's DVR quota in GB unless their own overrides it. 0 = unlimited (the default).
+ * @param dvrQuotaAction When a recording is due and its owner is at or over quota: block = it isn't recorded (default); deleteOldest = their oldest recordings they've watched (never one being watched or recorded) go to the media trash to make room.
+ * @param dvrFolder Where new recordings go: an absolute folder that exists and the server can write in. Empty = the server's configured recordings folder (dvrFolderDefault). Recordings made earlier stay where they are.
+ * @param dvrFolderDefault The server's configured recordings folder.
+ * @param dvrFolderInLibrary A library covers the recordings folder's TV and Movies folders (recordings appear in the library).
+ * @param commercials What happens to finished recordings and, nightly, older ones: off; detect = find the commercial breaks with Comskip but leave the files alone; remove = find them and cut them out (the original goes to the media trash and can be restored while it's there). Default off.
+ * @param comskipAvailable This server's build includes Comskip, so commercials can be found.
  * @param liveTvSources 
  * @param vodEnabled Movies on demand appear under Live TV (LIVE-6).
  * @param vodSources 
@@ -74,6 +81,34 @@ data class IntegrationSettings (
     @SerialName(value = "dvrPaddingAfter")
     val dvrPaddingAfter: kotlin.Int? = null,
 
+    /* Every user's DVR quota in GB unless their own overrides it. 0 = unlimited (the default). */
+    @SerialName(value = "dvrDefaultQuotaGb")
+    val dvrDefaultQuotaGb: kotlin.Int? = null,
+
+    /* When a recording is due and its owner is at or over quota: block = it isn't recorded (default); deleteOldest = their oldest recordings they've watched (never one being watched or recorded) go to the media trash to make room. */
+    @SerialName(value = "dvrQuotaAction")
+    val dvrQuotaAction: IntegrationSettings.DvrQuotaAction? = null,
+
+    /* Where new recordings go: an absolute folder that exists and the server can write in. Empty = the server's configured recordings folder (dvrFolderDefault). Recordings made earlier stay where they are. */
+    @SerialName(value = "dvrFolder")
+    val dvrFolder: kotlin.String? = null,
+
+    /* The server's configured recordings folder. */
+    @SerialName(value = "dvrFolderDefault")
+    val dvrFolderDefault: kotlin.String? = null,
+
+    /* A library covers the recordings folder's TV and Movies folders (recordings appear in the library). */
+    @SerialName(value = "dvrFolderInLibrary")
+    val dvrFolderInLibrary: kotlin.Boolean? = null,
+
+    /* What happens to finished recordings and, nightly, older ones: off; detect = find the commercial breaks with Comskip but leave the files alone; remove = find them and cut them out (the original goes to the media trash and can be restored while it's there). Default off. */
+    @SerialName(value = "commercials")
+    val commercials: IntegrationSettings.Commercials? = null,
+
+    /* This server's build includes Comskip, so commercials can be found. */
+    @SerialName(value = "comskipAvailable")
+    val comskipAvailable: kotlin.Boolean? = null,
+
     @SerialName(value = "liveTvSources")
     val liveTvSources: kotlin.collections.List<LiveTvSource>? = null,
 
@@ -86,6 +121,27 @@ data class IntegrationSettings (
 
 ) {
 
+    /**
+     * When a recording is due and its owner is at or over quota: block = it isn't recorded (default); deleteOldest = their oldest recordings they've watched (never one being watched or recorded) go to the media trash to make room.
+     *
+     * Values: BLOCK,DELETE_OLDEST
+     */
+    @Serializable
+    enum class DvrQuotaAction(val value: kotlin.String) {
+        @SerialName(value = "block") BLOCK("block"),
+        @SerialName(value = "deleteOldest") DELETE_OLDEST("deleteOldest");
+    }
+    /**
+     * What happens to finished recordings and, nightly, older ones: off; detect = find the commercial breaks with Comskip but leave the files alone; remove = find them and cut them out (the original goes to the media trash and can be restored while it's there). Default off.
+     *
+     * Values: OFF,DETECT,REMOVE
+     */
+    @Serializable
+    enum class Commercials(val value: kotlin.String) {
+        @SerialName(value = "off") OFF("off"),
+        @SerialName(value = "detect") DETECT("detect"),
+        @SerialName(value = "remove") REMOVE("remove");
+    }
 
 }
 

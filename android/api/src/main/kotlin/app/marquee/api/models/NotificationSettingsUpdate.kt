@@ -40,7 +40,8 @@ import kotlinx.serialization.Contextual
  * @param fromAddress 
  * @param fromName 
  * @param linkUrl 
- * @param alerts 
+ * @param alerts Replaces the list; the dvr_quota alert is kept as it was unless dvrQuotaAlert is sent.
+ * @param dvrQuotaAlert 
  * @param recipientsAllAdmins 
  * @param recipients 
  * @param diskThresholdPercent 
@@ -73,8 +74,12 @@ data class NotificationSettingsUpdate (
     @SerialName(value = "linkUrl")
     val linkUrl: kotlin.String? = null,
 
+    /* Replaces the list; the dvr_quota alert is kept as it was unless dvrQuotaAlert is sent. */
     @SerialName(value = "alerts")
     val alerts: kotlin.collections.List<@Contextual AlertType>? = null,
+
+    @SerialName(value = "dvrQuotaAlert")
+    val dvrQuotaAlert: kotlin.Boolean? = null,
 
     @SerialName(value = "recipientsAllAdmins")
     val recipientsAllAdmins: kotlin.Boolean? = null,

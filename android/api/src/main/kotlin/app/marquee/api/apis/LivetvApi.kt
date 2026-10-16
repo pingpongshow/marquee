@@ -27,6 +27,7 @@ import java.io.IOException
 import okhttp3.Call
 import okhttp3.HttpUrl
 
+import app.marquee.api.models.DvrUsage
 import app.marquee.api.models.Error
 import app.marquee.api.models.ListLiveGroups200ResponseInner
 import app.marquee.api.models.LiveChannel
@@ -84,10 +85,10 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
 
     /**
      * DELETE /livetv/recordings/{recordingId}
-     * Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list.
+     * Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list. Only whoever scheduled it, or an admin.
      * 
      * @param recordingId 
-     * @param deleteFile Finished recordings: delete the file too (admins, or whoever scheduled it). (optional)
+     * @param deleteFile Finished recordings: delete the file too. (optional)
      * @return void
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -116,10 +117,10 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
 
     /**
      * DELETE /livetv/recordings/{recordingId}
-     * Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list.
+     * Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list. Only whoever scheduled it, or an admin.
      * 
      * @param recordingId 
-     * @param deleteFile Finished recordings: delete the file too (admins, or whoever scheduled it). (optional)
+     * @param deleteFile Finished recordings: delete the file too. (optional)
      * @return ApiResponse<Unit?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -137,7 +138,7 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * To obtain the request config of the operation cancelRecording
      *
      * @param recordingId 
-     * @param deleteFile Finished recordings: delete the file too (admins, or whoever scheduled it). (optional)
+     * @param deleteFile Finished recordings: delete the file too. (optional)
      * @return RequestConfig
      */
     fun cancelRecordingRequestConfig(recordingId: kotlin.Long, deleteFile: kotlin.Boolean?) : RequestConfig<Unit> {
@@ -302,7 +303,7 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
 
     /**
      * DELETE /livetv/recording-rules/{ruleId}
-     * Stop recording a series. Its upcoming airings are dropped; recordings already made stay.
+     * Stop recording a series. Its upcoming airings are dropped; recordings already made stay. Only whoever made it, or an admin.
      * 
      * @param ruleId 
      * @return void
@@ -333,7 +334,7 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
 
     /**
      * DELETE /livetv/recording-rules/{ruleId}
-     * Stop recording a series. Its upcoming airings are dropped; recordings already made stay.
+     * Stop recording a series. Its upcoming airings are dropped; recordings already made stay. Only whoever made it, or an admin.
      * 
      * @param ruleId 
      * @return ApiResponse<Unit?>
@@ -435,6 +436,76 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.PUT,
             path = "/livetv/channels/{channelId}/favorite".replace("{"+"channelId"+"}", encodeURIComponent(channelId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /livetv/recordings/usage
+     * How much space the caller&#39;s recordings take (finished and in progress, actual sizes) and their DVR quota (LIVE-5).
+     * 
+     * @return DvrUsage
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun getRecordingUsage() : DvrUsage {
+        val localVarResponse = getRecordingUsageWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as DvrUsage
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /livetv/recordings/usage
+     * How much space the caller&#39;s recordings take (finished and in progress, actual sizes) and their DVR quota (LIVE-5).
+     * 
+     * @return ApiResponse<DvrUsage?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun getRecordingUsageWithHttpInfo() : ApiResponse<DvrUsage?> {
+        val localVariableConfig = getRecordingUsageRequestConfig()
+
+        return request<Unit, DvrUsage>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getRecordingUsage
+     *
+     * @return RequestConfig
+     */
+    fun getRecordingUsageRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/livetv/recordings/usage",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -904,8 +975,78 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     }
 
     /**
+     * GET /admin/dvr/usage
+     * Admins: every user&#39;s DVR usage and quota (LIVE-5), including users with no recordings.
+     * 
+     * @return kotlin.collections.List<DvrUsage>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listRecordingUsage() : kotlin.collections.List<DvrUsage> {
+        val localVarResponse = listRecordingUsageWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<DvrUsage>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /admin/dvr/usage
+     * Admins: every user&#39;s DVR usage and quota (LIVE-5), including users with no recordings.
+     * 
+     * @return ApiResponse<kotlin.collections.List<DvrUsage>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listRecordingUsageWithHttpInfo() : ApiResponse<kotlin.collections.List<DvrUsage>?> {
+        val localVariableConfig = listRecordingUsageRequestConfig()
+
+        return request<Unit, kotlin.collections.List<DvrUsage>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listRecordingUsage
+     *
+     * @return RequestConfig
+     */
+    fun listRecordingUsageRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/admin/dvr/usage",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * GET /livetv/recordings
-     * DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first).
+     * DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone&#39;s recordings are listed to every profile that may view DVR recordings, within the profile&#39;s content rating limit (the library item&#39;s rating once filed, else the guide&#39;s; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings.
      * 
      * @return kotlin.collections.List<Recording>
      * @throws IllegalStateException If the request is not correctly configured
@@ -936,7 +1077,7 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
 
     /**
      * GET /livetv/recordings
-     * DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first).
+     * DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone&#39;s recordings are listed to every profile that may view DVR recordings, within the profile&#39;s content rating limit (the library item&#39;s rating once filed, else the guide&#39;s; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings.
      * 
      * @return ApiResponse<kotlin.collections.List<Recording>?>
      * @throws IllegalStateException If the request is not correctly configured
