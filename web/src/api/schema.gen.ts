@@ -7063,17 +7063,10 @@ export interface components {
             /** @description A target video bitrate instead of a quality; 0 = use the quality. */
             videoKbps?: number;
             /**
-             * @description copy = every track as it is; default = only the default track, as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1).
+             * @description copy = every track as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1). Every audio track (all languages, commentary) and every subtitle is always kept; an MP4 with picture subtitles becomes MKV.
              * @enum {string}
              */
-            audio: "copy" | "default" | "aac_stereo" | "aac_51";
-            /** @description Leave out commentary tracks. */
-            dropCommentary?: boolean;
-            /**
-             * @description Picture subtitles (PGS, VobSub); text subtitles are always kept. MP4 files can't hold picture subtitles.
-             * @enum {string}
-             */
-            imageSubtitles: "keep" | "drop";
+            audio: "copy" | "aac_stereo" | "aac_51";
             /**
              * @description keep = HDR stays HDR (10-bit HEVC or AV1; H.264 always tone-maps); tonemap = converted to SDR.
              * @enum {string}

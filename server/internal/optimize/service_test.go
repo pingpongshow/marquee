@@ -279,7 +279,7 @@ func TestQueueEncodeSwapRestore(t *testing.T) {
 		Tick: 20 * time.Millisecond, Grace: 100 * time.Millisecond, BusyRetry: 20 * time.Millisecond}
 	e.set(func(c *settings.Settings) {
 		c.Optimize.MinSavingsPercent = 20
-		c.Optimize.Presets = []settings.OptimizePreset{{ID: "tiny", Name: "Tiny", Codec: "hevc", Quality: "small", Audio: "aac_stereo", ImageSubtitles: "keep", HDR: "keep"}}
+		c.Optimize.Presets = []settings.OptimizePreset{{ID: "tiny", Name: "Tiny", Codec: "hevc", Quality: "small", Audio: "aac_stereo", HDR: "keep"}}
 	})
 	if _, _, err := s.Enqueue(ctx, files, "nope"); !errors.Is(err, ErrNoPreset) {
 		t.Fatalf("unknown preset: %v", err)

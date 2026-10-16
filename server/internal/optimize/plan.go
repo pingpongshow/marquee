@@ -110,6 +110,15 @@ func NewPlan(src Source, p settings.OptimizePreset) (Plan, error) {
 	default:
 		pl.Format, pl.Final = "matroska", strings.TrimSuffix(src.Path, filepath.Ext(src.Path))+".mkv"
 	}
+	// Every subtitle is kept: MP4 can't hold picture subtitles, so such a file becomes MKV.
+	if pl.Format == "mp4" {
+		for _, st := range src.Subtitles {
+			if imageSubtitles[st.Codec] {
+				pl.Format, pl.Final = "matroska", strings.TrimSuffix(src.Path, filepath.Ext(src.Path))+".mkv"
+				break
+			}
+		}
+	}
 	if b, ok := boxes[p.MaxHeight]; ok && (src.Width > b[0] || src.Height > b[1]) {
 		pl.ScaleW, pl.ScaleH = b[0], b[1]
 	}
@@ -123,31 +132,8 @@ func NewPlan(src Source, p settings.OptimizePreset) (Plan, error) {
 	}
 	pl.TenBit = (p.Codec == "hevc" || p.Codec == "av1") && !pl.ToneMap && (src.TenBit() || pl.HDRTransfer != "")
 
-	// Audio: commentary left out when asked (never every track), then every track or only
-	// the default one, copied or converted to AAC.
-	audio := src.Audio
-	if p.DropCommentary {
-		var kept []Stream
-		for _, a := range audio {
-			if !a.Comment {
-				kept = append(kept, a)
-			}
-		}
-		if len(kept) > 0 {
-			audio = kept
-		}
-	}
-	if p.Audio == "default" && len(audio) > 1 {
-		pick := audio[0]
-		for _, a := range audio {
-			if a.Default {
-				pick = a
-				break
-			}
-		}
-		audio = []Stream{pick}
-	}
-	for _, a := range audio {
+	// Audio: every track (all languages, commentary), copied or converted to AAC.
+	for _, a := range src.Audio {
 		out := AudioOut{Stream: a, Codec: "copy"}
 		want := 0
 		switch p.Audio {
@@ -168,17 +154,19 @@ func NewPlan(src Source, p settings.OptimizePreset) (Plan, error) {
 		pl.Audio = append(pl.Audio, out)
 	}
 
-	// Subtitles: text always kept (as SRT in MKV, mov_text in MP4); pictures kept in MKV
-	// unless the preset drops them (MP4 can't hold them); others (captions, teletext) dropped.
+	// Subtitles: every one is kept. Text as SRT in MKV (mov_text in MP4), pictures as they
+	// are (the file is MKV then), closed-caption tracks as SRT; teletext can't be carried.
 	for _, st := range src.Subtitles {
 		switch {
 		case textSubtitles[st.Codec] && pl.Format == "mp4":
 			pl.Subtitles = append(pl.Subtitles, SubOut{Stream: st, Codec: "mov_text"})
-		case st.Codec == "mov_text" || st.Codec == "text":
+		case st.Codec == "eia_608" && pl.Format == "mp4":
+			pl.Subtitles = append(pl.Subtitles, SubOut{Stream: st, Codec: "mov_text"})
+		case st.Codec == "mov_text" || st.Codec == "text" || st.Codec == "eia_608":
 			pl.Subtitles = append(pl.Subtitles, SubOut{Stream: st, Codec: "srt"})
 		case textSubtitles[st.Codec]:
 			pl.Subtitles = append(pl.Subtitles, SubOut{Stream: st, Codec: "copy"})
-		case imageSubtitles[st.Codec] && pl.Format == "matroska" && p.ImageSubtitles != "drop":
+		case imageSubtitles[st.Codec]:
 			pl.Subtitles = append(pl.Subtitles, SubOut{Stream: st, Codec: "copy"})
 		}
 	}
@@ -322,26 +310,8 @@ func Estimate(f FileInfo, p settings.OptimizePreset) int64 {
 	if p.VideoKbps > 0 {
 		v = float64(p.VideoKbps)
 	}
-	// Audio as the preset keeps it.
-	var tracks []AudioInfo
-	for _, a := range f.Audio {
-		if !(p.DropCommentary && a.Commentary) {
-			tracks = append(tracks, a)
-		}
-	}
-	if len(tracks) == 0 {
-		tracks = f.Audio
-	}
-	if p.Audio == "default" && len(tracks) > 1 {
-		pick := tracks[0]
-		for _, a := range tracks {
-			if a.Default {
-				pick = a
-				break
-			}
-		}
-		tracks = []AudioInfo{pick}
-	}
+	// Audio: every track is kept.
+	tracks := f.Audio
 	var srcAudio, outAudio float64
 	for _, a := range f.Audio {
 		srcAudio += float64(audioKbps(a))
