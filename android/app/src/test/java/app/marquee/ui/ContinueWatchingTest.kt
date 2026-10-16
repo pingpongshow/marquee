@@ -45,8 +45,8 @@ class ContinueWatchingTest {
         assertEquals(HubsApi.KindRemoveVodFromContinueWatching.EPISODE to 7L, vodRemoval(ep))
         assertEquals(HubsApi.KindRemoveVodFromContinueWatching.MOVIE to 5L, vodRemoval(film))
         assertNull(vodRemoval(lib))
-        assertEquals("A Show" to "S1 · E3 · Third", vodTitles(ep))
-        assertEquals("A Film" to "On demand · 1999", vodTitles(film))
+        assertEquals("A Show" to "VOD · S1 · E3 · Third", vodTitles(ep))
+        assertEquals("A Film" to "VOD · 1999", vodTitles(film))
         // Unknown duration: the episode's runtime.
         assertEquals(0.25f, continueProgress(ep)!!, 0.001f)
         assertEquals(0.25f, continueProgress(film)!!, 0.001f)

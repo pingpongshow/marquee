@@ -1,5 +1,7 @@
 package app.marquee.ui
 
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -108,13 +110,19 @@ internal fun VodShowTile(s: VodSeries, width: Dp?, onOpen: () -> Unit) {
 
 /** Continue Watching for shows: the next episode's still, with the show and episode under it; opening it plays that episode. */
 @Composable
-internal fun VodNextEpisodeTile(s: VodSeries, width: Dp, onOpen: () -> Unit) {
+internal fun VodNextEpisodeTile(s: VodSeries, width: Dp, actions: List<TileAction> = emptyList(), onOpen: () -> Unit) {
     val marquee = LocalMarquee.current
     val e = s.nextEpisode
+    var menu by remember { mutableStateOf(false) }
     Column(Modifier.width(width)) {
         Box {
-            Artwork(marquee.absolute(e?.stillUrl ?: s.posterUrl), s.title, Shape.Wide, Modifier.fillMaxWidth().focusCard(onOpen)
-                .semantics { contentDescription = listOfNotNull(s.title, e?.label()).joinToString(", ") })
+            Artwork(marquee.absolute(e?.stillUrl ?: s.posterUrl), s.title, Shape.Wide, Modifier.fillMaxWidth()
+                .focusCard(onOpen, onLongClick = if (actions.isEmpty()) null else ({ menu = true }))
+                .semantics {
+                    contentDescription = listOfNotNull(s.title, e?.label()).joinToString(", ")
+                    if (actions.isNotEmpty()) customActions = actions.map { a -> CustomAccessibilityAction(a.label) { a.run(); true } }
+                })
+            TileMenu(actions, menu) { menu = false }
             e?.progress()?.let {
                 LinearProgressIndicator(progress = { it }, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(6.dp).height(3.dp),
                     color = Gold, trackColor = Color.White.copy(alpha = 0.3f), drawStopIndicator = {})

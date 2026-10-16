@@ -33,7 +33,7 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param id Stable id, e.g. scan:3
- * @param kind 
+ * @param kind download: a VOD title being saved to the library (admins).
  * @param title 
  * @param state 
  * @param libraryId 
@@ -47,6 +47,7 @@ data class ActivityTask (
     @SerialName(value = "id")
     val id: kotlin.String,
 
+    /* download: a VOD title being saved to the library (admins). */
     @SerialName(value = "kind")
     val kind: ActivityTask.Kind,
 
@@ -65,16 +66,17 @@ data class ActivityTask (
 ) {
 
     /**
-     * 
+     * download: a VOD title being saved to the library (admins).
      *
-     * Values: SCAN,IMPORT,STREAM,TASK
+     * Values: SCAN,IMPORT,STREAM,TASK,DOWNLOAD
      */
     @Serializable
     enum class Kind(val value: kotlin.String) {
         @SerialName(value = "scan") SCAN("scan"),
         @SerialName(value = "import") IMPORT("import"),
         @SerialName(value = "stream") STREAM("stream"),
-        @SerialName(value = "task") TASK("task");
+        @SerialName(value = "task") TASK("task"),
+        @SerialName(value = "download") DOWNLOAD("download");
     }
     /**
      * 
