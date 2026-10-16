@@ -7,6 +7,7 @@ import {
   createRouter,
   lazyRouteComponent,
   useRouterState,
+  redirect,
 } from "@tanstack/react-router";
 import { systemInfoQuery } from "@/api/queries";
 import { Alert, Spinner } from "@/components/ui";
@@ -51,7 +52,6 @@ const VodPlayerPage = lazyRouteComponent(
   "VodPlayerPage",
 );
 const VodShowsPage = lazyRouteComponent(() => import("@/features/livetv/Vod"), "VodShowsPage");
-const VodSavesPage = lazyRouteComponent(() => import("@/features/livetv/VodSaves"), "VodSavesPage");
 const VodShowPage = lazyRouteComponent(() => import("@/features/livetv/VodShows"), "VodShowPage");
 const VodEpisodePlayerPage = lazyRouteComponent(
   () => import("@/features/livetv/VodShows"),
@@ -260,11 +260,14 @@ const vodShowsRoute = createRoute({
   path: "/vod/shows",
   component: VodShowsPage,
 });
-// The save queue (admins only); "saves" ranks above /vod/$movieId like "shows".
+// The download queue moved to Settings → VOD; old links land there. ("saves" ranks above
+// /vod/$movieId like "shows".)
 const vodSavesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/vod/saves",
-  component: VodSavesPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/settings/$section", params: { section: "vod" }, hash: "downloads" });
+  },
 });
 const vodShowRoute = createRoute({
   getParentRoute: () => rootRoute,

@@ -124,8 +124,8 @@ export function ActivityIndicator() {
                     <div className="mt-1 truncate text-[11px] text-faint">{t.progress.current}</div>
                   )}
                   {t.kind === "download" && (
-                    <Link to="/vod/saves" onClick={() => setOpen(false)} className="mt-1 inline-block text-[11px] text-muted hover:text-text">
-                      Open VOD Downloads
+                    <Link to="/settings/$section" params={{ section: "vod" }} hash="downloads" onClick={() => setOpen(false)} className="mt-1 inline-block text-[11px] text-muted hover:text-text">
+                      Open downloads
                     </Link>
                   )}
                 </li>

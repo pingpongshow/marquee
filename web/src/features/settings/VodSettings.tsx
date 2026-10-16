@@ -9,6 +9,7 @@ import { Alert, Button, Card, Field, Input, Select, Spinner, Toggle } from "@/co
 import { vodStatusQuery } from "../livetv/vodApi";
 import { SaveBar } from "./SaveBar";
 import { VodSaveSettings } from "./VodSaveSettings";
+import { VodDownloadsPanel } from "@/features/livetv/VodSaves";
 
 type Source = components["schemas"]["VodSource"];
 type Draft = { enabled: boolean; sources: Source[] };
@@ -79,6 +80,7 @@ export function VodSettings() {
         (below). Marquee reloads the lists every six hours and
         matches each film to TMDB.
       </p>
+      <VodDownloadsPanel />
       <Card>
         <Toggle
           label="Show VOD"

@@ -102,7 +102,7 @@ function toastResult(r: { queued: number; already: number; skipped: number; upgr
     r.already && `${r.already} already queued or saved`,
     r.skipped && `${r.skipped} already in the library`,
   ].filter(Boolean);
-  toast(parts.length ? parts.join(", ") : "Nothing to save", { link: { to: "/vod/saves", label: "Saves" } });
+  toast(parts.length ? parts.join(", ") : "Nothing to save", { link: { to: "/vod/saves", label: "Downloads" } });
 }
 
 /** Where a film's or episode's page can save to: the default folder and the extra save folders. */
@@ -394,12 +394,12 @@ export function SaveEpisodeIcon({
   );
 }
 
-/** The header link to the save queue (admins only). */
+/** The header link to the download queue in Settings → VOD (admins only). */
 export function SavesLink() {
   const admin = useIsAdmin();
   if (!admin) return null;
   return (
-    <Link to="/vod/saves" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-text">
+    <Link to="/settings/$section" params={{ section: "vod" }} hash="downloads" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-text">
       <HardDriveDownload className="size-4" /> Downloads
     </Link>
   );
@@ -534,42 +534,21 @@ function SaveRow({ v }: { v: VodSave }) {
   );
 }
 
-/** The save queue: progress, speed, ETA, errors and the controls (admins only). */
-export function VodSavesPage() {
+/** The download queue (Settings → VOD): progress, speed, ETA, errors and the controls (admins only). */
+export function VodDownloadsPanel() {
   const admin = useIsAdmin();
   const q = useQuery({ ...vodSavesQuery, enabled: admin });
   const act = useSaveAction();
-  if (!admin)
-    return (
-      <div className="p-8">
-        <Alert tone="error">Only administrators can save to the library.</Alert>
-      </div>
-    );
+  if (!admin) return null;
   if (q.isPending) return <Spinner />;
-  if (q.isError)
-    return (
-      <div className="p-8">
-        <Alert tone="error">{q.error.message}</Alert>
-      </div>
-    );
+  if (q.isError) return <Alert tone="error">{q.error.message}</Alert>;
   const d = q.data;
   const finished = d.saves.filter((v) => ["done", "failed", "cancelled", "skipped"].includes(v.state));
   const waiting = d.saves.filter((v) => !finished.includes(v));
   return (
-    <div className="space-y-6 p-4 lg:p-6">
+    <section id="downloads" className="scroll-mt-4 space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold">VOD Downloads</h1>
-        <div className="flex gap-3 text-sm text-muted">
-          <Link to="/vod" className="hover:text-text">
-            VOD Movies
-          </Link>
-          <Link to="/vod/shows" className="hover:text-text">
-            VOD Shows
-          </Link>
-          <Link to="/settings/$section" params={{ section: "vod" }} className="hover:text-text">
-            Settings
-          </Link>
-        </div>
+        <h2 className="text-lg font-semibold">Downloads</h2>
         <div className="ml-auto flex gap-2">
           <Button size="sm" onClick={() => act.mutate({ action: d.paused ? "resume" : "pause" })}>
             {d.paused ? <Play className="size-4" /> : <Pause className="size-4" />} {d.paused ? "Resume queue" : "Pause queue"}
@@ -579,40 +558,27 @@ export function VodSavesPage() {
           </Button>
         </div>
       </div>
-      {!d.moviesFolderSet && !d.showsFolderSet && (
-        <Alert>
-          Choose where saves go in{" "}
-          <Link to="/settings/$section" params={{ section: "vod" }} className="underline">
-            Settings → VOD → Saving to library
-          </Link>
-          .
-        </Alert>
-      )}
+      {!d.moviesFolderSet && !d.showsFolderSet && <Alert>Choose where saves go under Saving to library, below.</Alert>}
       {d.paused && <Alert>The queue is paused. Saves keep what they downloaded and continue when it resumes.</Alert>}
-      <section>
-        <h2 className="mb-1 text-lg font-semibold">Queue</h2>
-        {waiting.length === 0 ? (
-          <p className="text-sm text-muted">
-            Nothing waiting. Save films and episodes from their pages on VOD Movies and VOD Shows.
-          </p>
-        ) : (
-          <ul className="divide-y divide-border">
-            {waiting.map((v) => (
-              <SaveRow key={v.id} v={v} />
-            ))}
-          </ul>
-        )}
-      </section>
+      {waiting.length === 0 ? (
+        <p className="text-sm text-muted">Nothing waiting. Save films and episodes from their pages on VOD Movies and VOD Shows.</p>
+      ) : (
+        <ul className="divide-y divide-border rounded-lg bg-surface px-4">
+          {waiting.map((v) => (
+            <SaveRow key={v.id} v={v} />
+          ))}
+        </ul>
+      )}
       {finished.length > 0 && (
-        <section>
-          <h2 className="mb-1 text-lg font-semibold">Finished</h2>
-          <ul className="divide-y divide-border">
+        <details>
+          <summary className="cursor-pointer text-sm text-muted hover:text-text">Finished ({finished.length})</summary>
+          <ul className="mt-2 divide-y divide-border rounded-lg bg-surface px-4">
             {finished.map((v) => (
               <SaveRow key={v.id} v={v} />
             ))}
           </ul>
-        </section>
+        </details>
       )}
-    </div>
+    </section>
   );
 }
