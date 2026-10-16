@@ -39,7 +39,7 @@ const (
 
 var (
 	ErrNotFound    = errors.New("not found")
-	ErrNoFolder    = errors.New("choose a folder to save to in Settings → Movies on demand")
+	ErrNoFolder    = errors.New("choose a folder to save to in Settings → VOD")
 	// ErrDestination is an unknown save folder, or one that doesn't take the kind saved.
 	ErrDestination = errors.New("no such save folder")
 	ErrNotSavable  = vod.ErrNotSavable

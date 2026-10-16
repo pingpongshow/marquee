@@ -122,7 +122,7 @@ func Compare(vod, lib Quality) (verdict, reason string) {
 		return VerdictSame, "The library's copy's quality isn't known"
 	}
 	if !vod.Known() {
-		return VerdictSame, "The quality of the copy on demand isn't known"
+		return VerdictSame, "The quality of the VOD copy isn't known"
 	}
 	vt, lt := vod.Tier(), lib.Tier()
 	switch {

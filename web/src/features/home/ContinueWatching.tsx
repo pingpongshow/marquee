@@ -113,9 +113,9 @@ function VodTile({ e, className }: { e: ContinueEntry; className?: string }) {
   const ep = e.vodEpisode;
   const title = m ? m.title : (ep?.seriesTitle ?? "");
   const sub = m
-    ? ["On demand", m.year ? String(m.year) : ""].filter(Boolean).join(" · ")
+    ? ["VOD", m.year ? String(m.year) : ""].filter(Boolean).join(" · ")
     : ep
-      ? `On demand · S${ep.season} · E${ep.episode}${ep.title ? ` · ${ep.title}` : ""}`
+      ? `VOD · S${ep.season} · E${ep.episode}${ep.title ? ` · ${ep.title}` : ""}`
       : "";
   // Wide artwork: the film's backdrop (its poster's sibling), the episode's still.
   const art = m ? `/api/v1/livetv/vod/movies/${m.id}/image?kind=backdrop` : (ep?.stillUrl ?? e.seriesPosterUrl);

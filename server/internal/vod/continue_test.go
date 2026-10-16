@@ -57,9 +57,19 @@ func TestContinueWatchingAll(t *testing.T) {
 	if l := list(""); len(l) != 0 {
 		t.Fatalf("hidden: %+v", l)
 	}
+	// The VOD pages' own Continue Watching rows leave them out too.
+	if m, err := s.ContinueWatching(ctx, uid, ""); err != nil || len(m) != 0 {
+		t.Fatalf("films row: %+v %v", m, err)
+	}
+	if u, err := s.SeriesContinueWatching(ctx, uid, ""); err != nil || len(u) != 0 {
+		t.Fatalf("shows row: %+v %v", u, err)
+	}
 	at("vod_progress", "movie_id", film, "2099-01-01T00:00:00Z")
 	if l := list(""); len(l) != 1 || l[0].Movie == nil {
 		t.Fatalf("watched again: %+v", l)
+	}
+	if m, _ := s.ContinueWatching(ctx, uid, ""); len(m) != 1 {
+		t.Fatalf("films row, watched again: %+v", m)
 	}
 	if err := s.HideMovieFromContinue(ctx, uid, 99999); err != ErrNotFound {
 		t.Errorf("missing film: %v", err)

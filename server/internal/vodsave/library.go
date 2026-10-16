@@ -44,7 +44,7 @@ func match(lib *LibraryCopy, q Quality, known, pending bool, note string) Match 
 	if !known {
 		m.Verdict, m.Reason = VerdictSame, note
 		if m.Reason == "" {
-			m.Reason = "The quality of the copy on demand isn't known"
+			m.Reason = "The quality of the VOD copy isn't known"
 		}
 		return m
 	}

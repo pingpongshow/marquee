@@ -400,7 +400,7 @@ export function SavesLink() {
   if (!admin) return null;
   return (
     <Link to="/vod/saves" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-text">
-      <HardDriveDownload className="size-4" /> Saves
+      <HardDriveDownload className="size-4" /> Downloads
     </Link>
   );
 }
@@ -558,7 +558,7 @@ export function VodSavesPage() {
   return (
     <div className="space-y-6 p-4 lg:p-6">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold">Saves</h1>
+        <h1 className="text-2xl font-bold">VOD Downloads</h1>
         <div className="flex gap-3 text-sm text-muted">
           <Link to="/vod" className="hover:text-text">
             VOD Movies
@@ -566,7 +566,7 @@ export function VodSavesPage() {
           <Link to="/vod/shows" className="hover:text-text">
             VOD Shows
           </Link>
-          <Link to="/settings/$section" params={{ section: "movies-on-demand" }} className="hover:text-text">
+          <Link to="/settings/$section" params={{ section: "vod" }} className="hover:text-text">
             Settings
           </Link>
         </div>
@@ -582,8 +582,8 @@ export function VodSavesPage() {
       {!d.moviesFolderSet && !d.showsFolderSet && (
         <Alert>
           Choose where saves go in{" "}
-          <Link to="/settings/$section" params={{ section: "movies-on-demand" }} className="underline">
-            Settings → Movies on demand → Saving to library
+          <Link to="/settings/$section" params={{ section: "vod" }} className="underline">
+            Settings → VOD → Saving to library
           </Link>
           .
         </Alert>

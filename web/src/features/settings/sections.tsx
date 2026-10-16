@@ -171,14 +171,14 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] =
             "Channels and the guide from Dispatcharr or an M3U playlist.",
         },
         {
-          id: "movies-on-demand",
-          label: "Movies on demand",
+          id: "vod",
+          label: "VOD",
           icon: Film,
           component: VodSettings,
           keywords:
             "vod movies on demand pluto films m3u live tv tmdb free streaming save download library queue",
           description:
-            "Films from an M3U playlist such as Pluto TV's, or from Dispatcharr (Xtream Codes), on the VOD page.",
+            "Movies and shows from Dispatcharr (Xtream Codes) or an M3U playlist such as Pluto TV's, saving them to the library, and the download queue.",
         },
         {
           id: "requests",
@@ -290,7 +290,11 @@ function StatisticsSettings() {
   return <StatsView admin />;
 }
 
+// Old section ids still open their section (bookmarks, links in alerts).
+const renamedSections: Record<string, string> = { "movies-on-demand": "vod" };
+
 export function findSection(id: string) {
+  id = renamedSections[id] ?? id;
   for (const g of settingsGroups) {
     const s = g.sections.find((x) => x.id === id);
     if (s) return s;

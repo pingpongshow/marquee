@@ -130,7 +130,7 @@ function Destinations({ value, onChange }: { value: Destination[]; onChange: (v:
   );
 }
 
-/** Settings → Movies on demand → Saving to library (admins only). */
+/** Settings → VOD → Saving to library (admins only). */
 export function VodSaveSettings() {
   const s = useSectionDraft("vodSave");
   if (!s.draft) return <Spinner />;

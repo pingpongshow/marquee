@@ -317,7 +317,7 @@ func pauseReasonFor(scope, sourceID, host string, playing []Playing) string {
 			case "live":
 				return "Paused while Live TV is playing"
 			case "vod":
-				return "Paused while a movie or show on demand is playing"
+				return "Paused while VOD is playing"
 			default:
 				return "Paused while something is playing"
 			}

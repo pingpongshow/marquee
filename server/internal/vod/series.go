@@ -1007,8 +1007,10 @@ type UpNext struct {
 func (s *Service) SeriesContinueWatching(ctx context.Context, userID int64, maxRating string) ([]UpNext, error) {
 	where, args := ratingClause(maxRating)
 	rows, err := s.DB.QueryContext(ctx, "SELECT "+seriesCols+` FROM vod_series m
-		JOIN (SELECT series_id, MAX(updated_at) AS at FROM vod_episode_progress WHERE user_id=? GROUP BY series_id) r ON r.series_id=m.id
-		WHERE `+where+" ORDER BY r.at DESC LIMIT 40", append([]any{userID, userID}, args...)...)
+		JOIN (SELECT series_id, user_id, MAX(updated_at) AS at FROM vod_episode_progress WHERE user_id=? GROUP BY series_id) r ON r.series_id=m.id
+		WHERE `+where+`
+		AND NOT EXISTS (SELECT 1 FROM vod_continue_hidden h WHERE h.user_id=r.user_id AND h.series_id=m.id AND h.hidden_at>=r.at)
+		ORDER BY r.at DESC LIMIT 40`, append([]any{userID, userID}, args...)...)
 	if err != nil {
 		return nil, err
 	}
