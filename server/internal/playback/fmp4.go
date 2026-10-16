@@ -242,6 +242,7 @@ func splitFragments(r io.Reader, dir string, plan []float64, first int, complete
 				// segment is byte-identical whichever run produced it.
 				inSegment++
 				setFragmentSequence(b.data, uint32(cur*1000+inSegment))
+				clampNegativeDecodeTimes(b.data, trackID)
 			}
 		case "mfra":
 			continue // end-of-file fragment index; not part of any segment
@@ -254,6 +255,27 @@ func splitFragments(r io.Reader, dir string, plan []float64, first int, complete
 			}
 		}
 	}
+}
+
+// clampNegativeDecodeTimes sets a negative base decode time (tfdt) of the audio tracks in a
+// moof box to zero. Copied audio that starts just before zero (AAC priming, an edit list in
+// the source) gets one in the opening fragment. Apple players accept it; Android's refuses
+// the whole stream. Moving those first samples later by a few hundredths of a second is
+// unnoticeable. The video track (videoID) is left alone: shifting it would make its first
+// frames overlap the next fragment's.
+func clampNegativeDecodeTimes(moof []byte, videoID uint32) {
+	children(moof[8:], func(typ string, traf []byte) bool {
+		if typ != "traf" {
+			return true
+		}
+		if tfhd := find(traf, "tfhd"); len(tfhd) < 8 || binary.BigEndian.Uint32(tfhd[4:8]) == videoID {
+			return true
+		}
+		if tfdt := find(traf, "tfdt"); len(tfdt) >= 12 && tfdt[0] == 1 && int64(binary.BigEndian.Uint64(tfdt[4:12])) < 0 {
+			binary.BigEndian.PutUint64(tfdt[4:12], 0)
+		}
+		return true
+	})
 }
 
 // setFragmentSequence rewrites the sequence number in a moof box's mfhd.

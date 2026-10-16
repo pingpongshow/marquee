@@ -31,14 +31,15 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param token 
+ * @param to The address to send to.
  */
 @Serializable
 
-data class ConnectLastFmRequest (
+data class TestEmailRequest (
 
-    @SerialName(value = "token")
-    val token: kotlin.String
+    /* The address to send to. */
+    @SerialName(value = "to")
+    val to: kotlin.String
 
 ) {
 

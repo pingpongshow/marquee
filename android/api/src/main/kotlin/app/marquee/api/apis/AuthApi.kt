@@ -33,6 +33,7 @@ import app.marquee.api.models.AuthorizeQuickConnectRequest
 import app.marquee.api.models.DisableTotpRequest
 import app.marquee.api.models.EnableTotp200Response
 import app.marquee.api.models.Error
+import app.marquee.api.models.ForgotRequest
 import app.marquee.api.models.InviteAccept
 import app.marquee.api.models.InviteInfo
 import app.marquee.api.models.LoginRequest
@@ -41,6 +42,9 @@ import app.marquee.api.models.PinLoginRequest
 import app.marquee.api.models.Profile
 import app.marquee.api.models.QuickConnectStart
 import app.marquee.api.models.QuickConnectState
+import app.marquee.api.models.ResetInfo
+import app.marquee.api.models.ResetInfoRequest
+import app.marquee.api.models.ResetRequest
 import app.marquee.api.models.SetupRequest
 import app.marquee.api.models.SetupTotp200Response
 import app.marquee.api.models.StartQuickConnectRequest
@@ -440,6 +444,78 @@ open class AuthApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /auth/forgot
+     * Ask for a password or PIN reset link by email. Always 204, whether or not the account exists or has an email address (no user enumeration). Rate limited per address and per account.
+     * 
+     * @param forgotRequest 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun forgotPassword(forgotRequest: ForgotRequest) : Unit {
+        val localVarResponse = forgotPasswordWithHttpInfo(forgotRequest = forgotRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /auth/forgot
+     * Ask for a password or PIN reset link by email. Always 204, whether or not the account exists or has an email address (no user enumeration). Rate limited per address and per account.
+     * 
+     * @param forgotRequest 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun forgotPasswordWithHttpInfo(forgotRequest: ForgotRequest) : ApiResponse<Unit?> {
+        val localVariableConfig = forgotPasswordRequestConfig(forgotRequest = forgotRequest)
+
+        return request<ForgotRequest, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation forgotPassword
+     *
+     * @param forgotRequest 
+     * @return RequestConfig
+     */
+    fun forgotPasswordRequestConfig(forgotRequest: ForgotRequest) : RequestConfig<ForgotRequest> {
+        val localVariableBody = forgotRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/auth/forgot",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
             body = localVariableBody
         )
     }
@@ -939,6 +1015,152 @@ open class AuthApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/auth/quickconnect/{secret}".replace("{"+"secret"+"}", encodeURIComponent(secret.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /auth/reset/info
+     * What a reset link is for (a password or a PIN, and whose), so the reset page asks for the right thing. 400 when the link is unknown, used or expired.
+     * 
+     * @param resetInfoRequest 
+     * @return ResetInfo
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun resetInfo(resetInfoRequest: ResetInfoRequest) : ResetInfo {
+        val localVarResponse = resetInfoWithHttpInfo(resetInfoRequest = resetInfoRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ResetInfo
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /auth/reset/info
+     * What a reset link is for (a password or a PIN, and whose), so the reset page asks for the right thing. 400 when the link is unknown, used or expired.
+     * 
+     * @param resetInfoRequest 
+     * @return ApiResponse<ResetInfo?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun resetInfoWithHttpInfo(resetInfoRequest: ResetInfoRequest) : ApiResponse<ResetInfo?> {
+        val localVariableConfig = resetInfoRequestConfig(resetInfoRequest = resetInfoRequest)
+
+        return request<ResetInfoRequest, ResetInfo>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation resetInfo
+     *
+     * @param resetInfoRequest 
+     * @return RequestConfig
+     */
+    fun resetInfoRequestConfig(resetInfoRequest: ResetInfoRequest) : RequestConfig<ResetInfoRequest> {
+        val localVariableBody = resetInfoRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/auth/reset/info",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /auth/reset
+     * Set a new password or PIN with a reset link. The link stops working, the account&#39;s other links too, and the account is signed out on every device. Two-factor sign-in stays as it is.
+     * 
+     * @param resetRequest 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun resetPassword(resetRequest: ResetRequest) : Unit {
+        val localVarResponse = resetPasswordWithHttpInfo(resetRequest = resetRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /auth/reset
+     * Set a new password or PIN with a reset link. The link stops working, the account&#39;s other links too, and the account is signed out on every device. Two-factor sign-in stays as it is.
+     * 
+     * @param resetRequest 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun resetPasswordWithHttpInfo(resetRequest: ResetRequest) : ApiResponse<Unit?> {
+        val localVariableConfig = resetPasswordRequestConfig(resetRequest = resetRequest)
+
+        return request<ResetRequest, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation resetPassword
+     *
+     * @param resetRequest 
+     * @return RequestConfig
+     */
+    fun resetPasswordRequestConfig(resetRequest: ResetRequest) : RequestConfig<ResetRequest> {
+        val localVariableBody = resetRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/auth/reset",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,

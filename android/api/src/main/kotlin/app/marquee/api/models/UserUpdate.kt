@@ -35,6 +35,7 @@ import kotlinx.serialization.Contextual
  * @param displayName 
  * @param password 
  * @param pin Empty string removes the PIN.
+ * @param email Empty string removes the email address.
  * @param isAdmin 
  * @param restrictions 
  */
@@ -51,6 +52,10 @@ data class UserUpdate (
     /* Empty string removes the PIN. */
     @SerialName(value = "pin")
     val pin: kotlin.String? = null,
+
+    /* Empty string removes the email address. */
+    @SerialName(value = "email")
+    val email: kotlin.String? = null,
 
     @SerialName(value = "isAdmin")
     val isAdmin: kotlin.Boolean? = null,

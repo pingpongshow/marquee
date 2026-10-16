@@ -34,6 +34,7 @@ import kotlinx.serialization.Contextual
  * @param id 
  * @param name 
  * @param movies 
+ * @param series Series the source lists (Xtream Codes; 0 for playlists).
  * @param refreshedAt 
  * @param error 
  */
@@ -49,6 +50,10 @@ data class VodStatusSourcesInner (
 
     @SerialName(value = "movies")
     val movies: kotlin.Int,
+
+    /* Series the source lists (Xtream Codes; 0 for playlists). */
+    @SerialName(value = "series")
+    val series: kotlin.Int,
 
     @Contextual @SerialName(value = "refreshedAt")
     val refreshedAt: java.time.OffsetDateTime? = null,

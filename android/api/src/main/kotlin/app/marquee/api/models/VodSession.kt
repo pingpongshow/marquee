@@ -33,7 +33,8 @@ import kotlinx.serialization.Contextual
  *
  * @param id 
  * @param url The HLS playlist (server-relative; the session id is its credential).
- * @param movieId 
+ * @param movieId The film (0 for an episode).
+ * @param episodeId The episode, when watching a series.
  * @param startMs Where to start (the caller's resume point).
  */
 @Serializable
@@ -47,8 +48,13 @@ data class VodSession (
     @SerialName(value = "url")
     val url: kotlin.String,
 
+    /* The film (0 for an episode). */
     @SerialName(value = "movieId")
     val movieId: kotlin.Long,
+
+    /* The episode, when watching a series. */
+    @SerialName(value = "episodeId")
+    val episodeId: kotlin.Long? = null,
 
     /* Where to start (the caller's resume point). */
     @SerialName(value = "startMs")

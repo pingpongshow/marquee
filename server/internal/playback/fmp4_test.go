@@ -33,3 +33,23 @@ func TestNegativeFragmentTimeIsSegmentZero(t *testing.T) {
 		t.Fatalf("segment %d", k)
 	}
 }
+
+// Android's player refuses a negative audio decode time (AAC priming in an MP4): it is
+// written as zero; the video track and positive times are left alone.
+func TestClampNegativeDecodeTimes(t *testing.T) {
+	traf := func(id uint32, dt int64) []byte {
+		return mkbox("traf", mkbox("tfhd", []byte{0, 0, 0, 0}, binary.BigEndian.AppendUint32(nil, id)),
+			mkbox("tfdt", []byte{1, 0, 0, 0}, binary.BigEndian.AppendUint64(nil, uint64(dt))))
+	}
+	moof := mkbox("moof", traf(1, -9_000), traf(2, -1014), traf(3, 4_800))
+	clampNegativeDecodeTimes(moof, 1)
+	if v, _ := fragmentTime(moof, 1, 90_000); v != -0.1 {
+		t.Fatalf("video %v", v)
+	}
+	if a, _ := fragmentTime(moof, 2, 48_000); a != 0 {
+		t.Fatalf("audio %v", a)
+	}
+	if o, _ := fragmentTime(moof, 3, 48_000); o != 0.1 {
+		t.Fatalf("other %v", o)
+	}
+}

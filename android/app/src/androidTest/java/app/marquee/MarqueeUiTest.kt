@@ -2699,9 +2699,10 @@ class MarqueeUiTest {
         adminApi("DELETE", "/livetv/vod/movies/$id/watched", asToken = appToken)
     }
 
-    private val moviesEntry = hasText("VOD") and hasClickAction() and !SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected)
+    private val moviesEntry = hasText("VOD Movies") and hasClickAction() and !SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected)
+    private val showsEntry = hasText("VOD Shows") and hasClickAction() and !SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected)
 
-    /** Libraries' VOD entry, to the VOD page, searched down to the test films. */
+    /** Libraries' VOD Movies entry, to the VOD Movies page, searched down to the test films. */
     private fun openVodTestFilms() {
         tap("Libraries")
         rule.waitUntil(15_000) { scrollTo(moviesEntry) }
@@ -2711,9 +2712,9 @@ class MarqueeUiTest {
         rule.waitUntilAtLeastOneExists(hasText("3 movies"), 15_000)
     }
 
-    /** The VOD page: its title and search, with no Live TV tabs. */
+    /** The VOD Movies page: its title and search, with no Live TV tabs. */
     private fun waitVodPage() {
-        rule.waitUntilAtLeastOneExists(hasContentDescription("VOD"), 15_000)
+        rule.waitUntilAtLeastOneExists(hasContentDescription("VOD Movies"), 15_000)
         rule.waitUntilAtLeastOneExists(hasSetTextAction(), 15_000)
         assertTrue("no Live TV tabs", rule.onAllNodesWithText("What's On").fetchSemanticsNodes().isEmpty() && rule.onAllNodesWithText("Guide").fetchSemanticsNodes().isEmpty())
     }
@@ -2798,7 +2799,7 @@ class MarqueeUiTest {
             shot("vod6-resume")
             back()
             // Back on the VOD page, still searched.
-            rule.waitUntilAtLeastOneExists(hasContentDescription("VOD") and hasScrollAction(), 10_000)
+            rule.waitUntilAtLeastOneExists(hasContentDescription("VOD Movies") and hasScrollAction(), 10_000)
             rule.waitUntilAtLeastOneExists(hasContentDescription("Droid Alpha Film (1985)"), 10_000)
         } finally {
             resetVodMovie(id)
@@ -2859,6 +2860,157 @@ class MarqueeUiTest {
             rule.waitUntil(10_000) { !vodMovie(id).getBoolean("watched") }
         } finally {
             resetVodMovie(id)
+        }
+    }
+
+    // ---------- VOD Shows and filters (LIVE-6) ----------
+
+    /**
+     * The test shows: a fake Xtream Codes server on the host (`.e2e/xtream-android`, port 32612),
+     * added by hand as the "Android e2e Xtream" source; skipped when it isn't there.
+     */
+    private fun vodSeriesId(title: String): Long {
+        val list = org.json.JSONObject(adminApi("GET", "/livetv/vod/series?q=${java.net.URLEncoder.encode(title, "UTF-8")}")).getJSONArray("series")
+        val found = (0 until list.length()).map { list.getJSONObject(it) }.firstOrNull { it.getString("title") == title }
+        assumeTrue("the Android e2e Xtream source (port 32612) isn't set up", found != null)
+        return found!!.getLong("id")
+    }
+
+    private fun vodSeries(id: Long) = org.json.JSONObject(adminApi("GET", "/livetv/vod/series/$id", asToken = appToken))
+
+    /** The category and filters are remembered per page: a run that stopped part-way may have left some. */
+    private fun clearVodFilters() {
+        Thread.sleep(1000)
+        rule.onAllNodes(hasText("All shows", substring = true) or hasText("All movies", substring = true)).onFirst().performClick()
+        if (rule.onAllNodes(hasContentDescription("Active filters")).fetchSemanticsNodes().isNotEmpty()) {
+            tap("Clear all")
+            rule.waitUntil(10_000) { rule.onAllNodes(hasContentDescription("Active filters")).fetchSemanticsNodes().isEmpty() }
+        }
+    }
+
+    /** VOD Shows, searched down to the test shows. */
+    private fun openVodTestShows() {
+        tap("Libraries")
+        rule.waitUntil(15_000) { scrollTo(showsEntry) }
+        rule.onNode(showsEntry).performClick()
+        rule.waitUntilAtLeastOneExists(hasContentDescription("VOD Shows"), 15_000)
+        rule.waitUntilAtLeastOneExists(hasSetTextAction(), 15_000)
+        clearVodFilters()
+        rule.onNode(hasSetTextAction()).performTextInput("Droid")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Droid Test Show"), 15_000)
+    }
+
+    /** Both entries are listed; the shows' filters narrow the grid, show as chips, are remembered and clear. */
+    @Test fun vodShowsFilters() {
+        vodSeriesId("Droid Test Show")
+        connectAndSignIn()
+        tap("Libraries")
+        rule.waitUntil(15_000) { scrollTo(moviesEntry) }
+        rule.waitUntil(15_000) { scrollTo(showsEntry) }
+        shot("vs0-libraries")
+        rule.onNode(showsEntry).performClick()
+        rule.waitUntilAtLeastOneExists(hasContentDescription("VOD Shows"), 15_000)
+        clearVodFilters()
+        rule.onNode(hasSetTextAction()).performTextInput("Droid")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Droid Comedy Show"), 15_000)
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Droid Test Show"), 15_000)
+        shot("vs1-grid")
+        tap("Filter")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Filters"), 10_000)
+        rule.waitText("Comedy (", substring = true)
+        // The source filter only with more than one source of shows.
+        val st = org.json.JSONObject(adminApi("GET", "/livetv/vod/status")).getJSONArray("sources")
+        val showSources = (0 until st.length()).count { st.getJSONObject(it).optInt("series") > 0 }
+        rule.waitForIdle()
+        assertEquals("source filter", showSources > 1, rule.onAllNodesWithText("All sources").fetchSemanticsNodes().isNotEmpty())
+        val inDialog = hasAnyAncestor(hasContentDescription("Filters"))
+        rule.onNode(hasText("Comedy (", substring = true) and inDialog).performClick()
+        rule.onNode(hasText("1980s") and inDialog).performClick()
+        shot("vs2-filter-dialog")
+        tap("Done")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Remove filter Comedy"), 10_000)
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Remove filter 1980s"), 10_000)
+        rule.waitUntil(15_000) { rule.onAllNodes(hasContentDescription("Droid Test Show")).fetchSemanticsNodes().isEmpty() }
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Droid Comedy Show"), 10_000)
+        rule.waitText("1 show")
+        shot("vs3-filtered")
+        // Remembered: back out and in again.
+        back()
+        rule.waitUntil(15_000) { scrollTo(showsEntry) }
+        rule.onNode(showsEntry).performClick()
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Remove filter Comedy"), 15_000)
+        rule.onNode(hasContentDescription("Remove filter 1980s")).performClick()
+        rule.waitUntil(10_000) { rule.onAllNodes(hasContentDescription("Remove filter 1980s")).fetchSemanticsNodes().isEmpty() }
+        tap("Clear all")
+        rule.waitUntil(10_000) { rule.onAllNodes(hasContentDescription("Active filters")).fetchSemanticsNodes().isEmpty() }
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Droid Test Show"), 15_000)
+        shot("vs4-cleared")
+        // VOD Movies has its own filters, with the source among them (several sources have films).
+        back()
+        rule.waitUntil(15_000) { scrollTo(moviesEntry) }
+        rule.onNode(moviesEntry).performClick()
+        waitVodPage()
+        clearVodFilters()
+        tap("Filter")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Filters"), 10_000)
+        rule.waitUntil(10_000) { runCatching { rule.onNode(hasContentDescription("Filters")).performScrollToNode(hasText("Android e2e Xtream")) }.isSuccess }
+        rule.onNode(hasText("Android e2e Xtream") and hasAnyAncestor(hasContentDescription("Filters"))).performClick()
+        shot("vs5-movie-filters")
+        tap("Done")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Droid Xtream Film (2001)"), 15_000)
+        rule.waitText("1 movie")
+        shot("vs6-movies-by-source")
+        tap("Clear all")
+        rule.waitUntil(10_000) { rule.onAllNodes(hasContentDescription("Active filters")).fetchSemanticsNodes().isEmpty() }
+    }
+
+    /** A show's page: seasons, episodes, watched for an episode; Play plays the next episode and Up Next goes on to the one after. */
+    @Test fun vodShowPlayAndUpNext() {
+        val id = vodSeriesId("Droid Test Show")
+        connectAndSignIn()
+        adminApi("DELETE", "/livetv/vod/series/$id/watched", asToken = appToken)
+        try {
+            openVodTestShows()
+            rule.onNode(hasContentDescription("Droid Test Show")).performClick()
+            rule.waitUntilAtLeastOneExists(hasText("Play S1 · E1") and hasClickAction(), 30_000)
+            rule.waitText("Season 2")
+            rule.waitText("1. Pilot")
+            shot("vs7-show")
+            // Watched for one episode, and back.
+            val page = hasContentDescription("Show") and hasScrollAction()
+            rule.onNode(page).performScrollToNode(hasContentDescription("Mark S1 · E2 watched"))
+            rule.onNode(hasContentDescription("Mark S1 · E2 watched")).performClick()
+            rule.waitUntil(10_000) { vodSeries(id).getJSONArray("episodes").getJSONObject(1).getBoolean("watched") }
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Mark S1 · E2 unwatched"), 10_000)
+            shot("vs7b-episode-watched")
+            rule.onNode(hasContentDescription("Mark S1 · E2 unwatched")).performClick()
+            rule.waitUntil(10_000) { !vodSeries(id).getJSONArray("episodes").getJSONObject(1).getBoolean("watched") }
+            // Season 2's episodes.
+            tap("Season 2")
+            rule.waitText("1. New Season")
+            shot("vs8-season2")
+            tap("Season 1")
+            rule.waitText("2. The Second One")
+            rule.onNode(page).performScrollToNode(hasText("Play S1 · E1"))
+            rule.onNode(hasText("Play S1 · E1") and hasClickAction()).performClick()
+            val playing = hasContentDescription("Video player") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Playing")
+            rule.waitUntilAtLeastOneExists(playing, 30_000)
+            shot("vs9-playing")
+            // A 16-second clip: Up Next counts down to the second episode.
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Up next countdown"), 40_000)
+            rule.waitText("S1 · E2 · The Second One")
+            shot("vs10-up-next")
+            tap("Play next")
+            rule.waitUntilAtLeastOneExists(playing, 30_000)
+            rule.waitUntil(15_000) { rule.onAllNodesWithText("Droid Test Show · S1 · E2", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+            shot("vs11-next-playing")
+            rule.waitUntil(15_000) { vodSeries(id).getJSONArray("episodes").getJSONObject(0).getBoolean("watched") }
+            back()
+            // Back on the show's page, where the next episode is now the second.
+            rule.waitUntilAtLeastOneExists(hasText("S1 · E2", substring = true) and hasClickAction(), 15_000)
+            shot("vs12-show-after")
+        } finally {
+            adminApi("DELETE", "/livetv/vod/series/$id/watched", asToken = appToken)
         }
     }
 }

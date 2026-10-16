@@ -32,8 +32,9 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param enabled Movies on demand are turned on, a source has films, and this profile may watch Live TV. Clients show them only when true.
+ * @param enabled Movies on demand are turned on, a source has films or series, and this profile may watch Live TV. Clients show them only when true.
  * @param movies 
+ * @param series Series (Xtream Codes sources).
  * @param matched Films matched to TMDB.
  * @param unmatched Films TMDB had no confident match for.
  * @param matching Details and TMDB matches are being fetched now.
@@ -44,12 +45,16 @@ import kotlinx.serialization.Contextual
 
 data class VodStatus (
 
-    /* Movies on demand are turned on, a source has films, and this profile may watch Live TV. Clients show them only when true. */
+    /* Movies on demand are turned on, a source has films or series, and this profile may watch Live TV. Clients show them only when true. */
     @SerialName(value = "enabled")
     val enabled: kotlin.Boolean,
 
     @SerialName(value = "movies")
     val movies: kotlin.Int,
+
+    /* Series (Xtream Codes sources). */
+    @SerialName(value = "series")
+    val series: kotlin.Int,
 
     /* Films matched to TMDB. */
     @SerialName(value = "matched")

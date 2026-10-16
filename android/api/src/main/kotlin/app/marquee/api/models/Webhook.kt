@@ -68,7 +68,7 @@ data class Webhook (
     /**
      * 
      *
-     * Values: PLAYBACK_PERIOD_STARTED,PLAYBACK_PERIOD_PAUSED,PLAYBACK_PERIOD_RESUMED,PLAYBACK_PERIOD_STOPPED,PLAYBACK_PERIOD_WATCHED,LIBRARY_PERIOD_ADDED
+     * Values: PLAYBACK_PERIOD_STARTED,PLAYBACK_PERIOD_PAUSED,PLAYBACK_PERIOD_RESUMED,PLAYBACK_PERIOD_STOPPED,PLAYBACK_PERIOD_WATCHED,LIBRARY_PERIOD_ADDED,ALERT
      */
     @Serializable
     enum class Events(val value: kotlin.String) {
@@ -77,7 +77,8 @@ data class Webhook (
         @SerialName(value = "playback.resumed") PLAYBACK_PERIOD_RESUMED("playback.resumed"),
         @SerialName(value = "playback.stopped") PLAYBACK_PERIOD_STOPPED("playback.stopped"),
         @SerialName(value = "playback.watched") PLAYBACK_PERIOD_WATCHED("playback.watched"),
-        @SerialName(value = "library.added") LIBRARY_PERIOD_ADDED("library.added");
+        @SerialName(value = "library.added") LIBRARY_PERIOD_ADDED("library.added"),
+        @SerialName(value = "alert") ALERT("alert");
     }
 
 }
