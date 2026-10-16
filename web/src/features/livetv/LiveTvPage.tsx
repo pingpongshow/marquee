@@ -33,6 +33,15 @@ import {
   useSchedule,
 } from "./api";
 import { LivePlayer } from "./LivePlayer";
+import {
+  canRemove,
+  commercialsText,
+  removeConfirm,
+  restoreConfirm,
+  useRemoveCommercials,
+  useRestoreCommercials,
+  type CommercialScan,
+} from "./commercials";
 import type { LiveTab } from "@/app/router";
 
 const PX_PER_MIN = 6; // 30 minutes = 180 px
@@ -803,6 +812,9 @@ function Recordings() {
             Failed: {r.error || "unknown error"}
           </div>
         )}
+        {r.commercials && r.itemId && (
+          <RecordingCommercials itemId={r.itemId} scan={r.commercials} />
+        )}
       </div>
       {action}
     </li>
@@ -889,6 +901,46 @@ function Recordings() {
           ),
         ),
       )}
+    </div>
+  );
+}
+
+/** Admins: a finished recording's commercials, with Remove now and Restore original. */
+function RecordingCommercials({
+  itemId,
+  scan,
+}: {
+  itemId: number;
+  scan: CommercialScan;
+}) {
+  const remove = useRemoveCommercials(itemId);
+  const restore = useRestoreCommercials(itemId);
+  const c = remove.data ?? restore.data ?? scan;
+  const error = remove.error ?? restore.error;
+  return (
+    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-muted">
+      <span className={clsx(c.status === "failed" && "text-danger")}>
+        {commercialsText(c)}
+      </span>
+      {canRemove(c) && (
+        <button
+          className="text-accent hover:underline disabled:opacity-50"
+          disabled={remove.isPending}
+          onClick={() => window.confirm(removeConfirm) && remove.mutate()}
+        >
+          Remove commercials now
+        </button>
+      )}
+      {c.canRestore && (
+        <button
+          className="text-accent hover:underline disabled:opacity-50"
+          disabled={restore.isPending}
+          onClick={() => window.confirm(restoreConfirm) && restore.mutate()}
+        >
+          Restore original
+        </button>
+      )}
+      {error && <span className="text-danger">{error.message}</span>}
     </div>
   );
 }

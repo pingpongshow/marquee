@@ -169,9 +169,11 @@ func TestDVRRecord(t *testing.T) {
 
 	var libDir string
 	var scanned atomic.Int64
+	var recorded atomic.Value
 	rec := &Recorder{Live: s, FFmpeg: ff, Dir: filepath.Join(dir, "rec"),
-		Library: func(_ context.Context, movies bool, d string) (int64, error) { libDir = d; return 7, nil },
-		Scan:    func(id int64) { scanned.Store(id) }}
+		Library:    func(_ context.Context, movies bool, d string) (int64, error) { libDir = d; return 7, nil },
+		Scan:       func(id int64) { scanned.Store(id) },
+		OnRecorded: func(p string) { recorded.Store(p) }}
 	if !rec.Available() {
 		t.Fatal("folder not writable")
 	}
@@ -192,6 +194,12 @@ func TestDVRRecord(t *testing.T) {
 	}
 	if want := filepath.Join(rec.Dir, "TV", "Short Show", "Season 1", "Short Show - S01E02.mkv"); x.Path != want {
 		t.Errorf("path %s, want %s", x.Path, want)
+	}
+	for time.Now().Before(deadline) && recorded.Load() == nil {
+		time.Sleep(50 * time.Millisecond)
+	}
+	if p, _ := recorded.Load().(string); p != x.Path {
+		t.Errorf("finished recording reported as %q, want %q (commercial detection)", p, x.Path)
 	}
 	if hits.Load() < 2 {
 		t.Errorf("expected a reconnect, got %d requests", hits.Load())

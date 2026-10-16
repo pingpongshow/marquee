@@ -18,6 +18,9 @@ import { liveStatusQuery } from "../livetv/api";
 import { SaveBar } from "./SaveBar";
 
 type Source = components["schemas"]["LiveTvSource"];
+type Commercials = NonNullable<
+  components["schemas"]["IntegrationSettingsUpdate"]["commercials"]
+>;
 
 /** Live TV sources (LIVE-1): M3U playlists with XMLTV guides, or Dispatcharr. */
 export function LiveTvSettings() {
@@ -278,6 +281,38 @@ function RecordingSettings() {
                   {minutes(n)}
                 </option>
               ))}
+            </Select>
+          )}
+        </Field>
+        <Field
+          label="Commercials"
+          help={
+            i?.comskipAvailable === false ? (
+              <span className="text-danger">
+                This build of Marquee doesn't include Comskip, so commercials
+                can't be found.
+              </span>
+            ) : (
+              "Found with Comskip when a recording finishes, and nightly for older ones. Removing cuts them out of the file; the original goes to the media trash, where it can be restored from the recording's menu for 30 days."
+            )
+          }
+        >
+          {(id) => (
+            <Select
+              id={id}
+              value={i?.commercials ?? "off"}
+              disabled={i?.comskipAvailable === false}
+              onChange={(e) =>
+                save.mutate({
+                  integrations: {
+                    commercials: e.target.value as Commercials,
+                  },
+                })
+              }
+            >
+              <option value="off">Leave recordings alone</option>
+              <option value="detect">Detect only (keep the files as they are)</option>
+              <option value="remove">Remove commercials from recordings</option>
             </Select>
           )}
         </Field>
