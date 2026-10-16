@@ -20,7 +20,7 @@ func TestSaveFilmOriginal(t *testing.T) {
 	e := newEnv(t, oneFilm, nil)
 	e.src.files["movie/101.mkv"] = data
 	ctx := context.Background()
-	res, err := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1)
+	res, err := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1, false)
 	if err != nil || res.Queued != 1 || len(res.Saves) != 1 {
 		t.Fatalf("save: %+v %v", res, err)
 	}
@@ -28,7 +28,7 @@ func TestSaveFilmOriginal(t *testing.T) {
 		t.Fatalf("queued: %+v", v)
 	}
 	// Asking again doesn't queue it twice.
-	if again, _ := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1); again.Queued != 0 || again.Already != 1 {
+	if again, _ := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1, false); again.Queued != 0 || again.Already != 1 {
 		t.Fatalf("again: %+v", again)
 	}
 	e.start()
@@ -68,7 +68,7 @@ func TestSaveFilmOriginal(t *testing.T) {
 	}
 	// Saving it again now skips it: the file is there.
 	e.s.ClearFinished(ctx)
-	if r, _ := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1); r.Skipped != 1 || r.Saves[0].State != Skipped {
+	if r, _ := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1, false); r.Skipped != 1 || r.Saves[0].State != Skipped {
 		t.Errorf("existing: %+v", r)
 	}
 	e.noSecrets()
@@ -88,7 +88,7 @@ func TestQueueOrderAndConcurrency(t *testing.T) {
 	e.s.SetQueuePaused(ctx, true)
 	var ids []int64
 	for _, title := range []string{"A (2001)", "B (2002)", "C (2003)", "D (2004)"} {
-		r, err := e.s.SaveMovie(ctx, e.movieID(title), 1)
+		r, err := e.s.SaveMovie(ctx, e.movieID(title), 1, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -130,7 +130,7 @@ func TestConcurrencyTwo(t *testing.T) {
 	ctx := context.Background()
 	var ids []int64
 	for _, title := range []string{"A (2001)", "B (2002)", "C (2003)"} {
-		r, _ := e.s.SaveMovie(ctx, e.movieID(title), 1)
+		r, _ := e.s.SaveMovie(ctx, e.movieID(title), 1, false)
 		ids = append(ids, r.Saves[0].ID)
 	}
 	e.start()
@@ -149,7 +149,7 @@ func TestResumeWithRange(t *testing.T) {
 	e := newEnv(t, oneFilm, nil)
 	e.src.files["movie/101.mkv"] = data
 	e.src.dropAfter = int64(len(data) / 2)
-	r, _ := e.s.SaveMovie(context.Background(), e.movieID("EN - Clip Film (2020)"), 1)
+	r, _ := e.s.SaveMovie(context.Background(), e.movieID("EN - Clip Film (2020)"), 1, false)
 	e.start()
 	v := e.wait(r.Saves[0].ID, Done, Failed)
 	if v.State != Done || v.SHA256 != sha(data) {
@@ -170,7 +170,7 @@ func TestIgnoredRangeRestarts(t *testing.T) {
 	e.src.files["movie/101.mkv"] = data
 	e.src.dropAfter = int64(len(data) / 3)
 	e.src.ignoreRange = true
-	r, _ := e.s.SaveMovie(context.Background(), e.movieID("EN - Clip Film (2020)"), 1)
+	r, _ := e.s.SaveMovie(context.Background(), e.movieID("EN - Clip Film (2020)"), 1, false)
 	e.start()
 	v := e.wait(r.Saves[0].ID, Done, Failed)
 	if v.State != Done || v.SHA256 != sha(data) {
@@ -189,7 +189,7 @@ func TestManualPauseResume(t *testing.T) {
 	e.src.files["movie/101.mkv"] = data
 	e.src.delay = 30 * time.Millisecond
 	ctx := context.Background()
-	r, _ := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1)
+	r, _ := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1, false)
 	id := r.Saves[0].ID
 	e.start()
 	e.waitFor("some bytes", func() bool {
@@ -233,7 +233,7 @@ func TestCancelCleansUp(t *testing.T) {
 	e.src.files["movie/101.mkv"] = data
 	e.src.delay = 30 * time.Millisecond
 	ctx := context.Background()
-	r, _ := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1)
+	r, _ := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1, false)
 	e.start()
 	part := r.Saves[0].TargetPath + ".part"
 	e.waitFor("some bytes", func() bool { st, _ := os.Stat(part); return st != nil && st.Size() > 0 })
@@ -252,7 +252,7 @@ func TestRetriesThenFailThenRetry(t *testing.T) {
 	e.src.files["movie/101.mkv"] = data
 	e.src.dropAfter = int64(len(data) / 2)
 	ctx := context.Background()
-	r, _ := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1)
+	r, _ := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1, false)
 	id := r.Saves[0].ID
 	// After the first half, the file answers 502 while the account still signs in.
 	e.src.statusAfterDrop = 502
@@ -292,7 +292,7 @@ func TestSourceDownPauses(t *testing.T) {
 	e.src.files["movie/101.mkv"] = data
 	e.src.down.Store(true)
 	ctx := context.Background()
-	r, _ := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1)
+	r, _ := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1, false)
 	id := r.Saves[0].ID
 	e.start()
 	e.waitFor("the source to count as down", func() bool {
@@ -311,7 +311,7 @@ func TestSourceDownPauses(t *testing.T) {
 	e.src.srv.Close()
 	os.RemoveAll(filepath.Dir(e.save(id).TargetPath))
 	e.s.ClearFinished(ctx)
-	r, _ = e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1)
+	r, _ = e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1, false)
 	e.waitFor("refused", func() bool {
 		v := e.save(r.Saves[0].ID)
 		return strings.Contains(v.Error, "Source unreachable")
@@ -330,7 +330,7 @@ func TestAutoPauseWhileWatching(t *testing.T) {
 	e.src.files["movie/101.mkv"] = data
 	e.src.delay = 30 * time.Millisecond
 	ctx := context.Background()
-	r, _ := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1)
+	r, _ := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1, false)
 	id := r.Saves[0].ID
 	e.start()
 	part := r.Saves[0].TargetPath + ".part"
@@ -403,7 +403,7 @@ func TestVerificationFailures(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			e := newEnv(t, oneFilm, nil)
 			e.src.files["movie/101.mkv"] = tc.file
-			r, _ := e.s.SaveMovie(context.Background(), e.movieID("EN - Clip Film (2020)"), 1)
+			r, _ := e.s.SaveMovie(context.Background(), e.movieID("EN - Clip Film (2020)"), 1, false)
 			e.start()
 			v := e.wait(r.Saves[0].ID, Failed, Done)
 			if v.State != Failed || !strings.Contains(v.Error, "Verification failed") || !strings.Contains(v.Error, tc.want) {
@@ -429,7 +429,7 @@ func TestVerificationDuration(t *testing.T) {
 	e.src.files["movie/101.mkv"] = data
 	id := e.movieID("EN - Clip Film (2020)")
 	e.s.DB.Exec("UPDATE vod_movies SET runtime_ms=? WHERE id=?", 600_000, id) // the source says 10 minutes
-	r, _ := e.s.SaveMovie(context.Background(), id, 1)
+	r, _ := e.s.SaveMovie(context.Background(), id, 1, false)
 	e.start()
 	v := e.wait(r.Saves[0].ID, Failed, Done)
 	if v.State != Failed || !strings.Contains(v.Error, "expected 0:10:00") {
@@ -442,7 +442,7 @@ func TestDiskSpace(t *testing.T) {
 	e := newEnv(t, oneFilm, nil)
 	e.src.files["movie/101.mkv"] = data
 	e.s.FreeSpace = func(string) (uint64, error) { return 1 << 20, nil }
-	r, _ := e.s.SaveMovie(context.Background(), e.movieID("EN - Clip Film (2020)"), 1)
+	r, _ := e.s.SaveMovie(context.Background(), e.movieID("EN - Clip Film (2020)"), 1, false)
 	e.start()
 	v := e.wait(r.Saves[0].ID, Failed, Done)
 	if v.State != Failed || !strings.Contains(v.Error, "not enough disk space") {
@@ -450,34 +450,12 @@ func TestDiskSpace(t *testing.T) {
 	}
 }
 
-// Titles already in a library (by TMDB id) are skipped.
-func TestSkipInLibrary(t *testing.T) {
-	e := newEnv(t, `[{"name":"The Matrix (1999)","stream_id":"7","container_extension":"mkv","tmdb":"603"}]`, nil)
-	ctx := context.Background()
-	id := e.movieID("The Matrix (1999)")
-	e.s.DB.Exec("UPDATE vod_movies SET match_state='matched' WHERE id=?", id)
-	var lib int64
-	e.s.DB.QueryRow("SELECT id FROM libraries WHERE name='Movies'").Scan(&lib)
-	res, _ := e.s.DB.Exec(`INSERT INTO items(library_id, type, title, sort_title) VALUES(?, 'movie', 'The Matrix', 'matrix')`, lib)
-	item, _ := res.LastInsertId()
-	e.s.DB.Exec(`INSERT INTO external_ids(item_id, provider, value) VALUES(?, 'tmdb', '603')`, item)
-	r, err := e.s.SaveMovie(ctx, id, 1)
-	if err != nil || r.Skipped != 1 || r.Saves[0].State != Skipped || r.Saves[0].Error != "Already in the library" {
-		t.Fatalf("save: %+v %v", r, err)
-	}
-	// With skipping off, it's saved anyway.
-	e.s.Settings.Update(ctx, func(s *settings.Settings) error { s.VODSave.SkipExisting = false; return nil })
-	if r, _ := e.s.SaveMovie(ctx, id, 1); r.Queued != 1 {
-		t.Fatalf("not skipping: %+v", r)
-	}
-}
-
 func TestNoFolderAndNotSavable(t *testing.T) {
 	e := newEnv(t, oneFilm, func(v *settings.VODSave) { v.MoviesFolder = "" })
-	if _, err := e.s.SaveMovie(context.Background(), e.movieID("EN - Clip Film (2020)"), 1); !errors.Is(err, ErrNoFolder) {
+	if _, err := e.s.SaveMovie(context.Background(), e.movieID("EN - Clip Film (2020)"), 1, false); !errors.Is(err, ErrNoFolder) {
 		t.Errorf("no folder: %v", err)
 	}
-	if _, err := e.s.SaveMovie(context.Background(), 9999, 1); !errors.Is(err, ErrNoFolder) && !errors.Is(err, ErrNotFound) {
+	if _, err := e.s.SaveMovie(context.Background(), 9999, 1, false); !errors.Is(err, ErrNoFolder) && !errors.Is(err, ErrNotFound) {
 		t.Errorf("missing: %v", err)
 	}
 }

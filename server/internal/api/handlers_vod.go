@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -287,6 +288,14 @@ func (h *Handlers) GetVodMovie(ctx context.Context, req GetVodMovieRequestObject
 		out.CanSave = ptr(movies && h.VOD.Savable(m.SourceID))
 		if st, err := h.VODSaves.MovieState(ctx, m.ID); err == nil {
 			out.Save = toAPIVodSaveState(st)
+		}
+		// How it compares with the library's copy (its quality is checked when unknown).
+		if *out.CanSave {
+			if lm, err := h.VODSaves.MovieMatch(ctx, m.ID); err == nil {
+				out.Library = toAPIVodLibraryMatch(lm)
+			} else {
+				slog.WarnContext(ctx, "vod library match", "err", err)
+			}
 		}
 	}
 	out.Cast = make([]struct {

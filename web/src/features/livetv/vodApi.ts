@@ -198,6 +198,8 @@ export function useVodEpisodeWatched() {
 export type VodSave = components["schemas"]["VodSave"];
 export type VodSaveState = components["schemas"]["VodSaveState"];
 export type VodSaveStateName = components["schemas"]["VodSaveStateName"];
+export type VodLibraryMatch = components["schemas"]["VodLibraryMatch"];
+export type VodLibraryRollup = components["schemas"]["VodLibraryRollup"];
 
 /** States in which a save is still on its way (the page polls while one is). */
 export const saveActive = (s?: VodSaveStateName) =>
@@ -209,18 +211,38 @@ export const vodSavesQuery = queryOptions({
   refetchInterval: (q) => (q.state.data?.active ? 2000 : 15_000),
 });
 
-/** Queues a film, an episode, a season or a whole show. */
+/**
+ * Queues a film, an episode, a season or a whole show. upgrade replaces the library's copy
+ * of a film or episode that's better on demand; a season's or show's includeUpgrades also
+ * queues its episodes that are better than the library's.
+ */
 export function useSaveVod() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (what: { movieId: number } | { episodeId: number } | { seriesId: number; season?: number }) => {
+    mutationFn: (
+      what:
+        | { movieId: number; upgrade?: boolean }
+        | { episodeId: number; upgrade?: boolean }
+        | { seriesId: number; season?: number; includeUpgrades?: boolean },
+    ) => {
       if ("movieId" in what)
-        return unwrap(api.POST("/livetv/vod/movies/{movieId}/save", { params: { path: { movieId: what.movieId } } }));
+        return unwrap(
+          api.POST("/livetv/vod/movies/{movieId}/save", {
+            params: { path: { movieId: what.movieId }, query: { upgrade: what.upgrade || undefined } },
+          }),
+        );
       if ("episodeId" in what)
-        return unwrap(api.POST("/livetv/vod/episodes/{episodeId}/save", { params: { path: { episodeId: what.episodeId } } }));
+        return unwrap(
+          api.POST("/livetv/vod/episodes/{episodeId}/save", {
+            params: { path: { episodeId: what.episodeId }, query: { upgrade: what.upgrade || undefined } },
+          }),
+        );
       return unwrap(
         api.POST("/livetv/vod/series/{seriesId}/save", {
-          params: { path: { seriesId: what.seriesId }, query: { season: what.season } },
+          params: {
+            path: { seriesId: what.seriesId },
+            query: { season: what.season, includeUpgrades: what.includeUpgrades || undefined },
+          },
         }),
       );
     },

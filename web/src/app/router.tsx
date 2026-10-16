@@ -20,6 +20,7 @@ import {
   validateLibrarySearch,
 } from "@/features/browse/LibraryPage";
 import { PersonPage } from "@/features/browse/PersonPage";
+import { ContinueWatchingPage } from "@/features/home/ContinueWatching";
 import { HomePage } from "@/features/home/HomePage";
 import { MusicProvider } from "@/features/player/MusicPlayer";
 import { PlayerPage } from "@/features/player/PlayerPage";
@@ -199,6 +200,12 @@ const personRoute = createRoute({
   path: "/person/$personId",
   component: PersonPage,
 });
+// Everything in Continue Watching (Home's row shows the first 20).
+const continueWatchingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/continue-watching",
+  component: ContinueWatchingPage,
+});
 const playlistsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/playlists",
@@ -353,6 +360,7 @@ const routeTree = rootRoute.addChildren([
   vodEpisodePlayRoute,
   discoverRoute,
   homeRoute,
+  continueWatchingRoute,
   playRoute,
   libraryRoute,
   librarySectionRoute,

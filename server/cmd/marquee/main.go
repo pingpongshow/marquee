@@ -423,7 +423,7 @@ func run() error {
 
 	// Saving films and episodes on demand into the library (admins only): a queue per
 	// source that pauses while someone watches.
-	vodSaves := &vodsave.Service{DB: database, Settings: store, VOD: vodSvc, Titles: meta,
+	vodSaves := &vodsave.Service{DB: database, Settings: store, VOD: vodSvc, Titles: meta, Trash: mediaTrash,
 		FFmpeg: cfg.FFmpegPath, FFprobe: cfg.FFprobePath, Encoders: player.EncoderChoices, QSVDevice: player.Encoders.QSVDevice,
 		Libraries: libraries.List,
 		Scan: func(id int64) {

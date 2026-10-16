@@ -2052,6 +2052,36 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /hubs/continue-watching:
+    get:
+      tags: [hubs]
+      operationId: continueWatching
+      summary: "All of the caller's Continue Watching, newest first, a page at a time: in-progress library movies, episodes and videos, the next episode of every show they've watched (no time limit), and films and episodes on demand stopped part-way through (when on demand is on and theirs to watch). Home's row is the first 20."
+      parameters:
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: A page of entries.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContinueWatchingPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /hubs/continue-watching/vod/{kind}/{vodId}:
+    parameters:
+      - { name: kind, in: path, required: true, schema: { type: string, enum: [movie, episode] } }
+      - { name: vodId, in: path, required: true, description: The film's or episode's id., schema: { type: integer, format: int64 } }
+    delete:
+      tags: [hubs]
+      operationId: removeVodFromContinueWatching
+      summary: "Removes a film on demand, or an episode's series, from your Continue Watching. The resume point is kept; it comes back once you play it (or, for a series, any of its episodes) again."
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /hubs/continue-watching/{itemId}:
     parameters:
       - $ref: "#/components/parameters/ItemId"
@@ -3171,7 +3201,9 @@ paths:
     post:
       tags: [livetv]
       operationId: saveVodMovie
-      summary: "Save a film into the library (admin only; Xtream Codes sources). Queued, downloaded, converted per Settings → vodSave, verified, moved into vodSave.moviesFolder and scanned. A film already queued or saved isn't queued again; one in the library is skipped (vodSave.skipExisting)."
+      summary: "Save a film into the library (admin only; Xtream Codes sources). Queued, downloaded, converted per Settings → vodSave, verified, moved into vodSave.moviesFolder and scanned. A film already queued or saved isn't queued again. One the library already has (VodMovieDetail.library) is refused with 409: in_library when the library's copy is as good or better, upgrade_available when this copy is better and upgrade wasn't set. With upgrade, a better copy replaces the library's: saved into the same folder, the old file(s) moved to the media trash, the item (and its watch history) kept."
+      parameters:
+        - { name: upgrade, in: query, description: "Replace the library's copy when this one is better (VodLibraryMatch.verdict better).", schema: { type: boolean, default: false } }
       responses:
         "200":
           description: What was queued.
@@ -3182,6 +3214,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
 
   /livetv/vod/episodes/{episodeId}/save:
@@ -3190,7 +3223,9 @@ paths:
     post:
       tags: [livetv]
       operationId: saveVodEpisode
-      summary: "Save one episode into the library (admin only), into vodSave.showsFolder: {Show (Year)}/Season N/{Show} - SxxEyy - {Title} WEBDL-1080p.ext."
+      summary: "Save one episode into the library (admin only), into vodSave.showsFolder: {Show (Year)}/Season N/{Show} - SxxEyy - {Title} WEBDL-1080p.ext. Like a film: 409 in_library or upgrade_available when the library has it; upgrade replaces the library's copy when this one is better."
+      parameters:
+        - { name: upgrade, in: query, description: "Replace the library's copy when this one is better.", schema: { type: boolean, default: false } }
       responses:
         "200":
           description: What was queued.
@@ -3201,6 +3236,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
 
   /livetv/vod/series/{seriesId}/save:
@@ -3210,7 +3246,9 @@ paths:
     post:
       tags: [livetv]
       operationId: saveVodSeries
-      summary: "Save a whole series, or one season, into the library (admin only). The episodes are fetched from the source first when they haven't been; ones already queued or saved are left out."
+      summary: "Save a whole series, or one season, into the library (admin only). The episodes are fetched from the source first when they haven't been; ones already queued or saved are left out. Only episodes the library doesn't have are queued, plus (includeUpgrades) those better than the library's copies, which they replace; the rest count as skipped."
+      parameters:
+        - { name: includeUpgrades, in: query, description: "Also queue episodes better than the library's copies, replacing them.", schema: { type: boolean, default: false } }
       responses:
         "200":
           description: What was queued.
@@ -5291,6 +5329,7 @@ components:
             matched: { type: boolean, description: The details are TMDB's. }
             canSave: { type: boolean, description: "The caller (an admin) can save it into the library: an Xtream Codes film with a movies folder set." }
             save: { $ref: "#/components/schemas/VodSaveState" }
+            library: { $ref: "#/components/schemas/VodLibraryMatch" }
 
     VodMoviePage:
       type: object
@@ -5361,6 +5400,7 @@ components:
               items: { $ref: "#/components/schemas/VodEpisode" }
             episodesError: { type: string, description: "The source didn't give the episodes (and none were kept from before)." }
             canSave: { type: boolean, description: "The caller (an admin) can save its episodes into the library (shows folder set). Each episode's save is in episodes[].save." }
+            library: { $ref: "#/components/schemas/VodLibraryRollup" }
 
     VodSeason:
       type: object
@@ -5373,6 +5413,43 @@ components:
         posterUrl: { type: string, description: Server-relative; no token needed. }
         episodeCount: { type: integer }
         watchedCount: { type: integer, description: Episodes the caller has watched. }
+        library: { $ref: "#/components/schemas/VodLibraryRollup" }
+
+    VodQuality:
+      type: object
+      description: What a video file is.
+      required: [summary]
+      properties:
+        width: { type: integer }
+        height: { type: integer }
+        resolution: { type: integer, description: "The standard resolution: 2160, 1080, 720, 576 or 480 (absent when unknown)." }
+        codec: { type: string, description: "ffprobe's name, e.g. h264, hevc, av1." }
+        hdr: { type: string, description: "Absent for SDR; e.g. HDR10, hdr10plus, HLG, dolby_vision." }
+        bitrateKbps: { type: integer, description: The whole file's bitrate. }
+        summary: { type: string, description: "e.g. 1080p HEVC HDR10 8.0 Mb/s (empty when nothing is known)." }
+
+    VodLibraryMatch:
+      type: object
+      description: "How a film or episode on demand compares with the library's copy (admins only). Found by TMDB id (films; shows plus season and episode), else by the same title and year. Compared by resolution, then HDR over SDR, then a codec-adjusted bitrate at least 1.5× higher (HEVC and AV1 count 1.5× H.264); else the same. none: not in the library (Save). better: this copy is better (Upgrade, replacing the library's). same, worse: saving isn't possible."
+      required: [verdict, reason]
+      properties:
+        verdict: { type: string, enum: [none, better, same, worse] }
+        reason: { type: string, description: "Why, e.g. Higher resolution (1080p; the library's is 720p)." }
+        quality: { $ref: "#/components/schemas/VodQuality" }
+        libraryQuality: { $ref: "#/components/schemas/VodQuality" }
+        libraryItemId: { type: integer, format: int64, description: The library's film or episode. }
+        pending: { type: boolean, description: "This copy's quality is being checked (the verdict is same until then); fetch again in a few seconds." }
+
+    VodLibraryRollup:
+      type: object
+      description: "A season's or show's episodes by VodLibraryMatch verdict (admins only): Save missing saves none, Upgrade saves better."
+      required: [none, better, same, worse]
+      properties:
+        none: { type: integer, description: Episodes not in the library. }
+        better: { type: integer, description: Episodes better than the library's copies. }
+        same: { type: integer }
+        worse: { type: integer }
+        pending: { type: integer, description: Episodes whose quality is being checked (counted as same meanwhile). }
 
     VodEpisode:
       type: object
@@ -5392,6 +5469,7 @@ components:
         positionMs: { type: integer, format: int64, description: The caller's resume point. }
         watched: { type: boolean }
         save: { $ref: "#/components/schemas/VodSaveState" }
+        library: { $ref: "#/components/schemas/VodLibraryMatch" }
 
     VodSaveSettings:
       type: object
@@ -5407,7 +5485,7 @@ components:
         audio: { type: string, enum: [copy, aac_stereo, aac_51], description: "Transcode: audio copied, or AAC stereo, or AAC up to 5.1." }
         concurrentPerSource: { type: integer, minimum: 1, maximum: 5, description: Saves at once per source. Default 1. }
         scanAfterSave: { type: boolean, description: Scan the library whose folder holds a saved file. Default on. }
-        skipExisting: { type: boolean, description: "Skip a title already in a library (by TMDB id) or whose file is already there. Default on." }
+        skipExisting: { type: boolean, description: "Skip a title whose file is already in its folder. Default on. (A title the library already has is never saved again, unless as an upgrade: see VodLibraryMatch.)" }
         pauseWhileWatching: { type: boolean, description: "Pause saves while someone watches (see pauseScope), resuming 60 s after. Default on." }
         pauseScope: { type: string, enum: [source, any], description: "source: something from the same source, or Live TV from the same host (Dispatcharr). any: any playback on the server." }
         retryFailed: { type: boolean, description: "Queue failed saves again every few hours. Default on." }
@@ -5458,6 +5536,8 @@ components:
         createdAt: { type: string, format: date-time }
         startedAt: { type: string, format: date-time }
         finishedAt: { type: string, format: date-time }
+        upgrade: { type: boolean, description: "It replaces the library's copy (moved to the media trash once this one is verified)." }
+        replacedPath: { type: string, description: "An upgrade, once done: where the library's copy it replaced was (shown as Upgraded)." }
 
     VodSaveQueue:
       type: object
@@ -5477,7 +5557,8 @@ components:
       properties:
         queued: { type: integer, description: Saves added (or failed ones queued again). }
         already: { type: integer, description: Already queued or saved. }
-        skipped: { type: integer, description: Already in the library. }
+        skipped: { type: integer, description: "Already in the library (as well or better, or better without includeUpgrades)." }
+        upgrades: { type: integer, description: "Of queued, upgrades replacing the library's copies." }
         saves:
           type: array
           items: { $ref: "#/components/schemas/VodSave" }
@@ -6459,6 +6540,35 @@ components:
         title: { type: string }
         libraryId: { type: integer, format: int64 }
         items: { type: array, items: { $ref: "#/components/schemas/ItemSummary" } }
+        entries:
+          type: array
+          description: "Continue Watching only: the row's entries, library items and films and episodes on demand together, newest first (up to 20; items stays library-only for older apps). When it's present show it instead of items. The row is sent when either has something."
+          items: { $ref: "#/components/schemas/ContinueEntry" }
+        total: { type: integer, description: "Continue Watching only: how many entries there are in all (GET /hubs/continue-watching); more than entries holds means a View more link." }
+
+    ContinueEntry:
+      type: object
+      description: "A Continue Watching entry: a library item (an in-progress movie, episode or video, or a show's next episode) or a film or episode on demand stopped part-way through."
+      required: [kind, key, positionMs, durationMs, lastWatchedAt]
+      properties:
+        kind: { type: string, enum: [item, vodMovie, vodEpisode] }
+        key: { type: string, description: "Unique within the list, e.g. item:12, vodMovie:5, vodEpisode:7." }
+        item: { $ref: "#/components/schemas/ItemSummary" }
+        vodMovie: { $ref: "#/components/schemas/VodMovie" }
+        vodEpisode: { $ref: "#/components/schemas/VodEpisode" }
+        seriesPosterUrl: { type: string, description: "A vodEpisode's series poster (server-relative; no token needed)." }
+        positionMs: { type: integer, format: int64, description: "The resume point (0 for a show's next episode)." }
+        durationMs: { type: integer, format: int64, description: 0 = unknown. }
+        lastWatchedAt: { type: string, format: date-time }
+
+    ContinueWatchingPage:
+      type: object
+      required: [total, entries]
+      properties:
+        total: { type: integer }
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/ContinueEntry" }
 
     # ---------- Items ----------
     ItemType:

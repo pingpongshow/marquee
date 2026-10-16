@@ -104,7 +104,10 @@ func toAPIVodSave(v vodsave.Save) VodSave {
 		BytesTotal: v.BytesTotal, Progress: float32(v.Progress), Attempts: v.Attempts, Verified: v.Verified,
 		VerifyNote: nz(v.VerifyNote), Sha256: nz(v.SHA256), Error: nz(v.Error), PauseReason: nz(v.PauseReason),
 		CreatedAt: v.CreatedAt, StartedAt: v.StartedAt, FinishedAt: v.FinishedAt, NextAttemptAt: v.NextAttemptAt,
-		EtaSeconds: nz(v.ETASeconds)}
+		EtaSeconds: nz(v.ETASeconds), ReplacedPath: nz(v.ReplacedPath)}
+	if v.ReplaceFileID > 0 {
+		out.Upgrade = ptr(true)
+	}
 	if v.SpeedBps > 0 {
 		out.SpeedBps = ptr(float32(v.SpeedBps))
 	}
@@ -117,11 +120,51 @@ func toAPIVodSave(v vodsave.Save) VodSave {
 }
 
 func toAPIVodSaveResult(r vodsave.Result) VodSaveResult {
-	out := VodSaveResult{Queued: r.Queued, Already: r.Already, Skipped: r.Skipped, Saves: make([]VodSave, len(r.Saves))}
+	out := VodSaveResult{Queued: r.Queued, Already: r.Already, Skipped: r.Skipped, Upgrades: nz(r.Upgrades), Saves: make([]VodSave, len(r.Saves))}
 	for i, v := range r.Saves {
 		out.Saves[i] = toAPIVodSave(v)
 	}
 	return out
+}
+
+// inLibrary is the 409 for a title the library already has: in_library when its copy is
+// as good or better, upgrade_available when this one is better and no upgrade was asked for.
+func inLibrary(err error) (Error, bool) {
+	var e *vodsave.InLibraryError
+	if !errors.As(err, &e) {
+		return Error{}, false
+	}
+	code := "in_library"
+	if e.Match.Verdict == vodsave.VerdictBetter {
+		code = "upgrade_available"
+	}
+	return apiErr(code, e.Error()), true
+}
+
+func toAPIVodQuality(q vodsave.Quality) *VodQuality {
+	if !q.Known() && q.BitrateKbps == 0 {
+		return nil
+	}
+	return &VodQuality{Width: nz(q.Width), Height: nz(q.Height), Resolution: nz(q.Tier()), Codec: nz(q.Codec), Hdr: nz(q.HDR),
+		BitrateKbps: nz(q.BitrateKbps), Summary: q.Summary()}
+}
+
+func toAPIVodLibraryMatch(m vodsave.Match) *VodLibraryMatch {
+	out := &VodLibraryMatch{Verdict: VodLibraryMatchVerdict(m.Verdict), Reason: m.Reason, Quality: toAPIVodQuality(m.VOD)}
+	if m.Pending {
+		out.Pending = ptr(true)
+	}
+	if m.Library != nil {
+		out.LibraryItemId, out.LibraryQuality = ptr(m.Library.ItemID), toAPIVodQuality(m.Library.Quality)
+		if out.LibraryQuality == nil {
+			out.LibraryQuality = &VodQuality{Summary: ""}
+		}
+	}
+	return out
+}
+
+func toAPIVodRollup(r vodsave.Rollup) *VodLibraryRollup {
+	return &VodLibraryRollup{None: r.None, Better: r.Better, Same: r.Same, Worse: r.Worse, Pending: nz(r.Pending)}
 }
 
 // vodSaveErr maps a save request's error to a 400/404 message ("" when it is internal).
@@ -147,7 +190,10 @@ func (h *Handlers) SaveVodMovie(ctx context.Context, req SaveVodMovieRequestObje
 	case !ok:
 		return SaveVodMovie503JSONResponse{ServiceUnavailableJSONResponse(errVodSaveUnavailable)}, nil
 	}
-	r, err := h.VODSaves.SaveMovie(ctx, req.MovieId, s.User.ID)
+	r, err := h.VODSaves.SaveMovie(ctx, req.MovieId, s.User.ID, req.Params.Upgrade != nil && *req.Params.Upgrade)
+	if e, ok := inLibrary(err); ok {
+		return SaveVodMovie409JSONResponse{ConflictJSONResponse(e)}, nil
+	}
 	switch code, msg := vodSaveErr(err); {
 	case code == "not_found":
 		return SaveVodMovie404JSONResponse{NotFoundJSONResponse(errVodNotFound)}, nil
@@ -169,7 +215,10 @@ func (h *Handlers) SaveVodEpisode(ctx context.Context, req SaveVodEpisodeRequest
 	case !ok:
 		return SaveVodEpisode503JSONResponse{ServiceUnavailableJSONResponse(errVodSaveUnavailable)}, nil
 	}
-	r, err := h.VODSaves.SaveEpisode(ctx, req.EpisodeId, s.User.ID)
+	r, err := h.VODSaves.SaveEpisode(ctx, req.EpisodeId, s.User.ID, req.Params.Upgrade != nil && *req.Params.Upgrade)
+	if e, ok := inLibrary(err); ok {
+		return SaveVodEpisode409JSONResponse{ConflictJSONResponse(e)}, nil
+	}
 	switch code, msg := vodSaveErr(err); {
 	case code == "not_found":
 		return SaveVodEpisode404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "episode not found"))}, nil
@@ -191,7 +240,7 @@ func (h *Handlers) SaveVodSeries(ctx context.Context, req SaveVodSeriesRequestOb
 	case !ok:
 		return SaveVodSeries503JSONResponse{ServiceUnavailableJSONResponse(errVodSaveUnavailable)}, nil
 	}
-	r, err := h.VODSaves.SaveSeries(ctx, req.SeriesId, req.Params.Season, s.User.ID)
+	r, err := h.VODSaves.SaveSeries(ctx, req.SeriesId, req.Params.Season, s.User.ID, req.Params.IncludeUpgrades != nil && *req.Params.IncludeUpgrades)
 	switch code, msg := vodSaveErr(err); {
 	case code == "not_found":
 		return SaveVodSeries404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "series not found"))}, nil

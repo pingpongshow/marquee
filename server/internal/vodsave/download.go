@@ -33,7 +33,7 @@ func (s *Service) client() *http.Client {
 func (s *Service) run(ctx context.Context, j *job, v Save) (outcome, error) {
 	c := s.cfg()
 	prov := v.TargetPath
-	if c.SkipExisting {
+	if c.SkipExisting && v.ReplaceFileID == 0 {
 		season, episode := episodeOf(prov)
 		if f := existingFile(prov, v.Kind, season, episode); f != "" {
 			return outcome{}, skipError{"Already saved: " + filepath.Base(f)}
@@ -104,8 +104,17 @@ func (s *Service) run(ctx context.Context, j *job, v Save) (outcome, error) {
 			return outcome{}, err
 		}
 	}
-	final, err := place(out, withTag(prov, info.Width, info.Height))
+	var final, replaced string
+	if v.ReplaceFileID > 0 {
+		final, replaced, err = s.replace(ctx, v, out, withTag(prov, info.Width, info.Height))
+	} else {
+		final, err = place(out, withTag(prov, info.Width, info.Height))
+	}
 	if err != nil {
+		var pe permError
+		if errors.As(err, &pe) {
+			return outcome{}, err
+		}
 		return outcome{}, permError{fmt.Errorf("couldn't move the file into the library: %w", err), true}
 	}
 	if processed {
@@ -116,7 +125,7 @@ func (s *Service) run(ctx context.Context, j *job, v Save) (outcome, error) {
 	if fst != nil {
 		size = fst.Size()
 	}
-	return outcome{path: final, note: note, sha: sum, bytes: size}, nil
+	return outcome{path: final, note: note, sha: sum, bytes: size, replaced: replaced}, nil
 }
 
 // withTag adds the quality tag ("WEBDL-1080p") to a file name.
