@@ -35,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Forward30
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -100,6 +101,14 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.navigation.NavHostController
 import app.marquee.api.apis.LivetvApi.SortListVodMovies
+import app.marquee.api.apis.LivetvApi.SortListVodSeries
+import app.marquee.api.apis.LivetvApi.WatchedListVodMovies
+import app.marquee.api.apis.LivetvApi.WatchedListVodSeries
+import app.marquee.api.models.PlayVodEpisodeRequest
+import app.marquee.api.models.PlayVodMovieRequest
+import app.marquee.api.models.VodEpisode
+import app.marquee.api.models.VodSeries
+import app.marquee.core.AndroidProfile
 import app.marquee.api.models.ReportVodPlaybackRequest
 import app.marquee.api.models.VodCategory
 import app.marquee.api.models.VodMovie
@@ -129,11 +138,12 @@ internal object VodChanges {
     fun bump() { version.value++ }
 }
 
+/** The sorts both VOD pages offer, by the API's value. */
 private val vodSorts = listOf(
-    SortListVodMovies.TITLE to "Title",
-    SortListVodMovies.ADDED to "Recently added",
-    SortListVodMovies.YEAR to "Release year",
-    SortListVodMovies.RATING to "Rating",
+    "title" to "Title",
+    "added" to "Recently added",
+    "year" to "Release year",
+    "rating" to "Rating",
 )
 
 private const val PAGE = 120
@@ -177,73 +187,115 @@ private fun VodTile(m: VodMovie, width: Dp?, onOpen: () -> Unit) {
     }
 }
 
-/** What the Movies tab has loaded, kept while Live TV is on the back stack (so Back returns to the same place). */
+/** What a VOD page has loaded (films or shows), kept while it's on the back stack (so Back returns to the same place). */
 private class VodList {
-    val movies = mutableStateOf<List<VodMovie>?>(null)
+    val items = mutableStateOf<List<Any>?>(null)
     val total = mutableIntStateOf(0)
     val error = mutableStateOf<String?>(null)
     val loadingMore = mutableStateOf(false)
-    var loadedFor: Triple<String, String, SortListVodMovies>? = null
+    var loadedFor: VodQuery? = null
     val grid = LazyGridState()
 }
 
-/** VOD (movies on demand, LIVE-6): a page of its own, opened from Libraries' VOD entry. */
+/** What a VOD page's list is for. */
+private data class VodQuery(val category: String, val q: String, val sort: String, val filters: VodFilters)
+
+/** VOD Movies (LIVE-6): a page of its own, opened from Libraries' VOD Movies entry. */
 @Composable
 fun VodPage(nav: NavHostController) {
-    VodBrowse(nav) {
-        Text("VOD", Modifier.padding(horizontal = sidePadding), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+    VodBrowse(nav, shows = false) {
+        Text("VOD Movies", Modifier.padding(horizontal = sidePadding), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** VOD Shows (LIVE-6): series from Xtream Codes sources, opened from Libraries' VOD Shows entry. */
+@Composable
+fun VodShowsPage(nav: NavHostController) {
+    VodBrowse(nav, shows = true) {
+        Text("VOD Shows", Modifier.padding(horizontal = sidePadding), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
     }
 }
 
 /**
- * The VOD page's browse (movies on demand): categories, search, sort, Continue Watching and a poster grid that
- * loads a page at a time. [header] is the page's title, scrolled with the grid.
+ * A VOD page's browse, films or [shows]: categories, search, sort, filters, Continue Watching and a
+ * poster grid that loads a page at a time. Category, sort and filters are remembered per page.
+ * [header] is the page's title, scrolled with the grid.
  */
 @Composable
-fun VodBrowse(nav: NavHostController, header: @Composable () -> Unit) {
+fun VodBrowse(nav: NavHostController, shows: Boolean, header: @Composable () -> Unit) {
     val marquee = LocalMarquee.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var category by rememberSaveable { mutableStateOf("") }
-    var sort by rememberSaveable { mutableStateOf(SortListVodMovies.TITLE) }
+    val prefs = remember(shows) { VodPagePrefs(context, marquee.server?.id, shows) }
+    val kind = if (shows) "vodshows" else "vod"
+    val noun = if (shows) "shows" else "movies"
+    var category by rememberSaveable { mutableStateOf(prefs.category) }
+    var sort by rememberSaveable { mutableStateOf(prefs.sort.takeIf { s -> vodSorts.any { it.first == s } } ?: "title") }
+    var filtersText by rememberSaveable { mutableStateOf(prefs.filters.encode()) }
+    val filters = remember(filtersText) { VodFilters.decode(filtersText) }
+    fun setFilters(f: VodFilters) { filtersText = f.encode(); prefs.filters = f }
+    LaunchedEffect(category) { prefs.category = category }
+    LaunchedEffect(sort) { prefs.sort = sort }
+    var filtersOpen by remember { mutableStateOf(false) }
     var text by rememberSaveable { mutableStateOf("") }
     var q by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(text) { delay(300); q = text.trim() }
     val changed by VodChanges.version.collectAsState()
-    val categories by cachedLoad<List<VodCategory>>("vod:categories") {
-        withContext(Dispatchers.IO) { runCatching { marquee.livetv.listVodCategories() }.getOrNull() }
+    val categories by cachedLoad<List<VodCategory>>("$kind:categories") {
+        withContext(Dispatchers.IO) { runCatching { if (shows) marquee.livetv.listVodSeriesCategories() else marquee.livetv.listVodCategories() }.getOrNull() }
     }
-    val resume by cachedLoad<List<VodMovie>>("vod:continue", changed) {
-        withContext(Dispatchers.IO) { runCatching { marquee.livetv.vodContinueWatching() }.getOrNull() }
+    val genres by cachedLoad<List<VodCategory>>("$kind:genres") {
+        withContext(Dispatchers.IO) { runCatching { if (shows) marquee.livetv.listVodSeriesGenres() else marquee.livetv.listVodGenres() }.getOrNull() }
     }
-    val state = rememberCached("vod:list") { VodList() }
-    var movies by state.movies
+    val status by cachedLoad<VodStatus>("$kind:status") { withContext(Dispatchers.IO) { runCatching { marquee.livetv.vodStatus() }.getOrNull() } }
+    val sources = status?.sources?.filter { if (shows) it.series > 0 else it.movies > 0 } ?: emptyList()
+    val resumeMovies by cachedLoad<List<VodMovie>>("vod:continue", changed) {
+        if (shows) null else withContext(Dispatchers.IO) { runCatching { marquee.livetv.vodContinueWatching() }.getOrNull() }
+    }
+    val resumeShows by cachedLoad<List<VodSeries>>("vodshows:continue", changed) {
+        if (!shows) null else withContext(Dispatchers.IO) { runCatching { marquee.livetv.vodSeriesContinueWatching() }.getOrNull() }
+    }
+    val state = rememberCached("$kind:list") { VodList() }
+    var items by state.items
 
-    suspend fun fetch(offset: Int, limit: Int) = withContext(Dispatchers.IO) {
-        runCatching { marquee.livetv.listVodMovies(category.ifEmpty { null }, q.ifEmpty { null }, sort, limit, offset) }
+    suspend fun fetch(k: VodQuery, offset: Int, limit: Int): Result<Pair<List<Any>, Int>> = withContext(Dispatchers.IO) {
+        val f = k.filters
+        runCatching {
+            if (shows) marquee.livetv.listVodSeries(
+                category = k.category.ifEmpty { null }, q = k.q.ifEmpty { null }, sort = SortListVodSeries.entries.first { it.value == k.sort },
+                limit = limit, genre = f.genre, yearFrom = f.yearFrom, yearTo = f.yearTo, minRating = f.minRating?.toDouble(),
+                watched = f.watched?.let { w -> WatchedListVodSeries.entries.first { it.value == w } }, sourceId = f.sourceId, offset = offset,
+            ).let { it.series to it.total }
+            else marquee.livetv.listVodMovies(
+                category = k.category.ifEmpty { null }, q = k.q.ifEmpty { null }, sort = SortListVodMovies.entries.first { it.value == k.sort },
+                limit = limit, genre = f.genre, yearFrom = f.yearFrom, yearTo = f.yearTo, minRating = f.minRating?.toDouble(),
+                watched = f.watched?.let { w -> WatchedListVodMovies.entries.first { it.value == w } }, sourceId = f.sourceId, offset = offset,
+            ).let { it.movies to it.total }
+        }
     }
-    // A new filter starts again from the top; coming back (or a change from the film's page)
-    // refreshes what's loaded in place, keeping the place in the grid.
-    LaunchedEffect(category, q, sort, changed) {
-        val key = Triple(category, q, sort)
-        val have = movies
+    // A new filter starts again from the top; coming back (or a change from the film's or show's
+    // page) refreshes what's loaded in place, keeping the place in the grid.
+    LaunchedEffect(category, q, sort, filters, changed) {
+        val key = VodQuery(category, q, sort, filters)
+        val have = items
         if (state.loadedFor == key && have != null) {
-            fetch(0, have.size.coerceAtLeast(PAGE)).onSuccess { movies = it.movies; state.total.intValue = it.total }
+            fetch(key, 0, have.size.coerceAtLeast(PAGE)).onSuccess { (list, total) -> items = list; state.total.intValue = total }
             return@LaunchedEffect
         }
-        movies = null
+        items = null
         state.error.value = null
         state.loadedFor = key
-        fetch(0, PAGE).onSuccess { movies = it.movies; state.total.intValue = it.total }
-            .onFailure { state.error.value = it.message ?: "Couldn't load the movies"; movies = emptyList() }
+        fetch(key, 0, PAGE).onSuccess { (list, total) -> items = list; state.total.intValue = total }
+            .onFailure { state.error.value = it.message ?: "Couldn't load the $noun"; items = emptyList() }
         state.grid.scrollToItem(0)
     }
     fun loadMore() {
-        val have = movies ?: return
+        val have = items ?: return
+        val key = state.loadedFor ?: return
         if (state.loadingMore.value || have.size >= state.total.intValue) return
         state.loadingMore.value = true
-        val key = state.loadedFor
         scope.launch {
-            fetch(have.size, PAGE).onSuccess { page -> if (state.loadedFor == key) movies = (movies ?: emptyList()) + page.movies }
+            fetch(key, have.size, PAGE).onSuccess { (page, _) -> if (state.loadedFor == key) items = (items ?: emptyList()) + page }
             state.loadingMore.value = false
         }
     }
@@ -252,13 +304,16 @@ fun VodBrowse(nav: NavHostController, header: @Composable () -> Unit) {
         snapshotFlow { state.grid.layoutInfo.let { (it.visibleItemsInfo.lastOrNull()?.index ?: 0) >= it.totalItemsCount - 12 } }
             .distinctUntilChanged().filter { it }.collect { loadMore() }
     }
-    fun open(m: VodMovie) = nav.navigate("vod/${m.id}")
+    fun openMovie(m: VodMovie) = nav.navigate("vod/${m.id}")
+    fun openShow(s: VodSeries) = nav.navigate("vodshow/${s.id}")
 
     val all = categories?.sumOf { it.count }
-    val list = movies
+    val list = items
+    val searched = category.isNotEmpty() || q.isNotEmpty() || filters.active
     val full: androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan = { GridItemSpan(maxLineSpan) }
+    val chipShape = RoundedCornerShape(8.dp)
     LazyVerticalGrid(
-        GridCells.Adaptive(if (marquee.isTv) 150.dp else 108.dp), Modifier.fillMaxSize().semantics { contentDescription = "VOD" }, state.grid,
+        GridCells.Adaptive(if (marquee.isTv) 150.dp else 108.dp), Modifier.fillMaxSize().semantics { contentDescription = if (shows) "VOD Shows" else "VOD Movies" }, state.grid,
         contentPadding = PaddingValues(start = sidePadding, end = sidePadding, top = 16.dp, bottom = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -266,44 +321,65 @@ fun VodBrowse(nav: NavHostController, header: @Composable () -> Unit) {
         item(span = full, key = "header") { HeaderNoPadding(header) }
         item(span = full, key = "filters") {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth().widthIn(max = 480.dp).semantics { contentDescription = "Search movies" }, singleLine = true,
-                    leadingIcon = { Icon(Icons.Filled.Search, null) }, placeholder = { Text("Search movies") })
+                OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth().widthIn(max = 480.dp).semantics { contentDescription = "Search $noun" }, singleLine = true,
+                    leadingIcon = { Icon(Icons.Filled.Search, null) }, placeholder = { Text("Search $noun") })
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item { FilterChip(category.isEmpty(), { category = "" }, { Text("All movies" + (all?.let { " ($it)" } ?: "")) }, Modifier.focusRing(RoundedCornerShape(8.dp))) }
+                    item { FilterChip(category.isEmpty(), { category = "" }, { Text("All $noun" + (all?.let { " ($it)" } ?: "")) }, Modifier.focusRing(chipShape)) }
                     items(categories ?: emptyList(), key = { it.name }) { c ->
-                        FilterChip(category == c.name, { category = c.name }, { Text("${c.name} (${c.count})") }, Modifier.focusRing(RoundedCornerShape(8.dp)))
+                        FilterChip(category == c.name, { category = c.name }, { Text("${c.name} (${c.count})") }, Modifier.focusRing(chipShape))
                     }
                 }
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    item { Text("Sort", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge) }
-                    items(vodSorts) { (s, label) -> FilterChip(sort == s, { sort = s }, { Text(label) }, Modifier.focusRing(RoundedCornerShape(8.dp))) }
+                LazyRow(Modifier.semantics { contentDescription = "Sort and filter" }, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    item {
+                        FilterChip(filters.active, { filtersOpen = true }, { Text("Filter", maxLines = 1) }, Modifier.focusRing(chipShape),
+                            leadingIcon = { Icon(Icons.Filled.FilterList, null, Modifier.size(18.dp)) })
+                    }
+                    item { Text("Sort", Modifier.padding(start = 8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge) }
+                    items(vodSorts) { (s, label) -> FilterChip(sort == s, { sort = s }, { Text(label) }, Modifier.focusRing(chipShape)) }
                 }
+                VodActiveFilters(filters, shows, sources, ::setFilters)
             }
         }
-        val r = resume
-        if (category.isEmpty() && q.isEmpty() && !r.isNullOrEmpty()) item(span = full, key = "continue") {
+        val rm = resumeMovies
+        val rs = resumeShows
+        if (!searched && (if (shows) !rs.isNullOrEmpty() else !rm.isNullOrEmpty())) item(span = full, key = "continue") {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Continue Watching", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 LazyRow(Modifier.semantics { contentDescription = "Continue Watching" }, contentPadding = PaddingValues(vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    items(r, key = { it.id }) { m -> VodTile(m, if (marquee.isTv) 150.dp else 112.dp) { open(m) } }
+                    if (shows) items(rs ?: emptyList(), key = { it.id }) { s ->
+                        VodNextEpisodeTile(s, if (marquee.isTv) 260.dp else 200.dp) {
+                            val e = s.nextEpisode
+                            if (e != null) nav.navigate("vodepplay/${s.id}/${e.id}") else openShow(s)
+                        }
+                    } else items(rm ?: emptyList(), key = { it.id }) { m -> VodTile(m, if (marquee.isTv) 150.dp else 112.dp) { openMovie(m) } }
                 }
             }
         }
-        if ((category.isNotEmpty() || q.isNotEmpty()) && list != null) item(span = full, key = "count") {
+        if (searched && list != null) item(span = full, key = "count") {
             val n = state.total.intValue
-            Text("$n ${if (n == 1) "movie" else "movies"}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            Text("$n ${if (n == 1) noun.dropLast(1) else noun}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
         when {
             list == null -> item(span = full, key = "loading") { Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
             state.error.value != null -> item(span = full, key = "error") { Text(state.error.value!!, color = MaterialTheme.colorScheme.error) }
             list.isEmpty() -> item(span = full, key = "empty") {
-                Text(if (q.isNotEmpty()) "No movies match “$q”." else "No movies here yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(when {
+                    q.isNotEmpty() -> "No $noun match “$q”."
+                    filters.active -> "Nothing matches these filters."
+                    else -> "No $noun here yet."
+                }, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            else -> items(list, key = { it.id }) { m -> VodTile(m, null) { open(m) } }
+            else -> items(list, key = { if (it is VodSeries) "s${it.id}" else "m${(it as VodMovie).id}" }) { x ->
+                when (x) {
+                    is VodSeries -> VodShowTile(x, null) { openShow(x) }
+                    is VodMovie -> VodTile(x, null) { openMovie(x) }
+                }
+            }
         }
         if (state.loadingMore.value) item(span = full, key = "more") { Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
     }
+    if (filtersOpen) VodFilterDialog(filters, shows, genres, sources, ::setFilters) { filtersOpen = false }
 }
 
 /** The page's header pads itself; inside the grid (which pads) it's pulled back to the edge. */
@@ -434,16 +510,28 @@ fun VodMovieScreen(nav: NavHostController, movieId: Long) {
 /**
  * Full-screen playback of a film: the source's HLS through the server, seekable. The position
  * is reported every 10 s while playing, on pause and on closing (so it resumes, and counts as
- * watched near the end); the session stops when the player closes. No trailers, Up Next,
- * rating request, watch together or casting: those are for library items.
+ * watched near the end); the session stops when the player closes. No trailers, rating
+ * request, watch together or casting: those are for library items.
  */
+@Composable
+fun VodPlayerScreen(nav: NavHostController, movieId: Long, startMs: Long?) = VodVideo(nav, movieId, null, null, startMs)
+
+/** Full-screen playback of a show's episode (LIVE-6), with Up Next at the end: the next episode in viewing order. */
+@Composable
+fun VodEpisodePlayerScreen(nav: NavHostController, seriesId: Long, episodeId: Long, startMs: Long?) = VodVideo(nav, null, seriesId, episodeId, startMs)
+
+/** "S1 · E2", or "Special 3" for season 0. */
+internal fun VodEpisode.label(): String = if (season == 0) "Special $episode" else "S$season · E$episode"
+
+/** The player for a film ([movieId]) or an episode ([seriesId], [episodeId]). */
 @OptIn(UnstableApi::class)
 @Composable
-fun VodPlayerScreen(nav: NavHostController, movieId: Long, startMs: Long?) {
+private fun VodVideo(nav: NavHostController, movieId: Long?, seriesId: Long?, episodeId: Long?, startMs: Long?) {
     val marquee = LocalMarquee.current
     val context = LocalContext.current
     val player = remember { videoPlayer(context, seekIncrements = true) }
     var movie by remember { mutableStateOf<VodMovieDetail?>(null) }
+    var episode by remember { mutableStateOf<VodEpisode?>(null) }
     var session by remember { mutableStateOf<VodSession?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var position by remember { mutableLongStateOf(0L) }
@@ -453,8 +541,13 @@ fun VodPlayerScreen(nav: NavHostController, movieId: Long, startMs: Long?) {
     var controls by remember { mutableStateOf(true) }
     var lastTouch by remember { mutableIntStateOf(0) }
     var scrub by remember { mutableStateOf<Long?>(null) }
+    // Up Next (episodes): the next one in viewing order, fetched as playback starts; at the end a countdown plays it.
+    var next by remember { mutableStateOf<VodEpisode?>(null) }
+    var upNext by remember { mutableStateOf(false) }
+    var countdown by remember { mutableIntStateOf(10) }
     val ownEntry = remember { nav.currentBackStackEntry }
     fun stillShowing() = ownEntry != null && nav.currentBackStackEntry === ownEntry
+    val what = if (episodeId != null) "episode" else "movie"
 
     suspend fun send(id: String, pos: Long, dur: Long) {
         if (pos <= 0) return
@@ -466,12 +559,26 @@ fun VodPlayerScreen(nav: NavHostController, movieId: Long, startMs: Long?) {
         val dur = player.duration
         marquee.scope.launch { send(id, pos, dur) }
     }
+    fun playNext() {
+        val n = next ?: return
+        if (stillShowing()) nav.navigate("vodepplay/${n.seriesId}/${n.id}") { popUpTo(ownEntry!!.destination.id) { inclusive = true } }
+    }
 
-    LaunchedEffect(movieId) {
-        launch { movie = withContext(Dispatchers.IO) { runCatching { marquee.livetv.getVodMovie(movieId) }.getOrNull() } }
+    LaunchedEffect(movieId, episodeId) {
+        if (movieId != null) launch { movie = withContext(Dispatchers.IO) { runCatching { marquee.livetv.getVodMovie(movieId) }.getOrNull() } }
+        if (seriesId != null && episodeId != null) {
+            launch { episode = withContext(Dispatchers.IO) { runCatching { marquee.livetv.getVodSeries(seriesId) }.getOrNull() }?.episodes?.firstOrNull { it.id == episodeId } }
+            launch { next = withContext(Dispatchers.IO) { runCatching { marquee.livetv.vodNextEpisode(episodeId) }.getOrNull() }?.episode }
+        }
         // Started on the session's own scope: if the player closes while the server is starting
-        // it, the session is stopped as soon as it arrives rather than left running.
-        val pending = marquee.scope.async { runCatching { marquee.livetv.playVodMovie(movieId) } }
+        // it, the session is stopped as soon as it arrives rather than left running. The device's
+        // profile lets the server copy what it plays (HEVC, AC3) rather than convert it.
+        val pending = marquee.scope.async {
+            runCatching {
+                if (episodeId != null) marquee.livetv.playVodEpisode(episodeId, PlayVodEpisodeRequest(AndroidProfile.profile, startMs = startMs))
+                else marquee.livetv.playVodMovie(movieId!!, PlayVodMovieRequest(AndroidProfile.profile))
+            }
+        }
         val result = try {
             pending.await()
         } catch (e: CancellationException) {
@@ -486,7 +593,7 @@ fun VodPlayerScreen(nav: NavHostController, movieId: Long, startMs: Long?) {
                 val at = startMs ?: s.startMs ?: 0
                 if (at > 0) player.seekTo(at)
                 player.playWhenReady = true
-            }.onFailure { error = it.message ?: "Couldn't start the movie" }
+            }.onFailure { error = vodStartError(it, what); buffering = false }
         }
     }
     LaunchedEffect(Unit) {
@@ -503,6 +610,11 @@ fun VodPlayerScreen(nav: NavHostController, movieId: Long, startMs: Long?) {
     LaunchedEffect(controls, lastTouch, playing, scrub) {
         if (controls && playing && scrub == null) { delay(3000); controls = false }
     }
+    LaunchedEffect(upNext) {
+        if (!upNext) return@LaunchedEffect
+        while (countdown > 0) { delay(1000); countdown-- }
+        playNext()
+    }
     VideoWindow()
     DisposableEffect(Unit) {
         val listener = object : Player.Listener {
@@ -512,11 +624,18 @@ fun VodPlayerScreen(nav: NavHostController, movieId: Long, startMs: Long?) {
             }
             override fun onPlaybackStateChanged(state: Int) {
                 buffering = state == Player.STATE_BUFFERING || state == Player.STATE_IDLE
-                // The end: closing reports it (so it counts as watched) and stops the session.
-                if (state == Player.STATE_ENDED && stillShowing()) nav.popBackStack()
+                if (state != Player.STATE_ENDED || !stillShowing()) return
+                // The end: an episode with one after it counts down to that; otherwise closing
+                // reports it (so it counts as watched) and stops the session.
+                if (next != null) {
+                    report()
+                    controls = false
+                    countdown = 10
+                    upNext = true
+                } else nav.popBackStack()
             }
             override fun onPlayerError(e: androidx.media3.common.PlaybackException) {
-                error = "The movie stopped playing (${e.errorCodeName})."
+                error = "The $what stopped playing (${e.errorCodeName})."
             }
         }
         player.addListener(listener)
@@ -544,7 +663,10 @@ fun VodPlayerScreen(nav: NavHostController, movieId: Long, startMs: Long?) {
     }
     fun commitScrub() { scrub?.let { player.seekTo(it) }; scrub = null; poke() }
     val rootFocus = remember { FocusRequester() }
-    LaunchedEffect(controls) { if (!controls) runCatching { rootFocus.requestFocus() } }
+    LaunchedEffect(controls) { if (!controls && !upNext) runCatching { rootFocus.requestFocus() } }
+    val title = movie?.title ?: episode?.let { "${it.seriesTitle} · ${it.label()}" } ?: ""
+    val subtitle = movie?.let { d -> listOfNotNull(d.year?.toString(), d.runtimeMs?.let(::formatRuntime)).joinToString(" · ") }
+        ?: episode?.let { e -> listOfNotNull(e.title, e.runtimeMs?.let(::formatRuntime)).joinToString(" · ") } ?: ""
 
     Box(
         Modifier.fillMaxSize().background(Color.Black)
@@ -556,7 +678,7 @@ fun VodPlayerScreen(nav: NavHostController, movieId: Long, startMs: Long?) {
             .focusRequester(rootFocus)
             // TV remote with the controls hidden, or mid-scrub: left/right scrub, select jumps there (or plays/pauses).
             .onPreviewKeyEvent { e ->
-                if (e.type != KeyEventType.KeyDown || (controls && scrub == null)) return@onPreviewKeyEvent false
+                if (upNext || e.type != KeyEventType.KeyDown || (controls && scrub == null)) return@onPreviewKeyEvent false
                 when (e.key) {
                     Key.DirectionLeft -> { seekBy(-10_000); true }
                     Key.DirectionRight -> { seekBy(10_000); true }
@@ -580,21 +702,18 @@ fun VodPlayerScreen(nav: NavHostController, movieId: Long, startMs: Long?) {
                 resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
             }
         }, Modifier.fillMaxSize())
-        if (buffering && error == null) CircularProgressIndicator(Modifier.align(Alignment.Center))
-        error?.let { Text(it, Modifier.align(Alignment.Center).padding(24.dp), color = MaterialTheme.colorScheme.error) }
+        if (buffering && error == null && !upNext) CircularProgressIndicator(Modifier.align(Alignment.Center))
+        error?.let { Text(it, Modifier.align(Alignment.Center).padding(24.dp).semantics { contentDescription = "Playback error" }, color = MaterialTheme.colorScheme.error) }
         if (!controls && scrub != null) Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 48.dp, vertical = 32.dp)) {
             ScrubBar(scrub!!, duration, null, onChange = { scrub = it }, onDone = ::commitScrub)
         }
-        AnimatedVisibility(controls, Modifier.fillMaxSize(), enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility(controls && !upNext, Modifier.fillMaxSize(), enter = fadeIn(), exit = fadeOut()) {
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.7f), 0.3f to Color.Transparent, 0.65f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.8f)))) {
                 Row(Modifier.align(Alignment.TopStart).fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton({ nav.popBackStack() }, Modifier.focusRing()) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Close player", tint = Color.White) }
                     Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                        Text(movie?.title ?: "", color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        movie?.let { d ->
-                            val meta = listOfNotNull(d.year?.toString(), d.runtimeMs?.let(::formatRuntime)).joinToString(" · ")
-                            if (meta.isNotEmpty()) Text(meta, color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodySmall)
-                        }
+                        Text(title, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (subtitle.isNotEmpty()) Text(subtitle, color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 Row(Modifier.align(Alignment.Center), horizontalArrangement = Arrangement.spacedBy(36.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -607,6 +726,21 @@ fun VodPlayerScreen(nav: NavHostController, movieId: Long, startMs: Long?) {
                 Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)) {
                     ScrubBar(scrub ?: position, duration, null, scrubbing = scrub != null, onChange = { scrub = it; poke() }, onDone = ::commitScrub)
                 }
+            }
+        }
+        // The end of an episode: Up Next's countdown, as library shows have it.
+        val n = next
+        if (upNext && n != null) Column(
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.65f)).padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically), horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Up next in ${countdown}s", color = Color.White, style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold, modifier = Modifier.semantics { contentDescription = "Up next countdown" })
+            n.stillUrl?.let { AsyncImage(marquee.absolute(it), null, Modifier.width(320.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop) }
+            Text("${n.label()} · ${n.title}", color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button({ playNext() }, Modifier.focusRing().initialFocus(marquee.isTv)) { Text("Play next") }
+                OutlinedButton({ if (stillShowing()) nav.popBackStack() }, Modifier.focusRing()) { Text("Back to the show", color = Color.White) }
             }
         }
     }

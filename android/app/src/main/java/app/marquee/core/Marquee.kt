@@ -131,6 +131,12 @@ class Marquee(context: Context) {
      * Checked with Live TV's status.
      */
     val vod: StateFlow<Boolean> = _vod
+    private val _vodShows = MutableStateFlow(false)
+    private val _vodMovies = MutableStateFlow(false)
+    /** VOD Movies is listed: VOD is usable and a source has films. */
+    val vodMovies: StateFlow<Boolean> = _vodMovies
+    /** VOD Shows is listed: VOD is usable and a source has series (Xtream Codes). */
+    val vodShows: StateFlow<Boolean> = _vodShows
     /** Test hook (debug builds only): a fixed movies-on-demand status instead of the server's. */
     @Volatile var fakeVod: Boolean? = null
         set(value) { field = value.takeIf { debuggable }; refreshLiveTv() }
@@ -139,16 +145,19 @@ class Marquee(context: Context) {
         val fakeLive = fakeLiveTv
         val fakeV = fakeVod
         fakeLive?.let { _liveTv.value = it }
-        fakeV?.let { _vod.value = it }
+        fakeV?.let { _vod.value = it; _vodMovies.value = it; _vodShows.value = false }
         if (fakeLive != null && fakeV != null) return
-        if (token == null || baseUrl == null) { if (fakeLive == null) _liveTv.value = false; if (fakeV == null) _vod.value = false; return }
+        if (token == null || baseUrl == null) { if (fakeLive == null) _liveTv.value = false; if (fakeV == null) { _vod.value = false; _vodMovies.value = false; _vodShows.value = false }; return }
         if (fakeLive == null) scope.launch {
             val on = runCatching { livetv.liveTvStatus().enabled }.getOrNull() ?: return@launch
             _liveTv.value = fakeLiveTv ?: on
         }
         if (fakeV == null) scope.launch {
-            val on = runCatching { livetv.vodStatus().enabled }.getOrNull() ?: return@launch
-            _vod.value = fakeVod ?: on
+            val st = runCatching { livetv.vodStatus() }.getOrNull() ?: return@launch
+            if (fakeVod != null) return@launch
+            _vod.value = st.enabled
+            _vodMovies.value = st.enabled && st.movies > 0
+            _vodShows.value = st.enabled && st.series > 0
         }
     }
 
@@ -303,6 +312,8 @@ class Marquee(context: Context) {
         _me.value = null
         _liveTv.value = false
         _vod.value = false
+        _vodMovies.value = false
+        _vodShows.value = false
         _ratingRequest.value = null
         _state.value = State.SignedOut
     }

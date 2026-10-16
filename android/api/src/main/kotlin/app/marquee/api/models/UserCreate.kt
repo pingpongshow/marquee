@@ -36,6 +36,7 @@ import kotlinx.serialization.Contextual
  * @param displayName 
  * @param password 
  * @param pin 
+ * @param email 
  * @param isAdmin 
  * @param isManaged 
  * @param restrictions 
@@ -55,6 +56,9 @@ data class UserCreate (
 
     @SerialName(value = "pin")
     val pin: kotlin.String? = null,
+
+    @SerialName(value = "email")
+    val email: kotlin.String? = null,
 
     @SerialName(value = "isAdmin")
     val isAdmin: kotlin.Boolean? = null,

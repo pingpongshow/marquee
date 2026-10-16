@@ -29,11 +29,15 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * An M3U playlist of films, e.g. Pluto TV's on-demand movies (LIVE-6). Each entry's group-title is its category.
+ * A source of films (LIVE-6): an M3U playlist, e.g. Pluto TV's on-demand movies (each entry's group-title is its category), or an Xtream Codes server such as Dispatcharr (its VOD categories and movies).
  *
  * @param name 
  * @param url 
  * @param id 
+ * @param kind m3u: url is the playlist. xtream: url is the server's address (e.g. Dispatcharr's), with a username and password (Dispatcharr: a user's XC password).
+ * @param username Xtream Codes username.
+ * @param password Xtream Codes password. Write-only; omit to keep the saved one.
+ * @param passwordSet 
  * @param userAgent 
  * @param enabled 
  */
@@ -50,6 +54,21 @@ data class VodSource (
     @SerialName(value = "id")
     val id: kotlin.String? = null,
 
+    /* m3u: url is the playlist. xtream: url is the server's address (e.g. Dispatcharr's), with a username and password (Dispatcharr: a user's XC password). */
+    @SerialName(value = "kind")
+    val kind: VodSource.Kind? = Kind.M3U,
+
+    /* Xtream Codes username. */
+    @SerialName(value = "username")
+    val username: kotlin.String? = null,
+
+    /* Xtream Codes password. Write-only; omit to keep the saved one. */
+    @SerialName(value = "password")
+    val password: kotlin.String? = null,
+
+    @SerialName(value = "passwordSet")
+    val passwordSet: kotlin.Boolean? = null,
+
     @SerialName(value = "userAgent")
     val userAgent: kotlin.String? = null,
 
@@ -58,6 +77,16 @@ data class VodSource (
 
 ) {
 
+    /**
+     * m3u: url is the playlist. xtream: url is the server's address (e.g. Dispatcharr's), with a username and password (Dispatcharr: a user's XC password).
+     *
+     * Values: M3U,XTREAM
+     */
+    @Serializable
+    enum class Kind(val value: kotlin.String) {
+        @SerialName(value = "m3u") M3U("m3u"),
+        @SerialName(value = "xtream") XTREAM("xtream");
+    }
 
 }
 

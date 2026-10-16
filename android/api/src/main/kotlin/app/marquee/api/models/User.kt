@@ -41,6 +41,7 @@ import kotlinx.serialization.Contextual
  * @param createdAt 
  * @param restrictions 
  * @param preferences 
+ * @param email For password and PIN reset links and, for administrators, alerts. Only in /me and the admin's user list; absent when none.
  * @param hasPin 
  * @param hasPassword 
  * @param hasTwoFactor Two-factor sign-in (an authenticator code) is on.
@@ -76,6 +77,10 @@ data class User (
 
     @SerialName(value = "preferences")
     val preferences: UserPreferences,
+
+    /* For password and PIN reset links and, for administrators, alerts. Only in /me and the admin's user list; absent when none. */
+    @SerialName(value = "email")
+    val email: kotlin.String? = null,
 
     @SerialName(value = "hasPin")
     val hasPin: kotlin.Boolean? = null,

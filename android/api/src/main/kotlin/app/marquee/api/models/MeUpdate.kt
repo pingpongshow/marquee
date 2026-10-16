@@ -36,6 +36,7 @@ import kotlinx.serialization.Contextual
  * @param currentPassword Required to change the password.
  * @param newPassword 
  * @param pin 
+ * @param email Your email address, for reset links. Empty string removes it.
  * @param preferences 
  */
 @Serializable
@@ -54,6 +55,10 @@ data class MeUpdate (
 
     @SerialName(value = "pin")
     val pin: kotlin.String? = null,
+
+    /* Your email address, for reset links. Empty string removes it. */
+    @SerialName(value = "email")
+    val email: kotlin.String? = null,
 
     @SerialName(value = "preferences")
     val preferences: UserPreferences? = null

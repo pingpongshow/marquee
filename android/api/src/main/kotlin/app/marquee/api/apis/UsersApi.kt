@@ -28,7 +28,6 @@ import okhttp3.Call
 import okhttp3.HttpUrl
 
 import app.marquee.api.models.AuthResult
-import app.marquee.api.models.ConnectLastFmRequest
 import app.marquee.api.models.ConnectListenBrainzRequest
 import app.marquee.api.models.Device
 import app.marquee.api.models.Error
@@ -38,6 +37,7 @@ import app.marquee.api.models.InviteCreated
 import app.marquee.api.models.LastFmAuthUrl200Response
 import app.marquee.api.models.LastFmAuthUrlRequest
 import app.marquee.api.models.Profile
+import app.marquee.api.models.ResetInfoRequest
 import app.marquee.api.models.ScrobbleStatus
 import app.marquee.api.models.SwitchProfileRequest
 import app.marquee.api.models.User
@@ -74,7 +74,7 @@ open class UsersApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * PUT /me/scrobbling/lastfm
      * Finish connecting Last.fm with the token last.fm returned.
      * 
-     * @param connectLastFmRequest 
+     * @param resetInfoRequest 
      * @return ScrobbleStatus
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -84,8 +84,8 @@ open class UsersApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun connectLastFm(connectLastFmRequest: ConnectLastFmRequest) : ScrobbleStatus {
-        val localVarResponse = connectLastFmWithHttpInfo(connectLastFmRequest = connectLastFmRequest)
+    fun connectLastFm(resetInfoRequest: ResetInfoRequest) : ScrobbleStatus {
+        val localVarResponse = connectLastFmWithHttpInfo(resetInfoRequest = resetInfoRequest)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as ScrobbleStatus
@@ -106,17 +106,17 @@ open class UsersApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * PUT /me/scrobbling/lastfm
      * Finish connecting Last.fm with the token last.fm returned.
      * 
-     * @param connectLastFmRequest 
+     * @param resetInfoRequest 
      * @return ApiResponse<ScrobbleStatus?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun connectLastFmWithHttpInfo(connectLastFmRequest: ConnectLastFmRequest) : ApiResponse<ScrobbleStatus?> {
-        val localVariableConfig = connectLastFmRequestConfig(connectLastFmRequest = connectLastFmRequest)
+    fun connectLastFmWithHttpInfo(resetInfoRequest: ResetInfoRequest) : ApiResponse<ScrobbleStatus?> {
+        val localVariableConfig = connectLastFmRequestConfig(resetInfoRequest = resetInfoRequest)
 
-        return request<ConnectLastFmRequest, ScrobbleStatus>(
+        return request<ResetInfoRequest, ScrobbleStatus>(
             localVariableConfig
         )
     }
@@ -124,11 +124,11 @@ open class UsersApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     /**
      * To obtain the request config of the operation connectLastFm
      *
-     * @param connectLastFmRequest 
+     * @param resetInfoRequest 
      * @return RequestConfig
      */
-    fun connectLastFmRequestConfig(connectLastFmRequest: ConnectLastFmRequest) : RequestConfig<ConnectLastFmRequest> {
-        val localVariableBody = connectLastFmRequest
+    fun connectLastFmRequestConfig(resetInfoRequest: ResetInfoRequest) : RequestConfig<ResetInfoRequest> {
+        val localVariableBody = resetInfoRequest
         val localVariableQuery: MultiValueMap = mutableMapOf()
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
         localVariableHeaders["Content-Type"] = "application/json"

@@ -31,6 +31,7 @@ import app.marquee.api.models.LibraryGlobalSettings
 import app.marquee.api.models.MetadataSettingsUpdate
 import app.marquee.api.models.MusicSettings
 import app.marquee.api.models.NetworkSettings
+import app.marquee.api.models.NotificationSettingsUpdate
 import app.marquee.api.models.RemoteAccessSettings
 import app.marquee.api.models.SecuritySettings
 import app.marquee.api.models.TaskSettings
@@ -56,6 +57,7 @@ import kotlinx.serialization.Contextual
  * @param integrations 
  * @param cinema 
  * @param ai 
+ * @param notifications 
  * @param webhooks Replaces the whole list when sent.
  */
 @Serializable
@@ -97,6 +99,9 @@ data class ServerSettingsUpdate (
 
     @SerialName(value = "ai")
     val ai: AiSettings? = null,
+
+    @SerialName(value = "notifications")
+    val notifications: NotificationSettingsUpdate? = null,
 
     /* Replaces the whole list when sent. */
     @SerialName(value = "webhooks")
