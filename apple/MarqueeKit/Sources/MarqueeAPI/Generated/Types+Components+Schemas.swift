@@ -1056,6 +1056,8 @@ extension Components {
             public var ai: Components.Schemas.AiSettings?
             /// - Remark: Generated from `#/components/schemas/ServerSettings/notifications`.
             public var notifications: Components.Schemas.NotificationSettings?
+            /// - Remark: Generated from `#/components/schemas/ServerSettings/vodSave`.
+            public var vodSave: Components.Schemas.VodSaveSettings?
             /// Replaces the whole list when sent.
             ///
             /// - Remark: Generated from `#/components/schemas/ServerSettings/webhooks`.
@@ -1076,6 +1078,7 @@ extension Components {
             ///   - cinema:
             ///   - ai:
             ///   - notifications:
+            ///   - vodSave:
             ///   - webhooks: Replaces the whole list when sent.
             public init(
                 security: Components.Schemas.SecuritySettings,
@@ -1091,6 +1094,7 @@ extension Components {
                 cinema: Components.Schemas.CinemaSettings? = nil,
                 ai: Components.Schemas.AiSettings? = nil,
                 notifications: Components.Schemas.NotificationSettings? = nil,
+                vodSave: Components.Schemas.VodSaveSettings? = nil,
                 webhooks: [Components.Schemas.Webhook]? = nil
             ) {
                 self.security = security
@@ -1106,6 +1110,7 @@ extension Components {
                 self.cinema = cinema
                 self.ai = ai
                 self.notifications = notifications
+                self.vodSave = vodSave
                 self.webhooks = webhooks
             }
             public enum CodingKeys: String, CodingKey {
@@ -1122,6 +1127,7 @@ extension Components {
                 case cinema
                 case ai
                 case notifications
+                case vodSave
                 case webhooks
             }
         }
@@ -1153,6 +1159,8 @@ extension Components {
             public var ai: Components.Schemas.AiSettings?
             /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/notifications`.
             public var notifications: Components.Schemas.NotificationSettingsUpdate?
+            /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/vodSave`.
+            public var vodSave: Components.Schemas.VodSaveSettings?
             /// Replaces the whole list when sent.
             ///
             /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/webhooks`.
@@ -1173,6 +1181,7 @@ extension Components {
             ///   - cinema:
             ///   - ai:
             ///   - notifications:
+            ///   - vodSave:
             ///   - webhooks: Replaces the whole list when sent.
             public init(
                 security: Components.Schemas.SecuritySettings? = nil,
@@ -1188,6 +1197,7 @@ extension Components {
                 cinema: Components.Schemas.CinemaSettings? = nil,
                 ai: Components.Schemas.AiSettings? = nil,
                 notifications: Components.Schemas.NotificationSettingsUpdate? = nil,
+                vodSave: Components.Schemas.VodSaveSettings? = nil,
                 webhooks: [Components.Schemas.Webhook]? = nil
             ) {
                 self.security = security
@@ -1203,6 +1213,7 @@ extension Components {
                 self.cinema = cinema
                 self.ai = ai
                 self.notifications = notifications
+                self.vodSave = vodSave
                 self.webhooks = webhooks
             }
             public enum CodingKeys: String, CodingKey {
@@ -1219,6 +1230,7 @@ extension Components {
                 case cinema
                 case ai
                 case notifications
+                case vodSave
                 case webhooks
             }
         }
@@ -1230,6 +1242,8 @@ extension Components {
         /// failed_signins: repeated wrong passwords for one account.
         /// new_admin_device: an administrator signed in from a device never used before.
         /// playback_failed: the transcoder couldn't produce video for a stream.
+        /// vod_save_failed: saving a film or episode on demand into the library failed.
+        /// vod_save_done: the save queue finished (one summary, not one per episode).
         ///
         ///
         /// - Remark: Generated from `#/components/schemas/AlertType`.
@@ -1242,6 +1256,8 @@ extension Components {
             case failedSignins = "failed_signins"
             case newAdminDevice = "new_admin_device"
             case playbackFailed = "playback_failed"
+            case vodSaveFailed = "vod_save_failed"
+            case vodSaveDone = "vod_save_done"
         }
         /// Outgoing email (SMTP) and admin alerts.
         ///
@@ -3473,6 +3489,22 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/matched`.
                 public var matched: Swift.Bool
+                /// The caller (an admin) can save it into the library: an Xtream Codes film with a movies folder or a movies save folder (saveDestinations) set.
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/canSave`.
+                public var canSave: Swift.Bool?
+                /// Admins: saving without a destination works (vodSave.moviesFolder is set).
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/saveDefault`.
+                public var saveDefault: Swift.Bool?
+                /// Admins: the extra save folders a film can go to (vodSave.destinations of kind movies or both).
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/saveDestinations`.
+                public var saveDestinations: [Components.Schemas.VodSaveDestinationRef]?
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/save`.
+                public var save: Components.Schemas.VodSaveState?
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/library`.
+                public var library: Components.Schemas.VodLibraryMatch?
                 /// Creates a new `Value2Payload`.
                 ///
                 /// - Parameters:
@@ -3485,6 +3517,11 @@ extension Components {
                 ///   - tmdbId:
                 ///   - imdbId:
                 ///   - matched: The details are TMDB's.
+                ///   - canSave: The caller (an admin) can save it into the library: an Xtream Codes film with a movies folder or a movies save folder (saveDestinations) set.
+                ///   - saveDefault: Admins: saving without a destination works (vodSave.moviesFolder is set).
+                ///   - saveDestinations: Admins: the extra save folders a film can go to (vodSave.destinations of kind movies or both).
+                ///   - save:
+                ///   - library:
                 public init(
                     overview: Swift.String? = nil,
                     tagline: Swift.String? = nil,
@@ -3494,7 +3531,12 @@ extension Components {
                     backdropUrl: Swift.String? = nil,
                     tmdbId: Swift.Int? = nil,
                     imdbId: Swift.String? = nil,
-                    matched: Swift.Bool
+                    matched: Swift.Bool,
+                    canSave: Swift.Bool? = nil,
+                    saveDefault: Swift.Bool? = nil,
+                    saveDestinations: [Components.Schemas.VodSaveDestinationRef]? = nil,
+                    save: Components.Schemas.VodSaveState? = nil,
+                    library: Components.Schemas.VodLibraryMatch? = nil
                 ) {
                     self.overview = overview
                     self.tagline = tagline
@@ -3505,6 +3547,11 @@ extension Components {
                     self.tmdbId = tmdbId
                     self.imdbId = imdbId
                     self.matched = matched
+                    self.canSave = canSave
+                    self.saveDefault = saveDefault
+                    self.saveDestinations = saveDestinations
+                    self.save = save
+                    self.library = library
                 }
                 public enum CodingKeys: String, CodingKey {
                     case overview
@@ -3516,6 +3563,11 @@ extension Components {
                     case tmdbId
                     case imdbId
                     case matched
+                    case canSave
+                    case saveDefault
+                    case saveDestinations
+                    case save
+                    case library
                 }
             }
             /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2`.
@@ -3793,6 +3845,20 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/episodesError`.
                 public var episodesError: Swift.String?
+                /// The caller (an admin) can save its episodes into the library (shows folder or a shows save folder set). Each episode's save is in episodes[].save.
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/canSave`.
+                public var canSave: Swift.Bool?
+                /// Admins: saving without a destination works (vodSave.showsFolder is set).
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/saveDefault`.
+                public var saveDefault: Swift.Bool?
+                /// Admins: the extra save folders episodes can go to (vodSave.destinations of kind shows or both).
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/saveDestinations`.
+                public var saveDestinations: [Components.Schemas.VodSaveDestinationRef]?
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/library`.
+                public var library: Components.Schemas.VodLibraryRollup?
                 /// Creates a new `Value2Payload`.
                 ///
                 /// - Parameters:
@@ -3806,6 +3872,10 @@ extension Components {
                 ///   - seasons: In viewing order (specials, season 0, last).
                 ///   - episodes: Every episode in viewing order (seasons in turn, specials last); filter by season for a season's list.
                 ///   - episodesError: The source didn't give the episodes (and none were kept from before).
+                ///   - canSave: The caller (an admin) can save its episodes into the library (shows folder or a shows save folder set). Each episode's save is in episodes[].save.
+                ///   - saveDefault: Admins: saving without a destination works (vodSave.showsFolder is set).
+                ///   - saveDestinations: Admins: the extra save folders episodes can go to (vodSave.destinations of kind shows or both).
+                ///   - library:
                 public init(
                     overview: Swift.String? = nil,
                     genres: [Swift.String],
@@ -3816,7 +3886,11 @@ extension Components {
                     matched: Swift.Bool,
                     seasons: [Components.Schemas.VodSeason],
                     episodes: [Components.Schemas.VodEpisode],
-                    episodesError: Swift.String? = nil
+                    episodesError: Swift.String? = nil,
+                    canSave: Swift.Bool? = nil,
+                    saveDefault: Swift.Bool? = nil,
+                    saveDestinations: [Components.Schemas.VodSaveDestinationRef]? = nil,
+                    library: Components.Schemas.VodLibraryRollup? = nil
                 ) {
                     self.overview = overview
                     self.genres = genres
@@ -3828,6 +3902,10 @@ extension Components {
                     self.seasons = seasons
                     self.episodes = episodes
                     self.episodesError = episodesError
+                    self.canSave = canSave
+                    self.saveDefault = saveDefault
+                    self.saveDestinations = saveDestinations
+                    self.library = library
                 }
                 public enum CodingKeys: String, CodingKey {
                     case overview
@@ -3840,6 +3918,10 @@ extension Components {
                     case seasons
                     case episodes
                     case episodesError
+                    case canSave
+                    case saveDefault
+                    case saveDestinations
+                    case library
                 }
             }
             /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2`.
@@ -3891,6 +3973,8 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/VodSeason/watchedCount`.
             public var watchedCount: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/VodSeason/library`.
+            public var library: Components.Schemas.VodLibraryRollup?
             /// Creates a new `VodSeason`.
             ///
             /// - Parameters:
@@ -3901,6 +3985,7 @@ extension Components {
             ///   - posterUrl: Server-relative; no token needed.
             ///   - episodeCount:
             ///   - watchedCount: Episodes the caller has watched.
+            ///   - library:
             public init(
                 season: Swift.Int,
                 name: Swift.String,
@@ -3908,7 +3993,8 @@ extension Components {
                 airDate: Swift.String? = nil,
                 posterUrl: Swift.String? = nil,
                 episodeCount: Swift.Int,
-                watchedCount: Swift.Int
+                watchedCount: Swift.Int,
+                library: Components.Schemas.VodLibraryRollup? = nil
             ) {
                 self.season = season
                 self.name = name
@@ -3917,6 +4003,7 @@ extension Components {
                 self.posterUrl = posterUrl
                 self.episodeCount = episodeCount
                 self.watchedCount = watchedCount
+                self.library = library
             }
             public enum CodingKeys: String, CodingKey {
                 case season
@@ -3926,6 +4013,183 @@ extension Components {
                 case posterUrl
                 case episodeCount
                 case watchedCount
+                case library
+            }
+        }
+        /// What a video file is.
+        ///
+        /// - Remark: Generated from `#/components/schemas/VodQuality`.
+        public struct VodQuality: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodQuality/width`.
+            public var width: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/VodQuality/height`.
+            public var height: Swift.Int?
+            /// The standard resolution: 2160, 1080, 720, 576 or 480 (absent when unknown).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodQuality/resolution`.
+            public var resolution: Swift.Int?
+            /// ffprobe's name, e.g. h264, hevc, av1.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodQuality/codec`.
+            public var codec: Swift.String?
+            /// Absent for SDR; e.g. HDR10, hdr10plus, HLG, dolby_vision.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodQuality/hdr`.
+            public var hdr: Swift.String?
+            /// The whole file's bitrate.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodQuality/bitrateKbps`.
+            public var bitrateKbps: Swift.Int?
+            /// e.g. 1080p HEVC HDR10 8.0 Mb/s (empty when nothing is known).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodQuality/summary`.
+            public var summary: Swift.String
+            /// Creates a new `VodQuality`.
+            ///
+            /// - Parameters:
+            ///   - width:
+            ///   - height:
+            ///   - resolution: The standard resolution: 2160, 1080, 720, 576 or 480 (absent when unknown).
+            ///   - codec: ffprobe's name, e.g. h264, hevc, av1.
+            ///   - hdr: Absent for SDR; e.g. HDR10, hdr10plus, HLG, dolby_vision.
+            ///   - bitrateKbps: The whole file's bitrate.
+            ///   - summary: e.g. 1080p HEVC HDR10 8.0 Mb/s (empty when nothing is known).
+            public init(
+                width: Swift.Int? = nil,
+                height: Swift.Int? = nil,
+                resolution: Swift.Int? = nil,
+                codec: Swift.String? = nil,
+                hdr: Swift.String? = nil,
+                bitrateKbps: Swift.Int? = nil,
+                summary: Swift.String
+            ) {
+                self.width = width
+                self.height = height
+                self.resolution = resolution
+                self.codec = codec
+                self.hdr = hdr
+                self.bitrateKbps = bitrateKbps
+                self.summary = summary
+            }
+            public enum CodingKeys: String, CodingKey {
+                case width
+                case height
+                case resolution
+                case codec
+                case hdr
+                case bitrateKbps
+                case summary
+            }
+        }
+        /// How a film or episode on demand compares with the library's copy (admins only). Found by TMDB id (films; shows plus season and episode), else by the same title and year. Compared by resolution, then HDR over SDR, then a codec-adjusted bitrate at least 1.5× higher (HEVC and AV1 count 1.5× H.264); else the same. none: not in the library (Save). better: this copy is better (Upgrade, replacing the library's). same, worse: saving isn't possible.
+        ///
+        /// - Remark: Generated from `#/components/schemas/VodLibraryMatch`.
+        public struct VodLibraryMatch: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodLibraryMatch/verdict`.
+            @frozen public enum VerdictPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case none = "none"
+                case better = "better"
+                case same = "same"
+                case worse = "worse"
+            }
+            /// - Remark: Generated from `#/components/schemas/VodLibraryMatch/verdict`.
+            public var verdict: Components.Schemas.VodLibraryMatch.VerdictPayload
+            /// Why, e.g. Higher resolution (1080p; the library's is 720p).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodLibraryMatch/reason`.
+            public var reason: Swift.String
+            /// - Remark: Generated from `#/components/schemas/VodLibraryMatch/quality`.
+            public var quality: Components.Schemas.VodQuality?
+            /// - Remark: Generated from `#/components/schemas/VodLibraryMatch/libraryQuality`.
+            public var libraryQuality: Components.Schemas.VodQuality?
+            /// The library's film or episode.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodLibraryMatch/libraryItemId`.
+            public var libraryItemId: Swift.Int64?
+            /// This copy's quality is being checked (the verdict is same until then); fetch again in a few seconds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodLibraryMatch/pending`.
+            public var pending: Swift.Bool?
+            /// Creates a new `VodLibraryMatch`.
+            ///
+            /// - Parameters:
+            ///   - verdict:
+            ///   - reason: Why, e.g. Higher resolution (1080p; the library's is 720p).
+            ///   - quality:
+            ///   - libraryQuality:
+            ///   - libraryItemId: The library's film or episode.
+            ///   - pending: This copy's quality is being checked (the verdict is same until then); fetch again in a few seconds.
+            public init(
+                verdict: Components.Schemas.VodLibraryMatch.VerdictPayload,
+                reason: Swift.String,
+                quality: Components.Schemas.VodQuality? = nil,
+                libraryQuality: Components.Schemas.VodQuality? = nil,
+                libraryItemId: Swift.Int64? = nil,
+                pending: Swift.Bool? = nil
+            ) {
+                self.verdict = verdict
+                self.reason = reason
+                self.quality = quality
+                self.libraryQuality = libraryQuality
+                self.libraryItemId = libraryItemId
+                self.pending = pending
+            }
+            public enum CodingKeys: String, CodingKey {
+                case verdict
+                case reason
+                case quality
+                case libraryQuality
+                case libraryItemId
+                case pending
+            }
+        }
+        /// A season's or show's episodes by VodLibraryMatch verdict (admins only): Save missing saves none, Upgrade saves better.
+        ///
+        /// - Remark: Generated from `#/components/schemas/VodLibraryRollup`.
+        public struct VodLibraryRollup: Codable, Hashable, Sendable {
+            /// Episodes not in the library.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodLibraryRollup/none`.
+            public var none: Swift.Int
+            /// Episodes better than the library's copies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodLibraryRollup/better`.
+            public var better: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/VodLibraryRollup/same`.
+            public var same: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/VodLibraryRollup/worse`.
+            public var worse: Swift.Int
+            /// Episodes whose quality is being checked (counted as same meanwhile).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodLibraryRollup/pending`.
+            public var pending: Swift.Int?
+            /// Creates a new `VodLibraryRollup`.
+            ///
+            /// - Parameters:
+            ///   - none: Episodes not in the library.
+            ///   - better: Episodes better than the library's copies.
+            ///   - same:
+            ///   - worse:
+            ///   - pending: Episodes whose quality is being checked (counted as same meanwhile).
+            public init(
+                none: Swift.Int,
+                better: Swift.Int,
+                same: Swift.Int,
+                worse: Swift.Int,
+                pending: Swift.Int? = nil
+            ) {
+                self.none = none
+                self.better = better
+                self.same = same
+                self.worse = worse
+                self.pending = pending
+            }
+            public enum CodingKeys: String, CodingKey {
+                case none
+                case better
+                case same
+                case worse
+                case pending
             }
         }
         /// - Remark: Generated from `#/components/schemas/VodEpisode`.
@@ -3964,6 +4228,10 @@ extension Components {
             public var positionMs: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/VodEpisode/watched`.
             public var watched: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/VodEpisode/save`.
+            public var save: Components.Schemas.VodSaveState?
+            /// - Remark: Generated from `#/components/schemas/VodEpisode/library`.
+            public var library: Components.Schemas.VodLibraryMatch?
             /// Creates a new `VodEpisode`.
             ///
             /// - Parameters:
@@ -3980,6 +4248,8 @@ extension Components {
             ///   - stillUrl: Server-relative; no token needed.
             ///   - positionMs: The caller's resume point.
             ///   - watched:
+            ///   - save:
+            ///   - library:
             public init(
                 id: Swift.Int64,
                 seriesId: Swift.Int64,
@@ -3993,7 +4263,9 @@ extension Components {
                 rating: Swift.Double? = nil,
                 stillUrl: Swift.String? = nil,
                 positionMs: Swift.Int64? = nil,
-                watched: Swift.Bool
+                watched: Swift.Bool,
+                save: Components.Schemas.VodSaveState? = nil,
+                library: Components.Schemas.VodLibraryMatch? = nil
             ) {
                 self.id = id
                 self.seriesId = seriesId
@@ -4008,6 +4280,8 @@ extension Components {
                 self.stillUrl = stillUrl
                 self.positionMs = positionMs
                 self.watched = watched
+                self.save = save
+                self.library = library
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -4023,6 +4297,667 @@ extension Components {
                 case stillUrl
                 case positionMs
                 case watched
+                case save
+                case library
+            }
+        }
+        /// Saving films and episodes on demand (Xtream Codes sources) into the library (admins only). Partial sends keep the other fields.
+        ///
+        /// - Remark: Generated from `#/components/schemas/VodSaveSettings`.
+        public struct VodSaveSettings: Codable, Hashable, Sendable {
+            /// Where films are saved, as the server sees it (must exist and be writable). Empty turns saving films off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/moviesFolder`.
+            public var moviesFolder: Swift.String?
+            /// Where episodes are saved. Empty turns saving episodes off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/showsFolder`.
+            public var showsFolder: Swift.String?
+            /// original: the file as it is (MPEG-TS, FLV and other unusual containers are remuxed to MKV). remux: to MKV, every stream copied. transcode: the settings below.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/quality`.
+            @frozen public enum QualityPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case original = "original"
+                case remux = "remux"
+                case transcode = "transcode"
+            }
+            /// original: the file as it is (MPEG-TS, FLV and other unusual containers are remuxed to MKV). remux: to MKV, every stream copied. transcode: the settings below.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/quality`.
+            public var quality: Components.Schemas.VodSaveSettings.QualityPayload?
+            /// Transcode: resolution cap (never upscaled).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/maxHeight`.
+            @frozen public enum MaxHeightPayload: Int, Codable, Hashable, Sendable, CaseIterable {
+                case _2160 = 2160
+                case _1080 = 1080
+                case _720 = 720
+                case _480 = 480
+            }
+            /// Transcode: resolution cap (never upscaled).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/maxHeight`.
+            public var maxHeight: Components.Schemas.VodSaveSettings.MaxHeightPayload?
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/videoCodec`.
+            @frozen public enum VideoCodecPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case hevc = "hevc"
+                case h264 = "h264"
+            }
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/videoCodec`.
+            public var videoCodec: Components.Schemas.VodSaveSettings.VideoCodecPayload?
+            /// Transcode: constant quality (CRF/CQ), used unless videoKbps is set.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/videoQuality`.
+            @frozen public enum VideoQualityPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case high = "high"
+                case balanced = "balanced"
+                case small = "small"
+            }
+            /// Transcode: constant quality (CRF/CQ), used unless videoKbps is set.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/videoQuality`.
+            public var videoQuality: Components.Schemas.VodSaveSettings.VideoQualityPayload?
+            /// Transcode: target video bitrate; 0 = use videoQuality.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/videoKbps`.
+            public var videoKbps: Swift.Int?
+            /// Transcode: audio copied, or AAC stereo, or AAC up to 5.1.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/audio`.
+            @frozen public enum AudioPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case copy = "copy"
+                case aacStereo = "aac_stereo"
+                case aac51 = "aac_51"
+            }
+            /// Transcode: audio copied, or AAC stereo, or AAC up to 5.1.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/audio`.
+            public var audio: Components.Schemas.VodSaveSettings.AudioPayload?
+            /// Saves at once per source. Default 1.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/concurrentPerSource`.
+            public var concurrentPerSource: Swift.Int?
+            /// Scan the library whose folder holds a saved file. Default on.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/scanAfterSave`.
+            public var scanAfterSave: Swift.Bool?
+            /// Skip a title whose file is already in its folder. Default on. (A title the library already has is never saved again, unless as an upgrade: see VodLibraryMatch.)
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/skipExisting`.
+            public var skipExisting: Swift.Bool?
+            /// Pause saves while someone watches (see pauseScope), resuming 60 s after. Default on.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/pauseWhileWatching`.
+            public var pauseWhileWatching: Swift.Bool?
+            /// source: something from the same source, or Live TV from the same host (Dispatcharr). any: any playback on the server.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/pauseScope`.
+            @frozen public enum PauseScopePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case source = "source"
+                case any = "any"
+            }
+            /// source: something from the same source, or Live TV from the same host (Dispatcharr). any: any playback on the server.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/pauseScope`.
+            public var pauseScope: Components.Schemas.VodSaveSettings.PauseScopePayload?
+            /// Queue failed saves again every few hours. Default on.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/retryFailed`.
+            public var retryFailed: Swift.Bool?
+            /// More save folders besides moviesFolder and showsFolder (e.g. Anime), offered as "Save to {name}". Sending the list replaces it; an item without an id is new.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/destinations`.
+            public var destinations: [Components.Schemas.VodSaveDestination]?
+            /// Creates a new `VodSaveSettings`.
+            ///
+            /// - Parameters:
+            ///   - moviesFolder: Where films are saved, as the server sees it (must exist and be writable). Empty turns saving films off.
+            ///   - showsFolder: Where episodes are saved. Empty turns saving episodes off.
+            ///   - quality: original: the file as it is (MPEG-TS, FLV and other unusual containers are remuxed to MKV). remux: to MKV, every stream copied. transcode: the settings below.
+            ///   - maxHeight: Transcode: resolution cap (never upscaled).
+            ///   - videoCodec:
+            ///   - videoQuality: Transcode: constant quality (CRF/CQ), used unless videoKbps is set.
+            ///   - videoKbps: Transcode: target video bitrate; 0 = use videoQuality.
+            ///   - audio: Transcode: audio copied, or AAC stereo, or AAC up to 5.1.
+            ///   - concurrentPerSource: Saves at once per source. Default 1.
+            ///   - scanAfterSave: Scan the library whose folder holds a saved file. Default on.
+            ///   - skipExisting: Skip a title whose file is already in its folder. Default on. (A title the library already has is never saved again, unless as an upgrade: see VodLibraryMatch.)
+            ///   - pauseWhileWatching: Pause saves while someone watches (see pauseScope), resuming 60 s after. Default on.
+            ///   - pauseScope: source: something from the same source, or Live TV from the same host (Dispatcharr). any: any playback on the server.
+            ///   - retryFailed: Queue failed saves again every few hours. Default on.
+            ///   - destinations: More save folders besides moviesFolder and showsFolder (e.g. Anime), offered as "Save to {name}". Sending the list replaces it; an item without an id is new.
+            public init(
+                moviesFolder: Swift.String? = nil,
+                showsFolder: Swift.String? = nil,
+                quality: Components.Schemas.VodSaveSettings.QualityPayload? = nil,
+                maxHeight: Components.Schemas.VodSaveSettings.MaxHeightPayload? = nil,
+                videoCodec: Components.Schemas.VodSaveSettings.VideoCodecPayload? = nil,
+                videoQuality: Components.Schemas.VodSaveSettings.VideoQualityPayload? = nil,
+                videoKbps: Swift.Int? = nil,
+                audio: Components.Schemas.VodSaveSettings.AudioPayload? = nil,
+                concurrentPerSource: Swift.Int? = nil,
+                scanAfterSave: Swift.Bool? = nil,
+                skipExisting: Swift.Bool? = nil,
+                pauseWhileWatching: Swift.Bool? = nil,
+                pauseScope: Components.Schemas.VodSaveSettings.PauseScopePayload? = nil,
+                retryFailed: Swift.Bool? = nil,
+                destinations: [Components.Schemas.VodSaveDestination]? = nil
+            ) {
+                self.moviesFolder = moviesFolder
+                self.showsFolder = showsFolder
+                self.quality = quality
+                self.maxHeight = maxHeight
+                self.videoCodec = videoCodec
+                self.videoQuality = videoQuality
+                self.videoKbps = videoKbps
+                self.audio = audio
+                self.concurrentPerSource = concurrentPerSource
+                self.scanAfterSave = scanAfterSave
+                self.skipExisting = skipExisting
+                self.pauseWhileWatching = pauseWhileWatching
+                self.pauseScope = pauseScope
+                self.retryFailed = retryFailed
+                self.destinations = destinations
+            }
+            public enum CodingKeys: String, CodingKey {
+                case moviesFolder
+                case showsFolder
+                case quality
+                case maxHeight
+                case videoCodec
+                case videoQuality
+                case videoKbps
+                case audio
+                case concurrentPerSource
+                case scanAfterSave
+                case skipExisting
+                case pauseWhileWatching
+                case pauseScope
+                case retryFailed
+                case destinations
+            }
+        }
+        /// A save folder besides the default Movies and Shows ones (admins only).
+        ///
+        /// - Remark: Generated from `#/components/schemas/VodSaveDestination`.
+        public struct VodSaveDestination: Codable, Hashable, Sendable {
+            /// Given by the server; send it back to keep the destination.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveDestination/id`.
+            public var id: Swift.String?
+            /// Shown in buttons ("Save to Anime"); unique, ignoring case.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveDestination/name`.
+            public var name: Swift.String
+            /// As the server sees it; must exist and be writable.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveDestination/folder`.
+            public var folder: Swift.String
+            /// What can be saved there: films, episodes, or both.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveDestination/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case movies = "movies"
+                case shows = "shows"
+                case both = "both"
+            }
+            /// What can be saved there: films, episodes, or both.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveDestination/kind`.
+            public var kind: Components.Schemas.VodSaveDestination.KindPayload
+            /// A library includes the folder (saved titles are scanned into it). When false, saved titles won't appear until the folder is added to a library.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveDestination/inLibrary`.
+            public var inLibrary: Swift.Bool?
+            /// Creates a new `VodSaveDestination`.
+            ///
+            /// - Parameters:
+            ///   - id: Given by the server; send it back to keep the destination.
+            ///   - name: Shown in buttons ("Save to Anime"); unique, ignoring case.
+            ///   - folder: As the server sees it; must exist and be writable.
+            ///   - kind: What can be saved there: films, episodes, or both.
+            ///   - inLibrary: A library includes the folder (saved titles are scanned into it). When false, saved titles won't appear until the folder is added to a library.
+            public init(
+                id: Swift.String? = nil,
+                name: Swift.String,
+                folder: Swift.String,
+                kind: Components.Schemas.VodSaveDestination.KindPayload,
+                inLibrary: Swift.Bool? = nil
+            ) {
+                self.id = id
+                self.name = name
+                self.folder = folder
+                self.kind = kind
+                self.inLibrary = inLibrary
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case name
+                case folder
+                case kind
+                case inLibrary
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/VodSaveDestinationRef`.
+        public struct VodSaveDestinationRef: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodSaveDestinationRef/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/VodSaveDestinationRef/name`.
+            public var name: Swift.String
+            /// Creates a new `VodSaveDestinationRef`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - name:
+            public init(
+                id: Swift.String,
+                name: Swift.String
+            ) {
+                self.id = id
+                self.name = name
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case name
+            }
+        }
+        /// The latest save of a film or episode (admins only).
+        ///
+        /// - Remark: Generated from `#/components/schemas/VodSaveState`.
+        public struct VodSaveState: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodSaveState/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/VodSaveState/state`.
+            public var state: Components.Schemas.VodSaveStateName
+            /// 0–1: downloaded share, or the conversion's progress while processing.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveState/progress`.
+            public var progress: Swift.Double
+            /// - Remark: Generated from `#/components/schemas/VodSaveState/verified`.
+            public var verified: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/VodSaveState/error`.
+            public var error: Swift.String?
+            /// Creates a new `VodSaveState`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - state:
+            ///   - progress: 0–1: downloaded share, or the conversion's progress while processing.
+            ///   - verified:
+            ///   - error:
+            public init(
+                id: Swift.Int64,
+                state: Components.Schemas.VodSaveStateName,
+                progress: Swift.Double,
+                verified: Swift.Bool,
+                error: Swift.String? = nil
+            ) {
+                self.id = id
+                self.state = state
+                self.progress = progress
+                self.verified = verified
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case state
+                case progress
+                case verified
+                case error
+            }
+        }
+        /// queued (waiting; see pauseReason), downloading, processing (remux or transcode), verifying, paused (by an admin), done, failed, cancelled, skipped (already in the library).
+        ///
+        /// - Remark: Generated from `#/components/schemas/VodSaveStateName`.
+        @frozen public enum VodSaveStateName: String, Codable, Hashable, Sendable, CaseIterable {
+            case queued = "queued"
+            case downloading = "downloading"
+            case processing = "processing"
+            case verifying = "verifying"
+            case paused = "paused"
+            case done = "done"
+            case failed = "failed"
+            case cancelled = "cancelled"
+            case skipped = "skipped"
+        }
+        /// - Remark: Generated from `#/components/schemas/VodSave`.
+        public struct VodSave: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodSave/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/VodSave/sourceId`.
+            public var sourceId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/VodSave/sourceName`.
+            public var sourceName: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/VodSave/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case movie = "movie"
+                case episode = "episode"
+            }
+            /// - Remark: Generated from `#/components/schemas/VodSave/kind`.
+            public var kind: Components.Schemas.VodSave.KindPayload
+            /// The film (kind movie).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/movieId`.
+            public var movieId: Swift.Int64?
+            /// The episode (kind episode).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/episodeId`.
+            public var episodeId: Swift.Int64?
+            /// The episode's series.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/seriesId`.
+            public var seriesId: Swift.Int64?
+            /// e.g. Archer - S01E01 - Mole Hunt.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/title`.
+            public var title: Swift.String
+            /// Where it goes (the final name, with its quality tag, once done).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/targetPath`.
+            public var targetPath: Swift.String
+            /// - Remark: Generated from `#/components/schemas/VodSave/quality`.
+            @frozen public enum QualityPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case original = "original"
+                case remux = "remux"
+                case transcode = "transcode"
+            }
+            /// - Remark: Generated from `#/components/schemas/VodSave/quality`.
+            public var quality: Components.Schemas.VodSave.QualityPayload
+            /// - Remark: Generated from `#/components/schemas/VodSave/state`.
+            public var state: Components.Schemas.VodSaveStateName
+            /// - Remark: Generated from `#/components/schemas/VodSave/bytesDone`.
+            public var bytesDone: Swift.Int64
+            /// 0 = unknown.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/bytesTotal`.
+            public var bytesTotal: Swift.Int64
+            /// 0–1 of the current step: download, or conversion while processing.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/progress`.
+            public var progress: Swift.Double
+            /// Download speed in bytes a second (while downloading).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/speedBps`.
+            public var speedBps: Swift.Double?
+            /// Time left for the download.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/etaSeconds`.
+            public var etaSeconds: Swift.Int64?
+            /// Why a queued save isn't running: the queue is paused, something is being watched, or the source is unreachable.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/pauseReason`.
+            public var pauseReason: Swift.String?
+            /// Network failures in a row.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/attempts`.
+            public var attempts: Swift.Int
+            /// When a save waiting after a network error tries again.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/nextAttemptAt`.
+            public var nextAttemptAt: Foundation.Date?
+            /// - Remark: Generated from `#/components/schemas/VodSave/error`.
+            public var error: Swift.String?
+            /// The file passed verification (size, ffprobe, length, start and end decode).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/verified`.
+            public var verified: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/VodSave/verifyNote`.
+            public var verifyNote: Swift.String?
+            /// The saved file's SHA-256.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/sha256`.
+            public var sha256: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/VodSave/createdAt`.
+            public var createdAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/VodSave/startedAt`.
+            public var startedAt: Foundation.Date?
+            /// - Remark: Generated from `#/components/schemas/VodSave/finishedAt`.
+            public var finishedAt: Foundation.Date?
+            /// It replaces the library's copy (moved to the media trash once this one is verified).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/upgrade`.
+            public var upgrade: Swift.Bool?
+            /// An upgrade, once done: where the library's copy it replaced was (shown as Upgraded).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/replacedPath`.
+            public var replacedPath: Swift.String?
+            /// The save folder chosen (vodSave.destinations' name, e.g. Anime); absent for the default folder and for upgrades (which replace the library's copy in place).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/destinationName`.
+            public var destinationName: Swift.String?
+            /// The chosen save folder's path.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/destinationFolder`.
+            public var destinationFolder: Swift.String?
+            /// No library includes the folder it's saved into, so it won't appear in Marquee until that folder is added to a library.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/noLibrary`.
+            public var noLibrary: Swift.Bool?
+            /// Creates a new `VodSave`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - sourceId:
+            ///   - sourceName:
+            ///   - kind:
+            ///   - movieId: The film (kind movie).
+            ///   - episodeId: The episode (kind episode).
+            ///   - seriesId: The episode's series.
+            ///   - title: e.g. Archer - S01E01 - Mole Hunt.
+            ///   - targetPath: Where it goes (the final name, with its quality tag, once done).
+            ///   - quality:
+            ///   - state:
+            ///   - bytesDone:
+            ///   - bytesTotal: 0 = unknown.
+            ///   - progress: 0–1 of the current step: download, or conversion while processing.
+            ///   - speedBps: Download speed in bytes a second (while downloading).
+            ///   - etaSeconds: Time left for the download.
+            ///   - pauseReason: Why a queued save isn't running: the queue is paused, something is being watched, or the source is unreachable.
+            ///   - attempts: Network failures in a row.
+            ///   - nextAttemptAt: When a save waiting after a network error tries again.
+            ///   - error:
+            ///   - verified: The file passed verification (size, ffprobe, length, start and end decode).
+            ///   - verifyNote:
+            ///   - sha256: The saved file's SHA-256.
+            ///   - createdAt:
+            ///   - startedAt:
+            ///   - finishedAt:
+            ///   - upgrade: It replaces the library's copy (moved to the media trash once this one is verified).
+            ///   - replacedPath: An upgrade, once done: where the library's copy it replaced was (shown as Upgraded).
+            ///   - destinationName: The save folder chosen (vodSave.destinations' name, e.g. Anime); absent for the default folder and for upgrades (which replace the library's copy in place).
+            ///   - destinationFolder: The chosen save folder's path.
+            ///   - noLibrary: No library includes the folder it's saved into, so it won't appear in Marquee until that folder is added to a library.
+            public init(
+                id: Swift.Int64,
+                sourceId: Swift.String,
+                sourceName: Swift.String? = nil,
+                kind: Components.Schemas.VodSave.KindPayload,
+                movieId: Swift.Int64? = nil,
+                episodeId: Swift.Int64? = nil,
+                seriesId: Swift.Int64? = nil,
+                title: Swift.String,
+                targetPath: Swift.String,
+                quality: Components.Schemas.VodSave.QualityPayload,
+                state: Components.Schemas.VodSaveStateName,
+                bytesDone: Swift.Int64,
+                bytesTotal: Swift.Int64,
+                progress: Swift.Double,
+                speedBps: Swift.Double? = nil,
+                etaSeconds: Swift.Int64? = nil,
+                pauseReason: Swift.String? = nil,
+                attempts: Swift.Int,
+                nextAttemptAt: Foundation.Date? = nil,
+                error: Swift.String? = nil,
+                verified: Swift.Bool,
+                verifyNote: Swift.String? = nil,
+                sha256: Swift.String? = nil,
+                createdAt: Foundation.Date,
+                startedAt: Foundation.Date? = nil,
+                finishedAt: Foundation.Date? = nil,
+                upgrade: Swift.Bool? = nil,
+                replacedPath: Swift.String? = nil,
+                destinationName: Swift.String? = nil,
+                destinationFolder: Swift.String? = nil,
+                noLibrary: Swift.Bool? = nil
+            ) {
+                self.id = id
+                self.sourceId = sourceId
+                self.sourceName = sourceName
+                self.kind = kind
+                self.movieId = movieId
+                self.episodeId = episodeId
+                self.seriesId = seriesId
+                self.title = title
+                self.targetPath = targetPath
+                self.quality = quality
+                self.state = state
+                self.bytesDone = bytesDone
+                self.bytesTotal = bytesTotal
+                self.progress = progress
+                self.speedBps = speedBps
+                self.etaSeconds = etaSeconds
+                self.pauseReason = pauseReason
+                self.attempts = attempts
+                self.nextAttemptAt = nextAttemptAt
+                self.error = error
+                self.verified = verified
+                self.verifyNote = verifyNote
+                self.sha256 = sha256
+                self.createdAt = createdAt
+                self.startedAt = startedAt
+                self.finishedAt = finishedAt
+                self.upgrade = upgrade
+                self.replacedPath = replacedPath
+                self.destinationName = destinationName
+                self.destinationFolder = destinationFolder
+                self.noLibrary = noLibrary
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case sourceId
+                case sourceName
+                case kind
+                case movieId
+                case episodeId
+                case seriesId
+                case title
+                case targetPath
+                case quality
+                case state
+                case bytesDone
+                case bytesTotal
+                case progress
+                case speedBps
+                case etaSeconds
+                case pauseReason
+                case attempts
+                case nextAttemptAt
+                case error
+                case verified
+                case verifyNote
+                case sha256
+                case createdAt
+                case startedAt
+                case finishedAt
+                case upgrade
+                case replacedPath
+                case destinationName
+                case destinationFolder
+                case noLibrary
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/VodSaveQueue`.
+        public struct VodSaveQueue: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodSaveQueue/saves`.
+            public var saves: [Components.Schemas.VodSave]
+            /// Something is queued or running (poll while true).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveQueue/active`.
+            public var active: Swift.Bool
+            /// The whole queue is paused.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveQueue/paused`.
+            public var paused: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/VodSaveQueue/moviesFolderSet`.
+            public var moviesFolderSet: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/VodSaveQueue/showsFolderSet`.
+            public var showsFolderSet: Swift.Bool
+            /// Creates a new `VodSaveQueue`.
+            ///
+            /// - Parameters:
+            ///   - saves:
+            ///   - active: Something is queued or running (poll while true).
+            ///   - paused: The whole queue is paused.
+            ///   - moviesFolderSet:
+            ///   - showsFolderSet:
+            public init(
+                saves: [Components.Schemas.VodSave],
+                active: Swift.Bool,
+                paused: Swift.Bool,
+                moviesFolderSet: Swift.Bool,
+                showsFolderSet: Swift.Bool
+            ) {
+                self.saves = saves
+                self.active = active
+                self.paused = paused
+                self.moviesFolderSet = moviesFolderSet
+                self.showsFolderSet = showsFolderSet
+            }
+            public enum CodingKeys: String, CodingKey {
+                case saves
+                case active
+                case paused
+                case moviesFolderSet
+                case showsFolderSet
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/VodSaveResult`.
+        public struct VodSaveResult: Codable, Hashable, Sendable {
+            /// Saves added (or failed ones queued again).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveResult/queued`.
+            public var queued: Swift.Int
+            /// Already queued or saved.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveResult/already`.
+            public var already: Swift.Int
+            /// Already in the library (as well or better, or better without includeUpgrades).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveResult/skipped`.
+            public var skipped: Swift.Int
+            /// Of queued, upgrades replacing the library's copies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveResult/upgrades`.
+            public var upgrades: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/VodSaveResult/saves`.
+            public var saves: [Components.Schemas.VodSave]
+            /// Creates a new `VodSaveResult`.
+            ///
+            /// - Parameters:
+            ///   - queued: Saves added (or failed ones queued again).
+            ///   - already: Already queued or saved.
+            ///   - skipped: Already in the library (as well or better, or better without includeUpgrades).
+            ///   - upgrades: Of queued, upgrades replacing the library's copies.
+            ///   - saves:
+            public init(
+                queued: Swift.Int,
+                already: Swift.Int,
+                skipped: Swift.Int,
+                upgrades: Swift.Int? = nil,
+                saves: [Components.Schemas.VodSave]
+            ) {
+                self.queued = queued
+                self.already = already
+                self.skipped = skipped
+                self.upgrades = upgrades
+                self.saves = saves
+            }
+            public enum CodingKeys: String, CodingKey {
+                case queued
+                case already
+                case skipped
+                case upgrades
+                case saves
             }
         }
         /// - Remark: Generated from `#/components/schemas/VodSeriesPage`.
@@ -8416,6 +9351,14 @@ extension Components {
             public var libraryId: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/Hub/items`.
             public var items: [Components.Schemas.ItemSummary]
+            /// Continue Watching only: the row's entries, library items and films and episodes on demand together, newest first (up to 20; items stays library-only for older apps). When it's present show it instead of items. The row is sent when either has something.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Hub/entries`.
+            public var entries: [Components.Schemas.ContinueEntry]?
+            /// Continue Watching only: how many entries there are in all (GET /hubs/continue-watching); more than entries holds means a View more link.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Hub/total`.
+            public var total: Swift.Int?
             /// Creates a new `Hub`.
             ///
             /// - Parameters:
@@ -8423,22 +9366,134 @@ extension Components {
             ///   - title:
             ///   - libraryId:
             ///   - items:
+            ///   - entries: Continue Watching only: the row's entries, library items and films and episodes on demand together, newest first (up to 20; items stays library-only for older apps). When it's present show it instead of items. The row is sent when either has something.
+            ///   - total: Continue Watching only: how many entries there are in all (GET /hubs/continue-watching); more than entries holds means a View more link.
             public init(
                 id: Swift.String,
                 title: Swift.String,
                 libraryId: Swift.Int64? = nil,
-                items: [Components.Schemas.ItemSummary]
+                items: [Components.Schemas.ItemSummary],
+                entries: [Components.Schemas.ContinueEntry]? = nil,
+                total: Swift.Int? = nil
             ) {
                 self.id = id
                 self.title = title
                 self.libraryId = libraryId
                 self.items = items
+                self.entries = entries
+                self.total = total
             }
             public enum CodingKeys: String, CodingKey {
                 case id
                 case title
                 case libraryId
                 case items
+                case entries
+                case total
+            }
+        }
+        /// A Continue Watching entry: a library item (an in-progress movie, episode or video, or a show's next episode) or a film or episode on demand stopped part-way through.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ContinueEntry`.
+        public struct ContinueEntry: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ContinueEntry/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case item = "item"
+                case vodMovie = "vodMovie"
+                case vodEpisode = "vodEpisode"
+            }
+            /// - Remark: Generated from `#/components/schemas/ContinueEntry/kind`.
+            public var kind: Components.Schemas.ContinueEntry.KindPayload
+            /// Unique within the list, e.g. item:12, vodMovie:5, vodEpisode:7.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ContinueEntry/key`.
+            public var key: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ContinueEntry/item`.
+            public var item: Components.Schemas.ItemSummary?
+            /// - Remark: Generated from `#/components/schemas/ContinueEntry/vodMovie`.
+            public var vodMovie: Components.Schemas.VodMovie?
+            /// - Remark: Generated from `#/components/schemas/ContinueEntry/vodEpisode`.
+            public var vodEpisode: Components.Schemas.VodEpisode?
+            /// A vodEpisode's series poster (server-relative; no token needed).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ContinueEntry/seriesPosterUrl`.
+            public var seriesPosterUrl: Swift.String?
+            /// The resume point (0 for a show's next episode).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ContinueEntry/positionMs`.
+            public var positionMs: Swift.Int64
+            /// 0 = unknown.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ContinueEntry/durationMs`.
+            public var durationMs: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/ContinueEntry/lastWatchedAt`.
+            public var lastWatchedAt: Foundation.Date
+            /// Creates a new `ContinueEntry`.
+            ///
+            /// - Parameters:
+            ///   - kind:
+            ///   - key: Unique within the list, e.g. item:12, vodMovie:5, vodEpisode:7.
+            ///   - item:
+            ///   - vodMovie:
+            ///   - vodEpisode:
+            ///   - seriesPosterUrl: A vodEpisode's series poster (server-relative; no token needed).
+            ///   - positionMs: The resume point (0 for a show's next episode).
+            ///   - durationMs: 0 = unknown.
+            ///   - lastWatchedAt:
+            public init(
+                kind: Components.Schemas.ContinueEntry.KindPayload,
+                key: Swift.String,
+                item: Components.Schemas.ItemSummary? = nil,
+                vodMovie: Components.Schemas.VodMovie? = nil,
+                vodEpisode: Components.Schemas.VodEpisode? = nil,
+                seriesPosterUrl: Swift.String? = nil,
+                positionMs: Swift.Int64,
+                durationMs: Swift.Int64,
+                lastWatchedAt: Foundation.Date
+            ) {
+                self.kind = kind
+                self.key = key
+                self.item = item
+                self.vodMovie = vodMovie
+                self.vodEpisode = vodEpisode
+                self.seriesPosterUrl = seriesPosterUrl
+                self.positionMs = positionMs
+                self.durationMs = durationMs
+                self.lastWatchedAt = lastWatchedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case kind
+                case key
+                case item
+                case vodMovie
+                case vodEpisode
+                case seriesPosterUrl
+                case positionMs
+                case durationMs
+                case lastWatchedAt
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ContinueWatchingPage`.
+        public struct ContinueWatchingPage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ContinueWatchingPage/total`.
+            public var total: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/ContinueWatchingPage/entries`.
+            public var entries: [Components.Schemas.ContinueEntry]
+            /// Creates a new `ContinueWatchingPage`.
+            ///
+            /// - Parameters:
+            ///   - total:
+            ///   - entries:
+            public init(
+                total: Swift.Int,
+                entries: [Components.Schemas.ContinueEntry]
+            ) {
+                self.total = total
+                self.entries = entries
+            }
+            public enum CodingKeys: String, CodingKey {
+                case total
+                case entries
             }
         }
         /// - Remark: Generated from `#/components/schemas/ItemType`.

@@ -18,6 +18,8 @@ struct HomeView: View {
     /// top bar, out of sight behind the libraries.
     @State private var videoPlaylists: [Playlist] = []
     @State private var editing = false
+    /// A film or episode on demand playing from Continue Watching.
+    @State private var vodPlaying: VodPlayTarget?
 
     var body: some View {
         ScrollView {
@@ -52,13 +54,25 @@ struct HomeView: View {
                 }
                 ForEach(hubs, id: \.id) { hub in
                     let wide = hub.id == "continue-watching"
-                    ShelfRow(title: hub.title, destination: destination(hub)) {
-                        ForEach(hub.items, id: \.id) { item in
-                            let remove: (() -> Void)? = wide ? { removeFromContinue(item) } : nil
-                            if wide && item.isPlayableVideo {
-                                ContinueCard(item: item, onRemove: remove)
-                            } else {
-                                PosterCard(item: item, shape: PosterShape.for(item) == .wide ? .wide : nil, onRemoveFromContinue: remove)
+                    if wide, let entries = hub.entries {
+                        // Library titles and films and episodes on demand together, in the
+                        // server's order; View more when there are more than the row holds.
+                        let more = (hub.total ?? 0) > entries.count
+                        ShelfRow(title: hub.title, destination: more ? .continueWatching : nil) {
+                            ForEach(entries, id: \.key) { e in
+                                ContinueEntryTile(entry: e, onRemove: { removeFromContinue(e) }, playVod: playVod)
+                            }
+                            if more, let total = hub.total { ContinueViewMoreTile(total: total) }
+                        }
+                    } else {
+                        ShelfRow(title: hub.title, destination: destination(hub)) {
+                            ForEach(hub.items, id: \.id) { item in
+                                let remove: (() -> Void)? = wide ? { removeFromContinue(item) } : nil
+                                if wide && item.isPlayableVideo {
+                                    ContinueCard(item: item, onRemove: remove)
+                                } else {
+                                    PosterCard(item: item, shape: PosterShape.for(item) == .wide ? .wide : nil, onRemoveFromContinue: remove)
+                                }
                             }
                         }
                     }
@@ -123,6 +137,40 @@ struct HomeView: View {
             if !loaded || loadedVersion != HomeChanges.shared.version { await load() }
         }
         .onChange(of: video.request) { if video.request == nil { Task { await load() } } }
+        .modifier(VodContinuePlayback(target: $vodPlaying, onDismiss: { Task { await load() } }))
+    }
+
+    /// A film or episode on demand from Continue Watching, where it stopped.
+    private func playVod(_ entry: ContinueEntry) {
+        ActionError.run { vodPlaying = try await app.vodPlayTarget(entry) }
+    }
+
+    /// Takes an entry off Continue Watching: a library title as before, or one on demand (an
+    /// episode takes the rest of its show with it).
+    private func removeFromContinue(_ entry: ContinueEntry) {
+        if let item = entry.item { removeFromContinue(item); return }
+        let before = hubs
+        if let i = hubs.firstIndex(where: { $0.id == "continue-watching" }) {
+            let gone = hubs[i].entries?.filter { entry.removes($0) }.count ?? 0
+            hubs[i].entries?.removeAll { entry.removes($0) }
+            hubs[i].total = hubs[i].total.map { max(0, $0 - gone) }
+            if Self.isEmptyContinue(hubs[i]) { hubs.remove(at: i) }
+        }
+        ActionError.run {
+            do {
+                try await app.removeVodFromContinueWatching(entry)
+            } catch {
+                hubs = before
+                throw error
+            }
+            await load()
+        }
+    }
+
+    /// Continue Watching with nothing in it (the server may send the row with no library items
+    /// but films on demand, or nothing left after a removal).
+    private static func isEmptyContinue(_ hub: Hub) -> Bool {
+        hub.id == "continue-watching" && hub.items.isEmpty && (hub.entries ?? []).isEmpty
     }
 
     #if os(tvOS)
@@ -145,8 +193,12 @@ struct HomeView: View {
     private func removeFromContinue(_ item: Item) {
         let before = hubs
         if let i = hubs.firstIndex(where: { $0.id == "continue-watching" }) {
-            hubs[i].items.removeAll { $0.id == item.id || (item._type == .episode && item.grandparentId != nil && $0.grandparentId == item.grandparentId) }
-            if hubs[i].items.isEmpty { hubs.remove(at: i) }
+            let sameShow: (Item) -> Bool = { $0.id == item.id || (item._type == .episode && item.grandparentId != nil && $0.grandparentId == item.grandparentId) }
+            hubs[i].items.removeAll(where: sameShow)
+            let gone = hubs[i].entries?.filter { $0.item.map(sameShow) ?? false }.count ?? 0
+            hubs[i].entries?.removeAll { $0.item.map(sameShow) ?? false }
+            hubs[i].total = hubs[i].total.map { max(0, $0 - gone) }
+            if Self.isEmptyContinue(hubs[i]) { hubs.remove(at: i) }
         }
         ActionError.run {
             do {
@@ -162,7 +214,7 @@ struct HomeView: View {
     private func load() async {
         loadedVersion = HomeChanges.shared.version
         do {
-            hubs = try await app.hubs()
+            hubs = try await app.hubs().filter { !Self.isEmptyContinue($0) }
             error = nil
             #if os(tvOS)
             if let lists = try? await app.playlists(kind: .video) { videoPlaylists = lists }
@@ -201,10 +253,11 @@ struct ContinueCard: View {
     /// Takes it off Continue Watching (its context menu).
     var onRemove: (() -> Void)?
     #if os(tvOS)
-    private let width: CGFloat = 420
+    static let width: CGFloat = 420
     #else
-    private let width: CGFloat = 260
+    static let width: CGFloat = 260
     #endif
+    private var width: CGFloat { Self.width }
 
     var body: some View {
         Button { video.play(item.id) } label: {
