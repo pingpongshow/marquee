@@ -42,9 +42,11 @@ type Streams struct {
 
 // Stream is one viewer watching one film.
 type Stream struct {
-	ID        string
-	UserID    int64
-	MovieID   int64
+	ID      string
+	UserID  int64
+	MovieID int64
+	// EpisodeID is set (and MovieID 0) when watching a series' episode.
+	EpisodeID int64
 	userAgent string
 	master    string
 	// PlaybackID is the server's own HLS session (playback.Manager) for a film that is a
@@ -87,6 +89,13 @@ func (st *Streams) Get(id string) *Stream {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	return st.sessions[id]
+}
+
+// StartEpisodePlayback records an episode's session whose HLS the server makes itself.
+func (st *Streams) StartEpisodePlayback(userID, episodeID int64, playbackID string) *Stream {
+	s := st.Start(userID, 0, "", "")
+	s.EpisodeID, s.PlaybackID = episodeID, playbackID
+	return s
 }
 
 // StartPlayback records a session whose HLS the server makes itself (playbackID).

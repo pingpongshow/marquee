@@ -2737,6 +2737,12 @@ paths:
         - { name: q, in: query, description: Part of the title., schema: { type: string } }
         - { name: sort, in: query, schema: { type: string, enum: [title, added, year, rating], default: title } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+        - { name: genre, in: query, description: "One genre (TMDB's once matched, else the source's); see the genres endpoint.", schema: { type: string } }
+        - { name: yearFrom, in: query, description: "Released in or after this year (items without a year are left out).", schema: { type: integer } }
+        - { name: yearTo, in: query, description: "Released in or before this year (a decade: yearFrom=1980&yearTo=1989).", schema: { type: integer } }
+        - { name: minRating, in: query, description: "Average vote out of 10 at least this (unrated items are left out).", schema: { type: number, minimum: 0, maximum: 10 } }
+        - { name: watched, in: query, description: "The caller's state: unwatched (never started), inProgress (started, not finished) or watched.", schema: { type: string, enum: [unwatched, inProgress, watched] } }
+        - { name: sourceId, in: query, description: "Only this source's (VodStatus.sources[].id).", schema: { type: string } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
         "200":
@@ -2879,6 +2885,242 @@ paths:
         "204": { description: Stopped. }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+  /livetv/vod/series:
+    get:
+      tags: [livetv]
+      operationId: listVodSeries
+      summary: TV series on demand (Xtream Codes sources), a page at a time.
+      parameters:
+        - { name: category, in: query, schema: { type: string } }
+        - { name: q, in: query, description: Part of the title., schema: { type: string } }
+        - { name: sort, in: query, schema: { type: string, enum: [title, added, year, rating], default: title } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+        - { name: genre, in: query, description: "One genre (TMDB's once matched, else the source's); see the genres endpoint.", schema: { type: string } }
+        - { name: yearFrom, in: query, description: "Released in or after this year (items without a year are left out).", schema: { type: integer } }
+        - { name: yearTo, in: query, description: "Released in or before this year (a decade: yearFrom=1980&yearTo=1989).", schema: { type: integer } }
+        - { name: minRating, in: query, description: "Average vote out of 10 at least this (unrated items are left out).", schema: { type: number, minimum: 0, maximum: 10 } }
+        - { name: watched, in: query, description: "The caller's state: unwatched (has episodes not yet watched, including never-opened series), inProgress (started but not every episode watched) or watched (every episode watched).", schema: { type: string, enum: [unwatched, inProgress, watched] } }
+        - { name: sourceId, in: query, description: "Only this source's (VodStatus.sources[].id).", schema: { type: string } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: A page of series.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VodSeriesPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /livetv/vod/series/categories:
+    get:
+      tags: [livetv]
+      operationId: listVodSeriesCategories
+      summary: The sources' series categories with how many series the caller may see in each.
+      responses:
+        "200":
+          description: Categories by name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VodCategory" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /livetv/vod/genres:
+    get:
+      tags: [livetv]
+      operationId: listVodGenres
+      summary: The films' genres with how many films the caller may see in each (for the genre filter).
+      responses:
+        "200":
+          description: Genres by name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VodCategory" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /livetv/vod/series/genres:
+    get:
+      tags: [livetv]
+      operationId: listVodSeriesGenres
+      summary: The series' genres with how many series the caller may see in each (for the genre filter).
+      responses:
+        "200":
+          description: Genres by name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VodCategory" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /livetv/vod/series/continue:
+    get:
+      tags: [livetv]
+      operationId: vodSeriesContinueWatching
+      summary: "Series the caller is watching, most recent first, each with nextEpisode set: the episode they're part-way through, else the next unwatched one. Finished series are left out."
+      responses:
+        "200":
+          description: Series.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VodSeries" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /livetv/vod/series/{seriesId}:
+    parameters:
+      - { name: seriesId, in: path, required: true, schema: { type: integer, format: int64 } }
+      - { name: refresh, in: query, description: "Fetch the episodes from the source now, even if they were fetched recently.", schema: { type: boolean, default: false } }
+    get:
+      tags: [livetv]
+      operationId: getVodSeries
+      summary: "A series with its seasons and episodes (and the caller's progress in each). Episodes are fetched from the source the first time a series is opened and again once 12 hours old, so this can take a few seconds."
+      responses:
+        "200":
+          description: The series.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VodSeriesDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /livetv/vod/series/{seriesId}/image:
+    parameters:
+      - { name: seriesId, in: path, required: true, schema: { type: integer, format: int64 } }
+      - { name: kind, in: query, schema: { type: string, enum: [poster, backdrop], default: poster } }
+      - { name: season, in: query, description: "A season's poster instead of the series' (kind is ignored).", schema: { type: integer } }
+    get:
+      tags: [livetv]
+      operationId: vodSeriesImage
+      summary: A series' (or season's) poster or backdrop, fetched once and cached (no sign-in needed, like artwork).
+      security: []
+      responses:
+        "200":
+          description: The image.
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /livetv/vod/series/{seriesId}/watched:
+    parameters:
+      - { name: seriesId, in: path, required: true, schema: { type: integer, format: int64 } }
+      - { name: season, in: query, description: Only this season's episodes., schema: { type: integer } }
+    put:
+      tags: [livetv]
+      operationId: markVodSeriesWatched
+      summary: Mark every episode of a series (or of one season) watched.
+      responses:
+        "204": { description: Marked. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [livetv]
+      operationId: markVodSeriesUnwatched
+      summary: Mark every episode of a series (or of one season) unwatched, forgetting resume points.
+      responses:
+        "204": { description: Marked. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /livetv/vod/episodes/{episodeId}/image:
+    parameters:
+      - { name: episodeId, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      tags: [livetv]
+      operationId: vodEpisodeImage
+      summary: An episode's still, fetched once and cached (no sign-in needed, like artwork).
+      security: []
+      responses:
+        "200":
+          description: The image.
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /livetv/vod/episodes/{episodeId}/watched:
+    parameters:
+      - { name: episodeId, in: path, required: true, schema: { type: integer, format: int64 } }
+    put:
+      tags: [livetv]
+      operationId: markVodEpisodeWatched
+      summary: Mark an episode watched (clears its resume point).
+      responses:
+        "204": { description: Marked. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [livetv]
+      operationId: markVodEpisodeUnwatched
+      summary: Mark an episode unwatched (forgets its resume point).
+      responses:
+        "204": { description: Marked. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /livetv/vod/episodes/{episodeId}/next:
+    parameters:
+      - { name: episodeId, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      tags: [livetv]
+      operationId: vodNextEpisode
+      summary: "The episode after this one in viewing order (seasons in turn, specials last), for autoplay at the end of an episode; no episode when this is the last."
+      responses:
+        "200":
+          description: The next episode, if any.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VodUpNext" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /livetv/vod/episodes/{episodeId}/play:
+    parameters:
+      - { name: episodeId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [livetv]
+      operationId: playVodEpisode
+      summary: "Start watching an episode: the file made into seekable HLS by the server, as for Xtream Codes films. The session's movieId is 0 and episodeId is set; report progress and stop with the film session endpoints (/livetv/vod/sessions/{sessionId})."
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                profile:
+                  allOf:
+                    - $ref: "#/components/schemas/DeviceProfile"
+                  description: "What the device plays. Without it, H.264 video and AAC/MP3 audio are copied and anything else is converted to them."
+                maxBitrateKbps: { type: integer, minimum: 0, description: "The app's quality setting; 0/omitted = original (home) or automatic (remote)." }
+                startMs: { type: integer, format: int64, minimum: 0, description: "Where to start; omitted = the caller's resume point (0 = from the beginning)." }
+      responses:
+        "200":
+          description: The session.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VodSession" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
   /livetv/vod/sources/test:
     post:
       tags: [livetv]
@@ -2901,6 +3143,7 @@ paths:
                   ok: { type: boolean }
                   movies: { type: integer, description: Films the source lists. }
                   categories: { type: integer, description: Categories (Xtream Codes). }
+                  series: { type: integer, description: "Series the server lists (Xtream Codes; absent when it didn't list them)." }
                   account: { type: string, description: "The account's status as the server reports it, e.g. Active (Xtream Codes)." }
                   expiresAt: { type: string, format: date-time, description: "When the account expires, if it does (Xtream Codes)." }
                   error: { type: string }
@@ -4794,10 +5037,11 @@ components:
 
     VodStatus:
       type: object
-      required: [enabled, movies, matched, unmatched, matching, sources]
+      required: [enabled, movies, series, matched, unmatched, matching, sources]
       properties:
-        enabled: { type: boolean, description: "Movies on demand are turned on, a source has films, and this profile may watch Live TV. Clients show them only when true." }
+        enabled: { type: boolean, description: "Movies on demand are turned on, a source has films or series, and this profile may watch Live TV. Clients show them only when true." }
         movies: { type: integer }
+        series: { type: integer, description: Series (Xtream Codes sources). }
         matched: { type: integer, description: Films matched to TMDB. }
         unmatched: { type: integer, description: Films TMDB had no confident match for. }
         matching: { type: boolean, description: Details and TMDB matches are being fetched now. }
@@ -4806,11 +5050,12 @@ components:
           type: array
           items:
             type: object
-            required: [id, name, movies]
+            required: [id, name, movies, series]
             properties:
               id: { type: string }
               name: { type: string }
               movies: { type: integer }
+              series: { type: integer, description: Series the source lists (Xtream Codes; 0 for playlists). }
               refreshedAt: { type: string, format: date-time }
               error: { type: string }
 
@@ -4874,8 +5119,103 @@ components:
       properties:
         id: { type: string }
         url: { type: string, description: The HLS playlist (server-relative; the session id is its credential). }
-        movieId: { type: integer, format: int64 }
+        movieId: { type: integer, format: int64, description: "The film (0 for an episode)." }
+        episodeId: { type: integer, format: int64, description: "The episode, when watching a series." }
         startMs: { type: integer, format: int64, description: Where to start (the caller's resume point). }
+
+    VodSeries:
+      type: object
+      required: [id, title, watched, episodeCount, watchedCount, seasonCount]
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        year: { type: integer }
+        category: { type: string }
+        contentRating: { type: string, description: "e.g. TV-14 (TMDB's, when matched)." }
+        rating: { type: number, description: "Average vote out of 10 (TMDB's when matched, else the source's)." }
+        posterUrl: { type: string, description: Server-relative; no token needed. }
+        seasonCount: { type: integer, description: "Seasons known (0 until the series is first opened)." }
+        episodeCount: { type: integer, description: "Episodes known (0 until the series is first opened)." }
+        watchedCount: { type: integer, description: Episodes the caller has watched. }
+        watched: { type: boolean, description: The caller has watched every known episode. }
+        nextEpisode:
+          allOf:
+            - $ref: "#/components/schemas/VodEpisode"
+          description: "The episode the caller would watch next (Continue Watching and the series detail)."
+
+    VodSeriesDetail:
+      allOf:
+        - $ref: "#/components/schemas/VodSeries"
+        - type: object
+          required: [genres, cast, matched, seasons, episodes]
+          properties:
+            overview: { type: string }
+            genres: { type: array, items: { type: string } }
+            director: { type: string }
+            cast:
+              type: array
+              items:
+                type: object
+                required: [name]
+                properties:
+                  name: { type: string }
+                  character: { type: string }
+            backdropUrl: { type: string, description: Server-relative; no token needed. }
+            tmdbId: { type: integer }
+            matched: { type: boolean, description: The details are TMDB's. }
+            seasons:
+              type: array
+              description: In viewing order (specials, season 0, last).
+              items: { $ref: "#/components/schemas/VodSeason" }
+            episodes:
+              type: array
+              description: Every episode in viewing order (seasons in turn, specials last); filter by season for a season's list.
+              items: { $ref: "#/components/schemas/VodEpisode" }
+            episodesError: { type: string, description: "The source didn't give the episodes (and none were kept from before)." }
+
+    VodSeason:
+      type: object
+      required: [season, name, episodeCount, watchedCount]
+      properties:
+        season: { type: integer, description: The season number (0 = specials). }
+        name: { type: string, description: "e.g. Season 1." }
+        overview: { type: string }
+        airDate: { type: string, description: "YYYY-MM-DD as the source gives it." }
+        posterUrl: { type: string, description: Server-relative; no token needed. }
+        episodeCount: { type: integer }
+        watchedCount: { type: integer, description: Episodes the caller has watched. }
+
+    VodEpisode:
+      type: object
+      required: [id, seriesId, seriesTitle, season, episode, title, watched]
+      properties:
+        id: { type: integer, format: int64 }
+        seriesId: { type: integer, format: int64 }
+        seriesTitle: { type: string }
+        season: { type: integer }
+        episode: { type: integer, description: The episode number within its season. }
+        title: { type: string }
+        overview: { type: string }
+        airDate: { type: string, description: "YYYY-MM-DD as the source gives it." }
+        runtimeMs: { type: integer, format: int64 }
+        rating: { type: number }
+        stillUrl: { type: string, description: Server-relative; no token needed. }
+        positionMs: { type: integer, format: int64, description: The caller's resume point. }
+        watched: { type: boolean }
+
+    VodSeriesPage:
+      type: object
+      required: [total, series]
+      properties:
+        total: { type: integer }
+        series:
+          type: array
+          items: { $ref: "#/components/schemas/VodSeries" }
+
+    VodUpNext:
+      type: object
+      properties:
+        episode: { $ref: "#/components/schemas/VodEpisode" }
 
     RequestsStatus:
       type: object

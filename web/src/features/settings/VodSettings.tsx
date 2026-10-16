@@ -29,6 +29,7 @@ function SourceTest({ source }: { source: Source }) {
             r.account && `Account ${r.account.toLowerCase()}`,
             r.expiresAt && `expires ${new Date(r.expiresAt).toLocaleDateString()}`,
             `${r.movies ?? 0} films`,
+            r.series !== undefined && `${r.series} shows`,
             r.categories !== undefined && `${r.categories} categories`,
           ]
             .filter(Boolean)
@@ -72,7 +73,7 @@ export function VodSettings() {
     <div className="space-y-6">
       <p className="text-sm text-muted">
         Films from an M3U playlist, such as Pluto TV&apos;s free movies, or from a Dispatcharr (Xtream Codes) server appear
-        on the VOD page for everyone who may watch Live TV (and within each profile&apos;s rating limit). Nothing is
+        on the VOD Movies page (and a Dispatcharr server&apos;s series on VOD Shows) for everyone who may watch Live TV (and within each profile&apos;s rating limit). Nothing is
         downloaded: a film streams from the source while someone watches it. Marquee reloads the lists every six hours and
         matches each film to TMDB.
       </p>
@@ -104,7 +105,7 @@ export function VodSettings() {
                 ss.error ? (
                   <span className="text-danger">{ss.error}</span>
                 ) : (
-                  `${ss.movies} films${ss.refreshedAt ? ` · loaded ${new Date(ss.refreshedAt).toLocaleString()}` : ""}`
+                  `${ss.movies} films${ss.series ? ` · ${ss.series} shows` : ""}${ss.refreshedAt ? ` · loaded ${new Date(ss.refreshedAt).toLocaleString()}` : ""}`
                 )
               ) : undefined
             }
@@ -213,6 +214,7 @@ export function VodSettings() {
         <p className="text-sm text-muted">
           {st.movies} films, {st.matched} matched to TMDB
           {st.unmatched > 0 && `, ${st.unmatched} without a match`}
+          {st.series > 0 && ` · ${st.series} shows`}
           {st.matching && " · matching…"}
         </p>
       )}

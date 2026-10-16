@@ -134,11 +134,11 @@ func (h *Handlers) vodStatus(ctx context.Context) (VodStatus, error) {
 	if err != nil {
 		return VodStatus{}, err
 	}
-	out := VodStatus{Movies: st.Movies, Matched: st.Matched, Unmatched: st.Unmatched, Matching: h.VOD.Matching()}
+	out := VodStatus{Movies: st.Movies, Series: st.Series, Matched: st.Matched, Unmatched: st.Unmatched, Matching: h.VOD.Matching()}
 	s, ok := session(ctx)
 	if ok {
 		allowed, _ := vodAccess(s)
-		out.Enabled = allowed && h.VOD.Enabled() && st.Movies > 0
+		out.Enabled = allowed && h.VOD.Enabled() && (st.Movies > 0 || st.Series > 0)
 		if s.User.IsAdmin {
 			out.TmdbConfigured = ptr(h.Settings.Get().Metadata.TMDBAPIKey != "")
 		}
@@ -149,9 +149,11 @@ func (h *Handlers) vodStatus(ctx context.Context) (VodStatus, error) {
 		Movies      int        `json:"movies"`
 		Name        string     `json:"name"`
 		RefreshedAt *time.Time `json:"refreshedAt,omitempty"`
+		Series      int        `json:"series"`
 	}, len(st.Sources))
 	for i, src := range st.Sources {
 		out.Sources[i].Id, out.Sources[i].Name, out.Sources[i].Movies = src.ID, src.Name, src.Movies
+		out.Sources[i].Series = src.Series
 		out.Sources[i].RefreshedAt, out.Sources[i].Error = src.RefreshedAt, nz(src.Error)
 	}
 	return out, nil
@@ -212,6 +214,7 @@ func (h *Handlers) ListVodMovies(ctx context.Context, req ListVodMoviesRequestOb
 	if p.Offset != nil {
 		f.Offset = *p.Offset
 	}
+	applyVodFilters(&f, p.Genre, p.YearFrom, p.YearTo, p.MinRating, (*string)(p.Watched), p.SourceId)
 	movies, total, err := h.VOD.Movies(ctx, f)
 	if err != nil {
 		return nil, internal(ctx, "listVodMovies", err)
@@ -370,46 +373,69 @@ func (h *Handlers) PlayVodMovie(ctx context.Context, req PlayVodMovieRequestObje
 			StartMs: nz(m.PositionMS)}), nil
 	}
 	// A file (Xtream Codes): the server makes it into HLS, like a library transcode.
+	var opts vodPlayOptions
+	if b := req.Body; b != nil {
+		opts = vodPlayOptions{Profile: b.Profile, MaxBitrateKbps: b.MaxBitrateKbps}
+	}
+	ps, apiErr503, apiErr502, err := h.startVodFile(ctx, s, "film", m.Title, link, ua, m.PositionMS, m.SourceID, opts)
+	switch {
+	case apiErr503 != nil:
+		return PlayVodMovie503JSONResponse{ServiceUnavailableJSONResponse(*apiErr503)}, nil
+	case apiErr502 != nil:
+		return PlayVodMovie502JSONResponse{BadGatewayJSONResponse(*apiErr502)}, nil
+	case err != nil:
+		return nil, err
+	}
+	st := h.VOD.Streams.StartPlayback(s.User.ID, m.ID, ps.ID)
+	return PlayVodMovie200JSONResponse(VodSession{Id: st.ID, Url: playback.StreamPrefix + ps.ID + "/master.m3u8", MovieId: m.ID,
+		StartMs: nz(ps.StartMS)}), nil
+}
+
+type vodPlayOptions struct {
+	Profile        *DeviceProfile
+	MaxBitrateKbps *int
+}
+
+// startVodFile makes a remote file (Xtream Codes film or episode) into HLS, like a library
+// transcode. A 503 or 502 error is returned as such; anything else is an internal error.
+func (h *Handlers) startVodFile(ctx context.Context, s auth.Session, noun, title, link, ua string, startMS int64, sourceID string,
+	o vodPlayOptions) (ps *playback.Session, unavailable, badGateway *Error, err error) {
 	if h.Playback == nil {
-		return PlayVodMovie503JSONResponse{ServiceUnavailableJSONResponse(apiErr("unavailable", "playback isn't available"))}, nil
+		return nil, ptr(apiErr("unavailable", "playback isn't available")), nil, nil
 	}
 	ri := requestInfo(ctx)
-	r := playback.ExternalRequest{UserID: s.User.ID, UserName: s.User.DisplayName, DeviceID: s.DeviceID, Title: m.Title,
-		URL: link, UserAgent: ua, StartMS: m.PositionMS, Remote: ri.Class == netclass.Remote, ClientIP: ri.ClientIP,
-		Redact: func(msg string) string { return h.VOD.Redact(m.SourceID, msg) }}
+	r := playback.ExternalRequest{UserID: s.User.ID, UserName: s.User.DisplayName, DeviceID: s.DeviceID, Title: title,
+		URL: link, UserAgent: ua, StartMS: startMS, Remote: ri.Class == netclass.Remote, ClientIP: ri.ClientIP,
+		Redact: func(msg string) string { return h.VOD.Redact(sourceID, msg) }}
 	for _, d := range must(h.Auth.ListDevices(ctx, s.User.ID)) {
 		if d.ID == s.DeviceID {
 			r.DeviceName = d.Name
 		}
 	}
-	if b := req.Body; b != nil {
-		if b.Profile != nil {
-			p := toProfile(*b.Profile)
-			r.Profile = &p
-		}
-		set(&r.Quality.RequestedKbps, b.MaxBitrateKbps)
+	if o.Profile != nil {
+		p := toProfile(*o.Profile)
+		r.Profile = &p
 	}
+	set(&r.Quality.RequestedKbps, o.MaxBitrateKbps)
 	if r.Remote {
 		r.Quality.UserPrefKbps = s.User.Preferences.RemoteQualityKbps
 		r.Quality.UserCapKbps = s.User.Restrictions.RemoteQualityKbps
 	} else {
 		r.Quality.UserPrefKbps = s.User.Preferences.LocalQualityKbps
 	}
-	ps, err := h.Playback.StartExternal(ctx, r)
+	ps, err = h.Playback.StartExternal(ctx, r)
 	switch {
 	case errors.Is(err, playback.ErrBusy):
-		return PlayVodMovie503JSONResponse{ServiceUnavailableJSONResponse(apiErr("busy", err.Error()))}, nil
+		return nil, ptr(apiErr("busy", err.Error())), nil, nil
 	case errors.Is(err, playback.ErrUnavailable):
-		return PlayVodMovie502JSONResponse{BadGatewayJSONResponse(apiErr("unavailable", "The film didn't load from its source: "+err.Error()))}, nil
+		return nil, nil, ptr(apiErr("unavailable", "The "+noun+" didn't load from its source: "+err.Error())), nil
 	case err != nil:
 		if ctx.Err() != nil {
-			return nil, ctx.Err()
+			return nil, nil, nil, ctx.Err()
 		}
-		return nil, internal(ctx, "playVodMovie", errors.New(h.VOD.Redact(m.SourceID, err.Error())))
+		return nil, nil, nil, internal(ctx, "playVod", errors.New(h.VOD.Redact(sourceID, err.Error())))
 	}
-	st := h.VOD.Streams.StartPlayback(s.User.ID, m.ID, ps.ID)
-	return PlayVodMovie200JSONResponse(VodSession{Id: st.ID, Url: playback.StreamPrefix + ps.ID + "/master.m3u8", MovieId: m.ID,
-		StartMs: nz(ps.StartMS)}), nil
+	return ps, nil, nil, nil
 }
 
 func (h *Handlers) ReportVodPlayback(ctx context.Context, req ReportVodPlaybackRequestObject) (ReportVodPlaybackResponseObject, error) {
@@ -432,7 +458,13 @@ func (h *Handlers) ReportVodPlayback(ctx context.Context, req ReportVodPlaybackR
 	if st.PlaybackID != "" && h.Playback != nil {
 		h.Playback.Progress(ctx, st.PlaybackID, req.Body.PositionMs, "playing") // keeps it alive; shows where they are
 	}
-	if err := h.VOD.SetProgress(ctx, s.User.ID, st.MovieID, req.Body.PositionMs, dur); err != nil {
+	var err error
+	if st.EpisodeID != 0 {
+		err = h.VOD.SetEpisodeProgress(ctx, s.User.ID, st.EpisodeID, req.Body.PositionMs, dur)
+	} else {
+		err = h.VOD.SetProgress(ctx, s.User.ID, st.MovieID, req.Body.PositionMs, dur)
+	}
+	if err != nil {
 		return nil, internal(ctx, "reportVodPlayback", err)
 	}
 	return ReportVodPlayback204Response{}, nil
@@ -493,9 +525,43 @@ func (h *Handlers) TestVodSource(ctx context.Context, req TestVodSourceRequestOb
 	out := TestVodSource200JSONResponse{Ok: true, Movies: ptr(r.Movies), Account: nz(r.Account)}
 	if src.Xtream() {
 		out.Categories = ptr(r.Categories)
+		if r.Series >= 0 {
+			out.Series = ptr(r.Series)
+		}
 	}
 	if !r.ExpiresAt.IsZero() {
 		out.ExpiresAt = ptr(r.ExpiresAt)
+	}
+	return out, nil
+}
+
+// applyVodFilters reads the list filters films and series share.
+func applyVodFilters(f *vod.Filter, genre *string, yearFrom, yearTo *int, minRating *float32, watched, sourceID *string) {
+	set(&f.Genre, genre)
+	set(&f.YearFrom, yearFrom)
+	set(&f.YearTo, yearTo)
+	if minRating != nil {
+		f.MinRating = float64(*minRating)
+	}
+	set(&f.Watched, watched)
+	set(&f.SourceID, sourceID)
+}
+
+func (h *Handlers) ListVodGenres(ctx context.Context, _ ListVodGenresRequestObject) (ListVodGenresResponseObject, error) {
+	_, maxRating, authed, allowed := h.vodSession(ctx)
+	switch {
+	case !authed:
+		return ListVodGenres401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !allowed:
+		return ListVodGenres403JSONResponse{ForbiddenJSONResponse(errVodNotAllowed)}, nil
+	}
+	gs, err := h.VOD.Genres(ctx, maxRating, false)
+	if err != nil {
+		return nil, internal(ctx, "listVodGenres", err)
+	}
+	out := make(ListVodGenres200JSONResponse, len(gs))
+	for i, c := range gs {
+		out[i] = VodCategory{Name: c.Name, Count: c.Count}
 	}
 	return out, nil
 }

@@ -35,3 +35,22 @@ func (s *Service) MovieByID(ctx context.Context, id int) (*tmdb.Movie, error) {
 	}
 	return c.Movie(ctx, id)
 }
+
+// TVByID returns a series' details by its TMDB id, for series on demand whose source names
+// it (Xtream Codes). Without a TMDB key it returns tmdb.ErrNoKey.
+func (s *Service) TVByID(ctx context.Context, id int) (*tmdb.TVShow, error) {
+	c, err := s.tmdb(s.Settings.Get().General.MetadataLanguage)
+	if err != nil {
+		return nil, err
+	}
+	return c.TV(ctx, id)
+}
+
+// TVSeason returns a season of a series on TMDB with its episodes (names, overviews, stills).
+func (s *Service) TVSeason(ctx context.Context, showID, season int) (*tmdb.Season, error) {
+	c, err := s.tmdb(s.Settings.Get().General.MetadataLanguage)
+	if err != nil {
+		return nil, err
+	}
+	return c.Season(ctx, showID, season)
+}

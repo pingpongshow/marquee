@@ -49,6 +49,12 @@ const VodPlayerPage = lazyRouteComponent(
   () => import("@/features/livetv/Vod"),
   "VodPlayerPage",
 );
+const VodShowsPage = lazyRouteComponent(() => import("@/features/livetv/Vod"), "VodShowsPage");
+const VodShowPage = lazyRouteComponent(() => import("@/features/livetv/VodShows"), "VodShowPage");
+const VodEpisodePlayerPage = lazyRouteComponent(
+  () => import("@/features/livetv/VodShows"),
+  "VodEpisodePlayerPage",
+);
 const DiscoverPage = lazyRouteComponent(
   () => import("@/features/requests/DiscoverPage"),
   "DiscoverPage",
@@ -239,6 +245,33 @@ const vodPlayRoute = createRoute({
     return <VodPlayerPage movieId={Number(movieId)} startMs={t} />;
   },
 });
+// VOD Shows (series from Xtream Codes sources), a page of their own beside VOD Movies. The
+// static "shows" segment ranks above /vod/$movieId.
+const vodShowsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/vod/shows",
+  component: VodShowsPage,
+});
+const vodShowRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/vod/shows/$seriesId",
+  component: function VodShow() {
+    const { seriesId } = vodShowRoute.useParams();
+    return <VodShowPage seriesId={Number(seriesId)} />;
+  },
+});
+const vodEpisodePlayRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/vod/shows/$seriesId/play/$episodeId",
+  validateSearch: (s: Record<string, unknown>): { t?: number } => ({
+    t: typeof s.t === "number" ? s.t : undefined,
+  }),
+  component: function VodEpisodePlay() {
+    const { seriesId, episodeId } = vodEpisodePlayRoute.useParams();
+    const { t } = vodEpisodePlayRoute.useSearch();
+    return <VodEpisodePlayerPage seriesId={Number(seriesId)} episodeId={Number(episodeId)} startMs={t} />;
+  },
+});
 const liveWatchRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/livetv/watch/$channelId",
@@ -307,6 +340,9 @@ const routeTree = rootRoute.addChildren([
   vodRoute,
   vodMovieRoute,
   vodPlayRoute,
+  vodShowsRoute,
+  vodShowRoute,
+  vodEpisodePlayRoute,
   discoverRoute,
   homeRoute,
   playRoute,

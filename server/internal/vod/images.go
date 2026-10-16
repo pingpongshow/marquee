@@ -25,6 +25,44 @@ func (s *Service) Image(ctx context.Context, id int64, kind string) ([]byte, str
 	} else if src == "" {
 		src = logo
 	}
+	return s.fetchImage(ctx, src)
+}
+
+// SeriesImage returns a series' poster (else the source's cover) or backdrop.
+func (s *Service) SeriesImage(ctx context.Context, id int64, kind string) ([]byte, string, error) {
+	var poster, backdrop, logo string
+	err := s.DB.QueryRowContext(ctx, "SELECT poster_url, backdrop_url, logo_url FROM vod_series WHERE id=?", id).Scan(&poster, &backdrop, &logo)
+	if err != nil {
+		return nil, "", ErrNotFound
+	}
+	src := or(poster, logo)
+	if kind == "backdrop" {
+		src = backdrop
+	}
+	return s.fetchImage(ctx, src)
+}
+
+// SeasonImage returns a season's poster.
+func (s *Service) SeasonImage(ctx context.Context, seriesID int64, season int) ([]byte, string, error) {
+	var poster string
+	if err := s.DB.QueryRowContext(ctx, "SELECT poster_url FROM vod_seasons WHERE series_id=? AND season=?", seriesID, season).
+		Scan(&poster); err != nil {
+		return nil, "", ErrNotFound
+	}
+	return s.fetchImage(ctx, poster)
+}
+
+// EpisodeImage returns an episode's still.
+func (s *Service) EpisodeImage(ctx context.Context, id int64) ([]byte, string, error) {
+	var still string
+	if err := s.DB.QueryRowContext(ctx, "SELECT still_url FROM vod_episodes WHERE id=?", id).Scan(&still); err != nil {
+		return nil, "", ErrNotFound
+	}
+	return s.fetchImage(ctx, still)
+}
+
+// fetchImage fetches an image once and keeps it on disk.
+func (s *Service) fetchImage(ctx context.Context, src string) ([]byte, string, error) {
 	if src == "" {
 		return nil, "", ErrNotFound
 	}
