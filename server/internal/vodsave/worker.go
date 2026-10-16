@@ -137,7 +137,7 @@ func (j *job) overall() float64 {
 }
 
 func (s *Service) tick() time.Duration       { return or(s.Tick, 2*time.Second) }
-func (s *Service) grace() time.Duration      { return or(s.Grace, 60*time.Second) }
+func (s *Service) grace() time.Duration      { return or(s.Grace, 15*time.Second) }
 func (s *Service) scanEvery() time.Duration  { return or(s.ScanEvery, 15*time.Minute) }
 func (s *Service) retryEvery() time.Duration { return or(s.RetryFailedEvery, 4*time.Hour) }
 func (s *Service) downWait() time.Duration   { return or(s.SourceDownWait, time.Minute) }

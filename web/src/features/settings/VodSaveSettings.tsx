@@ -251,7 +251,7 @@ export function VodSaveSettings() {
           />
           <Toggle
             label="Pause while someone is watching"
-            help="Saves wait while something plays, and go on a minute after it stops."
+            help="Saves wait while something plays, and go on about 15 seconds after it stops."
             checked={d.pauseWhileWatching ?? true}
             onChange={(v) => update({ pauseWhileWatching: v })}
           />
