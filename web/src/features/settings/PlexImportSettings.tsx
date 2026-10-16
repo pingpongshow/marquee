@@ -5,6 +5,7 @@ import { api, unwrap } from "@/api/client";
 import { usersQuery } from "@/api/queries";
 import type { components } from "@/api/schema.gen";
 import { Alert, Button, Card, Input, Select, Spinner, Toggle } from "@/components/ui";
+import { PlexSyncSettings } from "./PlexSyncSettings";
 
 type S = components["schemas"];
 type Preview = S["PlexImportPreview"];
@@ -68,7 +69,17 @@ function ReportView({ r }: { r: Report }) {
   );
 }
 
+/** Settings → Plex: two-way sync, then the one-time import. */
 export function PlexImportSettings() {
+  return (
+    <div className="space-y-6">
+      <PlexSyncSettings />
+      <PlexImport />
+    </div>
+  );
+}
+
+function PlexImport() {
   const qc = useQueryClient();
   const status = useQuery({ ...statusQuery, refetchInterval: (q) => (q.state.data?.running ? 1500 : false) });
   const users = useQuery(usersQuery);
@@ -104,7 +115,7 @@ export function PlexImportSettings() {
       <Card title="Plex database not found">
         <p className="text-sm text-muted">
           Mount your Plex data folder (the one containing <code className="text-text">Library</code>) read-only at <code className="text-text">/plex</code> in the Marquee container, then
-          reload this page.
+          reload this page. Two-way sync above doesn't need it.
         </p>
       </Card>
     );
@@ -136,7 +147,7 @@ export function PlexImportSettings() {
 
       <Card
         title={st.lastReport ? "Import again" : "Import from Plex"}
-        description="Brings over watch status, resume points, ratings, play history, playlists, intro/credits markers, the posters you chose and Plex's matches. Plex itself is not changed."
+        description="A one-time import of watch status, resume points, ratings, play history, playlists, intro/credits markers, the posters you chose and Plex's matches. Plex itself is not changed. The folders and people you choose are kept for two-way sync."
         actions={
           <Button size="sm" variant={preview ? "ghost" : "primary"} onClick={() => check.mutate(undefined)} loading={check.isPending}>
             <RefreshCw className="size-4" /> {preview ? "Re-check" : "Check Plex library"}

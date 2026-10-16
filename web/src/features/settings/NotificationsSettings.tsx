@@ -42,6 +42,7 @@ export function NotificationsSettings() {
       linkUrl: x.linkUrl,
       alerts: x.alerts,
       dvrQuotaAlert: x.dvrQuotaAlert,
+      plexSyncAlert: x.plexSyncAlert,
       recipientsAllAdmins: x.recipientsAllAdmins,
       recipients: x.recipients,
       diskThresholdPercent: x.diskThresholdPercent,
@@ -126,6 +127,12 @@ export function NotificationsSettings() {
               help="A recording wasn't made, or their oldest watched recordings went to the media trash to make room."
               checked={!!d.dvrQuotaAlert}
               onChange={(v) => update({ dvrQuotaAlert: v })}
+            />
+            <Toggle
+              label="Plex sync is failing"
+              help="Plex rejects the token, or hasn't been reachable for three sync runs in a row."
+              checked={!!d.plexSyncAlert}
+              onChange={(v) => update({ plexSyncAlert: v })}
             />
           </div>
           {alerts.includes("disk_low") && (

@@ -76,7 +76,15 @@ func (s Settings) Validate() error {
 			return invalid("invalid LAN subnet %q", c)
 		}
 	}
-	for _, u := range []string{s.Network.LANURL, s.RemoteAccess.RemoteURL, s.Integrations.BazarrURL} {
+	if m := s.PlexSync.IntervalMinutes; m < 5 || m > 24*60 {
+		return invalid("the Plex sync interval must be 5 minutes to 24 hours")
+	}
+	for _, m := range s.PlexSync.PathMappings {
+		if strings.TrimSpace(m.Plex) == "" || strings.TrimSpace(m.Marquee) == "" {
+			return invalid("each Plex folder mapping needs a Plex folder and a Marquee folder")
+		}
+	}
+	for _, u := range []string{s.Network.LANURL, s.RemoteAccess.RemoteURL, s.Integrations.BazarrURL, s.PlexSync.URL} {
 		if u == "" {
 			continue
 		}
