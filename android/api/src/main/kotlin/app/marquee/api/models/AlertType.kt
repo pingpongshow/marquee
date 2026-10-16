@@ -29,9 +29,9 @@ import kotlinx.serialization.Serializable
 
 
 /**
- * task_failed: a scheduled task (including the nightly backup) failed. disk_low: the config, transcode, recordings or a library folder's volume is low on space. recording_failed: a DVR recording failed. source_failed: a Live TV or movies-on-demand source couldn't be loaded. integration_down: Seerr, Bazarr, Ollama or the Soundprint sidecar isn't answering (only those that are set up). failed_signins: repeated wrong passwords for one account. new_admin_device: an administrator signed in from a device never used before. playback_failed: the transcoder couldn't produce video for a stream. 
+ * task_failed: a scheduled task (including the nightly backup) failed. disk_low: the config, transcode, recordings or a library folder's volume is low on space. recording_failed: a DVR recording failed. source_failed: a Live TV or movies-on-demand source couldn't be loaded. integration_down: Seerr, Bazarr, Ollama or the Soundprint sidecar isn't answering (only those that are set up). failed_signins: repeated wrong passwords for one account. new_admin_device: an administrator signed in from a device never used before. playback_failed: the transcoder couldn't produce video for a stream. vod_save_failed: saving a film or episode on demand into the library failed. vod_save_done: the save queue finished (one summary, not one per episode). 
  *
- * Values: TASK_FAILED,DISK_LOW,RECORDING_FAILED,SOURCE_FAILED,INTEGRATION_DOWN,FAILED_SIGNINS,NEW_ADMIN_DEVICE,PLAYBACK_FAILED
+ * Values: TASK_FAILED,DISK_LOW,RECORDING_FAILED,SOURCE_FAILED,INTEGRATION_DOWN,FAILED_SIGNINS,NEW_ADMIN_DEVICE,PLAYBACK_FAILED,VOD_SAVE_FAILED,VOD_SAVE_DONE
  */
 @Serializable
 enum class AlertType(val value: kotlin.String) {
@@ -58,7 +58,13 @@ enum class AlertType(val value: kotlin.String) {
     NEW_ADMIN_DEVICE("new_admin_device"),
 
     @SerialName(value = "playback_failed")
-    PLAYBACK_FAILED("playback_failed");
+    PLAYBACK_FAILED("playback_failed"),
+
+    @SerialName(value = "vod_save_failed")
+    VOD_SAVE_FAILED("vod_save_failed"),
+
+    @SerialName(value = "vod_save_done")
+    VOD_SAVE_DONE("vod_save_done");
 
     /**
      * Override [toString()] to avoid using the enum variable name as the value, and instead use

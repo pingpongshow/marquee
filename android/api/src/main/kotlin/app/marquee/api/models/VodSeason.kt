@@ -23,6 +23,7 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.VodLibraryRollup
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -38,6 +39,7 @@ import kotlinx.serialization.Contextual
  * @param overview 
  * @param airDate YYYY-MM-DD as the source gives it.
  * @param posterUrl Server-relative; no token needed.
+ * @param library 
  */
 @Serializable
 
@@ -67,7 +69,10 @@ data class VodSeason (
 
     /* Server-relative; no token needed. */
     @SerialName(value = "posterUrl")
-    val posterUrl: kotlin.String? = null
+    val posterUrl: kotlin.String? = null,
+
+    @SerialName(value = "library")
+    val library: VodLibraryRollup? = null
 
 ) {
 

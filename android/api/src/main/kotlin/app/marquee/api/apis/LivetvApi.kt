@@ -46,6 +46,8 @@ import app.marquee.api.models.VodCategory
 import app.marquee.api.models.VodMovie
 import app.marquee.api.models.VodMovieDetail
 import app.marquee.api.models.VodMoviePage
+import app.marquee.api.models.VodSaveQueue
+import app.marquee.api.models.VodSaveResult
 import app.marquee.api.models.VodSeries
 import app.marquee.api.models.VodSeriesDetail
 import app.marquee.api.models.VodSeriesPage
@@ -152,6 +154,145 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.DELETE,
             path = "/livetv/recordings/{recordingId}".replace("{"+"recordingId"+"}", encodeURIComponent(recordingId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /livetv/vod/saves/{saveId}
+     * Cancel a save (admin only); its partial files are deleted.
+     * 
+     * @param saveId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun cancelVodSave(saveId: kotlin.Long) : Unit {
+        val localVarResponse = cancelVodSaveWithHttpInfo(saveId = saveId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /livetv/vod/saves/{saveId}
+     * Cancel a save (admin only); its partial files are deleted.
+     * 
+     * @param saveId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun cancelVodSaveWithHttpInfo(saveId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = cancelVodSaveRequestConfig(saveId = saveId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation cancelVodSave
+     *
+     * @param saveId 
+     * @return RequestConfig
+     */
+    fun cancelVodSaveRequestConfig(saveId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/livetv/vod/saves/{saveId}".replace("{"+"saveId"+"}", encodeURIComponent(saveId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /livetv/vod/saves/clear
+     * Remove finished saves (done, failed, cancelled, skipped) from the list (admin only). Failed saves&#39; partial files are deleted.
+     * 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun clearVodSaves() : Unit {
+        val localVarResponse = clearVodSavesWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /livetv/vod/saves/clear
+     * Remove finished saves (done, failed, cancelled, skipped) from the list (admin only). Failed saves&#39; partial files are deleted.
+     * 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun clearVodSavesWithHttpInfo() : ApiResponse<Unit?> {
+        val localVariableConfig = clearVodSavesRequestConfig()
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation clearVodSaves
+     *
+     * @return RequestConfig
+     */
+    fun clearVodSavesRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/livetv/vod/saves/clear",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -1140,6 +1281,76 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/livetv/vod/movies",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /livetv/vod/saves
+     * The save queue (admin only): unfinished saves in the order they run, then finished ones, newest first, with live progress, speed and ETA. Poll while active is true.
+     * 
+     * @return VodSaveQueue
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listVodSaves() : VodSaveQueue {
+        val localVarResponse = listVodSavesWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as VodSaveQueue
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /livetv/vod/saves
+     * The save queue (admin only): unfinished saves in the order they run, then finished ones, newest first, with live progress, speed and ETA. Poll while active is true.
+     * 
+     * @return ApiResponse<VodSaveQueue?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listVodSavesWithHttpInfo() : ApiResponse<VodSaveQueue?> {
+        val localVariableConfig = listVodSavesRequestConfig()
+
+        return request<Unit, VodSaveQueue>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listVodSaves
+     *
+     * @return RequestConfig
+     */
+    fun listVodSavesRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/livetv/vod/saves",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -2146,6 +2357,216 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     }
 
     /**
+     * POST /livetv/vod/saves/{saveId}/top
+     * Make a waiting save the next to run (admin only).
+     * 
+     * @param saveId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun moveVodSaveToTop(saveId: kotlin.Long) : Unit {
+        val localVarResponse = moveVodSaveToTopWithHttpInfo(saveId = saveId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /livetv/vod/saves/{saveId}/top
+     * Make a waiting save the next to run (admin only).
+     * 
+     * @param saveId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun moveVodSaveToTopWithHttpInfo(saveId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = moveVodSaveToTopRequestConfig(saveId = saveId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation moveVodSaveToTop
+     *
+     * @param saveId 
+     * @return RequestConfig
+     */
+    fun moveVodSaveToTopRequestConfig(saveId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/livetv/vod/saves/{saveId}/top".replace("{"+"saveId"+"}", encodeURIComponent(saveId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /livetv/vod/saves/{saveId}/pause
+     * Pause one save (admin only); it keeps what it downloaded.
+     * 
+     * @param saveId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun pauseVodSave(saveId: kotlin.Long) : Unit {
+        val localVarResponse = pauseVodSaveWithHttpInfo(saveId = saveId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /livetv/vod/saves/{saveId}/pause
+     * Pause one save (admin only); it keeps what it downloaded.
+     * 
+     * @param saveId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun pauseVodSaveWithHttpInfo(saveId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = pauseVodSaveRequestConfig(saveId = saveId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation pauseVodSave
+     *
+     * @param saveId 
+     * @return RequestConfig
+     */
+    fun pauseVodSaveRequestConfig(saveId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/livetv/vod/saves/{saveId}/pause".replace("{"+"saveId"+"}", encodeURIComponent(saveId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /livetv/vod/saves/pause
+     * Pause the whole queue (admin only). Running saves stop and keep their partial files; resuming continues them with Range requests.
+     * 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun pauseVodSaves() : Unit {
+        val localVarResponse = pauseVodSavesWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /livetv/vod/saves/pause
+     * Pause the whole queue (admin only). Running saves stop and keep their partial files; resuming continues them with Range requests.
+     * 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun pauseVodSavesWithHttpInfo() : ApiResponse<Unit?> {
+        val localVariableConfig = pauseVodSavesRequestConfig()
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation pauseVodSaves
+     *
+     * @return RequestConfig
+     */
+    fun pauseVodSavesRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/livetv/vod/saves/pause",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * POST /livetv/channels/{channelId}/play
      * Start watching a channel. Returns a live HLS session (copied or transcoded for the device).
      * 
@@ -2584,6 +3005,483 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.PATCH,
             path = "/livetv/vod/sessions/{sessionId}".replace("{"+"sessionId"+"}", encodeURIComponent(sessionId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /livetv/vod/saves/{saveId}/resume
+     * Resume a paused save (admin only); it continues from where it stopped.
+     * 
+     * @param saveId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun resumeVodSave(saveId: kotlin.Long) : Unit {
+        val localVarResponse = resumeVodSaveWithHttpInfo(saveId = saveId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /livetv/vod/saves/{saveId}/resume
+     * Resume a paused save (admin only); it continues from where it stopped.
+     * 
+     * @param saveId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun resumeVodSaveWithHttpInfo(saveId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = resumeVodSaveRequestConfig(saveId = saveId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation resumeVodSave
+     *
+     * @param saveId 
+     * @return RequestConfig
+     */
+    fun resumeVodSaveRequestConfig(saveId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/livetv/vod/saves/{saveId}/resume".replace("{"+"saveId"+"}", encodeURIComponent(saveId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /livetv/vod/saves/resume
+     * Resume the whole queue (admin only).
+     * 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun resumeVodSaves() : Unit {
+        val localVarResponse = resumeVodSavesWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /livetv/vod/saves/resume
+     * Resume the whole queue (admin only).
+     * 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun resumeVodSavesWithHttpInfo() : ApiResponse<Unit?> {
+        val localVariableConfig = resumeVodSavesRequestConfig()
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation resumeVodSaves
+     *
+     * @return RequestConfig
+     */
+    fun resumeVodSavesRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/livetv/vod/saves/resume",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /livetv/vod/saves/{saveId}/retry
+     * Queue a failed or cancelled save again (admin only); a failed one continues from what it downloaded.
+     * 
+     * @param saveId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun retryVodSave(saveId: kotlin.Long) : Unit {
+        val localVarResponse = retryVodSaveWithHttpInfo(saveId = saveId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /livetv/vod/saves/{saveId}/retry
+     * Queue a failed or cancelled save again (admin only); a failed one continues from what it downloaded.
+     * 
+     * @param saveId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun retryVodSaveWithHttpInfo(saveId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = retryVodSaveRequestConfig(saveId = saveId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation retryVodSave
+     *
+     * @param saveId 
+     * @return RequestConfig
+     */
+    fun retryVodSaveRequestConfig(saveId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/livetv/vod/saves/{saveId}/retry".replace("{"+"saveId"+"}", encodeURIComponent(saveId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /livetv/vod/episodes/{episodeId}/save
+     * Save one episode into the library (admin only), into vodSave.showsFolder: {Show (Year)}/Season N/{Show} - SxxEyy - {Title} WEBDL-1080p.ext. Like a film: 409 in_library or upgrade_available when the library has it; upgrade replaces the library&#39;s copy when this one is better.
+     * 
+     * @param episodeId 
+     * @param upgrade Replace the library&#39;s copy when this one is better. (optional, default to false)
+     * @param destination A save folder from vodSave.destinations (its id); omitted &#x3D; the default shows folder. Episodes use destinations of kind shows or both. A wrong kind or an unknown id is 400. An upgrade always replaces the library&#39;s copy in its current folder, whatever the destination. (optional)
+     * @return VodSaveResult
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun saveVodEpisode(episodeId: kotlin.Long, upgrade: kotlin.Boolean? = false, destination: kotlin.String? = null) : VodSaveResult {
+        val localVarResponse = saveVodEpisodeWithHttpInfo(episodeId = episodeId, upgrade = upgrade, destination = destination)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as VodSaveResult
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /livetv/vod/episodes/{episodeId}/save
+     * Save one episode into the library (admin only), into vodSave.showsFolder: {Show (Year)}/Season N/{Show} - SxxEyy - {Title} WEBDL-1080p.ext. Like a film: 409 in_library or upgrade_available when the library has it; upgrade replaces the library&#39;s copy when this one is better.
+     * 
+     * @param episodeId 
+     * @param upgrade Replace the library&#39;s copy when this one is better. (optional, default to false)
+     * @param destination A save folder from vodSave.destinations (its id); omitted &#x3D; the default shows folder. Episodes use destinations of kind shows or both. A wrong kind or an unknown id is 400. An upgrade always replaces the library&#39;s copy in its current folder, whatever the destination. (optional)
+     * @return ApiResponse<VodSaveResult?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun saveVodEpisodeWithHttpInfo(episodeId: kotlin.Long, upgrade: kotlin.Boolean?, destination: kotlin.String?) : ApiResponse<VodSaveResult?> {
+        val localVariableConfig = saveVodEpisodeRequestConfig(episodeId = episodeId, upgrade = upgrade, destination = destination)
+
+        return request<Unit, VodSaveResult>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation saveVodEpisode
+     *
+     * @param episodeId 
+     * @param upgrade Replace the library&#39;s copy when this one is better. (optional, default to false)
+     * @param destination A save folder from vodSave.destinations (its id); omitted &#x3D; the default shows folder. Episodes use destinations of kind shows or both. A wrong kind or an unknown id is 400. An upgrade always replaces the library&#39;s copy in its current folder, whatever the destination. (optional)
+     * @return RequestConfig
+     */
+    fun saveVodEpisodeRequestConfig(episodeId: kotlin.Long, upgrade: kotlin.Boolean?, destination: kotlin.String?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (upgrade != null) {
+                    put("upgrade", listOf(upgrade.toString()))
+                }
+                if (destination != null) {
+                    put("destination", listOf(destination.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/livetv/vod/episodes/{episodeId}/save".replace("{"+"episodeId"+"}", encodeURIComponent(episodeId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /livetv/vod/movies/{movieId}/save
+     * Save a film into the library (admin only; Xtream Codes sources). Queued, downloaded, converted per Settings → vodSave, verified, moved into vodSave.moviesFolder and scanned. A film already queued or saved isn&#39;t queued again. One the library already has (VodMovieDetail.library) is refused with 409: in_library when the library&#39;s copy is as good or better, upgrade_available when this copy is better and upgrade wasn&#39;t set. With upgrade, a better copy replaces the library&#39;s: saved into the same folder, the old file(s) moved to the media trash, the item (and its watch history) kept.
+     * 
+     * @param movieId 
+     * @param upgrade Replace the library&#39;s copy when this one is better (VodLibraryMatch.verdict better). (optional, default to false)
+     * @param destination A save folder from vodSave.destinations (its id); omitted &#x3D; the default movies folder. Films use destinations of kind movies or both. A wrong kind or an unknown id is 400. An upgrade always replaces the library&#39;s copy in its current folder, whatever the destination. (optional)
+     * @return VodSaveResult
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun saveVodMovie(movieId: kotlin.Long, upgrade: kotlin.Boolean? = false, destination: kotlin.String? = null) : VodSaveResult {
+        val localVarResponse = saveVodMovieWithHttpInfo(movieId = movieId, upgrade = upgrade, destination = destination)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as VodSaveResult
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /livetv/vod/movies/{movieId}/save
+     * Save a film into the library (admin only; Xtream Codes sources). Queued, downloaded, converted per Settings → vodSave, verified, moved into vodSave.moviesFolder and scanned. A film already queued or saved isn&#39;t queued again. One the library already has (VodMovieDetail.library) is refused with 409: in_library when the library&#39;s copy is as good or better, upgrade_available when this copy is better and upgrade wasn&#39;t set. With upgrade, a better copy replaces the library&#39;s: saved into the same folder, the old file(s) moved to the media trash, the item (and its watch history) kept.
+     * 
+     * @param movieId 
+     * @param upgrade Replace the library&#39;s copy when this one is better (VodLibraryMatch.verdict better). (optional, default to false)
+     * @param destination A save folder from vodSave.destinations (its id); omitted &#x3D; the default movies folder. Films use destinations of kind movies or both. A wrong kind or an unknown id is 400. An upgrade always replaces the library&#39;s copy in its current folder, whatever the destination. (optional)
+     * @return ApiResponse<VodSaveResult?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun saveVodMovieWithHttpInfo(movieId: kotlin.Long, upgrade: kotlin.Boolean?, destination: kotlin.String?) : ApiResponse<VodSaveResult?> {
+        val localVariableConfig = saveVodMovieRequestConfig(movieId = movieId, upgrade = upgrade, destination = destination)
+
+        return request<Unit, VodSaveResult>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation saveVodMovie
+     *
+     * @param movieId 
+     * @param upgrade Replace the library&#39;s copy when this one is better (VodLibraryMatch.verdict better). (optional, default to false)
+     * @param destination A save folder from vodSave.destinations (its id); omitted &#x3D; the default movies folder. Films use destinations of kind movies or both. A wrong kind or an unknown id is 400. An upgrade always replaces the library&#39;s copy in its current folder, whatever the destination. (optional)
+     * @return RequestConfig
+     */
+    fun saveVodMovieRequestConfig(movieId: kotlin.Long, upgrade: kotlin.Boolean?, destination: kotlin.String?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (upgrade != null) {
+                    put("upgrade", listOf(upgrade.toString()))
+                }
+                if (destination != null) {
+                    put("destination", listOf(destination.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/livetv/vod/movies/{movieId}/save".replace("{"+"movieId"+"}", encodeURIComponent(movieId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /livetv/vod/series/{seriesId}/save
+     * Save a whole series, or one season, into the library (admin only). The episodes are fetched from the source first when they haven&#39;t been; ones already queued or saved are left out. Only episodes the library doesn&#39;t have are queued, plus (includeUpgrades) those better than the library&#39;s copies, which they replace; the rest count as skipped.
+     * 
+     * @param seriesId 
+     * @param season Only this season&#39;s episodes. (optional)
+     * @param includeUpgrades Also queue episodes better than the library&#39;s copies, replacing them. (optional, default to false)
+     * @param destination A save folder from vodSave.destinations (its id); omitted &#x3D; the default shows folder. Seasons and shows use destinations of kind shows or both. A wrong kind or an unknown id is 400. An upgrade always replaces the library&#39;s copy in its current folder, whatever the destination. (optional)
+     * @return VodSaveResult
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun saveVodSeries(seriesId: kotlin.Long, season: kotlin.Int? = null, includeUpgrades: kotlin.Boolean? = false, destination: kotlin.String? = null) : VodSaveResult {
+        val localVarResponse = saveVodSeriesWithHttpInfo(seriesId = seriesId, season = season, includeUpgrades = includeUpgrades, destination = destination)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as VodSaveResult
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /livetv/vod/series/{seriesId}/save
+     * Save a whole series, or one season, into the library (admin only). The episodes are fetched from the source first when they haven&#39;t been; ones already queued or saved are left out. Only episodes the library doesn&#39;t have are queued, plus (includeUpgrades) those better than the library&#39;s copies, which they replace; the rest count as skipped.
+     * 
+     * @param seriesId 
+     * @param season Only this season&#39;s episodes. (optional)
+     * @param includeUpgrades Also queue episodes better than the library&#39;s copies, replacing them. (optional, default to false)
+     * @param destination A save folder from vodSave.destinations (its id); omitted &#x3D; the default shows folder. Seasons and shows use destinations of kind shows or both. A wrong kind or an unknown id is 400. An upgrade always replaces the library&#39;s copy in its current folder, whatever the destination. (optional)
+     * @return ApiResponse<VodSaveResult?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun saveVodSeriesWithHttpInfo(seriesId: kotlin.Long, season: kotlin.Int?, includeUpgrades: kotlin.Boolean?, destination: kotlin.String?) : ApiResponse<VodSaveResult?> {
+        val localVariableConfig = saveVodSeriesRequestConfig(seriesId = seriesId, season = season, includeUpgrades = includeUpgrades, destination = destination)
+
+        return request<Unit, VodSaveResult>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation saveVodSeries
+     *
+     * @param seriesId 
+     * @param season Only this season&#39;s episodes. (optional)
+     * @param includeUpgrades Also queue episodes better than the library&#39;s copies, replacing them. (optional, default to false)
+     * @param destination A save folder from vodSave.destinations (its id); omitted &#x3D; the default shows folder. Seasons and shows use destinations of kind shows or both. A wrong kind or an unknown id is 400. An upgrade always replaces the library&#39;s copy in its current folder, whatever the destination. (optional)
+     * @return RequestConfig
+     */
+    fun saveVodSeriesRequestConfig(seriesId: kotlin.Long, season: kotlin.Int?, includeUpgrades: kotlin.Boolean?, destination: kotlin.String?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (season != null) {
+                    put("season", listOf(season.toString()))
+                }
+                if (includeUpgrades != null) {
+                    put("includeUpgrades", listOf(includeUpgrades.toString()))
+                }
+                if (destination != null) {
+                    put("destination", listOf(destination.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/livetv/vod/series/{seriesId}/save".replace("{"+"seriesId"+"}", encodeURIComponent(seriesId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

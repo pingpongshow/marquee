@@ -36,6 +36,7 @@ import app.marquee.api.models.RemoteAccessSettings
 import app.marquee.api.models.SecuritySettings
 import app.marquee.api.models.TaskSettings
 import app.marquee.api.models.TranscoderSettings
+import app.marquee.api.models.VodSaveSettings
 import app.marquee.api.models.Webhook
 
 import kotlinx.serialization.Serializable
@@ -58,6 +59,7 @@ import kotlinx.serialization.Contextual
  * @param cinema 
  * @param ai 
  * @param notifications 
+ * @param vodSave 
  * @param webhooks Replaces the whole list when sent.
  */
 @Serializable
@@ -102,6 +104,9 @@ data class ServerSettingsUpdate (
 
     @SerialName(value = "notifications")
     val notifications: NotificationSettingsUpdate? = null,
+
+    @SerialName(value = "vodSave")
+    val vodSave: VodSaveSettings? = null,
 
     /* Replaces the whole list when sent. */
     @SerialName(value = "webhooks")

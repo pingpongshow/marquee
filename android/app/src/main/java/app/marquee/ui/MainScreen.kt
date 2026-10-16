@@ -130,6 +130,8 @@ fun MainScreen() {
 private fun Routes(nav: NavHostController) {
     NavHost(nav, startDestination = "home") {
         composable("home") { HomeScreen(nav) }
+        // All of Continue Watching (Home's row's View more).
+        composable(CONTINUE_ROUTE) { ContinueWatchingScreen(nav) }
         composable("libraries") { LibrariesScreen(nav) }
         composable("playlists") { PlaylistsScreen(nav) }
         composable("search") { SearchScreen(nav) }
