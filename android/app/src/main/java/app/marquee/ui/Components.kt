@@ -176,6 +176,15 @@ fun RatingBadge(rating: Double?, modifier: Modifier = Modifier, size: Dp = 12.dp
 /** One entry of a tile's context menu. */
 data class TileAction(val label: String, val run: () -> Unit)
 
+/** A tile's context menu of [actions], while [open]. */
+@Composable
+fun TileMenu(actions: List<TileAction>, open: Boolean, onDismiss: () -> Unit) {
+    if (actions.isEmpty()) return
+    DropdownMenu(open, onDismiss) {
+        actions.forEach { a -> DropdownMenuItem({ Text(a.label) }, { onDismiss(); a.run() }) }
+    }
+}
+
 /**
  * A poster with its title underneath. Videos show a watched check or how far they were
  * watched, with this device's marks shown at once (USER-6). [actions] open as a context

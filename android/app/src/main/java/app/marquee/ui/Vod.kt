@@ -1,5 +1,9 @@
 package app.marquee.ui
 
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.runtime.mutableStateListOf
+import app.marquee.api.apis.HubsApi
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -166,15 +170,19 @@ private fun VodMovie.progress(): Float? {
 
 /** A film's poster with its title underneath, a watched tick or how far it was watched. */
 @Composable
-private fun VodTile(m: VodMovie, width: Dp?, onOpen: () -> Unit) {
+private fun VodTile(m: VodMovie, width: Dp?, actions: List<TileAction> = emptyList(), onOpen: () -> Unit) {
     val marquee = LocalMarquee.current
+    var menu by remember { mutableStateOf(false) }
     Column(if (width != null) Modifier.width(width) else Modifier.fillMaxWidth()) {
         Box {
-            Artwork(marquee.absolute(m.posterUrl), m.title, Shape.Poster, Modifier.fillMaxWidth().focusCard(onOpen)
+            Artwork(marquee.absolute(m.posterUrl), m.title, Shape.Poster, Modifier.fillMaxWidth()
+                .focusCard(onOpen, onLongClick = if (actions.isEmpty()) null else ({ menu = true }))
                 .semantics {
                     contentDescription = m.title
                     if (m.watched) stateDescription = "Watched"
+                    if (actions.isNotEmpty()) customActions = actions.map { a -> CustomAccessibilityAction(a.label) { a.run(); true } }
                 })
+            TileMenu(actions, menu) { menu = false }
             if (m.watched) Icon(Icons.Filled.CheckCircle, null, Modifier.align(Alignment.TopEnd).padding(6.dp).size(20.dp)
                 .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(50)), tint = Gold)
             m.progress()?.let {
@@ -306,6 +314,21 @@ fun VodBrowse(nav: NavHostController, shows: Boolean, header: @Composable () -> 
     }
     fun openMovie(m: VodMovie) = nav.navigate("vod/${m.id}")
     fun openShow(s: VodSeries) = nav.navigate("vodshow/${s.id}")
+    // Continue Watching's removals (USER-12): a tile goes at once ("m<id>" or "s<id>") and comes back
+    // if the call fails; once a reloaded row no longer has it, the key is forgotten (so a title
+    // watched again shows again).
+    val removed = remember { mutableStateListOf<String>() }
+    LaunchedEffect(resumeMovies, resumeShows) {
+        val keys = (resumeMovies?.map { "m${it.id}" } ?: emptyList()) + (resumeShows?.map { "s${it.id}" } ?: emptyList())
+        removed.retainAll { it in keys }
+    }
+    fun continueActions(removal: Pair<HubsApi.KindRemoveVodFromContinueWatching, Long>?, key: String, title: String, more: List<TileAction>) = buildList {
+        if (removal != null && !marquee.isOffline) add(TileAction("Remove from Continue Watching") {
+            removed.add(key)
+            removeVodContinue(marquee, context, removal.first, removal.second, title, onFailed = { removed.remove(key) })
+        })
+        addAll(more)
+    }
 
     val all = categories?.sumOf { it.count }
     val list = items
@@ -347,12 +370,16 @@ fun VodBrowse(nav: NavHostController, shows: Boolean, header: @Composable () -> 
                 Text("Continue Watching", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 LazyRow(Modifier.semantics { contentDescription = "Continue Watching" }, contentPadding = PaddingValues(vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    if (shows) items(rs ?: emptyList(), key = { it.id }) { s ->
-                        VodNextEpisodeTile(s, if (marquee.isTv) 260.dp else 200.dp) {
+                    if (shows) items(rs?.filter { "s${it.id}" !in removed } ?: emptyList(), key = { it.id }) { s ->
+                        VodNextEpisodeTile(s, if (marquee.isTv) 260.dp else 200.dp, continueActions(s.nextEpisode?.let { HubsApi.KindRemoveVodFromContinueWatching.EPISODE to it.id },
+                            "s${s.id}", s.title, listOf(TileAction("Go to show") { openShow(s) }))) {
                             val e = s.nextEpisode
                             if (e != null) nav.navigate("vodepplay/${s.id}/${e.id}") else openShow(s)
                         }
-                    } else items(rm ?: emptyList(), key = { it.id }) { m -> VodTile(m, if (marquee.isTv) 150.dp else 112.dp) { openMovie(m) } }
+                    } else items(rm?.filter { "m${it.id}" !in removed } ?: emptyList(), key = { it.id }) { m ->
+                        VodTile(m, if (marquee.isTv) 150.dp else 112.dp, continueActions(HubsApi.KindRemoveVodFromContinueWatching.MOVIE to m.id, "m${m.id}", m.title,
+                            listOf(TileAction("Go to film") { openMovie(m) }))) { openMovie(m) }
+                    }
                 }
             }
         }

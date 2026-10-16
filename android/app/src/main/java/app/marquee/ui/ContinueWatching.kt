@@ -1,5 +1,6 @@
 package app.marquee.ui
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,6 +57,7 @@ import app.marquee.api.apis.HubsApi
 import app.marquee.api.models.ContinueEntry
 import app.marquee.api.models.Hub
 import app.marquee.api.models.ItemSummary
+import app.marquee.core.Marquee
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -87,6 +89,20 @@ fun vodRemoval(e: ContinueEntry): Pair<HubsApi.KindRemoveVodFromContinueWatching
     else -> null
 }
 
+/**
+ * Removes a VOD film or show (its next episode's id: the whole show goes) from Continue Watching:
+ * [onRemoved] once it's gone, then Home's row and the VOD pages' rows refresh; if it fails, a toast
+ * and [onFailed] (to put the tile back when it was taken out at once).
+ */
+fun removeVodContinue(marquee: Marquee, context: Context, kind: HubsApi.KindRemoveVodFromContinueWatching, id: Long, title: String,
+    onRemoved: () -> Unit = {}, onFailed: () -> Unit = {}) {
+    marquee.scope.launch {
+        withContext(Dispatchers.IO) { runCatching { marquee.hubs.removeVodFromContinueWatching(kind, id) } }
+            .onSuccess { withContext(Dispatchers.Main) { onRemoved() }; marquee.watch.changed(); VodChanges.bump() }
+            .onFailure { withContext(Dispatchers.Main) { onFailed(); toast(context, "Couldn't remove “$title”: ${it.message ?: ""}") } }
+    }
+}
+
 /** Where opening an entry goes: library videos play (as Home always did), films and episodes on demand resume in their player. */
 fun continueRoute(e: ContinueEntry): String? {
     e.item?.let { return null }
@@ -105,8 +121,8 @@ fun continueProgress(e: ContinueEntry): Float? {
 
 /** A VOD entry's title and the line under it: the film and its year, or the show and "S1 · E3 · Title". */
 fun vodTitles(e: ContinueEntry): Pair<String, String> {
-    e.vodMovie?.let { m -> return m.title to listOfNotNull("On demand", m.year?.toString()).joinToString(" · ") }
-    e.vodEpisode?.let { ep -> return ep.seriesTitle to listOf(ep.label(), ep.title).filter { it.isNotBlank() }.joinToString(" · ") }
+    e.vodMovie?.let { m -> return m.title to listOfNotNull("VOD", m.year?.toString()).joinToString(" · ") }
+    e.vodEpisode?.let { ep -> return ep.seriesTitle to listOf("VOD", ep.label(), ep.title).filter { it.isNotBlank() }.joinToString(" · ") }
     return "" to ""
 }
 
@@ -140,11 +156,7 @@ private fun VodContinueTile(nav: NavHostController, e: ContinueEntry, width: Dp,
     val actions = buildList {
         if (!marquee.isOffline) add(TileAction("Remove from Continue Watching") {
             val (kind, id) = vodRemoval(e) ?: return@TileAction
-            marquee.scope.launch {
-                withContext(Dispatchers.IO) { runCatching { marquee.hubs.removeVodFromContinueWatching(kind, id) } }
-                    .onSuccess { withContext(Dispatchers.Main) { onRemoved(e.key) }; marquee.watch.changed(); VodChanges.bump() }
-                    .onFailure { toast(context, "Couldn't remove “$title”: ${it.message ?: ""}") }
-            }
+            removeVodContinue(marquee, context, kind, id, title, onRemoved = { onRemoved(e.key) })
         })
         if (m != null) add(TileAction("Go to film") { nav.navigate("vod/${m.id}") })
         if (ep != null) add(TileAction("Go to show") { nav.navigate("vodshow/${ep.seriesId}") })
