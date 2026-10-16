@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"marquee/internal/library"
 	"marquee/internal/settings"
 	"marquee/internal/vodsave"
 )
@@ -30,7 +31,80 @@ func toAPIVodSaveSettings(v settings.VODSave) *VodSaveSettings {
 		Audio: ptr(VodSaveSettingsAudio(v.Audio)), ConcurrentPerSource: ptr(v.ConcurrentPerSource),
 		ScanAfterSave: ptr(v.ScanAfterSave), SkipExisting: ptr(v.SkipExisting), PauseWhileWatching: ptr(v.PauseWhileWatching),
 		PauseScope: ptr(VodSaveSettingsPauseScope(v.PauseScope)), RetryFailed: ptr(v.RetryFailed),
+		Destinations: ptr(toAPIVodSaveDestinations(v.Destinations, nil)),
 	}
+}
+
+// toAPIVodSaveDestinations lists the save folders; with libs, each says whether a library
+// holds it.
+func toAPIVodSaveDestinations(ds []settings.VODSaveDestination, libs []library.Library) []VodSaveDestination {
+	out := make([]VodSaveDestination, len(ds))
+	for i, d := range ds {
+		out[i] = VodSaveDestination{Id: ptr(d.ID), Name: d.Name, Folder: d.Folder, Kind: VodSaveDestinationKind(d.Kind)}
+		if libs != nil {
+			out[i].InLibrary = ptr(vodsave.InLibrary(libs, d.Folder))
+		}
+	}
+	return out
+}
+
+// fillVodSaveCoverage says, for each save folder in the settings sent back, whether a
+// library holds it.
+func (h *Handlers) fillVodSaveCoverage(ctx context.Context, out *ServerSettings, s settings.Settings) {
+	if out.VodSave == nil || h.Libraries == nil || len(s.VODSave.Destinations) == 0 {
+		return
+	}
+	libs, err := h.Libraries.List(ctx)
+	if err != nil {
+		return
+	}
+	if libs == nil {
+		libs = []library.Library{}
+	}
+	out.VodSave.Destinations = ptr(toAPIVodSaveDestinations(s.VODSave.Destinations, libs))
+}
+
+// fromAPIVodSaveDestinations is the list sent, keeping ids (new ones get one).
+func fromAPIVodSaveDestinations(ds []VodSaveDestination) []settings.VODSaveDestination {
+	out := make([]settings.VODSaveDestination, len(ds))
+	for i, d := range ds {
+		id := ""
+		if d.Id != nil {
+			id = strings.TrimSpace(*d.Id)
+		}
+		if id == "" {
+			id = newWebhookID()
+		}
+		out[i] = settings.VODSaveDestination{ID: id, Name: strings.TrimSpace(d.Name), Folder: cleanFolder(d.Folder), Kind: string(d.Kind)}
+	}
+	return out
+}
+
+// checkSaveDestinations checks the save folders that are new or moved exist and are
+// writable.
+func checkSaveDestinations(before, after []settings.VODSaveDestination) error {
+	old := map[string]string{}
+	for _, d := range before {
+		old[d.ID] = d.Folder
+	}
+	for _, d := range after {
+		if f, ok := old[d.ID]; d.Folder != "" && filepath.IsAbs(d.Folder) && (!ok || f != d.Folder) {
+			if err := checkSaveFolder(d.Name, d.Folder); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// saveDestinationRefs are the save folders a kind (movie, episode) can go to, for a page.
+func (h *Handlers) saveDestinationRefs(kind string) []VodSaveDestinationRef {
+	ds := h.VODSaves.Destinations(kind)
+	out := make([]VodSaveDestinationRef, len(ds))
+	for i, d := range ds {
+		out[i] = VodSaveDestinationRef{Id: d.ID, Name: d.Name}
+	}
+	return out
 }
 
 func applyVodSaveSettings(v *settings.VODSave, u VodSaveSettings) {
@@ -64,6 +138,9 @@ func applyVodSaveSettings(v *settings.VODSave, u VodSaveSettings) {
 	set(&v.SkipExisting, u.SkipExisting)
 	set(&v.PauseWhileWatching, u.PauseWhileWatching)
 	set(&v.RetryFailed, u.RetryFailed)
+	if u.Destinations != nil {
+		v.Destinations = fromAPIVodSaveDestinations(*u.Destinations)
+	}
 }
 
 func cleanFolder(p string) string {
@@ -104,7 +181,11 @@ func toAPIVodSave(v vodsave.Save) VodSave {
 		BytesTotal: v.BytesTotal, Progress: float32(v.Progress), Attempts: v.Attempts, Verified: v.Verified,
 		VerifyNote: nz(v.VerifyNote), Sha256: nz(v.SHA256), Error: nz(v.Error), PauseReason: nz(v.PauseReason),
 		CreatedAt: v.CreatedAt, StartedAt: v.StartedAt, FinishedAt: v.FinishedAt, NextAttemptAt: v.NextAttemptAt,
-		EtaSeconds: nz(v.ETASeconds), ReplacedPath: nz(v.ReplacedPath)}
+		EtaSeconds: nz(v.ETASeconds), ReplacedPath: nz(v.ReplacedPath), DestinationName: nz(v.DestinationName),
+		DestinationFolder: nz(v.DestinationFolder)}
+	if v.NoLibrary {
+		out.NoLibrary = ptr(true)
+	}
 	if v.ReplaceFileID > 0 {
 		out.Upgrade = ptr(true)
 	}
@@ -176,6 +257,8 @@ func vodSaveErr(err error) (code, msg string) {
 		return "no_folder", err.Error()
 	case errors.Is(err, vodsave.ErrNotSavable):
 		return "not_savable", err.Error()
+	case errors.Is(err, vodsave.ErrDestination):
+		return "bad_destination", err.Error()
 	}
 	return "", ""
 }
@@ -190,7 +273,7 @@ func (h *Handlers) SaveVodMovie(ctx context.Context, req SaveVodMovieRequestObje
 	case !ok:
 		return SaveVodMovie503JSONResponse{ServiceUnavailableJSONResponse(errVodSaveUnavailable)}, nil
 	}
-	r, err := h.VODSaves.SaveMovie(ctx, req.MovieId, s.User.ID, req.Params.Upgrade != nil && *req.Params.Upgrade)
+	r, err := h.VODSaves.SaveMovieTo(ctx, req.MovieId, s.User.ID, req.Params.Upgrade != nil && *req.Params.Upgrade, strings.TrimSpace(nzs(req.Params.Destination)))
 	if e, ok := inLibrary(err); ok {
 		return SaveVodMovie409JSONResponse{ConflictJSONResponse(e)}, nil
 	}
@@ -215,7 +298,7 @@ func (h *Handlers) SaveVodEpisode(ctx context.Context, req SaveVodEpisodeRequest
 	case !ok:
 		return SaveVodEpisode503JSONResponse{ServiceUnavailableJSONResponse(errVodSaveUnavailable)}, nil
 	}
-	r, err := h.VODSaves.SaveEpisode(ctx, req.EpisodeId, s.User.ID, req.Params.Upgrade != nil && *req.Params.Upgrade)
+	r, err := h.VODSaves.SaveEpisodeTo(ctx, req.EpisodeId, s.User.ID, req.Params.Upgrade != nil && *req.Params.Upgrade, strings.TrimSpace(nzs(req.Params.Destination)))
 	if e, ok := inLibrary(err); ok {
 		return SaveVodEpisode409JSONResponse{ConflictJSONResponse(e)}, nil
 	}
@@ -240,7 +323,8 @@ func (h *Handlers) SaveVodSeries(ctx context.Context, req SaveVodSeriesRequestOb
 	case !ok:
 		return SaveVodSeries503JSONResponse{ServiceUnavailableJSONResponse(errVodSaveUnavailable)}, nil
 	}
-	r, err := h.VODSaves.SaveSeries(ctx, req.SeriesId, req.Params.Season, s.User.ID, req.Params.IncludeUpgrades != nil && *req.Params.IncludeUpgrades)
+	r, err := h.VODSaves.SaveSeriesTo(ctx, req.SeriesId, req.Params.Season, s.User.ID, req.Params.IncludeUpgrades != nil && *req.Params.IncludeUpgrades,
+		strings.TrimSpace(nzs(req.Params.Destination)))
 	switch code, msg := vodSaveErr(err); {
 	case code == "not_found":
 		return SaveVodSeries404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "series not found"))}, nil
@@ -270,6 +354,8 @@ func (h *Handlers) ListVodSaves(ctx context.Context, _ ListVodSavesRequestObject
 		return nil, internal(ctx, "listVodSaves", err)
 	}
 	movies, shows := h.VODSaves.Configured()
+	movies = movies || len(h.VODSaves.Destinations("movie")) > 0
+	shows = shows || len(h.VODSaves.Destinations("episode")) > 0
 	out := VodSaveQueue{Saves: make([]VodSave, len(list)), Active: h.VODSaves.Active(ctx), Paused: h.VODSaves.QueuePaused(ctx),
 		MoviesFolderSet: movies, ShowsFolderSet: shows}
 	for i, v := range list {
@@ -440,4 +526,12 @@ func (h *Handlers) ResumeVodSave(ctx context.Context, req ResumeVodSaveRequestOb
 		return ResumeVodSave409JSONResponse{ConflictJSONResponse(errVodSaveState)}, nil
 	}
 	return ResumeVodSave204Response{}, nil
+}
+
+// nzs is *p, or "" for nil.
+func nzs(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }

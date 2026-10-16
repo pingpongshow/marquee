@@ -40,6 +40,8 @@ const (
 var (
 	ErrNotFound    = errors.New("not found")
 	ErrNoFolder    = errors.New("choose a folder to save to in Settings → Movies on demand")
+	// ErrDestination is an unknown save folder, or one that doesn't take the kind saved.
+	ErrDestination = errors.New("no such save folder")
 	ErrNotSavable  = vod.ErrNotSavable
 	ErrWrongState  = errors.New("the save can't do that now")
 	errNoEpisodes  = errors.New("the source gave no episodes for this series")
@@ -195,6 +197,11 @@ type Save struct {
 	// trash once the new one is verified; ReplacedPath is where it was (when done).
 	ReplaceFileID int64
 	ReplacedPath  string
+	// The save folder chosen (Settings' destinations); "" for the default folder, and for
+	// upgrades, which go where the library's copy is.
+	DestinationName, DestinationFolder string
+	// NoLibrary: no library holds the folder it is saved into (it won't be scanned).
+	NoLibrary bool
 	// Live, while it runs.
 	Progress    float64 // 0–1 of the current step (processing, verifying); downloads use bytes
 	SpeedBps    float64
@@ -204,14 +211,16 @@ type Save struct {
 
 const saveCols = `id, source_id, kind, vod_id, COALESCE(series_id,0), source_key, file, title, COALESCE(tmdb_id,0), expected_ms,
 	target_path, quality, state, bytes_done, bytes_total, attempts, next_attempt_at, error, verified, verify_note, sha256,
-	created_at, started_at, finished_at, COALESCE(requested_by,0), COALESCE(replace_file_id,0), replaced_path`
+	created_at, started_at, finished_at, COALESCE(requested_by,0), COALESCE(replace_file_id,0), replaced_path,
+	destination_name, destination_folder`
 
 func scanSave(sc interface{ Scan(...any) error }) (Save, error) {
 	var v Save
 	var next, created, started, finished sql.NullString
 	err := sc.Scan(&v.ID, &v.SourceID, &v.Kind, &v.VODID, &v.SeriesID, &v.SourceKey, &v.File, &v.Title, &v.TMDBID, &v.ExpectedMS,
 		&v.TargetPath, &v.Quality, &v.State, &v.BytesDone, &v.BytesTotal, &v.Attempts, &next, &v.Error, &v.Verified, &v.VerifyNote,
-		&v.SHA256, &created, &started, &finished, &v.RequestedBy, &v.ReplaceFileID, &v.ReplacedPath)
+		&v.SHA256, &created, &started, &finished, &v.RequestedBy, &v.ReplaceFileID, &v.ReplacedPath,
+		&v.DestinationName, &v.DestinationFolder)
 	if err != nil {
 		return v, err
 	}
@@ -261,6 +270,14 @@ func (s *Service) List(ctx context.Context) ([]Save, error) {
 		return nil, err
 	}
 	paused := s.QueuePaused(ctx)
+	if s.Libraries != nil {
+		if libs, err := s.Libraries(ctx); err == nil {
+			for i := range out {
+				_, ok := libraryFor(libs, out[i].TargetPath)
+				out[i].NoLibrary = !ok
+			}
+		}
+	}
 	names := map[string]string{}
 	s.mu.Lock()
 	for i := range out {
@@ -490,10 +507,62 @@ func (s *Service) EpisodeStates(ctx context.Context, seriesID int64) (map[int64]
 	return out, nil
 }
 
-// Configured reports which kinds can be saved (their folder is set).
+// Configured reports which kinds can be saved to their default folder (it is set).
 func (s *Service) Configured() (movies, shows bool) {
 	c := s.cfg()
 	return c.MoviesFolder != "", c.ShowsFolder != ""
+}
+
+// Destinations are the save folders besides the default one that take a kind (movie,
+// episode), in the order of the settings.
+func (s *Service) Destinations(kind string) []settings.VODSaveDestination {
+	var out []settings.VODSaveDestination
+	for _, d := range s.cfg().Destinations {
+		if d.Takes(kind) {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+// destination is where a kind (movie, episode) is saved: the default folder (id "") or a
+// save folder from the settings, which must take that kind.
+func (s *Service) destination(id, kind string) (root string, d settings.VODSaveDestination, err error) {
+	c := s.cfg()
+	if id == "" {
+		root = c.ShowsFolder
+		if kind == "movie" {
+			root = c.MoviesFolder
+		}
+		if root == "" {
+			return "", d, ErrNoFolder
+		}
+		return root, d, nil
+	}
+	d, ok := c.Destination(id)
+	if !ok {
+		return "", d, destError("that save folder isn't in Settings any more")
+	}
+	if !d.Takes(kind) {
+		what := "episodes"
+		if kind == "movie" {
+			what = "films"
+		}
+		return "", d, destError(fmt.Sprintf("the save folder %s doesn't take %s", d.Name, what))
+	}
+	return d.Folder, d, nil
+}
+
+// destError is an unknown save folder or one of the wrong kind (errors.Is ErrDestination).
+type destError string
+
+func (e destError) Error() string        { return string(e) }
+func (e destError) Is(target error) bool { return target == ErrDestination }
+
+// InLibrary reports whether a library holds folder (what is saved there is scanned).
+func InLibrary(libs []library.Library, folder string) bool {
+	_, ok := libraryFor(libs, filepath.Clean(folder))
+	return ok
 }
 
 // libraryFor is the library whose folder holds path (the deepest one).

@@ -285,7 +285,11 @@ func (h *Handlers) GetVodMovie(ctx context.Context, req GetVodMovieRequestObject
 	// Admins see whether it's saved into the library.
 	if s.User.IsAdmin && h.VODSaves != nil {
 		movies, _ := h.VODSaves.Configured()
-		out.CanSave = ptr(movies && h.VOD.Savable(m.SourceID))
+		dests := h.saveDestinationRefs("movie")
+		out.CanSave = ptr((movies || len(dests) > 0) && h.VOD.Savable(m.SourceID))
+		if *out.CanSave {
+			out.SaveDefault, out.SaveDestinations = ptr(movies), &dests
+		}
 		if st, err := h.VODSaves.MovieState(ctx, m.ID); err == nil {
 			out.Save = toAPIVodSaveState(st)
 		}

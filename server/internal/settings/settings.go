@@ -70,6 +70,40 @@ type VODSave struct {
 	PauseScope         string `json:"pauseScope"`
 	// RetryFailed queues failed saves again every few hours.
 	RetryFailed bool `json:"retryFailed"`
+	// Destinations are more folders to save to besides the two above (e.g. Anime), chosen
+	// when saving ("Save to Anime").
+	Destinations []VODSaveDestination `json:"destinations,omitempty"`
+}
+
+// VODSaveDestination is a folder to save to besides the default Movies and Shows ones.
+type VODSaveDestination struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`   // shown in buttons; unique, ignoring case
+	Folder string `json:"folder"` // as the server sees it
+	Kind   string `json:"kind"`   // movies, shows, both
+}
+
+// Takes reports whether films (kind "movie") or episodes ("episode") can be saved there.
+func (d VODSaveDestination) Takes(kind string) bool {
+	switch d.Kind {
+	case "both":
+		return true
+	case "movies":
+		return kind == "movie"
+	case "shows":
+		return kind == "episode"
+	}
+	return false
+}
+
+// Destination is the destination with an id.
+func (v VODSave) Destination(id string) (VODSaveDestination, bool) {
+	for _, d := range v.Destinations {
+		if d.ID == id {
+			return d, true
+		}
+	}
+	return VODSaveDestination{}, false
 }
 
 // VODSave quality modes.

@@ -200,6 +200,7 @@ export type VodSaveState = components["schemas"]["VodSaveState"];
 export type VodSaveStateName = components["schemas"]["VodSaveStateName"];
 export type VodLibraryMatch = components["schemas"]["VodLibraryMatch"];
 export type VodLibraryRollup = components["schemas"]["VodLibraryRollup"];
+export type VodSaveDestinationRef = components["schemas"]["VodSaveDestinationRef"];
 
 /** States in which a save is still on its way (the page polls while one is). */
 export const saveActive = (s?: VodSaveStateName) =>
@@ -221,27 +222,28 @@ export function useSaveVod() {
   return useMutation({
     mutationFn: (
       what:
-        | { movieId: number; upgrade?: boolean }
-        | { episodeId: number; upgrade?: boolean }
-        | { seriesId: number; season?: number; includeUpgrades?: boolean },
+        | { movieId: number; upgrade?: boolean; destination?: string }
+        | { episodeId: number; upgrade?: boolean; destination?: string }
+        | { seriesId: number; season?: number; includeUpgrades?: boolean; destination?: string },
     ) => {
+      const destination = what.destination || undefined;
       if ("movieId" in what)
         return unwrap(
           api.POST("/livetv/vod/movies/{movieId}/save", {
-            params: { path: { movieId: what.movieId }, query: { upgrade: what.upgrade || undefined } },
+            params: { path: { movieId: what.movieId }, query: { upgrade: what.upgrade || undefined, destination } },
           }),
         );
       if ("episodeId" in what)
         return unwrap(
           api.POST("/livetv/vod/episodes/{episodeId}/save", {
-            params: { path: { episodeId: what.episodeId }, query: { upgrade: what.upgrade || undefined } },
+            params: { path: { episodeId: what.episodeId }, query: { upgrade: what.upgrade || undefined, destination } },
           }),
         );
       return unwrap(
         api.POST("/livetv/vod/series/{seriesId}/save", {
           params: {
             path: { seriesId: what.seriesId },
-            query: { season: what.season, includeUpgrades: what.includeUpgrades || undefined },
+            query: { season: what.season, includeUpgrades: what.includeUpgrades || undefined, destination },
           },
         }),
       );

@@ -5,6 +5,7 @@ import {
   ArrowUpCircle,
   ArrowUpToLine,
   Check,
+  ChevronDown,
   Download,
   HardDriveDownload,
   Library,
@@ -16,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { meQuery } from "@/api/queries";
+import { Menu, MenuItem } from "@/components/Menu";
 import { Alert, Badge, Button, Spinner } from "@/components/ui";
 import { toast } from "@/components/Toast";
 import {
@@ -26,6 +28,7 @@ import {
   type VodLibraryMatch,
   type VodLibraryRollup,
   type VodSave,
+  type VodSaveDestinationRef,
   type VodSaveState,
 } from "./vodApi";
 
@@ -102,122 +105,216 @@ function toastResult(r: { queued: number; already: number; skipped: number; upgr
   toast(parts.length ? parts.join(", ") : "Nothing to save", { link: { to: "/vod/saves", label: "Saves" } });
 }
 
+/** Where a film's or episode's page can save to: the default folder and the extra save folders. */
+export type SaveTargets = { saveDefault?: boolean; saveDestinations?: VodSaveDestinationRef[] };
+
+/** A save option: the default folder (no id) or a save folder from Settings. */
+type SaveOption = { id?: string; name?: string };
+
+/** The options in order: the default folder first (when it's set), then the save folders. */
+function saveOptions(t?: SaveTargets): SaveOption[] {
+  return [...(t?.saveDefault === false ? [] : [{}]), ...(t?.saveDestinations ?? [])];
+}
+
+const upgradeNote = "Upgrade replaces the copy in its current folder";
+
+/** "Save to Anime" for a save folder, the label as it is for the default one. */
+function withDest(label: string, o?: SaveOption) {
+  return o?.name ? `${label} to ${o.name}` : label;
+}
+
+/**
+ * The menu beside a save button listing the other places to save to ("Save to Anime"),
+ * showing the same disabled and upgrade states as the button.
+ */
+function SaveToMenu({
+  options,
+  verb,
+  upgrade,
+  disabled,
+  onPick,
+  floating,
+}: {
+  options: SaveOption[];
+  verb: string;
+  upgrade?: boolean;
+  disabled?: boolean;
+  onPick: (o: SaveOption) => void;
+  floating?: boolean;
+}) {
+  if (options.length === 0) return null;
+  return (
+    <Menu label="Save to another folder" trigger={<ChevronDown className="size-4" />} align="left" floating={floating}>
+      {options.map((o) => (
+        <MenuItem
+          key={o.id ?? ""}
+          disabled={disabled}
+          onClick={() => onPick(o)}
+          icon={upgrade ? <ArrowUpCircle className="text-accent" /> : <HardDriveDownload />}
+        >
+          <span className="min-w-0">
+            <span className="block">{o.name ? `${verb} to ${o.name}` : `${verb} to the default folder`}</span>
+            {upgrade && <span className="block text-xs text-muted">{upgradeNote}</span>}
+          </span>
+        </MenuItem>
+      ))}
+    </Menu>
+  );
+}
+
 /**
  * A film page's save button with its state: Save, Upgrade (replacing the library's copy),
- * or, when the library has it as well or better, disabled with the reason.
+ * or, when the library has it as well or better, disabled with the reason. With save folders
+ * besides the default one, a menu beside it offers "Save to Anime" and so on.
  */
 export function SaveMovieButton({
   movieId,
   save,
   library,
+  targets,
 }: {
   movieId: number;
   save?: VodSaveState | null;
   library?: VodLibraryMatch | null;
+  targets?: SaveTargets;
 }) {
+  const admin = useIsAdmin();
   const m = useSaveVod();
+  if (!admin) return null;
   const state = save?.state;
   const busy = saveActive(state) || state === "paused";
   const done = state === "done" || state === "skipped";
   const action = libraryAction(library);
+  const [main, ...more] = saveOptions(targets);
   // A save on its way, or just finished, shows its state; otherwise what the library allows.
   const showSave = busy || state === "failed" || (done && action.can && !action.upgrade);
-  const label = showSave ? (state === "failed" ? "Save failed — try again" : saveLabel(save)) : action.label;
+  const label = showSave
+    ? state === "failed"
+      ? "Save failed — try again"
+      : saveLabel(save)
+    : action.upgrade
+      ? action.label
+      : withDest(action.label, main);
   const disabled = busy || m.isPending || !action.can || (done && !action.upgrade);
+  const run = (o?: SaveOption) =>
+    m.mutate(
+      { movieId, upgrade: action.upgrade, destination: o?.id },
+      { onSuccess: toastResult, onError: (e) => toast(e.message, { tone: "error" }) },
+    );
   return (
-    <Button
-      variant="ghost"
-      onClick={() =>
-        m.mutate(
-          { movieId, upgrade: action.upgrade },
-          { onSuccess: toastResult, onError: (e) => toast(e.message, { tone: "error" }) },
-        )
-      }
-      disabled={disabled}
-      title={
-        save?.error ||
-        libraryTitle(library) ||
-        (done ? "Already in the library" : "Save a copy into the library's movies folder")
-      }
-    >
-      {showSave && done ? (
-        <Check className="size-4 text-success" />
-      ) : busy || library?.pending ? (
-        <Loader2 className="size-4 animate-spin" />
-      ) : state === "failed" ? (
-        <AlertTriangle className="size-4 text-danger" />
-      ) : action.upgrade ? (
-        <ArrowUpCircle className="size-4 text-accent" />
-      ) : !action.can ? (
-        <Library className="size-4" />
-      ) : (
-        <HardDriveDownload className="size-4" />
-      )}
-      {label}
-    </Button>
+    <div className="inline-flex items-center">
+      <Button
+        variant="ghost"
+        onClick={() => run(main)}
+        disabled={disabled}
+        title={
+          save?.error ||
+          [libraryTitle(library), action.upgrade ? upgradeNote : ""].filter(Boolean).join("\n") ||
+          (done
+            ? "Already in the library"
+            : main?.name
+              ? `Save a copy into the ${main.name} folder`
+              : "Save a copy into the library's movies folder")
+        }
+      >
+        {showSave && done ? (
+          <Check className="size-4 text-success" />
+        ) : busy || library?.pending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : state === "failed" ? (
+          <AlertTriangle className="size-4 text-danger" />
+        ) : action.upgrade ? (
+          <ArrowUpCircle className="size-4 text-accent" />
+        ) : !action.can ? (
+          <Library className="size-4" />
+        ) : (
+          <HardDriveDownload className="size-4" />
+        )}
+        {label}
+      </Button>
+      <SaveToMenu options={more} verb={action.upgrade ? "Upgrade" : "Save"} upgrade={action.upgrade} disabled={disabled} onPick={run} />
+    </div>
   );
 }
 
 /**
  * Save buttons for a show or one season: "Save missing (N)" queues the episodes the library
  * lacks; "Upgrade (M)" also queues those better than the library's copies, replacing them.
+ * With save folders besides the default one, a menu beside "Save missing" offers them.
  */
 export function SaveSeriesButton({
   seriesId,
   season,
   label,
   library,
+  targets,
 }: {
   seriesId: number;
   season?: number;
   label: string;
   library?: VodLibraryRollup | null;
+  targets?: SaveTargets;
 }) {
+  const admin = useIsAdmin();
   const m = useSaveVod();
-  const run = (includeUpgrades: boolean) =>
+  if (!admin) return null;
+  const [main, ...more] = saveOptions(targets);
+  const run = (includeUpgrades: boolean, o?: SaveOption) =>
     m.mutate(
-      { seriesId, season, includeUpgrades },
+      { seriesId, season, includeUpgrades, destination: o?.id },
       { onSuccess: toastResult, onError: (e) => toast(e.message, { tone: "error" }) },
     );
   const what = season == null ? "show" : "season";
+  const into = main?.name ? `the ${main.name} folder` : "the library's shows folder";
   if (!library)
     return (
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={() => run(false)}
-        loading={m.isPending}
-        title="Save copies of the episodes into the library's shows folder"
-      >
-        {!m.isPending && <HardDriveDownload className="size-4" />} {label}
-      </Button>
+      <div className="inline-flex items-center">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => run(false, main)}
+          loading={m.isPending}
+          title={`Save copies of the episodes into ${into}`}
+        >
+          {!m.isPending && <HardDriveDownload className="size-4" />} {withDest(label, main)}
+        </Button>
+        <SaveToMenu options={more} verb={label} disabled={m.isPending} onPick={(o) => run(false, o)} />
+      </div>
     );
   const have = library.same + library.worse;
   const checking = library.pending ? ` ${library.pending} still being checked.` : "";
+  const missing = library.none ? `Save missing (${library.none})` : "Nothing missing";
   return (
     <>
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={() => run(false)}
-        loading={m.isPending}
-        disabled={library.none === 0}
-        title={
-          library.none
-            ? `Save the ${library.none} episode${library.none === 1 ? "" : "s"} of this ${what} the library doesn't have.${have ? ` ${have} already in the library as well or better.` : ""}${checking}`
-            : `The library has every episode of this ${what}.${checking}`
-        }
-      >
-        {!m.isPending && <HardDriveDownload className="size-4" />}{" "}
-        {library.none ? `Save missing (${library.none})` : "Nothing missing"}
-      </Button>
+      <div className="inline-flex items-center">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => run(false, main)}
+          loading={m.isPending}
+          disabled={library.none === 0}
+          title={
+            library.none
+              ? `Save the ${library.none} episode${library.none === 1 ? "" : "s"} of this ${what} the library doesn't have into ${into}.${have ? ` ${have} already in the library as well or better.` : ""}${checking}`
+              : `The library has every episode of this ${what}.${checking}`
+          }
+        >
+          {!m.isPending && <HardDriveDownload className="size-4" />} {library.none ? withDest(missing, main) : missing}
+        </Button>
+        <SaveToMenu
+          options={more}
+          verb={`Save missing (${library.none})`}
+          disabled={m.isPending || library.none === 0}
+          onPick={(o) => run(false, o)}
+        />
+      </div>
       {library.better > 0 && (
         <Button
           size="sm"
           variant="ghost"
-          onClick={() => run(true)}
+          onClick={() => run(true, main)}
           disabled={m.isPending}
-          title={`Replace the library's copies of ${library.better} episode${library.better === 1 ? "" : "s"} with better ones${library.none ? `, and save the ${library.none} missing` : ""}. The old files go to the media trash.`}
+          title={`Replace the library's copies of ${library.better} episode${library.better === 1 ? "" : "s"} with better ones${library.none ? `, and save the ${library.none} missing into ${into}` : ""}. ${upgradeNote}; the old files go to the media trash.`}
         >
           <ArrowUpCircle className="size-4 text-accent" /> Upgrade ({library.better})
         </Button>
@@ -226,50 +323,73 @@ export function SaveSeriesButton({
   );
 }
 
-/** An episode row's save icon, showing its state and how it compares with the library. */
+/**
+ * An episode row's save icon, showing its state and how it compares with the library. With
+ * save folders besides the default one, it opens a menu of where to save to.
+ */
 export function SaveEpisodeIcon({
   episodeId,
   save,
   library,
+  targets,
 }: {
   episodeId: number;
   save?: VodSaveState | null;
   library?: VodLibraryMatch | null;
+  targets?: SaveTargets;
 }) {
+  const admin = useIsAdmin();
   const m = useSaveVod();
+  if (!admin) return null;
   const state = save?.state;
   const action = libraryAction(library);
   const idle = !state || state === "failed" || state === "cancelled" || ((state === "done" || state === "skipped") && action.upgrade);
   const can = idle && action.can;
   const label = idle ? action.label : saveLabel(save);
+  const options = saveOptions(targets);
+  const run = (o?: SaveOption) =>
+    m.mutate({ episodeId, upgrade: action.upgrade, destination: o?.id }, { onError: (e) => toast(e.message, { tone: "error" }) });
+  const icon =
+    idle && action.upgrade && !m.isPending ? (
+      <ArrowUpCircle className="size-4 text-accent" />
+    ) : idle && !action.can ? (
+      library?.pending ? <Loader2 className="size-4 animate-spin text-faint" /> : <Library className="size-4 text-success" />
+    ) : state === "done" || state === "skipped" ? (
+      <HardDriveDownload className="size-4 text-success" />
+    ) : saveActive(state) || m.isPending ? (
+      <>
+        <Loader2 className="size-4 animate-spin text-accent" />
+        {state === "downloading" && <span className="text-muted">{Math.floor((save?.progress ?? 0) * 100)}%</span>}
+      </>
+    ) : state === "paused" ? (
+      <Pause className="size-4 text-muted" />
+    ) : state === "failed" ? (
+      <AlertTriangle className="size-4 text-danger" />
+    ) : (
+      <Download className="size-4 text-faint" />
+    );
+  // Where to save to, when there's a choice (an upgrade has none: it replaces the copy where it is).
+  if (can && !m.isPending && !action.upgrade && options.length > 1)
+    return (
+      <Menu label={label} trigger={<span className="inline-flex items-center gap-1 text-xs">{icon}</span>} floating>
+        {options.map((o) => (
+          <MenuItem key={o.id ?? ""} onClick={() => run(o)} icon={<HardDriveDownload />}>
+            {withDest("Save", o)}
+          </MenuItem>
+        ))}
+      </Menu>
+    );
   return (
     <button
-      onClick={() =>
-        can && m.mutate({ episodeId, upgrade: action.upgrade }, { onError: (e) => toast(e.message, { tone: "error" }) })
-      }
+      onClick={() => can && run(options[0])}
       disabled={!can || m.isPending}
       className="inline-flex items-center gap-1 rounded-full p-1.5 text-xs hover:bg-surface-2 disabled:cursor-default disabled:hover:bg-transparent"
-      aria-label={label}
-      title={[save?.error, label, libraryTitle(library)].filter(Boolean).join("\n")}
+      aria-label={idle && !action.upgrade ? withDest(label, options[0]) : label}
+      title={[save?.error, idle && !action.upgrade ? withDest(label, options[0]) : label, action.upgrade && idle ? upgradeNote : "", libraryTitle(library)]
+        .filter(Boolean)
+        .join("\n")}
     >
-      {idle && action.upgrade && !m.isPending ? (
-        <ArrowUpCircle className="size-4 text-accent" />
-      ) : idle && !action.can ? (
-        library?.pending ? <Loader2 className="size-4 animate-spin text-faint" /> : <Library className="size-4 text-success" />
-      ) : state === "done" || state === "skipped" ? (
-        <HardDriveDownload className="size-4 text-success" />
-      ) : saveActive(state) || m.isPending ? (
-        <>
-          <Loader2 className="size-4 animate-spin text-accent" />
-          {state === "downloading" && <span className="text-muted">{Math.floor((save?.progress ?? 0) * 100)}%</span>}
-        </>
-      ) : state === "paused" ? (
-        <Pause className="size-4 text-muted" />
-      ) : state === "failed" ? (
-        <AlertTriangle className="size-4 text-danger" />
-      ) : (
-        <Download className="size-4 text-faint" />
-      )}
+      {icon}
     </button>
   );
 }
@@ -334,6 +454,11 @@ function SaveRow({ v }: { v: VodSave }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium">{v.title}</span>
+            {v.destinationName && (
+              <span className="text-sm text-muted" title={v.destinationFolder}>
+                → {v.destinationName}
+              </span>
+            )}
             <Badge tone={v.state === "failed" ? "danger" : running || v.state === "done" ? "accent" : "muted"}>
               {v.state === "done" && v.replacedPath ? "Upgraded" : stateText[v.state]}
             </Badge>
@@ -360,6 +485,12 @@ function SaveRow({ v }: { v: VodSave }) {
             </div>
           )}
           {details.length > 0 && <div className="mt-0.5 text-xs text-muted">{details.join(" · ")}</div>}
+          {v.noLibrary && (
+            <div className="mt-0.5 flex items-center gap-1 text-xs text-accent">
+              <AlertTriangle className="size-3.5 shrink-0" /> No library includes this folder, so saved titles won&apos;t appear in
+              Marquee until you add it to a library.
+            </div>
+          )}
           {v.state === "queued" && v.pauseReason && <div className="mt-0.5 text-xs text-muted">{v.pauseReason}</div>}
           {v.error && v.state !== "skipped" && (
             <div className={v.state === "failed" ? "mt-0.5 text-xs text-danger" : "mt-0.5 text-xs text-muted"}>{v.error}</div>

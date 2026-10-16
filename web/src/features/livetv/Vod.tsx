@@ -467,7 +467,7 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
               >
                 <Check className={isWatched ? "size-4 text-success" : "size-4"} /> {isWatched ? "Watched" : "Mark watched"}
               </Button>
-              {m.canSave && <SaveMovieButton movieId={m.id} save={m.save} library={m.library} />}
+              {m.canSave && <SaveMovieButton movieId={m.id} save={m.save} library={m.library} targets={m} />}
             </div>
             {m.tagline && <p className="mt-4 text-lg text-muted italic">{m.tagline}</p>}
             {m.overview && <p className="mt-5 max-w-3xl leading-relaxed text-text/90">{m.overview}</p>}

@@ -4474,8 +4474,12 @@ export interface components {
             imdbId?: string;
             /** @description The details are TMDB's. */
             matched: boolean;
-            /** @description The caller (an admin) can save it into the library: an Xtream Codes film with a movies folder set. */
+            /** @description The caller (an admin) can save it into the library: an Xtream Codes film with a movies folder or a movies save folder (saveDestinations) set. */
             canSave?: boolean;
+            /** @description Admins: saving without a destination works (vodSave.moviesFolder is set). */
+            saveDefault?: boolean;
+            /** @description Admins: the extra save folders a film can go to (vodSave.destinations of kind movies or both). */
+            saveDestinations?: components["schemas"]["VodSaveDestinationRef"][];
             save?: components["schemas"]["VodSaveState"];
             library?: components["schemas"]["VodLibraryMatch"];
         };
@@ -4545,8 +4549,12 @@ export interface components {
             episodes: components["schemas"]["VodEpisode"][];
             /** @description The source didn't give the episodes (and none were kept from before). */
             episodesError?: string;
-            /** @description The caller (an admin) can save its episodes into the library (shows folder set). Each episode's save is in episodes[].save. */
+            /** @description The caller (an admin) can save its episodes into the library (shows folder or a shows save folder set). Each episode's save is in episodes[].save. */
             canSave?: boolean;
+            /** @description Admins: saving without a destination works (vodSave.showsFolder is set). */
+            saveDefault?: boolean;
+            /** @description Admins: the extra save folders episodes can go to (vodSave.destinations of kind shows or both). */
+            saveDestinations?: components["schemas"]["VodSaveDestinationRef"][];
             library?: components["schemas"]["VodLibraryRollup"];
         };
         VodSeason: {
@@ -4678,6 +4686,28 @@ export interface components {
             pauseScope?: "source" | "any";
             /** @description Queue failed saves again every few hours. Default on. */
             retryFailed?: boolean;
+            /** @description More save folders besides moviesFolder and showsFolder (e.g. Anime), offered as "Save to {name}". Sending the list replaces it; an item without an id is new. */
+            destinations?: components["schemas"]["VodSaveDestination"][];
+        };
+        /** @description A save folder besides the default Movies and Shows ones (admins only). */
+        VodSaveDestination: {
+            /** @description Given by the server; send it back to keep the destination. */
+            id?: string;
+            /** @description Shown in buttons ("Save to Anime"); unique, ignoring case. */
+            name: string;
+            /** @description As the server sees it; must exist and be writable. */
+            folder: string;
+            /**
+             * @description What can be saved there: films, episodes, or both.
+             * @enum {string}
+             */
+            kind: "movies" | "shows" | "both";
+            /** @description A library includes the folder (saved titles are scanned into it). When false, saved titles won't appear until the folder is added to a library. */
+            readonly inLibrary?: boolean;
+        };
+        VodSaveDestinationRef: {
+            id: string;
+            name: string;
         };
         /** @description The latest save of a film or episode (admins only). */
         VodSaveState: {
@@ -4764,6 +4794,12 @@ export interface components {
             upgrade?: boolean;
             /** @description An upgrade, once done: where the library's copy it replaced was (shown as Upgraded). */
             replacedPath?: string;
+            /** @description The save folder chosen (vodSave.destinations' name, e.g. Anime); absent for the default folder and for upgrades (which replace the library's copy in place). */
+            destinationName?: string;
+            /** @description The chosen save folder's path. */
+            destinationFolder?: string;
+            /** @description No library includes the folder it's saved into, so it won't appear in Marquee until that folder is added to a library. */
+            noLibrary?: boolean;
         };
         VodSaveQueue: {
             saves: components["schemas"]["VodSave"][];
@@ -11026,6 +11062,8 @@ export interface operations {
             query?: {
                 /** @description Replace the library's copy when this one is better (VodLibraryMatch.verdict better). */
                 upgrade?: boolean;
+                /** @description A save folder from vodSave.destinations (its id); omitted = the default movies folder. Films use destinations of kind movies or both. A wrong kind or an unknown id is 400. An upgrade always replaces the library's copy in its current folder, whatever the destination. */
+                destination?: string;
             };
             header?: never;
             path: {
@@ -11057,6 +11095,8 @@ export interface operations {
             query?: {
                 /** @description Replace the library's copy when this one is better. */
                 upgrade?: boolean;
+                /** @description A save folder from vodSave.destinations (its id); omitted = the default shows folder. Episodes use destinations of kind shows or both. A wrong kind or an unknown id is 400. An upgrade always replaces the library's copy in its current folder, whatever the destination. */
+                destination?: string;
             };
             header?: never;
             path: {
@@ -11090,6 +11130,8 @@ export interface operations {
                 season?: number;
                 /** @description Also queue episodes better than the library's copies, replacing them. */
                 includeUpgrades?: boolean;
+                /** @description A save folder from vodSave.destinations (its id); omitted = the default shows folder. Seasons and shows use destinations of kind shows or both. A wrong kind or an unknown id is 400. An upgrade always replaces the library's copy in its current folder, whatever the destination. */
+                destination?: string;
             };
             header?: never;
             path: {
