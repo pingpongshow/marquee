@@ -13,6 +13,7 @@ import {
   ListMusic,
   LogOut,
   Menu,
+  MonitorPlay,
   MonitorSpeaker,
   Music,
   Settings,
@@ -163,10 +164,12 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const requests = useQuery(requestsStatusQuery);
   const live = useQuery(liveStatusQuery);
-  const vod = useQuery(vodStatusQuery); // movies on demand, a page under Live TV (LIVE-6)
+  const vod = useQuery(vodStatusQuery); // movies and shows on demand, pages under Live TV (LIVE-6)
   const location = useRouterState({ select: (r) => r.location });
   const onLive = location.pathname.startsWith("/livetv");
-  const onVod = location.pathname === "/vod" || location.pathname.startsWith("/vod/");
+  // /vod/shows… is VOD Shows; the rest of /vod… (films and their pages) is VOD Movies.
+  const onVodShows = location.pathname === "/vod/shows" || location.pathname.startsWith("/vod/shows/");
+  const onVod = !onVodShows && (location.pathname === "/vod" || location.pathname.startsWith("/vod/"));
   const sidebar = (
     <nav aria-label="Libraries" className="flex h-full flex-col gap-1 overflow-y-auto p-3">
       <Link
@@ -216,14 +219,23 @@ export function Shell({ children }: { children: ReactNode }) {
           <Tv className="size-5" aria-hidden /> Live TV
         </Link>
       )}
-      {/* Movies on demand (LIVE-6), just under Live TV. */}
-      {vod.data?.enabled && (
+      {/* Movies and shows on demand (LIVE-6), just under Live TV, each once it has some. */}
+      {vod.data?.enabled && vod.data.movies > 0 && (
         <Link
           to="/vod"
           className={clsx(navItem, onVod && navActive.className)}
           onClick={() => setNavOpen(false)}
         >
-          <Film className="size-5" aria-hidden /> VOD
+          <Film className="size-5" aria-hidden /> VOD Movies
+        </Link>
+      )}
+      {vod.data?.enabled && vod.data.series > 0 && (
+        <Link
+          to="/vod/shows"
+          className={clsx(navItem, onVodShows && navActive.className)}
+          onClick={() => setNavOpen(false)}
+        >
+          <MonitorPlay className="size-5" aria-hidden /> VOD Shows
         </Link>
       )}
       <Link

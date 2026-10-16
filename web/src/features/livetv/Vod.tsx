@@ -1,32 +1,42 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Check, ChevronLeft, ChevronRight, Play, RotateCcw, Search } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Check, ChevronLeft, ChevronRight, Filter, Play, RotateCcw, Search, X } from "lucide-react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { Alert, Button, Input, Select, Spinner } from "@/components/ui";
 import { formatDuration, formatTrackTime } from "@/features/browse/format";
 import { Poster } from "@/features/browse/Poster";
 import { deviceProfile } from "@/features/player/deviceProfile";
 import {
+  type VodFilters,
   type VodMovie,
+  type VodSeries,
   type VodSort,
   useVodWatched,
   vodCategoriesQuery,
   vodContinueQuery,
+  vodGenresQuery,
   vodMovieQuery,
   vodMoviesQuery,
+  vodSeriesCategoriesQuery,
+  vodSeriesContinueQuery,
+  vodSeriesGenresQuery,
+  vodSeriesListQuery,
+  vodStatusQuery,
 } from "./vodApi";
 
-// Movies on demand under Live TV (LIVE-6): browse by category, a film's page, and the player.
+// Movies and shows on demand (LIVE-6): two pages, VOD Movies (/vod) and VOD Shows
+// (/vod/shows), each browsed by category, search, sort and filters; a film's page; and the
+// player both use.
 
-function stored(k: string) {
+export function stored(k: string) {
   try {
     return localStorage.getItem(k);
   } catch {
     return null;
   }
 }
-function store(k: string, v: string) {
+export function store(k: string, v: string) {
   try {
     localStorage.setItem(k, v);
   } catch {
@@ -44,6 +54,19 @@ function posterItem(m: VodMovie) {
     viewOffsetMs: m.positionMs,
     durationMs: m.runtimeMs,
     viewCount: m.watched ? 1 : 0,
+  };
+}
+
+/** A show shaped for the library's Poster (watched tick once every episode is watched). */
+export function showPosterItem(m: VodSeries) {
+  return {
+    title: m.title,
+    type: "show" as const,
+    available: true,
+    images: {},
+    viewCount: m.watched ? 1 : 0,
+    leafCount: m.episodeCount || undefined,
+    watchedLeafCount: m.episodeCount ? m.watchedCount : undefined,
   };
 }
 
@@ -65,39 +88,116 @@ function VodTile({ movie: m }: { movie: VodMovie }) {
   );
 }
 
-/** The VOD page (LIVE-6). */
+function ShowTile({ show: m }: { show: VodSeries }) {
+  const next = m.nextEpisode;
+  const sub = next
+    ? `S${next.season} · E${next.episode}${next.positionMs ? " · resume" : ""}`
+    : [m.year, m.seasonCount ? `${m.seasonCount} ${m.seasonCount === 1 ? "season" : "seasons"}` : ""]
+        .filter(Boolean)
+        .join(" · ");
+  return (
+    <Link to="/vod/shows/$seriesId" params={{ seriesId: String(m.id) }} className="group block">
+      <Poster
+        item={showPosterItem(m)}
+        src={m.posterUrl}
+        className="transition-transform group-hover:scale-[1.03] group-hover:ring-2 group-hover:ring-accent"
+      />
+      <div className="mt-2 truncate text-sm font-medium" title={m.title}>
+        {m.title}
+      </div>
+      <div className="truncate text-xs text-muted">{sub}</div>
+    </Link>
+  );
+}
+
+/** The VOD Movies page (LIVE-6). */
 export function VodPage() {
   return (
     <div className="space-y-4 p-4 lg:p-6">
-      <h1 className="text-2xl font-bold">VOD</h1>
-      <VodBrowse />
+      <h1 className="text-2xl font-bold">VOD Movies</h1>
+      <VodBrowse kind="movies" />
     </div>
   );
 }
 
-/** VOD browsing: categories, search, sort, Continue Watching and a poster grid. */
-export function VodBrowse() {
-  const [category, setCategory] = useState(() => stored("marquee.vod.category") ?? "");
-  const [sort, setSort] = useState<VodSort>(() => (stored("marquee.vod.sort") as VodSort | null) ?? "title");
+/** The VOD Shows page: series from Xtream Codes sources. */
+export function VodShowsPage() {
+  return (
+    <div className="space-y-4 p-4 lg:p-6">
+      <h1 className="text-2xl font-bold">VOD Shows</h1>
+      <VodBrowse kind="shows" />
+    </div>
+  );
+}
+
+function Chip({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <span className="flex items-center gap-1 rounded-full bg-accent/15 py-0.5 pr-1 pl-3 text-xs text-accent">
+      {label}
+      <button onClick={onClear} className="rounded-full p-0.5 hover:bg-accent/20" aria-label={`Remove filter ${label}`}>
+        <X className="size-3" />
+      </button>
+    </span>
+  );
+}
+
+const DECADES = [2020, 2010, 2000, 1990, 1980, 1970, 1960, 1950, 1940, 1930];
+const WATCHED_LABELS: Record<NonNullable<VodFilters["watched"]>, string> = {
+  unwatched: "Unwatched",
+  inProgress: "In progress",
+  watched: "Watched",
+};
+
+function readFilters(key: string): VodFilters {
+  try {
+    const v = JSON.parse(stored(key) ?? "{}") as VodFilters;
+    return v && typeof v === "object" ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Browsing films or shows: categories, search, sort, filters, Continue Watching and a poster grid. */
+export function VodBrowse({ kind }: { kind: "movies" | "shows" }) {
+  const shows = kind === "shows";
+  // Remembered per page (the shows' keys are their own).
+  const k = (name: string) => (shows ? `marquee.vod.shows.${name}` : `marquee.vod.${name}`);
+  const [category, setCategory] = useState(() => stored(k("category")) ?? "");
+  const [sort, setSort] = useState<VodSort>(() => (stored(k("sort")) as VodSort | null) ?? "title");
+  const [filters, setFilters] = useState<VodFilters>(() => readFilters(k("filters")));
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [text, setText] = useState("");
   const [q, setQ] = useState("");
-  useEffect(() => store("marquee.vod.category", category), [category]);
-  useEffect(() => store("marquee.vod.sort", sort), [sort]);
+  useEffect(() => store(k("category"), category), [category]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => store(k("sort"), sort), [sort]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => store(k("filters"), JSON.stringify(filters)), [filters]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const t = setTimeout(() => setQ(text.trim()), 250);
     return () => clearTimeout(t);
   }, [text]);
+  const set = (patch: Partial<VodFilters>) => setFilters((f) => ({ ...f, ...patch }));
 
-  const categories = useQuery(vodCategoriesQuery);
-  const resume = useQuery(vodContinueQuery);
-  const movies = useInfiniteQuery(vodMoviesQuery(category, q, sort));
-  const list = movies.data?.pages.flatMap((p) => p.movies) ?? [];
-  const total = movies.data?.pages[0]?.total;
+  const categories = useQuery(shows ? vodSeriesCategoriesQuery : vodCategoriesQuery);
+  const genres = useQuery(shows ? vodSeriesGenresQuery : vodGenresQuery);
+  const status = useQuery(vodStatusQuery);
+  const sources = (status.data?.sources ?? []).filter((s) => (shows ? s.series > 0 : s.movies > 0));
+  const movieResume = useQuery({ ...vodContinueQuery, enabled: !shows });
+  const showResume = useQuery({ ...vodSeriesContinueQuery, enabled: shows });
+  const movies = useInfiniteQuery({ ...vodMoviesQuery(category, q, sort, filters), enabled: !shows });
+  const series = useInfiniteQuery({ ...vodSeriesListQuery(category, q, sort, filters), enabled: shows });
+  const list = shows ? series : movies;
+  const items: (VodMovie | VodSeries)[] = shows
+    ? (series.data?.pages.flatMap((p) => p.series) ?? [])
+    : (movies.data?.pages.flatMap((p) => p.movies) ?? []);
+  const total = shows ? series.data?.pages[0]?.total : movies.data?.pages[0]?.total;
   const all = categories.data?.reduce((n, c) => n + c.count, 0);
+  const noun = shows ? "shows" : "movies";
+  const filtered = !!(filters.genre || filters.decade || filters.minRating || filters.watched || filters.sourceId);
+  const sourceName = sources.find((s) => s.id === filters.sourceId)?.name ?? filters.sourceId;
 
   // Load the next page as the end of the grid comes into view.
   const sentinel = useRef<HTMLDivElement>(null);
-  const { hasNextPage, isFetchingNextPage, fetchNextPage } = movies;
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = list;
   useEffect(() => {
     const el = sentinel.current;
     if (!el || !hasNextPage) return;
@@ -109,70 +209,167 @@ export function VodBrowse() {
     return () => io.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  const resumeMovies = movieResume.data ?? [];
+  const resumeShows = showResume.data ?? [];
+  const showResumeRow = !category && !q && !filtered && (shows ? resumeShows.length : resumeMovies.length) > 0;
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="w-full sm:w-56">
-          <Select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category">
-            <option value="">All movies{all != null ? ` (${all})` : ""}</option>
-            {categories.data?.map((c) => (
-              <option key={c.name} value={c.name}>
-                {c.name} ({c.count})
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="w-full sm:w-56">
+            <Select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category">
+              <option value="">
+                All {noun}
+                {all != null ? ` (${all})` : ""}
               </option>
-            ))}
-          </Select>
+              {categories.data?.map((c) => (
+                <option key={c.name} value={c.name}>
+                  {c.name} ({c.count})
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="relative w-full sm:w-64">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-faint" aria-hidden />
+            <Input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={`Search ${noun}`}
+              aria-label={`Search ${noun}`}
+              className="pl-9"
+            />
+          </div>
+          <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
+            <Button
+              size="sm"
+              variant={filtersOpen || filtered ? "primary" : "secondary"}
+              onClick={() => setFiltersOpen((v) => !v)}
+              aria-expanded={filtersOpen}
+            >
+              <Filter className="size-4" /> Filter
+            </Button>
+            <div className="w-full sm:w-44">
+              <Select value={sort} onChange={(e) => setSort(e.target.value as VodSort)} aria-label="Sort">
+                <option value="title">Title</option>
+                <option value="added">Recently added</option>
+                <option value="year">Release year</option>
+                <option value="rating">Rating</option>
+              </Select>
+            </div>
+          </div>
         </div>
-        <div className="relative w-full sm:w-64">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-faint" aria-hidden />
-          <Input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Search movies"
-            aria-label="Search movies"
-            className="pl-9"
-          />
-        </div>
-        <div className="w-full sm:ml-auto sm:w-44">
-          <Select value={sort} onChange={(e) => setSort(e.target.value as VodSort)} aria-label="Sort">
-            <option value="title">Title</option>
-            <option value="added">Recently added</option>
-            <option value="year">Release year</option>
-            <option value="rating">Rating</option>
-          </Select>
-        </div>
+        {filtersOpen && (
+          <div className="rounded-lg border border-border bg-surface p-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <Select
+                aria-label="Watched state"
+                value={filters.watched ?? ""}
+                onChange={(e) => set({ watched: (e.target.value || undefined) as VodFilters["watched"] })}
+              >
+                <option value="">Watched or not</option>
+                <option value="unwatched">{shows ? "Unwatched episodes" : "Unwatched"}</option>
+                <option value="inProgress">In progress</option>
+                <option value="watched">Watched</option>
+              </Select>
+              <Select aria-label="Genre" value={filters.genre ?? ""} onChange={(e) => set({ genre: e.target.value || undefined })}>
+                <option value="">All genres</option>
+                {genres.data?.map((g) => (
+                  <option key={g.name} value={g.name}>
+                    {g.name} ({g.count})
+                  </option>
+                ))}
+              </Select>
+              <Select
+                aria-label="Decade"
+                value={filters.decade ?? ""}
+                onChange={(e) => set({ decade: e.target.value ? Number(e.target.value) : undefined })}
+              >
+                <option value="">Any decade</option>
+                {DECADES.map((d) => (
+                  <option key={d} value={d}>
+                    {d}s
+                  </option>
+                ))}
+              </Select>
+              <Select
+                aria-label="Minimum rating"
+                value={filters.minRating ?? ""}
+                onChange={(e) => set({ minRating: e.target.value ? Number(e.target.value) : undefined })}
+              >
+                <option value="">Any rating</option>
+                {[9, 8, 7, 6, 5].map((r) => (
+                  <option key={r} value={r}>
+                    Rated {r}+
+                  </option>
+                ))}
+              </Select>
+              {sources.length > 1 && (
+                <Select aria-label="Source" value={filters.sourceId ?? ""} onChange={(e) => set({ sourceId: e.target.value || undefined })}>
+                  <option value="">All sources</option>
+                  {sources.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </div>
+          </div>
+        )}
+        {filtered && (
+          <div className="flex flex-wrap items-center gap-2">
+            {filters.watched && (
+              <Chip label={WATCHED_LABELS[filters.watched]} onClear={() => set({ watched: undefined })} />
+            )}
+            {filters.genre && <Chip label={filters.genre} onClear={() => set({ genre: undefined })} />}
+            {filters.decade && <Chip label={`${filters.decade}s`} onClear={() => set({ decade: undefined })} />}
+            {filters.minRating && <Chip label={`Rated ${filters.minRating}+`} onClear={() => set({ minRating: undefined })} />}
+            {filters.sourceId && <Chip label={sourceName ?? "Source"} onClear={() => set({ sourceId: undefined })} />}
+            <button onClick={() => setFilters({})} className="text-xs text-muted hover:text-text">
+              Clear all
+            </button>
+          </div>
+        )}
       </div>
 
-      {!category && !q && !!resume.data?.length && (
+      {showResumeRow && (
         <section>
           <h2 className="mb-3 text-lg font-semibold">Continue Watching</h2>
           <ul className="flex gap-4 overflow-x-auto pb-2">
-            {resume.data.map((m) => (
-              <li key={m.id} className="w-36 shrink-0">
-                <VodTile movie={m} />
-              </li>
-            ))}
+            {shows
+              ? resumeShows.map((m) => (
+                  <li key={m.id} className="w-36 shrink-0">
+                    <ShowTile show={m} />
+                  </li>
+                ))
+              : resumeMovies.map((m) => (
+                  <li key={m.id} className="w-36 shrink-0">
+                    <VodTile movie={m} />
+                  </li>
+                ))}
           </ul>
         </section>
       )}
 
       <section>
-        {(category || q) && total != null && (
+        {(category || q || filtered) && total != null && (
           <p className="mb-3 text-sm text-muted">
-            {total} {total === 1 ? "movie" : "movies"}
+            {total} {total === 1 ? noun.slice(0, -1) : noun}
           </p>
         )}
-        {movies.isPending ? (
+        {list.isPending ? (
           <Spinner />
-        ) : movies.isError ? (
-          <Alert tone="error">{movies.error.message}</Alert>
-        ) : !list.length ? (
-          <p className="text-muted">{q ? `No movies match “${q}”.` : "No movies here yet."}</p>
+        ) : list.isError ? (
+          <Alert tone="error">{list.error.message}</Alert>
+        ) : !items.length ? (
+          <p className="text-muted">
+            {q ? `No ${noun} match “${q}”.` : filtered ? "Nothing matches these filters." : `No ${noun} here yet.`}
+          </p>
         ) : (
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-4">
-            {list.map((m) => (
-              <li key={m.id}>
-                <VodTile movie={m} />
-              </li>
+            {items.map((m) => (
+              <li key={m.id}>{shows ? <ShowTile show={m as VodSeries} /> : <VodTile movie={m as VodMovie} />}</li>
             ))}
           </ul>
         )}
@@ -219,7 +416,7 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
           <div className="min-w-0 flex-1">
             <nav aria-label="Breadcrumb" className="mb-2 flex items-center gap-1 text-sm text-muted">
               <Link to="/vod" className="hover:text-text">
-                VOD
+                VOD Movies
               </Link>
               {m.category && (
                 <>
@@ -290,15 +487,46 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
   );
 }
 
-/** Full-screen playback of a film through the server (the source's own HLS, or a file made into HLS), seekable. */
-export function VodPlayerPage({ movieId, startMs }: { movieId: number; startMs?: number }) {
-  const movie = useQuery(vodMovieQuery(movieId));
+/** What VodVideo shows over the picture: the current time and length, for Up Next. */
+export type VodOverlay = (time: number, duration: number) => ReactNode;
+
+/**
+ * Full-screen playback through the server (the source's own HLS, or a file made into HLS),
+ * seekable, reporting progress against the session. Films and episodes both use it.
+ */
+export function VodVideo({
+  sessionKey,
+  start,
+  startMs,
+  title,
+  subtitle,
+  onBack,
+  backLabel,
+  onEnded,
+  overlay,
+}: {
+  /** The film or episode; render with it as the key, so another one starts afresh. */
+  sessionKey: string;
+  start: () => Promise<{ id: string; url: string; startMs?: number }>;
+  startMs?: number;
+  title?: string;
+  subtitle?: string;
+  onBack: () => void;
+  backLabel: string;
+  /** Called after the last position is reported; defaults to onBack. */
+  onEnded?: () => void;
+  overlay?: VodOverlay;
+}) {
   const video = useRef<HTMLVideoElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
+  const [time, setTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const qc = useQueryClient();
-  const back = () => navigate({ to: "/vod/$movieId", params: { movieId: String(movieId) } });
+  const ended = useRef(onEnded ?? onBack);
+  useEffect(() => {
+    ended.current = onEnded ?? onBack;
+  });
 
   useEffect(() => {
     let hls: { destroy: () => void } | null = null;
@@ -321,26 +549,23 @@ export function VodPlayerPage({ movieId, startMs }: { movieId: number; startMs?:
     const stop = (id: string) =>
       void api.DELETE("/livetv/vod/sessions/{sessionId}", { params: { path: { sessionId: id } } }).catch(() => {});
     const onPause = () => void report();
-    const onEnded = () => void report().then(() => back());
+    const onEnd = () => void report().then(() => ended.current());
+    const onTime = () => {
+      if (!v) return;
+      setTime(v.currentTime);
+      if (Number.isFinite(v.duration)) setDuration(v.duration);
+    };
     v?.addEventListener("pause", onPause);
-    v?.addEventListener("ended", onEnded);
+    v?.addEventListener("ended", onEnd);
+    v?.addEventListener("timeupdate", onTime);
     (async () => {
-      const [s, { default: Hls }] = await Promise.all([
-        unwrap(
-          api.POST("/livetv/vod/movies/{movieId}/play", {
-            params: { path: { movieId } },
-            // Films that are files are made into HLS for this browser (copied when it plays the codec).
-            body: { profile: deviceProfile() },
-          }),
-        ),
-        import("hls.js"),
-      ]);
+      const [s, { default: Hls }] = await Promise.all([start(), import("hls.js")]);
       if (cancelled) return stop(s.id);
       session = s.id;
       if (!v) return;
-      const start = (startMs ?? s.startMs ?? 0) / 1000;
+      const at = (startMs ?? s.startMs ?? 0) / 1000;
       if (Hls.isSupported()) {
-        const h = new Hls({ startPosition: start, maxBufferLength: 30, backBufferLength: 60 });
+        const h = new Hls({ startPosition: at, maxBufferLength: 30, backBufferLength: 60 });
         hls = h;
         h.loadSource(s.url);
         h.attachMedia(v);
@@ -354,14 +579,14 @@ export function VodPlayerPage({ movieId, startMs }: { movieId: number; startMs?:
           } else if (!recovered && d.type === Hls.ErrorTypes.MEDIA_ERROR) {
             recovered = true;
             h.recoverMediaError();
-          } else setError("The movie stopped playing.");
+          } else setError("Playback stopped.");
         });
       } else {
         v.src = s.url; // Safari plays HLS itself
         v.addEventListener(
           "loadedmetadata",
           () => {
-            if (start) v.currentTime = start;
+            if (at) v.currentTime = at;
             void v.play().catch(() => {});
           },
           { once: true },
@@ -375,7 +600,8 @@ export function VodPlayerPage({ movieId, startMs }: { movieId: number; startMs?:
       cancelled = true;
       clearInterval(timer);
       v?.removeEventListener("pause", onPause);
-      v?.removeEventListener("ended", onEnded);
+      v?.removeEventListener("ended", onEnd);
+      v?.removeEventListener("timeupdate", onTime);
       const id = session;
       // Record where they stopped before ending the session (the position is reported against it).
       void report().finally(() => {
@@ -389,29 +615,57 @@ export function VodPlayerPage({ movieId, startMs }: { movieId: number; startMs?:
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [movieId]);
+  }, [sessionKey]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && back();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onBack();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const m = movie.data;
   return (
     <div className="fixed inset-0 z-40 bg-black">
-      <video ref={video} className="size-full object-contain" controls playsInline autoPlay aria-label={m?.title ?? "Movie"} />
+      <video ref={video} className="size-full object-contain" controls playsInline autoPlay aria-label={title ?? "Video"} />
       {loading && !error && <div className="absolute inset-0 grid place-items-center text-sm text-muted">Loading…</div>}
       <div className="absolute inset-x-0 top-0 flex items-center gap-3 bg-gradient-to-b from-black/80 to-transparent p-4">
-        <button onClick={back} className="rounded-full bg-black/50 p-2" aria-label="Back to the movie">
+        <button onClick={onBack} className="rounded-full bg-black/50 p-2" aria-label={backLabel}>
           <ChevronLeft className="size-5" />
         </button>
         <div className="min-w-0">
-          <div className="truncate font-semibold">{m?.title}</div>
-          {m && <div className="truncate text-xs text-muted">{[m.year, formatDuration(m.runtimeMs)].filter(Boolean).join(" · ")}</div>}
+          <div className="truncate font-semibold">{title}</div>
+          {subtitle && <div className="truncate text-xs text-muted">{subtitle}</div>}
         </div>
       </div>
       {error && <div className="absolute inset-x-0 bottom-24 text-center text-danger">{error}</div>}
+      {overlay?.(time, duration)}
     </div>
+  );
+}
+
+/** Full-screen playback of a film. */
+export function VodPlayerPage({ movieId, startMs }: { movieId: number; startMs?: number }) {
+  const movie = useQuery(vodMovieQuery(movieId));
+  const navigate = useNavigate();
+  const back = () => navigate({ to: "/vod/$movieId", params: { movieId: String(movieId) } });
+  const m = movie.data;
+  return (
+    <VodVideo
+      key={`movie-${movieId}`}
+      sessionKey={`movie-${movieId}`}
+      start={() =>
+        unwrap(
+          api.POST("/livetv/vod/movies/{movieId}/play", {
+            params: { path: { movieId } },
+            // Films that are files are made into HLS for this browser (copied when it plays the codec).
+            body: { profile: deviceProfile() },
+          }),
+        )
+      }
+      startMs={startMs}
+      title={m?.title ?? "Movie"}
+      subtitle={m ? [m.year, formatDuration(m.runtimeMs)].filter(Boolean).join(" · ") : undefined}
+      onBack={back}
+      backLabel="Back to the movie"
+    />
   );
 }

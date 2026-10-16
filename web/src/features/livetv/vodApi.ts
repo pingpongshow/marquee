@@ -12,6 +12,30 @@ import type { components } from "@/api/schema.gen";
 export type VodMovie = components["schemas"]["VodMovie"];
 export type VodMovieDetail = components["schemas"]["VodMovieDetail"];
 export type VodSort = "title" | "added" | "year" | "rating";
+export type VodSeries = components["schemas"]["VodSeries"];
+export type VodSeriesDetail = components["schemas"]["VodSeriesDetail"];
+export type VodEpisode = components["schemas"]["VodEpisode"];
+
+/** List filters shared by films and shows (remembered per page). */
+export interface VodFilters {
+  genre?: string;
+  /** A decade's first year, e.g. 1980. */
+  decade?: number;
+  minRating?: number;
+  watched?: "unwatched" | "inProgress" | "watched";
+  sourceId?: string;
+}
+
+function filterQuery(f: VodFilters) {
+  return {
+    genre: f.genre || undefined,
+    yearFrom: f.decade || undefined,
+    yearTo: f.decade ? f.decade + 9 : undefined,
+    minRating: f.minRating || undefined,
+    watched: f.watched || undefined,
+    sourceId: f.sourceId || undefined,
+  };
+}
 
 export const vodStatusQuery = queryOptions({
   queryKey: ["vod", "status"],
@@ -35,9 +59,15 @@ export const vodContinueQuery = queryOptions({
 
 const PAGE = 120;
 
-export const vodMoviesQuery = (category: string, q: string, sort: VodSort) =>
+export const vodGenresQuery = queryOptions({
+  queryKey: ["vod", "genres"],
+  queryFn: () => unwrap(api.GET("/livetv/vod/genres")),
+  staleTime: 5 * 60_000,
+});
+
+export const vodMoviesQuery = (category: string, q: string, sort: VodSort, filters: VodFilters = {}) =>
   infiniteQueryOptions({
-    queryKey: ["vod", "movies", category, q, sort],
+    queryKey: ["vod", "movies", category, q, sort, filters],
     queryFn: ({ pageParam }) =>
       unwrap(
         api.GET("/livetv/vod/movies", {
@@ -48,6 +78,7 @@ export const vodMoviesQuery = (category: string, q: string, sort: VodSort) =>
               sort,
               limit: PAGE,
               offset: pageParam,
+              ...filterQuery(filters),
             },
           },
         }),
@@ -79,6 +110,84 @@ export function useVodWatched(id: number) {
       return watched
         ? unwrap(api.PUT("/livetv/vod/movies/{movieId}/watched", params))
         : unwrap(api.DELETE("/livetv/vod/movies/{movieId}/watched", params));
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["vod"] }),
+  });
+}
+
+// ---- shows (series from Xtream Codes sources)
+
+export const vodSeriesCategoriesQuery = queryOptions({
+  queryKey: ["vod", "series-categories"],
+  queryFn: () => unwrap(api.GET("/livetv/vod/series/categories")),
+  staleTime: 5 * 60_000,
+});
+
+export const vodSeriesGenresQuery = queryOptions({
+  queryKey: ["vod", "series-genres"],
+  queryFn: () => unwrap(api.GET("/livetv/vod/series/genres")),
+  staleTime: 5 * 60_000,
+});
+
+export const vodSeriesContinueQuery = queryOptions({
+  queryKey: ["vod", "series-continue"],
+  queryFn: () => unwrap(api.GET("/livetv/vod/series/continue")),
+});
+
+export const vodSeriesListQuery = (category: string, q: string, sort: VodSort, filters: VodFilters = {}) =>
+  infiniteQueryOptions({
+    queryKey: ["vod", "series", category, q, sort, filters],
+    queryFn: ({ pageParam }) =>
+      unwrap(
+        api.GET("/livetv/vod/series", {
+          params: {
+            query: {
+              category: category || undefined,
+              q: q || undefined,
+              sort,
+              limit: PAGE,
+              offset: pageParam,
+              ...filterQuery(filters),
+            },
+          },
+        }),
+      ),
+    initialPageParam: 0,
+    getNextPageParam: (last, pages) => {
+      const loaded = pages.reduce((n, p) => n + p.series.length, 0);
+      return loaded < last.total ? loaded : undefined;
+    },
+    staleTime: 60_000,
+  });
+
+export const vodSeriesQuery = (id: number) =>
+  queryOptions({
+    queryKey: ["vod", "show", id],
+    queryFn: () => unwrap(api.GET("/livetv/vod/series/{seriesId}", { params: { path: { seriesId: id } } })),
+  });
+
+/** Marks a show (or one season) watched or unwatched. */
+export function useVodSeriesWatched(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ watched, season }: { watched: boolean; season?: number }) => {
+      const params = { params: { path: { seriesId: id }, query: { season } } };
+      return watched
+        ? unwrap(api.PUT("/livetv/vod/series/{seriesId}/watched", params))
+        : unwrap(api.DELETE("/livetv/vod/series/{seriesId}/watched", params));
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["vod"] }),
+  });
+}
+
+export function useVodEpisodeWatched() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, watched }: { id: number; watched: boolean }) => {
+      const params = { params: { path: { episodeId: id } } };
+      return watched
+        ? unwrap(api.PUT("/livetv/vod/episodes/{episodeId}/watched", params))
+        : unwrap(api.DELETE("/livetv/vod/episodes/{episodeId}/watched", params));
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["vod"] }),
   });

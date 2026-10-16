@@ -29,14 +29,25 @@ const xcStreams = `[
 ]`
 
 type fakeXtream struct {
-	mu      sync.Mutex
-	streams string
-	calls   []string
+	mu         sync.Mutex
+	streams    string
+	series     string
+	seriesInfo map[string]string
+	calls      []string
+	files      []string
 }
 
 func (f *fakeXtream) handler(t *testing.T) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
+		if strings.HasPrefix(r.URL.Path, "/series/") || strings.HasPrefix(r.URL.Path, "/movie/") {
+			f.mu.Lock()
+			f.files = append(f.files, r.URL.Path)
+			f.mu.Unlock()
+			w.Header().Set("Content-Type", "video/mp4")
+			io.WriteString(w, "not really a video")
+			return
+		}
 		if r.URL.Path != "/player_api.php" {
 			http.NotFound(w, r)
 			return
@@ -47,7 +58,7 @@ func (f *fakeXtream) handler(t *testing.T) http.HandlerFunc {
 		}
 		f.mu.Lock()
 		f.calls = append(f.calls, q.Get("action"))
-		streams := f.streams
+		streams, series, info := f.streams, f.series, f.seriesInfo[q.Get("series_id")]
 		f.mu.Unlock()
 		switch q.Get("action") {
 		case "":
@@ -64,6 +75,16 @@ func (f *fakeXtream) handler(t *testing.T) http.HandlerFunc {
 			io.WriteString(w, `{"info":{"plot":"A plot.","cast":"Ann One, Bob Two","director":"Dee","genre":"Drama, Thriller",
 				"releasedate":"2004-05-01","duration_secs":"5400","duration":"01:30:00","backdrop_path":["/bd/102.jpg"],"tmdb_id":""},
 				"movie_data":{"stream_id":102,"container_extension":"mp4"}}`)
+		case "get_series_categories":
+			io.WriteString(w, `[{"category_id":"10","category_name":"Drama Series"},{"category_id":11,"category_name":"Comedy Series"}]`)
+		case "get_series":
+			io.WriteString(w, series)
+		case "get_series_info":
+			if info == "" {
+				http.Error(w, "no such series", http.StatusInternalServerError)
+				return
+			}
+			io.WriteString(w, info)
 		default:
 			http.Error(w, "unknown action", http.StatusBadRequest)
 		}
@@ -73,7 +94,7 @@ func (f *fakeXtream) handler(t *testing.T) http.HandlerFunc {
 func xtreamSetup(t *testing.T) (*Service, *fakeXtream, *httptest.Server, *fakeMatcher, int64) {
 	t.Helper()
 	s, _, m, uid := setup(t)
-	f := &fakeXtream{streams: xcStreams}
+	f := &fakeXtream{streams: xcStreams, series: xcSeries, seriesInfo: map[string]string{"201": xcInfoByMap, "202": xcInfoByList}}
 	srv := httptest.NewServer(f.handler(t))
 	t.Cleanup(srv.Close)
 	s.Settings.Update(context.Background(), func(st *settings.Settings) error {
@@ -95,11 +116,12 @@ func TestXtreamRefreshMatchingAndDetails(t *testing.T) {
 		t.Fatalf("status: %+v", st)
 	}
 	// One request for the categories and one for every film: no per-film requests.
-	if strings.Join(f.calls, ",") != "get_vod_categories,get_vod_streams" {
+	if strings.Join(f.calls, ",") != "get_vod_categories,get_vod_streams,get_series_categories,get_series" {
 		t.Errorf("requests: %v", f.calls)
 	}
 	// The film the server named by TMDB id was looked up by it, not searched for.
-	if len(m.byID) != 1 || m.byID[0] != 603 {
+	// (Series lookups are recorded as negative ids.)
+	if len(m.byID) == 0 || m.byID[0] != 603 || (len(m.byID) > 1 && m.byID[1] > 0) {
 		t.Errorf("by id: %v", m.byID)
 	}
 	if _, searched := m.calls["The Matrix"]; searched {
@@ -203,7 +225,7 @@ func TestXtreamTest(t *testing.T) {
 	ctx := context.Background()
 	src := settings.VODSource{Kind: settings.VODKindXtream, URL: srv.URL, Username: "marquee", Password: xcPass}
 	r, err := s.Test(ctx, src)
-	if err != nil || r.Movies != 3 || r.Categories != 2 || r.Account != "Active" || r.ExpiresAt.Year() != 2030 {
+	if err != nil || r.Movies != 3 || r.Series != 3 || r.Categories != 2 || r.Account != "Active" || r.ExpiresAt.Year() != 2030 {
 		t.Fatalf("test: %+v %v", r, err)
 	}
 	src.Password = "wrong"

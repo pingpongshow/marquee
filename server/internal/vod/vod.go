@@ -138,17 +138,36 @@ func (s *Service) Refresh(ctx context.Context, retryFailed bool) {
 		if err != nil {
 			msg = err.Error()
 			slog.Warn("movie source failed", "source", src.Name, "err", err)
-			if s.OnSourceFailed != nil {
-				s.OnSourceFailed(src, err)
-			}
 		} else {
 			slog.Info("movie source loaded", "source", src.Name, "movies", n)
 		}
-		if _, err := s.DB.ExecContext(ctx, `INSERT INTO vod_sources(id, name, movies, refreshed_at, error) VALUES(?,?,?,?,?)
+		// Series (Xtream Codes): one more request for their categories and one for the list.
+		var series any
+		if src.Xtream() {
+			ns, serr := s.refreshXtreamSeries(ctx, src)
+			if serr != nil {
+				slog.Warn("series source failed", "source", src.Name, "err", serr)
+				if err == nil {
+					msg = "series: " + serr.Error()
+					err = serr
+				}
+			} else {
+				series = ns
+				slog.Info("series source loaded", "source", src.Name, "series", ns)
+			}
+		} else if _, derr := s.DB.ExecContext(ctx, "DELETE FROM vod_series WHERE source_id=?", src.ID); derr == nil {
+			series = 0
+		}
+		if err != nil && s.OnSourceFailed != nil {
+			s.OnSourceFailed(src, err)
+		}
+		filmsOK := msg == nil || strings.HasPrefix(msg.(string), "series: ")
+		if _, err := s.DB.ExecContext(ctx, `INSERT INTO vod_sources(id, name, movies, series, refreshed_at, error) VALUES(?,?,?,COALESCE(?,0),?,?)
 			ON CONFLICT(id) DO UPDATE SET name=excluded.name, error=excluded.error,
-			movies=CASE WHEN excluded.error IS NULL THEN excluded.movies ELSE vod_sources.movies END,
-			refreshed_at=CASE WHEN excluded.error IS NULL THEN excluded.refreshed_at ELSE vod_sources.refreshed_at END`,
-			src.ID, src.Name, n, now(), msg); err != nil {
+			movies=CASE WHEN ? THEN excluded.movies ELSE vod_sources.movies END,
+			series=CASE WHEN ? IS NOT NULL THEN excluded.series ELSE vod_sources.series END,
+			refreshed_at=CASE WHEN ? THEN excluded.refreshed_at ELSE vod_sources.refreshed_at END`,
+			src.ID, src.Name, n, series, now(), msg, filmsOK, series, filmsOK); err != nil {
 			slog.Warn("movie source status", "err", err)
 		}
 	}
@@ -158,6 +177,7 @@ func (s *Service) Refresh(ctx context.Context, retryFailed bool) {
 		in = "?" + strings.Repeat(",?", len(keep)-1)
 	}
 	s.DB.ExecContext(ctx, "DELETE FROM vod_movies WHERE source_id NOT IN ("+in+")", keep...)
+	s.DB.ExecContext(ctx, "DELETE FROM vod_series WHERE source_id NOT IN ("+in+")", keep...)
 	s.DB.ExecContext(ctx, "DELETE FROM vod_sources WHERE id NOT IN ("+in+")", keep...)
 	s.refreshing.Unlock()
 	if len(sources) > 0 {
@@ -249,6 +269,7 @@ func (s *Service) enrich(ctx context.Context, retryFailed bool) {
 		slog.Warn("pluto details", "err", err)
 	}
 	s.match(ctx, retryFailed)
+	s.matchSeries(ctx, retryFailed)
 }
 
 var titleYear = regexp.MustCompile(`^(.*?)\s*\((\d{4})\)\s*$`)
@@ -418,6 +439,102 @@ type Filter struct {
 	Sort      string // title (default), added, year, rating
 	Limit     int
 	Offset    int
+	// Genre is one of the item's genres (TMDB's once matched, else the source's).
+	Genre string
+	// YearFrom and YearTo bound the year (0 = open); items without a year are left out.
+	YearFrom, YearTo int
+	// MinRating is the lowest average vote out of 10 (0 = any); unrated items are left out.
+	MinRating float64
+	// Watched is the user's state: unwatched, inProgress or watched ("" = any). For series:
+	// has unwatched episodes, started but not finished, or every episode watched.
+	Watched string
+	// SourceID limits to one source.
+	SourceID string
+}
+
+// where builds the filter's conditions on m (vod_movies or vod_series).
+func (f Filter) where(series bool) (string, []any) {
+	where, args := ratingClause(f.MaxRating)
+	if f.Category != "" {
+		where += " AND m.category=?"
+		args = append(args, f.Category)
+	}
+	if q := strings.TrimSpace(f.Query); q != "" {
+		where += " AND m.title LIKE ? ESCAPE '\\'"
+		args = append(args, likeArg(q))
+	}
+	if f.Genre != "" {
+		where += " AND EXISTS (SELECT 1 FROM json_each(m.genres) g WHERE g.value=? COLLATE NOCASE)"
+		args = append(args, f.Genre)
+	}
+	if f.YearFrom > 0 {
+		where += " AND m.year>=?"
+		args = append(args, f.YearFrom)
+	}
+	if f.YearTo > 0 {
+		where += " AND m.year<=?"
+		args = append(args, f.YearTo)
+	}
+	if f.MinRating > 0 {
+		where += " AND m.rating>=?"
+		args = append(args, f.MinRating)
+	}
+	if f.SourceID != "" {
+		where += " AND m.source_id=?"
+		args = append(args, f.SourceID)
+	}
+	if !series {
+		const p = "SELECT 1 FROM vod_progress w WHERE w.movie_id=m.id AND w.user_id=?"
+		switch f.Watched {
+		case "unwatched":
+			where += " AND NOT EXISTS (" + p + " AND (w.watched=1 OR w.position_ms>0))"
+			args = append(args, f.UserID)
+		case "inProgress":
+			where += " AND EXISTS (" + p + " AND w.watched=0 AND w.position_ms>0)"
+			args = append(args, f.UserID)
+		case "watched":
+			where += " AND EXISTS (" + p + " AND w.watched=1)"
+			args = append(args, f.UserID)
+		}
+		return where, args
+	}
+	// Every known episode watched (none known counts as not).
+	const all = `((SELECT COUNT(*) FROM vod_episodes e WHERE e.series_id=m.id) > 0 AND (SELECT COUNT(*) FROM vod_episodes e WHERE e.series_id=m.id) <=
+		(SELECT COUNT(*) FROM vod_episode_progress w WHERE w.series_id=m.id AND w.user_id=? AND w.watched=1))`
+	switch f.Watched {
+	case "unwatched":
+		where += " AND NOT " + all
+		args = append(args, f.UserID)
+	case "inProgress":
+		where += " AND EXISTS (SELECT 1 FROM vod_episode_progress w WHERE w.series_id=m.id AND w.user_id=?) AND NOT " + all
+		args = append(args, f.UserID, f.UserID)
+	case "watched":
+		where += " AND " + all
+		args = append(args, f.UserID)
+	}
+	return where, args
+}
+
+// Genres lists the genres of films (or series) the user may see, with how many have each.
+func (s *Service) Genres(ctx context.Context, maxRating string, series bool) ([]Category, error) {
+	table := "vod_movies"
+	if series {
+		table = "vod_series"
+	}
+	where, args := ratingClause(maxRating)
+	rows, err := s.DB.QueryContext(ctx, "SELECT g.value, COUNT(*) FROM "+table+" m, json_each(m.genres) g WHERE g.type='text' AND g.value<>'' AND "+
+		where+" GROUP BY g.value COLLATE NOCASE ORDER BY g.value COLLATE NOCASE", args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Category
+	for rows.Next() {
+		var c Category
+		rows.Scan(&c.Name, &c.Count)
+		out = append(out, c)
+	}
+	return out, rows.Err()
 }
 
 var knownRatings = []string{"TV-Y", "G", "TV-G", "TV-Y7", "TV-Y7-FV", "PG", "TV-PG", "PG-13", "TV-14", "R", "TV-MA", "NC-17"}
@@ -469,15 +586,7 @@ func scanMovie(sc interface{ Scan(...any) error }) (Movie, error) {
 
 // Movies lists films with the user's progress, and how many match in total.
 func (s *Service) Movies(ctx context.Context, f Filter) ([]Movie, int, error) {
-	where, args := ratingClause(f.MaxRating)
-	if f.Category != "" {
-		where += " AND m.category=?"
-		args = append(args, f.Category)
-	}
-	if q := strings.TrimSpace(f.Query); q != "" {
-		where += " AND m.title LIKE ? ESCAPE '\\'"
-		args = append(args, "%"+strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(q)+"%")
-	}
+	where, args := f.where(false)
 	var total int
 	if err := s.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM vod_movies m WHERE "+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
@@ -568,12 +677,14 @@ func (s *Service) Movie(ctx context.Context, id, userID int64) (Movie, error) {
 
 type Status struct {
 	Movies, Matched, Unmatched int
+	Series                     int
 	Sources                    []SourceStatus
 }
 
 type SourceStatus struct {
 	ID, Name    string
 	Movies      int
+	Series      int
 	RefreshedAt *time.Time
 	Error       string
 }
@@ -584,15 +695,18 @@ func (s *Service) Status(ctx context.Context) (st Status, err error) {
 	if err != nil {
 		return
 	}
+	if err = s.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM vod_series").Scan(&st.Series); err != nil {
+		return
+	}
 	stored := map[string]SourceStatus{}
-	rows, err := s.DB.QueryContext(ctx, "SELECT id, name, movies, refreshed_at, COALESCE(error,'') FROM vod_sources")
+	rows, err := s.DB.QueryContext(ctx, "SELECT id, name, movies, series, refreshed_at, COALESCE(error,'') FROM vod_sources")
 	if err != nil {
 		return
 	}
 	for rows.Next() {
 		var ss SourceStatus
 		var at sql.NullString
-		rows.Scan(&ss.ID, &ss.Name, &ss.Movies, &at, &ss.Error)
+		rows.Scan(&ss.ID, &ss.Name, &ss.Movies, &ss.Series, &at, &ss.Error)
 		if t, err := time.Parse(time.RFC3339, at.String); err == nil {
 			ss.RefreshedAt = &t
 		}

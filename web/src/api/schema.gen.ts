@@ -2291,6 +2291,236 @@ export interface paths {
         patch: operations["reportVodPlayback"];
         trace?: never;
     };
+    "/livetv/vod/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** TV series on demand (Xtream Codes sources), a page at a time. */
+        get: operations["listVodSeries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/series/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The sources' series categories with how many series the caller may see in each. */
+        get: operations["listVodSeriesCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/genres": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The films' genres with how many films the caller may see in each (for the genre filter). */
+        get: operations["listVodGenres"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/series/genres": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The series' genres with how many series the caller may see in each (for the genre filter). */
+        get: operations["listVodSeriesGenres"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/series/continue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Series the caller is watching, most recent first, each with nextEpisode set: the episode they're part-way through, else the next unwatched one. Finished series are left out. */
+        get: operations["vodSeriesContinueWatching"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/series/{seriesId}": {
+        parameters: {
+            query?: {
+                /** @description Fetch the episodes from the source now, even if they were fetched recently. */
+                refresh?: boolean;
+            };
+            header?: never;
+            path: {
+                seriesId: number;
+            };
+            cookie?: never;
+        };
+        /** A series with its seasons and episodes (and the caller's progress in each). Episodes are fetched from the source the first time a series is opened and again once 12 hours old, so this can take a few seconds. */
+        get: operations["getVodSeries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/series/{seriesId}/image": {
+        parameters: {
+            query?: {
+                kind?: "poster" | "backdrop";
+                /** @description A season's poster instead of the series' (kind is ignored). */
+                season?: number;
+            };
+            header?: never;
+            path: {
+                seriesId: number;
+            };
+            cookie?: never;
+        };
+        /** A series' (or season's) poster or backdrop, fetched once and cached (no sign-in needed, like artwork). */
+        get: operations["vodSeriesImage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/series/{seriesId}/watched": {
+        parameters: {
+            query?: {
+                /** @description Only this season's episodes. */
+                season?: number;
+            };
+            header?: never;
+            path: {
+                seriesId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Mark every episode of a series (or of one season) watched. */
+        put: operations["markVodSeriesWatched"];
+        post?: never;
+        /** Mark every episode of a series (or of one season) unwatched, forgetting resume points. */
+        delete: operations["markVodSeriesUnwatched"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/episodes/{episodeId}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                episodeId: number;
+            };
+            cookie?: never;
+        };
+        /** An episode's still, fetched once and cached (no sign-in needed, like artwork). */
+        get: operations["vodEpisodeImage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/episodes/{episodeId}/watched": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                episodeId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Mark an episode watched (clears its resume point). */
+        put: operations["markVodEpisodeWatched"];
+        post?: never;
+        /** Mark an episode unwatched (forgets its resume point). */
+        delete: operations["markVodEpisodeUnwatched"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/episodes/{episodeId}/next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                episodeId: number;
+            };
+            cookie?: never;
+        };
+        /** The episode after this one in viewing order (seasons in turn, specials last), for autoplay at the end of an episode; no episode when this is the last. */
+        get: operations["vodNextEpisode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/episodes/{episodeId}/play": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                episodeId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start watching an episode: the file made into seekable HLS by the server, as for Xtream Codes films. The session's movieId is 0 and episodeId is set; report progress and stop with the film session endpoints (/livetv/vod/sessions/{sessionId}). */
+        post: operations["playVodEpisode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/livetv/vod/sources/test": {
         parameters: {
             query?: never;
@@ -3915,9 +4145,11 @@ export interface components {
             enabled?: boolean;
         };
         VodStatus: {
-            /** @description Movies on demand are turned on, a source has films, and this profile may watch Live TV. Clients show them only when true. */
+            /** @description Movies on demand are turned on, a source has films or series, and this profile may watch Live TV. Clients show them only when true. */
             enabled: boolean;
             movies: number;
+            /** @description Series (Xtream Codes sources). */
+            series: number;
             /** @description Films matched to TMDB. */
             matched: number;
             /** @description Films TMDB had no confident match for. */
@@ -3930,6 +4162,8 @@ export interface components {
                 id: string;
                 name: string;
                 movies: number;
+                /** @description Series the source lists (Xtream Codes; 0 for playlists). */
+                series: number;
                 /** Format: date-time */
                 refreshedAt?: string;
                 error?: string;
@@ -3984,13 +4218,110 @@ export interface components {
             id: string;
             /** @description The HLS playlist (server-relative; the session id is its credential). */
             url: string;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description The film (0 for an episode).
+             */
             movieId: number;
+            /**
+             * Format: int64
+             * @description The episode, when watching a series.
+             */
+            episodeId?: number;
             /**
              * Format: int64
              * @description Where to start (the caller's resume point).
              */
             startMs?: number;
+        };
+        VodSeries: {
+            /** Format: int64 */
+            id: number;
+            title: string;
+            year?: number;
+            category?: string;
+            /** @description e.g. TV-14 (TMDB's, when matched). */
+            contentRating?: string;
+            /** @description Average vote out of 10 (TMDB's when matched, else the source's). */
+            rating?: number;
+            /** @description Server-relative; no token needed. */
+            posterUrl?: string;
+            /** @description Seasons known (0 until the series is first opened). */
+            seasonCount: number;
+            /** @description Episodes known (0 until the series is first opened). */
+            episodeCount: number;
+            /** @description Episodes the caller has watched. */
+            watchedCount: number;
+            /** @description The caller has watched every known episode. */
+            watched: boolean;
+            /** @description The episode the caller would watch next (Continue Watching and the series detail). */
+            nextEpisode?: components["schemas"]["VodEpisode"];
+        };
+        VodSeriesDetail: components["schemas"]["VodSeries"] & {
+            overview?: string;
+            genres: string[];
+            director?: string;
+            cast: {
+                name: string;
+                character?: string;
+            }[];
+            /** @description Server-relative; no token needed. */
+            backdropUrl?: string;
+            tmdbId?: number;
+            /** @description The details are TMDB's. */
+            matched: boolean;
+            /** @description In viewing order (specials, season 0, last). */
+            seasons: components["schemas"]["VodSeason"][];
+            /** @description Every episode in viewing order (seasons in turn, specials last); filter by season for a season's list. */
+            episodes: components["schemas"]["VodEpisode"][];
+            /** @description The source didn't give the episodes (and none were kept from before). */
+            episodesError?: string;
+        };
+        VodSeason: {
+            /** @description The season number (0 = specials). */
+            season: number;
+            /** @description e.g. Season 1. */
+            name: string;
+            overview?: string;
+            /** @description YYYY-MM-DD as the source gives it. */
+            airDate?: string;
+            /** @description Server-relative; no token needed. */
+            posterUrl?: string;
+            episodeCount: number;
+            /** @description Episodes the caller has watched. */
+            watchedCount: number;
+        };
+        VodEpisode: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            seriesId: number;
+            seriesTitle: string;
+            season: number;
+            /** @description The episode number within its season. */
+            episode: number;
+            title: string;
+            overview?: string;
+            /** @description YYYY-MM-DD as the source gives it. */
+            airDate?: string;
+            /** Format: int64 */
+            runtimeMs?: number;
+            rating?: number;
+            /** @description Server-relative; no token needed. */
+            stillUrl?: string;
+            /**
+             * Format: int64
+             * @description The caller's resume point.
+             */
+            positionMs?: number;
+            watched: boolean;
+        };
+        VodSeriesPage: {
+            total: number;
+            series: components["schemas"]["VodSeries"][];
+        };
+        VodUpNext: {
+            episode?: components["schemas"]["VodEpisode"];
         };
         RequestsStatus: {
             /** @description Seerr is configured. */
@@ -9462,6 +9793,18 @@ export interface operations {
                 q?: string;
                 sort?: "title" | "added" | "year" | "rating";
                 limit?: number;
+                /** @description One genre (TMDB's once matched, else the source's); see the genres endpoint. */
+                genre?: string;
+                /** @description Released in or after this year (items without a year are left out). */
+                yearFrom?: number;
+                /** @description Released in or before this year (a decade: yearFrom=1980&yearTo=1989). */
+                yearTo?: number;
+                /** @description Average vote out of 10 at least this (unrated items are left out). */
+                minRating?: number;
+                /** @description The caller's state: unwatched (never started), inProgress (started, not finished) or watched. */
+                watched?: "unwatched" | "inProgress" | "watched";
+                /** @description Only this source's (VodStatus.sources[].id). */
+                sourceId?: string;
                 offset?: number;
             };
             header?: never;
@@ -9692,6 +10035,377 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    listVodSeries: {
+        parameters: {
+            query?: {
+                category?: string;
+                /** @description Part of the title. */
+                q?: string;
+                sort?: "title" | "added" | "year" | "rating";
+                limit?: number;
+                /** @description One genre (TMDB's once matched, else the source's); see the genres endpoint. */
+                genre?: string;
+                /** @description Released in or after this year (items without a year are left out). */
+                yearFrom?: number;
+                /** @description Released in or before this year (a decade: yearFrom=1980&yearTo=1989). */
+                yearTo?: number;
+                /** @description Average vote out of 10 at least this (unrated items are left out). */
+                minRating?: number;
+                /** @description The caller's state: unwatched (has episodes not yet watched, including never-opened series), inProgress (started but not every episode watched) or watched (every episode watched). */
+                watched?: "unwatched" | "inProgress" | "watched";
+                /** @description Only this source's (VodStatus.sources[].id). */
+                sourceId?: string;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of series. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodSeriesPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listVodSeriesCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Categories by name. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodCategory"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listVodGenres: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Genres by name. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodCategory"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listVodSeriesGenres: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Genres by name. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodCategory"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    vodSeriesContinueWatching: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Series. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodSeries"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getVodSeries: {
+        parameters: {
+            query?: {
+                /** @description Fetch the episodes from the source now, even if they were fetched recently. */
+                refresh?: boolean;
+            };
+            header?: never;
+            path: {
+                seriesId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The series. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodSeriesDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    vodSeriesImage: {
+        parameters: {
+            query?: {
+                kind?: "poster" | "backdrop";
+                /** @description A season's poster instead of the series' (kind is ignored). */
+                season?: number;
+            };
+            header?: never;
+            path: {
+                seriesId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    markVodSeriesWatched: {
+        parameters: {
+            query?: {
+                /** @description Only this season's episodes. */
+                season?: number;
+            };
+            header?: never;
+            path: {
+                seriesId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Marked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    markVodSeriesUnwatched: {
+        parameters: {
+            query?: {
+                /** @description Only this season's episodes. */
+                season?: number;
+            };
+            header?: never;
+            path: {
+                seriesId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Marked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    vodEpisodeImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                episodeId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    markVodEpisodeWatched: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                episodeId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Marked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    markVodEpisodeUnwatched: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                episodeId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Marked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    vodNextEpisode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                episodeId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The next episode, if any. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodUpNext"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    playVodEpisode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                episodeId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description What the device plays. Without it, H.264 video and AAC/MP3 audio are copied and anything else is converted to them. */
+                    profile?: components["schemas"]["DeviceProfile"];
+                    /** @description The app's quality setting; 0/omitted = original (home) or automatic (remote). */
+                    maxBitrateKbps?: number;
+                    /**
+                     * Format: int64
+                     * @description Where to start; omitted = the caller's resume point (0 = from the beginning).
+                     */
+                    startMs?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description The session. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodSession"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
     testVodSource: {
         parameters: {
             query?: never;
@@ -9717,6 +10431,8 @@ export interface operations {
                         movies?: number;
                         /** @description Categories (Xtream Codes). */
                         categories?: number;
+                        /** @description Series the server lists (Xtream Codes; absent when it didn't list them). */
+                        series?: number;
                         /** @description The account's status as the server reports it, e.g. Active (Xtream Codes). */
                         account?: string;
                         /**

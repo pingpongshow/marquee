@@ -84,7 +84,13 @@ func (x *xtream) call(ctx context.Context, action string, q url.Values, out any)
 	}
 	defer resp.Body.Close()
 	switch {
-	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
+	// Dispatcharr answers 404 for a username it doesn't have (an exact, case-sensitive
+	// match) and 401 for a wrong password or a user with no XC password.
+	case resp.StatusCode == http.StatusNotFound:
+		return errors.New("the server doesn't know that username (check the address too; Dispatcharr usernames are case-sensitive)")
+	case resp.StatusCode == http.StatusUnauthorized:
+		return errors.New("wrong password, or the user has no XC password set in Dispatcharr")
+	case resp.StatusCode == http.StatusForbidden:
 		return errors.New("the server refused the username or password")
 	case resp.StatusCode >= 300:
 		return fmt.Errorf("the server answered %s", resp.Status)
@@ -530,8 +536,10 @@ func (s *Service) Redact(sourceID, msg string) string {
 // TestResult is what a source check found.
 type TestResult struct {
 	Movies, Categories int
-	Account            string
-	ExpiresAt          time.Time
+	// Series is how many series an Xtream Codes server lists (-1: it didn't list them).
+	Series    int
+	Account   string
+	ExpiresAt time.Time
 }
 
 // Test checks a source without saving it: it signs in to an Xtream Codes server and counts
@@ -569,6 +577,17 @@ func (s *Service) Test(ctx context.Context, src settings.VODSource) (TestResult,
 	for _, st := range list {
 		if _, ok := x.film(st, cats); ok {
 			r.Movies++
+		}
+	}
+	r.Series = -1
+	if scats, err := x.seriesCategories(ctx); err == nil {
+		if shows, err := x.seriesList(ctx); err == nil {
+			r.Series = 0
+			for _, sh := range shows {
+				if _, ok := x.show(sh, scats); ok {
+					r.Series++
+				}
+			}
 		}
 	}
 	return r, nil
