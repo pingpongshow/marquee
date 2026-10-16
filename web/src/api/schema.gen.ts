@@ -5082,8 +5082,11 @@ export interface components {
         ActivityTask: {
             /** @description Stable id, e.g. scan:3 */
             id: string;
-            /** @enum {string} */
-            kind: "scan" | "import" | "stream" | "task";
+            /**
+             * @description download: a VOD title being saved to the library (admins).
+             * @enum {string}
+             */
+            kind: "scan" | "import" | "stream" | "task" | "download";
             /** @example Scanning Movies */
             title: string;
             /** @enum {string} */

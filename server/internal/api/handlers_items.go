@@ -15,6 +15,7 @@ import (
 	"marquee/internal/images"
 	"marquee/internal/items"
 	"marquee/internal/library"
+	"marquee/internal/vodsave"
 )
 
 // ---------- scans ----------
@@ -410,7 +411,7 @@ func (h *Handlers) GetActivity(ctx context.Context, _ GetActivityRequestObject) 
 		return GetActivity401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	out := Activity{ServerVersion: h.Version, Tasks: []ActivityTask{}}
-	if !sess.User.IsAdmin || h.Scans == nil {
+	if !sess.User.IsAdmin {
 		return GetActivity200JSONResponse(out), nil
 	}
 	if h.Playback != nil {
@@ -423,7 +424,7 @@ func (h *Handlers) GetActivity(ctx context.Context, _ GetActivityRequestObject) 
 			if verb == "" {
 				verb = "playing"
 			}
-			out.Tasks = append(out.Tasks, ActivityTask{Id: "stream:" + s.ID, Kind: Stream, State: ActivityTaskStateRunning,
+			out.Tasks = append(out.Tasks, ActivityTask{Id: "stream:" + s.ID, Kind: ActivityTaskKindStream, State: ActivityTaskStateRunning,
 				Title: fmt.Sprintf("%s is %s %s", s.UserName, verb, s.Title),
 				Progress: &ScanProgress{Phase: Probing, Done: int(snap.PositionMS / 1000), Total: int(s.Media.DurationMS / 1000),
 					Current: ptr(fmt.Sprintf("%s · %s · %d kbps", s.Decision.String(), map[bool]string{true: "Remote", false: "Local"}[s.Remote], s.BitrateKbps()))}})
@@ -431,7 +432,7 @@ func (h *Handlers) GetActivity(ctx context.Context, _ GetActivityRequestObject) 
 	}
 	if h.Plex != nil {
 		if running, p, _ := h.Plex.Status(); running {
-			out.Tasks = append(out.Tasks, ActivityTask{Id: "import:plex", Kind: Import, State: ActivityTaskStateRunning,
+			out.Tasks = append(out.Tasks, ActivityTask{Id: "import:plex", Kind: ActivityTaskKindImport, State: ActivityTaskStateRunning,
 				Title:    "Importing from Plex: " + p.Step,
 				Progress: &ScanProgress{Phase: Metadata, Done: p.Done, Total: p.Total}})
 		}
@@ -442,9 +443,13 @@ func (h *Handlers) GetActivity(ctx context.Context, _ GetActivityRequestObject) 
 				continue // short tasks aren't worth showing
 			}
 			done, total := t.Progress()
-			out.Tasks = append(out.Tasks, ActivityTask{Id: "task:" + t.ID, Kind: Task, State: ActivityTaskStateRunning, Title: t.Name,
+			out.Tasks = append(out.Tasks, ActivityTask{Id: "task:" + t.ID, Kind: ActivityTaskKindTask, State: ActivityTaskStateRunning, Title: t.Name,
 				Progress: &ScanProgress{Phase: Metadata, Done: done, Total: total}})
 		}
+	}
+	out.Tasks = append(out.Tasks, h.vodSaveActivity(ctx)...)
+	if h.Scans == nil {
+		return GetActivity200JSONResponse(out), nil
 	}
 	active := h.Scans.Active()
 	if len(active) == 0 {
@@ -459,7 +464,7 @@ func (h *Handlers) GetActivity(ctx context.Context, _ GetActivityRequestObject) 
 		if !ok {
 			continue
 		}
-		t := ActivityTask{Id: fmt.Sprintf("scan:%d", l.ID), Kind: Scan, LibraryId: ptr(l.ID), State: ActivityTaskStateQueued}
+		t := ActivityTask{Id: fmt.Sprintf("scan:%d", l.ID), Kind: ActivityTaskKindScan, LibraryId: ptr(l.ID), State: ActivityTaskStateQueued}
 		t.Title = "Waiting to scan " + l.Name
 		if st.State == "scanning" {
 			t.State = ActivityTaskStateRunning
@@ -474,6 +479,60 @@ func (h *Handlers) GetActivity(ctx context.Context, _ GetActivityRequestObject) 
 		out.Tasks = append(out.Tasks, t)
 	}
 	return GetActivity200JSONResponse(out), nil
+}
+
+// vodSaveActivity lists the VOD downloads that are running, and one line for the ones waiting
+// (with why, when the queue is held up).
+func (h *Handlers) vodSaveActivity(ctx context.Context) []ActivityTask {
+	if h.VODSaves == nil {
+		return nil
+	}
+	saves, err := h.VODSaves.List(ctx)
+	if err != nil {
+		return nil
+	}
+	var out []ActivityTask
+	waiting, reason := 0, ""
+	for _, v := range saves {
+		switch v.State {
+		case vodsave.Queued, vodsave.Paused:
+			waiting++
+			if reason == "" && v.PauseReason != "" {
+				reason = v.PauseReason
+			}
+			continue
+		case vodsave.Downloading, vodsave.Processing, vodsave.Verifying:
+		default:
+			continue
+		}
+		t := ActivityTask{Id: fmt.Sprintf("download:%d", v.ID), Kind: ActivityTaskKindDownload, State: ActivityTaskStateRunning}
+		const mb = 1 << 20
+		switch v.State {
+		case vodsave.Downloading:
+			t.Title = "Downloading " + v.Title
+			detail := fmt.Sprintf("%.1f of %.1f GB", float64(v.BytesDone)/(1<<30), float64(v.BytesTotal)/(1<<30))
+			if v.SpeedBps > 0 {
+				detail += fmt.Sprintf(" · %.1f MB/s", v.SpeedBps/mb)
+			}
+			if v.ETASeconds > 0 {
+				detail += fmt.Sprintf(" · %s left", (time.Duration(v.ETASeconds) * time.Second).Round(time.Minute))
+			}
+			t.Progress = &ScanProgress{Phase: Probing, Done: int(v.BytesDone / mb), Total: int(v.BytesTotal / mb), Current: ptr(detail)}
+		default:
+			t.Title = map[string]string{vodsave.Processing: "Converting ", vodsave.Verifying: "Checking "}[v.State] + v.Title
+			t.Progress = &ScanProgress{Phase: Probing, Done: int(v.Progress * 100), Total: 100}
+		}
+		out = append(out, t)
+	}
+	if waiting > 0 {
+		t := ActivityTask{Id: "download:waiting", Kind: ActivityTaskKindDownload, State: ActivityTaskStateQueued,
+			Title: fmt.Sprintf("%d VOD download%s waiting", waiting, map[bool]string{true: "", false: "s"}[waiting == 1])}
+		if reason != "" {
+			t.Progress = &ScanProgress{Phase: Walking, Current: ptr(reason)}
+		}
+		out = append(out, t)
+	}
+	return out
 }
 
 // ---------- logs ----------
