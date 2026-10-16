@@ -10,6 +10,8 @@ import SwiftUI
 struct VodSeriesTile: View {
     let series: VodSeries
     var width: CGFloat = 130
+    /// Takes the show off Continue Watching (its context menu, in the Continue Watching row).
+    var onRemove: (() -> Void)?
 
     var body: some View {
         #if os(tvOS)
@@ -18,6 +20,7 @@ struct VodSeriesTile: View {
                 .buttonStyle(.card)
                 .accessibilityLabel(series.title)
                 .accessibilityIdentifier("vod.showTile")
+                .modifier(RemoveFromContinueMenu(action: onRemove))
             titles
         }
         .frame(width: width)
@@ -34,6 +37,7 @@ struct VodSeriesTile: View {
         .accessibilityLabel(series.title)
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("vod.showTile")
+        .modifier(RemoveFromContinueMenu(action: onRemove))
         #endif
     }
 

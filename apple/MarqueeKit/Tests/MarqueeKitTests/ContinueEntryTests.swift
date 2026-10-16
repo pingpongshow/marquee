@@ -18,10 +18,10 @@ final class ContinueEntryTests: XCTestCase {
 
     func testLines() {
         XCTAssertEqual(movie(5).title, "Film 5")
-        XCTAssertEqual(movie(5).vodSubtitle, "On demand · 1985")
+        XCTAssertEqual(movie(5).vodSubtitle, "VOD · 1985")
         XCTAssertEqual(episode(7, series: 2).title, "Show 2")
-        XCTAssertEqual(episode(7, series: 2).vodSubtitle, "On demand · S1 · E3 · Pilot")
-        XCTAssertEqual(episode(7, series: 2, title: "").vodSubtitle, "On demand · S1 · E3")
+        XCTAssertEqual(episode(7, series: 2).vodSubtitle, "VOD · S1 · E3 · Pilot")
+        XCTAssertEqual(episode(7, series: 2, title: "").vodSubtitle, "VOD · S1 · E3")
     }
 
     func testArtwork() {
