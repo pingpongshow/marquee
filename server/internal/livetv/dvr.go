@@ -51,6 +51,9 @@ type Recorder struct {
 	Now func() time.Time
 	// OnFailed, when set, hears a recording that failed (admin alerts).
 	OnFailed func(id int64, title, errMsg string)
+	// OnRecorded, when set, hears a recording that finished, with its file (commercial
+	// detection). It's called after the library rescan is queued.
+	OnRecorded func(path string)
 
 	mu     sync.Mutex
 	active map[int64]context.CancelFunc
@@ -587,6 +590,9 @@ func (r *Recorder) record(rctx, ctx context.Context, id int64) {
 		}
 	}
 	slog.Info("dvr: recorded", "id", id, "path", dest)
+	if r.OnRecorded != nil {
+		r.OnRecorded(dest)
+	}
 }
 
 func deadline(ctx context.Context) time.Time {

@@ -30,7 +30,9 @@ type Config struct {
 	PlexDir string
 	// RecordingsDir holds Live TV recordings (LIVE-5).
 	RecordingsDir string
-	LogLevel      slog.Level
+	// ComskipPath and ComskipINI are the commercial detector and its settings (LIVE-5).
+	ComskipPath, ComskipINI string
+	LogLevel                slog.Level
 }
 
 func Load() (Config, error) {
@@ -43,6 +45,8 @@ func Load() (Config, error) {
 		WebDir:        os.Getenv("MARQUEE_WEB_DIR"),
 		PlexDir:       env("MARQUEE_PLEX_DIR", "/plex"),
 		RecordingsDir: env("MARQUEE_RECORDINGS_DIR", "/recordings"),
+		ComskipPath:   env("MARQUEE_COMSKIP", "comskip"),
+		ComskipINI:    env("MARQUEE_COMSKIP_INI", "/usr/local/share/marquee/comskip.ini"),
 	}
 	if _, err := strconv.Atoi(strings.TrimPrefix(c.ListenAddr, ":")); err != nil {
 		return c, fmt.Errorf("invalid MARQUEE_PORT: %w", err)

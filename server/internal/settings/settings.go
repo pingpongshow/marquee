@@ -215,6 +215,11 @@ type Integrations struct {
 	// DVR padding in minutes (LIVE-5).
 	DVRPaddingBefore int `json:"dvrPaddingBefore"`
 	DVRPaddingAfter  int `json:"dvrPaddingAfter"`
+	// Commercials is what happens to finished recordings (and, nightly, older ones):
+	// CommercialsOff, CommercialsDetect (find the breaks with Comskip, leave the file) or
+	// CommercialsRemove (cut them out; the original goes to the media trash). Off by default,
+	// since removing changes files.
+	Commercials string `json:"commercials"`
 	// Movies on demand under Live TV (LIVE-6): off until the admin turns it on.
 	VODEnabled bool        `json:"vodEnabled"`
 	VODSources []VODSource `json:"vodSources"`
@@ -234,6 +239,13 @@ type VODSource struct {
 	UserAgent string `json:"userAgent"`
 	Enabled   bool   `json:"enabled"`
 }
+
+// Commercials settings.
+const (
+	CommercialsOff    = "off"
+	CommercialsDetect = "detect"
+	CommercialsRemove = "remove"
+)
 
 // VODKindXtream is an Xtream Codes source; anything else is an M3U playlist.
 const VODKindXtream = "xtream"
@@ -395,7 +407,7 @@ func Defaults() Settings {
 		Metadata:     Metadata{AnimeEpisodeOrdering: "seasonal", OMDbDailyLimit: 950},
 		Tasks:        Tasks{MaintenanceWindowStart: "03:00", MaintenanceWindowHours: 4, BackupRetention: 7},
 		Music:        Music{SoundprintAnalysis: true, OnlineLyrics: false, LoudnessAnalysis: true, ArtistDetails: true},
-		Integrations: Integrations{DVRPaddingBefore: 1, DVRPaddingAfter: 3},
+		Integrations: Integrations{DVRPaddingBefore: 1, DVRPaddingAfter: 3, Commercials: CommercialsOff},
 		Notifications: Notifications{SMTPPort: 587, SMTPSecurity: "starttls", FromName: "Marquee",
 			RecipientsAllAdmins: true, DiskThresholdPercent: 10},
 		VODSave: VODSave{Quality: VODSaveOriginal, MaxHeight: 1080, VideoCodec: "hevc", VideoQuality: "balanced",

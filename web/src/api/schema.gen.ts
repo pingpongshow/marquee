@@ -801,6 +801,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/items/{itemId}/commercials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        /** Commercials in a Live TV recording: found, cut or not (admin only). 404 for items that aren't recordings. */
+        get: operations["getItemCommercials"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/commercials/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Find and cut the commercials out of a Live TV recording now, whatever the setting (admin only). Queued and done in the background, one at a time; a recording being watched waits. */
+        post: operations["removeItemCommercials"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/commercials/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Put back the original of a recording whose commercials were cut, while it's still in the media trash (admin only). The cut file goes to the trash instead. */
+        post: operations["restoreItemCommercials"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/items/{itemId}/children": {
         parameters: {
             query?: never;
@@ -4308,6 +4365,7 @@ export interface components {
              * @description Who scheduled it.
              */
             userId?: number;
+            commercials?: components["schemas"]["CommercialScan"];
         };
         RecordingRule: {
             /** Format: int64 */
@@ -4962,6 +5020,13 @@ export interface components {
             dvrPaddingBefore?: number;
             /** @description Minutes recordings run late. */
             dvrPaddingAfter?: number;
+            /**
+             * @description What happens to finished recordings and, nightly, older ones: off; detect = find the commercial breaks with Comskip but leave the files alone; remove = find them and cut them out (the original goes to the media trash and can be restored while it's there). Default off.
+             * @enum {string}
+             */
+            commercials?: "off" | "detect" | "remove";
+            /** @description This server's build includes Comskip, so commercials can be found. */
+            readonly comskipAvailable?: boolean;
             liveTvSources?: components["schemas"]["LiveTvSource"][];
             /** @description Movies on demand appear under Live TV (LIVE-6). */
             vodEnabled?: boolean;
@@ -4980,6 +5045,8 @@ export interface components {
             bazarrApiKey?: string;
             dvrPaddingBefore?: number;
             dvrPaddingAfter?: number;
+            /** @enum {string} */
+            commercials?: "off" | "detect" | "remove";
             /** @description Replaces the whole list when sent. */
             liveTvSources?: components["schemas"]["LiveTvSource"][];
             vodEnabled?: boolean;
@@ -5302,6 +5369,35 @@ export interface components {
             startMs: number;
             /** Format: int64 */
             endMs: number;
+        };
+        /** @description A commercial break in a Live TV recording, in milliseconds from the start of the original recording. Once cut, what was actually removed (aligned to keyframes). */
+        CommercialBreak: {
+            /** Format: int64 */
+            startMs: number;
+            /** Format: int64 */
+            endMs: number;
+        };
+        /** @description Admins only: commercials in a recording. pending = not checked yet; queued/running = being checked or cut; detected = found (breaks may be empty), file unchanged; waiting = to be cut once nobody is watching it; cut = removed from the file (removedMs); restored = the original was put back; failed = see error. */
+        CommercialScan: {
+            /** @enum {string} */
+            status: "pending" | "queued" | "running" | "detected" | "waiting" | "cut" | "restored" | "failed";
+            breaks: components["schemas"]["CommercialBreak"][];
+            /**
+             * Format: int64
+             * @description With cut: how much was removed in all.
+             */
+            removedMs?: number;
+            /** @description With failed */
+            error?: string;
+            /**
+             * Format: date-time
+             * @description When it was last checked or cut.
+             */
+            scannedAt?: string;
+            /** @description The original is still in the media trash, so it can be put back. */
+            canRestore?: boolean;
+            /** @description Comskip is in this server's build, so commercials can be removed. */
+            available?: boolean;
         };
         PlaybackSession: {
             id: string;
@@ -8014,6 +8110,83 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getItemCommercials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommercialScan"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    removeItemCommercials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommercialScan"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    restoreItemCommercials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Restored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommercialScan"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     listItemChildren: {

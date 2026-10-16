@@ -39,6 +39,9 @@ func (h *Handlers) ListRecordings(ctx context.Context, _ ListRecordingsRequestOb
 	out := make(ListRecordings200JSONResponse, len(list))
 	for i, x := range list {
 		out[i] = toAPIRecording(x)
+		if s.User.IsAdmin && x.Status == livetv.StatusCompleted && x.ItemID != nil {
+			out[i].Commercials = h.recordingCommercials(ctx, x.Path)
+		}
 	}
 	return out, nil
 }

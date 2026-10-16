@@ -12,6 +12,7 @@ import (
 	"marquee/internal/auth"
 	"marquee/internal/avatars"
 	"marquee/internal/bazarr"
+	"marquee/internal/commercials"
 	"marquee/internal/downloads"
 	"marquee/internal/health"
 	"marquee/internal/images"
@@ -69,6 +70,7 @@ type Handlers struct {
 	Requests         *requests.Service
 	LiveTV           *livetv.Service
 	DVR              *livetv.Recorder
+	Commercials      *commercials.Service
 	VOD              *vod.Service
 	Scrobble         *scrobble.Service
 	SyncPlay         *syncplay.Service

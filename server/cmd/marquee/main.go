@@ -25,6 +25,7 @@ import (
 	"marquee/internal/auth"
 	"marquee/internal/avatars"
 	"marquee/internal/bazarr"
+	"marquee/internal/commercials"
 	"marquee/internal/config"
 	"marquee/internal/db"
 	"marquee/internal/discovery"
@@ -491,6 +492,29 @@ func run() error {
 		},
 		Scan: scans.Queue,
 	}
+	// Commercials in recordings (Comskip, then FFmpeg; one at a time, lowest priority): when a
+	// recording finishes, on an admin's request, and nightly for older recordings.
+	ads := &commercials.Service{DB: database, Comskip: cfg.ComskipPath, INI: cfg.ComskipINI, Dir: cfg.RecordingsDir,
+		FFmpeg: cfg.FFmpegPath, FFprobe: cfg.FFprobePath, Encoders: player.EncoderChoices, QSVDevice: player.Encoders.QSVDevice,
+		Preset: func() string { return store.Get().Transcoder.Preset },
+		Mode:   func() string { return store.Get().Integrations.Commercials },
+		Trash:  mediaTrash, Rescan: scans.Queue, Pace: 30 * time.Second,
+		Playing: func(fileID int64) bool {
+			for _, ps := range player.List() {
+				if ps.FileID == fileID {
+					return true
+				}
+			}
+			return false
+		}}
+	if !ads.Available() {
+		slog.Info("commercial detection unavailable: comskip not found", "path", cfg.ComskipPath)
+	}
+	dvr.OnRecorded = func(path string) { ads.RecordingFinished(ctx, path) }
+	go ads.Run(ctx)
+	scheduler.Register(tasks.Task{ID: "commercials", Name: "Commercials in recordings", Window: true, Bounded: true,
+		Description: "Finds the commercials in Live TV recordings not looked at yet and, when Settings → Live TV says so, cuts them out (the original goes to the media trash). One at a time.",
+		Run:         ads.Backlog, Progress: ads.Progress})
 
 	watchTogether := &syncplay.Service{}
 	go watchTogether.Run(ctx)
@@ -575,6 +599,7 @@ func run() error {
 		VODSaves:    vodSaves,
 		Scrobble:    scrobbler,
 		DVR:         dvr,
+		Commercials: ads,
 		SyncPlay:    watchTogether,
 		Remote:      remoteHub,
 		Embeddings:  embedder,

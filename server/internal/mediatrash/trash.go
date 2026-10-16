@@ -87,6 +87,38 @@ func (s *Service) Trash(ctx context.Context, fileIDs []int64, why string) (paths
 	return paths, undo, nil
 }
 
+// Stash moves just a media file to the trash (its sidecars stay: they belong to the item)
+// and leaves the library's record alone, for a caller that puts another file in its place.
+// It returns where the file went, so it can be put back; undo puts it back now.
+func (s *Service) Stash(ctx context.Context, fileID int64, why string) (to string, undo func(), err error) {
+	var path string
+	var libID int64
+	err = s.DB.QueryRowContext(ctx, `SELECT path, library_id FROM media_files WHERE id = ?`, fileID).Scan(&path, &libID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", func() {}, ErrNotFound
+	}
+	if err != nil {
+		return "", func() {}, err
+	}
+	root, err := s.rootFor(ctx, libID, path)
+	if err != nil {
+		return "", func() {}, err
+	}
+	rel, err := filepath.Rel(root, path)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return "", func() {}, &MoveError{"The file isn't inside its library folder"}
+	}
+	to = free(filepath.Join(root, library.TrashDir, s.now().Format(dateLayout), rel))
+	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+		return "", func() {}, moveError(err)
+	}
+	if err := os.Rename(path, to); err != nil {
+		return "", func() {}, moveError(err)
+	}
+	slog.InfoContext(ctx, "media file moved to the trash", "why", why, "file", path, "trash", to)
+	return to, func() { os.Rename(to, path) }, nil
+}
+
 // moved is a file (and its sidecars) moved to the trash.
 type moved struct {
 	path  string

@@ -1125,6 +1125,59 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /items/{itemId}/commercials:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [items]
+      operationId: getItemCommercials
+      summary: "Commercials in a Live TV recording: found, cut or not (admin only). 404 for items that aren't recordings."
+      responses:
+        "200":
+          description: Status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommercialScan" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/commercials/remove:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    post:
+      tags: [items]
+      operationId: removeItemCommercials
+      summary: "Find and cut the commercials out of a Live TV recording now, whatever the setting (admin only). Queued and done in the background, one at a time; a recording being watched waits."
+      responses:
+        "202":
+          description: Queued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommercialScan" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /items/{itemId}/commercials/restore:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    post:
+      tags: [items]
+      operationId: restoreItemCommercials
+      summary: "Put back the original of a recording whose commercials were cut, while it's still in the media trash (admin only). The cut file goes to the trash instead."
+      responses:
+        "200":
+          description: Restored.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommercialScan" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
   /items/{itemId}/children:
     parameters:
       - $ref: "#/components/parameters/ItemId"
@@ -5174,6 +5227,7 @@ components:
         sizeBytes: { type: integer, format: int64 }
         itemId: { type: integer, format: int64, description: The library item once the recording has been scanned. }
         userId: { type: integer, format: int64, description: Who scheduled it. }
+        commercials: { $ref: "#/components/schemas/CommercialScan" }
 
     RecordingRule:
       type: object
@@ -5752,6 +5806,11 @@ components:
         bazarrApiKeySet: { type: boolean, readOnly: true }
         dvrPaddingBefore: { type: integer, minimum: 0, maximum: 60, description: Minutes recordings start early. }
         dvrPaddingAfter: { type: integer, minimum: 0, maximum: 120, description: Minutes recordings run late. }
+        commercials:
+          type: string
+          enum: ["off", detect, remove]
+          description: "What happens to finished recordings and, nightly, older ones: off; detect = find the commercial breaks with Comskip but leave the files alone; remove = find them and cut them out (the original goes to the media trash and can be restored while it's there). Default off."
+        comskipAvailable: { type: boolean, readOnly: true, description: "This server's build includes Comskip, so commercials can be found." }
         liveTvSources:
           type: array
           items: { $ref: "#/components/schemas/LiveTvSource" }
@@ -5771,6 +5830,7 @@ components:
         bazarrApiKey: { type: string, description: "Bazarr's API key (Settings → General in Bazarr). Write-only." }
         dvrPaddingBefore: { type: integer, minimum: 0, maximum: 60 }
         dvrPaddingAfter: { type: integer, minimum: 0, maximum: 120 }
+        commercials: { type: string, enum: ["off", detect, remove] }
         liveTvSources:
           type: array
           description: Replaces the whole list when sent.
@@ -6106,6 +6166,27 @@ components:
         kind: { type: string, enum: [intro, credits] }
         startMs: { type: integer, format: int64 }
         endMs: { type: integer, format: int64 }
+
+    CommercialBreak:
+      type: object
+      description: "A commercial break in a Live TV recording, in milliseconds from the start of the original recording. Once cut, what was actually removed (aligned to keyframes)."
+      required: [startMs, endMs]
+      properties:
+        startMs: { type: integer, format: int64 }
+        endMs: { type: integer, format: int64 }
+
+    CommercialScan:
+      type: object
+      description: "Admins only: commercials in a recording. pending = not checked yet; queued/running = being checked or cut; detected = found (breaks may be empty), file unchanged; waiting = to be cut once nobody is watching it; cut = removed from the file (removedMs); restored = the original was put back; failed = see error."
+      required: [status, breaks]
+      properties:
+        status: { type: string, enum: [pending, queued, running, detected, waiting, cut, restored, failed] }
+        breaks: { type: array, items: { $ref: "#/components/schemas/CommercialBreak" } }
+        removedMs: { type: integer, format: int64, description: "With cut: how much was removed in all." }
+        error: { type: string, description: With failed, why. }
+        scannedAt: { type: string, format: date-time, description: When it was last checked or cut. }
+        canRestore: { type: boolean, description: "The original is still in the media trash, so it can be put back." }
+        available: { type: boolean, description: "Comskip is in this server's build, so commercials can be removed." }
 
     PlaybackSession:
       type: object

@@ -91,6 +91,7 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			LiveTvSources:    ptr(toAPILiveSources(s.Integrations.LiveTVSources)),
 			DvrPaddingBefore: ptr(s.Integrations.DVRPaddingBefore),
 			DvrPaddingAfter:  ptr(s.Integrations.DVRPaddingAfter),
+			Commercials:      ptr(IntegrationSettingsCommercials(s.Integrations.Commercials)),
 			VodEnabled:       ptr(s.Integrations.VODEnabled),
 			VodSources:       ptr(toAPIVodSources(s.Integrations.VODSources)),
 		},
@@ -249,6 +250,9 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		}
 		set(&s.Integrations.DVRPaddingBefore, i.DvrPaddingBefore)
 		set(&s.Integrations.DVRPaddingAfter, i.DvrPaddingAfter)
+		if i.Commercials != nil {
+			s.Integrations.Commercials = string(*i.Commercials)
+		}
 		if i.LiveTvSources != nil {
 			s.Integrations.LiveTVSources = make([]settings.LiveTVSource, len(*i.LiveTvSources))
 			for k, src := range *i.LiveTvSources {
@@ -318,6 +322,7 @@ func (h *Handlers) GetSettings(ctx context.Context, _ GetSettingsRequestObject) 
 	cur := h.Settings.Get()
 	out := toAPISettings(cur)
 	h.fillVodSaveCoverage(ctx, &out, cur)
+	h.fillComskipAvailable(&out)
 	return GetSettings200JSONResponse(out), nil
 }
 
@@ -353,6 +358,7 @@ func (h *Handlers) UpdateSettings(ctx context.Context, req UpdateSettingsRequest
 	}
 	out := toAPISettings(next)
 	h.fillVodSaveCoverage(ctx, &out, next)
+	h.fillComskipAvailable(&out)
 	return UpdateSettings200JSONResponse(out), nil
 }
 

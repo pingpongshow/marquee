@@ -1,12 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Check, Lock, Pencil, RefreshCw, Search, Trash2, Unlock } from "lucide-react";
+import { Check, History, Lock, Pencil, RefreshCw, Scissors, Search, Trash2, Unlock } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, unwrap } from "@/api/client";
 import type { components } from "@/api/schema.gen";
 import type { ItemDetail } from "@/api/types";
 import { Alert, Button, Dialog, Field, Input, Spinner } from "@/components/ui";
 import { ItemFiles } from "./FileNames";
+import {
+  canRemove,
+  commercialsText,
+  removeConfirm,
+  restoreConfirm,
+  useCommercials,
+  useRemoveCommercials,
+  useRestoreCommercials,
+} from "../livetv/commercials";
 
 type Edit = components["schemas"]["ItemEdit"];
 type LockField = NonNullable<Edit["unlock"]>[number];
@@ -207,6 +216,11 @@ export function ItemActions({ item }: { item: ItemDetail }) {
     mutationFn: () => unwrap(api.POST("/items/{itemId}/refresh", { params: { path: { itemId: item.id } } })),
     onSuccess: updated,
   });
+  // Live TV recordings: commercials found, removed or restorable (404 for anything else).
+  const ads = useCommercials(item.id, item.type === "movie" || item.type === "episode");
+  const removeAds = useRemoveCommercials(item.id);
+  const restoreAds = useRestoreCommercials(item.id);
+  const adError = removeAds.error ?? restoreAds.error;
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
@@ -221,7 +235,7 @@ export function ItemActions({ item }: { item: ItemDetail }) {
           <Pencil className="size-4" />
         </Button>
         {open && (
-          <div className="absolute left-0 z-30 mt-2 w-52 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-2xl" onClick={() => setOpen(false)}>
+          <div className="absolute left-0 z-30 mt-2 w-64 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-2xl" onClick={() => setOpen(false)}>
             <button className={itemCls} onClick={() => setDialog("edit")}>
               <Pencil className="size-4" /> Edit
             </button>
@@ -235,6 +249,21 @@ export function ItemActions({ item }: { item: ItemDetail }) {
                 <RefreshCw className="size-4" /> Refresh metadata
               </button>
             )}
+            {ads.data && (
+              <>
+                <div className="mt-1 border-t border-border px-4 pt-2 pb-1 text-xs text-muted">{commercialsText(ads.data)}</div>
+                {canRemove(ads.data) && (
+                  <button className={itemCls} onClick={() => window.confirm(removeConfirm) && removeAds.mutate()}>
+                    <Scissors className="size-4" /> Remove commercials now
+                  </button>
+                )}
+                {ads.data.canRestore && (
+                  <button className={itemCls} onClick={() => window.confirm(restoreConfirm) && restoreAds.mutate()}>
+                    <History className="size-4" /> Restore original
+                  </button>
+                )}
+              </>
+            )}
             {item.type === "collection" && (
               <button
                 className={itemCls + " text-danger"}
@@ -247,6 +276,7 @@ export function ItemActions({ item }: { item: ItemDetail }) {
         )}
       </div>
       {refresh.isError && <span className="text-sm text-danger">{refresh.error.message}</span>}
+      {adError && <span className="text-sm text-danger">{adError.message}</span>}
       {dialog === "match" && <FixMatchDialog item={item} onClose={() => setDialog(null)} />}
       {dialog === "edit" && <EditDialog item={item} onClose={() => setDialog(null)} />}
     </>
