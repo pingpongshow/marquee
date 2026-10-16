@@ -6,6 +6,10 @@ public typealias VodMovieDetail = Components.Schemas.VodMovieDetail
 public typealias VodStatus = Components.Schemas.VodStatus
 public typealias VodCategory = Components.Schemas.VodCategory
 public typealias VodSort = Operations.ListVodMovies.Input.Query.SortPayload
+public typealias VodSeries = Components.Schemas.VodSeries
+public typealias VodSeriesDetail = Components.Schemas.VodSeriesDetail
+public typealias VodSeason = Components.Schemas.VodSeason
+public typealias VodEpisode = Components.Schemas.VodEpisode
 
 /// Movies on demand under Live TV (LIVE-6): films from M3U sources (e.g. Pluto TV), played by
 /// passing the source's HLS through the server, with per-viewer resume and watched state.
@@ -23,7 +27,7 @@ public extension AppSession {
     func vodStatus() async throws -> VodStatus {
         let args = ProcessInfo.processInfo.arguments
         if args.contains("-marquee-test-vod-off") || args.contains("-marquee-test-live-off") {
-            return VodStatus(enabled: false, movies: 0, matched: 0, unmatched: 0, matching: false, sources: [])
+            return VodStatus(enabled: false, movies: 0, series: 0, matched: 0, unmatched: 0, matching: false, sources: [])
         }
         return try await vodAPI.vodStatus().ok.body.json
     }
@@ -32,9 +36,18 @@ public extension AppSession {
         try await vodAPI.listVodCategories().ok.body.json
     }
 
+    /// The films' genres with counts (for the genre filter).
+    func vodGenres() async throws -> [VodCategory] {
+        try await vodAPI.listVodGenres().ok.body.json
+    }
+
     /// A page of films, with how many there are in all.
-    func vodMovies(category: String? = nil, query: String? = nil, sort: VodSort = .title, offset: Int = 0, limit: Int = 120) async throws -> (movies: [VodMovie], total: Int) {
-        let page = try await vodAPI.listVodMovies(query: .init(category: category, q: query, sort: sort, limit: limit, offset: offset)).ok.body.json
+    func vodMovies(category: String? = nil, query: String? = nil, sort: VodSort = .title, filters: VodFilters = .init(),
+                   offset: Int = 0, limit: Int = 120) async throws -> (movies: [VodMovie], total: Int) {
+        let page = try await vodAPI.listVodMovies(query: .init(
+            category: category, q: query, sort: sort, limit: limit, genre: filters.genre, yearFrom: filters.yearFrom,
+            yearTo: filters.yearTo, minRating: filters.minRating.map(Double.init),
+            watched: filters.watched.flatMap { .init(rawValue: $0.rawValue) }, sourceId: filters.sourceId, offset: offset)).ok.body.json
         return (page.movies, page.total)
     }
 
@@ -59,17 +72,53 @@ public extension AppSession {
         }
     }
 
-    /// Starts a film: the session id, the HLS URL and the caller's resume point (ms).
+    /// The app's quality setting for VOD playback, as for the library (nil = original / automatic).
+    private var vodMaxBitrate: Int? {
+        let q = isRemote ? QualityPreference.remote : QualityPreference.local
+        return q == 0 ? nil : q
+    }
+
+    /// Starts a film: the session id, the HLS URL and the caller's resume point (ms). Sends the
+    /// device's profile, so the server copies what this device plays (HEVC, AC3…).
     func playVod(_ id: Int64) async throws -> (id: String, url: URL, startMs: Int64) {
-        switch try await vodAPI.playVodMovie(path: .init(movieId: id)) {
+        let body = Operations.PlayVodMovie.Input.Body.JsonPayload(profile: .init(value1: AppleDeviceProfile.current()), maxBitrateKbps: vodMaxBitrate)
+        switch try await vodAPI.playVodMovie(path: .init(movieId: id), body: .json(body)) {
         case let .ok(ok):
             let s = try ok.body.json
             guard let url = absolute(s.url) else { throw MarqueeError("Not connected") }
             return (s.id, url, s.startMs ?? 0)
         case let .forbidden(e): throw MarqueeError((try? e.body.json.message) ?? "This movie isn't available on this profile")
         case .notFound: throw MarqueeError("That movie isn't available any more")
+        case let .badGateway(e): throw MarqueeError(Self.vodFailed((try? e.body.json.message), what: "movie"))
+        case .serviceUnavailable: throw MarqueeError(Self.vodBusy)
         default: throw MarqueeError("Couldn't start the movie")
         }
+    }
+
+    /// Starts an episode: the session id, the HLS URL and where to start (ms). `startMs` nil =
+    /// the caller's resume point, 0 = from the beginning.
+    func playVodEpisode(_ id: Int64, startMs: Int64? = nil) async throws -> (id: String, url: URL, startMs: Int64) {
+        let body = Operations.PlayVodEpisode.Input.Body.JsonPayload(profile: .init(value1: AppleDeviceProfile.current()),
+                                                                   maxBitrateKbps: vodMaxBitrate, startMs: startMs)
+        switch try await vodAPI.playVodEpisode(path: .init(episodeId: id), body: .json(body)) {
+        case let .ok(ok):
+            let s = try ok.body.json
+            guard let url = absolute(s.url) else { throw MarqueeError("Not connected") }
+            return (s.id, url, s.startMs ?? 0)
+        case let .forbidden(e): throw MarqueeError((try? e.body.json.message) ?? "This show isn't available on this profile")
+        case .notFound: throw MarqueeError("That episode isn't available any more")
+        case let .badGateway(e): throw MarqueeError(Self.vodFailed((try? e.body.json.message), what: "episode"))
+        case .serviceUnavailable: throw MarqueeError(Self.vodBusy)
+        default: throw MarqueeError("Couldn't start the episode")
+        }
+    }
+
+    private static let vodBusy = "The server is busy with other streams right now. Try again in a moment."
+
+    private static func vodFailed(_ message: String?, what: String) -> String {
+        let base = "The source couldn't play this \(what) right now. Try again later."
+        guard let message, !message.isEmpty else { return base }
+        return "\(base) (\(message))"
     }
 
     /// Where the viewer is, so the film resumes there (and counts as watched near the end).
@@ -92,6 +141,130 @@ public extension AppSession {
 
     /// A film's poster or backdrop (served without a token).
     func vodImageURL(_ path: String?) -> URL? { absolute(path) }
+
+    // MARK: Shows (series from Xtream Codes sources)
+
+    func vodSeriesCategories() async throws -> [VodCategory] {
+        try await vodAPI.listVodSeriesCategories().ok.body.json
+    }
+
+    /// The shows' genres with counts (for the genre filter).
+    func vodSeriesGenres() async throws -> [VodCategory] {
+        try await vodAPI.listVodSeriesGenres().ok.body.json
+    }
+
+    /// A page of shows, with how many there are in all.
+    func vodSeriesList(category: String? = nil, query: String? = nil, sort: VodSort = .title, filters: VodFilters = .init(),
+                       offset: Int = 0, limit: Int = 120) async throws -> (series: [VodSeries], total: Int) {
+        let page = try await vodAPI.listVodSeries(query: .init(
+            category: category, q: query, sort: .init(rawValue: sort.rawValue), limit: limit, genre: filters.genre,
+            yearFrom: filters.yearFrom, yearTo: filters.yearTo, minRating: filters.minRating.map(Double.init),
+            watched: filters.watched.flatMap { .init(rawValue: $0.rawValue) }, sourceId: filters.sourceId, offset: offset)).ok.body.json
+        return (page.series, page.total)
+    }
+
+    /// Shows being watched, each with the episode to watch next.
+    func vodSeriesContinueWatching() async throws -> [VodSeries] {
+        try await vodAPI.vodSeriesContinueWatching().ok.body.json
+    }
+
+    /// A show with its seasons and episodes (the first open fetches the episodes, which can take a few seconds).
+    func vodSeries(_ id: Int64, refresh: Bool = false) async throws -> VodSeriesDetail {
+        switch try await vodAPI.getVodSeries(path: .init(seriesId: id), query: .init(refresh: refresh ? true : nil)) {
+        case let .ok(ok): return try ok.body.json
+        case .notFound: throw MarqueeError("That show isn't available any more")
+        case .forbidden: throw MarqueeError("This show isn't available on this profile")
+        default: throw MarqueeError("Couldn't load the show")
+        }
+    }
+
+    /// Marks every episode of a show (or of one season) watched or unwatched.
+    func setVodSeriesWatched(_ id: Int64, season: Int? = nil, _ watched: Bool) async throws {
+        if watched {
+            _ = try await vodAPI.markVodSeriesWatched(path: .init(seriesId: id), query: .init(season: season)).noContent
+        } else {
+            _ = try await vodAPI.markVodSeriesUnwatched(path: .init(seriesId: id), query: .init(season: season)).noContent
+        }
+    }
+
+    func setVodEpisodeWatched(_ id: Int64, _ watched: Bool) async throws {
+        if watched {
+            _ = try await vodAPI.markVodEpisodeWatched(path: .init(episodeId: id)).noContent
+        } else {
+            _ = try await vodAPI.markVodEpisodeUnwatched(path: .init(episodeId: id)).noContent
+        }
+    }
+
+    /// The episode after this one in viewing order, if any (for Up Next).
+    func vodNextEpisode(_ id: Int64) async throws -> VodEpisode? {
+        try await vodAPI.vodNextEpisode(path: .init(episodeId: id)).ok.body.json.episode
+    }
+}
+
+/// The VOD pages' filters (genre, decade, minimum rating, watched state, source), kept per page.
+public struct VodFilters: Codable, Hashable, Sendable {
+    public enum Watched: String, Codable, CaseIterable, Sendable {
+        case unwatched, inProgress, watched
+    }
+
+    public var genre: String?
+    /// The decade's first year (1980 = 1980–1989).
+    public var decade: Int?
+    /// Rated at least this, out of 10.
+    public var minRating: Int?
+    public var watched: Watched?
+    /// VodStatus.sources[].id
+    public var sourceId: String?
+
+    public init(genre: String? = nil, decade: Int? = nil, minRating: Int? = nil, watched: Watched? = nil, sourceId: String? = nil) {
+        self.genre = genre
+        self.decade = decade
+        self.minRating = minRating
+        self.watched = watched
+        self.sourceId = sourceId
+    }
+
+    public var yearFrom: Int? { decade }
+    public var yearTo: Int? { decade.map { $0 + 9 } }
+    public var isActive: Bool { self != VodFilters() }
+
+    /// The decades offered, newest first (as on the web).
+    public static let decades = [2020, 2010, 2000, 1990, 1980, 1970, 1960, 1950, 1940, 1930]
+    public static let ratings = [9, 8, 7, 6, 5]
+
+    /// Stored as JSON in the app's settings; anything unreadable is no filters.
+    public init(stored: String) {
+        self = (try? JSONDecoder().decode(VodFilters.self, from: Data(stored.utf8))) ?? VodFilters()
+    }
+
+    public var stored: String {
+        (try? JSONEncoder().encode(self)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    }
+
+    public static func label(_ w: Watched, shows: Bool) -> String {
+        switch w {
+        case .unwatched: shows ? "Unwatched episodes" : "Unwatched"
+        case .inProgress: "In progress"
+        case .watched: "Watched"
+        }
+    }
+}
+
+public extension VodSeriesDetail {
+    var base: VodSeries { value1 }
+    var info: Value2Payload { value2 }
+    var id: Int64 { value1.id }
+    var title: String { value1.title }
+}
+
+public extension VodSeries {
+    /// The episode the viewer would watch next.
+    var next: VodEpisode? { nextEpisode?.value1 }
+}
+
+public extension VodEpisode {
+    /// "S1 · E2", as on the web.
+    var label: String { "S\(season) · E\(episode)" }
 }
 
 public extension VodMovieDetail {

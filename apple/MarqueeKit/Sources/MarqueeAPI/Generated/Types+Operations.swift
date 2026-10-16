@@ -1583,6 +1583,1332 @@ public enum Operations {
             }
         }
     }
+    /// Ask for a password or PIN reset link by email. Always 204, whether or not the account exists or has an email address (no user enumeration). Rate limited per address and per account.
+    ///
+    /// - Remark: HTTP `POST /auth/forgot`.
+    /// - Remark: Generated from `#/paths//auth/forgot/post(forgotPassword)`.
+    public enum ForgotPassword {
+        public static let id: Swift.String = "forgotPassword"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/auth/forgot/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ForgotPassword.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ForgotPassword.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ForgotPassword.Input.Headers
+            /// - Remark: Generated from `#/paths/auth/forgot/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/auth/forgot/POST/requestBody/content/application\/json`.
+                case json(Components.Schemas.ForgotRequest)
+            }
+            public var body: Operations.ForgotPassword.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            ///   - body:
+            public init(
+                headers: Operations.ForgotPassword.Input.Headers = .init(),
+                body: Operations.ForgotPassword.Input.Body
+            ) {
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// If the account has an email address, a link is on its way.
+            ///
+            /// - Remark: Generated from `#/paths//auth/forgot/post(forgotPassword)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.ForgotPassword.Output.NoContent)
+            /// If the account has an email address, a link is on its way.
+            ///
+            /// - Remark: Generated from `#/paths//auth/forgot/post(forgotPassword)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.ForgotPassword.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//auth/forgot/post(forgotPassword)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Rate limited.
+            ///
+            /// - Remark: Generated from `#/paths//auth/forgot/post(forgotPassword)/responses/429`.
+            ///
+            /// HTTP response code: `429 tooManyRequests`.
+            case tooManyRequests(Components.Responses.TooManyRequests)
+            /// The associated value of the enum case if `self` is `.tooManyRequests`.
+            ///
+            /// - Throws: An error if `self` is not `.tooManyRequests`.
+            /// - SeeAlso: `.tooManyRequests`.
+            public var tooManyRequests: Components.Responses.TooManyRequests {
+                get throws {
+                    switch self {
+                    case let .tooManyRequests(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "tooManyRequests",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// What a reset link is for (a password or a PIN, and whose), so the reset page asks for the right thing. 400 when the link is unknown, used or expired.
+    ///
+    /// - Remark: HTTP `POST /auth/reset/info`.
+    /// - Remark: Generated from `#/paths//auth/reset/info/post(resetInfo)`.
+    public enum ResetInfo {
+        public static let id: Swift.String = "resetInfo"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/auth/reset/info/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ResetInfo.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ResetInfo.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ResetInfo.Input.Headers
+            /// - Remark: Generated from `#/paths/auth/reset/info/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/auth/reset/info/POST/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// - Remark: Generated from `#/paths/auth/reset/info/POST/requestBody/json/token`.
+                    public var token: Swift.String
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - token:
+                    public init(token: Swift.String) {
+                        self.token = token
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case token
+                    }
+                }
+                /// - Remark: Generated from `#/paths/auth/reset/info/POST/requestBody/content/application\/json`.
+                case json(Operations.ResetInfo.Input.Body.JsonPayload)
+            }
+            public var body: Operations.ResetInfo.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            ///   - body:
+            public init(
+                headers: Operations.ResetInfo.Input.Headers = .init(),
+                body: Operations.ResetInfo.Input.Body
+            ) {
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/auth/reset/info/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/auth/reset/info/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.ResetInfo)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ResetInfo {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ResetInfo.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ResetInfo.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// The link works.
+            ///
+            /// - Remark: Generated from `#/paths//auth/reset/info/post(resetInfo)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ResetInfo.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ResetInfo.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//auth/reset/info/post(resetInfo)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Set a new password or PIN with a reset link. The link stops working, the account's other links too, and the account is signed out on every device. Two-factor sign-in stays as it is.
+    ///
+    /// - Remark: HTTP `POST /auth/reset`.
+    /// - Remark: Generated from `#/paths//auth/reset/post(resetPassword)`.
+    public enum ResetPassword {
+        public static let id: Swift.String = "resetPassword"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/auth/reset/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ResetPassword.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ResetPassword.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ResetPassword.Input.Headers
+            /// - Remark: Generated from `#/paths/auth/reset/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/auth/reset/POST/requestBody/content/application\/json`.
+                case json(Components.Schemas.ResetRequest)
+            }
+            public var body: Operations.ResetPassword.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            ///   - body:
+            public init(
+                headers: Operations.ResetPassword.Input.Headers = .init(),
+                body: Operations.ResetPassword.Input.Body
+            ) {
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Changed; sign in with the new password or PIN.
+            ///
+            /// - Remark: Generated from `#/paths//auth/reset/post(resetPassword)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.ResetPassword.Output.NoContent)
+            /// Changed; sign in with the new password or PIN.
+            ///
+            /// - Remark: Generated from `#/paths//auth/reset/post(resetPassword)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.ResetPassword.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//auth/reset/post(resetPassword)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Admin alerts for the bell, newest first (admin only). Kept for 30 days.
+    ///
+    /// - Remark: HTTP `GET /notifications`.
+    /// - Remark: Generated from `#/paths//notifications/get(listNotifications)`.
+    public enum ListNotifications {
+        public static let id: Swift.String = "listNotifications"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/notifications/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListNotifications.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListNotifications.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ListNotifications.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.ListNotifications.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/notifications/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/notifications/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.AdminNotificationList)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.AdminNotificationList {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListNotifications.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ListNotifications.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//notifications/get(listNotifications)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ListNotifications.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ListNotifications.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/get(listNotifications)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/get(listNotifications)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Mark every alert read (admin only).
+    ///
+    /// - Remark: HTTP `POST /notifications/read-all`.
+    /// - Remark: Generated from `#/paths//notifications/read-all/post(markAllNotificationsRead)`.
+    public enum MarkAllNotificationsRead {
+        public static let id: Swift.String = "markAllNotificationsRead"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/notifications/read-all/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkAllNotificationsRead.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkAllNotificationsRead.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.MarkAllNotificationsRead.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.MarkAllNotificationsRead.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Done.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/read-all/post(markAllNotificationsRead)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.MarkAllNotificationsRead.Output.NoContent)
+            /// Done.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/read-all/post(markAllNotificationsRead)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.MarkAllNotificationsRead.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/read-all/post(markAllNotificationsRead)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/read-all/post(markAllNotificationsRead)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Mark an alert read (admin only).
+    ///
+    /// - Remark: HTTP `POST /notifications/{notificationId}/read`.
+    /// - Remark: Generated from `#/paths//notifications/{notificationId}/read/post(markNotificationRead)`.
+    public enum MarkNotificationRead {
+        public static let id: Swift.String = "markNotificationRead"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/notifications/{notificationId}/read/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/notifications/{notificationId}/read/POST/path/notificationId`.
+                public var notificationId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - notificationId:
+                public init(notificationId: Swift.Int64) {
+                    self.notificationId = notificationId
+                }
+            }
+            public var path: Operations.MarkNotificationRead.Input.Path
+            /// - Remark: Generated from `#/paths/notifications/{notificationId}/read/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkNotificationRead.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkNotificationRead.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.MarkNotificationRead.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.MarkNotificationRead.Input.Path,
+                headers: Operations.MarkNotificationRead.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Done.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/{notificationId}/read/post(markNotificationRead)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.MarkNotificationRead.Output.NoContent)
+            /// Done.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/{notificationId}/read/post(markNotificationRead)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.MarkNotificationRead.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/{notificationId}/read/post(markNotificationRead)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/{notificationId}/read/post(markNotificationRead)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/{notificationId}/read/post(markNotificationRead)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Dismiss (delete) an alert (admin only).
+    ///
+    /// - Remark: HTTP `DELETE /notifications/{notificationId}`.
+    /// - Remark: Generated from `#/paths//notifications/{notificationId}/delete(dismissNotification)`.
+    public enum DismissNotification {
+        public static let id: Swift.String = "dismissNotification"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/notifications/{notificationId}/DELETE/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/notifications/{notificationId}/DELETE/path/notificationId`.
+                public var notificationId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - notificationId:
+                public init(notificationId: Swift.Int64) {
+                    self.notificationId = notificationId
+                }
+            }
+            public var path: Operations.DismissNotification.Input.Path
+            /// - Remark: Generated from `#/paths/notifications/{notificationId}/DELETE/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DismissNotification.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DismissNotification.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.DismissNotification.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.DismissNotification.Input.Path,
+                headers: Operations.DismissNotification.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Dismissed.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/{notificationId}/delete(dismissNotification)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.DismissNotification.Output.NoContent)
+            /// Dismissed.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/{notificationId}/delete(dismissNotification)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.DismissNotification.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/{notificationId}/delete(dismissNotification)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/{notificationId}/delete(dismissNotification)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/{notificationId}/delete(dismissNotification)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Send a test email with the saved mail settings now (admin only).
+    ///
+    /// - Remark: HTTP `POST /notifications/test-email`.
+    /// - Remark: Generated from `#/paths//notifications/test-email/post(testEmail)`.
+    public enum TestEmail {
+        public static let id: Swift.String = "testEmail"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/notifications/test-email/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.TestEmail.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.TestEmail.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.TestEmail.Input.Headers
+            /// - Remark: Generated from `#/paths/notifications/test-email/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/notifications/test-email/POST/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// The address to send to.
+                    ///
+                    /// - Remark: Generated from `#/paths/notifications/test-email/POST/requestBody/json/to`.
+                    public var to: Swift.String
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - to: The address to send to.
+                    public init(to: Swift.String) {
+                        self.to = to
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case to
+                    }
+                }
+                /// - Remark: Generated from `#/paths/notifications/test-email/POST/requestBody/content/application\/json`.
+                case json(Operations.TestEmail.Input.Body.JsonPayload)
+            }
+            public var body: Operations.TestEmail.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            ///   - body:
+            public init(
+                headers: Operations.TestEmail.Input.Headers = .init(),
+                body: Operations.TestEmail.Input.Body
+            ) {
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/notifications/test-email/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/notifications/test-email/POST/responses/200/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/notifications/test-email/POST/responses/200/content/json/ok`.
+                        public var ok: Swift.Bool
+                        /// - Remark: Generated from `#/paths/notifications/test-email/POST/responses/200/content/json/error`.
+                        public var error: Swift.String?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - ok:
+                        ///   - error:
+                        public init(
+                            ok: Swift.Bool,
+                            error: Swift.String? = nil
+                        ) {
+                            self.ok = ok
+                            self.error = error
+                        }
+                        public enum CodingKeys: String, CodingKey {
+                            case ok
+                            case error
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/notifications/test-email/POST/responses/200/content/application\/json`.
+                    case json(Operations.TestEmail.Output.Ok.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.TestEmail.Output.Ok.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.TestEmail.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.TestEmail.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Sent or not.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/test-email/post(testEmail)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.TestEmail.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.TestEmail.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/test-email/post(testEmail)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/test-email/post(testEmail)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//notifications/test-email/post(testEmail)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
     /// Revoke the current session token.
     ///
     /// - Remark: HTTP `POST /auth/logout`.
@@ -3117,6 +4443,29 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Conflicts with current state.
+            ///
+            /// - Remark: Generated from `#/paths//me/patch(updateMe)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Components.Responses.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Components.Responses.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -25734,6 +27083,36 @@ public enum Operations {
                 public var sort: Operations.ListVodMovies.Input.Query.SortPayload?
                 /// - Remark: Generated from `#/paths/livetv/vod/movies/GET/query/limit`.
                 public var limit: Swift.Int?
+                /// One genre (TMDB's once matched, else the source's); see the genres endpoint.
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/movies/GET/query/genre`.
+                public var genre: Swift.String?
+                /// Released in or after this year (items without a year are left out).
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/movies/GET/query/yearFrom`.
+                public var yearFrom: Swift.Int?
+                /// Released in or before this year (a decade: yearFrom=1980&yearTo=1989).
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/movies/GET/query/yearTo`.
+                public var yearTo: Swift.Int?
+                /// Average vote out of 10 at least this (unrated items are left out).
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/movies/GET/query/minRating`.
+                public var minRating: Swift.Double?
+                /// - Remark: Generated from `#/paths/livetv/vod/movies/GET/query/watched`.
+                @frozen public enum WatchedPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case unwatched = "unwatched"
+                    case inProgress = "inProgress"
+                    case watched = "watched"
+                }
+                /// The caller's state: unwatched (never started), inProgress (started, not finished) or watched.
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/movies/GET/query/watched`.
+                public var watched: Operations.ListVodMovies.Input.Query.WatchedPayload?
+                /// Only this source's (VodStatus.sources[].id).
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/movies/GET/query/sourceId`.
+                public var sourceId: Swift.String?
                 /// - Remark: Generated from `#/paths/livetv/vod/movies/GET/query/offset`.
                 public var offset: Swift.Int?
                 /// Creates a new `Query`.
@@ -25743,18 +27122,36 @@ public enum Operations {
                 ///   - q: Part of the title.
                 ///   - sort:
                 ///   - limit:
+                ///   - genre: One genre (TMDB's once matched, else the source's); see the genres endpoint.
+                ///   - yearFrom: Released in or after this year (items without a year are left out).
+                ///   - yearTo: Released in or before this year (a decade: yearFrom=1980&yearTo=1989).
+                ///   - minRating: Average vote out of 10 at least this (unrated items are left out).
+                ///   - watched: The caller's state: unwatched (never started), inProgress (started, not finished) or watched.
+                ///   - sourceId: Only this source's (VodStatus.sources[].id).
                 ///   - offset:
                 public init(
                     category: Swift.String? = nil,
                     q: Swift.String? = nil,
                     sort: Operations.ListVodMovies.Input.Query.SortPayload? = nil,
                     limit: Swift.Int? = nil,
+                    genre: Swift.String? = nil,
+                    yearFrom: Swift.Int? = nil,
+                    yearTo: Swift.Int? = nil,
+                    minRating: Swift.Double? = nil,
+                    watched: Operations.ListVodMovies.Input.Query.WatchedPayload? = nil,
+                    sourceId: Swift.String? = nil,
                     offset: Swift.Int? = nil
                 ) {
                     self.category = category
                     self.q = q
                     self.sort = sort
                     self.limit = limit
+                    self.genre = genre
+                    self.yearFrom = yearFrom
+                    self.yearTo = yearTo
+                    self.minRating = minRating
+                    self.watched = watched
+                    self.sourceId = sourceId
                     self.offset = offset
                 }
             }
@@ -26806,7 +28203,7 @@ public enum Operations {
             }
         }
     }
-    /// Start watching a film. Returns an HLS session passed through from the source (seekable; no transcode).
+    /// Start watching a film. Returns a seekable HLS session: an M3U source's own HLS passed through, or (Xtream Codes sources, whose films are files) the file made into HLS by the server, video copied when the device plays it and audio converted when needed.
     ///
     /// - Remark: HTTP `POST /livetv/vod/movies/{movieId}/play`.
     /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/play/post(playVodMovie)`.
@@ -26838,17 +28235,73 @@ public enum Operations {
                 }
             }
             public var headers: Operations.PlayVodMovie.Input.Headers
+            /// - Remark: Generated from `#/paths/livetv/vod/movies/{movieId}/play/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/movies/{movieId}/play/POST/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// What the device plays (Xtream Codes films). Without it, H.264 video and AAC/MP3 audio are copied and anything else is converted to them.
+                    ///
+                    /// - Remark: Generated from `#/paths/livetv/vod/movies/{movieId}/play/POST/requestBody/json/profile`.
+                    public struct ProfilePayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/livetv/vod/movies/{movieId}/play/POST/requestBody/json/profile/value1`.
+                        public var value1: Components.Schemas.DeviceProfile
+                        /// Creates a new `ProfilePayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        public init(value1: Components.Schemas.DeviceProfile) {
+                            self.value1 = value1
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            self.value1 = try .init(from: decoder)
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1.encode(to: encoder)
+                        }
+                    }
+                    /// What the device plays (Xtream Codes films). Without it, H.264 video and AAC/MP3 audio are copied and anything else is converted to them.
+                    ///
+                    /// - Remark: Generated from `#/paths/livetv/vod/movies/{movieId}/play/POST/requestBody/json/profile`.
+                    public var profile: Operations.PlayVodMovie.Input.Body.JsonPayload.ProfilePayload?
+                    /// The app's quality setting; 0/omitted = original (home) or automatic (remote).
+                    ///
+                    /// - Remark: Generated from `#/paths/livetv/vod/movies/{movieId}/play/POST/requestBody/json/maxBitrateKbps`.
+                    public var maxBitrateKbps: Swift.Int?
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - profile: What the device plays (Xtream Codes films). Without it, H.264 video and AAC/MP3 audio are copied and anything else is converted to them.
+                    ///   - maxBitrateKbps: The app's quality setting; 0/omitted = original (home) or automatic (remote).
+                    public init(
+                        profile: Operations.PlayVodMovie.Input.Body.JsonPayload.ProfilePayload? = nil,
+                        maxBitrateKbps: Swift.Int? = nil
+                    ) {
+                        self.profile = profile
+                        self.maxBitrateKbps = maxBitrateKbps
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case profile
+                        case maxBitrateKbps
+                    }
+                }
+                /// - Remark: Generated from `#/paths/livetv/vod/movies/{movieId}/play/POST/requestBody/content/application\/json`.
+                case json(Operations.PlayVodMovie.Input.Body.JsonPayload)
+            }
+            public var body: Operations.PlayVodMovie.Input.Body?
             /// Creates a new `Input`.
             ///
             /// - Parameters:
             ///   - path:
             ///   - headers:
+            ///   - body:
             public init(
                 path: Operations.PlayVodMovie.Input.Path,
-                headers: Operations.PlayVodMovie.Input.Headers = .init()
+                headers: Operations.PlayVodMovie.Input.Headers = .init(),
+                body: Operations.PlayVodMovie.Input.Body? = nil
             ) {
                 self.path = path
                 self.headers = headers
+                self.body = body
             }
         }
         @frozen public enum Output: Sendable, Hashable {
@@ -26967,6 +28420,52 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// An outside service (e.g. OpenSubtitles) failed or refused the request.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/play/post(playVodMovie)/responses/502`.
+            ///
+            /// HTTP response code: `502 badGateway`.
+            case badGateway(Components.Responses.BadGateway)
+            /// The associated value of the enum case if `self` is `.badGateway`.
+            ///
+            /// - Throws: An error if `self` is not `.badGateway`.
+            /// - SeeAlso: `.badGateway`.
+            public var badGateway: Components.Responses.BadGateway {
+                get throws {
+                    switch self {
+                    case let .badGateway(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badGateway",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// A helper service isn't running.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/play/post(playVodMovie)/responses/503`.
+            ///
+            /// HTTP response code: `503 serviceUnavailable`.
+            case serviceUnavailable(Components.Responses.ServiceUnavailable)
+            /// The associated value of the enum case if `self` is `.serviceUnavailable`.
+            ///
+            /// - Throws: An error if `self` is not `.serviceUnavailable`.
+            /// - SeeAlso: `.serviceUnavailable`.
+            public var serviceUnavailable: Components.Responses.ServiceUnavailable {
+                get throws {
+                    switch self {
+                    case let .serviceUnavailable(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "serviceUnavailable",
                             response: self
                         )
                     }
@@ -27294,6 +28793,2959 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// TV series on demand (Xtream Codes sources), a page at a time.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/get(listVodSeries)`.
+    public enum ListVodSeries {
+        public static let id: Swift.String = "listVodSeries"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/vod/series/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/series/GET/query/category`.
+                public var category: Swift.String?
+                /// Part of the title.
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/series/GET/query/q`.
+                public var q: Swift.String?
+                /// - Remark: Generated from `#/paths/livetv/vod/series/GET/query/sort`.
+                @frozen public enum SortPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case title = "title"
+                    case added = "added"
+                    case year = "year"
+                    case rating = "rating"
+                }
+                /// - Remark: Generated from `#/paths/livetv/vod/series/GET/query/sort`.
+                public var sort: Operations.ListVodSeries.Input.Query.SortPayload?
+                /// - Remark: Generated from `#/paths/livetv/vod/series/GET/query/limit`.
+                public var limit: Swift.Int?
+                /// One genre (TMDB's once matched, else the source's); see the genres endpoint.
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/series/GET/query/genre`.
+                public var genre: Swift.String?
+                /// Released in or after this year (items without a year are left out).
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/series/GET/query/yearFrom`.
+                public var yearFrom: Swift.Int?
+                /// Released in or before this year (a decade: yearFrom=1980&yearTo=1989).
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/series/GET/query/yearTo`.
+                public var yearTo: Swift.Int?
+                /// Average vote out of 10 at least this (unrated items are left out).
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/series/GET/query/minRating`.
+                public var minRating: Swift.Double?
+                /// - Remark: Generated from `#/paths/livetv/vod/series/GET/query/watched`.
+                @frozen public enum WatchedPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case unwatched = "unwatched"
+                    case inProgress = "inProgress"
+                    case watched = "watched"
+                }
+                /// The caller's state: unwatched (has episodes not yet watched, including never-opened series), inProgress (started but not every episode watched) or watched (every episode watched).
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/series/GET/query/watched`.
+                public var watched: Operations.ListVodSeries.Input.Query.WatchedPayload?
+                /// Only this source's (VodStatus.sources[].id).
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/series/GET/query/sourceId`.
+                public var sourceId: Swift.String?
+                /// - Remark: Generated from `#/paths/livetv/vod/series/GET/query/offset`.
+                public var offset: Swift.Int?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - category:
+                ///   - q: Part of the title.
+                ///   - sort:
+                ///   - limit:
+                ///   - genre: One genre (TMDB's once matched, else the source's); see the genres endpoint.
+                ///   - yearFrom: Released in or after this year (items without a year are left out).
+                ///   - yearTo: Released in or before this year (a decade: yearFrom=1980&yearTo=1989).
+                ///   - minRating: Average vote out of 10 at least this (unrated items are left out).
+                ///   - watched: The caller's state: unwatched (has episodes not yet watched, including never-opened series), inProgress (started but not every episode watched) or watched (every episode watched).
+                ///   - sourceId: Only this source's (VodStatus.sources[].id).
+                ///   - offset:
+                public init(
+                    category: Swift.String? = nil,
+                    q: Swift.String? = nil,
+                    sort: Operations.ListVodSeries.Input.Query.SortPayload? = nil,
+                    limit: Swift.Int? = nil,
+                    genre: Swift.String? = nil,
+                    yearFrom: Swift.Int? = nil,
+                    yearTo: Swift.Int? = nil,
+                    minRating: Swift.Double? = nil,
+                    watched: Operations.ListVodSeries.Input.Query.WatchedPayload? = nil,
+                    sourceId: Swift.String? = nil,
+                    offset: Swift.Int? = nil
+                ) {
+                    self.category = category
+                    self.q = q
+                    self.sort = sort
+                    self.limit = limit
+                    self.genre = genre
+                    self.yearFrom = yearFrom
+                    self.yearTo = yearTo
+                    self.minRating = minRating
+                    self.watched = watched
+                    self.sourceId = sourceId
+                    self.offset = offset
+                }
+            }
+            public var query: Operations.ListVodSeries.Input.Query
+            /// - Remark: Generated from `#/paths/livetv/vod/series/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListVodSeries.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListVodSeries.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ListVodSeries.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - query:
+            ///   - headers:
+            public init(
+                query: Operations.ListVodSeries.Input.Query = .init(),
+                headers: Operations.ListVodSeries.Input.Headers = .init()
+            ) {
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/series/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/vod/series/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.VodSeriesPage)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.VodSeriesPage {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListVodSeries.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ListVodSeries.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// A page of series.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/get(listVodSeries)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ListVodSeries.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ListVodSeries.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/get(listVodSeries)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/get(listVodSeries)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// The sources' series categories with how many series the caller may see in each.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series/categories`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/categories/get(listVodSeriesCategories)`.
+    public enum ListVodSeriesCategories {
+        public static let id: Swift.String = "listVodSeriesCategories"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/vod/series/categories/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListVodSeriesCategories.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListVodSeriesCategories.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ListVodSeriesCategories.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.ListVodSeriesCategories.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/series/categories/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/vod/series/categories/GET/responses/200/content/application\/json`.
+                    case json([Components.Schemas.VodCategory])
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: [Components.Schemas.VodCategory] {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListVodSeriesCategories.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ListVodSeriesCategories.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Categories by name.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/categories/get(listVodSeriesCategories)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ListVodSeriesCategories.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ListVodSeriesCategories.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/categories/get(listVodSeriesCategories)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/categories/get(listVodSeriesCategories)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// The films' genres with how many films the caller may see in each (for the genre filter).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/genres`.
+    /// - Remark: Generated from `#/paths//livetv/vod/genres/get(listVodGenres)`.
+    public enum ListVodGenres {
+        public static let id: Swift.String = "listVodGenres"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/vod/genres/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListVodGenres.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListVodGenres.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ListVodGenres.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.ListVodGenres.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/genres/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/vod/genres/GET/responses/200/content/application\/json`.
+                    case json([Components.Schemas.VodCategory])
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: [Components.Schemas.VodCategory] {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListVodGenres.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ListVodGenres.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Genres by name.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/genres/get(listVodGenres)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ListVodGenres.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ListVodGenres.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/genres/get(listVodGenres)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/genres/get(listVodGenres)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// The series' genres with how many series the caller may see in each (for the genre filter).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series/genres`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/genres/get(listVodSeriesGenres)`.
+    public enum ListVodSeriesGenres {
+        public static let id: Swift.String = "listVodSeriesGenres"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/vod/series/genres/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListVodSeriesGenres.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListVodSeriesGenres.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ListVodSeriesGenres.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.ListVodSeriesGenres.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/series/genres/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/vod/series/genres/GET/responses/200/content/application\/json`.
+                    case json([Components.Schemas.VodCategory])
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: [Components.Schemas.VodCategory] {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListVodSeriesGenres.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ListVodSeriesGenres.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Genres by name.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/genres/get(listVodSeriesGenres)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ListVodSeriesGenres.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ListVodSeriesGenres.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/genres/get(listVodSeriesGenres)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/genres/get(listVodSeriesGenres)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Series the caller is watching, most recent first, each with nextEpisode set: the episode they're part-way through, else the next unwatched one. Finished series are left out.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series/continue`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/continue/get(vodSeriesContinueWatching)`.
+    public enum VodSeriesContinueWatching {
+        public static let id: Swift.String = "vodSeriesContinueWatching"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/vod/series/continue/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.VodSeriesContinueWatching.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.VodSeriesContinueWatching.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.VodSeriesContinueWatching.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.VodSeriesContinueWatching.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/series/continue/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/vod/series/continue/GET/responses/200/content/application\/json`.
+                    case json([Components.Schemas.VodSeries])
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: [Components.Schemas.VodSeries] {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.VodSeriesContinueWatching.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.VodSeriesContinueWatching.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Series.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/continue/get(vodSeriesContinueWatching)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.VodSeriesContinueWatching.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.VodSeriesContinueWatching.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/continue/get(vodSeriesContinueWatching)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/continue/get(vodSeriesContinueWatching)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// A series with its seasons and episodes (and the caller's progress in each). Episodes are fetched from the source the first time a series is opened and again once 12 hours old, so this can take a few seconds.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series/{seriesId}`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/get(getVodSeries)`.
+    public enum GetVodSeries {
+        public static let id: Swift.String = "getVodSeries"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/GET/path/seriesId`.
+                public var seriesId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - seriesId:
+                public init(seriesId: Swift.Int64) {
+                    self.seriesId = seriesId
+                }
+            }
+            public var path: Operations.GetVodSeries.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// Fetch the episodes from the source now, even if they were fetched recently.
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/GET/query/refresh`.
+                public var refresh: Swift.Bool?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - refresh: Fetch the episodes from the source now, even if they were fetched recently.
+                public init(refresh: Swift.Bool? = nil) {
+                    self.refresh = refresh
+                }
+            }
+            public var query: Operations.GetVodSeries.Input.Query
+            /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetVodSeries.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetVodSeries.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetVodSeries.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - query:
+            ///   - headers:
+            public init(
+                path: Operations.GetVodSeries.Input.Path,
+                query: Operations.GetVodSeries.Input.Query = .init(),
+                headers: Operations.GetVodSeries.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.VodSeriesDetail)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.VodSeriesDetail {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetVodSeries.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.GetVodSeries.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// The series.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/get(getVodSeries)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetVodSeries.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetVodSeries.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/get(getVodSeries)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/get(getVodSeries)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/get(getVodSeries)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// A series' (or season's) poster or backdrop, fetched once and cached (no sign-in needed, like artwork).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series/{seriesId}/image`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/image/get(vodSeriesImage)`.
+    public enum VodSeriesImage {
+        public static let id: Swift.String = "vodSeriesImage"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/image/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/image/GET/path/seriesId`.
+                public var seriesId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - seriesId:
+                public init(seriesId: Swift.Int64) {
+                    self.seriesId = seriesId
+                }
+            }
+            public var path: Operations.VodSeriesImage.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/image/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/image/GET/query/kind`.
+                @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case poster = "poster"
+                    case backdrop = "backdrop"
+                }
+                /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/image/GET/query/kind`.
+                public var kind: Operations.VodSeriesImage.Input.Query.KindPayload?
+                /// A season's poster instead of the series' (kind is ignored).
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/image/GET/query/season`.
+                public var season: Swift.Int?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - kind:
+                ///   - season: A season's poster instead of the series' (kind is ignored).
+                public init(
+                    kind: Operations.VodSeriesImage.Input.Query.KindPayload? = nil,
+                    season: Swift.Int? = nil
+                ) {
+                    self.kind = kind
+                    self.season = season
+                }
+            }
+            public var query: Operations.VodSeriesImage.Input.Query
+            /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/image/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.VodSeriesImage.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.VodSeriesImage.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.VodSeriesImage.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - query:
+            ///   - headers:
+            public init(
+                path: Operations.VodSeriesImage.Input.Path,
+                query: Operations.VodSeriesImage.Input.Query = .init(),
+                headers: Operations.VodSeriesImage.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/image/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/image/GET/responses/200/content/image\/*`.
+                    case image_Ast_(OpenAPIRuntime.HTTPBody)
+                    /// The associated value of the enum case if `self` is `.image_Ast_`.
+                    ///
+                    /// - Throws: An error if `self` is not `.image_Ast_`.
+                    /// - SeeAlso: `.image_Ast_`.
+                    public var image_Ast_: OpenAPIRuntime.HTTPBody {
+                        get throws {
+                            switch self {
+                            case let .image_Ast_(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.VodSeriesImage.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.VodSeriesImage.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// The image.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/image/get(vodSeriesImage)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.VodSeriesImage.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.VodSeriesImage.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/image/get(vodSeriesImage)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case image_Ast_
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "image/*":
+                    self = .image_Ast_
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .image_Ast_:
+                    return "image/*"
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .image_Ast_,
+                    .json
+                ]
+            }
+        }
+    }
+    /// Mark every episode of a series (or of one season) watched.
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/series/{seriesId}/watched`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watched/put(markVodSeriesWatched)`.
+    public enum MarkVodSeriesWatched {
+        public static let id: Swift.String = "markVodSeriesWatched"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/watched/PUT/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/watched/PUT/path/seriesId`.
+                public var seriesId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - seriesId:
+                public init(seriesId: Swift.Int64) {
+                    self.seriesId = seriesId
+                }
+            }
+            public var path: Operations.MarkVodSeriesWatched.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/watched/PUT/query`.
+            public struct Query: Sendable, Hashable {
+                /// Only this season's episodes.
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/watched/PUT/query/season`.
+                public var season: Swift.Int?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - season: Only this season's episodes.
+                public init(season: Swift.Int? = nil) {
+                    self.season = season
+                }
+            }
+            public var query: Operations.MarkVodSeriesWatched.Input.Query
+            /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/watched/PUT/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkVodSeriesWatched.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkVodSeriesWatched.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.MarkVodSeriesWatched.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - query:
+            ///   - headers:
+            public init(
+                path: Operations.MarkVodSeriesWatched.Input.Path,
+                query: Operations.MarkVodSeriesWatched.Input.Query = .init(),
+                headers: Operations.MarkVodSeriesWatched.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Marked.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watched/put(markVodSeriesWatched)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.MarkVodSeriesWatched.Output.NoContent)
+            /// Marked.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watched/put(markVodSeriesWatched)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.MarkVodSeriesWatched.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watched/put(markVodSeriesWatched)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watched/put(markVodSeriesWatched)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watched/put(markVodSeriesWatched)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Mark every episode of a series (or of one season) unwatched, forgetting resume points.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/series/{seriesId}/watched`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watched/delete(markVodSeriesUnwatched)`.
+    public enum MarkVodSeriesUnwatched {
+        public static let id: Swift.String = "markVodSeriesUnwatched"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/watched/DELETE/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/watched/DELETE/path/seriesId`.
+                public var seriesId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - seriesId:
+                public init(seriesId: Swift.Int64) {
+                    self.seriesId = seriesId
+                }
+            }
+            public var path: Operations.MarkVodSeriesUnwatched.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/watched/DELETE/query`.
+            public struct Query: Sendable, Hashable {
+                /// Only this season's episodes.
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/watched/DELETE/query/season`.
+                public var season: Swift.Int?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - season: Only this season's episodes.
+                public init(season: Swift.Int? = nil) {
+                    self.season = season
+                }
+            }
+            public var query: Operations.MarkVodSeriesUnwatched.Input.Query
+            /// - Remark: Generated from `#/paths/livetv/vod/series/{seriesId}/watched/DELETE/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkVodSeriesUnwatched.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkVodSeriesUnwatched.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.MarkVodSeriesUnwatched.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - query:
+            ///   - headers:
+            public init(
+                path: Operations.MarkVodSeriesUnwatched.Input.Path,
+                query: Operations.MarkVodSeriesUnwatched.Input.Query = .init(),
+                headers: Operations.MarkVodSeriesUnwatched.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Marked.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watched/delete(markVodSeriesUnwatched)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.MarkVodSeriesUnwatched.Output.NoContent)
+            /// Marked.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watched/delete(markVodSeriesUnwatched)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.MarkVodSeriesUnwatched.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watched/delete(markVodSeriesUnwatched)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watched/delete(markVodSeriesUnwatched)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watched/delete(markVodSeriesUnwatched)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// An episode's still, fetched once and cached (no sign-in needed, like artwork).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/episodes/{episodeId}/image`.
+    /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/image/get(vodEpisodeImage)`.
+    public enum VodEpisodeImage {
+        public static let id: Swift.String = "vodEpisodeImage"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/image/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/image/GET/path/episodeId`.
+                public var episodeId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - episodeId:
+                public init(episodeId: Swift.Int64) {
+                    self.episodeId = episodeId
+                }
+            }
+            public var path: Operations.VodEpisodeImage.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/image/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.VodEpisodeImage.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.VodEpisodeImage.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.VodEpisodeImage.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.VodEpisodeImage.Input.Path,
+                headers: Operations.VodEpisodeImage.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/image/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/image/GET/responses/200/content/image\/*`.
+                    case image_Ast_(OpenAPIRuntime.HTTPBody)
+                    /// The associated value of the enum case if `self` is `.image_Ast_`.
+                    ///
+                    /// - Throws: An error if `self` is not `.image_Ast_`.
+                    /// - SeeAlso: `.image_Ast_`.
+                    public var image_Ast_: OpenAPIRuntime.HTTPBody {
+                        get throws {
+                            switch self {
+                            case let .image_Ast_(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.VodEpisodeImage.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.VodEpisodeImage.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// The image.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/image/get(vodEpisodeImage)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.VodEpisodeImage.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.VodEpisodeImage.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/image/get(vodEpisodeImage)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case image_Ast_
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "image/*":
+                    self = .image_Ast_
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .image_Ast_:
+                    return "image/*"
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .image_Ast_,
+                    .json
+                ]
+            }
+        }
+    }
+    /// Mark an episode watched (clears its resume point).
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/episodes/{episodeId}/watched`.
+    /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/watched/put(markVodEpisodeWatched)`.
+    public enum MarkVodEpisodeWatched {
+        public static let id: Swift.String = "markVodEpisodeWatched"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/watched/PUT/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/watched/PUT/path/episodeId`.
+                public var episodeId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - episodeId:
+                public init(episodeId: Swift.Int64) {
+                    self.episodeId = episodeId
+                }
+            }
+            public var path: Operations.MarkVodEpisodeWatched.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/watched/PUT/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkVodEpisodeWatched.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkVodEpisodeWatched.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.MarkVodEpisodeWatched.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.MarkVodEpisodeWatched.Input.Path,
+                headers: Operations.MarkVodEpisodeWatched.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Marked.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/watched/put(markVodEpisodeWatched)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.MarkVodEpisodeWatched.Output.NoContent)
+            /// Marked.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/watched/put(markVodEpisodeWatched)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.MarkVodEpisodeWatched.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/watched/put(markVodEpisodeWatched)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/watched/put(markVodEpisodeWatched)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/watched/put(markVodEpisodeWatched)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Mark an episode unwatched (forgets its resume point).
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/episodes/{episodeId}/watched`.
+    /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/watched/delete(markVodEpisodeUnwatched)`.
+    public enum MarkVodEpisodeUnwatched {
+        public static let id: Swift.String = "markVodEpisodeUnwatched"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/watched/DELETE/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/watched/DELETE/path/episodeId`.
+                public var episodeId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - episodeId:
+                public init(episodeId: Swift.Int64) {
+                    self.episodeId = episodeId
+                }
+            }
+            public var path: Operations.MarkVodEpisodeUnwatched.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/watched/DELETE/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkVodEpisodeUnwatched.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkVodEpisodeUnwatched.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.MarkVodEpisodeUnwatched.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.MarkVodEpisodeUnwatched.Input.Path,
+                headers: Operations.MarkVodEpisodeUnwatched.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Marked.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/watched/delete(markVodEpisodeUnwatched)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.MarkVodEpisodeUnwatched.Output.NoContent)
+            /// Marked.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/watched/delete(markVodEpisodeUnwatched)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.MarkVodEpisodeUnwatched.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/watched/delete(markVodEpisodeUnwatched)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/watched/delete(markVodEpisodeUnwatched)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/watched/delete(markVodEpisodeUnwatched)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// The episode after this one in viewing order (seasons in turn, specials last), for autoplay at the end of an episode; no episode when this is the last.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/episodes/{episodeId}/next`.
+    /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/next/get(vodNextEpisode)`.
+    public enum VodNextEpisode {
+        public static let id: Swift.String = "vodNextEpisode"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/next/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/next/GET/path/episodeId`.
+                public var episodeId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - episodeId:
+                public init(episodeId: Swift.Int64) {
+                    self.episodeId = episodeId
+                }
+            }
+            public var path: Operations.VodNextEpisode.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/next/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.VodNextEpisode.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.VodNextEpisode.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.VodNextEpisode.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.VodNextEpisode.Input.Path,
+                headers: Operations.VodNextEpisode.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/next/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/next/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.VodUpNext)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.VodUpNext {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.VodNextEpisode.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.VodNextEpisode.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// The next episode, if any.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/next/get(vodNextEpisode)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.VodNextEpisode.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.VodNextEpisode.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/next/get(vodNextEpisode)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/next/get(vodNextEpisode)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/next/get(vodNextEpisode)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Start watching an episode: the file made into seekable HLS by the server, as for Xtream Codes films. The session's movieId is 0 and episodeId is set; report progress and stop with the film session endpoints (/livetv/vod/sessions/{sessionId}).
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/episodes/{episodeId}/play`.
+    /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/play/post(playVodEpisode)`.
+    public enum PlayVodEpisode {
+        public static let id: Swift.String = "playVodEpisode"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/play/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/play/POST/path/episodeId`.
+                public var episodeId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - episodeId:
+                public init(episodeId: Swift.Int64) {
+                    self.episodeId = episodeId
+                }
+            }
+            public var path: Operations.PlayVodEpisode.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/play/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.PlayVodEpisode.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.PlayVodEpisode.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.PlayVodEpisode.Input.Headers
+            /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/play/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/play/POST/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// What the device plays. Without it, H.264 video and AAC/MP3 audio are copied and anything else is converted to them.
+                    ///
+                    /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/play/POST/requestBody/json/profile`.
+                    public struct ProfilePayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/play/POST/requestBody/json/profile/value1`.
+                        public var value1: Components.Schemas.DeviceProfile
+                        /// Creates a new `ProfilePayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        public init(value1: Components.Schemas.DeviceProfile) {
+                            self.value1 = value1
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            self.value1 = try .init(from: decoder)
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1.encode(to: encoder)
+                        }
+                    }
+                    /// What the device plays. Without it, H.264 video and AAC/MP3 audio are copied and anything else is converted to them.
+                    ///
+                    /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/play/POST/requestBody/json/profile`.
+                    public var profile: Operations.PlayVodEpisode.Input.Body.JsonPayload.ProfilePayload?
+                    /// The app's quality setting; 0/omitted = original (home) or automatic (remote).
+                    ///
+                    /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/play/POST/requestBody/json/maxBitrateKbps`.
+                    public var maxBitrateKbps: Swift.Int?
+                    /// Where to start; omitted = the caller's resume point (0 = from the beginning).
+                    ///
+                    /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/play/POST/requestBody/json/startMs`.
+                    public var startMs: Swift.Int64?
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - profile: What the device plays. Without it, H.264 video and AAC/MP3 audio are copied and anything else is converted to them.
+                    ///   - maxBitrateKbps: The app's quality setting; 0/omitted = original (home) or automatic (remote).
+                    ///   - startMs: Where to start; omitted = the caller's resume point (0 = from the beginning).
+                    public init(
+                        profile: Operations.PlayVodEpisode.Input.Body.JsonPayload.ProfilePayload? = nil,
+                        maxBitrateKbps: Swift.Int? = nil,
+                        startMs: Swift.Int64? = nil
+                    ) {
+                        self.profile = profile
+                        self.maxBitrateKbps = maxBitrateKbps
+                        self.startMs = startMs
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case profile
+                        case maxBitrateKbps
+                        case startMs
+                    }
+                }
+                /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/play/POST/requestBody/content/application\/json`.
+                case json(Operations.PlayVodEpisode.Input.Body.JsonPayload)
+            }
+            public var body: Operations.PlayVodEpisode.Input.Body?
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.PlayVodEpisode.Input.Path,
+                headers: Operations.PlayVodEpisode.Input.Headers = .init(),
+                body: Operations.PlayVodEpisode.Input.Body? = nil
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/play/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/vod/episodes/{episodeId}/play/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.VodSession)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.VodSession {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.PlayVodEpisode.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.PlayVodEpisode.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// The session.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/play/post(playVodEpisode)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.PlayVodEpisode.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.PlayVodEpisode.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/play/post(playVodEpisode)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/play/post(playVodEpisode)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/play/post(playVodEpisode)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// An outside service (e.g. OpenSubtitles) failed or refused the request.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/play/post(playVodEpisode)/responses/502`.
+            ///
+            /// HTTP response code: `502 badGateway`.
+            case badGateway(Components.Responses.BadGateway)
+            /// The associated value of the enum case if `self` is `.badGateway`.
+            ///
+            /// - Throws: An error if `self` is not `.badGateway`.
+            /// - SeeAlso: `.badGateway`.
+            public var badGateway: Components.Responses.BadGateway {
+                get throws {
+                    switch self {
+                    case let .badGateway(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badGateway",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// A helper service isn't running.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/play/post(playVodEpisode)/responses/503`.
+            ///
+            /// HTTP response code: `503 serviceUnavailable`.
+            case serviceUnavailable(Components.Responses.ServiceUnavailable)
+            /// The associated value of the enum case if `self` is `.serviceUnavailable`.
+            ///
+            /// - Throws: An error if `self` is not `.serviceUnavailable`.
+            /// - SeeAlso: `.serviceUnavailable`.
+            public var serviceUnavailable: Components.Responses.ServiceUnavailable {
+                get throws {
+                    switch self {
+                    case let .serviceUnavailable(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "serviceUnavailable",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Check a movie source before saving it (admin only): an M3U playlist's film count, or an Xtream Codes account's status and film count. Without a password, a saved source's (same id) is used.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/sources/test`.
+    /// - Remark: Generated from `#/paths//livetv/vod/sources/test/post(testVodSource)`.
+    public enum TestVodSource {
+        public static let id: Swift.String = "testVodSource"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/vod/sources/test/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.TestVodSource.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.TestVodSource.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.TestVodSource.Input.Headers
+            /// - Remark: Generated from `#/paths/livetv/vod/sources/test/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/sources/test/POST/requestBody/content/application\/json`.
+                case json(Components.Schemas.VodSource)
+            }
+            public var body: Operations.TestVodSource.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            ///   - body:
+            public init(
+                headers: Operations.TestVodSource.Input.Headers = .init(),
+                body: Operations.TestVodSource.Input.Body
+            ) {
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/sources/test/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/vod/sources/test/POST/responses/200/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/livetv/vod/sources/test/POST/responses/200/content/json/ok`.
+                        public var ok: Swift.Bool
+                        /// Films the source lists.
+                        ///
+                        /// - Remark: Generated from `#/paths/livetv/vod/sources/test/POST/responses/200/content/json/movies`.
+                        public var movies: Swift.Int?
+                        /// Categories (Xtream Codes).
+                        ///
+                        /// - Remark: Generated from `#/paths/livetv/vod/sources/test/POST/responses/200/content/json/categories`.
+                        public var categories: Swift.Int?
+                        /// Series the server lists (Xtream Codes; absent when it didn't list them).
+                        ///
+                        /// - Remark: Generated from `#/paths/livetv/vod/sources/test/POST/responses/200/content/json/series`.
+                        public var series: Swift.Int?
+                        /// The account's status as the server reports it, e.g. Active (Xtream Codes).
+                        ///
+                        /// - Remark: Generated from `#/paths/livetv/vod/sources/test/POST/responses/200/content/json/account`.
+                        public var account: Swift.String?
+                        /// When the account expires, if it does (Xtream Codes).
+                        ///
+                        /// - Remark: Generated from `#/paths/livetv/vod/sources/test/POST/responses/200/content/json/expiresAt`.
+                        public var expiresAt: Foundation.Date?
+                        /// - Remark: Generated from `#/paths/livetv/vod/sources/test/POST/responses/200/content/json/error`.
+                        public var error: Swift.String?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - ok:
+                        ///   - movies: Films the source lists.
+                        ///   - categories: Categories (Xtream Codes).
+                        ///   - series: Series the server lists (Xtream Codes; absent when it didn't list them).
+                        ///   - account: The account's status as the server reports it, e.g. Active (Xtream Codes).
+                        ///   - expiresAt: When the account expires, if it does (Xtream Codes).
+                        ///   - error:
+                        public init(
+                            ok: Swift.Bool,
+                            movies: Swift.Int? = nil,
+                            categories: Swift.Int? = nil,
+                            series: Swift.Int? = nil,
+                            account: Swift.String? = nil,
+                            expiresAt: Foundation.Date? = nil,
+                            error: Swift.String? = nil
+                        ) {
+                            self.ok = ok
+                            self.movies = movies
+                            self.categories = categories
+                            self.series = series
+                            self.account = account
+                            self.expiresAt = expiresAt
+                            self.error = error
+                        }
+                        public enum CodingKeys: String, CodingKey {
+                            case ok
+                            case movies
+                            case categories
+                            case series
+                            case account
+                            case expiresAt
+                            case error
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/livetv/vod/sources/test/POST/responses/200/content/application\/json`.
+                    case json(Operations.TestVodSource.Output.Ok.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.TestVodSource.Output.Ok.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.TestVodSource.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.TestVodSource.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Reachable or not.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/sources/test/post(testVodSource)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.TestVodSource.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.TestVodSource.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/sources/test/post(testVodSource)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/sources/test/post(testVodSource)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/sources/test/post(testVodSource)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
                             response: self
                         )
                     }

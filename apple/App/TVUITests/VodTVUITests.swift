@@ -156,15 +156,15 @@ final class VodTVUITests: XCTestCase {
 
         app.openSidebar()
         let live = try XCTUnwrap(app.sidebarItem("Live TV"))
-        let vod = try XCTUnwrap(app.sidebarItem("VOD"), "VOD is in the sidebar")
+        let vod = try XCTUnwrap(app.sidebarItem("VOD Movies"), "VOD Movies is in the sidebar")
         XCTAssertLessThan(live.frame.midY, vod.frame.midY, "VOD comes right after Live TV")
-        app.openSection("VOD")
+        app.openSection("VOD Movies")
         let tile = app.buttons.matching(identifier: "vod.tile").matching(NSPredicate(format: "label == %@", film)).firstMatch
         XCTAssertTrue(tile.waitForExistence(timeout: 15), "the film is in Continue Watching")
         sleep(1)
         shot("tv-vod-browse")
         XCTAssertFalse(app.buttons["Guide"].exists, "VOD is its own page, not inside Live TV")
-        XCTAssertFalse(app.pageTitleShows("VOD"), "no page title faded over VOD")
+        XCTAssertFalse(app.pageTitleShows("VOD Movies"), "no page title faded over VOD")
         focus(tile, direction: .down)
         remote.press(.select)
 
@@ -205,7 +205,7 @@ final class VodTVUITests: XCTestCase {
         sleep(1)
         shot("tv-livetv")
         XCTAssertFalse(app.pageTitleShows("Live TV"), "no Live TV title over the guide")
-        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label == 'VOD'")).count, 1, "VOD only in the sidebar, not a Live TV tab")
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label == 'VOD Movies'")).count, 1, "VOD only in the sidebar, not a Live TV tab")
     }
 
     /// Not usable for the profile: no VOD tab.
@@ -217,7 +217,7 @@ final class VodTVUITests: XCTestCase {
         app.openSidebar()
         XCTAssertNotNil(app.sidebarItem("Live TV"))
         sleep(2)
-        XCTAssertFalse(app.buttons["VOD"].exists, "no VOD tab")
+        XCTAssertFalse(app.buttons["VOD Movies"].exists, "no VOD tab")
     }
 
     /// No channels (Live TV hidden) but VOD on: VOD is still in the sidebar and opens.
@@ -227,10 +227,10 @@ final class VodTVUITests: XCTestCase {
         app.launchArguments += ["-marquee-test-channels-off"]
         try signIn(as: token)
         app.openSidebar()
-        XCTAssertTrue(app.buttons["VOD"].firstMatch.waitForExistence(timeout: 15), "VOD is listed without Live TV")
+        XCTAssertTrue(app.buttons["VOD Movies"].firstMatch.waitForExistence(timeout: 15), "VOD is listed without Live TV")
         XCTAssertFalse(app.buttons["Live TV"].exists, "no Live TV without channels")
         shot("tv-vod-no-live")
-        app.openSection("VOD")
+        app.openSection("VOD Movies")
         XCTAssertTrue(app.buttons.matching(identifier: "vod.tile").firstMatch.waitForExistence(timeout: 15), "VOD opens")
     }
 
@@ -254,7 +254,7 @@ final class VodTVUITests: XCTestCase {
         for _ in 0..<10 where !app.sidebarIsOpen { Thread.sleep(forTimeInterval: 0.5) }
         XCTAssertTrue(app.sidebarIsOpen, "Back opened the sidebar")
         XCTAssertEqual(app.state, .runningForeground, "still in the app")
-        let names = ["Home", "Anime", "Movies", "Music", "Recorded TV", "Live TV", "VOD", "Playlists", "Settings", "Search"]
+        let names = ["Home", "Anime", "Movies", "Music", "Recorded TV", "Live TV", "VOD Movies", "VOD Shows", "Playlists", "Settings", "Search"]
         let items = try names.map { try XCTUnwrap(app.sidebarItem($0), "\($0) is in the sidebar") }
         for (a, b) in zip(items, items.dropFirst()) {
             XCTAssertLessThan(a.frame.midY, b.frame.midY, "\(a.label) comes before \(b.label)")
@@ -264,7 +264,7 @@ final class VodTVUITests: XCTestCase {
         XCTAssertTrue(header.frame.midY > items[0].frame.midY && header.frame.midY < items[1].frame.midY, "between Home and the libraries")
         shot("tv-sidebar-open")
 
-        app.openSection("VOD")
+        app.openSection("VOD Movies")
         XCTAssertTrue(app.buttons.matching(identifier: "vod.tile").firstMatch.waitForExistence(timeout: 15), "VOD opens")
         for _ in 0..<6 where app.sidebarIsOpen { Thread.sleep(forTimeInterval: 0.5) }
         XCTAssertFalse(app.sidebarIsOpen, "the sidebar closed onto VOD")
@@ -304,5 +304,109 @@ final class VodTVUITests: XCTestCase {
         app.openSidebar()
         XCTAssertTrue(app.sidebarIsOpen, "Back opens the sidebar from Search")
         shot("tv-search-sidebar")
+    }
+
+    // MARK: - VOD Shows
+
+    /// VOD on with the fake Xtream source (127.0.0.1:32622, as VodShowsUITests describes); the show's id.
+    @discardableResult
+    private func ensureShows() throws -> Int {
+        func id() throws -> Int? {
+            let page = try api("GET", "/livetv/vod/series?q=Apple%20Test%20Show")
+            return (page["series"] as? [[String: Any]] ?? []).first { $0["title"] as? String == "Apple Test Show" }?["id"] as? Int
+        }
+        if try id() == nil {
+            let settings = try api("GET", "/settings")
+            var sources = (settings["integrations"] as? [String: Any])?["vodSources"] as? [[String: Any]] ?? []
+            if !sources.contains(where: { $0["id"] as? String == "apple-e2e-xtream" }) {
+                sources = sources.map { var s = $0; s["passwordSet"] = nil; return s }
+                sources.append(["id": "apple-e2e-xtream", "name": "Apple e2e Xtream", "kind": "xtream", "url": "http://127.0.0.1:32622",
+                                "username": "apple", "password": "apple-test", "enabled": true])
+                try api("PATCH", "/settings", ["integrations": ["vodEnabled": true, "vodSources": sources]])
+            }
+            try api("POST", "/livetv/vod/refresh")
+        }
+        return try XCTUnwrap(try id(), "the fake Xtream source loaded")
+    }
+
+    /// Moves focus onto an element: down/up to its row, then across.
+    private func focusOn(_ element: XCUIElement, tries: Int = 6) {
+        for d in [XCUIRemote.Button.down, .left, .up, .right] {
+            for _ in 0..<tries where !element.hasFocus { remote.press(d) }
+        }
+        XCTAssertTrue(element.hasFocus, "couldn't focus \(element); focus is on \(focused.label)")
+    }
+
+    /// VOD Movies and VOD Shows in the sidebar; the shows grid with the filter bubble at the top
+    /// right; a show's page; an episode playing to Up Next and on into the next one.
+    func testVodShowsTV() throws {
+        let id = try ensureShows()
+        let token = try temporaryAccount()
+        try signIn(as: token)
+
+        app.openSidebar()
+        let movies = try XCTUnwrap(app.sidebarItem("VOD Movies"), "VOD Movies is in the sidebar")
+        let shows = try XCTUnwrap(app.sidebarItem("VOD Shows"), "VOD Shows is in the sidebar")
+        XCTAssertLessThan(movies.frame.midY, shows.frame.midY, "VOD Shows after VOD Movies")
+        if let live = app.sidebarItem("Live TV") { XCTAssertLessThan(live.frame.midY, movies.frame.midY) }
+        shot("tv-shows-sidebar")
+        app.openSection("VOD Shows")
+        let tile = app.buttons.matching(identifier: "vod.showTile").matching(NSPredicate(format: "label == 'Apple Test Show'")).firstMatch
+        XCTAssertTrue(tile.waitForExistence(timeout: 15), "the shows grid")
+        let filter = app.buttons["vod.filter"]
+        XCTAssertTrue(filter.exists, "the filter bubble")
+        XCTAssertGreaterThan(filter.frame.minX, 1500, "at the top right")
+        XCTAssertLessThan(filter.frame.minY, 300, "at the top right")
+        sleep(1)
+        shot("tv-shows-grid")
+
+        // The filter menu.
+        // (The menu's focus lands on its unlabelled button: check where focus is instead.)
+        let onFilter = { abs(self.focused.frame.midX - filter.frame.midX) < 40 && abs(self.focused.frame.midY - filter.frame.midY) < 40 }
+        for _ in 0..<6 where !onFilter() { remote.press(.right) }
+        XCTAssertTrue(onFilter(), "focus reaches the filter bubble")
+        remote.press(.select)
+        XCTAssertTrue(app.descendants(matching: .any)["Genre"].firstMatch.waitForExistence(timeout: 5), "the filter menu")
+        XCTAssertTrue(app.descendants(matching: .any)["Decade"].exists && app.descendants(matching: .any)["Rating"].exists && app.descendants(matching: .any)["Watched"].exists)
+        shot("tv-shows-filter-menu")
+        remote.press(.menu)
+        sleep(1)
+        XCTAssertTrue(onFilter(), "back on the filter bubble")
+        // Left across the controls to the category menu (not on into the sidebar), then down.
+        for _ in 0..<5 where focused.frame.minX > 300 { remote.press(.left) }
+        remote.press(.down) // the grid's first show
+        focus(tile, direction: .right, tries: 4)
+        remote.press(.select)
+        let play = app.buttons["vod.show.play"]
+        XCTAssertTrue(play.waitForExistence(timeout: 30), "the show's page")
+        XCTAssertEqual(play.label, "Start S1 · E1")
+        XCTAssertTrue(app.buttons.matching(identifier: "vod.episode").firstMatch.exists, "the episodes (lazy: those on screen)")
+        sleep(1)
+        shot("tv-show-page")
+        focus(app.buttons.matching(identifier: "vod.episode").firstMatch, direction: .down, tries: 8)
+        sleep(1)
+        shot("tv-show-episodes")
+        for _ in 0..<10 where !play.hasFocus && focused.identifier != "vod.show.watched" { remote.press(.up) }
+        focus(play, direction: .left, tries: 3)
+        remote.press(.select)
+        sleep(5)
+        shot("tv-episode-playing")
+        let upNext = app.staticTexts["S1 · E2 · Second"]
+        XCTAssertTrue(upNext.waitForExistence(timeout: 40), "Up Next at the end")
+        shot("tv-up-next")
+        let now = app.buttons["Play now"]
+        if !now.hasFocus { focusOn(now, tries: 6) }
+        remote.press(.select)
+        XCTAssertTrue(upNext.waitForNonExistence(timeout: 10))
+        try eventually(10, "episode 1 counted watched") {
+            ((try api("GET", "/livetv/vod/series/\(id)", token: token)["episodes"] as? [[String: Any]])?.first?["watched"] as? Bool) == true
+        }
+        XCTAssertTrue(app.staticTexts["S1 · E3 · Third"].waitForExistence(timeout: 40), "the next episode played to its Up Next")
+        let cancel = app.buttons["Cancel"]
+        if !cancel.hasFocus { focusOn(cancel, tries: 6) }
+        remote.press(.select)
+        XCTAssertTrue(play.waitForExistence(timeout: 10))
+        try eventually(10, "the page offers the next episode") { play.label == "Play S1 · E3" }
+        shot("tv-show-after")
     }
 }

@@ -59,6 +59,46 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /auth/quickconnect/authorize`.
     /// - Remark: Generated from `#/paths//auth/quickconnect/authorize/post(authorizeQuickConnect)`.
     func authorizeQuickConnect(_ input: Operations.AuthorizeQuickConnect.Input) async throws -> Operations.AuthorizeQuickConnect.Output
+    /// Ask for a password or PIN reset link by email. Always 204, whether or not the account exists or has an email address (no user enumeration). Rate limited per address and per account.
+    ///
+    /// - Remark: HTTP `POST /auth/forgot`.
+    /// - Remark: Generated from `#/paths//auth/forgot/post(forgotPassword)`.
+    func forgotPassword(_ input: Operations.ForgotPassword.Input) async throws -> Operations.ForgotPassword.Output
+    /// What a reset link is for (a password or a PIN, and whose), so the reset page asks for the right thing. 400 when the link is unknown, used or expired.
+    ///
+    /// - Remark: HTTP `POST /auth/reset/info`.
+    /// - Remark: Generated from `#/paths//auth/reset/info/post(resetInfo)`.
+    func resetInfo(_ input: Operations.ResetInfo.Input) async throws -> Operations.ResetInfo.Output
+    /// Set a new password or PIN with a reset link. The link stops working, the account's other links too, and the account is signed out on every device. Two-factor sign-in stays as it is.
+    ///
+    /// - Remark: HTTP `POST /auth/reset`.
+    /// - Remark: Generated from `#/paths//auth/reset/post(resetPassword)`.
+    func resetPassword(_ input: Operations.ResetPassword.Input) async throws -> Operations.ResetPassword.Output
+    /// Admin alerts for the bell, newest first (admin only). Kept for 30 days.
+    ///
+    /// - Remark: HTTP `GET /notifications`.
+    /// - Remark: Generated from `#/paths//notifications/get(listNotifications)`.
+    func listNotifications(_ input: Operations.ListNotifications.Input) async throws -> Operations.ListNotifications.Output
+    /// Mark every alert read (admin only).
+    ///
+    /// - Remark: HTTP `POST /notifications/read-all`.
+    /// - Remark: Generated from `#/paths//notifications/read-all/post(markAllNotificationsRead)`.
+    func markAllNotificationsRead(_ input: Operations.MarkAllNotificationsRead.Input) async throws -> Operations.MarkAllNotificationsRead.Output
+    /// Mark an alert read (admin only).
+    ///
+    /// - Remark: HTTP `POST /notifications/{notificationId}/read`.
+    /// - Remark: Generated from `#/paths//notifications/{notificationId}/read/post(markNotificationRead)`.
+    func markNotificationRead(_ input: Operations.MarkNotificationRead.Input) async throws -> Operations.MarkNotificationRead.Output
+    /// Dismiss (delete) an alert (admin only).
+    ///
+    /// - Remark: HTTP `DELETE /notifications/{notificationId}`.
+    /// - Remark: Generated from `#/paths//notifications/{notificationId}/delete(dismissNotification)`.
+    func dismissNotification(_ input: Operations.DismissNotification.Input) async throws -> Operations.DismissNotification.Output
+    /// Send a test email with the saved mail settings now (admin only).
+    ///
+    /// - Remark: HTTP `POST /notifications/test-email`.
+    /// - Remark: Generated from `#/paths//notifications/test-email/post(testEmail)`.
+    func testEmail(_ input: Operations.TestEmail.Input) async throws -> Operations.TestEmail.Output
     /// Revoke the current session token.
     ///
     /// - Remark: HTTP `POST /auth/logout`.
@@ -745,7 +785,7 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /livetv/vod/movies/{movieId}/watched`.
     /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/watched/delete(markVodUnwatched)`.
     func markVodUnwatched(_ input: Operations.MarkVodUnwatched.Input) async throws -> Operations.MarkVodUnwatched.Output
-    /// Start watching a film. Returns an HLS session passed through from the source (seekable; no transcode).
+    /// Start watching a film. Returns a seekable HLS session: an M3U source's own HLS passed through, or (Xtream Codes sources, whose films are files) the file made into HLS by the server, video copied when the device plays it and audio converted when needed.
     ///
     /// - Remark: HTTP `POST /livetv/vod/movies/{movieId}/play`.
     /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/play/post(playVodMovie)`.
@@ -760,6 +800,81 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /livetv/vod/sessions/{sessionId}`.
     /// - Remark: Generated from `#/paths//livetv/vod/sessions/{sessionId}/delete(stopVodSession)`.
     func stopVodSession(_ input: Operations.StopVodSession.Input) async throws -> Operations.StopVodSession.Output
+    /// TV series on demand (Xtream Codes sources), a page at a time.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/get(listVodSeries)`.
+    func listVodSeries(_ input: Operations.ListVodSeries.Input) async throws -> Operations.ListVodSeries.Output
+    /// The sources' series categories with how many series the caller may see in each.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series/categories`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/categories/get(listVodSeriesCategories)`.
+    func listVodSeriesCategories(_ input: Operations.ListVodSeriesCategories.Input) async throws -> Operations.ListVodSeriesCategories.Output
+    /// The films' genres with how many films the caller may see in each (for the genre filter).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/genres`.
+    /// - Remark: Generated from `#/paths//livetv/vod/genres/get(listVodGenres)`.
+    func listVodGenres(_ input: Operations.ListVodGenres.Input) async throws -> Operations.ListVodGenres.Output
+    /// The series' genres with how many series the caller may see in each (for the genre filter).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series/genres`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/genres/get(listVodSeriesGenres)`.
+    func listVodSeriesGenres(_ input: Operations.ListVodSeriesGenres.Input) async throws -> Operations.ListVodSeriesGenres.Output
+    /// Series the caller is watching, most recent first, each with nextEpisode set: the episode they're part-way through, else the next unwatched one. Finished series are left out.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series/continue`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/continue/get(vodSeriesContinueWatching)`.
+    func vodSeriesContinueWatching(_ input: Operations.VodSeriesContinueWatching.Input) async throws -> Operations.VodSeriesContinueWatching.Output
+    /// A series with its seasons and episodes (and the caller's progress in each). Episodes are fetched from the source the first time a series is opened and again once 12 hours old, so this can take a few seconds.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series/{seriesId}`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/get(getVodSeries)`.
+    func getVodSeries(_ input: Operations.GetVodSeries.Input) async throws -> Operations.GetVodSeries.Output
+    /// A series' (or season's) poster or backdrop, fetched once and cached (no sign-in needed, like artwork).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series/{seriesId}/image`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/image/get(vodSeriesImage)`.
+    func vodSeriesImage(_ input: Operations.VodSeriesImage.Input) async throws -> Operations.VodSeriesImage.Output
+    /// Mark every episode of a series (or of one season) watched.
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/series/{seriesId}/watched`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watched/put(markVodSeriesWatched)`.
+    func markVodSeriesWatched(_ input: Operations.MarkVodSeriesWatched.Input) async throws -> Operations.MarkVodSeriesWatched.Output
+    /// Mark every episode of a series (or of one season) unwatched, forgetting resume points.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/series/{seriesId}/watched`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watched/delete(markVodSeriesUnwatched)`.
+    func markVodSeriesUnwatched(_ input: Operations.MarkVodSeriesUnwatched.Input) async throws -> Operations.MarkVodSeriesUnwatched.Output
+    /// An episode's still, fetched once and cached (no sign-in needed, like artwork).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/episodes/{episodeId}/image`.
+    /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/image/get(vodEpisodeImage)`.
+    func vodEpisodeImage(_ input: Operations.VodEpisodeImage.Input) async throws -> Operations.VodEpisodeImage.Output
+    /// Mark an episode watched (clears its resume point).
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/episodes/{episodeId}/watched`.
+    /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/watched/put(markVodEpisodeWatched)`.
+    func markVodEpisodeWatched(_ input: Operations.MarkVodEpisodeWatched.Input) async throws -> Operations.MarkVodEpisodeWatched.Output
+    /// Mark an episode unwatched (forgets its resume point).
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/episodes/{episodeId}/watched`.
+    /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/watched/delete(markVodEpisodeUnwatched)`.
+    func markVodEpisodeUnwatched(_ input: Operations.MarkVodEpisodeUnwatched.Input) async throws -> Operations.MarkVodEpisodeUnwatched.Output
+    /// The episode after this one in viewing order (seasons in turn, specials last), for autoplay at the end of an episode; no episode when this is the last.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/episodes/{episodeId}/next`.
+    /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/next/get(vodNextEpisode)`.
+    func vodNextEpisode(_ input: Operations.VodNextEpisode.Input) async throws -> Operations.VodNextEpisode.Output
+    /// Start watching an episode: the file made into seekable HLS by the server, as for Xtream Codes films. The session's movieId is 0 and episodeId is set; report progress and stop with the film session endpoints (/livetv/vod/sessions/{sessionId}).
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/episodes/{episodeId}/play`.
+    /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/play/post(playVodEpisode)`.
+    func playVodEpisode(_ input: Operations.PlayVodEpisode.Input) async throws -> Operations.PlayVodEpisode.Output
+    /// Check a movie source before saving it (admin only): an M3U playlist's film count, or an Xtream Codes account's status and film count. Without a password, a saved source's (same id) is used.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/sources/test`.
+    /// - Remark: Generated from `#/paths//livetv/vod/sources/test/post(testVodSource)`.
+    func testVodSource(_ input: Operations.TestVodSource.Input) async throws -> Operations.TestVodSource.Output
     /// Reload every movie source now and retry TMDB matching for films that didn't match (admin only). Matching continues in the background.
     ///
     /// - Remark: HTTP `POST /livetv/vod/refresh`.
@@ -1137,6 +1252,98 @@ extension APIProtocol {
         body: Operations.AuthorizeQuickConnect.Input.Body
     ) async throws -> Operations.AuthorizeQuickConnect.Output {
         try await authorizeQuickConnect(Operations.AuthorizeQuickConnect.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Ask for a password or PIN reset link by email. Always 204, whether or not the account exists or has an email address (no user enumeration). Rate limited per address and per account.
+    ///
+    /// - Remark: HTTP `POST /auth/forgot`.
+    /// - Remark: Generated from `#/paths//auth/forgot/post(forgotPassword)`.
+    public func forgotPassword(
+        headers: Operations.ForgotPassword.Input.Headers = .init(),
+        body: Operations.ForgotPassword.Input.Body
+    ) async throws -> Operations.ForgotPassword.Output {
+        try await forgotPassword(Operations.ForgotPassword.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// What a reset link is for (a password or a PIN, and whose), so the reset page asks for the right thing. 400 when the link is unknown, used or expired.
+    ///
+    /// - Remark: HTTP `POST /auth/reset/info`.
+    /// - Remark: Generated from `#/paths//auth/reset/info/post(resetInfo)`.
+    public func resetInfo(
+        headers: Operations.ResetInfo.Input.Headers = .init(),
+        body: Operations.ResetInfo.Input.Body
+    ) async throws -> Operations.ResetInfo.Output {
+        try await resetInfo(Operations.ResetInfo.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Set a new password or PIN with a reset link. The link stops working, the account's other links too, and the account is signed out on every device. Two-factor sign-in stays as it is.
+    ///
+    /// - Remark: HTTP `POST /auth/reset`.
+    /// - Remark: Generated from `#/paths//auth/reset/post(resetPassword)`.
+    public func resetPassword(
+        headers: Operations.ResetPassword.Input.Headers = .init(),
+        body: Operations.ResetPassword.Input.Body
+    ) async throws -> Operations.ResetPassword.Output {
+        try await resetPassword(Operations.ResetPassword.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Admin alerts for the bell, newest first (admin only). Kept for 30 days.
+    ///
+    /// - Remark: HTTP `GET /notifications`.
+    /// - Remark: Generated from `#/paths//notifications/get(listNotifications)`.
+    public func listNotifications(headers: Operations.ListNotifications.Input.Headers = .init()) async throws -> Operations.ListNotifications.Output {
+        try await listNotifications(Operations.ListNotifications.Input(headers: headers))
+    }
+    /// Mark every alert read (admin only).
+    ///
+    /// - Remark: HTTP `POST /notifications/read-all`.
+    /// - Remark: Generated from `#/paths//notifications/read-all/post(markAllNotificationsRead)`.
+    public func markAllNotificationsRead(headers: Operations.MarkAllNotificationsRead.Input.Headers = .init()) async throws -> Operations.MarkAllNotificationsRead.Output {
+        try await markAllNotificationsRead(Operations.MarkAllNotificationsRead.Input(headers: headers))
+    }
+    /// Mark an alert read (admin only).
+    ///
+    /// - Remark: HTTP `POST /notifications/{notificationId}/read`.
+    /// - Remark: Generated from `#/paths//notifications/{notificationId}/read/post(markNotificationRead)`.
+    public func markNotificationRead(
+        path: Operations.MarkNotificationRead.Input.Path,
+        headers: Operations.MarkNotificationRead.Input.Headers = .init()
+    ) async throws -> Operations.MarkNotificationRead.Output {
+        try await markNotificationRead(Operations.MarkNotificationRead.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Dismiss (delete) an alert (admin only).
+    ///
+    /// - Remark: HTTP `DELETE /notifications/{notificationId}`.
+    /// - Remark: Generated from `#/paths//notifications/{notificationId}/delete(dismissNotification)`.
+    public func dismissNotification(
+        path: Operations.DismissNotification.Input.Path,
+        headers: Operations.DismissNotification.Input.Headers = .init()
+    ) async throws -> Operations.DismissNotification.Output {
+        try await dismissNotification(Operations.DismissNotification.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Send a test email with the saved mail settings now (admin only).
+    ///
+    /// - Remark: HTTP `POST /notifications/test-email`.
+    /// - Remark: Generated from `#/paths//notifications/test-email/post(testEmail)`.
+    public func testEmail(
+        headers: Operations.TestEmail.Input.Headers = .init(),
+        body: Operations.TestEmail.Input.Body
+    ) async throws -> Operations.TestEmail.Output {
+        try await testEmail(Operations.TestEmail.Input(
             headers: headers,
             body: body
         ))
@@ -2797,17 +3004,19 @@ extension APIProtocol {
             headers: headers
         ))
     }
-    /// Start watching a film. Returns an HLS session passed through from the source (seekable; no transcode).
+    /// Start watching a film. Returns a seekable HLS session: an M3U source's own HLS passed through, or (Xtream Codes sources, whose films are files) the file made into HLS by the server, video copied when the device plays it and audio converted when needed.
     ///
     /// - Remark: HTTP `POST /livetv/vod/movies/{movieId}/play`.
     /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/play/post(playVodMovie)`.
     public func playVodMovie(
         path: Operations.PlayVodMovie.Input.Path,
-        headers: Operations.PlayVodMovie.Input.Headers = .init()
+        headers: Operations.PlayVodMovie.Input.Headers = .init(),
+        body: Operations.PlayVodMovie.Input.Body? = nil
     ) async throws -> Operations.PlayVodMovie.Output {
         try await playVodMovie(Operations.PlayVodMovie.Input(
             path: path,
-            headers: headers
+            headers: headers,
+            body: body
         ))
     }
     /// Report the position, so the film resumes there (and counts as watched near the end).
@@ -2836,6 +3045,187 @@ extension APIProtocol {
         try await stopVodSession(Operations.StopVodSession.Input(
             path: path,
             headers: headers
+        ))
+    }
+    /// TV series on demand (Xtream Codes sources), a page at a time.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/get(listVodSeries)`.
+    public func listVodSeries(
+        query: Operations.ListVodSeries.Input.Query = .init(),
+        headers: Operations.ListVodSeries.Input.Headers = .init()
+    ) async throws -> Operations.ListVodSeries.Output {
+        try await listVodSeries(Operations.ListVodSeries.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// The sources' series categories with how many series the caller may see in each.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series/categories`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/categories/get(listVodSeriesCategories)`.
+    public func listVodSeriesCategories(headers: Operations.ListVodSeriesCategories.Input.Headers = .init()) async throws -> Operations.ListVodSeriesCategories.Output {
+        try await listVodSeriesCategories(Operations.ListVodSeriesCategories.Input(headers: headers))
+    }
+    /// The films' genres with how many films the caller may see in each (for the genre filter).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/genres`.
+    /// - Remark: Generated from `#/paths//livetv/vod/genres/get(listVodGenres)`.
+    public func listVodGenres(headers: Operations.ListVodGenres.Input.Headers = .init()) async throws -> Operations.ListVodGenres.Output {
+        try await listVodGenres(Operations.ListVodGenres.Input(headers: headers))
+    }
+    /// The series' genres with how many series the caller may see in each (for the genre filter).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series/genres`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/genres/get(listVodSeriesGenres)`.
+    public func listVodSeriesGenres(headers: Operations.ListVodSeriesGenres.Input.Headers = .init()) async throws -> Operations.ListVodSeriesGenres.Output {
+        try await listVodSeriesGenres(Operations.ListVodSeriesGenres.Input(headers: headers))
+    }
+    /// Series the caller is watching, most recent first, each with nextEpisode set: the episode they're part-way through, else the next unwatched one. Finished series are left out.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series/continue`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/continue/get(vodSeriesContinueWatching)`.
+    public func vodSeriesContinueWatching(headers: Operations.VodSeriesContinueWatching.Input.Headers = .init()) async throws -> Operations.VodSeriesContinueWatching.Output {
+        try await vodSeriesContinueWatching(Operations.VodSeriesContinueWatching.Input(headers: headers))
+    }
+    /// A series with its seasons and episodes (and the caller's progress in each). Episodes are fetched from the source the first time a series is opened and again once 12 hours old, so this can take a few seconds.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series/{seriesId}`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/get(getVodSeries)`.
+    public func getVodSeries(
+        path: Operations.GetVodSeries.Input.Path,
+        query: Operations.GetVodSeries.Input.Query = .init(),
+        headers: Operations.GetVodSeries.Input.Headers = .init()
+    ) async throws -> Operations.GetVodSeries.Output {
+        try await getVodSeries(Operations.GetVodSeries.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// A series' (or season's) poster or backdrop, fetched once and cached (no sign-in needed, like artwork).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/series/{seriesId}/image`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/image/get(vodSeriesImage)`.
+    public func vodSeriesImage(
+        path: Operations.VodSeriesImage.Input.Path,
+        query: Operations.VodSeriesImage.Input.Query = .init(),
+        headers: Operations.VodSeriesImage.Input.Headers = .init()
+    ) async throws -> Operations.VodSeriesImage.Output {
+        try await vodSeriesImage(Operations.VodSeriesImage.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Mark every episode of a series (or of one season) watched.
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/series/{seriesId}/watched`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watched/put(markVodSeriesWatched)`.
+    public func markVodSeriesWatched(
+        path: Operations.MarkVodSeriesWatched.Input.Path,
+        query: Operations.MarkVodSeriesWatched.Input.Query = .init(),
+        headers: Operations.MarkVodSeriesWatched.Input.Headers = .init()
+    ) async throws -> Operations.MarkVodSeriesWatched.Output {
+        try await markVodSeriesWatched(Operations.MarkVodSeriesWatched.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Mark every episode of a series (or of one season) unwatched, forgetting resume points.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/series/{seriesId}/watched`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watched/delete(markVodSeriesUnwatched)`.
+    public func markVodSeriesUnwatched(
+        path: Operations.MarkVodSeriesUnwatched.Input.Path,
+        query: Operations.MarkVodSeriesUnwatched.Input.Query = .init(),
+        headers: Operations.MarkVodSeriesUnwatched.Input.Headers = .init()
+    ) async throws -> Operations.MarkVodSeriesUnwatched.Output {
+        try await markVodSeriesUnwatched(Operations.MarkVodSeriesUnwatched.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// An episode's still, fetched once and cached (no sign-in needed, like artwork).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/episodes/{episodeId}/image`.
+    /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/image/get(vodEpisodeImage)`.
+    public func vodEpisodeImage(
+        path: Operations.VodEpisodeImage.Input.Path,
+        headers: Operations.VodEpisodeImage.Input.Headers = .init()
+    ) async throws -> Operations.VodEpisodeImage.Output {
+        try await vodEpisodeImage(Operations.VodEpisodeImage.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Mark an episode watched (clears its resume point).
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/episodes/{episodeId}/watched`.
+    /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/watched/put(markVodEpisodeWatched)`.
+    public func markVodEpisodeWatched(
+        path: Operations.MarkVodEpisodeWatched.Input.Path,
+        headers: Operations.MarkVodEpisodeWatched.Input.Headers = .init()
+    ) async throws -> Operations.MarkVodEpisodeWatched.Output {
+        try await markVodEpisodeWatched(Operations.MarkVodEpisodeWatched.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Mark an episode unwatched (forgets its resume point).
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/episodes/{episodeId}/watched`.
+    /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/watched/delete(markVodEpisodeUnwatched)`.
+    public func markVodEpisodeUnwatched(
+        path: Operations.MarkVodEpisodeUnwatched.Input.Path,
+        headers: Operations.MarkVodEpisodeUnwatched.Input.Headers = .init()
+    ) async throws -> Operations.MarkVodEpisodeUnwatched.Output {
+        try await markVodEpisodeUnwatched(Operations.MarkVodEpisodeUnwatched.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// The episode after this one in viewing order (seasons in turn, specials last), for autoplay at the end of an episode; no episode when this is the last.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/episodes/{episodeId}/next`.
+    /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/next/get(vodNextEpisode)`.
+    public func vodNextEpisode(
+        path: Operations.VodNextEpisode.Input.Path,
+        headers: Operations.VodNextEpisode.Input.Headers = .init()
+    ) async throws -> Operations.VodNextEpisode.Output {
+        try await vodNextEpisode(Operations.VodNextEpisode.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Start watching an episode: the file made into seekable HLS by the server, as for Xtream Codes films. The session's movieId is 0 and episodeId is set; report progress and stop with the film session endpoints (/livetv/vod/sessions/{sessionId}).
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/episodes/{episodeId}/play`.
+    /// - Remark: Generated from `#/paths//livetv/vod/episodes/{episodeId}/play/post(playVodEpisode)`.
+    public func playVodEpisode(
+        path: Operations.PlayVodEpisode.Input.Path,
+        headers: Operations.PlayVodEpisode.Input.Headers = .init(),
+        body: Operations.PlayVodEpisode.Input.Body? = nil
+    ) async throws -> Operations.PlayVodEpisode.Output {
+        try await playVodEpisode(Operations.PlayVodEpisode.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Check a movie source before saving it (admin only): an M3U playlist's film count, or an Xtream Codes account's status and film count. Without a password, a saved source's (same id) is used.
+    ///
+    /// - Remark: HTTP `POST /livetv/vod/sources/test`.
+    /// - Remark: Generated from `#/paths//livetv/vod/sources/test/post(testVodSource)`.
+    public func testVodSource(
+        headers: Operations.TestVodSource.Input.Headers = .init(),
+        body: Operations.TestVodSource.Input.Body
+    ) async throws -> Operations.TestVodSource.Output {
+        try await testVodSource(Operations.TestVodSource.Input(
+            headers: headers,
+            body: body
         ))
     }
     /// Reload every movie source now and retry TMDB matching for films that didn't match (admin only). Matching continues in the background.

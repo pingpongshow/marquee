@@ -326,6 +326,10 @@ extension Components {
             public var username: Swift.String
             /// - Remark: Generated from `#/components/schemas/User/displayName`.
             public var displayName: Swift.String
+            /// For password and PIN reset links and, for administrators, alerts. Only in /me and the admin's user list; absent when none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/User/email`.
+            public var email: Swift.String?
             /// - Remark: Generated from `#/components/schemas/User/isAdmin`.
             public var isAdmin: Swift.Bool
             /// Managed profiles (e.g. children) sign in only by switching profile with a PIN.
@@ -362,6 +366,7 @@ extension Components {
             ///   - id:
             ///   - username:
             ///   - displayName:
+            ///   - email: For password and PIN reset links and, for administrators, alerts. Only in /me and the admin's user list; absent when none.
             ///   - isAdmin:
             ///   - isManaged: Managed profiles (e.g. children) sign in only by switching profile with a PIN.
             ///   - hasPin:
@@ -377,6 +382,7 @@ extension Components {
                 id: Swift.Int64,
                 username: Swift.String,
                 displayName: Swift.String,
+                email: Swift.String? = nil,
                 isAdmin: Swift.Bool,
                 isManaged: Swift.Bool,
                 hasPin: Swift.Bool? = nil,
@@ -392,6 +398,7 @@ extension Components {
                 self.id = id
                 self.username = username
                 self.displayName = displayName
+                self.email = email
                 self.isAdmin = isAdmin
                 self.isManaged = isManaged
                 self.hasPin = hasPin
@@ -408,6 +415,7 @@ extension Components {
                 case id
                 case username
                 case displayName
+                case email
                 case isAdmin
                 case isManaged
                 case hasPin
@@ -615,6 +623,8 @@ extension Components {
             public var password: Swift.String?
             /// - Remark: Generated from `#/components/schemas/UserCreate/pin`.
             public var pin: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/UserCreate/email`.
+            public var email: Swift.String?
             /// - Remark: Generated from `#/components/schemas/UserCreate/isAdmin`.
             public var isAdmin: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/UserCreate/isManaged`.
@@ -628,6 +638,7 @@ extension Components {
             ///   - displayName:
             ///   - password:
             ///   - pin:
+            ///   - email:
             ///   - isAdmin:
             ///   - isManaged:
             ///   - restrictions:
@@ -636,6 +647,7 @@ extension Components {
                 displayName: Swift.String? = nil,
                 password: Swift.String? = nil,
                 pin: Swift.String? = nil,
+                email: Swift.String? = nil,
                 isAdmin: Swift.Bool? = nil,
                 isManaged: Swift.Bool? = nil,
                 restrictions: Components.Schemas.UserRestrictions? = nil
@@ -644,6 +656,7 @@ extension Components {
                 self.displayName = displayName
                 self.password = password
                 self.pin = pin
+                self.email = email
                 self.isAdmin = isAdmin
                 self.isManaged = isManaged
                 self.restrictions = restrictions
@@ -653,6 +666,7 @@ extension Components {
                 case displayName
                 case password
                 case pin
+                case email
                 case isAdmin
                 case isManaged
                 case restrictions
@@ -670,6 +684,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/UserUpdate/pin`.
             public var pin: Swift.String?
+            /// Empty string removes the email address.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserUpdate/email`.
+            public var email: Swift.String?
             /// - Remark: Generated from `#/components/schemas/UserUpdate/isAdmin`.
             public var isAdmin: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/UserUpdate/restrictions`.
@@ -680,18 +698,21 @@ extension Components {
             ///   - displayName:
             ///   - password:
             ///   - pin: Empty string removes the PIN.
+            ///   - email: Empty string removes the email address.
             ///   - isAdmin:
             ///   - restrictions:
             public init(
                 displayName: Swift.String? = nil,
                 password: Swift.String? = nil,
                 pin: Swift.String? = nil,
+                email: Swift.String? = nil,
                 isAdmin: Swift.Bool? = nil,
                 restrictions: Components.Schemas.UserRestrictions? = nil
             ) {
                 self.displayName = displayName
                 self.password = password
                 self.pin = pin
+                self.email = email
                 self.isAdmin = isAdmin
                 self.restrictions = restrictions
             }
@@ -699,6 +720,7 @@ extension Components {
                 case displayName
                 case password
                 case pin
+                case email
                 case isAdmin
                 case restrictions
             }
@@ -715,6 +737,10 @@ extension Components {
             public var newPassword: Swift.String?
             /// - Remark: Generated from `#/components/schemas/MeUpdate/pin`.
             public var pin: Swift.String?
+            /// Your email address, for reset links. Empty string removes it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MeUpdate/email`.
+            public var email: Swift.String?
             /// - Remark: Generated from `#/components/schemas/MeUpdate/preferences`.
             public var preferences: Components.Schemas.UserPreferences?
             /// Creates a new `MeUpdate`.
@@ -724,18 +750,21 @@ extension Components {
             ///   - currentPassword: Required to change the password.
             ///   - newPassword:
             ///   - pin:
+            ///   - email: Your email address, for reset links. Empty string removes it.
             ///   - preferences:
             public init(
                 displayName: Swift.String? = nil,
                 currentPassword: Swift.String? = nil,
                 newPassword: Swift.String? = nil,
                 pin: Swift.String? = nil,
+                email: Swift.String? = nil,
                 preferences: Components.Schemas.UserPreferences? = nil
             ) {
                 self.displayName = displayName
                 self.currentPassword = currentPassword
                 self.newPassword = newPassword
                 self.pin = pin
+                self.email = email
                 self.preferences = preferences
             }
             public enum CodingKeys: String, CodingKey {
@@ -743,6 +772,7 @@ extension Components {
                 case currentPassword
                 case newPassword
                 case pin
+                case email
                 case preferences
             }
         }
@@ -1024,6 +1054,8 @@ extension Components {
             public var cinema: Components.Schemas.CinemaSettings?
             /// - Remark: Generated from `#/components/schemas/ServerSettings/ai`.
             public var ai: Components.Schemas.AiSettings?
+            /// - Remark: Generated from `#/components/schemas/ServerSettings/notifications`.
+            public var notifications: Components.Schemas.NotificationSettings?
             /// Replaces the whole list when sent.
             ///
             /// - Remark: Generated from `#/components/schemas/ServerSettings/webhooks`.
@@ -1043,6 +1075,7 @@ extension Components {
             ///   - integrations:
             ///   - cinema:
             ///   - ai:
+            ///   - notifications:
             ///   - webhooks: Replaces the whole list when sent.
             public init(
                 security: Components.Schemas.SecuritySettings,
@@ -1057,6 +1090,7 @@ extension Components {
                 integrations: Components.Schemas.IntegrationSettings? = nil,
                 cinema: Components.Schemas.CinemaSettings? = nil,
                 ai: Components.Schemas.AiSettings? = nil,
+                notifications: Components.Schemas.NotificationSettings? = nil,
                 webhooks: [Components.Schemas.Webhook]? = nil
             ) {
                 self.security = security
@@ -1071,6 +1105,7 @@ extension Components {
                 self.integrations = integrations
                 self.cinema = cinema
                 self.ai = ai
+                self.notifications = notifications
                 self.webhooks = webhooks
             }
             public enum CodingKeys: String, CodingKey {
@@ -1086,6 +1121,7 @@ extension Components {
                 case integrations
                 case cinema
                 case ai
+                case notifications
                 case webhooks
             }
         }
@@ -1115,6 +1151,8 @@ extension Components {
             public var cinema: Components.Schemas.CinemaSettings?
             /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/ai`.
             public var ai: Components.Schemas.AiSettings?
+            /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/notifications`.
+            public var notifications: Components.Schemas.NotificationSettingsUpdate?
             /// Replaces the whole list when sent.
             ///
             /// - Remark: Generated from `#/components/schemas/ServerSettingsUpdate/webhooks`.
@@ -1134,6 +1172,7 @@ extension Components {
             ///   - integrations:
             ///   - cinema:
             ///   - ai:
+            ///   - notifications:
             ///   - webhooks: Replaces the whole list when sent.
             public init(
                 security: Components.Schemas.SecuritySettings? = nil,
@@ -1148,6 +1187,7 @@ extension Components {
                 integrations: Components.Schemas.IntegrationSettingsUpdate? = nil,
                 cinema: Components.Schemas.CinemaSettings? = nil,
                 ai: Components.Schemas.AiSettings? = nil,
+                notifications: Components.Schemas.NotificationSettingsUpdate? = nil,
                 webhooks: [Components.Schemas.Webhook]? = nil
             ) {
                 self.security = security
@@ -1162,6 +1202,7 @@ extension Components {
                 self.integrations = integrations
                 self.cinema = cinema
                 self.ai = ai
+                self.notifications = notifications
                 self.webhooks = webhooks
             }
             public enum CodingKeys: String, CodingKey {
@@ -1177,7 +1218,402 @@ extension Components {
                 case integrations
                 case cinema
                 case ai
+                case notifications
                 case webhooks
+            }
+        }
+        /// task_failed: a scheduled task (including the nightly backup) failed.
+        /// disk_low: the config, transcode, recordings or a library folder's volume is low on space.
+        /// recording_failed: a DVR recording failed.
+        /// source_failed: a Live TV or movies-on-demand source couldn't be loaded.
+        /// integration_down: Seerr, Bazarr, Ollama or the Soundprint sidecar isn't answering (only those that are set up).
+        /// failed_signins: repeated wrong passwords for one account.
+        /// new_admin_device: an administrator signed in from a device never used before.
+        /// playback_failed: the transcoder couldn't produce video for a stream.
+        ///
+        ///
+        /// - Remark: Generated from `#/components/schemas/AlertType`.
+        @frozen public enum AlertType: String, Codable, Hashable, Sendable, CaseIterable {
+            case taskFailed = "task_failed"
+            case diskLow = "disk_low"
+            case recordingFailed = "recording_failed"
+            case sourceFailed = "source_failed"
+            case integrationDown = "integration_down"
+            case failedSignins = "failed_signins"
+            case newAdminDevice = "new_admin_device"
+            case playbackFailed = "playback_failed"
+        }
+        /// Outgoing email (SMTP) and admin alerts.
+        ///
+        /// - Remark: Generated from `#/components/schemas/NotificationSettings`.
+        public struct NotificationSettings: Codable, Hashable, Sendable {
+            /// The mail server, e.g. smtp.example.com. Empty turns email off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/smtpHost`.
+            public var smtpHost: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/smtpPort`.
+            public var smtpPort: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/smtpSecurity`.
+            @frozen public enum SmtpSecurityPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case none = "none"
+                case starttls = "starttls"
+                case tls = "tls"
+            }
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/smtpSecurity`.
+            public var smtpSecurity: Components.Schemas.NotificationSettings.SmtpSecurityPayload?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/smtpUsername`.
+            public var smtpUsername: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/smtpPasswordSet`.
+            public var smtpPasswordSet: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/fromAddress`.
+            public var fromAddress: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/fromName`.
+            public var fromName: Swift.String?
+            /// Host, port and from address are set.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/mailConfigured`.
+            public var mailConfigured: Swift.Bool?
+            /// Address links in mail start with (e.g. reset links). Empty = the Remote Access URL.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/linkUrl`.
+            public var linkUrl: Swift.String?
+            /// Alert types that are on. All are off by default.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/alerts`.
+            public var alerts: [Components.Schemas.AlertType]?
+            /// Mail alerts to every administrator with an email address.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/recipientsAllAdmins`.
+            public var recipientsAllAdmins: Swift.Bool?
+            /// Administrators (user ids) who get alert mail when recipientsAllAdmins is off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/recipients`.
+            public var recipients: [Swift.Int64]?
+            /// Alert when a volume has less free space than this.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/diskThresholdPercent`.
+            public var diskThresholdPercent: Swift.Int?
+            /// Creates a new `NotificationSettings`.
+            ///
+            /// - Parameters:
+            ///   - smtpHost: The mail server, e.g. smtp.example.com. Empty turns email off.
+            ///   - smtpPort:
+            ///   - smtpSecurity:
+            ///   - smtpUsername:
+            ///   - smtpPasswordSet:
+            ///   - fromAddress:
+            ///   - fromName:
+            ///   - mailConfigured: Host, port and from address are set.
+            ///   - linkUrl: Address links in mail start with (e.g. reset links). Empty = the Remote Access URL.
+            ///   - alerts: Alert types that are on. All are off by default.
+            ///   - recipientsAllAdmins: Mail alerts to every administrator with an email address.
+            ///   - recipients: Administrators (user ids) who get alert mail when recipientsAllAdmins is off.
+            ///   - diskThresholdPercent: Alert when a volume has less free space than this.
+            public init(
+                smtpHost: Swift.String? = nil,
+                smtpPort: Swift.Int? = nil,
+                smtpSecurity: Components.Schemas.NotificationSettings.SmtpSecurityPayload? = nil,
+                smtpUsername: Swift.String? = nil,
+                smtpPasswordSet: Swift.Bool? = nil,
+                fromAddress: Swift.String? = nil,
+                fromName: Swift.String? = nil,
+                mailConfigured: Swift.Bool? = nil,
+                linkUrl: Swift.String? = nil,
+                alerts: [Components.Schemas.AlertType]? = nil,
+                recipientsAllAdmins: Swift.Bool? = nil,
+                recipients: [Swift.Int64]? = nil,
+                diskThresholdPercent: Swift.Int? = nil
+            ) {
+                self.smtpHost = smtpHost
+                self.smtpPort = smtpPort
+                self.smtpSecurity = smtpSecurity
+                self.smtpUsername = smtpUsername
+                self.smtpPasswordSet = smtpPasswordSet
+                self.fromAddress = fromAddress
+                self.fromName = fromName
+                self.mailConfigured = mailConfigured
+                self.linkUrl = linkUrl
+                self.alerts = alerts
+                self.recipientsAllAdmins = recipientsAllAdmins
+                self.recipients = recipients
+                self.diskThresholdPercent = diskThresholdPercent
+            }
+            public enum CodingKeys: String, CodingKey {
+                case smtpHost
+                case smtpPort
+                case smtpSecurity
+                case smtpUsername
+                case smtpPasswordSet
+                case fromAddress
+                case fromName
+                case mailConfigured
+                case linkUrl
+                case alerts
+                case recipientsAllAdmins
+                case recipients
+                case diskThresholdPercent
+            }
+        }
+        /// The SMTP password is write-only; send an empty string to clear it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate`.
+        public struct NotificationSettingsUpdate: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/smtpHost`.
+            public var smtpHost: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/smtpPort`.
+            public var smtpPort: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/smtpSecurity`.
+            @frozen public enum SmtpSecurityPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case none = "none"
+                case starttls = "starttls"
+                case tls = "tls"
+            }
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/smtpSecurity`.
+            public var smtpSecurity: Components.Schemas.NotificationSettingsUpdate.SmtpSecurityPayload?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/smtpUsername`.
+            public var smtpUsername: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/smtpPassword`.
+            public var smtpPassword: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/fromAddress`.
+            public var fromAddress: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/fromName`.
+            public var fromName: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/linkUrl`.
+            public var linkUrl: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/alerts`.
+            public var alerts: [Components.Schemas.AlertType]?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/recipientsAllAdmins`.
+            public var recipientsAllAdmins: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/recipients`.
+            public var recipients: [Swift.Int64]?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/diskThresholdPercent`.
+            public var diskThresholdPercent: Swift.Int?
+            /// Creates a new `NotificationSettingsUpdate`.
+            ///
+            /// - Parameters:
+            ///   - smtpHost:
+            ///   - smtpPort:
+            ///   - smtpSecurity:
+            ///   - smtpUsername:
+            ///   - smtpPassword:
+            ///   - fromAddress:
+            ///   - fromName:
+            ///   - linkUrl:
+            ///   - alerts:
+            ///   - recipientsAllAdmins:
+            ///   - recipients:
+            ///   - diskThresholdPercent:
+            public init(
+                smtpHost: Swift.String? = nil,
+                smtpPort: Swift.Int? = nil,
+                smtpSecurity: Components.Schemas.NotificationSettingsUpdate.SmtpSecurityPayload? = nil,
+                smtpUsername: Swift.String? = nil,
+                smtpPassword: Swift.String? = nil,
+                fromAddress: Swift.String? = nil,
+                fromName: Swift.String? = nil,
+                linkUrl: Swift.String? = nil,
+                alerts: [Components.Schemas.AlertType]? = nil,
+                recipientsAllAdmins: Swift.Bool? = nil,
+                recipients: [Swift.Int64]? = nil,
+                diskThresholdPercent: Swift.Int? = nil
+            ) {
+                self.smtpHost = smtpHost
+                self.smtpPort = smtpPort
+                self.smtpSecurity = smtpSecurity
+                self.smtpUsername = smtpUsername
+                self.smtpPassword = smtpPassword
+                self.fromAddress = fromAddress
+                self.fromName = fromName
+                self.linkUrl = linkUrl
+                self.alerts = alerts
+                self.recipientsAllAdmins = recipientsAllAdmins
+                self.recipients = recipients
+                self.diskThresholdPercent = diskThresholdPercent
+            }
+            public enum CodingKeys: String, CodingKey {
+                case smtpHost
+                case smtpPort
+                case smtpSecurity
+                case smtpUsername
+                case smtpPassword
+                case fromAddress
+                case fromName
+                case linkUrl
+                case alerts
+                case recipientsAllAdmins
+                case recipients
+                case diskThresholdPercent
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/AdminNotification`.
+        public struct AdminNotification: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/AdminNotification/id`.
+            public var id: Swift.Int64
+            /// An AlertType.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AdminNotification/type`.
+            public var _type: Swift.String
+            /// What it is about (a task, a volume, a service).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AdminNotification/subject`.
+            public var subject: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/AdminNotification/title`.
+            public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/AdminNotification/message`.
+            public var message: Swift.String
+            /// - Remark: Generated from `#/components/schemas/AdminNotification/createdAt`.
+            public var createdAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/AdminNotification/read`.
+            public var read: Swift.Bool
+            /// Creates a new `AdminNotification`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - _type: An AlertType.
+            ///   - subject: What it is about (a task, a volume, a service).
+            ///   - title:
+            ///   - message:
+            ///   - createdAt:
+            ///   - read:
+            public init(
+                id: Swift.Int64,
+                _type: Swift.String,
+                subject: Swift.String? = nil,
+                title: Swift.String,
+                message: Swift.String,
+                createdAt: Foundation.Date,
+                read: Swift.Bool
+            ) {
+                self.id = id
+                self._type = _type
+                self.subject = subject
+                self.title = title
+                self.message = message
+                self.createdAt = createdAt
+                self.read = read
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case _type = "type"
+                case subject
+                case title
+                case message
+                case createdAt
+                case read
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/AdminNotificationList`.
+        public struct AdminNotificationList: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/AdminNotificationList/items`.
+            public var items: [Components.Schemas.AdminNotification]
+            /// - Remark: Generated from `#/components/schemas/AdminNotificationList/unread`.
+            public var unread: Swift.Int
+            /// Creates a new `AdminNotificationList`.
+            ///
+            /// - Parameters:
+            ///   - items:
+            ///   - unread:
+            public init(
+                items: [Components.Schemas.AdminNotification],
+                unread: Swift.Int
+            ) {
+                self.items = items
+                self.unread = unread
+            }
+            public enum CodingKeys: String, CodingKey {
+                case items
+                case unread
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ForgotRequest`.
+        public struct ForgotRequest: Codable, Hashable, Sendable {
+            /// Username or email address.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ForgotRequest/login`.
+            public var login: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ForgotRequest/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case password = "password"
+                case pin = "pin"
+            }
+            /// - Remark: Generated from `#/components/schemas/ForgotRequest/kind`.
+            public var kind: Components.Schemas.ForgotRequest.KindPayload
+            /// Creates a new `ForgotRequest`.
+            ///
+            /// - Parameters:
+            ///   - login: Username or email address.
+            ///   - kind:
+            public init(
+                login: Swift.String,
+                kind: Components.Schemas.ForgotRequest.KindPayload
+            ) {
+                self.login = login
+                self.kind = kind
+            }
+            public enum CodingKeys: String, CodingKey {
+                case login
+                case kind
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ResetInfo`.
+        public struct ResetInfo: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ResetInfo/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case password = "password"
+                case pin = "pin"
+            }
+            /// - Remark: Generated from `#/components/schemas/ResetInfo/kind`.
+            public var kind: Components.Schemas.ResetInfo.KindPayload
+            /// - Remark: Generated from `#/components/schemas/ResetInfo/displayName`.
+            public var displayName: Swift.String
+            /// Creates a new `ResetInfo`.
+            ///
+            /// - Parameters:
+            ///   - kind:
+            ///   - displayName:
+            public init(
+                kind: Components.Schemas.ResetInfo.KindPayload,
+                displayName: Swift.String
+            ) {
+                self.kind = kind
+                self.displayName = displayName
+            }
+            public enum CodingKeys: String, CodingKey {
+                case kind
+                case displayName
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ResetRequest`.
+        public struct ResetRequest: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ResetRequest/token`.
+            public var token: Swift.String
+            /// For a password link.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ResetRequest/password`.
+            public var password: Swift.String?
+            /// For a PIN link.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ResetRequest/pin`.
+            public var pin: Swift.String?
+            /// Creates a new `ResetRequest`.
+            ///
+            /// - Parameters:
+            ///   - token:
+            ///   - password: For a password link.
+            ///   - pin: For a PIN link.
+            public init(
+                token: Swift.String,
+                password: Swift.String? = nil,
+                pin: Swift.String? = nil
+            ) {
+                self.token = token
+                self.password = password
+                self.pin = pin
+            }
+            public enum CodingKeys: String, CodingKey {
+                case token
+                case password
+                case pin
             }
         }
         /// - Remark: Generated from `#/components/schemas/Webhook`.
@@ -1204,6 +1640,7 @@ extension Components {
                 case playback_stopped = "playback.stopped"
                 case playback_watched = "playback.watched"
                 case library_added = "library.added"
+                case alert = "alert"
             }
             /// - Remark: Generated from `#/components/schemas/Webhook/events`.
             public typealias EventsPayload = [Components.Schemas.Webhook.EventsPayloadPayload]
@@ -2679,7 +3116,7 @@ extension Components {
                 case enabled
             }
         }
-        /// An M3U playlist of films, e.g. Pluto TV's on-demand movies (LIVE-6). Each entry's group-title is its category.
+        /// A source of films (LIVE-6): an M3U playlist, e.g. Pluto TV's on-demand movies (each entry's group-title is its category), or an Xtream Codes server such as Dispatcharr (its VOD categories and movies).
         ///
         /// - Remark: Generated from `#/components/schemas/VodSource`.
         public struct VodSource: Codable, Hashable, Sendable {
@@ -2687,8 +3124,29 @@ extension Components {
             public var id: Swift.String?
             /// - Remark: Generated from `#/components/schemas/VodSource/name`.
             public var name: Swift.String
+            /// m3u: url is the playlist. xtream: url is the server's address (e.g. Dispatcharr's), with a username and password (Dispatcharr: a user's XC password).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSource/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case m3u = "m3u"
+                case xtream = "xtream"
+            }
+            /// m3u: url is the playlist. xtream: url is the server's address (e.g. Dispatcharr's), with a username and password (Dispatcharr: a user's XC password).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSource/kind`.
+            public var kind: Components.Schemas.VodSource.KindPayload?
             /// - Remark: Generated from `#/components/schemas/VodSource/url`.
             public var url: Swift.String
+            /// Xtream Codes username.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSource/username`.
+            public var username: Swift.String?
+            /// Xtream Codes password. Write-only; omit to keep the saved one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSource/password`.
+            public var password: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/VodSource/passwordSet`.
+            public var passwordSet: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/VodSource/userAgent`.
             public var userAgent: Swift.String?
             /// - Remark: Generated from `#/components/schemas/VodSource/enabled`.
@@ -2698,38 +3156,58 @@ extension Components {
             /// - Parameters:
             ///   - id:
             ///   - name:
+            ///   - kind: m3u: url is the playlist. xtream: url is the server's address (e.g. Dispatcharr's), with a username and password (Dispatcharr: a user's XC password).
             ///   - url:
+            ///   - username: Xtream Codes username.
+            ///   - password: Xtream Codes password. Write-only; omit to keep the saved one.
+            ///   - passwordSet:
             ///   - userAgent:
             ///   - enabled:
             public init(
                 id: Swift.String? = nil,
                 name: Swift.String,
+                kind: Components.Schemas.VodSource.KindPayload? = nil,
                 url: Swift.String,
+                username: Swift.String? = nil,
+                password: Swift.String? = nil,
+                passwordSet: Swift.Bool? = nil,
                 userAgent: Swift.String? = nil,
                 enabled: Swift.Bool? = nil
             ) {
                 self.id = id
                 self.name = name
+                self.kind = kind
                 self.url = url
+                self.username = username
+                self.password = password
+                self.passwordSet = passwordSet
                 self.userAgent = userAgent
                 self.enabled = enabled
             }
             public enum CodingKeys: String, CodingKey {
                 case id
                 case name
+                case kind
                 case url
+                case username
+                case password
+                case passwordSet
                 case userAgent
                 case enabled
             }
         }
         /// - Remark: Generated from `#/components/schemas/VodStatus`.
         public struct VodStatus: Codable, Hashable, Sendable {
-            /// Movies on demand are turned on, a source has films, and this profile may watch Live TV. Clients show them only when true.
+            /// Movies on demand are turned on, a source has films or series, and this profile may watch Live TV. Clients show them only when true.
             ///
             /// - Remark: Generated from `#/components/schemas/VodStatus/enabled`.
             public var enabled: Swift.Bool
             /// - Remark: Generated from `#/components/schemas/VodStatus/movies`.
             public var movies: Swift.Int
+            /// Series (Xtream Codes sources).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodStatus/series`.
+            public var series: Swift.Int
             /// Films matched to TMDB.
             ///
             /// - Remark: Generated from `#/components/schemas/VodStatus/matched`.
@@ -2754,6 +3232,10 @@ extension Components {
                 public var name: Swift.String
                 /// - Remark: Generated from `#/components/schemas/VodStatus/SourcesPayload/movies`.
                 public var movies: Swift.Int
+                /// Series the source lists (Xtream Codes; 0 for playlists).
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodStatus/SourcesPayload/series`.
+                public var series: Swift.Int
                 /// - Remark: Generated from `#/components/schemas/VodStatus/SourcesPayload/refreshedAt`.
                 public var refreshedAt: Foundation.Date?
                 /// - Remark: Generated from `#/components/schemas/VodStatus/SourcesPayload/error`.
@@ -2764,18 +3246,21 @@ extension Components {
                 ///   - id:
                 ///   - name:
                 ///   - movies:
+                ///   - series: Series the source lists (Xtream Codes; 0 for playlists).
                 ///   - refreshedAt:
                 ///   - error:
                 public init(
                     id: Swift.String,
                     name: Swift.String,
                     movies: Swift.Int,
+                    series: Swift.Int,
                     refreshedAt: Foundation.Date? = nil,
                     error: Swift.String? = nil
                 ) {
                     self.id = id
                     self.name = name
                     self.movies = movies
+                    self.series = series
                     self.refreshedAt = refreshedAt
                     self.error = error
                 }
@@ -2783,6 +3268,7 @@ extension Components {
                     case id
                     case name
                     case movies
+                    case series
                     case refreshedAt
                     case error
                 }
@@ -2794,8 +3280,9 @@ extension Components {
             /// Creates a new `VodStatus`.
             ///
             /// - Parameters:
-            ///   - enabled: Movies on demand are turned on, a source has films, and this profile may watch Live TV. Clients show them only when true.
+            ///   - enabled: Movies on demand are turned on, a source has films or series, and this profile may watch Live TV. Clients show them only when true.
             ///   - movies:
+            ///   - series: Series (Xtream Codes sources).
             ///   - matched: Films matched to TMDB.
             ///   - unmatched: Films TMDB had no confident match for.
             ///   - matching: Details and TMDB matches are being fetched now.
@@ -2804,6 +3291,7 @@ extension Components {
             public init(
                 enabled: Swift.Bool,
                 movies: Swift.Int,
+                series: Swift.Int,
                 matched: Swift.Int,
                 unmatched: Swift.Int,
                 matching: Swift.Bool,
@@ -2812,6 +3300,7 @@ extension Components {
             ) {
                 self.enabled = enabled
                 self.movies = movies
+                self.series = series
                 self.matched = matched
                 self.unmatched = unmatched
                 self.matching = matching
@@ -2821,6 +3310,7 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case enabled
                 case movies
+                case series
                 case matched
                 case unmatched
                 case matching
@@ -3082,8 +3572,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/VodSession/url`.
             public var url: Swift.String
+            /// The film (0 for an episode).
+            ///
             /// - Remark: Generated from `#/components/schemas/VodSession/movieId`.
             public var movieId: Swift.Int64
+            /// The episode, when watching a series.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSession/episodeId`.
+            public var episodeId: Swift.Int64?
             /// Where to start (the caller's resume point).
             ///
             /// - Remark: Generated from `#/components/schemas/VodSession/startMs`.
@@ -3093,24 +3589,478 @@ extension Components {
             /// - Parameters:
             ///   - id:
             ///   - url: The HLS playlist (server-relative; the session id is its credential).
-            ///   - movieId:
+            ///   - movieId: The film (0 for an episode).
+            ///   - episodeId: The episode, when watching a series.
             ///   - startMs: Where to start (the caller's resume point).
             public init(
                 id: Swift.String,
                 url: Swift.String,
                 movieId: Swift.Int64,
+                episodeId: Swift.Int64? = nil,
                 startMs: Swift.Int64? = nil
             ) {
                 self.id = id
                 self.url = url
                 self.movieId = movieId
+                self.episodeId = episodeId
                 self.startMs = startMs
             }
             public enum CodingKeys: String, CodingKey {
                 case id
                 case url
                 case movieId
+                case episodeId
                 case startMs
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/VodSeries`.
+        public struct VodSeries: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodSeries/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/VodSeries/title`.
+            public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/VodSeries/year`.
+            public var year: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/VodSeries/category`.
+            public var category: Swift.String?
+            /// e.g. TV-14 (TMDB's, when matched).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSeries/contentRating`.
+            public var contentRating: Swift.String?
+            /// Average vote out of 10 (TMDB's when matched, else the source's).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSeries/rating`.
+            public var rating: Swift.Double?
+            /// Server-relative; no token needed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSeries/posterUrl`.
+            public var posterUrl: Swift.String?
+            /// Seasons known (0 until the series is first opened).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSeries/seasonCount`.
+            public var seasonCount: Swift.Int
+            /// Episodes known (0 until the series is first opened).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSeries/episodeCount`.
+            public var episodeCount: Swift.Int
+            /// Episodes the caller has watched.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSeries/watchedCount`.
+            public var watchedCount: Swift.Int
+            /// The caller has watched every known episode.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSeries/watched`.
+            public var watched: Swift.Bool
+            /// The episode the caller would watch next (Continue Watching and the series detail).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSeries/nextEpisode`.
+            public struct NextEpisodePayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/VodSeries/nextEpisode/value1`.
+                public var value1: Components.Schemas.VodEpisode
+                /// Creates a new `NextEpisodePayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                public init(value1: Components.Schemas.VodEpisode) {
+                    self.value1 = value1
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try self.value1.encode(to: encoder)
+                }
+            }
+            /// The episode the caller would watch next (Continue Watching and the series detail).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSeries/nextEpisode`.
+            public var nextEpisode: Components.Schemas.VodSeries.NextEpisodePayload?
+            /// Creates a new `VodSeries`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - title:
+            ///   - year:
+            ///   - category:
+            ///   - contentRating: e.g. TV-14 (TMDB's, when matched).
+            ///   - rating: Average vote out of 10 (TMDB's when matched, else the source's).
+            ///   - posterUrl: Server-relative; no token needed.
+            ///   - seasonCount: Seasons known (0 until the series is first opened).
+            ///   - episodeCount: Episodes known (0 until the series is first opened).
+            ///   - watchedCount: Episodes the caller has watched.
+            ///   - watched: The caller has watched every known episode.
+            ///   - nextEpisode: The episode the caller would watch next (Continue Watching and the series detail).
+            public init(
+                id: Swift.Int64,
+                title: Swift.String,
+                year: Swift.Int? = nil,
+                category: Swift.String? = nil,
+                contentRating: Swift.String? = nil,
+                rating: Swift.Double? = nil,
+                posterUrl: Swift.String? = nil,
+                seasonCount: Swift.Int,
+                episodeCount: Swift.Int,
+                watchedCount: Swift.Int,
+                watched: Swift.Bool,
+                nextEpisode: Components.Schemas.VodSeries.NextEpisodePayload? = nil
+            ) {
+                self.id = id
+                self.title = title
+                self.year = year
+                self.category = category
+                self.contentRating = contentRating
+                self.rating = rating
+                self.posterUrl = posterUrl
+                self.seasonCount = seasonCount
+                self.episodeCount = episodeCount
+                self.watchedCount = watchedCount
+                self.watched = watched
+                self.nextEpisode = nextEpisode
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case title
+                case year
+                case category
+                case contentRating
+                case rating
+                case posterUrl
+                case seasonCount
+                case episodeCount
+                case watchedCount
+                case watched
+                case nextEpisode
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/VodSeriesDetail`.
+        public struct VodSeriesDetail: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value1`.
+            public var value1: Components.Schemas.VodSeries
+            /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2`.
+            public struct Value2Payload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/overview`.
+                public var overview: Swift.String?
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/genres`.
+                public var genres: [Swift.String]
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/director`.
+                public var director: Swift.String?
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/CastPayload`.
+                public struct CastPayloadPayload: Codable, Hashable, Sendable {
+                    /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/CastPayload/name`.
+                    public var name: Swift.String
+                    /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/CastPayload/character`.
+                    public var character: Swift.String?
+                    /// Creates a new `CastPayloadPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - name:
+                    ///   - character:
+                    public init(
+                        name: Swift.String,
+                        character: Swift.String? = nil
+                    ) {
+                        self.name = name
+                        self.character = character
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case name
+                        case character
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/cast`.
+                public typealias CastPayload = [Components.Schemas.VodSeriesDetail.Value2Payload.CastPayloadPayload]
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/cast`.
+                public var cast: Components.Schemas.VodSeriesDetail.Value2Payload.CastPayload
+                /// Server-relative; no token needed.
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/backdropUrl`.
+                public var backdropUrl: Swift.String?
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/tmdbId`.
+                public var tmdbId: Swift.Int?
+                /// The details are TMDB's.
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/matched`.
+                public var matched: Swift.Bool
+                /// In viewing order (specials, season 0, last).
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/seasons`.
+                public var seasons: [Components.Schemas.VodSeason]
+                /// Every episode in viewing order (seasons in turn, specials last); filter by season for a season's list.
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/episodes`.
+                public var episodes: [Components.Schemas.VodEpisode]
+                /// The source didn't give the episodes (and none were kept from before).
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/episodesError`.
+                public var episodesError: Swift.String?
+                /// Creates a new `Value2Payload`.
+                ///
+                /// - Parameters:
+                ///   - overview:
+                ///   - genres:
+                ///   - director:
+                ///   - cast:
+                ///   - backdropUrl: Server-relative; no token needed.
+                ///   - tmdbId:
+                ///   - matched: The details are TMDB's.
+                ///   - seasons: In viewing order (specials, season 0, last).
+                ///   - episodes: Every episode in viewing order (seasons in turn, specials last); filter by season for a season's list.
+                ///   - episodesError: The source didn't give the episodes (and none were kept from before).
+                public init(
+                    overview: Swift.String? = nil,
+                    genres: [Swift.String],
+                    director: Swift.String? = nil,
+                    cast: Components.Schemas.VodSeriesDetail.Value2Payload.CastPayload,
+                    backdropUrl: Swift.String? = nil,
+                    tmdbId: Swift.Int? = nil,
+                    matched: Swift.Bool,
+                    seasons: [Components.Schemas.VodSeason],
+                    episodes: [Components.Schemas.VodEpisode],
+                    episodesError: Swift.String? = nil
+                ) {
+                    self.overview = overview
+                    self.genres = genres
+                    self.director = director
+                    self.cast = cast
+                    self.backdropUrl = backdropUrl
+                    self.tmdbId = tmdbId
+                    self.matched = matched
+                    self.seasons = seasons
+                    self.episodes = episodes
+                    self.episodesError = episodesError
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case overview
+                    case genres
+                    case director
+                    case cast
+                    case backdropUrl
+                    case tmdbId
+                    case matched
+                    case seasons
+                    case episodes
+                    case episodesError
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2`.
+            public var value2: Components.Schemas.VodSeriesDetail.Value2Payload
+            /// Creates a new `VodSeriesDetail`.
+            ///
+            /// - Parameters:
+            ///   - value1:
+            ///   - value2:
+            public init(
+                value1: Components.Schemas.VodSeries,
+                value2: Components.Schemas.VodSeriesDetail.Value2Payload
+            ) {
+                self.value1 = value1
+                self.value2 = value2
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                self.value1 = try .init(from: decoder)
+                self.value2 = try .init(from: decoder)
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                try self.value1.encode(to: encoder)
+                try self.value2.encode(to: encoder)
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/VodSeason`.
+        public struct VodSeason: Codable, Hashable, Sendable {
+            /// The season number (0 = specials).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSeason/season`.
+            public var season: Swift.Int
+            /// e.g. Season 1.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSeason/name`.
+            public var name: Swift.String
+            /// - Remark: Generated from `#/components/schemas/VodSeason/overview`.
+            public var overview: Swift.String?
+            /// YYYY-MM-DD as the source gives it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSeason/airDate`.
+            public var airDate: Swift.String?
+            /// Server-relative; no token needed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSeason/posterUrl`.
+            public var posterUrl: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/VodSeason/episodeCount`.
+            public var episodeCount: Swift.Int
+            /// Episodes the caller has watched.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSeason/watchedCount`.
+            public var watchedCount: Swift.Int
+            /// Creates a new `VodSeason`.
+            ///
+            /// - Parameters:
+            ///   - season: The season number (0 = specials).
+            ///   - name: e.g. Season 1.
+            ///   - overview:
+            ///   - airDate: YYYY-MM-DD as the source gives it.
+            ///   - posterUrl: Server-relative; no token needed.
+            ///   - episodeCount:
+            ///   - watchedCount: Episodes the caller has watched.
+            public init(
+                season: Swift.Int,
+                name: Swift.String,
+                overview: Swift.String? = nil,
+                airDate: Swift.String? = nil,
+                posterUrl: Swift.String? = nil,
+                episodeCount: Swift.Int,
+                watchedCount: Swift.Int
+            ) {
+                self.season = season
+                self.name = name
+                self.overview = overview
+                self.airDate = airDate
+                self.posterUrl = posterUrl
+                self.episodeCount = episodeCount
+                self.watchedCount = watchedCount
+            }
+            public enum CodingKeys: String, CodingKey {
+                case season
+                case name
+                case overview
+                case airDate
+                case posterUrl
+                case episodeCount
+                case watchedCount
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/VodEpisode`.
+        public struct VodEpisode: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodEpisode/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/VodEpisode/seriesId`.
+            public var seriesId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/VodEpisode/seriesTitle`.
+            public var seriesTitle: Swift.String
+            /// - Remark: Generated from `#/components/schemas/VodEpisode/season`.
+            public var season: Swift.Int
+            /// The episode number within its season.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodEpisode/episode`.
+            public var episode: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/VodEpisode/title`.
+            public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/VodEpisode/overview`.
+            public var overview: Swift.String?
+            /// YYYY-MM-DD as the source gives it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodEpisode/airDate`.
+            public var airDate: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/VodEpisode/runtimeMs`.
+            public var runtimeMs: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/VodEpisode/rating`.
+            public var rating: Swift.Double?
+            /// Server-relative; no token needed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodEpisode/stillUrl`.
+            public var stillUrl: Swift.String?
+            /// The caller's resume point.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodEpisode/positionMs`.
+            public var positionMs: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/VodEpisode/watched`.
+            public var watched: Swift.Bool
+            /// Creates a new `VodEpisode`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - seriesId:
+            ///   - seriesTitle:
+            ///   - season:
+            ///   - episode: The episode number within its season.
+            ///   - title:
+            ///   - overview:
+            ///   - airDate: YYYY-MM-DD as the source gives it.
+            ///   - runtimeMs:
+            ///   - rating:
+            ///   - stillUrl: Server-relative; no token needed.
+            ///   - positionMs: The caller's resume point.
+            ///   - watched:
+            public init(
+                id: Swift.Int64,
+                seriesId: Swift.Int64,
+                seriesTitle: Swift.String,
+                season: Swift.Int,
+                episode: Swift.Int,
+                title: Swift.String,
+                overview: Swift.String? = nil,
+                airDate: Swift.String? = nil,
+                runtimeMs: Swift.Int64? = nil,
+                rating: Swift.Double? = nil,
+                stillUrl: Swift.String? = nil,
+                positionMs: Swift.Int64? = nil,
+                watched: Swift.Bool
+            ) {
+                self.id = id
+                self.seriesId = seriesId
+                self.seriesTitle = seriesTitle
+                self.season = season
+                self.episode = episode
+                self.title = title
+                self.overview = overview
+                self.airDate = airDate
+                self.runtimeMs = runtimeMs
+                self.rating = rating
+                self.stillUrl = stillUrl
+                self.positionMs = positionMs
+                self.watched = watched
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case seriesId
+                case seriesTitle
+                case season
+                case episode
+                case title
+                case overview
+                case airDate
+                case runtimeMs
+                case rating
+                case stillUrl
+                case positionMs
+                case watched
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/VodSeriesPage`.
+        public struct VodSeriesPage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodSeriesPage/total`.
+            public var total: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/VodSeriesPage/series`.
+            public var series: [Components.Schemas.VodSeries]
+            /// Creates a new `VodSeriesPage`.
+            ///
+            /// - Parameters:
+            ///   - total:
+            ///   - series:
+            public init(
+                total: Swift.Int,
+                series: [Components.Schemas.VodSeries]
+            ) {
+                self.total = total
+                self.series = series
+            }
+            public enum CodingKeys: String, CodingKey {
+                case total
+                case series
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/VodUpNext`.
+        public struct VodUpNext: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodUpNext/episode`.
+            public var episode: Components.Schemas.VodEpisode?
+            /// Creates a new `VodUpNext`.
+            ///
+            /// - Parameters:
+            ///   - episode:
+            public init(episode: Components.Schemas.VodEpisode? = nil) {
+                self.episode = episode
+            }
+            public enum CodingKeys: String, CodingKey {
+                case episode
             }
         }
         /// - Remark: Generated from `#/components/schemas/RequestsStatus`.
