@@ -315,7 +315,10 @@ func (h *Handlers) GetSettings(ctx context.Context, _ GetSettingsRequestObject) 
 	case !admin:
 		return GetSettings403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
 	}
-	return GetSettings200JSONResponse(toAPISettings(h.Settings.Get())), nil
+	cur := h.Settings.Get()
+	out := toAPISettings(cur)
+	h.fillVodSaveCoverage(ctx, &out, cur)
+	return GetSettings200JSONResponse(out), nil
 }
 
 func (h *Handlers) UpdateSettings(ctx context.Context, req UpdateSettingsRequestObject) (UpdateSettingsResponseObject, error) {
@@ -339,7 +342,7 @@ func (h *Handlers) UpdateSettings(ctx context.Context, req UpdateSettingsRequest
 				return err
 			}
 		}
-		return nil
+		return checkSaveDestinations(before.Destinations, s.VODSave.Destinations)
 	})
 	var ve *settings.ValidationError
 	if errors.As(err, &ve) {
@@ -348,7 +351,9 @@ func (h *Handlers) UpdateSettings(ctx context.Context, req UpdateSettingsRequest
 	if err != nil {
 		return nil, internal(ctx, "updateSettings", err)
 	}
-	return UpdateSettings200JSONResponse(toAPISettings(next)), nil
+	out := toAPISettings(next)
+	h.fillVodSaveCoverage(ctx, &out, next)
+	return UpdateSettings200JSONResponse(out), nil
 }
 
 // ---------- libraries ----------

@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { HardDriveDownload } from "lucide-react";
+import { AlertTriangle, HardDriveDownload, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { components } from "@/api/schema.gen";
 import { Button, Card, Field, Input, Select, Spinner, Toggle } from "@/components/ui";
@@ -8,19 +8,34 @@ import { SaveBar } from "./SaveBar";
 import { useSectionDraft } from "./useSectionDraft";
 
 type Draft = components["schemas"]["VodSaveSettings"];
+type Destination = components["schemas"]["VodSaveDestination"];
 
-function FolderField({ label, help, value, onChange }: { label: string; help: string; value: string; onChange: (v: string) => void }) {
+function FolderField({
+  label,
+  help,
+  value,
+  onChange,
+  placeholder = "Not set: saving is off",
+  clearable = true,
+}: {
+  label: string;
+  help?: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  clearable?: boolean;
+}) {
   const [browsing, setBrowsing] = useState(false);
   return (
     <Field label={label} help={help}>
       {(id) => (
         <div className="space-y-2">
           <div className="flex gap-2">
-            <Input id={id} value={value} placeholder="Not set: saving is off" onChange={(e) => onChange(e.target.value)} className="font-mono" />
+            <Input id={id} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className="font-mono" />
             <Button size="sm" variant="secondary" className="h-10" onClick={() => setBrowsing((b) => !b)}>
               {browsing ? "Close" : "Browse"}
             </Button>
-            {value && (
+            {clearable && value && (
               <Button size="sm" variant="ghost" className="h-10" onClick={() => onChange("")}>
                 Clear
               </Button>
@@ -38,6 +53,80 @@ function FolderField({ label, help, value, onChange }: { label: string; help: st
         </div>
       )}
     </Field>
+  );
+}
+
+/**
+ * More save folders besides the default Movies and Shows ones (e.g. Anime), offered as
+ * "Save to Anime" beside the save buttons; each warns when no library includes it.
+ */
+function Destinations({ value, onChange }: { value: Destination[]; onChange: (v: Destination[]) => void }) {
+  const set = (i: number, p: Partial<Destination>) =>
+    onChange(value.map((d, j) => (j === i ? { ...d, ...p, ...("folder" in p ? { inLibrary: undefined } : {}) } : d)));
+  const names = value.map((d) => d.name.trim().toLowerCase());
+  return (
+    <div className="space-y-3">
+      <div>
+        <div className="text-sm font-medium">More save folders</div>
+        <p className="text-sm text-muted">
+          Folders besides the two above, such as an Anime folder. The save buttons offer them (“Save to Anime”); titles are
+          named the same way inside them, and the library is checked the same way. An upgrade always replaces the
+          library&apos;s copy in its current folder.
+        </p>
+      </div>
+      {value.map((d, i) => (
+        <div key={d.id ?? `new-${i}`} className="space-y-3 rounded-md border border-border p-4" data-testid="vod-save-destination">
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_auto] md:items-end">
+            <Field
+              label="Name"
+              error={
+                !d.name.trim()
+                  ? "Give it a name"
+                  : names.indexOf(d.name.trim().toLowerCase()) !== i
+                    ? "Another save folder has this name"
+                    : undefined
+              }
+            >
+              {(id) => <Input id={id} value={d.name} placeholder="Anime" onChange={(e) => set(i, { name: e.target.value })} />}
+            </Field>
+            <Field label="Saves">
+              {(id) => (
+                <Select id={id} value={d.kind} onChange={(e) => set(i, { kind: e.target.value as Destination["kind"] })}>
+                  <option value="both">Movies and shows</option>
+                  <option value="movies">Movies</option>
+                  <option value="shows">Shows</option>
+                </Select>
+              )}
+            </Field>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-10"
+              onClick={() => onChange(value.filter((_, j) => j !== i))}
+              aria-label={`Remove ${d.name || "this save folder"}`}
+            >
+              <Trash2 className="size-4" /> Remove
+            </Button>
+          </div>
+          <FolderField
+            label="Folder"
+            value={d.folder}
+            placeholder="Choose a folder"
+            clearable={false}
+            onChange={(v) => set(i, { folder: v })}
+          />
+          {d.inLibrary === false && (
+            <p className="flex items-start gap-1.5 text-sm text-accent">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+              No library includes this folder, so saved titles won&apos;t appear in Marquee until you add it to a library.
+            </p>
+          )}
+        </div>
+      ))}
+      <Button size="sm" onClick={() => onChange([...value, { name: "", folder: "", kind: "both" }])}>
+        <Plus className="size-4" /> Add a save folder
+      </Button>
+    </div>
   );
 }
 
@@ -82,6 +171,7 @@ export function VodSaveSettings() {
             value={d.showsFolder ?? ""}
             onChange={(v) => update({ showsFolder: v })}
           />
+          <Destinations value={d.destinations ?? []} onChange={(v) => update({ destinations: v })} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Quality" help="Original keeps the file as it is (an MPEG-TS or other unusual container becomes MKV).">
               {(id) => (

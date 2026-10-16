@@ -226,6 +226,28 @@ func (v VODSave) validate() error {
 			return invalid("the folder %q to save to must be an absolute path", f)
 		}
 	}
+	ids, names := map[string]bool{}, map[string]bool{}
+	for _, d := range v.Destinations {
+		name := strings.ToLower(strings.TrimSpace(d.Name))
+		switch {
+		case name == "":
+			return invalid("each save folder needs a name")
+		case names[name]:
+			return invalid("there are two save folders named %q", strings.TrimSpace(d.Name))
+		case d.ID == "" || ids[d.ID]:
+			return invalid("each save folder needs its own id")
+		case d.Folder == "":
+			return invalid("the save folder %q needs a folder", d.Name)
+		case !filepath.IsAbs(d.Folder):
+			return invalid("the folder %q to save to must be an absolute path", d.Folder)
+		}
+		switch d.Kind {
+		case "movies", "shows", "both":
+		default:
+			return invalid("the save folder %q must take movies, shows or both", d.Name)
+		}
+		ids[d.ID], names[name] = true, true
+	}
 	switch v.Quality {
 	case VODSaveOriginal, VODSaveRemux, VODSaveTranscode:
 	default:

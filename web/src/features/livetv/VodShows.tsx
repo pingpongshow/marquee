@@ -138,7 +138,7 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
                   <Check className={s.watched ? "size-4 text-success" : "size-4"} /> {s.watched ? "Watched" : "Mark watched"}
                 </Button>
               )}
-              {s.canSave && <SaveSeriesButton seriesId={s.id} label="Save show" library={s.library} />}
+              {s.canSave && <SaveSeriesButton seriesId={s.id} label="Save show" library={s.library} targets={s} />}
             </div>
             {s.overview && <p className="mt-5 max-w-3xl leading-relaxed text-text/90">{s.overview}</p>}
             {s.cast.length > 0 && (
@@ -177,7 +177,13 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
                 </Button>
               )}
               {seasonInfo && s.canSave && (
-                <SaveSeriesButton seriesId={s.id} season={seasonInfo.season} label="Save season" library={seasonInfo.library} />
+                <SaveSeriesButton
+                  seriesId={s.id}
+                  season={seasonInfo.season}
+                  label="Save season"
+                  library={seasonInfo.library}
+                  targets={s}
+                />
               )}
             </div>
           )}
@@ -220,7 +226,7 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
                           {[e.airDate, formatDuration(e.runtimeMs)].filter(Boolean).join(" · ")}
                         </div>
                       </div>
-                      {s.canSave && <SaveEpisodeIcon episodeId={e.id} save={e.save} library={e.library} />}
+                      {s.canSave && <SaveEpisodeIcon episodeId={e.id} save={e.save} library={e.library} targets={s} />}
                       <button
                         onClick={() => episodeWatched.mutate({ id: e.id, watched: !watched })}
                         className="rounded-full p-1.5 hover:bg-surface-2"

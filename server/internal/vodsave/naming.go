@@ -189,8 +189,14 @@ func titleWithYear(title string, year int) string {
 // is still there, else one in root whose name matches the title, with or without the year,
 // ignoring case. "" when there is none.
 func FindFolder(ctx context.Context, db *sql.DB, kind, root, title string, year, tmdbID int) string {
+	return findFolder(ctx, db, kind, root, title, year, tmdbID, true)
+}
+
+// findFolder is FindFolder; without anyLibrary, the library's folder is only reused when it
+// is inside root (a save to a chosen save folder stays in it).
+func findFolder(ctx context.Context, db *sql.DB, kind, root, title string, year, tmdbID int, anyLibrary bool) string {
 	if tmdbID > 0 && db != nil {
-		if f := libraryFolder(ctx, db, kind, tmdbID); f != "" {
+		if f := libraryFolder(ctx, db, kind, tmdbID); f != "" && (anyLibrary || within(f, root)) {
 			return f
 		}
 	}
@@ -222,6 +228,12 @@ func FindFolder(ctx context.Context, db *sql.DB, kind, root, title string, year,
 		return filepath.Join(root, loose)
 	}
 	return ""
+}
+
+// within reports whether path is root or inside it.
+func within(path, root string) bool {
+	path, root = filepath.Clean(path), filepath.Clean(root)
+	return path == root || strings.HasPrefix(path, root+string(filepath.Separator))
 }
 
 // libraryFolder is the folder the library keeps a film or show in, found by its TMDB id.

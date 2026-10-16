@@ -3204,6 +3204,7 @@ paths:
       summary: "Save a film into the library (admin only; Xtream Codes sources). Queued, downloaded, converted per Settings → vodSave, verified, moved into vodSave.moviesFolder and scanned. A film already queued or saved isn't queued again. One the library already has (VodMovieDetail.library) is refused with 409: in_library when the library's copy is as good or better, upgrade_available when this copy is better and upgrade wasn't set. With upgrade, a better copy replaces the library's: saved into the same folder, the old file(s) moved to the media trash, the item (and its watch history) kept."
       parameters:
         - { name: upgrade, in: query, description: "Replace the library's copy when this one is better (VodLibraryMatch.verdict better).", schema: { type: boolean, default: false } }
+        - { name: destination, in: query, description: "A save folder from vodSave.destinations (its id); omitted = the default movies folder. Films use destinations of kind movies or both. A wrong kind or an unknown id is 400. An upgrade always replaces the library's copy in its current folder, whatever the destination.", schema: { type: string } }
       responses:
         "200":
           description: What was queued.
@@ -3226,6 +3227,7 @@ paths:
       summary: "Save one episode into the library (admin only), into vodSave.showsFolder: {Show (Year)}/Season N/{Show} - SxxEyy - {Title} WEBDL-1080p.ext. Like a film: 409 in_library or upgrade_available when the library has it; upgrade replaces the library's copy when this one is better."
       parameters:
         - { name: upgrade, in: query, description: "Replace the library's copy when this one is better.", schema: { type: boolean, default: false } }
+        - { name: destination, in: query, description: "A save folder from vodSave.destinations (its id); omitted = the default shows folder. Episodes use destinations of kind shows or both. A wrong kind or an unknown id is 400. An upgrade always replaces the library's copy in its current folder, whatever the destination.", schema: { type: string } }
       responses:
         "200":
           description: What was queued.
@@ -3249,6 +3251,7 @@ paths:
       summary: "Save a whole series, or one season, into the library (admin only). The episodes are fetched from the source first when they haven't been; ones already queued or saved are left out. Only episodes the library doesn't have are queued, plus (includeUpgrades) those better than the library's copies, which they replace; the rest count as skipped."
       parameters:
         - { name: includeUpgrades, in: query, description: "Also queue episodes better than the library's copies, replacing them.", schema: { type: boolean, default: false } }
+        - { name: destination, in: query, description: "A save folder from vodSave.destinations (its id); omitted = the default shows folder. Seasons and shows use destinations of kind shows or both. A wrong kind or an unknown id is 400. An upgrade always replaces the library's copy in its current folder, whatever the destination.", schema: { type: string } }
       responses:
         "200":
           description: What was queued.
@@ -5327,7 +5330,12 @@ components:
             tmdbId: { type: integer }
             imdbId: { type: string }
             matched: { type: boolean, description: The details are TMDB's. }
-            canSave: { type: boolean, description: "The caller (an admin) can save it into the library: an Xtream Codes film with a movies folder set." }
+            canSave: { type: boolean, description: "The caller (an admin) can save it into the library: an Xtream Codes film with a movies folder or a movies save folder (saveDestinations) set." }
+            saveDefault: { type: boolean, description: "Admins: saving without a destination works (vodSave.moviesFolder is set)." }
+            saveDestinations:
+              type: array
+              description: "Admins: the extra save folders a film can go to (vodSave.destinations of kind movies or both)."
+              items: { $ref: "#/components/schemas/VodSaveDestinationRef" }
             save: { $ref: "#/components/schemas/VodSaveState" }
             library: { $ref: "#/components/schemas/VodLibraryMatch" }
 
@@ -5399,7 +5407,12 @@ components:
               description: Every episode in viewing order (seasons in turn, specials last); filter by season for a season's list.
               items: { $ref: "#/components/schemas/VodEpisode" }
             episodesError: { type: string, description: "The source didn't give the episodes (and none were kept from before)." }
-            canSave: { type: boolean, description: "The caller (an admin) can save its episodes into the library (shows folder set). Each episode's save is in episodes[].save." }
+            canSave: { type: boolean, description: "The caller (an admin) can save its episodes into the library (shows folder or a shows save folder set). Each episode's save is in episodes[].save." }
+            saveDefault: { type: boolean, description: "Admins: saving without a destination works (vodSave.showsFolder is set)." }
+            saveDestinations:
+              type: array
+              description: "Admins: the extra save folders episodes can go to (vodSave.destinations of kind shows or both)."
+              items: { $ref: "#/components/schemas/VodSaveDestinationRef" }
             library: { $ref: "#/components/schemas/VodLibraryRollup" }
 
     VodSeason:
@@ -5489,6 +5502,28 @@ components:
         pauseWhileWatching: { type: boolean, description: "Pause saves while someone watches (see pauseScope), resuming 60 s after. Default on." }
         pauseScope: { type: string, enum: [source, any], description: "source: something from the same source, or Live TV from the same host (Dispatcharr). any: any playback on the server." }
         retryFailed: { type: boolean, description: "Queue failed saves again every few hours. Default on." }
+        destinations:
+          type: array
+          description: "More save folders besides moviesFolder and showsFolder (e.g. Anime), offered as \"Save to {name}\". Sending the list replaces it; an item without an id is new."
+          items: { $ref: "#/components/schemas/VodSaveDestination" }
+
+    VodSaveDestination:
+      type: object
+      description: "A save folder besides the default Movies and Shows ones (admins only)."
+      required: [name, folder, kind]
+      properties:
+        id: { type: string, description: "Given by the server; send it back to keep the destination." }
+        name: { type: string, description: "Shown in buttons (\"Save to Anime\"); unique, ignoring case." }
+        folder: { type: string, description: "As the server sees it; must exist and be writable." }
+        kind: { type: string, enum: [movies, shows, both], description: "What can be saved there: films, episodes, or both." }
+        inLibrary: { type: boolean, readOnly: true, description: "A library includes the folder (saved titles are scanned into it). When false, saved titles won't appear until the folder is added to a library." }
+
+    VodSaveDestinationRef:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
 
     VodSaveState:
       type: object
@@ -5538,6 +5573,9 @@ components:
         finishedAt: { type: string, format: date-time }
         upgrade: { type: boolean, description: "It replaces the library's copy (moved to the media trash once this one is verified)." }
         replacedPath: { type: string, description: "An upgrade, once done: where the library's copy it replaced was (shown as Upgraded)." }
+        destinationName: { type: string, description: "The save folder chosen (vodSave.destinations' name, e.g. Anime); absent for the default folder and for upgrades (which replace the library's copy in place)." }
+        destinationFolder: { type: string, description: The chosen save folder's path. }
+        noLibrary: { type: boolean, description: "No library includes the folder it's saved into, so it won't appear in Marquee until that folder is added to a library." }
 
     VodSaveQueue:
       type: object
