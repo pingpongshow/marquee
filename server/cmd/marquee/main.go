@@ -442,7 +442,7 @@ func run() error {
 		},
 		Activity: func(ctx context.Context) []vodsave.Playing {
 			var out []vodsave.Playing
-			for _, src := range vodSvc.WatchingSources(ctx, 2*time.Minute) {
+			for _, src := range vodSvc.WatchingSources(ctx, time.Minute) {
 				out = append(out, vodsave.Playing{Kind: "vod", SourceID: src, Host: vodSvc.SourceHost(src)})
 			}
 			for _, ls := range live.Sessions.List() {

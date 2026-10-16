@@ -5553,7 +5553,7 @@ components:
         concurrentPerSource: { type: integer, minimum: 1, maximum: 5, description: Saves at once per source. Default 1. }
         scanAfterSave: { type: boolean, description: Scan the library whose folder holds a saved file. Default on. }
         skipExisting: { type: boolean, description: "Skip a title whose file is already in its folder. Default on. (A title the library already has is never saved again, unless as an upgrade: see VodLibraryMatch.)" }
-        pauseWhileWatching: { type: boolean, description: "Pause saves while someone watches (see pauseScope), resuming 60 s after. Default on." }
+        pauseWhileWatching: { type: boolean, description: "Pause saves while someone watches (see pauseScope), resuming 15 s after. Default on." }
         pauseScope: { type: string, enum: [source, any], description: "source: something from the same source, or Live TV from the same host (Dispatcharr). any: any playback on the server." }
         retryFailed: { type: boolean, description: "Queue failed saves again every few hours. Default on." }
         destinations:

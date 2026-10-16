@@ -100,7 +100,7 @@ type Service struct {
 	// Timings; zero values are the defaults.
 	Tick             time.Duration   // how often the queue is looked at (2 s)
 	Backoff          []time.Duration // waits after network failures (1, 3, 8, 18 min: 5 tries in ~30 min)
-	Grace            time.Duration   // saves resume this long after watching stops (60 s)
+	Grace            time.Duration   // saves resume this long after watching stops (15 s)
 	SourceDownWait   time.Duration   // first wait for a source that's down (1 min, doubling to 30)
 	RetryFailedEvery time.Duration   // failed saves are queued again this often (4 h)
 	ScanEvery        time.Duration   // while a library keeps getting files, scans at most this often (15 min)
