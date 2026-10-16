@@ -156,7 +156,8 @@ struct PlayerView: View {
                                 countdownPaused = false
                             }
                         }
-                        UpNextCard(next: next, seconds: countdown, paused: countdownPaused, play: playNext, cancel: { self.countdown = nil; close() })
+                        UpNextCard(title: next._type == .episode ? "\(next.grandparentTitle ?? "") · \(next.subtitle) · \(next.title)" : next.title,
+                                   seconds: countdown, paused: countdownPaused, play: playNext, cancel: { self.countdown = nil; close() })
                     }
                     .padding(.trailing, 40).padding(.bottom, 60)
                 }
@@ -385,8 +386,9 @@ struct PlayerView: View {
     }
 }
 
-private struct UpNextCard: View {
-    let next: Item
+/// The countdown to the next episode at the end of one (library and on-demand shows).
+struct UpNextCard: View {
+    let title: String
     let seconds: Int
     /// Waiting while the person answers the rating request.
     var paused = false
@@ -395,14 +397,14 @@ private struct UpNextCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(paused ? "Up next" : "Up next in \(seconds)s").font(.caption).foregroundStyle(.secondary)
-            Text(next._type == .episode ? "\(next.grandparentTitle ?? "") · \(next.subtitle) · \(next.title)" : next.title).font(.headline).lineLimit(2)
+            Text(title).font(.headline).lineLimit(2)
             HStack {
                 Button("Play now", action: play).buttonStyle(.borderedProminent)
                 Button("Cancel", action: cancel).buttonStyle(.bordered)
             }
         }
         .padding(16)
-        .frame(maxWidth: 380, alignment: .leading)
+        .frame(maxWidth: isTV ? 620 : 380, alignment: .leading)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
     }
 }

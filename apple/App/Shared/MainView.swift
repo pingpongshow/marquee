@@ -16,8 +16,10 @@ struct MainView: View {
     @State private var linkedItem: LinkedItem?
     @State private var canDiscover = false
     @State private var hasLiveTV = false
-    /// Movies on demand are on and usable (LIVE-6): a VOD entry right after Live TV.
-    @State private var hasVod = false
+    /// Films and shows on demand are on and usable (LIVE-6): VOD Movies and VOD Shows entries
+    /// right after Live TV, each while it has something.
+    @State private var hasVodMovies = false
+    @State private var hasVodShows = false
     /// Why the libraries couldn't be loaded (shown with a retry instead of an empty list).
     @State private var librariesError: String?
 
@@ -28,20 +30,22 @@ struct MainView: View {
                 // iPhone: one Libraries tab so the tab bar doesn't overflow into "More". Live TV
                 // is listed there with the libraries.
                 Tab("Libraries", systemImage: "square.stack") {
-                    stack { LibrariesList(libraries: libraries, liveTV: hasLiveTV, vod: hasVod, error: librariesError, icon: icon, reload: { await loadAll() }) }
+                    stack { LibrariesList(libraries: libraries, liveTV: hasLiveTV, vodMovies: hasVodMovies, vodShows: hasVodShows, error: librariesError, icon: icon, reload: { await loadAll() }) }
                 }
             } else {
                 // iPad and Apple TV sidebar: Live TV is one of the libraries, after
                 // the video ones.
                 TabSection("Libraries") {
-                    ForEach(LibraryEntry.list(libraries, liveTV: hasLiveTV, vod: hasVod)) { entry in
+                    ForEach(LibraryEntry.list(libraries, liveTV: hasLiveTV, vodMovies: hasVodMovies, vodShows: hasVodShows)) { entry in
                         switch entry {
                         case .library(let lib):
                             Tab(lib.name, systemImage: icon(lib._type)) { stack { LibraryView(libraryID: lib.id) } }
                         case .liveTV:
                             Tab("Live TV", systemImage: "antenna.radiowaves.left.and.right") { stack { LiveTVView() } }
-                        case .vod:
-                            Tab("VOD", systemImage: "film.stack") { stack { VodPage() } }
+                        case .vodMovies:
+                            Tab("VOD Movies", systemImage: "film.stack") { stack { VodPage() } }
+                        case .vodShows:
+                            Tab("VOD Shows", systemImage: "play.tv") { stack { VodPage(shows: true) } }
                         }
                     }
                     if libraries.isEmpty, librariesError != nil {
@@ -208,9 +212,13 @@ struct MainView: View {
         }
         // A failed check keeps what was known (a tab doesn't vanish on a blip).
         if let s = await requests { canDiscover = s.enabled && s.canRequest }
-        // Live TV is listed when its channels are usable; VOD (LIVE-6) separately, after it.
+        // Live TV is listed when its channels are usable; VOD Movies and VOD Shows (LIVE-6)
+        // separately, after it, each while it has something.
         let l = await live, v = await vod
-        if let v { hasVod = v.enabled }
+        if let v {
+            hasVodMovies = v.enabled && v.movies > 0
+            hasVodShows = v.enabled && v.series > 0
+        }
         if let l { hasLiveTV = l.enabled }
     }
 
@@ -243,31 +251,38 @@ extension EnvironmentValues {
 }
 
 /// A row of the Libraries list (or a sidebar / top bar tab): a library, or Live TV, which is
-/// listed after the video libraries when it's set up, with VOD (movies on demand, LIVE-6)
-/// right after it when those are on.
+/// listed after the video libraries when it's set up, with VOD Movies and VOD Shows (films and
+/// shows on demand, LIVE-6) right after it when they have something.
 enum LibraryEntry: Identifiable {
     case library(Library)
     case liveTV
-    case vod
+    case vodMovies
+    case vodShows
 
     var id: String {
         switch self {
         case .library(let l): "library-\(l.id)"
         case .liveTV: "liveTV"
-        case .vod: "vod"
+        case .vodMovies: "vod"
+        case .vodShows: "vodShows"
         }
     }
 
-    static func list(_ libraries: [Library], liveTV: Bool, vod: Bool = false) -> [LibraryEntry] {
+    static func list(_ libraries: [Library], liveTV: Bool, vodMovies: Bool = false, vodShows: Bool = false) -> [LibraryEntry] {
         var out = libraries.map(LibraryEntry.library)
         let video: Set<Schemas.LibraryType> = [.movies, .shows, .anime, .videos]
         var at = (libraries.lastIndex { video.contains($0._type) }).map { $0 + 1 } ?? libraries.count
-        // Live TV after the video libraries when it has channels; VOD (its own page) after it.
+        // Live TV after the video libraries when it has channels; VOD Movies and VOD Shows
+        // (their own pages) after it.
         if liveTV {
             out.insert(.liveTV, at: at)
             at += 1
         }
-        if vod { out.insert(.vod, at: at) }
+        if vodMovies {
+            out.insert(.vodMovies, at: at)
+            at += 1
+        }
+        if vodShows { out.insert(.vodShows, at: at) }
         return out
     }
 }
@@ -278,8 +293,9 @@ struct LibrariesList: View {
     let libraries: [Library]
     /// Live TV is set up: listed with the libraries.
     var liveTV = false
-    /// Movies on demand are on: VOD is listed right after Live TV.
-    var vod = false
+    /// Films / shows on demand are on: VOD Movies and VOD Shows are listed right after Live TV.
+    var vodMovies = false
+    var vodShows = false
     var error: String?
     let icon: (Schemas.LibraryType) -> String
     var reload: () async -> Void = {}
@@ -292,7 +308,7 @@ struct LibrariesList: View {
                         .accessibilityIdentifier("librariesRetry")
                 }
             }
-            ForEach(LibraryEntry.list(libraries, liveTV: liveTV, vod: vod)) { entry in
+            ForEach(LibraryEntry.list(libraries, liveTV: liveTV, vodMovies: vodMovies, vodShows: vodShows)) { entry in
                 switch entry {
                 case .library(let lib):
                     NavigationLink(value: Route.library(lib.id)) {
@@ -317,11 +333,11 @@ struct LibrariesList: View {
                         }
                     }
                     .accessibilityIdentifier("libraries.liveTV")
-                case .vod:
+                case .vodMovies:
                     NavigationLink(value: Route.liveTVMovies) {
                         Label {
                             VStack(alignment: .leading) {
-                                Text("VOD")
+                                Text("VOD Movies")
                                 Text("Movies on demand").font(.caption).foregroundStyle(.secondary)
                             }
                         } icon: {
@@ -329,6 +345,18 @@ struct LibrariesList: View {
                         }
                     }
                     .accessibilityIdentifier("libraries.vod")
+                case .vodShows:
+                    NavigationLink(value: Route.vodShows) {
+                        Label {
+                            VStack(alignment: .leading) {
+                                Text("VOD Shows")
+                                Text("Shows on demand").font(.caption).foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "play.tv").foregroundStyle(Color.marqueeGold)
+                        }
+                    }
+                    .accessibilityIdentifier("libraries.vodShows")
                 }
             }
             #if os(iOS)

@@ -2,69 +2,141 @@ import AVKit
 import MarqueeKit
 import SwiftUI
 
-// Movies on demand ("VOD" in the UI) under Live TV (LIVE-6): the VOD tab (categories, search, sort, Continue
-// Watching and a poster grid), a film's page, and full-screen playback in AVKit's player.
+// Movies and shows on demand under Live TV (LIVE-6): the VOD Movies and VOD Shows pages
+// (categories, search, sort, filters, Continue Watching and a poster grid), a film's page, and
+// full-screen playback in AVKit's player (films and episodes, with Up Next between episodes).
+// A show's page is in VodShowsViews.swift.
 
-/// VOD on its own page (LIVE-6): the VOD entry after Live TV opens it.
+/// VOD Movies and VOD Shows (LIVE-6), each its own page after Live TV: categories, search,
+/// sort, filters, Continue Watching and a poster grid.
 struct VodPage: View {
-    @State private var refresh = 0
+    /// Shows (series) rather than films.
+    var shows = false
 
     var body: some View {
-        ScrollView {
-            VodBrowseView(refresh: refresh).padding(.vertical)
-        }
-        .refreshable { refresh += 1 }
-        // (No title on the TV: MainView hides it there, as the sidebar names the page.)
-        .navigationTitle("VOD")
+        VodBrowseView(shows: shows)
+            // (No title on the TV: MainView hides it there, as the sidebar names the page.)
+            .navigationTitle(shows ? "VOD Shows" : "VOD Movies")
     }
 }
 
 struct VodBrowseView: View {
     @Environment(AppSession.self) private var app
-    /// Bumped by the page's pull-to-refresh.
-    var refresh = 0
-    @AppStorage("marquee.vod.category") private var category = ""
-    @AppStorage("marquee.vod.sort") private var sortRaw = VodSort.title.rawValue
+    let shows: Bool
+    @AppStorage private var category: String
+    @AppStorage private var sortRaw: String
+    /// The page's filters (VodFilters as JSON), remembered per page.
+    @AppStorage private var filtersRaw: String
+    @State private var refresh = 0
     @State private var text = ""
     @State private var query = ""
     @State private var categories: [VodCategory] = []
+    @State private var genres: [VodCategory] = []
     @State private var resume: [VodMovie] = []
+    @State private var resumeShows: [VodSeries] = []
     @State private var movies: [VodMovie] = []
+    @State private var series: [VodSeries] = []
     @State private var total: Int?
     @State private var loading = false
     @State private var error: String?
     @State private var status: VodStatus?
     @State private var refreshing = false
 
+    init(shows: Bool) {
+        self.shows = shows
+        let prefix = shows ? "marquee.vod.shows." : "marquee.vod."
+        _category = AppStorage(wrappedValue: "", prefix + "category")
+        _sortRaw = AppStorage(wrappedValue: VodSort.title.rawValue, prefix + "sort")
+        _filtersRaw = AppStorage(wrappedValue: "", prefix + "filters")
+    }
+
     private var sort: VodSort { VodSort(rawValue: sortRaw) ?? .title }
+    private var filters: VodFilters { VodFilters(stored: filtersRaw) }
     private var isAdmin: Bool { app.me?.isAdmin == true }
+    private var noun: (one: String, many: String) { shows ? ("show", "shows") : ("movie", "movies") }
+    private var count: Int { shows ? series.count : movies.count }
+    /// The sources with something on this page (the source filter shows when there are two or more).
+    private var sources: [VodStatus.SourcesPayloadPayload] {
+        (status?.sources ?? []).filter { shows ? $0.series > 0 : $0.movies > 0 }
+    }
     private static let sorts: [(VodSort, String)] = [(.title, "Title"), (.added, "Recently Added"), (.year, "Release Year"), (.rating, "Rating")]
 
     var body: some View {
+        #if os(tvOS)
+        // As in the libraries: the filter menu stays pinned at the top right while the grid
+        // scrolls (Right from the grid's edge reaches it).
+        scroll
+            .safeAreaInset(edge: .trailing, alignment: .top, spacing: 0) {
+                filterMenu
+                    .labelStyle(.iconOnly)
+                    .padding(.top, 30)
+                    .padding(.trailing, 50)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .focusSection()
+            }
+        #else
+        scroll
+            .refreshable { refresh += 1 }
+            .toolbar { ToolbarItem { filterMenu } }
+        #endif
+    }
+
+    private var scroll: some View {
+        ScrollView {
+            content.padding(.vertical)
+        }
+        .task(id: "\(category)|\(query)|\(sortRaw)|\(filtersRaw)|\(refresh)") { await reload() }
+        .task(id: text) {
+            // Search as they type, once they pause.
+            try? await Task.sleep(for: .milliseconds(300))
+            if !Task.isCancelled { query = text.trimmingCharacters(in: .whitespaces) }
+        }
+        // Back from a page or its player: resume points or watched state may have changed.
+        .onAppear { Task { await reloadResume() } }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 20) {
             controls.padding(.horizontal, sidePadding)
-            if category.isEmpty, query.isEmpty, !resume.isEmpty {
-                ShelfRow(title: "Continue Watching") {
-                    ForEach(resume, id: \.id) { m in VodTile(movie: m, width: tileWidth) }
+            if filters.isActive { activeFilters.padding(.horizontal, sidePadding) }
+            if category.isEmpty, query.isEmpty, !filters.isActive {
+                if shows, !resumeShows.isEmpty {
+                    ShelfRow(title: "Continue Watching") {
+                        ForEach(resumeShows, id: \.id) { s in VodSeriesTile(series: s, width: tileWidth) }
+                    }
+                    .accessibilityIdentifier("vod.continue")
+                } else if !shows, !resume.isEmpty {
+                    ShelfRow(title: "Continue Watching") {
+                        ForEach(resume, id: \.id) { m in VodTile(movie: m, width: tileWidth) }
+                    }
+                    .accessibilityIdentifier("vod.continue")
                 }
-                .accessibilityIdentifier("vod.continue")
             }
             VStack(alignment: .leading, spacing: 12) {
-                if (!category.isEmpty || !query.isEmpty), let total {
-                    Text("\(total) \(total == 1 ? "movie" : "movies")").font(.callout).foregroundStyle(.secondary)
+                if (!category.isEmpty || !query.isEmpty || filters.isActive), let total {
+                    Text("\(total) \(total == 1 ? noun.one : noun.many)").font(.callout).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("vod.total")
                 }
                 if let error { ErrorBanner(message: error) }
-                if movies.isEmpty {
+                if count == 0 {
                     if loading { ProgressView().frame(maxWidth: .infinity) }
                     else if error == nil && total != nil {
-                        Text(query.isEmpty ? "No movies here yet." : "No movies match “\(query)”.").foregroundStyle(.secondary)
+                        Text(!query.isEmpty ? "No \(noun.many) match “\(query)”." : filters.isActive ? "Nothing matches these filters." : "No \(noun.many) here yet.")
+                            .foregroundStyle(.secondary)
                     }
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: tileWidth, maximum: tileWidth * 1.4), spacing: gridSpacing, alignment: .top)],
                               alignment: .leading, spacing: gridSpacing) {
-                        ForEach(movies, id: \.id) { m in
-                            VodTile(movie: m, width: tileWidth)
-                                .onAppear { if m.id == movies.last?.id { Task { await loadMore() } } }
+                        if shows {
+                            ForEach(series, id: \.id) { s in
+                                VodSeriesTile(series: s, width: tileWidth)
+                                    .onAppear { if s.id == series.last?.id { Task { await loadMore() } } }
+                            }
+                        } else {
+                            ForEach(movies, id: \.id) { m in
+                                VodTile(movie: m, width: tileWidth)
+                                    .onAppear { if m.id == movies.last?.id { Task { await loadMore() } } }
+                            }
                         }
                     }
                     if loading { ProgressView().frame(maxWidth: .infinity) }
@@ -73,28 +145,20 @@ struct VodBrowseView: View {
             .padding(.horizontal, sidePadding)
             if isAdmin, let status { adminStatus(status).padding(.horizontal, sidePadding) }
         }
-        .task(id: "\(category)|\(query)|\(sortRaw)|\(refresh)") { await reload() }
-        .task(id: text) {
-            // Search as they type, once they pause.
-            try? await Task.sleep(for: .milliseconds(300))
-            if !Task.isCancelled { query = text.trimmingCharacters(in: .whitespaces) }
-        }
-        // Back from a film or its player: its resume point or watched state may have changed.
-        .onAppear { Task { await reloadResume() } }
     }
 
     private var controls: some View {
         HStack(spacing: 12) {
             Menu {
                 Picker("Category", selection: $category) {
-                    Text("All Movies").tag("")
+                    Text(shows ? "All Shows" : "All Movies").tag("")
                     ForEach(categories, id: \.name) { c in Text("\(c.name) (\(c.count))").tag(c.name) }
                 }
             } label: {
-                Label(category.isEmpty ? "All Movies" : category, systemImage: "line.3.horizontal.decrease.circle").lineLimit(1)
+                Label(category.isEmpty ? (shows ? "All Shows" : "All Movies") : category, systemImage: "square.grid.2x2").lineLimit(1)
             }
             .accessibilityIdentifier("vod.category")
-            TextField("Search movies", text: $text)
+            TextField(shows ? "Search shows" : "Search movies", text: $text)
                 #if os(iOS)
                 .textFieldStyle(.roundedBorder)
                 .autocorrectionDisabled()
@@ -122,11 +186,112 @@ struct VodBrowseView: View {
         }
     }
 
+    // MARK: Filters
+
+    /// One of the filters, read from and written back to the stored ones.
+    private func binding<T>(_ path: WritableKeyPath<VodFilters, T>) -> Binding<T> {
+        Binding(get: { filters[keyPath: path] },
+                set: { v in
+                    var f = filters
+                    f[keyPath: path] = v
+                    filtersRaw = f.isActive ? f.stored : ""
+                })
+    }
+
+    /// Watched state, genre, decade, minimum rating and source, like the library's filter menu.
+    private var filterMenu: some View {
+        Menu {
+            Picker("Watched", selection: binding(\.watched)) {
+                Text("Watched or not").tag(VodFilters.Watched?.none)
+                ForEach(VodFilters.Watched.allCases, id: \.self) { w in
+                    Text(VodFilters.label(w, shows: shows)).tag(VodFilters.Watched?.some(w))
+                }
+            }
+            .pickerStyle(.menu)
+            if !genres.isEmpty {
+                Picker("Genre", selection: binding(\.genre)) {
+                    Text("Any genre").tag(String?.none)
+                    ForEach(genres, id: \.name) { g in Text("\(g.name) (\(g.count))").tag(String?.some(g.name)) }
+                }
+                .pickerStyle(.menu)
+            }
+            Picker("Decade", selection: binding(\.decade)) {
+                Text("Any decade").tag(Int?.none)
+                ForEach(VodFilters.decades, id: \.self) { d in Text("\(String(d))s").tag(Int?.some(d)) }
+            }
+            .pickerStyle(.menu)
+            Picker("Rating", selection: binding(\.minRating)) {
+                Text("Any rating").tag(Int?.none)
+                ForEach(VodFilters.ratings, id: \.self) { r in Text("Rated \(r)+").tag(Int?.some(r)) }
+            }
+            .pickerStyle(.menu)
+            if sources.count > 1 {
+                Picker("Source", selection: binding(\.sourceId)) {
+                    Text("All sources").tag(String?.none)
+                    ForEach(sources, id: \.id) { s in Text(s.name).tag(String?.some(s.id)) }
+                }
+                .pickerStyle(.menu)
+            }
+            if filters.isActive {
+                Button("Clear Filters", systemImage: "xmark.circle", role: .destructive) { filtersRaw = "" }
+            }
+        } label: {
+            Label("Filter", systemImage: filters.isActive ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+        }
+        .accessibilityLabel("Filter")
+        .accessibilityValue(filters.isActive ? "On" : "Off")
+        .accessibilityIdentifier("vod.filter")
+    }
+
+    /// The filters in use, each removable, and Clear All.
+    private var activeFilters: some View {
+        let f = filters
+        var chips: [(String, () -> Void)] = []
+        if let w = f.watched { chips.append((VodFilters.label(w, shows: shows), { binding(\.watched).wrappedValue = nil })) }
+        if let g = f.genre { chips.append((g, { binding(\.genre).wrappedValue = nil })) }
+        if let d = f.decade { chips.append(("\(String(d))s", { binding(\.decade).wrappedValue = nil })) }
+        if let r = f.minRating { chips.append(("Rated \(r)+", { binding(\.minRating).wrappedValue = nil })) }
+        if let s = f.sourceId { chips.append((sources.first { $0.id == s }?.name ?? "Source", { binding(\.sourceId).wrappedValue = nil })) }
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(Array(chips.enumerated()), id: \.offset) { _, chip in
+                    Button(action: chip.1) {
+                        HStack(spacing: 6) {
+                            Text(chip.0).lineLimit(1)
+                            Image(systemName: "xmark").font(.caption2.weight(.bold))
+                        }
+                        .font(isTV ? .callout : .footnote)
+                    }
+                    #if os(iOS)
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.capsule)
+                    .tint(Color.marqueeGold)
+                    #endif
+                    .accessibilityLabel("Remove filter \(chip.0)")
+                    .accessibilityIdentifier("vod.filterChip")
+                }
+                Button("Clear All") { filtersRaw = "" }
+                    #if os(iOS)
+                    .buttonStyle(.borderless)
+                    .font(.footnote)
+                    #endif
+                    .accessibilityIdentifier("vod.clearFilters")
+            }
+            #if os(tvOS)
+            .padding(.vertical, 12)
+            #endif
+        }
+        #if os(tvOS)
+        .scrollClipDisabled()
+        #endif
+    }
+
     /// For admins: what the sources loaded, and a way to load them again now.
     private func adminStatus(_ s: VodStatus) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("\(s.movies) movies from \(s.sources.count) \(s.sources.count == 1 ? "source" : "sources")\(s.matching ? " · matching details…" : "")")
+                let n = shows ? s.series : s.movies
+                Text("\(n) \(n == 1 ? noun.one : noun.many) from \(sources.count) \(sources.count == 1 ? "source" : "sources")\(s.matching ? " · matching details…" : "")")
                     .font(.footnote).foregroundStyle(.secondary)
                 Spacer()
                 Button(refreshing ? "Refreshing…" : "Refresh Now") {
@@ -148,16 +313,17 @@ struct VodBrowseView: View {
         .padding(.top, 8)
     }
 
+    // MARK: Loading
+
     private func reload() async {
         loading = true
         error = nil
-        async let cats = try? app.vodCategories()
-        async let st = isAdmin ? try? app.vodStatus() : nil
+        async let cats = try? (shows ? app.vodSeriesCategories() : app.vodCategories())
+        async let gens = try? (shows ? app.vodSeriesGenres() : app.vodGenres())
+        async let st = try? app.vodStatus()
         await reloadResume()
         do {
-            let page = try await app.vodMovies(category: category.isEmpty ? nil : category, query: query.isEmpty ? nil : query, sort: sort)
-            movies = page.movies
-            total = page.total
+            try await fetch(offset: 0, replace: true)
         } catch is CancellationError {
         } catch {
             if !Task.isCancelled { self.error = error.localizedDescription }
@@ -167,24 +333,48 @@ struct VodBrowseView: View {
             // A category that went away (the source changed): back to all.
             if !category.isEmpty, !c.contains(where: { $0.name == category }) { category = "" }
         }
+        if let g = await gens { genres = g }
         if let s = await st { status = s }
         loading = false
     }
 
+    private func fetch(offset: Int, replace: Bool) async throws {
+        let cat = category.isEmpty ? nil : category, q = query.isEmpty ? nil : query
+        if shows {
+            let page = try await app.vodSeriesList(category: cat, query: q, sort: sort, filters: filters, offset: offset)
+            if replace {
+                series = page.series
+            } else {
+                let have = Set(series.map(\.id))
+                series += page.series.filter { !have.contains($0.id) }
+            }
+            total = page.total
+        } else {
+            let page = try await app.vodMovies(category: cat, query: q, sort: sort, filters: filters, offset: offset)
+            if replace {
+                movies = page.movies
+            } else {
+                let have = Set(movies.map(\.id))
+                movies += page.movies.filter { !have.contains($0.id) }
+            }
+            total = page.total
+        }
+    }
+
     private func reloadResume() async {
-        if let r = try? await app.vodContinueWatching() { resume = r }
+        if shows {
+            if let r = try? await app.vodSeriesContinueWatching() { resumeShows = r }
+        } else {
+            if let r = try? await app.vodContinueWatching() { resume = r }
+        }
     }
 
     /// The next page, as the end of the grid comes into view.
     private func loadMore() async {
-        guard !loading, let total, movies.count < total else { return }
+        guard !loading, let total, count < total else { return }
         loading = true
         defer { loading = false }
-        if let page = try? await app.vodMovies(category: category.isEmpty ? nil : category, query: query.isEmpty ? nil : query, sort: sort, offset: movies.count) {
-            let have = Set(movies.map(\.id))
-            movies += page.movies.filter { !have.contains($0.id) }
-            self.total = page.total
-        }
+        try? await fetch(offset: count, replace: false)
     }
 
     #if os(tvOS)
@@ -237,27 +427,44 @@ struct VodTile: View {
 
 /// A film's poster from the server (no token needed), or a coloured placeholder with its title.
 struct VodPoster: View {
-    @Environment(AppSession.self) private var app
     let movie: VodMovie
     var width: CGFloat = 130
 
     var body: some View {
+        VodArt(title: movie.title, path: movie.posterUrl, watched: movie.watched, progress: movie.progress, width: width)
+    }
+}
+
+/// VOD artwork (a poster, or a 16:9 still when `aspect` says so) with a watched tick and a
+/// progress bar, over a coloured placeholder with the title until it loads.
+struct VodArt: View {
+    @Environment(AppSession.self) private var app
+    let title: String
+    let path: String?
+    var watched = false
+    /// 0…1, shown as a bar along the bottom.
+    var progress: Double?
+    var width: CGFloat = 130
+    /// Height over width (1.5 for posters).
+    var aspect: CGFloat = 1.5
+
+    var body: some View {
         ZStack(alignment: .bottomLeading) {
             placeholder
-            CachedImage(url: app.vodImageURL(movie.posterUrl)) { phase in
+            CachedImage(url: app.vodImageURL(path)) { phase in
                 if let image = phase.image { image.resizable().scaledToFill() }
             }
         }
-        .frame(width: width, height: width * 1.5)
+        .frame(width: width, height: width * aspect)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(alignment: .topTrailing) {
-            if movie.watched {
+            if watched {
                 Image(systemName: "checkmark.circle.fill").symbolRenderingMode(.palette).foregroundStyle(.black, Color.marqueeGold).padding(6)
                     .accessibilityLabel("Watched")
             }
         }
         .overlay(alignment: .bottom) {
-            if let p = movie.progress {
+            if let p = progress {
                 GeometryReader { g in
                     ZStack(alignment: .leading) {
                         Rectangle().fill(.black.opacity(0.6))
@@ -265,17 +472,18 @@ struct VodPoster: View {
                     }
                 }
                 .frame(height: 4)
+                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 8, bottomTrailingRadius: 8))
             }
         }
     }
 
     private var placeholder: some View {
-        let hash = movie.title.unicodeScalars.reduce(UInt32(5381)) { ($0 &<< 5) &+ $0 &+ $1.value }
+        let hash = title.unicodeScalars.reduce(UInt32(5381)) { ($0 &<< 5) &+ $0 &+ $1.value }
         let hue = Double(hash % 360) / 360
         return LinearGradient(colors: [Color(hue: hue, saturation: 0.35, brightness: 0.3), Color(hue: hue, saturation: 0.3, brightness: 0.12)],
                               startPoint: .topLeading, endPoint: .bottomTrailing)
             .overlay(alignment: .bottomLeading) {
-                Text(movie.title).font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.85)).lineLimit(3).padding(8)
+                Text(title).font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.85)).lineLimit(3).padding(8)
             }
     }
 }
@@ -291,13 +499,6 @@ extension VodMovie {
         guard !watched, let pos = positionMs, pos > 0, let total = runtimeMs, total > 0 else { return nil }
         return min(1, max(0.02, Double(pos) / Double(total)))
     }
-}
-
-/// What to play: a film from a position (nil = its resume point).
-struct VodPlayTarget: Identifiable {
-    let movie: VodMovieDetail
-    let startMs: Int64?
-    var id: Int64 { movie.id }
 }
 
 /// A film's page: backdrop, poster, details, Play or Resume, Play from Start and Watched.
@@ -329,7 +530,7 @@ struct VodMovieView: View {
         #endif
         .task { await load() }
         .fullScreenCover(item: $playing, onDismiss: { Task { await load() } }) { t in
-            VodPlayerView(movie: t.movie, startMs: t.startMs)
+            VodPlayerView(target: t)
         }
     }
 
@@ -474,16 +675,71 @@ struct VodMovieView: View {
     }
 }
 
-/// Full-screen playback of a film: the source's own HLS through the server, seekable, in
-/// AVKit's player. Its own player, not the library's: no trailers, rating request, Up Next or
-/// watch together for films on demand.
+/// Something on demand to play: a film or a show's episode.
+enum VodPlayable: Hashable {
+    case movie(VodMovieDetail)
+    case episode(VodEpisode)
+
+    var key: String {
+        switch self {
+        case .movie(let m): "movie-\(m.id)"
+        case .episode(let e): "episode-\(e.id)"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .movie(let m): m.title
+        case .episode(let e): "\(e.seriesTitle) · \(e.label)"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .movie(let m): m.base.metaLine
+        case .episode(let e): [e.title, (e.runtimeMs ?? 0) >= 60_000 ? formatDuration(ms: e.runtimeMs) : ""].filter { !$0.isEmpty }.joined(separator: " · ")
+        }
+    }
+
+    var overview: String? {
+        switch self {
+        case .movie(let m): m.info.overview
+        case .episode(let e): e.overview
+        }
+    }
+
+    var isEpisode: Bool { if case .episode = self { true } else { false } }
+}
+
+/// What to play, from a position (nil = its resume point).
+struct VodPlayTarget: Identifiable {
+    let item: VodPlayable
+    let startMs: Int64?
+    var id: String { item.key }
+
+    init(movie: VodMovieDetail, startMs: Int64?) {
+        item = .movie(movie)
+        self.startMs = startMs
+    }
+
+    init(episode: VodEpisode, startMs: Int64?) {
+        item = .episode(episode)
+        self.startMs = startMs
+    }
+}
+
+/// Full-screen playback of a film or an episode: the source's HLS through the server (or its
+/// file made into HLS), seekable, in AVKit's player. Its own player, not the library's: no
+/// trailers, rating request or watch together on demand. Episodes end with Up Next: a
+/// countdown to the next one in viewing order (the server's), as library shows do.
 struct VodPlayerView: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
     @Environment(\.dismiss) private var dismiss
-    let movie: VodMovieDetail
+    /// What's playing (an episode's Up Next replaces it in place).
+    @State private var current: VodPlayable
     /// nil: from the viewer's resume point.
-    let startMs: Int64?
+    @State private var startMs: Int64?
     @State private var player = AVPlayer()
     @State private var session: String?
     @State private var error: String?
@@ -491,16 +747,33 @@ struct VodPlayerView: View {
     @State private var closing = false
     @State private var observers: [NSObjectProtocol] = []
     @State private var rateWatch: NSKeyValueObservation?
+    /// The episode after this one, fetched as it starts.
+    @State private var next: VodEpisode?
+    @State private var countdown: Int?
     #if os(iOS)
     @State private var chrome = PlayerChrome()
     #endif
 
+    init(movie: VodMovieDetail, startMs: Int64?) {
+        _current = State(initialValue: .movie(movie))
+        _startMs = State(initialValue: startMs)
+    }
+
+    init(target: VodPlayTarget) {
+        _current = State(initialValue: target.item)
+        _startMs = State(initialValue: target.startMs)
+    }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            VodPlayerController(player: player, chrome: chromeModel)
-                .ignoresSafeArea()
-                .accessibilityIdentifier("vod.player")
+            // On the TV the player's transport bar keeps focus: it goes while Up Next is up,
+            // so the remote reaches Play Now and Cancel.
+            if !(isTV && countdown != nil) {
+                VodPlayerController(player: player, chrome: chromeModel)
+                    .ignoresSafeArea()
+                    .accessibilityIdentifier("vod.player")
+            }
             if loading && error == nil { ProgressView().tint(.white) }
             VStack {
                 #if os(iOS)
@@ -514,9 +787,17 @@ struct VodPlayerView: View {
                 #endif
                 if let error { ErrorBanner(message: error).padding().frame(maxWidth: 600) }
                 Spacer()
+                if let next, let countdown {
+                    HStack {
+                        Spacer()
+                        UpNextCard(title: "\(next.label) · \(next.title)", seconds: countdown, play: playNext,
+                                   cancel: { self.countdown = nil; close() })
+                    }
+                    .padding(.trailing, 40).padding(.bottom, 60)
+                }
             }
         }
-        .task { await start() }
+        .task(id: current.key) { await start() }
         .onDisappear { finish() }
         #if os(tvOS)
         .onExitCommand { close() }
@@ -529,8 +810,8 @@ struct VodPlayerView: View {
             Button { close() } label: { PlayerBubble(systemImage: "xmark") }
                 .accessibilityLabel("Close player")
             VStack(alignment: .leading, spacing: 2) {
-                Text(movie.title).font(.headline).lineLimit(1)
-                if !movie.base.metaLine.isEmpty { Text(movie.base.metaLine).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                Text(current.title).font(.headline).lineLimit(1)
+                if !current.subtitle.isEmpty { Text(current.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
             }
             .shadow(radius: 3)
             Spacer()
@@ -550,8 +831,17 @@ struct VodPlayerView: View {
 
     private func start() async {
         music.pause() // a film takes over from the music
+        error = nil
+        loading = true
+        next = nil
         do {
-            let s = try await app.playVod(movie.id)
+            let s: (id: String, url: URL, startMs: Int64)
+            switch current {
+            case .movie(let m): s = try await app.playVod(m.id)
+            case .episode(let e):
+                s = try await app.playVodEpisode(e.id, startMs: startMs)
+                Task { next = try? await app.vodNextEpisode(e.id) }
+            }
             if Task.isCancelled || closing { await app.stopVod(s.id); return }
             session = s.id
             let item = AVPlayerItem(url: s.url)
@@ -566,7 +856,7 @@ struct VodPlayerView: View {
                     await player.seek(to: CMTime(value: from, timescale: 1000), toleranceBefore: .zero, toleranceAfter: .positiveInfinity)
                 }
             }
-            if item.status == .failed { throw MarqueeError(item.error?.localizedDescription ?? "The movie couldn't be played") }
+            if item.status == .failed { throw MarqueeError(item.error?.localizedDescription ?? "This couldn't be played") }
             player.play()
             loading = false
             // Where they are, every 10 seconds while playing.
@@ -581,13 +871,13 @@ struct VodPlayerView: View {
         }
     }
 
-    /// Reports on pause, and goes back to the film's page at the end.
+    /// Reports on pause; at the end, Up Next for an episode with one after it, else back to the page.
     private func watch(_ item: AVPlayerItem) {
         let end = NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: item, queue: .main) { _ in
-            Task { @MainActor in close() }
+            Task { @MainActor in ended() }
         }
         let failed = NotificationCenter.default.addObserver(forName: AVPlayerItem.failedToPlayToEndTimeNotification, object: item, queue: .main) { _ in
-            Task { @MainActor in error = "The movie stopped playing." }
+            Task { @MainActor in error = current.isEpisode ? "The episode stopped playing." : "The movie stopped playing." }
         }
         observers = [end, failed]
         rateWatch = player.observe(\.timeControlStatus, options: [.new]) { p, _ in
@@ -596,6 +886,32 @@ struct VodPlayerView: View {
                 if paused { await report() }
             }
         }
+    }
+
+    private func ended() {
+        guard current.isEpisode, next != nil else { close(); return }
+        endSession() // counts the episode watched and ends its session
+        startCountdown()
+    }
+
+    private func startCountdown() {
+        countdown = 10
+        Task {
+            while let c = countdown, c > 0 {
+                try? await Task.sleep(for: .seconds(1))
+                if let now = countdown { countdown = now - 1 }
+            }
+            if countdown == 0 { playNext() }
+        }
+    }
+
+    /// The next episode, in this player, from its start.
+    private func playNext() {
+        guard let next, !closing else { return }
+        countdown = nil
+        endSession()
+        startMs = 0
+        current = .episode(next)
     }
 
     private var position: Double { player.currentTime().seconds }
@@ -611,14 +927,19 @@ struct VodPlayerView: View {
     }
 
     private func close() {
+        countdown = nil
         finish()
         dismiss()
     }
 
-    /// Records where they stopped, then ends the session (the position is reported against it).
     private func finish() {
         guard !closing else { return }
         closing = true
+        endSession()
+    }
+
+    /// Records where they stopped, then ends the session (the position is reported against it).
+    private func endSession() {
         rateWatch = nil
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []
@@ -628,7 +949,7 @@ struct VodPlayerView: View {
             let d = item.duration.seconds
             return d.isFinite && d > 0 && position >= d - 1
         } ?? false
-        let pos = atEnd ? (durationMs ?? Int64(position * 1000)) : Int64(max(0, position) * 1000)
+        let pos = atEnd ? (durationMs ?? Int64(position * 1000)) : Int64(max(0, position.isFinite ? position : 0) * 1000)
         let dur = durationMs
         player.pause()
         player.replaceCurrentItem(with: nil)
@@ -642,9 +963,9 @@ struct VodPlayerView: View {
     private func metadata() -> [AVMetadataItem] {
         let title = AVMutableMetadataItem()
         title.identifier = .commonIdentifierTitle
-        title.value = movie.title as NSString
+        title.value = current.title as NSString
         var out: [AVMetadataItem] = [title]
-        if let o = movie.info.overview {
+        if let o = current.overview ?? (current.isEpisode ? current.subtitle : nil) {
             let desc = AVMutableMetadataItem()
             desc.identifier = .commonIdentifierDescription
             desc.value = o as NSString
