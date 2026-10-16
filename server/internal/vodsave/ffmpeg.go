@@ -1,18 +1,17 @@
 package vodsave
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 
+	"marquee/internal/encode"
 	"marquee/internal/playback"
 	"marquee/internal/settings"
 )
@@ -60,10 +59,10 @@ func (s *Service) probe(ctx context.Context, path string) (mediaInfo, error) {
 	defer cancel()
 	var stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, or2(s.FFprobe, "ffprobe"), "-v", "error", "-print_format", "json", "-show_format", "-show_streams", path)
-	cmd.Stderr = &limitWriter{w: &stderr, n: 4096}
+	cmd.Stderr = &encode.LimitWriter{W: &stderr, N: 4096}
 	out, err := cmd.Output()
 	if err != nil {
-		return mi, fmt.Errorf("ffprobe couldn't read it: %s", lastLine(stderr.String(), err))
+		return mi, fmt.Errorf("ffprobe couldn't read it: %s", encode.LastLine(stderr.String(), err))
 	}
 	var p probeOut
 	if err := json.Unmarshal(out, &p); err != nil {
@@ -101,18 +100,6 @@ func (s *Service) probe(ctx context.Context, path string) (mediaInfo, error) {
 var mkvSubtitles = map[string]bool{"subrip": true, "srt": true, "ass": true, "ssa": true, "webvtt": true,
 	"hdmv_pgs_subtitle": true, "dvd_subtitle": true, "dvb_subtitle": true}
 
-// crf is the constant-quality level for an encoder, codec and quality preset.
-func crf(encoder, codec, quality string) int {
-	i := map[string]int{"high": 0, "balanced": 1, "small": 2}[quality]
-	switch {
-	case encoder == "software" && codec == "h264":
-		return []int{18, 21, 24}[i]
-	case encoder == "software":
-		return []int{20, 23, 26}[i]
-	}
-	return []int{20, 24, 28}[i] // NVENC -cq, Quick Sync -global_quality
-}
-
 // processArgs is the FFmpeg command line that remuxes (every stream copied) or transcodes a
 // downloaded file into an MKV at out. Transcodes follow the save settings: the resolution
 // capped (never upscaled), HEVC or H.264 on the given encoder at a constant quality or
@@ -120,8 +107,8 @@ func crf(encoder, codec, quality string) int {
 func processArgs(c settings.VODSave, mode, in, out string, mi mediaInfo, encoder, preset, qsvDevice string, toneMap, withSubs bool) []string {
 	a := []string{"-hide_banner", "-v", "error", "-nostdin", "-y"}
 	transcode := mode == "transcode"
-	if transcode && encoder == "qsv" {
-		a = append(a, "-init_hw_device", "qsv=qs:"+qsvDevice, "-filter_hw_device", "qs")
+	if transcode {
+		a = append(a, encode.HWInit(encoder, qsvDevice)...)
 	}
 	a = append(a, "-i", in)
 	if transcode {
@@ -150,7 +137,7 @@ func processArgs(c settings.VODSave, mode, in, out string, mi mediaInfo, encoder
 	if transcode {
 		var chain []string
 		if mi.HDR && toneMap {
-			chain = append(chain, "tonemapx=tonemap=bt2390:desat=0:peak=100:t=bt709:m=bt709:p=bt709:format=yuv420p")
+			chain = append(chain, encode.ToneMap)
 		}
 		h := c.MaxHeight
 		if mi.Height > 0 && mi.Height < h {
@@ -158,51 +145,9 @@ func processArgs(c settings.VODSave, mode, in, out string, mi mediaInfo, encoder
 		}
 		chain = append(chain, fmt.Sprintf("scale=-2:%d", h))
 		tenBit := c.VideoCodec == "hevc" && strings.Contains(mi.PixFmt, "10") && !(mi.HDR && toneMap)
-		switch {
-		case tenBit && encoder == "software":
-			chain = append(chain, "format=yuv420p10le")
-		case tenBit:
-			chain = append(chain, "format=p010le")
-		default:
-			chain = append(chain, "format=yuv420p")
-		}
-		if encoder == "qsv" {
-			chain = append(chain, "hwupload=extra_hw_frames=64", "format=qsv")
-		}
+		chain = append(chain, encode.PixelFormat(encoder, tenBit)...)
 		a = append(a, "-vf", strings.Join(chain, ","))
-		q := crf(encoder, c.VideoCodec, c.VideoQuality)
-		switch encoder {
-		case "nvenc":
-			codec := "h264_nvenc"
-			if c.VideoCodec == "hevc" {
-				codec = "hevc_nvenc"
-			}
-			a = append(a, "-c:v", codec, "-preset", preset, "-rc", "vbr", "-spatial_aq", "1")
-			if c.VideoKbps == 0 {
-				a = append(a, "-cq", strconv.Itoa(q), "-b:v", "0")
-			}
-		case "qsv":
-			codec := "h264_qsv"
-			if c.VideoCodec == "hevc" {
-				codec = "hevc_qsv"
-			}
-			a = append(a, "-c:v", codec, "-preset", preset)
-			if c.VideoKbps == 0 {
-				a = append(a, "-global_quality", strconv.Itoa(q))
-			}
-		default:
-			if c.VideoCodec == "hevc" {
-				a = append(a, "-c:v", "libx265", "-preset", preset, "-x265-params", "log-level=error")
-			} else {
-				a = append(a, "-c:v", "libx264", "-preset", preset)
-			}
-			if c.VideoKbps == 0 {
-				a = append(a, "-crf", strconv.Itoa(q))
-			}
-		}
-		if k := c.VideoKbps; k > 0 {
-			a = append(a, "-b:v", fmt.Sprintf("%dk", k), "-maxrate", fmt.Sprintf("%dk", k*3/2), "-bufsize", fmt.Sprintf("%dk", k*2))
-		}
+		a = append(a, encode.Video{Encoder: encoder, Codec: c.VideoCodec, Preset: preset, Quality: c.VideoQuality, Kbps: c.VideoKbps}.Args()...)
 		for i, st := range mi.Audio {
 			switch c.Audio {
 			case "aac_stereo":
@@ -244,28 +189,11 @@ func (s *Service) process(ctx context.Context, j *job, c settings.VODSave, mode,
 
 // ffmpeg runs FFmpeg, reporting progress (0–1) from -progress output.
 func (s *Service) ffmpeg(ctx context.Context, args []string, durationMS int64, progress func(float64)) error {
-	cmd := exec.CommandContext(ctx, or2(s.FFmpeg, "ffmpeg"), args...)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	var stderr bytes.Buffer
-	cmd.Stderr = &limitWriter{w: &stderr, n: 8192}
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	sc := bufio.NewScanner(stdout)
-	for sc.Scan() {
-		if v, ok := strings.CutPrefix(sc.Text(), "out_time_us="); ok && durationMS > 0 && progress != nil {
-			if us, err := strconv.ParseInt(v, 10, 64); err == nil {
-				progress(min(1, float64(us)/1000/float64(durationMS)))
-			}
+	return encode.Run(ctx, or2(s.FFmpeg, "ffmpeg"), args, durationMS, func(p encode.Progress) {
+		if progress != nil && durationMS > 0 {
+			progress(p.Fraction)
 		}
-	}
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("FFmpeg: %s", lastLine(stderr.String(), err))
-	}
-	return nil
+	}, nil)
 }
 
 // verify checks a finished file before it goes into the library: it has video, its length
@@ -310,33 +238,7 @@ func (s *Service) verify(ctx context.Context, path string, mi mediaInfo, expecte
 // decodeCheck decodes 5 seconds of video from at (seconds), failing on any error or when
 // no frame comes out.
 func (s *Service) decodeCheck(ctx context.Context, path string, at float64) error {
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-	args := []string{"-hide_banner", "-v", "error", "-nostdin"}
-	if at > 0 {
-		args = append(args, "-ss", strconv.FormatFloat(at, 'f', 3, 64))
-	}
-	args = append(args, "-i", path, "-t", "5", "-map", "0:V:0", "-f", "null", "-progress", "pipe:1", "-nostats", "-")
-	cmd := exec.CommandContext(ctx, or2(s.FFmpeg, "ffmpeg"), args...)
-	var stderr bytes.Buffer
-	cmd.Stderr = &limitWriter{w: &stderr, n: 4096}
-	out, err := cmd.Output()
-	if err != nil {
-		return errors.New(lastLine(stderr.String(), err))
-	}
-	if msg := strings.TrimSpace(stderr.String()); msg != "" {
-		return errors.New(firstLine(msg))
-	}
-	frames := 0
-	for _, line := range strings.Split(string(out), "\n") {
-		if v, ok := strings.CutPrefix(line, "frame="); ok {
-			frames, _ = strconv.Atoi(strings.TrimSpace(v))
-		}
-	}
-	if frames == 0 {
-		return errors.New("no frames")
-	}
-	return nil
+	return encode.DecodeCheck(ctx, or2(s.FFmpeg, "ffmpeg"), path, at, 5, false)
 }
 
 func clock(ms int64) string {
@@ -349,36 +251,4 @@ func or2(a, b string) string {
 		return a
 	}
 	return b
-}
-
-func lastLine(msg string, err error) string {
-	msg = strings.TrimSpace(msg)
-	if msg == "" {
-		return err.Error()
-	}
-	if i := strings.LastIndex(msg, "\n"); i >= 0 {
-		msg = msg[i+1:]
-	}
-	return msg
-}
-
-func firstLine(msg string) string {
-	if i := strings.Index(msg, "\n"); i >= 0 {
-		return msg[:i]
-	}
-	return msg
-}
-
-type limitWriter struct {
-	w io.Writer
-	n int
-}
-
-func (l *limitWriter) Write(p []byte) (int, error) {
-	if l.n > 0 {
-		k := min(len(p), l.n)
-		l.w.Write(p[:k])
-		l.n -= k
-	}
-	return len(p), nil
 }

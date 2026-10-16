@@ -11,6 +11,7 @@ import { FixMatchDialog } from "../browse/ItemActions";
 import { Poster } from "../browse/Poster";
 import { BazarrDialog } from "../player/Bazarr";
 import { DuplicateCompare } from "./DuplicateCompare";
+import { LargeFilesEntry, LargeFilesTool } from "./LargeFiles";
 
 const PAGE = 50;
 
@@ -29,44 +30,52 @@ const healthQuery = {
 export function LibraryHealthSettings() {
   const checks = useQuery(healthQuery);
   const [open, setOpen] = useState<HealthCheck | null>(null);
+  const [largeFiles, setLargeFiles] = useState(false);
+  if (largeFiles) return <LargeFilesTool onBack={() => setLargeFiles(false)} />;
   if (open) return <CheckIssues check={open} onBack={() => setOpen(null)} />;
   if (checks.isPending) return <Spinner />;
   if (checks.isError) return <Alert tone="error">{checks.error.message}</Alert>;
   return (
-    <ul className="space-y-2" aria-label="Health checks">
-      {checks.data.map((c) => {
-        const sev = severityStyle[c.severity];
-        const available = c.available !== false;
-        const clean = available && c.count === 0;
-        return (
-          <li key={c.id}>
-            <button
-              disabled={!available || clean}
-              onClick={() => setOpen(c)}
-              aria-label={`${c.title}: ${available ? c.count : "unavailable"}`}
-              className={clsx(
-                "flex w-full items-center gap-4 rounded-lg border border-l-4 border-border bg-surface px-4 py-3 text-left enabled:hover:bg-surface-2",
-                available && !clean ? sev.border : "border-l-border",
-                !available && "opacity-50",
-              )}
-            >
-              <span className={clsx("size-2.5 shrink-0 rounded-full", available && !clean ? sev.dot : "bg-success")} title={sev.label} aria-hidden />
-              <span className="min-w-0 flex-1">
-                <span className="block font-medium">{c.title}</span>
-                <span className="block text-sm text-muted">{c.description}</span>
-                {!available && <span className="mt-0.5 block text-xs text-faint">Unavailable on this server.</span>}
-              </span>
-              {available && (
-                <span className={clsx("text-lg font-semibold tabular-nums", clean ? "text-success" : "text-text")} data-testid={`health-count-${c.id}`}>
-                  {c.count.toLocaleString()}
+    <div className="space-y-6">
+      <ul className="space-y-2" aria-label="Health checks">
+        {checks.data.map((c) => {
+          const sev = severityStyle[c.severity];
+          const available = c.available !== false;
+          const clean = available && c.count === 0;
+          return (
+            <li key={c.id}>
+              <button
+                disabled={!available || clean}
+                onClick={() => setOpen(c)}
+                aria-label={`${c.title}: ${available ? c.count : "unavailable"}`}
+                className={clsx(
+                  "flex w-full items-center gap-4 rounded-lg border border-l-4 border-border bg-surface px-4 py-3 text-left enabled:hover:bg-surface-2",
+                  available && !clean ? sev.border : "border-l-border",
+                  !available && "opacity-50",
+                )}
+              >
+                <span className={clsx("size-2.5 shrink-0 rounded-full", available && !clean ? sev.dot : "bg-success")} title={sev.label} aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium">{c.title}</span>
+                  <span className="block text-sm text-muted">{c.description}</span>
+                  {!available && <span className="mt-0.5 block text-xs text-faint">Unavailable on this server.</span>}
                 </span>
-              )}
-              {available && !clean && <ChevronRight className="size-5 text-faint" aria-hidden />}
-            </button>
-          </li>
-        );
-      })}
-    </ul>
+                {available && (
+                  <span className={clsx("text-lg font-semibold tabular-nums", clean ? "text-success" : "text-text")} data-testid={`health-count-${c.id}`}>
+                    {c.count.toLocaleString()}
+                  </span>
+                )}
+                {available && !clean && <ChevronRight className="size-5 text-faint" aria-hidden />}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <section className="space-y-2" aria-label="Tools">
+        <h3 className="text-sm font-medium text-muted">Tools</h3>
+        <LargeFilesEntry onOpen={() => setLargeFiles(true)} />
+      </section>
+    </div>
   );
 }
 

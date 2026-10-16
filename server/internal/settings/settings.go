@@ -40,6 +40,8 @@ type Settings struct {
 	// PlexSync keeps watch state, ratings, resume positions and plays in step with a Plex
 	// Media Server, both ways. Exposed through /plex-sync, not /settings.
 	PlexSync PlexSync `json:"plexSync"`
+	// Optimize re-encodes oversized library files to save space (admins only).
+	Optimize Optimize `json:"optimize"`
 }
 
 // PlexSync configures two-way sync with a Plex Media Server through its HTTP API.
@@ -468,6 +470,7 @@ func Defaults() Settings {
 			Audio: "copy", ConcurrentPerSource: 1, ScanAfterSave: true, SkipExisting: true,
 			PauseWhileWatching: true, PauseScope: "source", RetryFailed: true},
 		PlexSync: PlexSync{IntervalMinutes: 30, WatchState: true, Ratings: true, ResumePositions: true, PlayHistory: true},
+		Optimize: defaultOptimize(),
 		AI: AI{URL: "http://127.0.0.1:11434", ChatModel: "qwen3:8b", EmbedModel: "mxbai-embed-large", UnloadMinutes: 5,
 			UnderstandPrompts: true, RerankMovies: true, LyricsThemes: true, Reasons: true, LearnFromBehaviour: true},
 	}

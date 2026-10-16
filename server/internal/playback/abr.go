@@ -151,6 +151,10 @@ func (m *Manager) nvencJobs() int {
 	return n
 }
 
+// NVENCJobs is how many NVENC encodes playback is running (for background encoders that
+// share the session cap and give way to playback).
+func (m *Manager) NVENCJobs() int { return m.nvencJobs() }
+
 // encodersFor is the configured encoder order, skipping NVENC while its concurrent
 // session limit is reached (consumer NVIDIA drivers allow a fixed number of encodes);
 // new jobs then go to Quick Sync and finally the CPU instead of failing.

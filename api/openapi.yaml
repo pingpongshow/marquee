@@ -2149,6 +2149,140 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  # ---------- Library optimizer (Library Health → Large files, admins only) ----------
+  /optimize/files:
+    get:
+      tags: [libraries]
+      operationId: listLargeFiles
+      summary: "Movie and episode files matching the Large files filters, biggest first, with the size each would be after a preset and totals for all that match (admin only). Read from what the library knows; nothing is probed."
+      parameters:
+        - { name: libraryId, in: query, schema: { type: integer, format: int64 } }
+        - { name: type, in: query, schema: { type: string, enum: [movie, episode] } }
+        - { name: minSizeGb, in: query, description: "At least this many GB (10^9 bytes).", schema: { type: number, minimum: 0 } }
+        - { name: minBitrateMbps, in: query, description: "At least this overall bitrate.", schema: { type: number, minimum: 0 } }
+        - { name: resolution, in: query, description: "Only this resolution class (by width or height, so letterboxed films count): 2160 = 4K, 480 = SD.", schema: { type: integer, enum: [2160, 1080, 720, 480] } }
+        - { name: codecs, in: query, description: "Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9).", schema: { type: string } }
+        - { name: hdr, in: query, description: "Only HDR (yes) or only SDR (no) files.", schema: { type: string, enum: ["yes", "no"] } }
+        - { name: presetId, in: query, description: "The preset the estimates are for (default: the default preset).", schema: { type: string } }
+        - { name: sort, in: query, schema: { type: string, enum: [size, bitrate, title, savings], default: size } }
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LargeFilePage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /optimize/jobs:
+    get:
+      tags: [libraries]
+      operationId: listOptimizeJobs
+      summary: "The optimizer queue (running and queued jobs first, then finished ones not cleared) or its history (optimized and restored files, newest first), with the space saved so far (admin only)."
+      parameters:
+        - { name: view, in: query, schema: { type: string, enum: [queue, history], default: queue } }
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OptimizeJobPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [libraries]
+      operationId: queueOptimizeJobs
+      summary: "Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren't available movies or episodes, are skipped."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OptimizeQueueRequest" }
+      responses:
+        "202":
+          description: Queued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OptimizeQueueResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /optimize/jobs/clear:
+    post:
+      tags: [libraries]
+      operationId: clearOptimizeJobs
+      summary: "Remove finished jobs from the queue view; optimized files stay in the history (admin only)."
+      responses:
+        "200":
+          description: Cleared.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cleared]
+                properties:
+                  cleared: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /optimize/jobs/{jobId}/{action}:
+    parameters:
+      - { name: jobId, in: path, required: true, schema: { type: integer, format: int64 } }
+      - name: action
+        in: path
+        required: true
+        description: "cancel = stop a queued or running job (the original stays as it is); retry = queue a failed, cancelled or skipped job again; restore = put an optimized file's original back from the media trash (the optimized file goes there instead)."
+        schema: { type: string, enum: [cancel, retry, restore] }
+    post:
+      tags: [libraries]
+      operationId: optimizeJobAction
+      summary: Cancel, retry or restore an optimizer job (admin only).
+      responses:
+        "204": { description: Done. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /optimize/settings:
+    get:
+      tags: [libraries]
+      operationId: getOptimizeSettings
+      summary: "The optimizer's settings and every preset, built-in and custom (admin only)."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OptimizeConfig" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    put:
+      tags: [libraries]
+      operationId: updateOptimizeSettings
+      summary: "Change the optimizer's settings and custom presets (admin only). Built-in presets in the list are ignored."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OptimizeSettings" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OptimizeConfig" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  # ---------- end library optimizer ----------
+
   /files/{fileId}:
     parameters:
       - name: fileId
@@ -6159,7 +6293,7 @@ components:
       required: [id, kind, title, state]
       properties:
         id: { type: string, description: "Stable id, e.g. scan:3" }
-        kind: { type: string, enum: [scan, import, stream, task, download], description: "download: a VOD title being saved to the library (admins)." }
+        kind: { type: string, enum: [scan, import, stream, task, download, optimize], description: "download: a VOD title being saved to the library (admins). optimize: a library file being re-encoded by the optimizer (admins)." }
         title: { type: string, example: Scanning Movies }
         state: { type: string, enum: [queued, running] }
         libraryId: { type: integer, format: int64 }
@@ -7604,3 +7738,150 @@ components:
         entries:
           type: array
           items: { $ref: "#/components/schemas/DirectoryEntry" }
+
+    # ---------- Library optimizer ----------
+    LargeFile:
+      type: object
+      description: "A movie or episode file in the Large files list."
+      required: [fileId, itemId, title, type, path, size, width, height, videoCodec, hdr, bitrateKbps, durationMs, estimatedSize]
+      properties:
+        fileId: { type: integer, format: int64 }
+        itemId: { type: integer, format: int64 }
+        title: { type: string }
+        subtitle: { type: string, description: "The show and episode number, or the year." }
+        type: { type: string, enum: [movie, episode] }
+        path: { type: string }
+        size: { type: integer, format: int64, description: Bytes. }
+        width: { type: integer }
+        height: { type: integer }
+        videoCodec: { type: string, description: "FFprobe's name, e.g. h264, hevc, vc1." }
+        hdr: { type: string, description: "HDR format (hdr10, hlg, dolby_vision, …); empty for SDR." }
+        bitrateKbps: { type: integer }
+        durationMs: { type: integer, format: int64 }
+        estimatedSize: { type: integer, format: int64, description: "About how big it would be after the preset asked for." }
+        jobId: { type: integer, format: int64, description: "The file's latest optimizer job, if any." }
+        jobState: { $ref: "#/components/schemas/OptimizeJobState" }
+
+    LargeFilePage:
+      type: object
+      required: [items, total, totalSize, estimatedSize]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LargeFile" }
+        total: { type: integer, description: Files matching the filters. }
+        totalSize: { type: integer, format: int64, description: "Bytes, all matching files." }
+        estimatedSize: { type: integer, format: int64, description: "About how big all matching files would be after the preset." }
+
+    OptimizeJobState:
+      type: string
+      enum: [queued, running, verifying, done, failed, cancelled, skipped, restored]
+      description: "verifying = the new file is being checked (or waits for nobody to be watching before it's swapped in); done = optimized, the original is in the media trash; skipped = not worth it (see error); restored = the original was put back."
+
+    OptimizeJob:
+      type: object
+      required: [id, title, path, presetId, presetName, state, progress, beforeSize, afterSize, canRestore, createdAt]
+      properties:
+        id: { type: integer, format: int64 }
+        fileId: { type: integer, format: int64 }
+        itemId: { type: integer, format: int64 }
+        title: { type: string }
+        path: { type: string }
+        presetId: { type: string }
+        presetName: { type: string }
+        state: { $ref: "#/components/schemas/OptimizeJobState" }
+        progress: { type: number, description: "0–1." }
+        fps: { type: number }
+        speed: { type: number, description: "× real time." }
+        etaSeconds: { type: integer, format: int64 }
+        encoder: { type: string, description: "nvenc, qsv or software." }
+        beforeSize: { type: integer, format: int64 }
+        afterSize: { type: integer, format: int64, description: "The new file's size (also for a skipped job, showing why)." }
+        error: { type: string, description: "Why it failed or was skipped." }
+        paused: { type: string, description: "Why it's waiting (paused while someone is watching, outside the maintenance window, waiting for a viewer to stop before the swap)." }
+        canRestore: { type: boolean, description: "The original is still in the media trash." }
+        createdAt: { type: string, format: date-time }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time }
+
+    OptimizeJobPage:
+      type: object
+      required: [items, total, savedBytes, optimized]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/OptimizeJob" }
+        total: { type: integer }
+        savedBytes: { type: integer, format: int64, description: "Space saved by every optimized file (not restored)." }
+        optimized: { type: integer, description: "How many files are optimized." }
+        paused: { type: string, description: "Why the queue isn't running now, if it isn't." }
+
+    OptimizeFilter:
+      type: object
+      description: "The Large files filters (as the list's query parameters)."
+      properties:
+        libraryId: { type: integer, format: int64 }
+        type: { type: string, enum: [movie, episode] }
+        minSizeGb: { type: number, minimum: 0 }
+        minBitrateMbps: { type: number, minimum: 0 }
+        resolution: { type: integer, enum: [2160, 1080, 720, 480] }
+        codecs: { type: array, items: { type: string } }
+        hdr: { type: string, enum: ["yes", "no"] }
+
+    OptimizeQueueRequest:
+      type: object
+      required: [presetId]
+      properties:
+        presetId: { type: string }
+        fileIds: { type: array, items: { type: integer, format: int64 }, description: "The files to queue; or" }
+        filter: { $ref: "#/components/schemas/OptimizeFilter" }
+
+    OptimizeQueueResult:
+      type: object
+      required: [queued, skipped]
+      properties:
+        queued: { type: integer }
+        skipped: { type: integer, description: "Already queued, or not an available movie or episode." }
+
+    OptimizePreset:
+      type: object
+      required: [id, name, maxHeight, codec, quality, audio, imageSubtitles, hdr]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        builtIn: { type: boolean, readOnly: true }
+        maxHeight: { type: integer, enum: [0, 2160, 1080, 720, 480], description: "Resolution cap (never upscaled; letterboxed films fit the frame by width); 0 keeps it." }
+        codec: { type: string, enum: [hevc, h264, av1], description: "AV1 only when the server has an AV1 encoder (av1Available)." }
+        quality: { type: string, enum: [high, balanced, small], description: "Constant-quality level, unless videoKbps is set." }
+        videoKbps: { type: integer, minimum: 0, maximum: 100000, description: "A target video bitrate instead of a quality; 0 = use the quality." }
+        audio: { type: string, enum: [copy, default, aac_stereo, aac_51], description: "copy = every track as it is; default = only the default track, as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1)." }
+        dropCommentary: { type: boolean, description: "Leave out commentary tracks." }
+        imageSubtitles: { type: string, enum: [keep, drop], description: "Picture subtitles (PGS, VobSub); text subtitles are always kept. MP4 files can't hold picture subtitles." }
+        hdr: { type: string, enum: [keep, tonemap], description: "keep = HDR stays HDR (10-bit HEVC or AV1; H.264 always tone-maps); tonemap = converted to SDR." }
+
+    OptimizeSettings:
+      type: object
+      required: [presets, defaultPreset, concurrency, minSavingsPercent, pauseWhileWatching, windowOnly, paused]
+      properties:
+        presets:
+          type: array
+          description: "Custom presets (built-in ones sent back are ignored)."
+          items: { $ref: "#/components/schemas/OptimizePreset" }
+        defaultPreset: { type: string }
+        concurrency: { type: integer, minimum: 1, maximum: 4, description: "Files optimized at once. Default 1." }
+        minSavingsPercent: { type: integer, minimum: 5, maximum: 90, description: "A new file replaces the original only when it's at least this much smaller; otherwise it's thrown away and the job skipped. Default 20." }
+        pauseWhileWatching: { type: boolean, description: "Pause while anyone is watching anything, resuming about 15 s after. Default on." }
+        windowOnly: { type: boolean, description: "Only run inside the maintenance window." }
+        paused: { type: boolean, description: "The queue is paused by an admin." }
+
+    OptimizeConfig:
+      type: object
+      required: [settings, presets, av1Available]
+      properties:
+        settings: { $ref: "#/components/schemas/OptimizeSettings" }
+        presets:
+          type: array
+          description: Every preset, built-in first.
+          items: { $ref: "#/components/schemas/OptimizePreset" }
+        av1Available: { type: boolean }
+    # ---------- end library optimizer ----------
