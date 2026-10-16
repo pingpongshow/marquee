@@ -22,14 +22,25 @@ public extension AppSession {
 
     /// Takes a film on demand, or an episode's whole show, off Continue Watching until it's played again.
     func removeVodFromContinueWatching(_ entry: ContinueEntry) async throws {
-        let path: Operations.RemoveVodFromContinueWatching.Input.Path
         if let m = entry.vodMovie {
-            path = .init(kind: .movie, vodId: m.id)
+            try await removeVodMovieFromContinueWatching(m.id)
         } else if let e = entry.vodEpisode {
-            path = .init(kind: .episode, vodId: e.id)
-        } else {
-            return
+            try await removeVodEpisodeFromContinueWatching(e.id)
         }
+    }
+
+    /// Takes a film on demand off Continue Watching (VOD Movies' row as well as Home's).
+    func removeVodMovieFromContinueWatching(_ movieId: Int64) async throws {
+        try await removeVod(.init(kind: .movie, vodId: movieId))
+    }
+
+    /// Takes an episode's whole show off Continue Watching until it's played again (VOD Shows'
+    /// row passes the show's next episode).
+    func removeVodEpisodeFromContinueWatching(_ episodeId: Int64) async throws {
+        try await removeVod(.init(kind: .episode, vodId: episodeId))
+    }
+
+    private func removeVod(_ path: Operations.RemoveVodFromContinueWatching.Input.Path) async throws {
         switch try await continueAPI.removeVodFromContinueWatching(path: path) {
         case .noContent: return
         case .notFound: throw MarqueeError("This isn't in Continue Watching any more.")
@@ -46,10 +57,10 @@ public extension ContinueEntry {
         return vodEpisode?.seriesTitle ?? ""
     }
 
-    /// The second line for one on demand: "On demand · 1985", "On demand · S1 · E3 · Pilot".
+    /// The second line for one on demand: "VOD · 1985", "VOD · S1 · E3 · Pilot".
     var vodSubtitle: String {
-        if let m = vodMovie { return (["On demand"] + [m.year.map(String.init)].compactMap { $0 }).joined(separator: " · ") }
-        if let e = vodEpisode { return (["On demand", e.label] + (e.title.isEmpty ? [] : [e.title])).joined(separator: " · ") }
+        if let m = vodMovie { return (["VOD"] + [m.year.map(String.init)].compactMap { $0 }).joined(separator: " · ") }
+        if let e = vodEpisode { return (["VOD", e.label] + (e.title.isEmpty ? [] : [e.title])).joined(separator: " · ") }
         return ""
     }
 

@@ -102,12 +102,14 @@ struct VodBrowseView: View {
             if category.isEmpty, query.isEmpty, !filters.isActive {
                 if shows, !resumeShows.isEmpty {
                     ShelfRow(title: "Continue Watching") {
-                        ForEach(resumeShows, id: \.id) { s in VodSeriesTile(series: s, width: tileWidth) }
+                        ForEach(resumeShows, id: \.id) { s in
+                            VodSeriesTile(series: s, width: tileWidth, onRemove: s.next.map { e in { removeShow(s, episodeId: e.id) } })
+                        }
                     }
                     .accessibilityIdentifier("vod.continue")
                 } else if !shows, !resume.isEmpty {
                     ShelfRow(title: "Continue Watching") {
-                        ForEach(resume, id: \.id) { m in VodTile(movie: m, width: tileWidth) }
+                        ForEach(resume, id: \.id) { m in VodTile(movie: m, width: tileWidth, onRemove: { removeMovie(m) }) }
                     }
                     .accessibilityIdentifier("vod.continue")
                 }
@@ -369,6 +371,40 @@ struct VodBrowseView: View {
         }
     }
 
+    /// Takes a film off Continue Watching: gone from the row at once, back if the server says no;
+    /// then this row and Home's come from the server again.
+    private func removeMovie(_ m: VodMovie) {
+        let before = resume
+        resume.removeAll { $0.id == m.id }
+        ActionError.run {
+            do {
+                try await app.removeVodMovieFromContinueWatching(m.id)
+            } catch {
+                resume = before
+                throw error
+            }
+            HomeChanges.shared.version += 1
+            await reloadResume()
+        }
+    }
+
+    /// Takes a show off Continue Watching (by its next episode, which hides the whole show until
+    /// it's watched again), as for a film.
+    private func removeShow(_ s: VodSeries, episodeId: Int64) {
+        let before = resumeShows
+        resumeShows.removeAll { $0.id == s.id }
+        ActionError.run {
+            do {
+                try await app.removeVodEpisodeFromContinueWatching(episodeId)
+            } catch {
+                resumeShows = before
+                throw error
+            }
+            HomeChanges.shared.version += 1
+            await reloadResume()
+        }
+    }
+
     /// The next page, as the end of the grid comes into view.
     private func loadMore() async {
         guard !loading, let total, count < total else { return }
@@ -390,6 +426,8 @@ struct VodBrowseView: View {
 struct VodTile: View {
     let movie: VodMovie
     var width: CGFloat = 130
+    /// Takes it off Continue Watching (its context menu, in the Continue Watching row).
+    var onRemove: (() -> Void)?
 
     var body: some View {
         #if os(tvOS)
@@ -398,6 +436,7 @@ struct VodTile: View {
                 .buttonStyle(.card)
                 .accessibilityLabel(movie.title)
                 .accessibilityIdentifier("vod.tile")
+                .modifier(RemoveFromContinueMenu(action: onRemove))
             titles
         }
         .frame(width: width)
@@ -414,6 +453,7 @@ struct VodTile: View {
         .accessibilityLabel(movie.title)
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("vod.tile")
+        .modifier(RemoveFromContinueMenu(action: onRemove))
         #endif
     }
 

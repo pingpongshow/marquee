@@ -6183,13 +6183,18 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ActivityTask/id`.
             public var id: Swift.String
+            /// download: a VOD title being saved to the library (admins).
+            ///
             /// - Remark: Generated from `#/components/schemas/ActivityTask/kind`.
             @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case scan = "scan"
                 case _import = "import"
                 case stream = "stream"
                 case task = "task"
+                case download = "download"
             }
+            /// download: a VOD title being saved to the library (admins).
+            ///
             /// - Remark: Generated from `#/components/schemas/ActivityTask/kind`.
             public var kind: Components.Schemas.ActivityTask.KindPayload
             /// - Remark: Generated from `#/components/schemas/ActivityTask/title`.
@@ -6209,7 +6214,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id: Stable id, e.g. scan:3
-            ///   - kind:
+            ///   - kind: download: a VOD title being saved to the library (admins).
             ///   - title:
             ///   - state:
             ///   - libraryId:

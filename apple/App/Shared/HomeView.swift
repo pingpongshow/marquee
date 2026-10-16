@@ -282,6 +282,19 @@ struct ContinueCard: View {
     }
 }
 
+/// A context menu with just "Remove from Continue Watching" when there's an action (the VOD
+/// pages' Continue Watching rows, LIVE-6); nothing otherwise.
+struct RemoveFromContinueMenu: ViewModifier {
+    let action: (() -> Void)?
+    func body(content: Content) -> some View {
+        if let action {
+            content.contextMenu { RemoveFromContinueButton(action: action) }
+        } else {
+            content
+        }
+    }
+}
+
 /// "Remove from Continue Watching" in a Continue Watching tile's context menu (USER-6).
 struct RemoveFromContinueButton: View {
     let action: () -> Void

@@ -303,4 +303,32 @@ final class ContinueWatchingUITests: XCTestCase {
         try eventually(10, "the library title gone on the server") { try !continueKeys(user.token).contains(first) }
         XCTAssertTrue(libraryTile.waitForNonExistence(timeout: 10))
     }
+
+    /// The VOD Movies and VOD Shows pages' Continue Watching rows: a long press offers Remove from
+    /// Continue Watching; the film goes, and the show goes (by its next episode), here and on the
+    /// server, and the row with them (its only title).
+    func testRemoveFromVodPagesRows() throws {
+        let user = try temporaryUser()
+        let keys = try makeProgress(user.token, library: 0)
+        signIn(user)
+        for (entry, identifier, title, key) in [("libraries.vod", "vod.tile", "Apple XC Film One", keys.film),
+                                                ("libraries.vodShows", "vod.showTile", "Apple Test Show", "vodEpisode:")] {
+            app.buttons["Libraries"].firstMatch.tap()
+            let back = app.navigationBars.buttons["Libraries"]
+            if back.waitForExistence(timeout: 2) { back.tap() }
+            let link = app.buttons[entry]
+            XCTAssertTrue(link.waitForExistence(timeout: 10), "\(entry) is listed")
+            link.tap()
+            let tiles = app.buttons.matching(identifier: identifier).matching(NSPredicate(format: "label == %@", title))
+            // In the row (and in the grid below it, when it's loaded that far).
+            try eventually(15, "\(title) in Continue Watching") { app.descendants(matching: .any)["vod.continue"].exists && tiles.count >= 1 }
+            let count = tiles.count
+            shot("vod-row-\(identifier)-before")
+            let row = try XCTUnwrap(tiles.allElementsBoundByIndex.min { $0.frame.minY < $1.frame.minY })
+            contextMenu(row, "Remove from Continue Watching")
+            try eventually(10, "\(title) gone from the row") { tiles.count == count - 1 && !app.descendants(matching: .any)["vod.continue"].exists }
+            try eventually(10, "gone on the server") { try !continueKeys(user.token).contains { $0.hasPrefix(key) } }
+            shot("vod-row-\(identifier)-after")
+        }
+    }
 }

@@ -241,4 +241,34 @@ final class ContinueWatchingTVUITests: XCTestCase {
         XCTAssertTrue(episode.waitForNonExistence(timeout: 10), "the tile goes")
         try eventually(10, "gone on the server") { try !continueKeys(token).contains(keys.episode) }
     }
+
+    /// The VOD Movies and VOD Shows pages' Continue Watching rows: holding Select on the row's
+    /// tile offers Remove from Continue Watching; the film goes, and the show goes (by its next
+    /// episode), here and on the server, and the row with them (its only title).
+    func testRemoveFromVodPagesRowsTV() throws {
+        let token = try temporaryAccount()
+        let keys = try makeProgress(token, library: 0)
+        try signIn(as: token)
+        for (section, identifier, title, key) in [("VOD Movies", "vod.tile", "Apple XC Film One", keys.film),
+                                                  ("VOD Shows", "vod.showTile", "Apple Test Show", "vodEpisode:")] {
+            app.openSection(section)
+            let tiles = app.buttons.matching(identifier: identifier).matching(NSPredicate(format: "label == %@", title))
+            try eventually(15, "\(title) in Continue Watching") { app.descendants(matching: .any)["vod.continue"].exists && tiles.count >= 1 }
+            let count = tiles.count
+            // Down from the controls reaches the row first.
+            for _ in 0..<8 where focused.identifier != identifier { remote.press(.down) }
+            for _ in 0..<4 where focused.label != title { remote.press(.left) }
+            let row = try XCTUnwrap(tiles.allElementsBoundByIndex.min { $0.frame.minY < $1.frame.minY })
+            XCTAssertTrue(row.hasFocus, "the row's tile has focus; focus is on \(focused.identifier) \(focused.label)")
+            shot("tv-vod-row-\(identifier)-before")
+            remote.press(.select, forDuration: 1.5)
+            let remove = app.descendants(matching: .any)["removeFromContinue"]
+            XCTAssertTrue(remove.waitForExistence(timeout: 5), "the context menu offers it")
+            shot("tv-vod-row-\(identifier)-menu")
+            remote.press(.select)
+            try eventually(10, "\(title) gone from the row") { tiles.count == count - 1 && !app.descendants(matching: .any)["vod.continue"].exists }
+            try eventually(10, "gone on the server") { try !continueKeys(token).contains { $0.hasPrefix(key) } }
+            shot("tv-vod-row-\(identifier)-after")
+        }
+    }
 }
