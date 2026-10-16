@@ -38,6 +38,9 @@ type harness struct {
 	srv   *httptest.Server
 	token string
 	media string
+	// handlers and store, for tests that add services (set before the requests that use them).
+	handlers *api.Handlers
+	store    *settings.Store
 }
 
 func newHarness(t *testing.T) *harness {
@@ -83,7 +86,7 @@ func newHarness(t *testing.T) *harness {
 	})
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	return &harness{t: t, srv: srv, media: media, db: database}
+	return &harness{t: t, srv: srv, media: media, db: database, handlers: handlers, store: store}
 }
 
 func (h *harness) do(method, path string, body any, out any) int {

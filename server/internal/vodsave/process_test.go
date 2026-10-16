@@ -98,7 +98,7 @@ func TestRemuxAndTranscode(t *testing.T) {
 	e.src.files["movie/5.ts"] = ts
 	e.src.files["movie/6.mkv"] = clip(t, "mkv")
 	ctx := context.Background()
-	r, _ := e.s.SaveMovie(ctx, e.movieID("TS Film (2010)"), 1)
+	r, _ := e.s.SaveMovie(ctx, e.movieID("TS Film (2010)"), 1, false)
 	if !strings.HasSuffix(r.Saves[0].TargetPath, "TS Film (2010).mkv") {
 		t.Fatalf("target: %s", r.Saves[0].TargetPath)
 	}
@@ -107,7 +107,7 @@ func TestRemuxAndTranscode(t *testing.T) {
 		s.Transcoder.Preset = "speed"
 		return nil
 	})
-	r2, _ := e.s.SaveMovie(ctx, e.movieID("Small (2011)"), 1)
+	r2, _ := e.s.SaveMovie(ctx, e.movieID("Small (2011)"), 1, false)
 	e.start()
 	v := e.wait(r.Saves[0].ID, Done, Failed)
 	if v.State != Done || !strings.HasSuffix(v.TargetPath, "TS Film (2010) WEBDL-720p.mkv") || !v.Verified {
@@ -154,7 +154,7 @@ func TestSaveSeason(t *testing.T) {
 	e.s.DB.QueryRow("SELECT id FROM vod_series").Scan(&seriesID)
 	ctx := context.Background()
 	one := 1
-	r, err := e.s.SaveSeries(ctx, seriesID, &one, 1)
+	r, err := e.s.SaveSeries(ctx, seriesID, &one, 1, false)
 	if err != nil || r.Queued != 2 {
 		t.Fatalf("season: %+v %v", r, err)
 	}
@@ -171,7 +171,7 @@ func TestSaveSeason(t *testing.T) {
 		t.Errorf("states: %+v", states)
 	}
 	// Saving the whole series now adds only season 2's episode.
-	if r, _ := e.s.SaveSeries(ctx, seriesID, nil, 1); r.Queued != 1 || r.Already != 2 {
+	if r, _ := e.s.SaveSeries(ctx, seriesID, nil, 1, false); r.Queued != 1 || r.Already != 2 {
 		t.Errorf("series: %+v", r)
 	}
 	e.waitFor("the shows scan", func() bool { e.scanMu.Lock(); defer e.scanMu.Unlock(); return len(e.scans) >= 1 })
@@ -183,7 +183,7 @@ func TestRestartAndBackgroundRetry(t *testing.T) {
 	e := newEnv(t, oneFilm, nil)
 	e.src.files["movie/101.mkv"] = data
 	ctx := context.Background()
-	r, _ := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1)
+	r, _ := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1, false)
 	id := r.Saves[0].ID
 	// As if the server stopped mid-download: half the file there, the row "downloading".
 	os.MkdirAll(filepath.Dir(r.Saves[0].TargetPath), 0o775)
@@ -197,7 +197,7 @@ func TestRestartAndBackgroundRetry(t *testing.T) {
 	// A failed one comes back by itself.
 	e.s.DB.Exec("UPDATE vod_saves SET state='failed', retryable=1, error='x' WHERE id=?", id)
 	e.s.ClearFinished(ctx)
-	r, _ = e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1)
+	r, _ = e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1, false)
 	e.s.DB.Exec("UPDATE vod_saves SET state='failed', retryable=1 WHERE id=?", r.Saves[0].ID)
 	e.s.mu.Lock()
 	e.s.RetryFailedEvery = 1

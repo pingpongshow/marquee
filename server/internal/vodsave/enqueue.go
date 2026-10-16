@@ -15,10 +15,11 @@ import (
 
 // Result is what a save request did.
 type Result struct {
-	Queued  int // new saves
-	Already int // already queued or saved
-	Skipped int // already in the library
-	Saves   []Save
+	Queued   int // new saves
+	Already  int // already queued or saved
+	Skipped  int // already in the library (as well or better, or better without upgrades asked for)
+	Upgrades int // of Queued, upgrades replacing the library's copy
+	Saves    []Save
 }
 
 type item struct {
@@ -29,44 +30,40 @@ type item struct {
 	// naming
 	path            string
 	season, episode int
-	inLibrary       bool
+	// replaceFileID: an upgrade replaces this library file.
+	replaceFileID int64
 }
 
-// SaveMovie queues a film.
-func (s *Service) SaveMovie(ctx context.Context, movieID, userID int64) (Result, error) {
+// SaveMovie queues a film. One the library has as well or better is refused
+// (*InLibraryError); one better than the library's copy is saved as an upgrade replacing it
+// when upgrade is set, else refused too.
+func (s *Service) SaveMovie(ctx context.Context, movieID, userID int64, upgrade bool) (Result, error) {
 	s.init()
 	c := s.cfg()
 	if c.MoviesFolder == "" {
 		return Result{}, ErrNoFolder
 	}
-	var it item
-	var title string
-	var year, tmdbID int
-	var runtime int64
-	var matched bool
-	var key string
-	err := s.DB.QueryRowContext(ctx, `SELECT source_id, source_key, stream_url, title, COALESCE(year,0), COALESCE(tmdb_id,0),
-		match_state='matched', runtime_ms FROM vod_movies WHERE id=?`, movieID).
-		Scan(&it.sourceID, &key, &it.file, &title, &year, &tmdbID, &matched, &runtime)
-	if errors.Is(err, sql.ErrNoRows) {
-		return Result{}, ErrNotFound
-	}
+	r, err := s.movieRow(ctx, movieID)
 	if err != nil {
 		return Result{}, err
 	}
-	if !s.VOD.Savable(it.sourceID) || !strings.HasPrefix(key, "xtream:") {
+	if !s.VOD.Savable(r.sourceID) || !strings.HasPrefix(r.key, "xtream:") {
 		return Result{}, ErrNotSavable
 	}
-	it.kind, it.sourceKey, it.vodID = "movie", strings.TrimPrefix(key, "xtream:"), movieID
-	name, y := CleanTitle(title)
-	if year == 0 {
-		year = y
+	m, err := s.movieMatch(ctx, movieID, r, true)
+	if err != nil {
+		return Result{}, err
 	}
-	if matched && tmdbID > 0 {
-		it.tmdbID = tmdbID
+	if !m.Savable() || (m.Verdict == VerdictBetter && !upgrade) {
+		return Result{}, &InLibraryError{m}
+	}
+	it := item{sourceID: r.sourceID, file: r.file, kind: "movie", sourceKey: strings.TrimPrefix(r.key, "xtream:"), vodID: movieID}
+	name, year := libraryTitle(r.title, r.year)
+	if r.tmdbID > 0 {
+		it.tmdbID = r.tmdbID
 		if s.Titles != nil {
 			tctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-			if m, err := s.Titles.MovieByID(tctx, tmdbID); err == nil && m != nil && m.Title != "" {
+			if m, err := s.Titles.MovieByID(tctx, r.tmdbID); err == nil && m != nil && m.Title != "" {
 				name = m.Title
 				if len(m.ReleaseDate) >= 4 {
 					if y, err := strconv.Atoi(m.ReleaseDate[:4]); err == nil {
@@ -78,21 +75,24 @@ func (s *Service) SaveMovie(ctx context.Context, movieID, userID int64) (Result,
 		}
 	} else {
 		// TMDB's runtime is the film's, not this file's, so only the source's is checked.
-		it.expectedMS = runtime
+		it.expectedMS = r.runtime
 	}
 	it.title = titleWithYear(name, year)
 	n := Naming{Kind: "movie", Root: c.MoviesFolder, Title: name, Year: year,
 		Ext: outputExt(filepath.Ext(it.file), c.Quality)}
-	n.Folder = FindFolder(ctx, s.DB, "movie", c.MoviesFolder, name, year, it.tmdbID)
-	it.path = n.Path()
-	if c.SkipExisting && it.tmdbID > 0 {
-		it.inLibrary = s.movieInLibrary(ctx, it.tmdbID)
+	if m.Verdict == VerdictBetter {
+		// An upgrade goes where the library's copy is, which it replaces.
+		n.Folder, it.replaceFileID = filepath.Dir(m.Library.Path), m.Library.FileID
+	} else {
+		n.Folder = FindFolder(ctx, s.DB, "movie", c.MoviesFolder, name, year, it.tmdbID)
 	}
+	it.path = n.Path()
 	return s.enqueue(ctx, []item{it}, userID)
 }
 
 // SaveEpisode queues one episode.
-func (s *Service) SaveEpisode(ctx context.Context, episodeID, userID int64) (Result, error) {
+// Like a film, one the library has is refused, or saved as an upgrade (see SaveMovie).
+func (s *Service) SaveEpisode(ctx context.Context, episodeID, userID int64, upgrade bool) (Result, error) {
 	var seriesID int64
 	err := s.DB.QueryRowContext(ctx, "SELECT series_id FROM vod_episodes WHERE id=?", episodeID).Scan(&seriesID)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -101,22 +101,24 @@ func (s *Service) SaveEpisode(ctx context.Context, episodeID, userID int64) (Res
 	if err != nil {
 		return Result{}, err
 	}
-	return s.saveEpisodes(ctx, seriesID, nil, episodeID, userID)
+	return s.saveEpisodes(ctx, seriesID, nil, episodeID, userID, upgrade)
 }
 
 // SaveSeries queues a series' episodes, or one season's (season non-nil). The episodes are
-// fetched from the source first when they haven't been.
-func (s *Service) SaveSeries(ctx context.Context, seriesID int64, season *int, userID int64) (Result, error) {
+// fetched from the source first when they haven't been. Only episodes the library doesn't
+// have are queued, and (with upgrades) those better than the library's copies, replacing
+// them; the others count as skipped.
+func (s *Service) SaveSeries(ctx context.Context, seriesID int64, season *int, userID int64, upgrades bool) (Result, error) {
 	if err := s.VOD.LoadEpisodes(ctx, seriesID, false); err != nil {
 		if errors.Is(err, vod.ErrNotFound) {
 			return Result{}, ErrNotFound
 		}
 		return Result{}, err
 	}
-	return s.saveEpisodes(ctx, seriesID, season, 0, userID)
+	return s.saveEpisodes(ctx, seriesID, season, 0, userID, upgrades)
 }
 
-func (s *Service) saveEpisodes(ctx context.Context, seriesID int64, season *int, episodeID, userID int64) (Result, error) {
+func (s *Service) saveEpisodes(ctx context.Context, seriesID int64, season *int, episodeID, userID int64, upgrade bool) (Result, error) {
 	s.init()
 	c := s.cfg()
 	if c.ShowsFolder == "" {
@@ -200,37 +202,37 @@ func (s *Service) saveEpisodes(ctx context.Context, seriesID int64, season *int,
 		}
 		return Result{}, errNoEpisodes
 	}
-	if c.SkipExisting && tmdbID > 0 {
-		have := s.episodesInLibrary(ctx, tmdbID)
-		for i := range items {
-			items[i].inLibrary = have[[2]int{items[i].season, items[i].episode}]
-		}
+	// Compared with the library: one episode is checked now; a season's or show's use what's
+	// known (unknown ones are checked in the background and left out for now).
+	keys := make([]episodeKey, len(items))
+	for i, it := range items {
+		keys[i] = episodeKey{it.vodID, it.season, it.episode}
 	}
-	return s.enqueue(ctx, items, userID)
-}
-
-func (s *Service) movieInLibrary(ctx context.Context, tmdbID int) bool {
-	var n int
-	s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM external_ids x JOIN items i ON i.id=x.item_id AND i.type='movie'
-		WHERE x.provider='tmdb' AND x.value=?`, strconv.Itoa(tmdbID)).Scan(&n)
-	return n > 0
-}
-
-func (s *Service) episodesInLibrary(ctx context.Context, tmdbID int) map[[2]int]bool {
-	out := map[[2]int]bool{}
-	rows, err := s.DB.QueryContext(ctx, `SELECT z.idx, e.idx FROM external_ids x JOIN items sh ON sh.id=x.item_id AND sh.type='show'
-		JOIN items e ON e.grandparent_id=sh.id AND e.type='episode' JOIN items z ON z.id=e.parent_id
-		WHERE x.provider='tmdb' AND x.value=? AND z.idx IS NOT NULL AND e.idx IS NOT NULL`, strconv.Itoa(tmdbID))
+	matches, err := s.episodeMatches(ctx, seriesID, keys, episodeID > 0)
 	if err != nil {
-		return out
+		return Result{}, err
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var se, ep int
-		rows.Scan(&se, &ep)
-		out[[2]int{se, ep}] = true
+	keep := items[:0]
+	refused := 0
+	for _, it := range items {
+		m := matches[it.vodID]
+		switch {
+		case m.Verdict == VerdictBetter && upgrade:
+			// An upgrade goes where the library's copy is, which it replaces.
+			it.path = filepath.Join(filepath.Dir(m.Library.Path), filepath.Base(it.path))
+			it.replaceFileID = m.Library.FileID
+		case m.Verdict != VerdictNone:
+			if episodeID > 0 {
+				return Result{}, &InLibraryError{m}
+			}
+			refused++
+			continue
+		}
+		keep = append(keep, it)
 	}
-	return out
+	res, err := s.enqueue(ctx, keep, userID)
+	res.Skipped += refused
+	return res, err
 }
 
 // enqueue adds saves, leaving out what is already queued or saved. A failed save of the
@@ -248,17 +250,27 @@ func (s *Service) enqueue(ctx context.Context, items []item, userID int64) (Resu
 	var ids []int64
 	for _, it := range items {
 		var id int64
-		var state string
-		err := tx.QueryRowContext(ctx, `SELECT id, state FROM vod_saves WHERE source_id=? AND kind=? AND source_key=?
-			ORDER BY id DESC LIMIT 1`, it.sourceID, it.kind, it.sourceKey).Scan(&id, &state)
+		var state, oldPath string
+		err := tx.QueryRowContext(ctx, `SELECT id, state, target_path FROM vod_saves WHERE source_id=? AND kind=? AND source_key=?
+			ORDER BY id DESC LIMIT 1`, it.sourceID, it.kind, it.sourceKey).Scan(&id, &state, &oldPath)
 		switch {
 		case err == nil && (state == Failed):
 			pos++
+			var replace any
+			if it.replaceFileID > 0 {
+				replace = it.replaceFileID
+			}
+			if oldPath != it.path {
+				removeParts(oldPath) // it goes elsewhere now (an upgrade, or the library's copy went)
+			}
 			if _, err := tx.ExecContext(ctx, `UPDATE vod_saves SET state=?, attempts=0, verify_tries=0, next_attempt_at=NULL,
-				error='', finished_at=NULL, queue_pos=? WHERE id=?`, Queued, pos, id); err != nil {
+				error='', finished_at=NULL, queue_pos=?, target_path=?, replace_file_id=? WHERE id=?`, Queued, pos, it.path, replace, id); err != nil {
 				return res, err
 			}
 			res.Queued++
+			if it.replaceFileID > 0 {
+				res.Upgrades++
+			}
 			ids = append(ids, id)
 			continue
 		case err == nil && state != Cancelled && state != Skipped:
@@ -269,10 +281,8 @@ func (s *Service) enqueue(ctx context.Context, items []item, userID int64) (Resu
 			return res, err
 		}
 		state, msg, finished := Queued, "", any(nil)
-		if c.SkipExisting {
-			if it.inLibrary {
-				state, msg = Skipped, "Already in the library"
-			} else if f := existingFile(it.path, it.kind, it.season, it.episode); f != "" {
+		if c.SkipExisting && it.replaceFileID == 0 {
+			if f := existingFile(it.path, it.kind, it.season, it.episode); f != "" {
 				state, msg = Skipped, "Already saved: "+filepath.Base(f)
 			}
 		}
@@ -281,9 +291,12 @@ func (s *Service) enqueue(ctx context.Context, items []item, userID int64) (Resu
 			res.Skipped++
 		} else {
 			res.Queued++
+			if it.replaceFileID > 0 {
+				res.Upgrades++
+			}
 		}
 		pos++
-		var tmdbID, seriesID, by any
+		var tmdbID, seriesID, by, replace any
 		if it.tmdbID > 0 {
 			tmdbID = it.tmdbID
 		}
@@ -293,10 +306,13 @@ func (s *Service) enqueue(ctx context.Context, items []item, userID int64) (Resu
 		if userID > 0 {
 			by = userID
 		}
+		if it.replaceFileID > 0 {
+			replace = it.replaceFileID
+		}
 		r, err := tx.ExecContext(ctx, `INSERT INTO vod_saves(source_id, kind, vod_id, series_id, source_key, file, title, tmdb_id,
-			expected_ms, target_path, quality, state, queue_pos, error, created_at, finished_at, requested_by)
-			VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, it.sourceID, it.kind, it.vodID, seriesID, it.sourceKey, it.file, it.title,
-			tmdbID, it.expectedMS, it.path, c.Quality, state, pos, msg, now(), finished, by)
+			expected_ms, target_path, quality, state, queue_pos, error, created_at, finished_at, requested_by, replace_file_id)
+			VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, it.sourceID, it.kind, it.vodID, seriesID, it.sourceKey, it.file, it.title,
+			tmdbID, it.expectedMS, it.path, c.Quality, state, pos, msg, now(), finished, by, replace)
 		if err != nil {
 			return res, err
 		}

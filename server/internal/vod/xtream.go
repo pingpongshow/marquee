@@ -259,15 +259,24 @@ func (x *xtream) streams(ctx context.Context) ([]xtreamStream, error) {
 	return list, err
 }
 
-func (x *xtream) info(ctx context.Context, id string) (xtreamInfo, error) {
+// rawInfo is a film's "info" as the server sends it.
+func (x *xtream) rawInfo(ctx context.Context, id string) (json.RawMessage, error) {
 	var r struct {
 		Info json.RawMessage `json:"info"`
 	}
-	var out xtreamInfo
 	if err := x.call(ctx, "get_vod_info", url.Values{"vod_id": {id}}, &r); err != nil {
+		return nil, err
+	}
+	return r.Info, nil
+}
+
+func (x *xtream) info(ctx context.Context, id string) (xtreamInfo, error) {
+	var out xtreamInfo
+	raw, err := x.rawInfo(ctx, id)
+	if err != nil {
 		return out, err
 	}
-	if b := bytes.TrimSpace(r.Info); len(b) > 0 && b[0] == '{' { // some send [] when there's nothing
+	if b := bytes.TrimSpace(raw); len(b) > 0 && b[0] == '{' { // some send [] when there's nothing
 		if err := json.Unmarshal(b, &out); err != nil {
 			return out, fmt.Errorf("the server's details weren't understood: %v", x.redactErr(err))
 		}
@@ -446,10 +455,21 @@ func (s *Service) Details(ctx context.Context, id int64) {
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 	x := s.xtream(src)
-	info, err := x.info(ctx, strings.TrimPrefix(key, "xtream:"))
+	raw, err := x.rawInfo(ctx, strings.TrimPrefix(key, "xtream:"))
 	if err != nil {
 		slog.Warn("movie details", "source", src.Name, "err", err)
 		return
+	}
+	var info xtreamInfo
+	if b := bytes.TrimSpace(raw); len(b) > 0 && b[0] == '{' {
+		if err := json.Unmarshal(b, &info); err != nil {
+			slog.Warn("movie details", "source", src.Name, "err", x.redactErr(err))
+			return
+		}
+	}
+	// What the file is, for comparing it with the library's copy.
+	if q, ok := qualityFromInfo(raw); ok {
+		s.StoreMovieQuality(ctx, id, q)
 	}
 	if err := s.applyXtream(ctx, x, id, info); err != nil {
 		slog.Warn("movie details", "source", src.Name, "err", err)

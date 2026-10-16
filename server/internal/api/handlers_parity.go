@@ -275,9 +275,24 @@ func (h *Handlers) HomeHubs(ctx context.Context, _ HomeHubsRequestObject) (HomeH
 	if err != nil {
 		return nil, internal(ctx, "hubs", err)
 	}
+	home, err := h.homeLibraries(ctx)
+	if err != nil {
+		return nil, internal(ctx, "hubs", err)
+	}
 	out := HomeHubs200JSONResponse{}
 	for _, r := range rows {
 		if r.hidden {
+			continue
+		}
+		if r.id == "continue-watching" {
+			// Films and episodes on demand too, in entries; items stays as it was.
+			hub, ok, err := h.continueHub(ctx, r, home)
+			if err != nil {
+				return nil, internal(ctx, "hubs", err)
+			}
+			if ok {
+				out = append(out, hub)
+			}
 			continue
 		}
 		subs := []homeRow{r}

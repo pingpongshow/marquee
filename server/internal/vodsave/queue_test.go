@@ -131,6 +131,14 @@ func (f *fakeSource) serve(w http.ResponseWriter, r *http.Request) {
 			io.WriteString(w, series)
 		case "get_series_info":
 			io.WriteString(w, info)
+		case "get_vod_info":
+			f.mu.Lock()
+			vi := f.info["vod:"+q.Get("vod_id")]
+			f.mu.Unlock()
+			if vi == "" {
+				vi = `{"info":[]}`
+			}
+			io.WriteString(w, vi)
 		default:
 			io.WriteString(w, `[]`)
 		}

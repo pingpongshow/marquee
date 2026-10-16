@@ -163,6 +163,7 @@ func (s *Service) Run(ctx context.Context) {
 	if _, err := s.DB.ExecContext(ctx, "UPDATE vod_saves SET state=? WHERE state IN (?,?,?)", append([]any{Queued}, runningStates...)...); err != nil {
 		slog.Warn("vod saves", "err", err)
 	}
+	go s.runQuality(ctx)
 	t := time.NewTicker(s.tick())
 	defer t.Stop()
 	for {
@@ -364,6 +365,7 @@ func (s *Service) start(ctx context.Context, v Save) {
 type outcome struct {
 	path, note, sha string
 	bytes           int64
+	replaced        string // an upgrade: where the library's copy it replaced was
 }
 
 func (s *Service) setState(ctx context.Context, id int64, state string) {
@@ -388,16 +390,16 @@ func (s *Service) finish(ctx context.Context, jctx context.Context, j *job, v Sa
 	}
 	if err == nil {
 		s.DB.ExecContext(ctx, `UPDATE vod_saves SET state=?, target_path=?, verified=1, verify_note=?, sha256=?, bytes_done=?,
-			bytes_total=CASE WHEN bytes_total=0 THEN ? ELSE bytes_total END, error='', finished_at=? WHERE id=?`,
-			Done, res.path, res.note, res.sha, res.bytes, res.bytes, now(), v.ID)
-		slog.Info("vod save done", "title", v.Title, "path", res.path)
+			bytes_total=CASE WHEN bytes_total=0 THEN ? ELSE bytes_total END, error='', finished_at=?, replaced_path=? WHERE id=?`,
+			Done, res.path, res.note, res.sha, res.bytes, res.bytes, now(), res.replaced, v.ID)
+		slog.Info("vod save done", "title", v.Title, "path", res.path, "replaced", res.replaced)
 		s.mu.Lock()
 		s.drain.done++
 		if len(s.drain.titles) < 20 {
 			s.drain.titles = append(s.drain.titles, v.Title)
 		}
 		s.mu.Unlock()
-		s.saved(ctx, res.path)
+		s.saved(ctx, res.path, res.replaced != "")
 		return
 	}
 	switch cause := context.Cause(jctx); {
@@ -517,9 +519,10 @@ func (s *Service) checkDrained(ctx context.Context) {
 }
 
 // saved scans the library a file went into: now when nothing else is on its way there, or
-// at most every ScanEvery while more is.
-func (s *Service) saved(ctx context.Context, path string) {
-	if !s.cfg().ScanAfterSave || s.Libraries == nil || s.Scan == nil {
+// at most every ScanEvery while more is. An upgrade's library is always scanned (its item
+// points at the new file, which the scan reads).
+func (s *Service) saved(ctx context.Context, path string, upgrade bool) {
+	if (!s.cfg().ScanAfterSave && !upgrade) || s.Libraries == nil || s.Scan == nil {
 		return
 	}
 	libs, err := s.Libraries(ctx)

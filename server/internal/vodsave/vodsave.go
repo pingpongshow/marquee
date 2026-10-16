@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"marquee/internal/library"
+	"marquee/internal/mediatrash"
 	"marquee/internal/metadata/tmdb"
 	"marquee/internal/settings"
 	"marquee/internal/vod"
@@ -88,6 +89,11 @@ type Service struct {
 	OnDrained func(done, failed int, titles []string)
 	// FreeSpace reports the bytes free on the volume holding path (tests replace it).
 	FreeSpace func(path string) (uint64, error)
+	// Trash takes the library's copy an upgrade replaces (to the media trash); without it
+	// upgrades fail.
+	Trash *mediatrash.Service
+	// ProbeRemote reads a remote file's video (tests replace it; default ffprobe).
+	ProbeRemote func(ctx context.Context, link, userAgent string) (vod.Quality, error)
 
 	// Timings; zero values are the defaults.
 	Tick             time.Duration   // how often the queue is looked at (2 s)
@@ -96,6 +102,7 @@ type Service struct {
 	SourceDownWait   time.Duration   // first wait for a source that's down (1 min, doubling to 30)
 	RetryFailedEvery time.Duration   // failed saves are queued again this often (4 h)
 	ScanEvery        time.Duration   // while a library keeps getting files, scans at most this often (15 min)
+	ProbeGap         time.Duration   // the least time between two probes of files on demand (2 s)
 
 	once        sync.Once
 	mu          sync.Mutex
@@ -108,6 +115,13 @@ type Service struct {
 	pendingScan map[int64]bool
 	lastRetry   time.Time
 	drain       drainCount
+
+	// Checking the quality of files on demand.
+	probeMu        sync.Mutex
+	lastProbe      time.Time
+	qualityQueue   []qualityKey
+	qualityWaiting map[qualityKey]bool
+	qualityWake    chan struct{}
 }
 
 type sourceDown struct {
@@ -131,6 +145,8 @@ func (s *Service) init() {
 		s.lastScan = map[int64]time.Time{}
 		s.pendingScan = map[int64]bool{}
 		s.lastRetry = time.Now()
+		s.qualityWaiting = map[qualityKey]bool{}
+		s.qualityWake = make(chan struct{}, 1)
 	})
 }
 
@@ -175,6 +191,10 @@ type Save struct {
 	StartedAt     *time.Time
 	FinishedAt    *time.Time
 	RequestedBy   int64
+	// An upgrade replaces the library's copy: its file (ReplaceFileID) goes to the media
+	// trash once the new one is verified; ReplacedPath is where it was (when done).
+	ReplaceFileID int64
+	ReplacedPath  string
 	// Live, while it runs.
 	Progress    float64 // 0–1 of the current step (processing, verifying); downloads use bytes
 	SpeedBps    float64
@@ -184,14 +204,14 @@ type Save struct {
 
 const saveCols = `id, source_id, kind, vod_id, COALESCE(series_id,0), source_key, file, title, COALESCE(tmdb_id,0), expected_ms,
 	target_path, quality, state, bytes_done, bytes_total, attempts, next_attempt_at, error, verified, verify_note, sha256,
-	created_at, started_at, finished_at, COALESCE(requested_by,0)`
+	created_at, started_at, finished_at, COALESCE(requested_by,0), COALESCE(replace_file_id,0), replaced_path`
 
 func scanSave(sc interface{ Scan(...any) error }) (Save, error) {
 	var v Save
 	var next, created, started, finished sql.NullString
 	err := sc.Scan(&v.ID, &v.SourceID, &v.Kind, &v.VODID, &v.SeriesID, &v.SourceKey, &v.File, &v.Title, &v.TMDBID, &v.ExpectedMS,
 		&v.TargetPath, &v.Quality, &v.State, &v.BytesDone, &v.BytesTotal, &v.Attempts, &next, &v.Error, &v.Verified, &v.VerifyNote,
-		&v.SHA256, &created, &started, &finished, &v.RequestedBy)
+		&v.SHA256, &created, &started, &finished, &v.RequestedBy, &v.ReplaceFileID, &v.ReplacedPath)
 	if err != nil {
 		return v, err
 	}

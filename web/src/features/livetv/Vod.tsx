@@ -393,7 +393,9 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
   // While it's being saved, the button's state follows along.
   const movie = useQuery({
     ...vodMovieQuery(movieId),
-    refetchInterval: (q) => (saveActive(q.state.data?.save?.state) ? 2000 : false),
+    // Also while the copy's quality is being checked, to compare it with the library's.
+    refetchInterval: (q) =>
+      saveActive(q.state.data?.save?.state) ? 2000 : q.state.data?.library?.pending ? 4000 : false,
   });
   const watched = useVodWatched(movieId);
   const navigate = useNavigate();
@@ -465,7 +467,7 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
               >
                 <Check className={isWatched ? "size-4 text-success" : "size-4"} /> {isWatched ? "Watched" : "Mark watched"}
               </Button>
-              {m.canSave && <SaveMovieButton movieId={m.id} save={m.save} />}
+              {m.canSave && <SaveMovieButton movieId={m.id} save={m.save} library={m.library} />}
             </div>
             {m.tagline && <p className="mt-4 text-lg text-muted italic">{m.tagline}</p>}
             {m.overview && <p className="mt-5 max-w-3xl leading-relaxed text-text/90">{m.overview}</p>}

@@ -5,12 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 
 	"marquee/internal/auth"
 	"marquee/internal/netclass"
 	"marquee/internal/playback"
 	"marquee/internal/vod"
+	"marquee/internal/vodsave"
 )
 
 // TV series on demand from Xtream Codes sources (LIVE-6), alongside the films.
@@ -213,6 +215,35 @@ func (h *Handlers) GetVodSeries(ctx context.Context, req GetVodSeriesRequestObje
 		if states, err := h.VODSaves.EpisodeStates(ctx, m.ID); err == nil {
 			for i := range out.Episodes {
 				out.Episodes[i].Save = toAPIVodSaveState(states[out.Episodes[i].Id])
+			}
+		}
+		// How each episode compares with the library's copy, with each season's and the
+		// show's counts.
+		if *out.CanSave {
+			if matches, err := h.VODSaves.EpisodeMatches(ctx, m.ID); err == nil {
+				var show vodsave.Rollup
+				seasons := map[int]*vodsave.Rollup{}
+				for i := range out.Episodes {
+					e := &out.Episodes[i]
+					lm, ok := matches[e.Id]
+					if !ok {
+						continue
+					}
+					e.Library = toAPIVodLibraryMatch(lm)
+					show.Add(lm)
+					if seasons[e.Season] == nil {
+						seasons[e.Season] = &vodsave.Rollup{}
+					}
+					seasons[e.Season].Add(lm)
+				}
+				out.Library = toAPIVodRollup(show)
+				for i := range out.Seasons {
+					if r := seasons[out.Seasons[i].Season]; r != nil {
+						out.Seasons[i].Library = toAPIVodRollup(*r)
+					}
+				}
+			} else {
+				slog.WarnContext(ctx, "vod library matches", "err", err)
 			}
 		}
 	}

@@ -569,6 +569,7 @@ func (s *Service) storeEpisodes(ctx context.Context, x *xtream, seriesID int64, 
 	defer stmt.Close()
 	seen := map[string]bool{}
 	seasons := map[int]bool{}
+	quality := map[string]Quality{} // what the server says the files are
 	for _, e := range info.Episodes {
 		id := e.ID.Int()
 		if id <= 0 {
@@ -589,6 +590,9 @@ func (s *Service) storeEpisodes(ctx context.Context, x *xtream, seriesID int64, 
 		if b := bytes.TrimSpace(e.Info); len(b) > 0 && b[0] == '{' {
 			json.Unmarshal(b, &ei)
 		}
+		if q, ok := qualityFromInfo(e.Info); ok {
+			quality[k] = q
+		}
 		var rating any
 		if r := ei.Rating.Float(); r > 0 && r <= 10 {
 			rating = r
@@ -607,6 +611,27 @@ func (s *Service) storeEpisodes(ctx context.Context, x *xtream, seriesID int64, 
 		if !seen[k] {
 			if _, err := tx.ExecContext(ctx, "DELETE FROM vod_episodes WHERE id=?", id); err != nil {
 				return err
+			}
+		}
+	}
+	if len(quality) > 0 {
+		ids := map[string]int64{}
+		rows, err := tx.QueryContext(ctx, "SELECT id, source_key FROM vod_episodes WHERE series_id=?", seriesID)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var id int64
+			var k string
+			rows.Scan(&id, &k)
+			ids[k] = id
+		}
+		rows.Close()
+		for k, q := range quality {
+			if id := ids[k]; id > 0 {
+				if err := s.storeQuality(ctx, tx, "episode_id", id, q); err != nil {
+					return err
+				}
 			}
 		}
 	}

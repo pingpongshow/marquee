@@ -2,10 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
+  ArrowUpCircle,
   ArrowUpToLine,
   Check,
   Download,
   HardDriveDownload,
+  Library,
   Loader2,
   Pause,
   Play,
@@ -21,6 +23,8 @@ import {
   useSaveAction,
   useSaveVod,
   vodSavesQuery,
+  type VodLibraryMatch,
+  type VodLibraryRollup,
   type VodSave,
   type VodSaveState,
 } from "./vodApi";
@@ -55,75 +59,204 @@ export function saveLabel(s?: VodSaveState | null): string {
   }
 }
 
-function toastResult(r: { queued: number; already: number; skipped: number }) {
+const codecNames: Record<string, string> = { h264: "H.264", hevc: "HEVC", av1: "AV1", vp9: "VP9", mpeg2video: "MPEG-2" };
+
+/** "1080p HEVC" for a button; the full summary (with HDR and bitrate) goes in tooltips. */
+export function shortQuality(q?: VodLibraryMatch["quality"]) {
+  if (!q) return "";
+  const codec = q.codec ? (codecNames[q.codec.toLowerCase()] ?? q.codec.toUpperCase()) : "";
+  return [q.resolution ? `${q.resolution}p` : "", codec].filter(Boolean).join(" ");
+}
+
+/** Both copies' quality and why, for a tooltip. */
+export function libraryTitle(l?: VodLibraryMatch | null) {
+  if (!l || l.verdict === "none") return "";
+  return [
+    `This copy: ${l.quality?.summary || "quality not known yet"}`,
+    `Library: ${l.libraryQuality?.summary || "quality not known"}`,
+    l.reason,
+  ].join("\n");
+}
+
+/** What a film's or episode's save button offers, given how it compares with the library. */
+export function libraryAction(l?: VodLibraryMatch | null): { can: boolean; upgrade: boolean; label: string } {
+  switch (l?.verdict) {
+    case "better": {
+      const from = shortQuality(l.libraryQuality);
+      return { can: true, upgrade: true, label: `Upgrade (${shortQuality(l.quality) || "better"}${from ? ` → replaces ${from}` : ""})` };
+    }
+    case "same":
+      return { can: false, upgrade: false, label: l.pending ? "In library (checking quality…)" : "In library (same quality)" };
+    case "worse":
+      return { can: false, upgrade: false, label: "In library (better quality)" };
+  }
+  return { can: true, upgrade: false, label: "Save to library" };
+}
+
+function toastResult(r: { queued: number; already: number; skipped: number; upgrades?: number }) {
   const parts = [
-    r.queued && `${r.queued} queued`,
+    r.queued && `${r.queued} queued${r.upgrades ? ` (${r.upgrades} upgrade${r.upgrades === 1 ? "" : "s"})` : ""}`,
     r.already && `${r.already} already queued or saved`,
     r.skipped && `${r.skipped} already in the library`,
   ].filter(Boolean);
   toast(parts.length ? parts.join(", ") : "Nothing to save", { link: { to: "/vod/saves", label: "Saves" } });
 }
 
-/** A film page's "Save to library" button with its state. */
-export function SaveMovieButton({ movieId, save }: { movieId: number; save?: VodSaveState | null }) {
+/**
+ * A film page's save button with its state: Save, Upgrade (replacing the library's copy),
+ * or, when the library has it as well or better, disabled with the reason.
+ */
+export function SaveMovieButton({
+  movieId,
+  save,
+  library,
+}: {
+  movieId: number;
+  save?: VodSaveState | null;
+  library?: VodLibraryMatch | null;
+}) {
   const m = useSaveVod();
   const state = save?.state;
   const busy = saveActive(state) || state === "paused";
   const done = state === "done" || state === "skipped";
+  const action = libraryAction(library);
+  // A save on its way, or just finished, shows its state; otherwise what the library allows.
+  const showSave = busy || state === "failed" || (done && action.can && !action.upgrade);
+  const label = showSave ? (state === "failed" ? "Save failed — try again" : saveLabel(save)) : action.label;
+  const disabled = busy || m.isPending || !action.can || (done && !action.upgrade);
   return (
     <Button
       variant="ghost"
-      onClick={() => m.mutate({ movieId }, { onSuccess: toastResult, onError: (e) => toast(e.message, { tone: "error" }) })}
-      disabled={busy || done || m.isPending}
-      title={save?.error || (done ? "Already in the library" : "Save a copy into the library's movies folder")}
+      onClick={() =>
+        m.mutate(
+          { movieId, upgrade: action.upgrade },
+          { onSuccess: toastResult, onError: (e) => toast(e.message, { tone: "error" }) },
+        )
+      }
+      disabled={disabled}
+      title={
+        save?.error ||
+        libraryTitle(library) ||
+        (done ? "Already in the library" : "Save a copy into the library's movies folder")
+      }
     >
-      {done ? (
+      {showSave && done ? (
         <Check className="size-4 text-success" />
-      ) : busy ? (
+      ) : busy || library?.pending ? (
         <Loader2 className="size-4 animate-spin" />
       ) : state === "failed" ? (
         <AlertTriangle className="size-4 text-danger" />
+      ) : action.upgrade ? (
+        <ArrowUpCircle className="size-4 text-accent" />
+      ) : !action.can ? (
+        <Library className="size-4" />
       ) : (
         <HardDriveDownload className="size-4" />
       )}
-      {state === "failed" ? "Save failed — try again" : saveLabel(save)}
+      {label}
     </Button>
   );
 }
 
-/** Save buttons for a show or one season. */
-export function SaveSeriesButton({ seriesId, season, label }: { seriesId: number; season?: number; label: string }) {
+/**
+ * Save buttons for a show or one season: "Save missing (N)" queues the episodes the library
+ * lacks; "Upgrade (M)" also queues those better than the library's copies, replacing them.
+ */
+export function SaveSeriesButton({
+  seriesId,
+  season,
+  label,
+  library,
+}: {
+  seriesId: number;
+  season?: number;
+  label: string;
+  library?: VodLibraryRollup | null;
+}) {
   const m = useSaveVod();
+  const run = (includeUpgrades: boolean) =>
+    m.mutate(
+      { seriesId, season, includeUpgrades },
+      { onSuccess: toastResult, onError: (e) => toast(e.message, { tone: "error" }) },
+    );
+  const what = season == null ? "show" : "season";
+  if (!library)
+    return (
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() => run(false)}
+        loading={m.isPending}
+        title="Save copies of the episodes into the library's shows folder"
+      >
+        {!m.isPending && <HardDriveDownload className="size-4" />} {label}
+      </Button>
+    );
+  const have = library.same + library.worse;
+  const checking = library.pending ? ` ${library.pending} still being checked.` : "";
   return (
-    <Button
-      size="sm"
-      variant="ghost"
-      onClick={() =>
-        m.mutate({ seriesId, season }, { onSuccess: toastResult, onError: (e) => toast(e.message, { tone: "error" }) })
-      }
-      loading={m.isPending}
-      title="Save copies of the episodes into the library's shows folder"
-    >
-      {!m.isPending && <HardDriveDownload className="size-4" />} {label}
-    </Button>
+    <>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() => run(false)}
+        loading={m.isPending}
+        disabled={library.none === 0}
+        title={
+          library.none
+            ? `Save the ${library.none} episode${library.none === 1 ? "" : "s"} of this ${what} the library doesn't have.${have ? ` ${have} already in the library as well or better.` : ""}${checking}`
+            : `The library has every episode of this ${what}.${checking}`
+        }
+      >
+        {!m.isPending && <HardDriveDownload className="size-4" />}{" "}
+        {library.none ? `Save missing (${library.none})` : "Nothing missing"}
+      </Button>
+      {library.better > 0 && (
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => run(true)}
+          disabled={m.isPending}
+          title={`Replace the library's copies of ${library.better} episode${library.better === 1 ? "" : "s"} with better ones${library.none ? `, and save the ${library.none} missing` : ""}. The old files go to the media trash.`}
+        >
+          <ArrowUpCircle className="size-4 text-accent" /> Upgrade ({library.better})
+        </Button>
+      )}
+    </>
   );
 }
 
-/** An episode row's save icon, showing its state. */
-export function SaveEpisodeIcon({ episodeId, save }: { episodeId: number; save?: VodSaveState | null }) {
+/** An episode row's save icon, showing its state and how it compares with the library. */
+export function SaveEpisodeIcon({
+  episodeId,
+  save,
+  library,
+}: {
+  episodeId: number;
+  save?: VodSaveState | null;
+  library?: VodLibraryMatch | null;
+}) {
   const m = useSaveVod();
   const state = save?.state;
-  const label = saveLabel(save);
-  const can = !state || state === "failed" || state === "cancelled";
+  const action = libraryAction(library);
+  const idle = !state || state === "failed" || state === "cancelled" || ((state === "done" || state === "skipped") && action.upgrade);
+  const can = idle && action.can;
+  const label = idle ? action.label : saveLabel(save);
   return (
     <button
-      onClick={() => can && m.mutate({ episodeId }, { onError: (e) => toast(e.message, { tone: "error" }) })}
+      onClick={() =>
+        can && m.mutate({ episodeId, upgrade: action.upgrade }, { onError: (e) => toast(e.message, { tone: "error" }) })
+      }
       disabled={!can || m.isPending}
       className="inline-flex items-center gap-1 rounded-full p-1.5 text-xs hover:bg-surface-2 disabled:cursor-default disabled:hover:bg-transparent"
-      aria-label={can ? "Save episode to library" : label}
-      title={save?.error || (can ? "Save to library" : label)}
+      aria-label={label}
+      title={[save?.error, label, libraryTitle(library)].filter(Boolean).join("\n")}
     >
-      {state === "done" || state === "skipped" ? (
+      {idle && action.upgrade && !m.isPending ? (
+        <ArrowUpCircle className="size-4 text-accent" />
+      ) : idle && !action.can ? (
+        library?.pending ? <Loader2 className="size-4 animate-spin text-faint" /> : <Library className="size-4 text-success" />
+      ) : state === "done" || state === "skipped" ? (
         <HardDriveDownload className="size-4 text-success" />
       ) : saveActive(state) || m.isPending ? (
         <>
@@ -202,8 +335,16 @@ function SaveRow({ v }: { v: VodSave }) {
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium">{v.title}</span>
             <Badge tone={v.state === "failed" ? "danger" : running || v.state === "done" ? "accent" : "muted"}>
-              {stateText[v.state]}
+              {v.state === "done" && v.replacedPath ? "Upgraded" : stateText[v.state]}
             </Badge>
+            {v.upgrade && v.state !== "done" && (
+              <span
+                className="inline-flex items-center gap-1 text-xs text-accent"
+                title="Replaces the library's copy, which goes to the media trash once this one is verified"
+              >
+                <ArrowUpCircle className="size-3.5" /> Upgrade
+              </span>
+            )}
             {v.verified && (
               <span className="inline-flex items-center gap-1 text-xs text-success" title={v.verifyNote}>
                 <ShieldCheck className="size-3.5" /> Verified
@@ -213,6 +354,11 @@ function SaveRow({ v }: { v: VodSave }) {
           <div className="mt-0.5 truncate font-mono text-xs text-faint" title={v.targetPath}>
             {v.targetPath}
           </div>
+          {v.replacedPath && (
+            <div className="mt-0.5 truncate text-xs text-muted" title={v.replacedPath}>
+              Replaced {v.replacedPath} (moved to the media trash)
+            </div>
+          )}
           {details.length > 0 && <div className="mt-0.5 text-xs text-muted">{details.join(" · ")}</div>}
           {v.state === "queued" && v.pauseReason && <div className="mt-0.5 text-xs text-muted">{v.pauseReason}</div>}
           {v.error && v.state !== "skipped" && (

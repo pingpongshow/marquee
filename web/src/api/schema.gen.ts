@@ -1581,6 +1581,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/hubs/continue-watching": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All of the caller's Continue Watching, newest first, a page at a time: in-progress library movies, episodes and videos, the next episode of every show they've watched (no time limit), and films and episodes on demand stopped part-way through (when on demand is on and theirs to watch). Home's row is the first 20. */
+        get: operations["continueWatching"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/hubs/continue-watching/vod/{kind}/{vodId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "movie" | "episode";
+                /** @description The film's or episode's id. */
+                vodId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Removes a film on demand, or an episode's series, from your Continue Watching. The resume point is kept; it comes back once you play it (or, for a series, any of its episodes) again. */
+        delete: operations["removeVodFromContinueWatching"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/hubs/continue-watching/{itemId}": {
         parameters: {
             query?: never;
@@ -2566,7 +2604,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Save a film into the library (admin only; Xtream Codes sources). Queued, downloaded, converted per Settings → vodSave, verified, moved into vodSave.moviesFolder and scanned. A film already queued or saved isn't queued again; one in the library is skipped (vodSave.skipExisting). */
+        /** Save a film into the library (admin only; Xtream Codes sources). Queued, downloaded, converted per Settings → vodSave, verified, moved into vodSave.moviesFolder and scanned. A film already queued or saved isn't queued again. One the library already has (VodMovieDetail.library) is refused with 409: in_library when the library's copy is as good or better, upgrade_available when this copy is better and upgrade wasn't set. With upgrade, a better copy replaces the library's: saved into the same folder, the old file(s) moved to the media trash, the item (and its watch history) kept. */
         post: operations["saveVodMovie"];
         delete?: never;
         options?: never;
@@ -2585,7 +2623,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Save one episode into the library (admin only), into vodSave.showsFolder: {Show (Year)}/Season N/{Show} - SxxEyy - {Title} WEBDL-1080p.ext. */
+        /** Save one episode into the library (admin only), into vodSave.showsFolder: {Show (Year)}/Season N/{Show} - SxxEyy - {Title} WEBDL-1080p.ext. Like a film: 409 in_library or upgrade_available when the library has it; upgrade replaces the library's copy when this one is better. */
         post: operations["saveVodEpisode"];
         delete?: never;
         options?: never;
@@ -2607,7 +2645,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Save a whole series, or one season, into the library (admin only). The episodes are fetched from the source first when they haven't been; ones already queued or saved are left out. */
+        /** Save a whole series, or one season, into the library (admin only). The episodes are fetched from the source first when they haven't been; ones already queued or saved are left out. Only episodes the library doesn't have are queued, plus (includeUpgrades) those better than the library's copies, which they replace; the rest count as skipped. */
         post: operations["saveVodSeries"];
         delete?: never;
         options?: never;
@@ -4439,6 +4477,7 @@ export interface components {
             /** @description The caller (an admin) can save it into the library: an Xtream Codes film with a movies folder set. */
             canSave?: boolean;
             save?: components["schemas"]["VodSaveState"];
+            library?: components["schemas"]["VodLibraryMatch"];
         };
         VodMoviePage: {
             total: number;
@@ -4508,6 +4547,7 @@ export interface components {
             episodesError?: string;
             /** @description The caller (an admin) can save its episodes into the library (shows folder set). Each episode's save is in episodes[].save. */
             canSave?: boolean;
+            library?: components["schemas"]["VodLibraryRollup"];
         };
         VodSeason: {
             /** @description The season number (0 = specials). */
@@ -4522,6 +4562,49 @@ export interface components {
             episodeCount: number;
             /** @description Episodes the caller has watched. */
             watchedCount: number;
+            library?: components["schemas"]["VodLibraryRollup"];
+        };
+        /** @description What a video file is. */
+        VodQuality: {
+            width?: number;
+            height?: number;
+            /** @description The standard resolution: 2160, 1080, 720, 576 or 480 (absent when unknown). */
+            resolution?: number;
+            /** @description ffprobe's name, e.g. h264, hevc, av1. */
+            codec?: string;
+            /** @description Absent for SDR; e.g. HDR10, hdr10plus, HLG, dolby_vision. */
+            hdr?: string;
+            /** @description The whole file's bitrate. */
+            bitrateKbps?: number;
+            /** @description e.g. 1080p HEVC HDR10 8.0 Mb/s (empty when nothing is known). */
+            summary: string;
+        };
+        /** @description How a film or episode on demand compares with the library's copy (admins only). Found by TMDB id (films; shows plus season and episode), else by the same title and year. Compared by resolution, then HDR over SDR, then a codec-adjusted bitrate at least 1.5× higher (HEVC and AV1 count 1.5× H.264); else the same. none: not in the library (Save). better: this copy is better (Upgrade, replacing the library's). same, worse: saving isn't possible. */
+        VodLibraryMatch: {
+            /** @enum {string} */
+            verdict: "none" | "better" | "same" | "worse";
+            /** @description Why, e.g. Higher resolution (1080p; the library's is 720p). */
+            reason: string;
+            quality?: components["schemas"]["VodQuality"];
+            libraryQuality?: components["schemas"]["VodQuality"];
+            /**
+             * Format: int64
+             * @description The library's film or episode.
+             */
+            libraryItemId?: number;
+            /** @description This copy's quality is being checked (the verdict is same until then); fetch again in a few seconds. */
+            pending?: boolean;
+        };
+        /** @description A season's or show's episodes by VodLibraryMatch verdict (admins only): Save missing saves none, Upgrade saves better. */
+        VodLibraryRollup: {
+            /** @description Episodes not in the library. */
+            none: number;
+            /** @description Episodes better than the library's copies. */
+            better: number;
+            same: number;
+            worse: number;
+            /** @description Episodes whose quality is being checked (counted as same meanwhile). */
+            pending?: number;
         };
         VodEpisode: {
             /** Format: int64 */
@@ -4548,6 +4631,7 @@ export interface components {
             positionMs?: number;
             watched: boolean;
             save?: components["schemas"]["VodSaveState"];
+            library?: components["schemas"]["VodLibraryMatch"];
         };
         /** @description Saving films and episodes on demand (Xtream Codes sources) into the library (admins only). Partial sends keep the other fields. */
         VodSaveSettings: {
@@ -4583,7 +4667,7 @@ export interface components {
             concurrentPerSource?: number;
             /** @description Scan the library whose folder holds a saved file. Default on. */
             scanAfterSave?: boolean;
-            /** @description Skip a title already in a library (by TMDB id) or whose file is already there. Default on. */
+            /** @description Skip a title whose file is already in its folder. Default on. (A title the library already has is never saved again, unless as an upgrade: see VodLibraryMatch.) */
             skipExisting?: boolean;
             /** @description Pause saves while someone watches (see pauseScope), resuming 60 s after. Default on. */
             pauseWhileWatching?: boolean;
@@ -4676,6 +4760,10 @@ export interface components {
             startedAt?: string;
             /** Format: date-time */
             finishedAt?: string;
+            /** @description It replaces the library's copy (moved to the media trash once this one is verified). */
+            upgrade?: boolean;
+            /** @description An upgrade, once done: where the library's copy it replaced was (shown as Upgraded). */
+            replacedPath?: string;
         };
         VodSaveQueue: {
             saves: components["schemas"]["VodSave"][];
@@ -4691,8 +4779,10 @@ export interface components {
             queued: number;
             /** @description Already queued or saved. */
             already: number;
-            /** @description Already in the library. */
+            /** @description Already in the library (as well or better, or better without includeUpgrades). */
             skipped: number;
+            /** @description Of queued, upgrades replacing the library's copies. */
+            upgrades?: number;
             saves: components["schemas"]["VodSave"][];
         };
         VodSeriesPage: {
@@ -5664,6 +5754,38 @@ export interface components {
             /** Format: int64 */
             libraryId?: number;
             items: components["schemas"]["ItemSummary"][];
+            /** @description Continue Watching only: the row's entries, library items and films and episodes on demand together, newest first (up to 20; items stays library-only for older apps). When it's present show it instead of items. The row is sent when either has something. */
+            entries?: components["schemas"]["ContinueEntry"][];
+            /** @description Continue Watching only: how many entries there are in all (GET /hubs/continue-watching); more than entries holds means a View more link. */
+            total?: number;
+        };
+        /** @description A Continue Watching entry: a library item (an in-progress movie, episode or video, or a show's next episode) or a film or episode on demand stopped part-way through. */
+        ContinueEntry: {
+            /** @enum {string} */
+            kind: "item" | "vodMovie" | "vodEpisode";
+            /** @description Unique within the list, e.g. item:12, vodMovie:5, vodEpisode:7. */
+            key: string;
+            item?: components["schemas"]["ItemSummary"];
+            vodMovie?: components["schemas"]["VodMovie"];
+            vodEpisode?: components["schemas"]["VodEpisode"];
+            /** @description A vodEpisode's series poster (server-relative; no token needed). */
+            seriesPosterUrl?: string;
+            /**
+             * Format: int64
+             * @description The resume point (0 for a show's next episode).
+             */
+            positionMs: number;
+            /**
+             * Format: int64
+             * @description 0 = unknown.
+             */
+            durationMs: number;
+            /** Format: date-time */
+            lastWatchedAt: string;
+        };
+        ContinueWatchingPage: {
+            total: number;
+            entries: components["schemas"]["ContinueEntry"][];
         };
         /** @enum {string} */
         ItemType: "movie" | "show" | "season" | "episode" | "artist" | "album" | "track" | "video" | "collection";
@@ -9176,6 +9298,55 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    continueWatching: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of entries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContinueWatchingPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    removeVodFromContinueWatching: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "movie" | "episode";
+                /** @description The film's or episode's id. */
+                vodId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     removeFromContinueWatching: {
         parameters: {
             query?: never;
@@ -10852,7 +11023,10 @@ export interface operations {
     };
     saveVodMovie: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Replace the library's copy when this one is better (VodLibraryMatch.verdict better). */
+                upgrade?: boolean;
+            };
             header?: never;
             path: {
                 movieId: number;
@@ -10874,12 +11048,16 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
     saveVodEpisode: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Replace the library's copy when this one is better. */
+                upgrade?: boolean;
+            };
             header?: never;
             path: {
                 episodeId: number;
@@ -10901,6 +11079,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -10909,6 +11088,8 @@ export interface operations {
             query?: {
                 /** @description Only this season's episodes. */
                 season?: number;
+                /** @description Also queue episodes better than the library's copies, replacing them. */
+                includeUpgrades?: boolean;
             };
             header?: never;
             path: {

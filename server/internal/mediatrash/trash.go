@@ -51,65 +51,105 @@ func (s *Service) now() time.Time {
 // library. When it was its item's last file the item goes too, with a season or show (or
 // album or artist) left empty. by names who asked, for the log.
 func (s *Service) Delete(ctx context.Context, fileID int64, by string) error {
+	m, err := s.move(ctx, fileID)
+	if err != nil {
+		return err
+	}
+	if err := s.forget(ctx, fileID, m.libID); err != nil {
+		m.undo()
+		return err
+	}
+	slog.InfoContext(ctx, "media file deleted to the trash", "by", by, "file", m.path, "trash", m.moved[0][1], "sidecars", len(m.moved)-1)
+	return nil
+}
+
+// Trash moves media files (each with its own sidecars) to the trash and leaves the
+// library's records alone: a file replaced by a better copy keeps its item, whose record
+// the caller points at the new file. undo puts every file back. It returns the files'
+// paths as they were.
+func (s *Service) Trash(ctx context.Context, fileIDs []int64, why string) (paths []string, undo func(), err error) {
+	var done []moved
+	undo = func() {
+		for i := len(done) - 1; i >= 0; i-- {
+			done[i].undo()
+		}
+	}
+	for _, id := range fileIDs {
+		m, err := s.move(ctx, id)
+		if err != nil {
+			undo()
+			return nil, func() {}, err
+		}
+		done = append(done, m)
+		paths = append(paths, m.path)
+		slog.InfoContext(ctx, "media file moved to the trash", "why", why, "file", m.path, "trash", m.moved[0][1], "sidecars", len(m.moved)-1)
+	}
+	return paths, undo, nil
+}
+
+// moved is a file (and its sidecars) moved to the trash.
+type moved struct {
+	path  string
+	libID int64
+	moved [][2]string // from, to
+}
+
+func (m moved) undo() {
+	for i := len(m.moved) - 1; i >= 0; i-- {
+		os.Rename(m.moved[i][1], m.moved[i][0])
+	}
+}
+
+// move moves a media file and its own sidecars into its library folder's trash.
+func (s *Service) move(ctx context.Context, fileID int64) (moved, error) {
 	var path string
 	var libID int64
 	err := s.DB.QueryRowContext(ctx, `SELECT path, library_id FROM media_files WHERE id = ?`, fileID).Scan(&path, &libID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return ErrNotFound
+		return moved{}, ErrNotFound
 	}
 	if err != nil {
-		return err
+		return moved{}, err
 	}
+	m := moved{path: path, libID: libID}
 	root, err := s.rootFor(ctx, libID, path)
 	if err != nil {
-		return err
+		return m, err
 	}
 	if _, err := os.Lstat(path); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return &MoveError{"The file isn't on disk any more, so there's nothing to move to the trash"}
+			return m, &MoveError{"The file isn't on disk any more, so there's nothing to move to the trash"}
 		}
-		return moveError(err)
+		return m, moveError(err)
 	}
 	others, err := s.mediaInDir(ctx, path, fileID)
 	if err != nil {
-		return err
+		return m, err
 	}
 	files := append([]string{path}, ownSidecars(path, others)...)
 
 	day := filepath.Join(root, library.TrashDir, s.now().Format(dateLayout))
-	var moved [][2]string // from, to
-	undo := func() {
-		for i := len(moved) - 1; i >= 0; i-- {
-			os.Rename(moved[i][1], moved[i][0])
-		}
-	}
 	for _, from := range files {
 		rel, err := filepath.Rel(root, from)
 		if err != nil || strings.HasPrefix(rel, "..") {
-			undo()
-			return &MoveError{"The file isn't inside its library folder"}
+			m.undo()
+			return m, &MoveError{"The file isn't inside its library folder"}
 		}
 		to := free(filepath.Join(day, rel))
 		if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
-			undo()
-			return moveError(err)
+			m.undo()
+			return m, moveError(err)
 		}
 		if err := os.Rename(from, to); err != nil {
 			if from != path && errors.Is(err, os.ErrNotExist) {
 				continue // a sidecar went in the meantime
 			}
-			undo()
-			return moveError(err)
+			m.undo()
+			return m, moveError(err)
 		}
-		moved = append(moved, [2]string{from, to})
+		m.moved = append(m.moved, [2]string{from, to})
 	}
-
-	if err := s.forget(ctx, fileID, libID); err != nil {
-		undo()
-		return err
-	}
-	slog.InfoContext(ctx, "media file deleted to the trash", "by", by, "file", path, "trash", moved[0][1], "sidecars", len(moved)-1)
-	return nil
+	return m, nil
 }
 
 // forget removes the file's row (streams and the rest cascade) and tidies the library the

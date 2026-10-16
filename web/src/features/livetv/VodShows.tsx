@@ -29,7 +29,13 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
   // While episodes are being saved, their icons follow along.
   const show = useQuery({
     ...vodSeriesQuery(seriesId),
-    refetchInterval: (q) => (q.state.data?.episodes.some((e) => saveActive(e.save?.state)) ? 3000 : false),
+    // Also while episodes' qualities are being checked, to compare them with the library's.
+    refetchInterval: (q) =>
+      q.state.data?.episodes.some((e) => saveActive(e.save?.state))
+        ? 3000
+        : q.state.data?.library?.pending
+          ? 5000
+          : false,
   });
   const seriesWatched = useVodSeriesWatched(seriesId);
   const episodeWatched = useVodEpisodeWatched();
@@ -132,7 +138,7 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
                   <Check className={s.watched ? "size-4 text-success" : "size-4"} /> {s.watched ? "Watched" : "Mark watched"}
                 </Button>
               )}
-              {s.canSave && <SaveSeriesButton seriesId={s.id} label="Save show" />}
+              {s.canSave && <SaveSeriesButton seriesId={s.id} label="Save show" library={s.library} />}
             </div>
             {s.overview && <p className="mt-5 max-w-3xl leading-relaxed text-text/90">{s.overview}</p>}
             {s.cast.length > 0 && (
@@ -170,7 +176,9 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
                   {seasonDone ? "Season watched" : "Mark season watched"}
                 </Button>
               )}
-              {seasonInfo && s.canSave && <SaveSeriesButton seriesId={s.id} season={seasonInfo.season} label="Save season" />}
+              {seasonInfo && s.canSave && (
+                <SaveSeriesButton seriesId={s.id} season={seasonInfo.season} label="Save season" library={seasonInfo.library} />
+              )}
             </div>
           )}
           {seasonInfo?.overview && <p className="mb-4 max-w-3xl text-sm text-muted">{seasonInfo.overview}</p>}
@@ -212,7 +220,7 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
                           {[e.airDate, formatDuration(e.runtimeMs)].filter(Boolean).join(" · ")}
                         </div>
                       </div>
-                      {s.canSave && <SaveEpisodeIcon episodeId={e.id} save={e.save} />}
+                      {s.canSave && <SaveEpisodeIcon episodeId={e.id} save={e.save} library={e.library} />}
                       <button
                         onClick={() => episodeWatched.mutate({ id: e.id, watched: !watched })}
                         className="rounded-full p-1.5 hover:bg-surface-2"

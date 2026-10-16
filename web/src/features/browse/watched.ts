@@ -60,13 +60,21 @@ export function applyWatched<T>(data: T, targetId: number, watched: boolean): T 
   return walk(data) as T;
 }
 
-type Hub = { id: string; items: ItemSummary[] };
+type Hub = { id: string; items: ItemSummary[]; entries?: { item?: ItemSummary }[] };
 
 /** Takes an item (or, for a show, its episodes) out of Continue Watching. */
 export function withoutContinueWatching(hubs: Hub[] | undefined, targetId: number): Hub[] | undefined {
   if (!hubs) return hubs;
+  const keep = (it: ItemSummary) => it.id !== targetId && it.grandparentId !== targetId && it.parentId !== targetId;
   return hubs.map((h) =>
-    h.id === "continue-watching" ? { ...h, items: h.items.filter((it) => it.id !== targetId && it.grandparentId !== targetId && it.parentId !== targetId) } : h,
+    h.id === "continue-watching"
+      ? {
+          ...h,
+          items: h.items.filter(keep),
+          // The row's entries (library and on demand): library ones go the same way.
+          entries: h.entries?.filter((e) => !e.item || keep(e.item)),
+        }
+      : h,
   );
 }
 
@@ -74,7 +82,7 @@ export const hubsKey = ["items", "hubs"] as const;
 
 /** Refreshes everything that shows watch state: item pages, Home rows, library grids, playlists, search. */
 export function refreshWatchState(qc: QueryClient) {
-  for (const key of [["items"], ["libraries"], ["playlists"], ["search"]]) void qc.invalidateQueries({ queryKey: key });
+  for (const key of [["items"], ["libraries"], ["playlists"], ["search"], ["continue-watching"]]) void qc.invalidateQueries({ queryKey: key });
 }
 
 /**
@@ -113,10 +121,19 @@ export function useRemoveFromContinueWatching() {
     mutationFn: (itemId: number) => unwrap(api.DELETE("/hubs/continue-watching/{itemId}", { params: { path: { itemId } } })),
     onMutate: (itemId) => {
       const old = qc.getQueryData<Hub[]>(hubsKey);
-      qc.setQueryData<Hub[]>(hubsKey, (h) => h?.map((x) => (x.id === "continue-watching" ? { ...x, items: x.items.filter((it) => it.id !== itemId) } : x)));
+      qc.setQueryData<Hub[]>(hubsKey, (h) =>
+        h?.map((x) =>
+          x.id === "continue-watching"
+            ? { ...x, items: x.items.filter((it) => it.id !== itemId), entries: x.entries?.filter((e) => e.item?.id !== itemId) }
+            : x,
+        ),
+      );
       return { old };
     },
     onError: (_e, _v, ctx) => qc.setQueryData(hubsKey, ctx?.old),
-    onSettled: () => qc.invalidateQueries({ queryKey: hubsKey }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: hubsKey });
+      qc.invalidateQueries({ queryKey: ["continue-watching"] });
+    },
   });
 }

@@ -94,8 +94,35 @@ type Hub struct {
 }
 
 // ContinueWatching returns in-progress movies/episodes/videos plus the next episode of shows
-// the user has been watching, most recent first.
+// the user has been watching (in the last 60 days), most recent first.
 func (s *Store) ContinueWatching(ctx context.Context, acc Access, libIDs []int64, limit int) ([]Summary, error) {
+	list, err := s.continueWatching(ctx, acc, libIDs, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := []Summary{}
+	for _, e := range list {
+		out = append(out, e.Item)
+	}
+	return out, nil
+}
+
+// ContinueItem is a Continue Watching entry and when it was last watched (the show's
+// latest episode for a next episode), as stored ("2006-01-02T15:04:05.000Z").
+type ContinueItem struct {
+	Item Summary
+	When string
+}
+
+// ContinueWatchingAll is the whole of Continue Watching, without ContinueWatching's limits
+// (count, and 60 days for next episodes): every in-progress movie, episode and video and
+// the next episode of every show the user has watched, newest first.
+func (s *Store) ContinueWatchingAll(ctx context.Context, acc Access, libIDs []int64) ([]ContinueItem, error) {
+	return s.continueWatching(ctx, acc, libIDs, -1)
+}
+
+// continueWatching builds Continue Watching; limit < 0 is without limits.
+func (s *Store) continueWatching(ctx context.Context, acc Access, libIDs []int64, limit int) ([]ContinueItem, error) {
 	acc.LibraryIDs = intersect(acc.LibraryIDs, libIDs)
 	ac, aargs := acc.clause()
 	uid := strconv.FormatInt(acc.UserID, 10)
@@ -123,10 +150,14 @@ func (s *Store) ContinueWatching(ctx context.Context, acc Access, libIDs []int64
 		season, ep int
 		when       string
 	}
+	recentWhere, recentLimit := ` AND us.last_viewed_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-60 days')`, 30
+	if limit < 0 {
+		recentWhere, recentLimit = "", -1
+	}
 	r, err := s.db.QueryContext(ctx, `SELECT e.grandparent_id, s.idx, e.idx, MAX(us.last_viewed_at) FROM user_item_state us
 		JOIN items e ON e.id = us.item_id AND e.type = 'episode' JOIN items s ON s.id = e.parent_id
-		WHERE us.user_id = `+uid+` AND us.play_count > 0 AND us.last_viewed_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-60 days')
-		GROUP BY e.grandparent_id ORDER BY MAX(us.last_viewed_at) DESC LIMIT 30`)
+		WHERE us.user_id = `+uid+` AND us.play_count > 0`+recentWhere+`
+		GROUP BY e.grandparent_id ORDER BY MAX(us.last_viewed_at) DESC LIMIT ?`, recentLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -186,12 +217,12 @@ func (s *Store) ContinueWatching(ctx context.Context, acc Access, libIDs []int64
 			merged[j], merged[j-1] = merged[j-1], merged[j]
 		}
 	}
-	out := []Summary{}
+	out := []ContinueItem{}
 	for _, e := range merged {
 		if len(out) == limit {
 			break
 		}
-		out = append(out, e.item)
+		out = append(out, ContinueItem{e.item, e.when})
 	}
 	return out, nil
 }

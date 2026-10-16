@@ -1,77 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ChevronRight, FolderPlus, LayoutList, UsersRound } from "lucide-react";
-import { clsx } from "clsx";
 import { useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { librariesQuery, meQuery } from "@/api/queries";
-import type { ItemSummary } from "@/api/types";
 import { Button, Spinner } from "@/components/ui";
-import { useTileMenu } from "../browse/ItemMenu";
-import { Poster } from "../browse/Poster";
-import { subtitleFor } from "../browse/format";
+import { ContinueTile, HubItem, ViewMoreTile } from "./ContinueWatching";
 import { EditHomeDialog } from "./EditHome";
 import { GettingStarted } from "./GettingStarted";
 import { pinnedTarget } from "./layout";
 import { MuseButton } from "../search/MuseVideo";
-
-function HubItem({ it, wide, continueWatching }: { it: ItemSummary; wide: boolean; continueWatching: boolean }) {
-  // The "…" menu shows on hover, and right-click opens it too.
-  const tile = useTileMenu(it, { continueWatching });
-  // Continue Watching episodes open the player directly.
-  const playable =
-    (it.type === "episode" || it.type === "movie" || it.type === "video") &&
-    wide;
-  const title = it.type === "episode" ? it.grandparentTitle : it.title;
-  const sub =
-    it.type === "episode"
-      ? `${it.parentTitle ?? ""} · E${it.index ?? ""}${it.title ? ` · ${it.title}` : ""}`
-      : subtitleFor(it);
-  const body = (
-    <>
-      <Poster
-        item={it}
-        shape={
-          wide
-            ? "wide"
-            : it.type === "album" || it.type === "artist"
-              ? "square"
-              : "poster"
-        }
-        width={wide ? 320 : 180}
-        className="group-hover:ring-2 group-hover:ring-accent"
-      />
-      <div className="mt-2 truncate text-sm font-medium">{title}</div>
-      <div className="truncate text-xs text-muted">{sub}</div>
-    </>
-  );
-  return (
-    <li
-      className={clsx("group/tile relative", wide ? "w-72 shrink-0" : "w-36 shrink-0")}
-      onContextMenu={tile.onContextMenu}
-    >
-      {playable ? (
-        <Link
-          to="/play/$itemId"
-          params={{ itemId: String(it.id) }}
-          search={{ t: undefined }}
-          className="group block"
-        >
-          {body}
-        </Link>
-      ) : (
-        <Link
-          to="/item/$itemId"
-          params={{ itemId: String(it.id) }}
-          className="group block"
-        >
-          {body}
-        </Link>
-      )}
-      {tile.menu}
-    </li>
-  );
-}
 
 export function HomePage() {
   const libraries = useQuery(librariesQuery);
@@ -112,13 +50,19 @@ export function HomePage() {
       <WatchTogetherBanner myId={me.data?.id} />
       {hubs.data?.map((hub) => {
         const wide = hub.id === "continue-watching";
+        // Continue Watching: entries holds the library's and on-demand titles together.
+        const entries = wide ? hub.entries : undefined;
         // A pinned collection or playlist opens itself (USER-12).
         const pinned = pinnedTarget(hub.id);
         return (
           <section key={hub.id}>
             <div className="mb-3 flex items-center gap-2 px-6 lg:px-8">
               <h2 className="text-lg font-semibold">
-                {pinned ? (
+                {wide ? (
+                  <Link to="/continue-watching" className="hover:underline">
+                    {hub.title}
+                  </Link>
+                ) : pinned ? (
                   <Link {...pinned} className="hover:underline">
                     {hub.title}
                   </Link>
@@ -126,7 +70,11 @@ export function HomePage() {
                   hub.title
                 )}
               </h2>
-              {pinned ? (
+              {wide ? (
+                <Link to="/continue-watching" className="text-muted hover:text-text" aria-label={`Open ${hub.title}`}>
+                  <ChevronRight className="size-5" />
+                </Link>
+              ) : pinned ? (
                 <Link
                   {...pinned}
                   className="text-muted hover:text-text"
@@ -146,9 +94,10 @@ export function HomePage() {
               )}
             </div>
             <ul className="flex gap-4 overflow-x-auto px-6 pb-2 lg:px-8">
-              {hub.items.map((it) => (
-                <HubItem key={it.id} it={it} wide={wide} continueWatching={wide} />
-              ))}
+              {entries
+                ? entries.map((e) => <ContinueTile key={e.key} e={e} />)
+                : hub.items.map((it) => <HubItem key={it.id} it={it} wide={wide} continueWatching={wide} />)}
+              {entries && (hub.total ?? 0) > entries.length && <ViewMoreTile total={hub.total ?? 0} />}
             </ul>
           </section>
         );
