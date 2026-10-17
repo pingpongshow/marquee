@@ -710,7 +710,7 @@ const presetSummary = (p: Preset) =>
     p.maxHeight ? `${p.maxHeight === 2160 ? "4K" : `${p.maxHeight}p`}` : "Same resolution",
     { hevc: "HEVC", h264: "H.264", av1: "AV1" }[p.codec],
     p.videoKbps ? `${(p.videoKbps / 1000).toFixed(1)} Mb/s` : `${p.quality} quality`,
-    p.maxSizeGb ? `at most ${p.maxSizeGb} GB` : "",
+    p.maxGbPerHour ? `at most ${p.maxGbPerHour} GB per hour` : "",
     { copy: "audio copied", default: "default audio track only", aac_stereo: "AAC stereo", aac_51: "AAC up to 5.1" }[p.audio],
     p.hdr === "tonemap" ? "HDR to SDR" : "HDR kept",
   ]
@@ -876,9 +876,9 @@ function PresetDialog({ preset, av1, onSave, onClose }: { preset: Preset; av1: b
   const [p, setP] = useState<Preset>(preset);
   const [useBitrate, setUseBitrate] = useState(!!preset.videoKbps);
   const set = (patch: Partial<Preset>) => setP((x) => ({ ...x, ...patch }));
-  const [maxSize, setMaxSize] = useState(preset.maxSizeGb ? String(preset.maxSizeGb) : "");
-  const maxSizeGb = maxSize.trim() === "" ? 0 : Number(maxSize);
-  const maxSizeOK = maxSizeGb === 0 || (Number.isFinite(maxSizeGb) && maxSizeGb >= 0.5 && maxSizeGb <= 1000);
+  const [maxSize, setMaxSize] = useState(preset.maxGbPerHour ? String(preset.maxGbPerHour) : "");
+  const maxGbPerHour = maxSize.trim() === "" ? 0 : Number(maxSize);
+  const maxSizeOK = maxGbPerHour === 0 || (Number.isFinite(maxGbPerHour) && maxGbPerHour >= 0.25 && maxGbPerHour <= 100);
   const valid = p.name.trim() !== "" && (!useBitrate || (p.videoKbps ?? 0) > 0) && maxSizeOK;
   return (
     <Dialog
@@ -890,7 +890,7 @@ function PresetDialog({ preset, av1, onSave, onClose }: { preset: Preset; av1: b
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={!valid} onClick={() => onSave({ ...p, name: p.name.trim(), videoKbps: useBitrate ? p.videoKbps : 0, maxSizeGb: maxSizeGb || undefined })}>
+          <Button variant="primary" disabled={!valid} onClick={() => onSave({ ...p, name: p.name.trim(), videoKbps: useBitrate ? p.videoKbps : 0, maxGbPerHour: maxGbPerHour || undefined })}>
             Done
           </Button>
         </>
@@ -945,11 +945,11 @@ function PresetDialog({ preset, av1, onSave, onClose }: { preset: Preset; av1: b
             </Field>
           )}
           <Field
-            label="Maximum file size (GB)"
-            help="Optional. Each file's video bitrate is capped so it fits with its audio and subtitles; files that need less stay smaller. Pair it with AAC audio: copied lossless tracks take 1.5–2 GB an hour."
-            error={maxSizeOK ? undefined : "0.5–1000 GB, or empty for no limit"}
+            label="Maximum size per hour (GB)"
+            help="Optional. At 5, a 2-hour film is at most 10 GB and a 45-minute episode 3.75 GB. Each file's video bitrate is capped so it fits with its audio and subtitles; files that need less stay smaller. Pair it with AAC audio: copied lossless tracks take 1.5–2 GB an hour."
+            error={maxSizeOK ? undefined : "0.25–100 GB per hour, or empty for no limit"}
           >
-            {(id) => <Input id={id} type="number" min={0.5} max={1000} step="0.5" value={maxSize} placeholder="No limit" onChange={(e) => setMaxSize(e.target.value)} />}
+            {(id) => <Input id={id} type="number" min={0.25} max={100} step="0.25" value={maxSize} placeholder="No limit" onChange={(e) => setMaxSize(e.target.value)} />}
           </Field>
           <Field label="Audio">
             {(id) => (

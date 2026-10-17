@@ -41,9 +41,10 @@ type OptimizePreset struct {
 	// (a target bitrate) is set.
 	Quality   string `json:"quality"`
 	VideoKbps int    `json:"videoKbps"`
-	// MaxSizeGB caps a result's size (GB, 10^9 bytes): each file's video bitrate is limited
-	// so that, with its audio and subtitles, it fits. 0 = no limit.
-	MaxSizeGB float64 `json:"maxSizeGb,omitempty"`
+	// MaxGBPerHour caps a result's size per hour of running time (GB, 10^9 bytes; 5 = a
+	// 2-hour film at most 10 GB): each file's video bitrate is limited so that, with its
+	// audio and subtitles, it fits. 0 = no limit.
+	MaxGBPerHour float64 `json:"maxGbPerHour,omitempty"`
 	// Audio: copy (every track as it is), aac_stereo or aac_51 (every track converted, at
 	// most 5.1). Every audio track (all languages, commentary) and every subtitle is always
 	// kept.
@@ -147,8 +148,8 @@ func (p OptimizePreset) Validate() error {
 	if p.VideoKbps < 0 || p.VideoKbps > 100000 {
 		return invalid("the preset %q: the video bitrate must be 0 (use the quality) to 100000 kbps", p.Name)
 	}
-	if p.MaxSizeGB != 0 && (p.MaxSizeGB < 0.5 || p.MaxSizeGB > 1000) {
-		return invalid("the preset %q: the maximum size must be 0 (no limit) or 0.5–1000 GB", p.Name)
+	if p.MaxGBPerHour != 0 && (p.MaxGBPerHour < 0.25 || p.MaxGBPerHour > 100) {
+		return invalid("the preset %q: the maximum size must be 0 (no limit) or 0.25–100 GB per hour", p.Name)
 	}
 	switch p.Audio {
 	case "copy", "aac_stereo", "aac_51":

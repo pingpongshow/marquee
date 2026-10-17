@@ -8118,7 +8118,7 @@ components:
         codec: { type: string, enum: [hevc, h264, av1], description: "AV1 only when the server has an AV1 encoder (av1Available)." }
         quality: { type: string, enum: [high, balanced, small], description: "Constant-quality level, unless videoKbps is set." }
         videoKbps: { type: integer, minimum: 0, maximum: 100000, description: "A target video bitrate instead of a quality; 0 = use the quality." }
-        maxSizeGb: { type: number, minimum: 0, maximum: 1000, description: "The largest a result may be, in GB (10^9 bytes): each file's video bitrate is capped so that, with its audio and subtitles, it fits (files that need less stay smaller). 0 or omitted = no limit." }
+        maxGbPerHour: { type: number, minimum: 0, maximum: 100, description: "The largest a result may be per hour of running time, in GB (10^9 bytes): 5 = a 2-hour film at most 10 GB. Each file's video bitrate is capped so that, with its audio and subtitles, it fits (files that need less stay smaller). 0 or omitted = no limit." }
         audio: { type: string, enum: [copy, aac_stereo, aac_51], description: "copy = every track as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1). Every audio track (all languages, commentary) and every subtitle is always kept; an MP4 with picture subtitles becomes MKV." }
         hdr: { type: string, enum: [keep, tonemap], description: "keep = HDR stays HDR (10-bit HEVC or AV1; H.264 always tone-maps); tonemap = converted to SDR." }
 

@@ -246,8 +246,8 @@ func toAPIOptimizePreset(p settings.OptimizePreset) OptimizePreset {
 	out := OptimizePreset{Id: p.ID, Name: p.Name, BuiltIn: ptr(p.BuiltIn), MaxHeight: OptimizePresetMaxHeight(p.MaxHeight), Codec: OptimizePresetCodec(p.Codec),
 		Quality: OptimizePresetQuality(p.Quality), VideoKbps: nz(p.VideoKbps), Audio: OptimizePresetAudio(p.Audio),
 		Hdr: OptimizePresetHdr(p.HDR)}
-	if p.MaxSizeGB > 0 {
-		out.MaxSizeGb = ptr(float32(p.MaxSizeGB))
+	if p.MaxGBPerHour > 0 {
+		out.MaxGbPerHour = ptr(float32(p.MaxGBPerHour))
 	}
 	return out
 }
@@ -258,9 +258,9 @@ func fromAPIOptimizePreset(p OptimizePreset) settings.OptimizePreset {
 	if p.VideoKbps != nil {
 		out.VideoKbps = *p.VideoKbps
 	}
-	if p.MaxSizeGb != nil {
+	if p.MaxGbPerHour != nil {
 		// Two decimals: float32 → float64 would otherwise turn 5.5 into 5.499999…
-		out.MaxSizeGB = math.Round(float64(*p.MaxSizeGb)*100) / 100
+		out.MaxGBPerHour = math.Round(float64(*p.MaxGbPerHour)*100) / 100
 	}
 	return out
 }

@@ -176,9 +176,9 @@ func NewPlan(src Source, p settings.OptimizePreset) (Plan, error) {
 	}
 	pl.Attachments = pl.Format == "matroska" && src.Attachments > 0 && ext == ".mkv"
 
-	// A maximum size caps the video bitrate: what's left of the size, spread over the
-	// running time, once the audio and subtitles are counted.
-	if p.MaxSizeGB > 0 && src.DurationMS > 0 {
+	// A maximum size per hour caps the video bitrate: what's left of the size, once the
+	// audio and subtitles are counted.
+	if p.MaxGBPerHour > 0 && src.DurationMS > 0 {
 		var audio, subs float64
 		for _, a := range pl.Audio {
 			if a.Codec == "copy" {
@@ -190,7 +190,7 @@ func NewPlan(src Source, p settings.OptimizePreset) (Plan, error) {
 		for _, st := range pl.Subtitles {
 			subs += subtitleKbps(st.Stream.Codec)
 		}
-		pl.MaxKbps = sizeCapKbps(p.MaxSizeGB, float64(src.DurationMS)/1000, audio+subs)
+		pl.MaxKbps = sizeCapKbps(p.MaxGBPerHour, audio+subs)
 		if pl.VideoKbps > pl.MaxKbps {
 			pl.VideoKbps = pl.MaxKbps
 		}
@@ -202,11 +202,11 @@ func NewPlan(src Source, p settings.OptimizePreset) (Plan, error) {
 // audio alone nearly fills the size comes out bigger rather than unwatchable.
 const minCapKbps = 1000
 
-// sizeCapKbps is the video bitrate that fits a file of secs into maxGB along with
-// otherKbps of audio and subtitles, leaving 3% for the container and the encoder's
-// overshoot.
-func sizeCapKbps(maxGB, secs, otherKbps float64) int {
-	total := maxGB * 1e9 * 8 / 1000 / secs * 0.97
+// sizeCapKbps is the video bitrate that keeps a file under gbPerHour along with otherKbps
+// of audio and subtitles, leaving 3% for the container and the encoder's overshoot. Per
+// hour, the cap is the same bitrate whatever the running time.
+func sizeCapKbps(gbPerHour, otherKbps float64) int {
+	total := gbPerHour * 1e9 * 8 / 1000 / 3600 * 0.97
 	return max(int(total-otherKbps), minCapKbps)
 }
 
@@ -414,8 +414,8 @@ func Estimate(f FileInfo, p settings.OptimizePreset) int64 {
 	if srcVideo > 0 && v > srcVideo {
 		v = srcVideo
 	}
-	if p.MaxSizeGB > 0 {
-		v = min(v, float64(sizeCapKbps(p.MaxSizeGB, secs, outAudio)))
+	if p.MaxGBPerHour > 0 {
+		v = min(v, float64(sizeCapKbps(p.MaxGBPerHour, outAudio)))
 	}
 	est := int64((v + outAudio) * 1000 / 8 * secs * 1.01) // ~1% container overhead
 	return min(est, f.Size)

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// A maximum size caps the video bitrate at what fits after the audio and subtitles: copied
+// A maximum size per hour caps the video bitrate at what fits after the audio and subtitles: copied
 // lossless audio (its real bitrate, or a guess for DTS-HD MA) leaves less for the video,
 // AAC leaves more; a target bitrate above the cap comes down to it; a file whose audio
 // fills the size keeps a floor.
@@ -15,12 +15,12 @@ func TestMaxSizeCapsVideo(t *testing.T) {
 		Audio:     []Stream{{Index: 1, Codec: "dts", Profile: "DTS-HD MA", Channels: 6, Kbps: 4000}},
 		Subtitles: []Stream{{Index: 2, Codec: "hdmv_pgs_subtitle"}, {Index: 3, Codec: "subrip"}}}
 	p := preset("1080p-hevc-balanced") // audio copied
-	p.MaxSizeGB = 5
+	p.MaxGBPerHour = 2.5 // a 2-hour film: at most 5 GB
 	pl, err := NewPlan(src, p)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 5 GB over 2 h = 5556 kb/s; 97% = 5388; minus 4000 audio and 41 subtitles = 1347.
+	// 2.5 GB an hour = 5556 kb/s; 97% = 5388; minus 4000 audio and 41 subtitles = 1347.
 	if pl.MaxKbps != 1347 {
 		t.Errorf("copied audio: cap %d", pl.MaxKbps)
 	}
@@ -62,25 +62,35 @@ func TestMaxSizeCapsVideo(t *testing.T) {
 	}
 
 	// A tiny size: the floor.
-	p.VideoKbps, p.MaxSizeGB = 0, 0.5
+	p.VideoKbps, p.MaxGBPerHour = 0, 0.25
 	if pl, _ = NewPlan(src, p); pl.MaxKbps != minCapKbps {
 		t.Errorf("floor: %d", pl.MaxKbps)
 	}
+	// Per hour, the cap doesn't depend on the running time: a 1-hour episode gets the same
+	// bitrate (so at most half the size).
+	p.MaxGBPerHour = 2.5
+	short := src
+	short.DurationMS = 3_600_000
+	a, _ := NewPlan(src, p)
+	b, _ := NewPlan(short, p)
+	if a.MaxKbps != b.MaxKbps {
+		t.Errorf("per hour: %d vs %d", a.MaxKbps, b.MaxKbps)
+	}
 	// No maximum: no cap.
-	p.MaxSizeGB = 0
+	p.MaxGBPerHour = 0
 	if pl, _ = NewPlan(src, p); pl.MaxKbps != 0 || has(pl.Args(src, "nvenc", "p6", "", "/m/o.part"), "-maxrate") {
 		t.Errorf("no maximum: %+v", pl)
 	}
 }
 
-// The Large files estimate respects the maximum size.
+// The Large files estimate respects the maximum size per hour.
 func TestEstimateMaxSize(t *testing.T) {
 	const gb = 1_000_000_000
 	f := FileInfo{Size: 30 * gb, DurationMS: 3 * 3_600_000, Width: 1920, Height: 1080,
 		Audio: []AudioInfo{{Codec: "dts", Profile: "DTS-HD MA 5.1", Channels: 6}}}
 	p := preset("1080p-hevc-balanced")
 	before := Estimate(f, p)
-	p.MaxSizeGB = 6
+	p.MaxGBPerHour = 2 // 3 hours: at most 6 GB
 	p.Audio = "aac_51"
 	after := Estimate(f, p)
 	if after > 6*gb || after >= before {
