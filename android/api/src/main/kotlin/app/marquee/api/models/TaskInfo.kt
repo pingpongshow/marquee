@@ -38,6 +38,7 @@ import kotlinx.serialization.Contextual
  * @param schedule Human-readable, e.g. \"Daily in the maintenance window\".
  * @param running 
  * @param lastRun 
+ * @param enabled Off: the task never runs on its schedule or automatically (after scans, recordings and the like); Run now still works. Default on.
  */
 @Serializable
 
@@ -60,7 +61,11 @@ data class TaskInfo (
     val running: kotlin.Boolean,
 
     @SerialName(value = "lastRun")
-    val lastRun: TaskRun? = null
+    val lastRun: TaskRun? = null,
+
+    /* Off: the task never runs on its schedule or automatically (after scans, recordings and the like); Run now still works. Default on. */
+    @SerialName(value = "enabled")
+    val enabled: kotlin.Boolean? = null
 
 ) {
 

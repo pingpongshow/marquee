@@ -905,9 +905,27 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     }
 
     /**
+     * enum for parameter owner
+     */
+     enum class OwnerListRecordingRules(val value: kotlin.String) {
+         @SerialName(value = "me") ME("me"),
+         @SerialName(value = "all") ALL("all");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
      * GET /livetv/recording-rules
      * Series being recorded.
      * 
+     * @param owner all (default) &#x3D; every recording or series the caller may see; me &#x3D; only the ones the caller scheduled. (optional, default to Owner.ALL)
      * @return kotlin.collections.List<RecordingRule>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -917,8 +935,8 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun listRecordingRules() : kotlin.collections.List<RecordingRule> {
-        val localVarResponse = listRecordingRulesWithHttpInfo()
+    fun listRecordingRules(owner: OwnerListRecordingRules? = OwnerListRecordingRules.ALL) : kotlin.collections.List<RecordingRule> {
+        val localVarResponse = listRecordingRulesWithHttpInfo(owner = owner)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<RecordingRule>
@@ -939,14 +957,15 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * GET /livetv/recording-rules
      * Series being recorded.
      * 
+     * @param owner all (default) &#x3D; every recording or series the caller may see; me &#x3D; only the ones the caller scheduled. (optional, default to Owner.ALL)
      * @return ApiResponse<kotlin.collections.List<RecordingRule>?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun listRecordingRulesWithHttpInfo() : ApiResponse<kotlin.collections.List<RecordingRule>?> {
-        val localVariableConfig = listRecordingRulesRequestConfig()
+    fun listRecordingRulesWithHttpInfo(owner: OwnerListRecordingRules?) : ApiResponse<kotlin.collections.List<RecordingRule>?> {
+        val localVariableConfig = listRecordingRulesRequestConfig(owner = owner)
 
         return request<Unit, kotlin.collections.List<RecordingRule>>(
             localVariableConfig
@@ -956,11 +975,17 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     /**
      * To obtain the request config of the operation listRecordingRules
      *
+     * @param owner all (default) &#x3D; every recording or series the caller may see; me &#x3D; only the ones the caller scheduled. (optional, default to Owner.ALL)
      * @return RequestConfig
      */
-    fun listRecordingRulesRequestConfig() : RequestConfig<Unit> {
+    fun listRecordingRulesRequestConfig(owner: OwnerListRecordingRules?) : RequestConfig<Unit> {
         val localVariableBody = null
-        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (owner != null) {
+                    put("owner", listOf(owner.value))
+                }
+            }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
         localVariableHeaders["Accept"] = "application/json"
 
@@ -1045,9 +1070,27 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     }
 
     /**
+     * enum for parameter owner
+     */
+     enum class OwnerListRecordings(val value: kotlin.String) {
+         @SerialName(value = "me") ME("me"),
+         @SerialName(value = "all") ALL("all");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
      * GET /livetv/recordings
-     * DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone&#39;s recordings are listed to every profile that may view DVR recordings, within the profile&#39;s content rating limit (the library item&#39;s rating once filed, else the guide&#39;s; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings.
+     * DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone&#39;s recordings are listed to every profile that may view DVR recordings, within the profile&#39;s content rating limit (the library item&#39;s rating once filed, else the guide&#39;s; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings. Recordings appear only here, never in the libraries, Home, search or browse; finished ones carry the caller&#39;s resume position (viewOffsetMs, durationMs, watched).
      * 
+     * @param owner all (default) &#x3D; every recording or series the caller may see; me &#x3D; only the ones the caller scheduled. (optional, default to Owner.ALL)
      * @return kotlin.collections.List<Recording>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -1057,8 +1100,8 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun listRecordings() : kotlin.collections.List<Recording> {
-        val localVarResponse = listRecordingsWithHttpInfo()
+    fun listRecordings(owner: OwnerListRecordings? = OwnerListRecordings.ALL) : kotlin.collections.List<Recording> {
+        val localVarResponse = listRecordingsWithHttpInfo(owner = owner)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<Recording>
@@ -1077,16 +1120,17 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
 
     /**
      * GET /livetv/recordings
-     * DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone&#39;s recordings are listed to every profile that may view DVR recordings, within the profile&#39;s content rating limit (the library item&#39;s rating once filed, else the guide&#39;s; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings.
+     * DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone&#39;s recordings are listed to every profile that may view DVR recordings, within the profile&#39;s content rating limit (the library item&#39;s rating once filed, else the guide&#39;s; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings. Recordings appear only here, never in the libraries, Home, search or browse; finished ones carry the caller&#39;s resume position (viewOffsetMs, durationMs, watched).
      * 
+     * @param owner all (default) &#x3D; every recording or series the caller may see; me &#x3D; only the ones the caller scheduled. (optional, default to Owner.ALL)
      * @return ApiResponse<kotlin.collections.List<Recording>?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun listRecordingsWithHttpInfo() : ApiResponse<kotlin.collections.List<Recording>?> {
-        val localVariableConfig = listRecordingsRequestConfig()
+    fun listRecordingsWithHttpInfo(owner: OwnerListRecordings?) : ApiResponse<kotlin.collections.List<Recording>?> {
+        val localVariableConfig = listRecordingsRequestConfig(owner = owner)
 
         return request<Unit, kotlin.collections.List<Recording>>(
             localVariableConfig
@@ -1096,11 +1140,17 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     /**
      * To obtain the request config of the operation listRecordings
      *
+     * @param owner all (default) &#x3D; every recording or series the caller may see; me &#x3D; only the ones the caller scheduled. (optional, default to Owner.ALL)
      * @return RequestConfig
      */
-    fun listRecordingsRequestConfig() : RequestConfig<Unit> {
+    fun listRecordingsRequestConfig(owner: OwnerListRecordings?) : RequestConfig<Unit> {
         val localVariableBody = null
-        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (owner != null) {
+                    put("owner", listOf(owner.value))
+                }
+            }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
         localVariableHeaders["Accept"] = "application/json"
 
@@ -1305,6 +1355,7 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * @param minRating Average vote out of 10 at least this (unrated items are left out). (optional)
      * @param watched The caller&#39;s state: unwatched (never started), inProgress (started, not finished) or watched. (optional)
      * @param sourceId Only this source&#39;s (VodStatus.sources[].id). (optional)
+     * @param inLibrary true &#x3D; only titles the library already has (in a library the caller can see); false &#x3D; only those it doesn&#39;t. Omitted &#x3D; any. (optional)
      * @param offset  (optional, default to 0)
      * @return VodMoviePage
      * @throws IllegalStateException If the request is not correctly configured
@@ -1315,8 +1366,8 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun listVodMovies(category: kotlin.String? = null, q: kotlin.String? = null, sort: SortListVodMovies? = SortListVodMovies.TITLE, limit: kotlin.Int? = 100, genre: kotlin.String? = null, yearFrom: kotlin.Int? = null, yearTo: kotlin.Int? = null, minRating: kotlin.Double? = null, watched: WatchedListVodMovies? = null, sourceId: kotlin.String? = null, offset: kotlin.Int? = 0) : VodMoviePage {
-        val localVarResponse = listVodMoviesWithHttpInfo(category = category, q = q, sort = sort, limit = limit, genre = genre, yearFrom = yearFrom, yearTo = yearTo, minRating = minRating, watched = watched, sourceId = sourceId, offset = offset)
+    fun listVodMovies(category: kotlin.String? = null, q: kotlin.String? = null, sort: SortListVodMovies? = SortListVodMovies.TITLE, limit: kotlin.Int? = 100, genre: kotlin.String? = null, yearFrom: kotlin.Int? = null, yearTo: kotlin.Int? = null, minRating: kotlin.Double? = null, watched: WatchedListVodMovies? = null, sourceId: kotlin.String? = null, inLibrary: kotlin.Boolean? = null, offset: kotlin.Int? = 0) : VodMoviePage {
+        val localVarResponse = listVodMoviesWithHttpInfo(category = category, q = q, sort = sort, limit = limit, genre = genre, yearFrom = yearFrom, yearTo = yearTo, minRating = minRating, watched = watched, sourceId = sourceId, inLibrary = inLibrary, offset = offset)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as VodMoviePage
@@ -1347,6 +1398,7 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * @param minRating Average vote out of 10 at least this (unrated items are left out). (optional)
      * @param watched The caller&#39;s state: unwatched (never started), inProgress (started, not finished) or watched. (optional)
      * @param sourceId Only this source&#39;s (VodStatus.sources[].id). (optional)
+     * @param inLibrary true &#x3D; only titles the library already has (in a library the caller can see); false &#x3D; only those it doesn&#39;t. Omitted &#x3D; any. (optional)
      * @param offset  (optional, default to 0)
      * @return ApiResponse<VodMoviePage?>
      * @throws IllegalStateException If the request is not correctly configured
@@ -1354,8 +1406,8 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun listVodMoviesWithHttpInfo(category: kotlin.String?, q: kotlin.String?, sort: SortListVodMovies?, limit: kotlin.Int?, genre: kotlin.String?, yearFrom: kotlin.Int?, yearTo: kotlin.Int?, minRating: kotlin.Double?, watched: WatchedListVodMovies?, sourceId: kotlin.String?, offset: kotlin.Int?) : ApiResponse<VodMoviePage?> {
-        val localVariableConfig = listVodMoviesRequestConfig(category = category, q = q, sort = sort, limit = limit, genre = genre, yearFrom = yearFrom, yearTo = yearTo, minRating = minRating, watched = watched, sourceId = sourceId, offset = offset)
+    fun listVodMoviesWithHttpInfo(category: kotlin.String?, q: kotlin.String?, sort: SortListVodMovies?, limit: kotlin.Int?, genre: kotlin.String?, yearFrom: kotlin.Int?, yearTo: kotlin.Int?, minRating: kotlin.Double?, watched: WatchedListVodMovies?, sourceId: kotlin.String?, inLibrary: kotlin.Boolean?, offset: kotlin.Int?) : ApiResponse<VodMoviePage?> {
+        val localVariableConfig = listVodMoviesRequestConfig(category = category, q = q, sort = sort, limit = limit, genre = genre, yearFrom = yearFrom, yearTo = yearTo, minRating = minRating, watched = watched, sourceId = sourceId, inLibrary = inLibrary, offset = offset)
 
         return request<Unit, VodMoviePage>(
             localVariableConfig
@@ -1375,10 +1427,11 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * @param minRating Average vote out of 10 at least this (unrated items are left out). (optional)
      * @param watched The caller&#39;s state: unwatched (never started), inProgress (started, not finished) or watched. (optional)
      * @param sourceId Only this source&#39;s (VodStatus.sources[].id). (optional)
+     * @param inLibrary true &#x3D; only titles the library already has (in a library the caller can see); false &#x3D; only those it doesn&#39;t. Omitted &#x3D; any. (optional)
      * @param offset  (optional, default to 0)
      * @return RequestConfig
      */
-    fun listVodMoviesRequestConfig(category: kotlin.String?, q: kotlin.String?, sort: SortListVodMovies?, limit: kotlin.Int?, genre: kotlin.String?, yearFrom: kotlin.Int?, yearTo: kotlin.Int?, minRating: kotlin.Double?, watched: WatchedListVodMovies?, sourceId: kotlin.String?, offset: kotlin.Int?) : RequestConfig<Unit> {
+    fun listVodMoviesRequestConfig(category: kotlin.String?, q: kotlin.String?, sort: SortListVodMovies?, limit: kotlin.Int?, genre: kotlin.String?, yearFrom: kotlin.Int?, yearTo: kotlin.Int?, minRating: kotlin.Double?, watched: WatchedListVodMovies?, sourceId: kotlin.String?, inLibrary: kotlin.Boolean?, offset: kotlin.Int?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -1411,6 +1464,9 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
                 }
                 if (sourceId != null) {
                     put("sourceId", listOf(sourceId.toString()))
+                }
+                if (inLibrary != null) {
+                    put("inLibrary", listOf(inLibrary.toString()))
                 }
                 if (offset != null) {
                     put("offset", listOf(offset.toString()))
@@ -1550,6 +1606,7 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * @param minRating Average vote out of 10 at least this (unrated items are left out). (optional)
      * @param watched The caller&#39;s state: unwatched (has episodes not yet watched, including never-opened series), inProgress (started but not every episode watched) or watched (every episode watched). (optional)
      * @param sourceId Only this source&#39;s (VodStatus.sources[].id). (optional)
+     * @param inLibrary true &#x3D; only titles the library already has (in a library the caller can see); false &#x3D; only those it doesn&#39;t. Omitted &#x3D; any. (optional)
      * @param offset  (optional, default to 0)
      * @return VodSeriesPage
      * @throws IllegalStateException If the request is not correctly configured
@@ -1560,8 +1617,8 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun listVodSeries(category: kotlin.String? = null, q: kotlin.String? = null, sort: SortListVodSeries? = SortListVodSeries.TITLE, limit: kotlin.Int? = 100, genre: kotlin.String? = null, yearFrom: kotlin.Int? = null, yearTo: kotlin.Int? = null, minRating: kotlin.Double? = null, watched: WatchedListVodSeries? = null, sourceId: kotlin.String? = null, offset: kotlin.Int? = 0) : VodSeriesPage {
-        val localVarResponse = listVodSeriesWithHttpInfo(category = category, q = q, sort = sort, limit = limit, genre = genre, yearFrom = yearFrom, yearTo = yearTo, minRating = minRating, watched = watched, sourceId = sourceId, offset = offset)
+    fun listVodSeries(category: kotlin.String? = null, q: kotlin.String? = null, sort: SortListVodSeries? = SortListVodSeries.TITLE, limit: kotlin.Int? = 100, genre: kotlin.String? = null, yearFrom: kotlin.Int? = null, yearTo: kotlin.Int? = null, minRating: kotlin.Double? = null, watched: WatchedListVodSeries? = null, sourceId: kotlin.String? = null, inLibrary: kotlin.Boolean? = null, offset: kotlin.Int? = 0) : VodSeriesPage {
+        val localVarResponse = listVodSeriesWithHttpInfo(category = category, q = q, sort = sort, limit = limit, genre = genre, yearFrom = yearFrom, yearTo = yearTo, minRating = minRating, watched = watched, sourceId = sourceId, inLibrary = inLibrary, offset = offset)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as VodSeriesPage
@@ -1592,6 +1649,7 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * @param minRating Average vote out of 10 at least this (unrated items are left out). (optional)
      * @param watched The caller&#39;s state: unwatched (has episodes not yet watched, including never-opened series), inProgress (started but not every episode watched) or watched (every episode watched). (optional)
      * @param sourceId Only this source&#39;s (VodStatus.sources[].id). (optional)
+     * @param inLibrary true &#x3D; only titles the library already has (in a library the caller can see); false &#x3D; only those it doesn&#39;t. Omitted &#x3D; any. (optional)
      * @param offset  (optional, default to 0)
      * @return ApiResponse<VodSeriesPage?>
      * @throws IllegalStateException If the request is not correctly configured
@@ -1599,8 +1657,8 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun listVodSeriesWithHttpInfo(category: kotlin.String?, q: kotlin.String?, sort: SortListVodSeries?, limit: kotlin.Int?, genre: kotlin.String?, yearFrom: kotlin.Int?, yearTo: kotlin.Int?, minRating: kotlin.Double?, watched: WatchedListVodSeries?, sourceId: kotlin.String?, offset: kotlin.Int?) : ApiResponse<VodSeriesPage?> {
-        val localVariableConfig = listVodSeriesRequestConfig(category = category, q = q, sort = sort, limit = limit, genre = genre, yearFrom = yearFrom, yearTo = yearTo, minRating = minRating, watched = watched, sourceId = sourceId, offset = offset)
+    fun listVodSeriesWithHttpInfo(category: kotlin.String?, q: kotlin.String?, sort: SortListVodSeries?, limit: kotlin.Int?, genre: kotlin.String?, yearFrom: kotlin.Int?, yearTo: kotlin.Int?, minRating: kotlin.Double?, watched: WatchedListVodSeries?, sourceId: kotlin.String?, inLibrary: kotlin.Boolean?, offset: kotlin.Int?) : ApiResponse<VodSeriesPage?> {
+        val localVariableConfig = listVodSeriesRequestConfig(category = category, q = q, sort = sort, limit = limit, genre = genre, yearFrom = yearFrom, yearTo = yearTo, minRating = minRating, watched = watched, sourceId = sourceId, inLibrary = inLibrary, offset = offset)
 
         return request<Unit, VodSeriesPage>(
             localVariableConfig
@@ -1620,10 +1678,11 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * @param minRating Average vote out of 10 at least this (unrated items are left out). (optional)
      * @param watched The caller&#39;s state: unwatched (has episodes not yet watched, including never-opened series), inProgress (started but not every episode watched) or watched (every episode watched). (optional)
      * @param sourceId Only this source&#39;s (VodStatus.sources[].id). (optional)
+     * @param inLibrary true &#x3D; only titles the library already has (in a library the caller can see); false &#x3D; only those it doesn&#39;t. Omitted &#x3D; any. (optional)
      * @param offset  (optional, default to 0)
      * @return RequestConfig
      */
-    fun listVodSeriesRequestConfig(category: kotlin.String?, q: kotlin.String?, sort: SortListVodSeries?, limit: kotlin.Int?, genre: kotlin.String?, yearFrom: kotlin.Int?, yearTo: kotlin.Int?, minRating: kotlin.Double?, watched: WatchedListVodSeries?, sourceId: kotlin.String?, offset: kotlin.Int?) : RequestConfig<Unit> {
+    fun listVodSeriesRequestConfig(category: kotlin.String?, q: kotlin.String?, sort: SortListVodSeries?, limit: kotlin.Int?, genre: kotlin.String?, yearFrom: kotlin.Int?, yearTo: kotlin.Int?, minRating: kotlin.Double?, watched: WatchedListVodSeries?, sourceId: kotlin.String?, inLibrary: kotlin.Boolean?, offset: kotlin.Int?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -1656,6 +1715,9 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
                 }
                 if (sourceId != null) {
                     put("sourceId", listOf(sourceId.toString()))
+                }
+                if (inLibrary != null) {
+                    put("inLibrary", listOf(inLibrary.toString()))
                 }
                 if (offset != null) {
                     put("offset", listOf(offset.toString()))

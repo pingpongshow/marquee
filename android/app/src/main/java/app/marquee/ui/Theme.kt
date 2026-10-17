@@ -6,6 +6,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 val Gold = Color(0xFFE8B84A)
+/** VOD titles a library already has. */
+val InLibraryGreen = Color(0xFF4CAF50)
 val Ink = Color(0xFF0B0B0F)
 val Surface1 = Color(0xFF16161C)
 val Surface2 = Color(0xFF202029)

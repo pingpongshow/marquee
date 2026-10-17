@@ -47,6 +47,7 @@ import kotlinx.serialization.Contextual
  * @param lastScanResult Summary of the last scan, e.g. 6596 files: 12 added…
  * @param lastScanError 
  * @param lastScannedAt 
+ * @param recordings A Live TV recordings library (Recorded TV / Recorded Movies). Only listed to admins with manage=true; its items are shown only under Live TV → Recordings, and browsing it returns 404.
  */
 @Serializable
 
@@ -90,7 +91,11 @@ data class Library (
     val lastScanError: kotlin.String? = null,
 
     @Contextual @SerialName(value = "lastScannedAt")
-    val lastScannedAt: java.time.OffsetDateTime? = null
+    val lastScannedAt: java.time.OffsetDateTime? = null,
+
+    /* A Live TV recordings library (Recorded TV / Recorded Movies). Only listed to admins with manage=true; its items are shown only under Live TV → Recordings, and browsing it returns 404. */
+    @SerialName(value = "recordings")
+    val recordings: kotlin.Boolean? = null
 
 ) {
 

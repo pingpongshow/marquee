@@ -12,6 +12,13 @@ public import struct Foundation.Date
 extension Components {
     /// Types generated from the `#/components/parameters` section of the OpenAPI document.
     public enum Parameters {
+        /// all (default) = every recording or series the caller may see; me = only the ones the caller scheduled.
+        ///
+        /// - Remark: Generated from `#/components/parameters/RecordingOwner`.
+        @frozen public enum RecordingOwner: String, Codable, Hashable, Sendable, CaseIterable {
+            case me = "me"
+            case all = "all"
+        }
         /// - Remark: Generated from `#/components/parameters/UserId`.
         public typealias UserId = Swift.Int64
         /// - Remark: Generated from `#/components/parameters/ItemId`.

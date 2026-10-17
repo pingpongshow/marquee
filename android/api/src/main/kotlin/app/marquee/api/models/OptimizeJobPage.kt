@@ -37,6 +37,8 @@ import kotlinx.serialization.Contextual
  * @param savedBytes Space saved by every optimized file (not restored).
  * @param optimized How many files are optimized.
  * @param paused Why the queue isn't running now, if it isn't.
+ * @param keptOriginals Originals of optimized files still kept in the media trash (keepOriginals on, or from before it existed).
+ * @param keptOriginalsBytes How much space those originals take.
  */
 @Serializable
 
@@ -58,7 +60,15 @@ data class OptimizeJobPage (
 
     /* Why the queue isn't running now, if it isn't. */
     @SerialName(value = "paused")
-    val paused: kotlin.String? = null
+    val paused: kotlin.String? = null,
+
+    /* Originals of optimized files still kept in the media trash (keepOriginals on, or from before it existed). */
+    @SerialName(value = "keptOriginals")
+    val keptOriginals: kotlin.Int? = null,
+
+    /* How much space those originals take. */
+    @SerialName(value = "keptOriginalsBytes")
+    val keptOriginalsBytes: kotlin.Long? = null
 
 ) {
 

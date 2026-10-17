@@ -28,6 +28,7 @@ import okhttp3.Call
 import okhttp3.HttpUrl
 
 import app.marquee.api.models.ClearOptimizeJobs200Response
+import app.marquee.api.models.DeleteKeptOriginals200Response
 import app.marquee.api.models.Error
 import app.marquee.api.models.HealthCheck
 import app.marquee.api.models.HealthIssuePage
@@ -275,6 +276,76 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/libraries",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /optimize/originals/delete
+     * Delete the originals of optimized files kept in the media trash, so they can no longer be restored (admin only). Only optimizer originals: nothing else in the media trash is touched. With keepOriginals off this also happens by itself at start-up and when the setting is saved.
+     * 
+     * @return DeleteKeptOriginals200Response
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun deleteKeptOriginals() : DeleteKeptOriginals200Response {
+        val localVarResponse = deleteKeptOriginalsWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as DeleteKeptOriginals200Response
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /optimize/originals/delete
+     * Delete the originals of optimized files kept in the media trash, so they can no longer be restored (admin only). Only optimizer originals: nothing else in the media trash is touched. With keepOriginals off this also happens by itself at start-up and when the setting is saved.
+     * 
+     * @return ApiResponse<DeleteKeptOriginals200Response?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun deleteKeptOriginalsWithHttpInfo() : ApiResponse<DeleteKeptOriginals200Response?> {
+        val localVariableConfig = deleteKeptOriginalsRequestConfig()
+
+        return request<Unit, DeleteKeptOriginals200Response>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation deleteKeptOriginals
+     *
+     * @return RequestConfig
+     */
+    fun deleteKeptOriginalsRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/optimize/originals/delete",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -1010,8 +1081,9 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
 
     /**
      * GET /libraries
-     * Libraries visible to the current user.
+     * Libraries visible to the current user. The Live TV recordings libraries (Recorded TV / Recorded Movies) are left out for everyone, admins included: recordings appear only under Live TV → Recordings (GET /livetv/recordings) and are played from there by item id.
      * 
+     * @param manage Admins (Settings → Libraries): include the Live TV recordings libraries too, flagged recordings: true, so they can be rescanned and configured. Ignored for everyone else. (optional)
      * @return kotlin.collections.List<Library>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -1021,8 +1093,8 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun listLibraries() : kotlin.collections.List<Library> {
-        val localVarResponse = listLibrariesWithHttpInfo()
+    fun listLibraries(manage: kotlin.Boolean? = null) : kotlin.collections.List<Library> {
+        val localVarResponse = listLibrariesWithHttpInfo(manage = manage)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<Library>
@@ -1041,16 +1113,17 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
 
     /**
      * GET /libraries
-     * Libraries visible to the current user.
+     * Libraries visible to the current user. The Live TV recordings libraries (Recorded TV / Recorded Movies) are left out for everyone, admins included: recordings appear only under Live TV → Recordings (GET /livetv/recordings) and are played from there by item id.
      * 
+     * @param manage Admins (Settings → Libraries): include the Live TV recordings libraries too, flagged recordings: true, so they can be rescanned and configured. Ignored for everyone else. (optional)
      * @return ApiResponse<kotlin.collections.List<Library>?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun listLibrariesWithHttpInfo() : ApiResponse<kotlin.collections.List<Library>?> {
-        val localVariableConfig = listLibrariesRequestConfig()
+    fun listLibrariesWithHttpInfo(manage: kotlin.Boolean?) : ApiResponse<kotlin.collections.List<Library>?> {
+        val localVariableConfig = listLibrariesRequestConfig(manage = manage)
 
         return request<Unit, kotlin.collections.List<Library>>(
             localVariableConfig
@@ -1060,11 +1133,17 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
     /**
      * To obtain the request config of the operation listLibraries
      *
+     * @param manage Admins (Settings → Libraries): include the Live TV recordings libraries too, flagged recordings: true, so they can be rescanned and configured. Ignored for everyone else. (optional)
      * @return RequestConfig
      */
-    fun listLibrariesRequestConfig() : RequestConfig<Unit> {
+    fun listLibrariesRequestConfig(manage: kotlin.Boolean?) : RequestConfig<Unit> {
         val localVariableBody = null
-        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (manage != null) {
+                    put("manage", listOf(manage.toString()))
+                }
+            }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
         localVariableHeaders["Accept"] = "application/json"
 
@@ -1208,7 +1287,7 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      * Cancel, retry or restore an optimizer job (admin only).
      * 
      * @param jobId 
-     * @param action cancel &#x3D; stop a queued or running job (the original stays as it is); retry &#x3D; queue a failed, cancelled or skipped job again; restore &#x3D; put an optimized file&#39;s original back from the media trash (the optimized file goes there instead).
+     * @param action cancel &#x3D; stop a queued or running job (the original stays as it is); retry &#x3D; queue a failed, cancelled or skipped job again; restore &#x3D; put an optimized file&#39;s original back from the media trash (the optimized file goes there instead; only when the original was kept).
      * @return void
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -1240,7 +1319,7 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      * Cancel, retry or restore an optimizer job (admin only).
      * 
      * @param jobId 
-     * @param action cancel &#x3D; stop a queued or running job (the original stays as it is); retry &#x3D; queue a failed, cancelled or skipped job again; restore &#x3D; put an optimized file&#39;s original back from the media trash (the optimized file goes there instead).
+     * @param action cancel &#x3D; stop a queued or running job (the original stays as it is); retry &#x3D; queue a failed, cancelled or skipped job again; restore &#x3D; put an optimized file&#39;s original back from the media trash (the optimized file goes there instead; only when the original was kept).
      * @return ApiResponse<Unit?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -1258,7 +1337,7 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      * To obtain the request config of the operation optimizeJobAction
      *
      * @param jobId 
-     * @param action cancel &#x3D; stop a queued or running job (the original stays as it is); retry &#x3D; queue a failed, cancelled or skipped job again; restore &#x3D; put an optimized file&#39;s original back from the media trash (the optimized file goes there instead).
+     * @param action cancel &#x3D; stop a queued or running job (the original stays as it is); retry &#x3D; queue a failed, cancelled or skipped job again; restore &#x3D; put an optimized file&#39;s original back from the media trash (the optimized file goes there instead; only when the original was kept).
      * @return RequestConfig
      */
     fun optimizeJobActionRequestConfig(jobId: kotlin.Long, action: ActionOptimizeJobAction) : RequestConfig<Unit> {

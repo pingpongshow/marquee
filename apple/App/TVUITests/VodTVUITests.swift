@@ -107,7 +107,9 @@ final class VodTVUITests: XCTestCase {
     /// the token (as the main TV tests do).
     private func signIn(as token: String) throws {
         app.launch()
-        let found = app.buttons.matching(NSPredicate(format: "label CONTAINS 'E2E'")).firstMatch
+        // (MARQUEE_TEST_SERVER_NAME picks the test server out when another one is on the network.)
+        let name = ProcessInfo.processInfo.environment["MARQUEE_TEST_SERVER_NAME"].flatMap { $0.isEmpty ? nil : $0 } ?? "E2E"
+        let found = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", name + ",")).firstMatch
         if found.waitForExistence(timeout: 20) {
             remote.press(.up)
             for _ in 0..<4 { remote.press(.left) }
@@ -254,7 +256,7 @@ final class VodTVUITests: XCTestCase {
         for _ in 0..<10 where !app.sidebarIsOpen { Thread.sleep(forTimeInterval: 0.5) }
         XCTAssertTrue(app.sidebarIsOpen, "Back opened the sidebar")
         XCTAssertEqual(app.state, .runningForeground, "still in the app")
-        let names = ["Home", "Anime", "Movies", "Music", "Recorded TV", "Live TV", "VOD Movies", "VOD Shows", "Playlists", "Settings", "Search"]
+        let names = ["Home", "Anime", "Movies", "Music", "Live TV", "VOD Movies", "VOD Shows", "Playlists", "Settings", "Search"]
         let items = try names.map { try XCTUnwrap(app.sidebarItem($0), "\($0) is in the sidebar") }
         for (a, b) in zip(items, items.dropFirst()) {
             XCTAssertLessThan(a.frame.midY, b.frame.midY, "\(a.label) comes before \(b.label)")
@@ -408,5 +410,59 @@ final class VodTVUITests: XCTestCase {
         XCTAssertTrue(play.waitForExistence(timeout: 10))
         try eventually(10, "the page offers the next episode") { play.label == "Play S1 · E3" }
         shot("tv-show-after")
+    }
+
+    /// A film the library already has: its poster's green border stays with it under focus, and
+    /// the In my library filter narrows the grid. Needs the fake Xtream film "10 Xenon" (2014),
+    /// which the e2e Movies library has too.
+    func testInLibraryBorderAndFilterTV() throws {
+        try ensureShows()
+        let token = try temporaryAccount()
+        try signIn(as: token)
+        app.openSection("VOD Movies")
+        let film = { (title: String) in
+            self.app.buttons.matching(identifier: "vod.tile").matching(NSPredicate(format: "label == %@", title)).firstMatch
+        }
+        let owned = film("10 Xenon"), other = film("Apple XC Film One")
+        XCTAssertTrue(owned.waitForExistence(timeout: 15), "the film the library has")
+        XCTAssertTrue(other.waitForExistence(timeout: 5))
+        XCTAssertEqual(owned.value as? String, "In your library")
+        XCTAssertNotEqual(other.value as? String, "In your library")
+        let filter = app.buttons["vod.filter"]
+        let onFilter = { abs(self.focused.frame.midX - filter.frame.midX) < 40 && abs(self.focused.frame.midY - filter.frame.midY) < 40 }
+        for _ in 0..<6 where !onFilter() { remote.press(.right) }
+        XCTAssertTrue(onFilter(), "focus reaches the filter bubble")
+        for _ in 0..<5 where focused.frame.minX > 300 { remote.press(.left) }
+        remote.press(.down)
+        focus(owned, direction: .right, tries: 4)
+        sleep(1)
+        shot("tv-in-library-focused")
+        focus(other, direction: .right, tries: 4)
+        sleep(1)
+        shot("tv-in-library-unfocused")
+
+        // In my library: Yes, from the filter menu.
+        for _ in 0..<3 { remote.press(.up) }
+        for _ in 0..<8 where !onFilter() { remote.press(.right) }
+        XCTAssertTrue(onFilter(), "back on the filter bubble")
+        remote.press(.select)
+        let group = app.descendants(matching: .any)["In my library"].firstMatch
+        XCTAssertTrue(group.waitForExistence(timeout: 5), "the filter menu offers In my library")
+        // (Menu items' focus shows on unlabelled elements: compare where focus is.)
+        let on = { (e: XCUIElement) in abs(self.focused.frame.midY - e.frame.midY) < 30 && self.focused.frame.minX <= e.frame.midX && e.frame.midX <= self.focused.frame.maxX }
+        for _ in 0..<12 where !on(group) { remote.press(.down) }
+        XCTAssertTrue(on(group), "focus on In my library; it's at \(focused.frame)")
+        shot("tv-in-library-menu")
+        remote.press(.select)
+        let yes = app.descendants(matching: .any)["In my library: Yes"].firstMatch
+        XCTAssertTrue(yes.waitForExistence(timeout: 5))
+        for d in [XCUIRemote.Button.down, .up] { for _ in 0..<4 where !on(yes) { remote.press(d) } }
+        XCTAssertTrue(on(yes), "focus on Yes; it's at \(focused.frame)")
+        remote.press(.select)
+        XCTAssertTrue(app.buttons["Remove filter In my library"].waitForExistence(timeout: 10), "shown as a chip")
+        XCTAssertTrue(other.waitForNonExistence(timeout: 10), "only titles the library has")
+        XCTAssertTrue(owned.exists)
+        sleep(1)
+        shot("tv-in-library-filtered")
     }
 }

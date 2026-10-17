@@ -200,7 +200,7 @@ struct VodBrowseView: View {
                 })
     }
 
-    /// Watched state, genre, decade, minimum rating and source, like the library's filter menu.
+    /// Watched state, genre, decade, minimum rating, in the library and source, like the library's filter menu.
     private var filterMenu: some View {
         Menu {
             Picker("Watched", selection: binding(\.watched)) {
@@ -225,6 +225,12 @@ struct VodBrowseView: View {
             Picker("Rating", selection: binding(\.minRating)) {
                 Text("Any rating").tag(Int?.none)
                 ForEach(VodFilters.ratings, id: \.self) { r in Text("Rated \(r)+").tag(Int?.some(r)) }
+            }
+            .pickerStyle(.menu)
+            Picker("In my library", selection: binding(\.inLibrary)) {
+                Text("In my library: Any").tag(Bool?.none)
+                Text("In my library: Yes").tag(Bool?.some(true))
+                Text("In my library: No").tag(Bool?.some(false))
             }
             .pickerStyle(.menu)
             if sources.count > 1 {
@@ -253,6 +259,7 @@ struct VodBrowseView: View {
         if let g = f.genre { chips.append((g, { binding(\.genre).wrappedValue = nil })) }
         if let d = f.decade { chips.append(("\(String(d))s", { binding(\.decade).wrappedValue = nil })) }
         if let r = f.minRating { chips.append(("Rated \(r)+", { binding(\.minRating).wrappedValue = nil })) }
+        if let l = f.inLibrary { chips.append((VodFilters.inLibraryLabel(l), { binding(\.inLibrary).wrappedValue = nil })) }
         if let s = f.sourceId { chips.append((sources.first { $0.id == s }?.name ?? "Source", { binding(\.sourceId).wrappedValue = nil })) }
         return ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
@@ -435,6 +442,7 @@ struct VodTile: View {
             NavigationLink(value: Route.vodMovie(movie.id)) { VodPoster(movie: movie, width: width) }
                 .buttonStyle(.card)
                 .accessibilityLabel(movie.title)
+                .accessibilityValue(movie.inLibrary == true ? VodInLibraryBadge.text : "")
                 .accessibilityIdentifier("vod.tile")
                 .modifier(RemoveFromContinueMenu(action: onRemove))
             titles
@@ -451,6 +459,7 @@ struct VodTile: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(movie.title)
+        .accessibilityValue(movie.inLibrary == true ? VodInLibraryBadge.text : "")
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("vod.tile")
         .modifier(RemoveFromContinueMenu(action: onRemove))
@@ -471,7 +480,8 @@ struct VodPoster: View {
     var width: CGFloat = 130
 
     var body: some View {
-        VodArt(title: movie.title, path: movie.posterUrl, watched: movie.watched, progress: movie.progress, width: width)
+        VodArt(title: movie.title, path: movie.posterUrl, watched: movie.watched, progress: movie.progress, width: width,
+               inLibrary: movie.inLibrary == true)
     }
 }
 
@@ -487,6 +497,8 @@ struct VodArt: View {
     var width: CGFloat = 130
     /// Height over width (1.5 for posters).
     var aspect: CGFloat = 1.5
+    /// A library the viewer can see already has it: a green border round the art.
+    var inLibrary = false
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -497,6 +509,15 @@ struct VodArt: View {
         }
         .frame(width: width, height: width * aspect)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            if inLibrary {
+                // Inside the art's edge, so the TV's focus lift and shadow carry it along.
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.vodInLibrary, lineWidth: isTV ? 4 : 2)
+                    .accessibilityLabel(VodInLibraryBadge.text)
+                    .accessibilityIdentifier("vod.inLibrary")
+            }
+        }
         .overlay(alignment: .topTrailing) {
             if watched {
                 Image(systemName: "checkmark.circle.fill").symbolRenderingMode(.palette).foregroundStyle(.black, Color.marqueeGold).padding(6)
@@ -615,6 +636,7 @@ struct VodMovieView: View {
         let details = VStack(alignment: .leading, spacing: 10) {
             if let c = m.base.category { Text(c).font(.caption).foregroundStyle(.secondary) }
             Text(m.title).font(isTV ? .title2.bold() : .title.bold()).fixedSize(horizontal: false, vertical: true)
+            if m.base.inLibrary == true { VodInLibraryBadge() }
             let meta = [m.base.year.map(String.init), m.base.contentRating, formatDuration(ms: m.base.runtimeMs)].compactMap { $0 }.filter { !$0.isEmpty }
             if !meta.isEmpty { Text(meta.joined(separator: " · ")).font(.callout).foregroundStyle(.secondary) }
             if !m.info.genres.isEmpty { Text(m.info.genres.joined(separator: ", ")).font(.footnote).foregroundStyle(.secondary) }
@@ -712,6 +734,27 @@ struct VodMovieView: View {
         } catch {
             if movie == nil { self.error = error.localizedDescription }
         }
+    }
+}
+
+extension Color {
+    /// VOD titles a library already has (their border and label).
+    static let vodInLibrary = Color.green
+}
+
+/// "In your library", next to the title on a film's or show's page.
+struct VodInLibraryBadge: View {
+    static let text = "In your library"
+
+    var body: some View {
+        Label(Self.text, systemImage: "checkmark.circle.fill")
+            .font(isTV ? .callout.weight(.semibold) : .footnote.weight(.semibold))
+            .foregroundStyle(Color.vodInLibrary)
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(Color.vodInLibrary.opacity(0.15), in: Capsule())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Self.text)
+            .accessibilityIdentifier("vod.inLibraryLabel")
     }
 }
 

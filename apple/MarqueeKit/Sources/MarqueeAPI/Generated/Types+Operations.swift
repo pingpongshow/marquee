@@ -8038,13 +8038,28 @@ public enum Operations {
             }
         }
     }
-    /// Libraries visible to the current user.
+    /// Libraries visible to the current user. The Live TV recordings libraries (Recorded TV / Recorded Movies) are left out for everyone, admins included: recordings appear only under Live TV → Recordings (GET /livetv/recordings) and are played from there by item id.
     ///
     /// - Remark: HTTP `GET /libraries`.
     /// - Remark: Generated from `#/paths//libraries/get(listLibraries)`.
     public enum ListLibraries {
         public static let id: Swift.String = "listLibraries"
         public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/libraries/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// Admins (Settings → Libraries): include the Live TV recordings libraries too, flagged recordings: true, so they can be rescanned and configured. Ignored for everyone else.
+                ///
+                /// - Remark: Generated from `#/paths/libraries/GET/query/manage`.
+                public var manage: Swift.Bool?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - manage: Admins (Settings → Libraries): include the Live TV recordings libraries too, flagged recordings: true, so they can be rescanned and configured. Ignored for everyone else.
+                public init(manage: Swift.Bool? = nil) {
+                    self.manage = manage
+                }
+            }
+            public var query: Operations.ListLibraries.Input.Query
             /// - Remark: Generated from `#/paths/libraries/GET/header`.
             public struct Headers: Sendable, Hashable {
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListLibraries.AcceptableContentType>]
@@ -8060,8 +8075,13 @@ public enum Operations {
             /// Creates a new `Input`.
             ///
             /// - Parameters:
+            ///   - query:
             ///   - headers:
-            public init(headers: Operations.ListLibraries.Input.Headers = .init()) {
+            public init(
+                query: Operations.ListLibraries.Input.Query = .init(),
+                headers: Operations.ListLibraries.Input.Headers = .init()
+            ) {
+                self.query = query
                 self.headers = headers
             }
         }
@@ -22319,7 +22339,7 @@ public enum Operations {
                     case retry = "retry"
                     case restore = "restore"
                 }
-                /// cancel = stop a queued or running job (the original stays as it is); retry = queue a failed, cancelled or skipped job again; restore = put an optimized file's original back from the media trash (the optimized file goes there instead).
+                /// cancel = stop a queued or running job (the original stays as it is); retry = queue a failed, cancelled or skipped job again; restore = put an optimized file's original back from the media trash (the optimized file goes there instead; only when the original was kept).
                 ///
                 /// - Remark: Generated from `#/paths/optimize/jobs/{jobId}/{action}/POST/path/action`.
                 public var action: Operations.OptimizeJobAction.Input.Path.ActionPayload
@@ -22327,7 +22347,7 @@ public enum Operations {
                 ///
                 /// - Parameters:
                 ///   - jobId:
-                ///   - action: cancel = stop a queued or running job (the original stays as it is); retry = queue a failed, cancelled or skipped job again; restore = put an optimized file's original back from the media trash (the optimized file goes there instead).
+                ///   - action: cancel = stop a queued or running job (the original stays as it is); retry = queue a failed, cancelled or skipped job again; restore = put an optimized file's original back from the media trash (the optimized file goes there instead; only when the original was kept).
                 public init(
                     jobId: Swift.Int64,
                     action: Operations.OptimizeJobAction.Input.Path.ActionPayload
@@ -22485,6 +22505,185 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Delete the originals of optimized files kept in the media trash, so they can no longer be restored (admin only). Only optimizer originals: nothing else in the media trash is touched. With keepOriginals off this also happens by itself at start-up and when the setting is saved.
+    ///
+    /// - Remark: HTTP `POST /optimize/originals/delete`.
+    /// - Remark: Generated from `#/paths//optimize/originals/delete/post(deleteKeptOriginals)`.
+    public enum DeleteKeptOriginals {
+        public static let id: Swift.String = "deleteKeptOriginals"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/optimize/originals/delete/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteKeptOriginals.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteKeptOriginals.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.DeleteKeptOriginals.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.DeleteKeptOriginals.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/optimize/originals/delete/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/optimize/originals/delete/POST/responses/200/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/optimize/originals/delete/POST/responses/200/content/json/deleted`.
+                        public var deleted: Swift.Int
+                        /// - Remark: Generated from `#/paths/optimize/originals/delete/POST/responses/200/content/json/freedBytes`.
+                        public var freedBytes: Swift.Int64
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - deleted:
+                        ///   - freedBytes:
+                        public init(
+                            deleted: Swift.Int,
+                            freedBytes: Swift.Int64
+                        ) {
+                            self.deleted = deleted
+                            self.freedBytes = freedBytes
+                        }
+                        public enum CodingKeys: String, CodingKey {
+                            case deleted
+                            case freedBytes
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/optimize/originals/delete/POST/responses/200/content/application\/json`.
+                    case json(Operations.DeleteKeptOriginals.Output.Ok.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.DeleteKeptOriginals.Output.Ok.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.DeleteKeptOriginals.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.DeleteKeptOriginals.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Deleted.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/originals/delete/post(deleteKeptOriginals)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.DeleteKeptOriginals.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.DeleteKeptOriginals.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/originals/delete/post(deleteKeptOriginals)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//optimize/originals/delete/post(deleteKeptOriginals)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
                             response: self
                         )
                     }
@@ -27668,13 +27867,33 @@ public enum Operations {
             }
         }
     }
-    /// DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone's recordings are listed to every profile that may view DVR recordings, within the profile's content rating limit (the library item's rating once filed, else the guide's; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings.
+    /// DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone's recordings are listed to every profile that may view DVR recordings, within the profile's content rating limit (the library item's rating once filed, else the guide's; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings. Recordings appear only here, never in the libraries, Home, search or browse; finished ones carry the caller's resume position (viewOffsetMs, durationMs, watched).
     ///
     /// - Remark: HTTP `GET /livetv/recordings`.
     /// - Remark: Generated from `#/paths//livetv/recordings/get(listRecordings)`.
     public enum ListRecordings {
         public static let id: Swift.String = "listRecordings"
         public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/recordings/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// - Remark: Generated from `#/components/parameters/RecordingOwner`.
+                @frozen public enum RecordingOwner: String, Codable, Hashable, Sendable, CaseIterable {
+                    case me = "me"
+                    case all = "all"
+                }
+                /// all (default) = every recording or series the caller may see; me = only the ones the caller scheduled.
+                ///
+                /// - Remark: Generated from `#/paths/livetv/recordings/GET/query/owner`.
+                public var owner: Components.Parameters.RecordingOwner?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - owner: all (default) = every recording or series the caller may see; me = only the ones the caller scheduled.
+                public init(owner: Components.Parameters.RecordingOwner? = nil) {
+                    self.owner = owner
+                }
+            }
+            public var query: Operations.ListRecordings.Input.Query
             /// - Remark: Generated from `#/paths/livetv/recordings/GET/header`.
             public struct Headers: Sendable, Hashable {
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListRecordings.AcceptableContentType>]
@@ -27690,8 +27909,13 @@ public enum Operations {
             /// Creates a new `Input`.
             ///
             /// - Parameters:
+            ///   - query:
             ///   - headers:
-            public init(headers: Operations.ListRecordings.Input.Headers = .init()) {
+            public init(
+                query: Operations.ListRecordings.Input.Query = .init(),
+                headers: Operations.ListRecordings.Input.Headers = .init()
+            ) {
+                self.query = query
                 self.headers = headers
             }
         }
@@ -28693,6 +28917,26 @@ public enum Operations {
     public enum ListRecordingRules {
         public static let id: Swift.String = "listRecordingRules"
         public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/recording-rules/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// - Remark: Generated from `#/components/parameters/RecordingOwner`.
+                @frozen public enum RecordingOwner: String, Codable, Hashable, Sendable, CaseIterable {
+                    case me = "me"
+                    case all = "all"
+                }
+                /// all (default) = every recording or series the caller may see; me = only the ones the caller scheduled.
+                ///
+                /// - Remark: Generated from `#/paths/livetv/recording-rules/GET/query/owner`.
+                public var owner: Components.Parameters.RecordingOwner?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - owner: all (default) = every recording or series the caller may see; me = only the ones the caller scheduled.
+                public init(owner: Components.Parameters.RecordingOwner? = nil) {
+                    self.owner = owner
+                }
+            }
+            public var query: Operations.ListRecordingRules.Input.Query
             /// - Remark: Generated from `#/paths/livetv/recording-rules/GET/header`.
             public struct Headers: Sendable, Hashable {
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListRecordingRules.AcceptableContentType>]
@@ -28708,8 +28952,13 @@ public enum Operations {
             /// Creates a new `Input`.
             ///
             /// - Parameters:
+            ///   - query:
             ///   - headers:
-            public init(headers: Operations.ListRecordingRules.Input.Headers = .init()) {
+            public init(
+                query: Operations.ListRecordingRules.Input.Query = .init(),
+                headers: Operations.ListRecordingRules.Input.Headers = .init()
+            ) {
+                self.query = query
                 self.headers = headers
             }
         }
@@ -31255,6 +31504,10 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/livetv/vod/movies/GET/query/sourceId`.
                 public var sourceId: Swift.String?
+                /// true = only titles the library already has (in a library the caller can see); false = only those it doesn't. Omitted = any.
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/movies/GET/query/inLibrary`.
+                public var inLibrary: Swift.Bool?
                 /// - Remark: Generated from `#/paths/livetv/vod/movies/GET/query/offset`.
                 public var offset: Swift.Int?
                 /// Creates a new `Query`.
@@ -31270,6 +31523,7 @@ public enum Operations {
                 ///   - minRating: Average vote out of 10 at least this (unrated items are left out).
                 ///   - watched: The caller's state: unwatched (never started), inProgress (started, not finished) or watched.
                 ///   - sourceId: Only this source's (VodStatus.sources[].id).
+                ///   - inLibrary: true = only titles the library already has (in a library the caller can see); false = only those it doesn't. Omitted = any.
                 ///   - offset:
                 public init(
                     category: Swift.String? = nil,
@@ -31282,6 +31536,7 @@ public enum Operations {
                     minRating: Swift.Double? = nil,
                     watched: Operations.ListVodMovies.Input.Query.WatchedPayload? = nil,
                     sourceId: Swift.String? = nil,
+                    inLibrary: Swift.Bool? = nil,
                     offset: Swift.Int? = nil
                 ) {
                     self.category = category
@@ -31294,6 +31549,7 @@ public enum Operations {
                     self.minRating = minRating
                     self.watched = watched
                     self.sourceId = sourceId
+                    self.inLibrary = inLibrary
                     self.offset = offset
                 }
             }
@@ -33027,6 +33283,10 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/livetv/vod/series/GET/query/sourceId`.
                 public var sourceId: Swift.String?
+                /// true = only titles the library already has (in a library the caller can see); false = only those it doesn't. Omitted = any.
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/series/GET/query/inLibrary`.
+                public var inLibrary: Swift.Bool?
                 /// - Remark: Generated from `#/paths/livetv/vod/series/GET/query/offset`.
                 public var offset: Swift.Int?
                 /// Creates a new `Query`.
@@ -33042,6 +33302,7 @@ public enum Operations {
                 ///   - minRating: Average vote out of 10 at least this (unrated items are left out).
                 ///   - watched: The caller's state: unwatched (has episodes not yet watched, including never-opened series), inProgress (started but not every episode watched) or watched (every episode watched).
                 ///   - sourceId: Only this source's (VodStatus.sources[].id).
+                ///   - inLibrary: true = only titles the library already has (in a library the caller can see); false = only those it doesn't. Omitted = any.
                 ///   - offset:
                 public init(
                     category: Swift.String? = nil,
@@ -33054,6 +33315,7 @@ public enum Operations {
                     minRating: Swift.Double? = nil,
                     watched: Operations.ListVodSeries.Input.Query.WatchedPayload? = nil,
                     sourceId: Swift.String? = nil,
+                    inLibrary: Swift.Bool? = nil,
                     offset: Swift.Int? = nil
                 ) {
                     self.category = category
@@ -33066,6 +33328,7 @@ public enum Operations {
                     self.minRating = minRating
                     self.watched = watched
                     self.sourceId = sourceId
+                    self.inLibrary = inLibrary
                     self.offset = offset
                 }
             }
@@ -44553,6 +44816,250 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Turn a task on or off (admin only). Off: it never runs on its schedule or automatically; Run now still works.
+    ///
+    /// - Remark: HTTP `PATCH /tasks/{taskId}`.
+    /// - Remark: Generated from `#/paths//tasks/{taskId}/patch(updateTask)`.
+    public enum UpdateTask {
+        public static let id: Swift.String = "updateTask"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/tasks/{taskId}/PATCH/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/tasks/{taskId}/PATCH/path/taskId`.
+                public var taskId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - taskId:
+                public init(taskId: Swift.String) {
+                    self.taskId = taskId
+                }
+            }
+            public var path: Operations.UpdateTask.Input.Path
+            /// - Remark: Generated from `#/paths/tasks/{taskId}/PATCH/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateTask.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateTask.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.UpdateTask.Input.Headers
+            /// - Remark: Generated from `#/paths/tasks/{taskId}/PATCH/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/tasks/{taskId}/PATCH/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// - Remark: Generated from `#/paths/tasks/{taskId}/PATCH/requestBody/json/enabled`.
+                    public var enabled: Swift.Bool
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - enabled:
+                    public init(enabled: Swift.Bool) {
+                        self.enabled = enabled
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case enabled
+                    }
+                }
+                /// - Remark: Generated from `#/paths/tasks/{taskId}/PATCH/requestBody/content/application\/json`.
+                case json(Operations.UpdateTask.Input.Body.JsonPayload)
+            }
+            public var body: Operations.UpdateTask.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.UpdateTask.Input.Path,
+                headers: Operations.UpdateTask.Input.Headers = .init(),
+                body: Operations.UpdateTask.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/tasks/{taskId}/PATCH/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/tasks/{taskId}/PATCH/responses/200/content/application\/json`.
+                    case json(Components.Schemas.TaskInfo)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.TaskInfo {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UpdateTask.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.UpdateTask.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// The task.
+            ///
+            /// - Remark: Generated from `#/paths//tasks/{taskId}/patch(updateTask)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.UpdateTask.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.UpdateTask.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//tasks/{taskId}/patch(updateTask)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//tasks/{taskId}/patch(updateTask)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//tasks/{taskId}/patch(updateTask)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//tasks/{taskId}/patch(updateTask)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
                             response: self
                         )
                     }

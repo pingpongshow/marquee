@@ -54,6 +54,9 @@ import kotlinx.serialization.Contextual
  * @param canDelete The caller may cancel or delete it (whoever scheduled it, or an admin).
  * @param rating The guide's content rating for the programme, e.g. TV-14, when it gave one.
  * @param commercials 
+ * @param viewOffsetMs Finished recordings: where the caller stopped watching (0 = not started or finished), to resume from the Recordings list.
+ * @param durationMs Finished recordings: the recorded item's length.
+ * @param watched Finished recordings: the caller has watched it to the end.
  */
 @Serializable
 
@@ -131,7 +134,19 @@ data class Recording (
     val rating: kotlin.String? = null,
 
     @SerialName(value = "commercials")
-    val commercials: CommercialScan? = null
+    val commercials: CommercialScan? = null,
+
+    /* Finished recordings: where the caller stopped watching (0 = not started or finished), to resume from the Recordings list. */
+    @SerialName(value = "viewOffsetMs")
+    val viewOffsetMs: kotlin.Long? = null,
+
+    /* Finished recordings: the recorded item's length. */
+    @SerialName(value = "durationMs")
+    val durationMs: kotlin.Long? = null,
+
+    /* Finished recordings: the caller has watched it to the end. */
+    @SerialName(value = "watched")
+    val watched: kotlin.Boolean? = null
 
 ) {
 

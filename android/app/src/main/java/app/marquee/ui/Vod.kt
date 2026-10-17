@@ -177,9 +177,10 @@ private fun VodTile(m: VodMovie, width: Dp?, actions: List<TileAction> = emptyLi
         Box {
             Artwork(marquee.absolute(m.posterUrl), m.title, Shape.Poster, Modifier.fillMaxWidth()
                 .focusCard(onOpen, onLongClick = if (actions.isEmpty()) null else ({ menu = true }))
+                .inLibraryBorder(m.inLibrary)
                 .semantics {
                     contentDescription = m.title
-                    if (m.watched) stateDescription = "Watched"
+                    vodTileState(m.watched, m.inLibrary)?.let { stateDescription = it }
                     if (actions.isNotEmpty()) customActions = actions.map { a -> CustomAccessibilityAction(a.label) { a.run(); true } }
                 })
             TileMenu(actions, menu) { menu = false }
@@ -272,12 +273,12 @@ fun VodBrowse(nav: NavHostController, shows: Boolean, header: @Composable () -> 
             if (shows) marquee.livetv.listVodSeries(
                 category = k.category.ifEmpty { null }, q = k.q.ifEmpty { null }, sort = SortListVodSeries.entries.first { it.value == k.sort },
                 limit = limit, genre = f.genre, yearFrom = f.yearFrom, yearTo = f.yearTo, minRating = f.minRating?.toDouble(),
-                watched = f.watched?.let { w -> WatchedListVodSeries.entries.first { it.value == w } }, sourceId = f.sourceId, offset = offset,
+                watched = f.watched?.let { w -> WatchedListVodSeries.entries.first { it.value == w } }, sourceId = f.sourceId, inLibrary = f.inLibrary, offset = offset,
             ).let { it.series to it.total }
             else marquee.livetv.listVodMovies(
                 category = k.category.ifEmpty { null }, q = k.q.ifEmpty { null }, sort = SortListVodMovies.entries.first { it.value == k.sort },
                 limit = limit, genre = f.genre, yearFrom = f.yearFrom, yearTo = f.yearTo, minRating = f.minRating?.toDouble(),
-                watched = f.watched?.let { w -> WatchedListVodMovies.entries.first { it.value == w } }, sourceId = f.sourceId, offset = offset,
+                watched = f.watched?.let { w -> WatchedListVodMovies.entries.first { it.value == w } }, sourceId = f.sourceId, inLibrary = f.inLibrary, offset = offset,
             ).let { it.movies to it.total }
         }
     }
@@ -476,6 +477,7 @@ fun VodMovieScreen(nav: NavHostController, movieId: Long) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         m.category?.let { Text("VOD · $it", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge) }
                         Text(m.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        if (m.inLibrary == true) InLibraryLabel()
                         if (meta.isNotEmpty()) Text(meta.joinToString(" · "), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (m.genres.isNotEmpty()) Text(m.genres.joinToString(", "), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                         m.rating?.let {

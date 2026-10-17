@@ -1,6 +1,7 @@
 package app.marquee.ui
 
 import android.content.Context
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -11,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LibraryAddCheck
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -32,7 +34,7 @@ import java.net.URLDecoder
 import java.net.URLEncoder
 
 // The filters VOD Movies and VOD Shows share (LIVE-6): genre, decade, minimum rating, watched
-// state and source, sent with the list's category, search and sort. Remembered per page.
+// state, source and whether the library already has the title, sent with the list's category, search and sort. Remembered per page.
 
 /** One page's filters. [watched] is the API's value: unwatched, inProgress or watched. */
 internal data class VodFilters(
@@ -43,15 +45,17 @@ internal data class VodFilters(
     val minRating: Int? = null,
     val watched: String? = null,
     val sourceId: String? = null,
+    /** true = only titles already in a library the user can see; false = only those that aren't. */
+    val inLibrary: Boolean? = null,
 ) {
-    val active: Boolean get() = genre != null || decade != null || minRating != null || watched != null || sourceId != null
+    val active: Boolean get() = genre != null || decade != null || minRating != null || watched != null || sourceId != null || inLibrary != null
     val yearFrom: Int? get() = decade
     val yearTo: Int? get() = decade?.let { it + 9 }
 
     /** A line for the preferences ("genre=Drama&decade=1980"). */
     fun encode(): String = listOfNotNull(
         genre?.let { "genre" to it }, decade?.let { "decade" to it.toString() }, minRating?.let { "minRating" to it.toString() },
-        watched?.let { "watched" to it }, sourceId?.let { "sourceId" to it },
+        watched?.let { "watched" to it }, sourceId?.let { "sourceId" to it }, inLibrary?.let { "inLibrary" to it.toString() },
     ).joinToString("&") { (k, v) -> "$k=${URLEncoder.encode(v, "UTF-8")}" }
 
     companion object {
@@ -71,6 +75,7 @@ internal data class VodFilters(
                 minRating = m["minRating"]?.toIntOrNull()?.takeIf { it in 0..10 },
                 watched = m["watched"]?.takeIf { it in WATCHED },
                 sourceId = m["sourceId"]?.takeIf { it.isNotEmpty() },
+                inLibrary = m["inLibrary"]?.toBooleanStrictOrNull(),
             )
         }
 
@@ -79,6 +84,8 @@ internal data class VodFilters(
             "inProgress" -> "In progress"
             else -> "Watched"
         }
+
+        fun inLibraryLabel(v: Boolean) = if (v) "In my library" else "Not in my library"
     }
 }
 
@@ -95,6 +102,27 @@ internal class VodPagePrefs(context: Context, server: String?, shows: Boolean) {
     var filters: VodFilters
         get() = VodFilters.decode(prefs.getString(prefix + "filters", null))
         set(v) = prefs.edit().putString(prefix + "filters", v.encode()).apply()
+}
+
+/**
+ * A green ring round the poster of a title a library already has. Chained after focusCard, so it
+ * sits inside the poster's clip with the same corners and the focus ring is drawn over it on TV.
+ */
+internal fun Modifier.inLibraryBorder(inLibrary: Boolean?, shape: RoundedCornerShape = RoundedCornerShape(8.dp)): Modifier =
+    if (inLibrary == true) border(2.dp, InLibraryGreen, shape) else this
+
+/** What a VOD tile's state reads as: watched and/or in the library. */
+internal fun vodTileState(watched: Boolean, inLibrary: Boolean?): String? =
+    listOfNotNull(if (watched) "Watched" else null, if (inLibrary == true) "In your library" else null).joinToString(", ").ifEmpty { null }
+
+/** The small "In your library" label by a VOD film's or show's title. */
+@Composable
+internal fun InLibraryLabel() {
+    androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Icon(Icons.Filled.LibraryAddCheck, null, Modifier.size(16.dp), tint = InLibraryGreen)
+        Text("In your library", color = InLibraryGreen, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+    }
 }
 
 /**
@@ -121,6 +149,7 @@ internal fun VodActiveFilters(filters: VodFilters, shows: Boolean, sources: List
         filters.decade?.let { "${it}s" to filters.copy(decade = null) },
         filters.minRating?.let { "Rated $it+" to filters.copy(minRating = null) },
         filters.sourceId?.let { id -> (sources.firstOrNull { it.id == id }?.name ?: "Source") to filters.copy(sourceId = null) },
+        filters.inLibrary?.let { VodFilters.inLibraryLabel(it) to filters.copy(inLibrary = null) },
     )
     FlowRow(Modifier.semantics { contentDescription = "Active filters" }, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         chips.forEach { (label, without) ->
@@ -131,7 +160,7 @@ internal fun VodActiveFilters(filters: VodFilters, shows: Boolean, sources: List
     }
 }
 
-/** The filter choices, as the library's chips: watched, genre, decade, rating and (with more than one) source. */
+/** The filter choices, as the library's chips: watched, in my library, genre, decade, rating and (with more than one) source. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun VodFilterDialog(
@@ -156,6 +185,11 @@ internal fun VodFilterDialog(
                     VodFilters.WATCHED.forEach { w ->
                         FilterChip(filters.watched == w, { onChange(filters.copy(watched = w)) }, { Text(VodFilters.watchedLabel(w, shows)) }, chip)
                     }
+                }
+                Section("In my library") {
+                    FilterChip(filters.inLibrary == null, { onChange(filters.copy(inLibrary = null)) }, { Text("Any") }, chip)
+                    FilterChip(filters.inLibrary == true, { onChange(filters.copy(inLibrary = true)) }, { Text("Yes") }, chip)
+                    FilterChip(filters.inLibrary == false, { onChange(filters.copy(inLibrary = false)) }, { Text("No") }, chip)
                 }
                 Section("Genre") {
                     FilterChip(filters.genre == null, { onChange(filters.copy(genre = null)) }, { Text("All genres") }, chip)
