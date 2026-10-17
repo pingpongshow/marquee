@@ -367,7 +367,7 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     /**
      * GET /music/mixes
      * Your daily mixes (MUSIC-7), built from your listening; they change once a day.
-     * 
+     * Also a Favourites mix (id favorites): your favourite songs (the heart) shuffled, first in the list when you have at least three. It needs no Soundprint analysis, so it&#39;s there even when the daily mixes aren&#39;t.
      * @param libraryId  (optional)
      * @return kotlin.collections.List<Station>
      * @throws IllegalStateException If the request is not correctly configured
@@ -399,7 +399,7 @@ open class MusicApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     /**
      * GET /music/mixes
      * Your daily mixes (MUSIC-7), built from your listening; they change once a day.
-     * 
+     * Also a Favourites mix (id favorites): your favourite songs (the heart) shuffled, first in the list when you have at least three. It needs no Soundprint analysis, so it&#39;s there even when the daily mixes aren&#39;t.
      * @param libraryId  (optional)
      * @return ApiResponse<kotlin.collections.List<Station>?>
      * @throws IllegalStateException If the request is not correctly configured

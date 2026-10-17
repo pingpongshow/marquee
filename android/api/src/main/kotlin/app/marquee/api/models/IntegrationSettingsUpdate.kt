@@ -47,6 +47,8 @@ import kotlinx.serialization.Contextual
  * @param dvrFolder Checked when it changes: it must exist and be writable.
  * @param liveTvSources Replaces the whole list when sent.
  * @param vodEnabled 
+ * @param vodAutoRefresh 
+ * @param vodRefreshHours 
  * @param vodSources Replaces the whole list when sent.
  */
 @Serializable
@@ -100,6 +102,12 @@ data class IntegrationSettingsUpdate (
 
     @SerialName(value = "vodEnabled")
     val vodEnabled: kotlin.Boolean? = null,
+
+    @SerialName(value = "vodAutoRefresh")
+    val vodAutoRefresh: kotlin.Boolean? = null,
+
+    @SerialName(value = "vodRefreshHours")
+    val vodRefreshHours: kotlin.Int? = null,
 
     /* Replaces the whole list when sent. */
     @SerialName(value = "vodSources")

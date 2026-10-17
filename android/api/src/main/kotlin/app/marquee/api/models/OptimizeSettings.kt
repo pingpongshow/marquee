@@ -39,7 +39,7 @@ import kotlinx.serialization.Contextual
  * @param pauseWhileWatching Pause while anyone is watching anything, resuming about 15 s after. Default on.
  * @param windowOnly Only run inside the maintenance window.
  * @param paused The queue is paused by an admin.
- * @param keepOriginals On: originals go to the media trash (restorable for about 30 days). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once, and originals kept earlier are deleted too (at start-up and when this is saved off). Omitted on update = unchanged.
+ * @param keepOriginals On: originals go to the media trash (restorable until the daily Empty media trash task runs). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once, and originals kept earlier are deleted too (at start-up and when this is saved off). Omitted on update = unchanged.
  */
 @Serializable
 
@@ -72,7 +72,7 @@ data class OptimizeSettings (
     @SerialName(value = "paused")
     val paused: kotlin.Boolean,
 
-    /* On: originals go to the media trash (restorable for about 30 days). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once, and originals kept earlier are deleted too (at start-up and when this is saved off). Omitted on update = unchanged. */
+    /* On: originals go to the media trash (restorable until the daily Empty media trash task runs). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once, and originals kept earlier are deleted too (at start-up and when this is saved off). Omitted on update = unchanged. */
     @SerialName(value = "keepOriginals")
     val keepOriginals: kotlin.Boolean? = null
 

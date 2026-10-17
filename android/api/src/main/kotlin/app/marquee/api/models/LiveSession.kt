@@ -32,7 +32,7 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param id 
- * @param url The live HLS playlist (server-relative; the session id is its credential).
+ * @param url The live HLS playlist (server-relative; the session id is its credential). Once the stream has ended the playlist answers 410 with a plain-text reason. A reason starting with \"Stopped:\" (e.g. \"Stopped: a recording needed the connection\") should be shown to the viewer; any other (the recording it shared ended, or it moved to a recording's stream) means tuning the channel again will work.
  * @param channelId 
  * @param method 
  * @param videoCodec 
@@ -45,7 +45,7 @@ data class LiveSession (
     @SerialName(value = "id")
     val id: kotlin.String,
 
-    /* The live HLS playlist (server-relative; the session id is its credential). */
+    /* The live HLS playlist (server-relative; the session id is its credential). Once the stream has ended the playlist answers 410 with a plain-text reason. A reason starting with \"Stopped:\" (e.g. \"Stopped: a recording needed the connection\") should be shown to the viewer; any other (the recording it shared ended, or it moved to a recording's stream) means tuning the channel again will work. */
     @SerialName(value = "url")
     val url: kotlin.String,
 

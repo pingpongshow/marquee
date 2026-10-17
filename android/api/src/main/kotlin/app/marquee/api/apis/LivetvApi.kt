@@ -42,6 +42,7 @@ import app.marquee.api.models.RecordingRule
 import app.marquee.api.models.ReportVodPlaybackRequest
 import app.marquee.api.models.ScheduleRecording201Response
 import app.marquee.api.models.ScheduleRecordingRequest
+import app.marquee.api.models.StopRecordingRequest
 import app.marquee.api.models.TestVodSource200Response
 import app.marquee.api.models.VodCategory
 import app.marquee.api.models.VodMovie
@@ -3830,6 +3831,81 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.DELETE,
             path = "/livetv/sessions/{sessionId}".replace("{"+"sessionId"+"}", encodeURIComponent(sessionId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /livetv/recordings/{recordingId}/stop
+     * Stop a recording in progress now. keep true (the default): what was recorded is finalised as a playable file, filed like a finished recording and marked stoppedEarly. keep false: the partial recording is deleted and it leaves the list. Only whoever scheduled it, or an admin (canDelete). Returns once it has stopped.
+     * 
+     * @param recordingId 
+     * @param stopRecordingRequest  (optional)
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun stopRecording(recordingId: kotlin.Long, stopRecordingRequest: StopRecordingRequest? = null) : Unit {
+        val localVarResponse = stopRecordingWithHttpInfo(recordingId = recordingId, stopRecordingRequest = stopRecordingRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /livetv/recordings/{recordingId}/stop
+     * Stop a recording in progress now. keep true (the default): what was recorded is finalised as a playable file, filed like a finished recording and marked stoppedEarly. keep false: the partial recording is deleted and it leaves the list. Only whoever scheduled it, or an admin (canDelete). Returns once it has stopped.
+     * 
+     * @param recordingId 
+     * @param stopRecordingRequest  (optional)
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun stopRecordingWithHttpInfo(recordingId: kotlin.Long, stopRecordingRequest: StopRecordingRequest?) : ApiResponse<Unit?> {
+        val localVariableConfig = stopRecordingRequestConfig(recordingId = recordingId, stopRecordingRequest = stopRecordingRequest)
+
+        return request<StopRecordingRequest, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation stopRecording
+     *
+     * @param recordingId 
+     * @param stopRecordingRequest  (optional)
+     * @return RequestConfig
+     */
+    fun stopRecordingRequestConfig(recordingId: kotlin.Long, stopRecordingRequest: StopRecordingRequest?) : RequestConfig<StopRecordingRequest> {
+        val localVariableBody = stopRecordingRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/livetv/recordings/{recordingId}/stop".replace("{"+"recordingId"+"}", encodeURIComponent(recordingId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

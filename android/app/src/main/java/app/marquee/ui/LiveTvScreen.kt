@@ -1,5 +1,6 @@
 package app.marquee.ui
 
+import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -69,6 +70,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Brush
@@ -89,7 +91,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -145,8 +149,14 @@ fun LiveTvScreen(nav: NavHostController) {
     var preview by remember { mutableStateOf<Long?>(null) }
     var details by remember { mutableStateOf<Pair<LiveProgramme, LiveChannel>?>(null) }
     var reload by remember { mutableIntStateOf(0) }
+    // Bumped when a recording is stopped, so the strip, the Recordings list and channel availability catch up.
+    var recReload by remember { mutableIntStateOf(0) }
+    // Recordings starting or ending change which channels can be tuned: reload them when the count changes.
+    var recordingCount by remember { mutableStateOf<Int?>(null) }
+    var availability by remember { mutableIntStateOf(0) }
+    val context = LocalContext.current
 
-    LaunchedEffect(filter, start, reload) {
+    LaunchedEffect(filter, start, reload, recReload, availability) {
         val group = filter.takeUnless { it in setOf("all", "favorites", "recent", "hidden") }
         val fav = if (filter == "favorites") true else null
         val recent = if (filter == "recent") true else null
@@ -158,7 +168,12 @@ fun LiveTvScreen(nav: NavHostController) {
         }
     }
     fun watch(id: Long) = nav.navigate("live/$id")
-    fun pick(c: LiveChannel) { if (marquee.isTv || preview == c.id) watch(c.id) else preview = c.id }
+    // Every connection of its source in use (LIVE-3): it can't be tuned now, so say why instead.
+    fun unavailable(c: LiveChannel) = Toast.makeText(context, c.unavailableReason ?: "${c.name} isn't available right now.", Toast.LENGTH_LONG).show()
+    fun pick(c: LiveChannel) {
+        if (c.available == false) unavailable(c)
+        else if (marquee.isTv || preview == c.id) watch(c.id) else preview = c.id
+    }
 
     val s = status
     if (statusResult == null) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }; return }
@@ -193,8 +208,12 @@ fun LiveTvScreen(nav: NavHostController) {
     val list = channels
     LazyColumn(contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { header() }
+        if ((s.canViewRecordings ?: s.canRecord) == true) item(key = "recording-now") { RecordingNowStrip(recReload, onActive = { n ->
+            if (recordingCount != null && recordingCount != n) availability++
+            recordingCount = n
+        }) { recReload++ } }
         if (current == "recordings") {
-            item { RecordingsList(nav, canRecord = s.canRecord == true) }
+            item { RecordingsList(nav, canRecord = s.canRecord == true, reloadKey = recReload) { recReload++ } }
             return@LazyColumn
         }
         item {
@@ -203,7 +222,7 @@ fun LiveTvScreen(nav: NavHostController) {
                 items(options) { (v, label) -> FilterChip(filter == v, { filter = v }, { Text(label) }, Modifier.focusRing(RoundedCornerShape(8.dp))) }
             }
         }
-        if (!marquee.isTv) list?.let { l -> (l.firstOrNull { it.id == preview } ?: l.firstOrNull())?.let { c ->
+        if (!marquee.isTv) list?.let { l -> (l.firstOrNull { it.id == preview } ?: l.firstOrNull { it.available != false } ?: l.firstOrNull())?.let { c ->
             item(key = "preview") { LivePreview(c) { watch(c.id) } }
         } }
         if (list == null) item { Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
@@ -230,8 +249,9 @@ fun LiveTvScreen(nav: NavHostController) {
                     onProgramme = { p, c ->
                         // On now: preview (phone) or watch (TV); the previewed channel's programme
                         // or a later one shows its details, with Record.
-                        val previewed = preview ?: list.firstOrNull()?.id
-                        if (p.isOn() && (marquee.isTv || previewed != c.id)) pick(c) else details = p to c
+                        // An unavailable channel's programme shows its details, which say why.
+                        val previewed = preview ?: list.firstOrNull { it.available != false }?.id
+                        if (p.isOn() && c.available != false && (marquee.isTv || previewed != c.id)) pick(c) else details = p to c
                     },
                     onFavorite = { c ->
                         scope.launch {
@@ -249,7 +269,7 @@ fun LiveTvScreen(nav: NavHostController) {
                     })
             }
         } else {
-            items(list, key = { it.id }) { c -> WhatsOnRow(c) { watch(c.id) } }
+            items(list, key = { it.id }) { c -> WhatsOnRow(c) { if (c.available == false) unavailable(c) else watch(c.id) } }
         }
     }
     details?.let { (p, c) ->
@@ -261,7 +281,8 @@ fun LiveTvScreen(nav: NavHostController) {
                     Text("${c.name} · ${p.start.local().format(DateTimeFormatter.ofPattern("EEE h:mm a"))}–${p.end.local().format(clock)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     listOfNotNull(p.episode, p.subtitle).takeIf { it.isNotEmpty() }?.let { Text(it.joinToString(" · ")) }
                     p.description?.let { Text(it) }
-                    if (s.canRecord == true && p.end.isAfter(OffsetDateTime.now())) RecordActions(p, c) { details = null; reload++ }
+                    if (c.available == false) Text(c.unavailableReason ?: "This channel isn't available right now.", color = MaterialTheme.colorScheme.error)
+                    if (s.canRecord == true && p.end.isAfter(OffsetDateTime.now())) RecordActions(p, c) { details = null; reload++; recReload++ }
                     TextButton({
                         scope.launch {
                             withContext(Dispatchers.IO) { runCatching { marquee.livetv.hideLiveChannel(c.id) } }
@@ -300,9 +321,11 @@ private fun Guide(
         Column(Modifier.width(column)) {
             Spacer(Modifier.height(28.dp))
             channels.forEach { c ->
+                val off = c.available == false
                 Row(Modifier.height(row).fillMaxWidth().border(1.dp, if (selected == c.id) Gold else Color.Transparent, RoundedCornerShape(6.dp)),
                     verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f).focusCard({ onChannel(c) }).padding(4.dp).semantics { contentDescription = "Preview ${c.name}" },
+                    Column(Modifier.weight(1f).focusCard({ onChannel(c) }).alpha(if (off) 0.4f else 1f).padding(4.dp)
+                        .semantics { contentDescription = if (off) "${c.name}, unavailable: ${c.unavailableReason ?: "not available right now"}" else "Preview ${c.name}" },
                         horizontalAlignment = Alignment.CenterHorizontally) {
                         ChannelLogo(c, Modifier.width(56.dp).height(row * 0.45f))
                         c.number?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -323,7 +346,7 @@ private fun Guide(
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 channels.forEach { c ->
-                    Box(Modifier.width(width).height(row)) {
+                    Box(Modifier.width(width).height(row).alpha(if (c.available == false) 0.5f else 1f)) {
                         guide[c.id].orEmpty().forEach { p ->
                             val left = maxOf(0.dp, x(p.start))
                             val right = minOf(width, x(p.end))
@@ -352,8 +375,10 @@ private fun Guide(
 
 @Composable
 private fun WhatsOnRow(c: LiveChannel, onWatch: () -> Unit) {
+    val off = c.available == false
     Column(Modifier.padding(horizontal = sidePadding).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Surface2).focusCard(onWatch, RoundedCornerShape(10.dp))
-        .semantics { contentDescription = "Watch ${c.name}" }.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        .alpha(if (off) 0.5f else 1f)
+        .semantics { contentDescription = if (off) "${c.name}, unavailable" else "Watch ${c.name}" }.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ChannelLogo(c, Modifier.width(64.dp).height(40.dp))
             Column(Modifier.weight(1f)) {
@@ -362,7 +387,8 @@ private fun WhatsOnRow(c: LiveChannel, onWatch: () -> Unit) {
             }
         }
         c.now?.let { LinearProgressIndicator(progress = { it.progress() }, Modifier.fillMaxWidth(), color = Gold) }
-        c.next?.let { Text("Next: ${it.title} at ${it.start.local().format(clock)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (off) Text(c.unavailableReason ?: "Not available right now", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        else c.next?.let { Text("Next: ${it.title} at ${it.start.local().format(clock)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 
@@ -374,12 +400,17 @@ private fun LiveVideo(channelId: Long, muted: Boolean, modifier: Modifier, onSta
     val context = LocalContext.current
     val player = remember(channelId) { videoPlayer(context) }
     val session = remember(channelId) { arrayOfNulls<String>(1) } // read when the player goes away
+    val url = remember(channelId) { arrayOfNulls<String>(1) } // the session's playlist, asked why it ended
+    // Bumped to tune again after the server ended the stream for a reason that tuning again fixes.
+    var attempt by remember(channelId) { mutableIntStateOf(0) }
+    // Re-tuned since it last played: once is enough; a second end is shown instead.
+    var retuned by remember(channelId) { mutableStateOf(false) }
     LaunchedEffect(muted, player) {
         player.volume = if (muted) 0f else 1f
         // A muted preview leaves music alone; with sound it takes audio focus like any video.
         player.setAudioAttributes(videoAudio, !muted)
     }
-    LaunchedEffect(channelId) {
+    LaunchedEffect(channelId, attempt) {
         onState(null)
         // Tuned on the session's own scope: if this goes away while the server is tuning,
         // the stream is stopped as soon as it arrives rather than left running.
@@ -392,15 +423,37 @@ private fun LiveVideo(channelId: Long, muted: Boolean, modifier: Modifier, onSta
         }
         session[0] = s.getOrNull()?.id
         s.onSuccess {
+            url[0] = marquee.absolute(it.url)
             withContext(Dispatchers.Main) {
                 player.setMediaItem(MediaItem.fromUri(marquee.absolute(it.url)!!))
                 player.prepare()
                 player.playWhenReady = true
             }
-        }.onFailure { onState(it.message ?: "Couldn't tune the channel") }
+        }.onFailure { onState(serverMessage(it).ifBlank { "Couldn't tune the channel" }) } // 409 no_tuner carries its own message
     }
     DisposableEffect(player) {
-        val l = object : Player.Listener { override fun onIsPlayingChanged(isPlaying: Boolean) = onPlaying(isPlaying) }
+        val l = object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying) retuned = false
+                onPlaying(isPlaying)
+            }
+            // The server may end the stream: its playlist then answers 410 with why. A reason starting
+            // "Stopped:" is shown; any other (the recording it shared ended, it moved to a recording's
+            // stream) means tuning the same channel again works, which happens once by itself.
+            override fun onPlayerError(error: PlaybackException) {
+                val playlist = url[0]
+                marquee.scope.launch {
+                    val reason = endReason(error) ?: playlist?.let { liveEndReason(marquee.http, it) }
+                    withContext(Dispatchers.Main) {
+                        when {
+                            reason == null -> onState("The stream stopped.")
+                            !reason.startsWith("Stopped:") && !retuned -> { session[0] = null; retuned = true; attempt++ }
+                            else -> { session[0] = null; onState(reason.ifBlank { "The stream stopped." }) }
+                        }
+                    }
+                }
+            }
+        }
         player.addListener(l)
         onDispose {
             player.removeListener(l)
@@ -412,6 +465,24 @@ private fun LiveVideo(channelId: Long, muted: Boolean, modifier: Modifier, onSta
         update = { it.player = player })
 }
 
+/** The 410 reason in a playback error, when the player got it from the playlist itself. */
+@OptIn(UnstableApi::class)
+private fun endReason(error: PlaybackException): String? {
+    var e: Throwable? = error
+    while (e != null) {
+        if (e is HttpDataSource.InvalidResponseCodeException && e.responseCode == 410) return e.responseBody.toString(Charsets.UTF_8).trim()
+        e = e.cause
+    }
+    return null
+}
+
+/** Why a live stream ended: its playlist answers 410 with a plain-text reason; null when it didn't end. */
+private fun liveEndReason(http: okhttp3.OkHttpClient, url: String): String? = runCatching {
+    http.newCall(okhttp3.Request.Builder().url(url).header("Cache-Control", "no-store").build()).execute().use { r ->
+        if (r.code == 410) r.body?.string()?.trim().orEmpty() else null
+    }
+}.getOrNull()
+
 @Composable
 private fun LivePreview(c: LiveChannel, onExpand: () -> Unit) {
     var muted by remember { mutableStateOf(true) }
@@ -419,7 +490,9 @@ private fun LivePreview(c: LiveChannel, onExpand: () -> Unit) {
     var playing by remember { mutableStateOf(false) }
     Box(Modifier.padding(horizontal = sidePadding).fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(10.dp)).background(Color.Black)
         .semantics { contentDescription = "Live preview"; stateDescription = if (playing) "Playing" else "Tuning" }) {
-        LiveVideo(c.id, muted, Modifier.fillMaxSize(), onState = { error = it }, onPlaying = { playing = it })
+        if (c.available == false) Text(c.unavailableReason ?: "This channel isn't available right now.", Modifier.align(Alignment.Center).padding(24.dp),
+            color = Color.White.copy(alpha = 0.8f))
+        else LiveVideo(c.id, muted, Modifier.fillMaxSize(), onState = { error = it }, onPlaying = { playing = it })
         Row(Modifier.fillMaxWidth().padding(8.dp)) {
             IconButton({ muted = !muted }, Modifier.focusRing().background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))) {
                 Icon(if (muted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp, if (muted) "Unmute" else "Mute", tint = Color.White)
@@ -444,7 +517,13 @@ private fun LivePreview(c: LiveChannel, onExpand: () -> Unit) {
 fun LiveWatchScreen(nav: NavHostController, startId: Long) {
     val marquee = LocalMarquee.current
     val scope = rememberCoroutineScope()
-    val channels by produceState(emptyList<LiveChannel>()) { value = withContext(Dispatchers.IO) { runCatching { marquee.livetv.listLiveChannels() }.getOrDefault(emptyList()) } }
+    // Refreshed now and then: which channels can be tuned changes as recordings start and stop.
+    val channels by produceState(emptyList<LiveChannel>()) {
+        while (true) {
+            withContext(Dispatchers.IO) { runCatching { marquee.livetv.listLiveChannels() } }.onSuccess { value = it }
+            delay(30_000)
+        }
+    }
     var current by remember { mutableLongStateOf(startId) }
     var error by remember { mutableStateOf<String?>(null) }
     var playing by remember { mutableStateOf(false) }
@@ -455,10 +534,18 @@ fun LiveWatchScreen(nav: NavHostController, startId: Long) {
     val c = channels.firstOrNull { it.id == current }
     // Phones: full screen in landscape, as for video.
     VideoWindow()
-    fun step(d: Int) {
-        if (channels.isEmpty()) return
+    // Channel up/down and swipes skip channels that can't be tuned now (every connection of their
+    // source in use); the one playing stays reachable.
+    // Whether it moved: with nothing else tunable it stays put.
+    fun step(d: Int): Boolean {
+        if (channels.isEmpty()) return false
         val i = channels.indexOfFirst { it.id == current }.coerceAtLeast(0)
-        current = channels[(i + d + channels.size) % channels.size].id
+        for (k in 1..channels.size) {
+            val cand = channels[((i + d * k) % channels.size + channels.size) % channels.size]
+            if (cand.id == current) return false
+            if (cand.available != false) { current = cand.id; return true }
+        }
+        return false
     }
     LaunchedEffect(switching) { if (switching > 0) { delay(2000); switching = 0 } }
     // Follows a pull down from the top, which closes it.
@@ -477,7 +564,7 @@ fun LiveWatchScreen(nav: NavHostController, startId: Long) {
         // Over the video and under the info bar's buttons, so those keep their taps.
         if (!marquee.isTv) Box(Modifier.fillMaxSize().liveGestures(
             onTap = { controls = !controls },
-            onSwipe = { d -> step(d); switching++ },
+            onSwipe = { d -> if (step(d)) switching++ },
             onPull = { y -> scope.launch { pull.snapTo(y) } },
             onPullEnd = { close -> if (close) nav.popBackStack() else scope.launch { pull.animateTo(0f) } },
         ))

@@ -38,6 +38,7 @@ import kotlinx.serialization.Contextual
  * @param state 
  * @param libraryId 
  * @param progress 
+ * @param link Web app path that shows this task, e.g. /livetv?tab=recordings for a recording in progress (id recording:<recordingId>, kind task, progress done/total = seconds elapsed/scheduled length).
  */
 @Serializable
 
@@ -61,7 +62,11 @@ data class ActivityTask (
     val libraryId: kotlin.Long? = null,
 
     @SerialName(value = "progress")
-    val progress: ScanProgress? = null
+    val progress: ScanProgress? = null,
+
+    /* Web app path that shows this task, e.g. /livetv?tab=recordings for a recording in progress (id recording:<recordingId>, kind task, progress done/total = seconds elapsed/scheduled length). */
+    @SerialName(value = "link")
+    val link: kotlin.String? = null
 
 ) {
 

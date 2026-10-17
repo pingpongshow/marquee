@@ -803,6 +803,81 @@ class MarqueeUiTest {
         rule.waitUntil(10_000) { rule.onAllNodesWithText("Upcoming").fetchSemanticsNodes().isEmpty() }
     }
 
+    /**
+     * Connection limits and stopping a recording (LIVE-3, LIVE-5). Needs the test source's maxStreams at 1:
+     * the profile records what's on Marquee News now, so the other channels are greyed out and channel
+     * up/down skips them; Recordings' All/Only mine switch hides the admin's recording; Stop and keep in
+     * the Recording now strip stops it, kept and marked Stopped early.
+     */
+    @Test fun recordingNowAndConnectionLimits() {
+        assumeTrue("phones", !isTv)
+        val users = org.json.JSONArray(adminApi("GET", "/users"))
+        val kid = (0 until users.length()).map { users.getJSONObject(it) }.first { it.getString("displayName") == profile }
+        val before = kid.optJSONObject("restrictions") ?: org.json.JSONObject()
+        val restrictions = org.json.JSONObject(before.toString()).put("canRecord", true).put("canRecordDVR", true)
+        adminApi("PATCH", "/users/${kid.getLong("id")}", org.json.JSONObject().put("restrictions", restrictions).toString())
+        var adminRecording: Long? = null
+        try {
+            connectAndSignIn()
+            val channels = org.json.JSONArray(adminApi("GET", "/livetv/channels", asToken = appToken)).let { a -> (0 until a.length()).map { a.getJSONObject(it) } }
+            val news = channels.first { it.getString("name") == "Marquee News" }
+            val others = channels.filter { it.getLong("id") != news.getLong("id") }.map { it.getString("name") }
+            val now = news.getJSONObject("now")
+            adminApi("POST", "/livetv/recordings", """{"channelId":${news.getLong("id")},"start":"${now.getString("start")}"}""", asToken = appToken)
+            // Someone else's, later: shown under All recordings, not under Only mine.
+            val later = news.optJSONObject("next")!!
+            adminRecording = org.json.JSONObject(adminApi("POST", "/livetv/recordings", """{"channelId":${news.getLong("id")},"start":"${later.getString("start")}"}""")).optJSONObject("recording")?.optLong("id")
+            rule.waitUntil(30_000) {
+                val list = org.json.JSONArray(adminApi("GET", "/livetv/recordings", asToken = appToken))
+                (0 until list.length()).any { list.getJSONObject(it).getString("status") == "recording" }
+            }
+            openLiveTv()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Recording now"), 20_000)
+            shot("rn0-strip")
+            rule.waitText("Stop and keep")
+            shot("rn1-recording-now")
+
+            // Every connection is in use: the other channels are greyed out with the reason.
+            tap("What's On")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("${others[0]}, unavailable"), 15_000)
+            rule.waitText("All connections are in use", substring = true)
+            shot("rn2-unavailable")
+            // Channel up/down and swipes skip them: from Marquee News there's nowhere to go.
+            rule.onNode(hasContentDescription("Watch Marquee News")).performClick()
+            val playing = hasContentDescription("Live TV") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Playing")
+            rule.waitUntilAtLeastOneExists(playing, 30_000)
+            rule.onNode(hasContentDescription("Live TV")).performTouchInput { swipeLeft() }
+            key(KeyEvent.KEYCODE_DPAD_DOWN)
+            key(KeyEvent.KEYCODE_DPAD_UP)
+            Thread.sleep(1500)
+            others.forEach { assertTrue("didn't switch to $it", rule.onAllNodes(hasContentDescription("Switching to $it")).fetchSemanticsNodes().isEmpty()) }
+            rule.waitUntilAtLeastOneExists(hasText("Marquee News", substring = true), 5_000)
+            shot("rn3-skipped")
+            back()
+
+            // All recordings / Only mine.
+            rule.waitText("Recordings", 15_000)
+            tap("Recordings")
+            rule.waitText("Only mine", 10_000)
+            rule.waitText(later.getString("title"))
+            shot("rn4-all")
+            tap("Only mine")
+            rule.waitUntil(10_000) { rule.onAllNodesWithText(later.getString("title")).fetchSemanticsNodes().isEmpty() }
+            shot("rn5-only-mine")
+            tap("All recordings")
+            rule.waitText(later.getString("title"))
+
+            // Stop and keep, from the strip: it's kept, marked Stopped early.
+            tap("Stop and keep")
+            rule.waitUntil(30_000) { rule.onAllNodes(hasContentDescription("Recording now")).fetchSemanticsNodes().isEmpty() }
+            rule.waitText("Stopped early", 20_000, substring = true)
+            shot("rn6-stopped")
+        } finally {
+            adminRecording?.let { adminApi("DELETE", "/livetv/recordings/$it") }
+            adminApi("PATCH", "/users/${kid.getLong("id")}", org.json.JSONObject().put("restrictions", before).toString())
+        }
+    }
+
     /** Chromecast (D82): the Cast button in the player opens a device picker that searches the network. */
     @Test fun castPicker() {
         assumeTrue("phones only", !isTv)

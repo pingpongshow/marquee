@@ -46,6 +46,7 @@ import kotlinx.serialization.Contextual
  * @param pauseWhileWatching Pause saves while someone watches (see pauseScope), resuming 15 s after. Default on.
  * @param pauseScope source: something from the same source, or Live TV from the same host (Dispatcharr). any: any playback on the server.
  * @param retryFailed Queue failed saves again every few hours. Default on.
+ * @param windowOnly Download only during the maintenance window (Scheduled Tasks); outside it running saves stop and keep what they downloaded. Default off: any time.
  * @param destinations More save folders besides moviesFolder and showsFolder (e.g. Anime), offered as \"Save to {name}\". Sending the list replaces it; an item without an id is new.
  */
 @Serializable
@@ -106,6 +107,10 @@ data class VodSaveSettings (
     /* Queue failed saves again every few hours. Default on. */
     @SerialName(value = "retryFailed")
     val retryFailed: kotlin.Boolean? = null,
+
+    /* Download only during the maintenance window (Scheduled Tasks); outside it running saves stop and keep what they downloaded. Default off: any time. */
+    @SerialName(value = "windowOnly")
+    val windowOnly: kotlin.Boolean? = null,
 
     /* More save folders besides moviesFolder and showsFolder (e.g. Anime), offered as \"Save to {name}\". Sending the list replaces it; an item without an id is new. */
     @SerialName(value = "destinations")

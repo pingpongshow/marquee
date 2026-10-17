@@ -37,6 +37,8 @@ import kotlinx.serialization.Contextual
  * @param programmes 
  * @param refreshedAt 
  * @param error 
+ * @param maxStreams Connections the source allows at once (0 = unlimited).
+ * @param inUse Connections in use now: recordings in progress plus live streams (shared ones count once).
  */
 @Serializable
 
@@ -58,7 +60,15 @@ data class LiveTvStatusSourcesInner (
     val refreshedAt: java.time.OffsetDateTime? = null,
 
     @SerialName(value = "error")
-    val error: kotlin.String? = null
+    val error: kotlin.String? = null,
+
+    /* Connections the source allows at once (0 = unlimited). */
+    @SerialName(value = "maxStreams")
+    val maxStreams: kotlin.Int? = null,
+
+    /* Connections in use now: recordings in progress plus live streams (shared ones count once). */
+    @SerialName(value = "inUse")
+    val inUse: kotlin.Int? = null
 
 ) {
 

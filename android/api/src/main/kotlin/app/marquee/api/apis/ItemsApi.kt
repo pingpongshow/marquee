@@ -81,6 +81,85 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
+     * PUT /items/{itemId}/favorite
+     * Make a movie, show, episode, song, album or artist one of your favourites (the heart). Favourites are yours alone (a managed profile has its own); recommendations, Muse, radios and mixes weight them above star ratings.
+     * 
+     * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun addFavorite(itemId: kotlin.Long, at: java.time.OffsetDateTime? = null) : Unit {
+        val localVarResponse = addFavoriteWithHttpInfo(itemId = itemId, at = at)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /items/{itemId}/favorite
+     * Make a movie, show, episode, song, album or artist one of your favourites (the heart). Favourites are yours alone (a managed profile has its own); recommendations, Muse, radios and mixes weight them above star ratings.
+     * 
+     * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun addFavoriteWithHttpInfo(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : ApiResponse<Unit?> {
+        val localVariableConfig = addFavoriteRequestConfig(itemId = itemId, at = at)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation addFavorite
+     *
+     * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
+     * @return RequestConfig
+     */
+    fun addFavoriteRequestConfig(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (at != null) {
+                    put("at", listOf(parseDateToQueryString<java.time.OffsetDateTime>(at)))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/items/{itemId}/favorite".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * POST /collections/{collectionId}/items
      * Add items from the same library to a collection (admin only).
      * 
@@ -1360,6 +1439,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param itemId 
      * @param shuffle  (optional)
      * @param unwatched Start from the first unwatched episode (shows and seasons). (optional)
+     * @param favorites Only the user&#39;s favourite episodes or songs (e.g. a show&#39;s favourite episodes, an artist&#39;s favourite songs). (optional)
      * @return kotlin.collections.List<ItemSummary>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -1369,8 +1449,8 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun itemLeaves(itemId: kotlin.Long, shuffle: kotlin.Boolean? = null, unwatched: kotlin.Boolean? = null) : kotlin.collections.List<ItemSummary> {
-        val localVarResponse = itemLeavesWithHttpInfo(itemId = itemId, shuffle = shuffle, unwatched = unwatched)
+    fun itemLeaves(itemId: kotlin.Long, shuffle: kotlin.Boolean? = null, unwatched: kotlin.Boolean? = null, favorites: kotlin.Boolean? = null) : kotlin.collections.List<ItemSummary> {
+        val localVarResponse = itemLeavesWithHttpInfo(itemId = itemId, shuffle = shuffle, unwatched = unwatched, favorites = favorites)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<ItemSummary>
@@ -1394,14 +1474,15 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param itemId 
      * @param shuffle  (optional)
      * @param unwatched Start from the first unwatched episode (shows and seasons). (optional)
+     * @param favorites Only the user&#39;s favourite episodes or songs (e.g. a show&#39;s favourite episodes, an artist&#39;s favourite songs). (optional)
      * @return ApiResponse<kotlin.collections.List<ItemSummary>?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun itemLeavesWithHttpInfo(itemId: kotlin.Long, shuffle: kotlin.Boolean?, unwatched: kotlin.Boolean?) : ApiResponse<kotlin.collections.List<ItemSummary>?> {
-        val localVariableConfig = itemLeavesRequestConfig(itemId = itemId, shuffle = shuffle, unwatched = unwatched)
+    fun itemLeavesWithHttpInfo(itemId: kotlin.Long, shuffle: kotlin.Boolean?, unwatched: kotlin.Boolean?, favorites: kotlin.Boolean?) : ApiResponse<kotlin.collections.List<ItemSummary>?> {
+        val localVariableConfig = itemLeavesRequestConfig(itemId = itemId, shuffle = shuffle, unwatched = unwatched, favorites = favorites)
 
         return request<Unit, kotlin.collections.List<ItemSummary>>(
             localVariableConfig
@@ -1414,9 +1495,10 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param itemId 
      * @param shuffle  (optional)
      * @param unwatched Start from the first unwatched episode (shows and seasons). (optional)
+     * @param favorites Only the user&#39;s favourite episodes or songs (e.g. a show&#39;s favourite episodes, an artist&#39;s favourite songs). (optional)
      * @return RequestConfig
      */
-    fun itemLeavesRequestConfig(itemId: kotlin.Long, shuffle: kotlin.Boolean?, unwatched: kotlin.Boolean?) : RequestConfig<Unit> {
+    fun itemLeavesRequestConfig(itemId: kotlin.Long, shuffle: kotlin.Boolean?, unwatched: kotlin.Boolean?, favorites: kotlin.Boolean?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -1425,6 +1507,9 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
                 }
                 if (unwatched != null) {
                     put("unwatched", listOf(unwatched.toString()))
+                }
+                if (favorites != null) {
+                    put("favorites", listOf(favorites.toString()))
                 }
             }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
@@ -1601,6 +1686,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param itemId 
      * @param offset  (optional, default to 0)
      * @param limit  (optional, default to 100)
+     * @param favorites Only the user&#39;s favourites, and children holding one (a show&#39;s seasons with a favourite episode, an artist&#39;s albums with a favourite song). (optional)
      * @return ItemPage
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -1610,8 +1696,8 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun listItemChildren(itemId: kotlin.Long, offset: kotlin.Int? = 0, limit: kotlin.Int? = 100) : ItemPage {
-        val localVarResponse = listItemChildrenWithHttpInfo(itemId = itemId, offset = offset, limit = limit)
+    fun listItemChildren(itemId: kotlin.Long, offset: kotlin.Int? = 0, limit: kotlin.Int? = 100, favorites: kotlin.Boolean? = null) : ItemPage {
+        val localVarResponse = listItemChildrenWithHttpInfo(itemId = itemId, offset = offset, limit = limit, favorites = favorites)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as ItemPage
@@ -1635,14 +1721,15 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param itemId 
      * @param offset  (optional, default to 0)
      * @param limit  (optional, default to 100)
+     * @param favorites Only the user&#39;s favourites, and children holding one (a show&#39;s seasons with a favourite episode, an artist&#39;s albums with a favourite song). (optional)
      * @return ApiResponse<ItemPage?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun listItemChildrenWithHttpInfo(itemId: kotlin.Long, offset: kotlin.Int?, limit: kotlin.Int?) : ApiResponse<ItemPage?> {
-        val localVariableConfig = listItemChildrenRequestConfig(itemId = itemId, offset = offset, limit = limit)
+    fun listItemChildrenWithHttpInfo(itemId: kotlin.Long, offset: kotlin.Int?, limit: kotlin.Int?, favorites: kotlin.Boolean?) : ApiResponse<ItemPage?> {
+        val localVariableConfig = listItemChildrenRequestConfig(itemId = itemId, offset = offset, limit = limit, favorites = favorites)
 
         return request<Unit, ItemPage>(
             localVariableConfig
@@ -1655,9 +1742,10 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param itemId 
      * @param offset  (optional, default to 0)
      * @param limit  (optional, default to 100)
+     * @param favorites Only the user&#39;s favourites, and children holding one (a show&#39;s seasons with a favourite episode, an artist&#39;s albums with a favourite song). (optional)
      * @return RequestConfig
      */
-    fun listItemChildrenRequestConfig(itemId: kotlin.Long, offset: kotlin.Int?, limit: kotlin.Int?) : RequestConfig<Unit> {
+    fun listItemChildrenRequestConfig(itemId: kotlin.Long, offset: kotlin.Int?, limit: kotlin.Int?, favorites: kotlin.Boolean?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -1666,6 +1754,9 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
                 }
                 if (limit != null) {
                     put("limit", listOf(limit.toString()))
+                }
+                if (favorites != null) {
+                    put("favorites", listOf(favorites.toString()))
                 }
             }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
@@ -1700,7 +1791,9 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
          @SerialName(value = "-viewed") _VIEWED("-viewed"),
          @SerialName(value = "random") RANDOM("random"),
          @SerialName(value = "myRating") MY_RATING("myRating"),
-         @SerialName(value = "-myRating") _MY_RATING("-myRating");
+         @SerialName(value = "-myRating") _MY_RATING("-myRating"),
+         @SerialName(value = "favorited") FAVORITED("favorited"),
+         @SerialName(value = "-favorited") _FAVORITED("-favorited");
 
         /**
          * Override [toString()] to avoid using the enum variable name as the value, and instead use
@@ -1766,6 +1859,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param hdr  (optional)
      * @param letter Only titles starting with this letter (\&quot;#\&quot; for anything else). (optional)
      * @param minMyRating Only what the person rated at least this (0–10, e.g. 8 &#x3D; 4 stars: favourites). (optional)
+     * @param favorites Only the person&#39;s favourites (the heart). Combines with the other filters and sorts; sort -favorited lists the newest favourites first. (optional)
      * @return ItemPage
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -1775,8 +1869,8 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun listLibraryItems(libraryId: kotlin.Long, type: ItemType? = null, sort: SortListLibraryItems? = SortListLibraryItems.TITLE, offset: kotlin.Int? = 0, limit: kotlin.Int? = 100, watch: WatchListLibraryItems? = null, genre: kotlin.String? = null, decade: kotlin.Int? = null, contentRating: kotlin.String? = null, resolution: ResolutionListLibraryItems? = null, hdr: kotlin.Boolean? = null, letter: kotlin.String? = null, minMyRating: kotlin.Int? = null) : ItemPage {
-        val localVarResponse = listLibraryItemsWithHttpInfo(libraryId = libraryId, type = type, sort = sort, offset = offset, limit = limit, watch = watch, genre = genre, decade = decade, contentRating = contentRating, resolution = resolution, hdr = hdr, letter = letter, minMyRating = minMyRating)
+    fun listLibraryItems(libraryId: kotlin.Long, type: ItemType? = null, sort: SortListLibraryItems? = SortListLibraryItems.TITLE, offset: kotlin.Int? = 0, limit: kotlin.Int? = 100, watch: WatchListLibraryItems? = null, genre: kotlin.String? = null, decade: kotlin.Int? = null, contentRating: kotlin.String? = null, resolution: ResolutionListLibraryItems? = null, hdr: kotlin.Boolean? = null, letter: kotlin.String? = null, minMyRating: kotlin.Int? = null, favorites: kotlin.Boolean? = null) : ItemPage {
+        val localVarResponse = listLibraryItemsWithHttpInfo(libraryId = libraryId, type = type, sort = sort, offset = offset, limit = limit, watch = watch, genre = genre, decade = decade, contentRating = contentRating, resolution = resolution, hdr = hdr, letter = letter, minMyRating = minMyRating, favorites = favorites)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as ItemPage
@@ -1810,14 +1904,15 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param hdr  (optional)
      * @param letter Only titles starting with this letter (\&quot;#\&quot; for anything else). (optional)
      * @param minMyRating Only what the person rated at least this (0–10, e.g. 8 &#x3D; 4 stars: favourites). (optional)
+     * @param favorites Only the person&#39;s favourites (the heart). Combines with the other filters and sorts; sort -favorited lists the newest favourites first. (optional)
      * @return ApiResponse<ItemPage?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun listLibraryItemsWithHttpInfo(libraryId: kotlin.Long, type: ItemType?, sort: SortListLibraryItems?, offset: kotlin.Int?, limit: kotlin.Int?, watch: WatchListLibraryItems?, genre: kotlin.String?, decade: kotlin.Int?, contentRating: kotlin.String?, resolution: ResolutionListLibraryItems?, hdr: kotlin.Boolean?, letter: kotlin.String?, minMyRating: kotlin.Int?) : ApiResponse<ItemPage?> {
-        val localVariableConfig = listLibraryItemsRequestConfig(libraryId = libraryId, type = type, sort = sort, offset = offset, limit = limit, watch = watch, genre = genre, decade = decade, contentRating = contentRating, resolution = resolution, hdr = hdr, letter = letter, minMyRating = minMyRating)
+    fun listLibraryItemsWithHttpInfo(libraryId: kotlin.Long, type: ItemType?, sort: SortListLibraryItems?, offset: kotlin.Int?, limit: kotlin.Int?, watch: WatchListLibraryItems?, genre: kotlin.String?, decade: kotlin.Int?, contentRating: kotlin.String?, resolution: ResolutionListLibraryItems?, hdr: kotlin.Boolean?, letter: kotlin.String?, minMyRating: kotlin.Int?, favorites: kotlin.Boolean?) : ApiResponse<ItemPage?> {
+        val localVariableConfig = listLibraryItemsRequestConfig(libraryId = libraryId, type = type, sort = sort, offset = offset, limit = limit, watch = watch, genre = genre, decade = decade, contentRating = contentRating, resolution = resolution, hdr = hdr, letter = letter, minMyRating = minMyRating, favorites = favorites)
 
         return request<Unit, ItemPage>(
             localVariableConfig
@@ -1840,9 +1935,10 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param hdr  (optional)
      * @param letter Only titles starting with this letter (\&quot;#\&quot; for anything else). (optional)
      * @param minMyRating Only what the person rated at least this (0–10, e.g. 8 &#x3D; 4 stars: favourites). (optional)
+     * @param favorites Only the person&#39;s favourites (the heart). Combines with the other filters and sorts; sort -favorited lists the newest favourites first. (optional)
      * @return RequestConfig
      */
-    fun listLibraryItemsRequestConfig(libraryId: kotlin.Long, type: ItemType?, sort: SortListLibraryItems?, offset: kotlin.Int?, limit: kotlin.Int?, watch: WatchListLibraryItems?, genre: kotlin.String?, decade: kotlin.Int?, contentRating: kotlin.String?, resolution: ResolutionListLibraryItems?, hdr: kotlin.Boolean?, letter: kotlin.String?, minMyRating: kotlin.Int?) : RequestConfig<Unit> {
+    fun listLibraryItemsRequestConfig(libraryId: kotlin.Long, type: ItemType?, sort: SortListLibraryItems?, offset: kotlin.Int?, limit: kotlin.Int?, watch: WatchListLibraryItems?, genre: kotlin.String?, decade: kotlin.Int?, contentRating: kotlin.String?, resolution: ResolutionListLibraryItems?, hdr: kotlin.Boolean?, letter: kotlin.String?, minMyRating: kotlin.Int?, favorites: kotlin.Boolean?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -1881,6 +1977,9 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
                 }
                 if (minMyRating != null) {
                     put("minMyRating", listOf(minMyRating.toString()))
+                }
+                if (favorites != null) {
+                    put("favorites", listOf(favorites.toString()))
                 }
             }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
@@ -2562,6 +2661,85 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/items/{itemId}/related".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /items/{itemId}/favorite
+     * No longer one of your favourites.
+     * 
+     * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun removeFavorite(itemId: kotlin.Long, at: java.time.OffsetDateTime? = null) : Unit {
+        val localVarResponse = removeFavoriteWithHttpInfo(itemId = itemId, at = at)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /items/{itemId}/favorite
+     * No longer one of your favourites.
+     * 
+     * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun removeFavoriteWithHttpInfo(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : ApiResponse<Unit?> {
+        val localVariableConfig = removeFavoriteRequestConfig(itemId = itemId, at = at)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation removeFavorite
+     *
+     * @param itemId 
+     * @param at When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. (optional)
+     * @return RequestConfig
+     */
+    fun removeFavoriteRequestConfig(itemId: kotlin.Long, at: java.time.OffsetDateTime?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (at != null) {
+                    put("at", listOf(parseDateToQueryString<java.time.OffsetDateTime>(at)))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/items/{itemId}/favorite".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

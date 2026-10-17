@@ -287,7 +287,7 @@ fun ServerSettingsScreen() {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f).padding(end = 12.dp)) {
                         Text("Allow deleting media files")
-                        Text("Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good after 30 days.",
+                        Text("Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good when the daily Empty media trash task runs.",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(library?.allowMediaDeletion == true, ::setDeletion, Modifier.focusRing().semantics { contentDescription = "Allow deleting media files" },
