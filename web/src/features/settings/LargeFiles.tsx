@@ -499,6 +499,8 @@ function JobsTab({ config, history }: { config: OptimizeConfig; history: boolean
   });
   const page = jobs.data;
   const total = page?.total ?? 0;
+  // Fixing, ignoring or clearing can empty the last page: step back to the new last page.
+  if (page && offset > 0 && offset >= total) setOffset(Math.max(0, Math.ceil(total / PAGE) - 1) * PAGE);
   const kept = page?.keptOriginals ?? 0;
   return (
     <div className="space-y-4">

@@ -171,9 +171,15 @@ function ModelPicker({ label, help, value, models, onChange }: { label: string; 
         ) : (
           <Select
             id={id}
-            value={models.includes(value) ? value : `${value}:latest`}
+            value={value === "" ? "" : models.includes(value) ? value : `${value}:latest`}
             onChange={(e) => (e.target.value === OTHER ? setTyping(true) : onChange(e.target.value.replace(/:latest$/, "")))}
           >
+            {/* None chosen yet: say so, rather than showing the first model as if it were saved. */}
+            {value === "" && (
+              <option value="" disabled>
+                Choose a model…
+              </option>
+            )}
             {models.map((m) => (
               <option key={m} value={m}>
                 {m}

@@ -35,6 +35,8 @@ export function TwoFactorCard() {
       unwrap(api.POST("/auth/totp/disable", { body: { code } })),
     onSuccess: () => (
       setCode(""),
+      // The recovery codes shown at enabling are void now.
+      setRecovery(null),
       qc.invalidateQueries({ queryKey: ["totp"] })
     ),
   });

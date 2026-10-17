@@ -91,6 +91,9 @@ async function measureKbps(): Promise<number> {
     headers: { Authorization: `Bearer ${authSession.token}` },
     cache: "no-store",
   });
+  // An error page (or an older server without the test) is tiny: timing it would cache a
+  // bogus, very low speed and hold remote playback at the lowest quality.
+  if (!res.ok) throw new Error(`bandwidth test ${res.status}`);
   const bytes = (await res.arrayBuffer()).byteLength;
   const secs = (performance.now() - t0) / 1000;
   const kbps = Math.round((bytes * 8) / 1000 / Math.max(secs, 0.05));
@@ -359,7 +362,7 @@ export function VideoPlayer({
             method: "DELETE",
             keepalive: true,
             headers: { Authorization: `Bearer ${authSession.token}` },
-          });
+          }).catch(() => {});
           return;
         }
         stopSession();
@@ -511,7 +514,15 @@ export function VideoPlayer({
       v.addEventListener("loadedmetadata", seek);
       removeSeek = () => v.removeEventListener("loadedmetadata", seek);
     }
-    v.play().catch(() => setPlaying(false));
+    v.play().catch((e: unknown) => {
+      setPlaying(false);
+      // Autoplay blocked by the browser: the stream is fine and waits for Play, so the
+      // start timeout mustn't count it as a failure (and step down to a transcode).
+      if ((e as DOMException | undefined)?.name === "NotAllowedError") {
+        startedRef.current = true;
+        setBuffering(false);
+      }
+    });
     return () => {
       removeSeek?.();
       hlsRef.current?.destroy();
@@ -563,7 +574,8 @@ export function VideoPlayer({
   const [finding, setFinding] = useState(false);
   const restart = (patch: Partial<Selection>, keepMenu = false) => {
     const v = videoRef.current;
-    setRestartAt(v ? Math.round(v.currentTime * 1000) : 0);
+    // Before the stream has started (Try again after a failed start) keep the resume point.
+    if (v && startedRef.current) setRestartAt(Math.round(v.currentTime * 1000));
     // Offsets are remembered per file: another version starts with its own. Otherwise a
     // subtitle offset tried without a restart is sent now, which also remembers it.
     const trial = subTrial && subTrial.sid === sess?.id ? subTrial.ms : undefined;
@@ -595,7 +607,7 @@ export function VideoPlayer({
   const toggle = useCallback(() => {
     const el = videoRef.current;
     if (!el) return;
-    if (el.paused) el.play();
+    if (el.paused) el.play().catch(() => {});
     else el.pause();
   }, []);
   const seekBy = (d: number) => {

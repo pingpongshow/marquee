@@ -109,7 +109,11 @@ export function ActivityIndicator() {
                         aria-label={`Stop: ${t.title}`}
                         title="Stop"
                         onClick={() => {
-                          if (t.kind === "stream") void api.DELETE("/playback/sessions/{sessionId}", { params: { path: { sessionId: t.id.replace("stream:", "") } } });
+                          if (t.kind === "stream")
+                            void api
+                              .DELETE("/playback/sessions/{sessionId}", { params: { path: { sessionId: t.id.replace("stream:", "") } } })
+                              .then(() => activity.refetch())
+                              .catch(() => {});
                           else if (t.libraryId) cancel.mutate(t.libraryId);
                         }}
                       >

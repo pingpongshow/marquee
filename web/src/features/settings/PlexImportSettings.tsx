@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, CheckCircle2, Download, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { usersQuery } from "@/api/queries";
 import type { components } from "@/api/schema.gen";
@@ -87,6 +87,17 @@ function PlexImport() {
   const [mappings, setMappings] = useState<S["PlexPathMapping"][]>([]);
   const [choices, setChoices] = useState<Record<number, Choice>>({});
   const [include, setInclude] = useState<Include>({ matches: true, watchState: true, history: true, playlists: true, markers: true, artwork: true });
+  // An import that finishes may have added users and changed what two-way sync maps.
+  const wasRunning = useRef(false);
+  const running = !!status.data?.running;
+  useEffect(() => {
+    if (wasRunning.current && !running) {
+      void qc.invalidateQueries({ queryKey: ["users"] });
+      void qc.invalidateQueries({ queryKey: ["profiles"] });
+      void qc.invalidateQueries({ queryKey: ["plex-sync"] });
+    }
+    wasRunning.current = running;
+  }, [running, qc]);
 
   const check = useMutation({
     mutationFn: (m?: S["PlexPathMapping"][]) => unwrap(api.POST("/plex-import/preview", { body: m ? { pathMappings: m } : {} })),

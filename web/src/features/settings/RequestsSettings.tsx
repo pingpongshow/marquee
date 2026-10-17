@@ -291,6 +291,7 @@ function Approvals() {
                 variant="ghost"
                 onClick={() => {
                   setReason("");
+                  decline.reset();
                   setDeclining(r);
                 }}
                 aria-label={`Decline ${r.title}`}
@@ -314,6 +315,7 @@ function Approvals() {
               </Button>
               <Button
                 variant="danger"
+                loading={decline.isPending}
                 onClick={() =>
                   decline.mutate(
                     { id: declining.id, reason },
@@ -339,6 +341,11 @@ function Approvals() {
               />
             )}
           </Field>
+          {decline.error && (
+            <div className="mt-3">
+              <Alert tone="error">{decline.error.message}</Alert>
+            </div>
+          )}
         </Dialog>
       )}
       {decided.length > 0 && (

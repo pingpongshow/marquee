@@ -36,11 +36,13 @@ export function AccountPage() {
   const [cur, setCur] = useState("");
   const [next, setNext] = useState("");
   const [pin, setPin] = useState("");
-  const [prefs, setPrefs] = useState<UserPreferences | null>(null);
+  // Only the fields changed here; saved over the current preferences, so a subtitle style
+  // saved meanwhile (Subtitle appearance) isn't reverted.
+  const [prefs, setPrefs] = useState<Partial<UserPreferences> | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   if (!me.data) return <Spinner />;
   const u = me.data;
-  const p = prefs ?? u.preferences;
+  const p: UserPreferences = { ...u.preferences, ...prefs };
   const done = (msg: string) => () => {
     setSaved(msg);
     setCur("");
@@ -244,7 +246,7 @@ export function AccountPage() {
                 id={id}
                 value={p.audioLanguage ?? ""}
                 onChange={(e) =>
-                  setPrefs({ ...p, audioLanguage: e.target.value || undefined })
+                  setPrefs({ ...prefs, audioLanguage: e.target.value || undefined })
                 }
               >
                 {languageOptions.map(([v, l]) => (
@@ -262,7 +264,7 @@ export function AccountPage() {
                 value={p.subtitleLanguage ?? ""}
                 onChange={(e) =>
                   setPrefs({
-                    ...p,
+                    ...prefs,
                     subtitleLanguage: e.target.value || undefined,
                   })
                 }
@@ -282,7 +284,7 @@ export function AccountPage() {
                 value={p.subtitleMode ?? "foreign"}
                 onChange={(e) =>
                   setPrefs({
-                    ...p,
+                    ...prefs,
                     subtitleMode: e.target
                       .value as UserPreferences["subtitleMode"],
                   })
@@ -304,7 +306,7 @@ export function AccountPage() {
                 id={id}
                 value={p.localQualityKbps ?? 0}
                 onChange={(e) =>
-                  setPrefs({ ...p, localQualityKbps: Number(e.target.value) })
+                  setPrefs({ ...prefs, localQualityKbps: Number(e.target.value) })
                 }
               >
                 {localQualityOptions.map((o) => (
@@ -324,7 +326,7 @@ export function AccountPage() {
                 id={id}
                 value={p.remoteQualityKbps ?? 0}
                 onChange={(e) =>
-                  setPrefs({ ...p, remoteQualityKbps: Number(e.target.value) })
+                  setPrefs({ ...prefs, remoteQualityKbps: Number(e.target.value) })
                 }
               >
                 {remoteQualityOptions.map((o) => (
@@ -340,14 +342,14 @@ export function AccountPage() {
           label="Play trailers before movies"
           help="When the server has cinema trailers on, and a movie starts from the beginning."
           checked={p.cinemaTrailers !== false}
-          onChange={(v) => setPrefs({ ...p, cinemaTrailers: v })}
+          onChange={(v) => setPrefs({ ...prefs, cinemaTrailers: v })}
         />
         {info.data?.ratingPrompt && (
           <Toggle
             label="Ask me to rate after watching"
             help="Stars to tap when a movie or episode ends."
             checked={p.ratingPrompt !== false}
-            onChange={(v) => setPrefs({ ...p, ratingPrompt: v })}
+            onChange={(v) => setPrefs({ ...prefs, ratingPrompt: v })}
           />
         )}
         <div className="flex justify-end">
@@ -358,7 +360,7 @@ export function AccountPage() {
             onClick={() =>
               prefs &&
               update.mutate(
-                { preferences: prefs },
+                { preferences: { ...u.preferences, ...prefs } },
                 {
                   onSuccess: () => (
                     setPrefs(null),

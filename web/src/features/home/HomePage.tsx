@@ -4,7 +4,7 @@ import { ChevronRight, FolderPlus, LayoutList, UsersRound } from "lucide-react";
 import { useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { librariesQuery, meQuery } from "@/api/queries";
-import { Button, Spinner } from "@/components/ui";
+import { Alert, Button, Spinner } from "@/components/ui";
 import { ContinueTile, HubItem, ViewMoreTile } from "./ContinueWatching";
 import { EditHomeDialog } from "./EditHome";
 import { GettingStarted } from "./GettingStarted";
@@ -47,6 +47,11 @@ export function HomePage() {
       </div>
       {me.data?.isAdmin && <GettingStarted />}
       <WatchTogetherBanner myId={me.data?.id} />
+      {hubs.isError && (
+        <div className="px-6 lg:px-8">
+          <Alert tone="error">Home didn&apos;t load: {hubs.error.message}</Alert>
+        </div>
+      )}
       {hubs.data?.map((hub) => {
         const wide = hub.id === "continue-watching";
         // Continue Watching: entries holds the library's and on-demand titles together.

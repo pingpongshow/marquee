@@ -48,6 +48,13 @@ export function SearchPage() {
 function TextSearch({ q, tabs }: { q: string; tabs: ReactNode }) {
   const navigate = useNavigate({ from: "/search" });
   const [text, setText] = useState(q);
+  // A search started elsewhere (the header, Back or Forward) changes q: show it in the box, or
+  // the debounce below would put the old text back.
+  const [seenQ, setSeenQ] = useState(q);
+  if (q !== seenQ) {
+    setSeenQ(q);
+    if (q !== text.trim()) setText(q);
+  }
   // Update the URL (and results) shortly after typing stops.
   useEffect(() => {
     if (text.trim() === q) return;

@@ -83,7 +83,7 @@ export function MusicSettings() {
               size="sm"
               onClick={() => run.mutate("soundprint")}
               disabled={!st?.available || st?.running}
-              loading={run.isPending}
+              loading={run.isPending && run.variables === "soundprint"}
             >
               <Play className="size-4" /> Analyse new tracks now
             </Button>
@@ -104,7 +104,7 @@ export function MusicSettings() {
               size="sm"
               onClick={() => run.mutate("musicbrainz")}
               disabled={!s.draft.artistDetails}
-              loading={run.isPending}
+              loading={run.isPending && run.variables === "musicbrainz"}
             >
               <Play className="size-4" /> Look up new artists and albums now
             </Button>
@@ -133,12 +133,13 @@ export function MusicSettings() {
             <Button
               size="sm"
               onClick={() => run.mutate("loudness")}
-              loading={run.isPending}
+              loading={run.isPending && run.variables === "loudness"}
             >
               <Play className="size-4" /> Measure now
             </Button>
           </div>
         </Card>
+        {run.error && <Alert tone="error">{run.error.message}</Alert>}
         <LastFmSettings />
       </div>
       <SaveBar

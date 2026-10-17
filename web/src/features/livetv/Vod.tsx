@@ -215,13 +215,13 @@ export function VodBrowse({ kind }: { kind: "movies" | "shows" }) {
   const shows = kind === "shows";
   // Remembered per page (the shows' keys are their own).
   const k = (name: string) => (shows ? `marquee.vod.shows.${name}` : `marquee.vod.${name}`);
-  const [category, setCategory] = useState(() => stored(k("category")) ?? "");
+  const [chosenCategory, setCategory] = useState(() => stored(k("category")) ?? "");
   const [sort, setSort] = useState<VodSort>(() => (stored(k("sort")) as VodSort | null) ?? "title");
   const [filters, setFilters] = useState<VodFilters>(() => readFilters(k("filters")));
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [text, setText] = useState("");
   const [q, setQ] = useState("");
-  useEffect(() => store(k("category"), category), [category]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => store(k("category"), chosenCategory), [chosenCategory]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => store(k("sort"), sort), [sort]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => store(k("filters"), JSON.stringify(filters)), [filters]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -231,6 +231,10 @@ export function VodBrowse({ kind }: { kind: "movies" | "shows" }) {
   const set = (patch: Partial<VodFilters>) => setFilters((f) => ({ ...f, ...patch }));
 
   const categories = useQuery(shows ? vodSeriesCategoriesQuery : vodCategoriesQuery);
+  // A remembered category that no longer exists would leave an empty grid under a select
+  // showing "All": it means all.
+  const category =
+    chosenCategory && categories.data && !categories.data.some((c) => c.name === chosenCategory) ? "" : chosenCategory;
   const genres = useQuery(shows ? vodSeriesGenresQuery : vodGenresQuery);
   const status = useQuery(vodStatusQuery);
   const sources = (status.data?.sources ?? []).filter((s) => (shows ? s.series > 0 : s.movies > 0));
@@ -633,7 +637,17 @@ export function VodVideo({
     v?.addEventListener("ended", onEnd);
     v?.addEventListener("timeupdate", onTime);
     (async () => {
-      const [s, { default: Hls }] = await Promise.all([start(), import("hls.js")]);
+      // The player code loads while the session starts; if it fails to load, the session is ended.
+      const hlsModule = import("hls.js");
+      hlsModule.catch(() => {});
+      const s = await start();
+      let Hls: typeof import("hls.js").default;
+      try {
+        Hls = (await hlsModule).default;
+      } catch (e) {
+        stop(s.id);
+        throw e;
+      }
       if (cancelled) return stop(s.id);
       session = s.id;
       if (!v) return;

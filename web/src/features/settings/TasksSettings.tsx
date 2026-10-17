@@ -6,6 +6,7 @@ import { api, session, unwrap } from "@/api/client";
 import { settingsQuery, useUpdateSettings } from "@/api/queries";
 import type { Backup } from "@/api/types";
 import { Alert, Badge, Button, Card, Dialog, Field, Input, Spinner } from "@/components/ui";
+import { toast } from "@/components/Toast";
 import { timeAgo } from "@/lib/time";
 import { formatBytes } from "../browse/format";
 import { SaveBar } from "./SaveBar";
@@ -13,22 +14,26 @@ import { useSectionDraft } from "./useSectionDraft";
 
 const kindLabel: Record<Backup["kind"], string> = { scheduled: "Daily", manual: "Manual", "pre-migration": "Before upgrade", "pre-restore": "Before restore" };
 
-/** Waits for the server to come back after a restart, then reloads the page. */
-async function waitForRestart() {
+/** Waits for the server to come back after a restart, then reloads the page. False when it
+ * hasn't come back after about a minute. */
+async function waitForRestart(): Promise<boolean> {
   await new Promise((r) => setTimeout(r, 2000));
   for (let i = 0; i < 60; i++) {
     try {
       const r = await fetch("/api/v1/system/health", { cache: "no-store" });
       if (r.ok) {
         window.location.reload();
-        return;
+        return true;
       }
     } catch {
       /* still restarting */
     }
     await new Promise((r) => setTimeout(r, 1000));
   }
+  return false;
 }
+
+const notBack = "The server hasn't come back yet. Check that its container is running, then reload this page.";
 
 function MaintenanceWindow() {
   // Backup retention has its own field in the Database backups card, so this only saves the window.
@@ -193,7 +198,8 @@ function Backups() {
   const qc = useQueryClient();
   const backups = useQuery({ queryKey: ["backups"], queryFn: () => unwrap(api.GET("/backups")) });
   const [restoring, setRestoring] = useState<Backup | null>(null);
-  const [restarting, setRestarting] = useState(false);
+  const [deleting, setDeleting] = useState<Backup | null>(null);
+  const [restarting, setRestarting] = useState<false | "waiting" | "stuck">(false);
   const create = useMutation({ mutationFn: () => unwrap(api.POST("/backups")), onSuccess: () => qc.invalidateQueries({ queryKey: ["backups"] }) });
   const del = useMutation({
     mutationFn: (name: string) => unwrap(api.DELETE("/backups/{name}", { params: { path: { name } } })),
@@ -202,15 +208,22 @@ function Backups() {
   const restore = useMutation({
     mutationFn: (name: string) => unwrap(api.POST("/backups/{name}/restore", { params: { path: { name } } })),
     onSuccess: () => {
-      setRestarting(true);
-      void waitForRestart();
+      setRestarting("waiting");
+      void waitForRestart().then((back) => !back && setRestarting("stuck"));
     },
   });
   // Downloads go through fetch so the auth header is sent, then save via a blob link.
   const download = async (name: string) => {
-    const r = await fetch(`/api/v1/backups/${encodeURIComponent(name)}`, { headers: { Authorization: `Bearer ${session.token}` } });
-    if (!r.ok) return;
-    const url = URL.createObjectURL(await r.blob());
+    let blob: Blob;
+    try {
+      const r = await fetch(`/api/v1/backups/${encodeURIComponent(name)}`, { headers: { Authorization: `Bearer ${session.token}` } });
+      if (!r.ok) throw new Error(r.status === 404 ? "That backup no longer exists." : `The server answered ${r.status}.`);
+      blob = await r.blob();
+    } catch (e) {
+      toast(`Couldn't download the backup. ${(e as Error).message}`, { tone: "error" });
+      return;
+    }
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = name;
@@ -228,7 +241,8 @@ function Backups() {
       }
     >
       <BackupRetention />
-      {restarting && <Alert tone="info">Restoring the backup. The server is restarting; this page reloads when it's back.</Alert>}
+      {restarting === "waiting" && <Alert tone="info">Restoring the backup. The server is restarting; this page reloads when it's back.</Alert>}
+      {restarting === "stuck" && <Alert tone="error">{notBack}</Alert>}
       {(create.isError || del.isError || restore.isError) && <Alert tone="error">{(create.error ?? del.error ?? restore.error)?.message}</Alert>}
       {backups.isPending && <Spinner />}
       {backups.data?.length === 0 && <p className="text-sm text-muted">No backups yet. One is taken every day in the maintenance window.</p>}
@@ -250,12 +264,41 @@ function Backups() {
             <Button size="sm" variant="ghost" onClick={() => setRestoring(b)}>
               <RotateCcw className="size-4" /> Restore
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => del.mutate(b.name)} aria-label={`Delete ${b.name}`}>
+            <Button size="sm" variant="ghost" onClick={() => setDeleting(b)} aria-label={`Delete ${b.name}`}>
               <Trash2 className="size-4" />
             </Button>
           </li>
         ))}
       </ul>
+      <Dialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        title="Delete this backup?"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setDeleting(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              loading={del.isPending}
+              onClick={() => deleting && del.mutate(deleting.name, { onSuccess: () => setDeleting(null) })}
+            >
+              Delete backup
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted">
+          The backup from {deleting && new Date(deleting.createdAt).toLocaleString()} ({deleting?.name}) is deleted for good and can&apos;t be restored from
+          afterwards.
+        </p>
+        {del.isError && (
+          <div className="mt-3">
+            <Alert tone="error">{del.error.message}</Alert>
+          </div>
+        )}
+      </Dialog>
       <Dialog
         open={!!restoring}
         onClose={() => setRestoring(null)}
@@ -299,18 +342,22 @@ export function ScheduledTasksSettings() {
 
 export function RestartServer() {
   const [confirm, setConfirm] = useState(false);
-  const [restarting, setRestarting] = useState(false);
+  const [restarting, setRestarting] = useState<false | "waiting" | "stuck">(false);
   const restart = useMutation({
     mutationFn: () => unwrap(api.POST("/system/restart")),
     onSuccess: () => {
-      setRestarting(true);
-      void waitForRestart();
+      setRestarting("waiting");
+      void waitForRestart().then((back) => !back && setRestarting("stuck"));
     },
   });
   return (
     <Card title="Restart" description="Stops all playback and restarts the server. Docker starts it again within a few seconds.">
       {restarting ? (
-        <Alert tone="info">Restarting… this page reloads when the server is back.</Alert>
+        restarting === "stuck" ? (
+          <Alert tone="error">{notBack}</Alert>
+        ) : (
+          <Alert tone="info">Restarting… this page reloads when the server is back.</Alert>
+        )
       ) : (
         <div>
           <Button onClick={() => setConfirm(true)} loading={restart.isPending}>

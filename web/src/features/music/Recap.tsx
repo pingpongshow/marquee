@@ -8,6 +8,7 @@ import type { ItemSummary, ListeningRecap, RecapEntry } from "@/api/types";
 import { Alert, Button, Select, Spinner } from "@/components/ui";
 import { toast } from "@/components/Toast";
 import { useMusicActions } from "../player/MusicPlayer";
+import { ignoreShortcut } from "@/lib/keys";
 import { recapYearsQuery } from "./RecapCard";
 
 const recapQuery = (year: number) => ({
@@ -341,7 +342,8 @@ export function RecapPage() {
   const { year: wanted } = useSearch({ from: "/recap" });
   const years = useQuery(recapYearsQuery);
   const year = wanted ?? years.data?.[0] ?? new Date().getFullYear();
-  const recap = useQuery({ ...recapQuery(year), enabled: wanted !== undefined || years.isSuccess });
+  // Without a year in the address, the newest year with plays (or this year, if that list fails).
+  const recap = useQuery({ ...recapQuery(year), enabled: wanted !== undefined || !years.isPending });
   const navigate = useNavigate();
   const router = useRouter();
   const music = useMusicActions();
@@ -356,7 +358,8 @@ export function RecapPage() {
     onError: (e) => toast(e.message, { tone: "error" }),
   });
   const close = useCallback(() => {
-    if (window.history.length > 1) router.history.back();
+    // Back only within the app (history.length counts other sites' pages too).
+    if (router.history.canGoBack()) router.history.back();
     else navigate({ to: "/" });
   }, [router, navigate]);
 
@@ -374,6 +377,8 @@ export function RecapPage() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Focused controls, dialogs and Now Playing (opened from here) keep their keys.
+      if (ignoreShortcut(e) || document.querySelector('[role="dialog"][aria-label="Now Playing"]')) return;
       if (e.key === "ArrowRight" || e.key === " ") {
         e.preventDefault();
         go(1);
@@ -384,7 +389,7 @@ export function RecapPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [go, close]);
 
-  if (recap.isPending || years.isPending)
+  if (recap.isPending || (wanted === undefined && years.isPending))
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black text-white">
         <Spinner label="Wrapping up your year" />

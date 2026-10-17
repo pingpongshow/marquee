@@ -6,6 +6,7 @@ import { api, unwrap } from "@/api/client";
 import { fetchLeaves } from "@/api/queries";
 import type { ItemDetail } from "@/api/types";
 import { Button, Select } from "@/components/ui";
+import { toast } from "@/components/Toast";
 import { useMusicActions } from "../player/MusicPlayer";
 import { formatTrackTime, versionLabel } from "./format";
 import { TrailerButton } from "./Trailer";
@@ -35,6 +36,8 @@ export function PlayButtons({ item }: { item: ItemDetail }) {
     setBusy(true);
     try {
       await fn();
+    } catch (e) {
+      toast(`Couldn't start playing. ${(e as Error).message}`, { tone: "error" });
     } finally {
       setBusy(false);
     }

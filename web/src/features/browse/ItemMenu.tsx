@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/components/Toast";
 import { useNavigate } from "@tanstack/react-router";
 import { Bookmark, BookmarkMinus, CircleCheck, CircleSlash, Compass, Disc3, EyeOff, Heart, HeartOff, Layers, ListEnd, ListPlus, ListStart, MoreHorizontal, Radio, Shuffle, UserRound } from "lucide-react";
 import { clsx } from "clsx";
@@ -56,6 +57,9 @@ export function ItemMenu({
   const setFavorite = useSetFavorite();
   const isMusic = music.has(item.type);
   const leaves = async () => (item.type === "track" ? [item] : await fetchLeaves(item.id));
+  // Runs a menu action that loads tracks first; a failed load shows instead of vanishing.
+  const withTracks = (fn: () => Promise<void>) => () =>
+    void fn().catch((e: Error) => toast(`Couldn't load the tracks. ${e.message}`, { tone: "error" }));
   return (
     <>
       <Menu label={`More actions for ${item.title}`} trigger={<MoreHorizontal className="size-4" />} className={className} open={open} onOpenChange={onOpenChange} floating={floating}>
@@ -71,10 +75,10 @@ export function ItemMenu({
         )}
         {isMusic && (
           <>
-            <MenuItem icon={<ListStart />} onClick={async () => player.playNext(await leaves())}>
+            <MenuItem icon={<ListStart />} onClick={withTracks(async () => player.playNext(await leaves()))}>
               Play next
             </MenuItem>
-            <MenuItem icon={<ListEnd />} onClick={async () => player.addToQueue(await leaves())}>
+            <MenuItem icon={<ListEnd />} onClick={withTracks(async () => player.addToQueue(await leaves()))}>
               Add to queue
             </MenuItem>
             <MenuItem icon={<Radio />} onClick={() => radio.mutate({ seed: "item", itemId: item.id })}>
@@ -86,7 +90,7 @@ export function ItemMenu({
               </MenuItem>
             )}
             {item.type !== "track" && (
-              <MenuItem icon={<Shuffle />} onClick={async () => player.play(await fetchLeaves(item.id, { shuffle: true }), 0, { source: item.title })}>
+              <MenuItem icon={<Shuffle />} onClick={withTracks(async () => player.play(await fetchLeaves(item.id, { shuffle: true }), 0, { source: item.title }))}>
                 Shuffle play
               </MenuItem>
             )}

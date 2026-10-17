@@ -7,11 +7,13 @@ import type { Profile } from "@/api/types";
 import { PinPad } from "@/components/PinPad";
 import { Alert, Button, Dialog, Input, Spinner } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
+import { useMusicActions } from "@/features/player/MusicPlayer";
 import { Avatar } from "./Avatar";
 
 /** Profile picker with an on-screen PIN pad. */
 export function ProfileSwitcher({ onClose }: { onClose: () => void }) {
   const { signIn } = useAuth();
+  const music = useMusicActions();
   const profiles = useQuery(profilesQuery);
   const me = useQuery(meQuery);
   const [target, setTarget] = useState<Profile | null>(null);
@@ -25,6 +27,8 @@ export function ProfileSwitcher({ onClose }: { onClose: () => void }) {
         }),
       ),
     onSuccess: (res) => {
+      // The previous profile's music (its queue, sessions and plays) doesn't carry over.
+      music.close();
       signIn(res.token);
       onClose();
     },

@@ -150,11 +150,18 @@ export function RemoteAccessSettings() {
 
 export function SecretField({ label, help, isSet, value, onChange, placeholder = "Paste API key" }: { label: string; help: React.ReactNode; isSet: boolean; value: string | undefined; onChange: (v: string | undefined) => void; placeholder?: string }) {
   const [editing, setEditing] = useState(false);
+  // After a save (the draft's value cleared) or a change on the server, show the state again.
+  const [seen, setSeen] = useState({ isSet, value });
+  if (seen.isSet !== isSet || (seen.value !== undefined && value === undefined)) {
+    setSeen({ isSet, value });
+    setEditing(false);
+  } else if (seen.value !== value) setSeen({ isSet, value });
   return (
     <Field label={label} help={help}>
       {(id) =>
         editing || !isSet ? (
-          <Input id={id} type="password" autoComplete="off" placeholder={placeholder} value={value ?? ""} onChange={(e) => onChange(e.target.value)} />
+          // An emptied field leaves the saved secret alone (Remove is for removing it).
+          <Input id={id} type="password" autoComplete="off" placeholder={placeholder} value={value ?? ""} onChange={(e) => onChange(e.target.value || undefined)} />
         ) : (
           <div className="flex items-center gap-3">
             {value === "" ? (

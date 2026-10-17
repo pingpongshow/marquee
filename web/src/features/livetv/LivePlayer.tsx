@@ -51,15 +51,22 @@ export function LivePlayer({
     setLoading(true);
     onError?.(null);
     (async () => {
-      const [s, { default: Hls }] = await Promise.all([
-        unwrap(
-          api.POST("/livetv/channels/{channelId}/play", {
-            params: { path: { channelId } },
-            body: { profile: deviceProfile() },
-          }),
-        ),
-        import("hls.js"),
-      ]);
+      // The player code loads while tuning; if it fails to load, the session is ended.
+      const hlsModule = import("hls.js");
+      hlsModule.catch(() => {});
+      const s = await unwrap(
+        api.POST("/livetv/channels/{channelId}/play", {
+          params: { path: { channelId } },
+          body: { profile: deviceProfile() },
+        }),
+      );
+      let Hls: typeof import("hls.js").default;
+      try {
+        Hls = (await hlsModule).default;
+      } catch (e) {
+        stop(s.id);
+        throw e;
+      }
       // Switched channel (or closed) while tuning: end the session nobody will watch.
       if (cancelled) return stop(s.id);
       session = s.id;
