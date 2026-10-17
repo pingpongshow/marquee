@@ -50,7 +50,7 @@ func (h *Handlers) CreateDownload(ctx context.Context, req CreateDownloadRequest
 		return CreateDownload401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	b := req.Body
-	if h.Items.Visible(ctx, access(ctx), b.ItemId) != nil {
+	if h.Items.Visible(ctx, itemAccess(ctx), b.ItemId) != nil {
 		return CreateDownload404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
 	if requestInfo(ctx).Class == netclass.Remote && !sess.User.IsAdmin && !sess.User.Restrictions.RemoteAllowed() {
@@ -131,7 +131,7 @@ func (h *Handlers) SyncProgress(ctx context.Context, req SyncProgressRequestObje
 	if !ok {
 		return SyncProgress401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if h.Items.Visible(ctx, access(ctx), req.ItemId) != nil {
+	if h.Items.Visible(ctx, itemAccess(ctx), req.ItemId) != nil {
 		return SyncProgress404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
 	b := req.Body
@@ -190,7 +190,7 @@ func (h *Handlers) DownloadFiles() http.Handler {
 		switch {
 		case strings.HasPrefix(rest, "original/"):
 			itemID, err := strconv.ParseInt(strings.TrimPrefix(rest, "original/"), 10, 64)
-			if err != nil || h.Items.Visible(r.Context(), access(r.Context()), itemID) != nil {
+			if err != nil || h.Items.Visible(r.Context(), itemAccess(r.Context()), itemID) != nil {
 				http.NotFound(w, r)
 				return
 			}
@@ -203,7 +203,7 @@ func (h *Handlers) DownloadFiles() http.Handler {
 			path, name = p, filepath.Base(p)
 		case strings.HasPrefix(rest, "zip/"):
 			itemID, err := strconv.ParseInt(strings.TrimPrefix(rest, "zip/"), 10, 64)
-			if err != nil || h.Items.Visible(r.Context(), access(r.Context()), itemID) != nil {
+			if err != nil || h.Items.Visible(r.Context(), itemAccess(r.Context()), itemID) != nil {
 				http.NotFound(w, r)
 				return
 			}

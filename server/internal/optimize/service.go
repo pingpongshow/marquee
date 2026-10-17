@@ -136,7 +136,8 @@ func (s *Service) kick() {
 }
 
 // Enqueue queues files with a preset. Files already queued or being optimized, and files
-// that aren't available movies or episodes in a video library, are skipped.
+// that aren't available movies or episodes in a video library (Live TV recordings aren't),
+// are skipped.
 func (s *Service) Enqueue(ctx context.Context, fileIDs []int64, presetID string) (queued, skipped int, err error) {
 	p, ok := s.cfg().Preset(presetID)
 	if !ok {
@@ -153,7 +154,7 @@ func (s *Service) Enqueue(ctx context.Context, fileIDs []int64, presetID string)
 			CROSS JOIN media_versions v ON v.id = f.version_id CROSS JOIN items i ON i.id = v.item_id
 			CROSS JOIN libraries l ON l.id = f.library_id
 			WHERE f.id = ? AND f.available = 1 AND i.type IN ('movie', 'episode') AND i.extra_type IS NULL
-			  AND l.type IN ('movies', 'shows', 'anime', 'videos')
+			  AND l.type IN ('movies', 'shows', 'anime', 'videos') AND l.recordings = 0
 			  AND NOT EXISTS (SELECT 1 FROM optimize_jobs j WHERE j.file_id = f.id AND j.state IN ('queued', 'running', 'verifying'))`, id).
 			Scan(&itemID, &libID, &size, &title, &path)
 		if errors.Is(err, sql.ErrNoRows) {
@@ -271,6 +272,9 @@ func (s *Service) Run(ctx context.Context) {
 		}
 		s.DB.ExecContext(ctx, `UPDATE optimize_jobs SET state = 'queued', progress = 0 WHERE state IN ('running', 'verifying')`)
 	}
+	// With keepOriginals off, originals kept earlier (when it was on, or before it existed)
+	// go now.
+	s.PurgeOriginals(ctx, "keepOriginals is off")
 	tick := s.Tick
 	if tick == 0 {
 		tick = 2 * time.Second

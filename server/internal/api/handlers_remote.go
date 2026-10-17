@@ -187,7 +187,7 @@ func (h *Handlers) checkRemoteCommand(ctx context.Context, c *RemoteCommand, p r
 		for id := range distinct {
 			uniq = append(uniq, id)
 		}
-		visible, err := h.Items.ByIDs(ctx, userAccess(u), uniq)
+		visible, err := h.Items.ByIDs(ctx, userItemAccess(u), uniq)
 		if err != nil {
 			return "", err
 		}

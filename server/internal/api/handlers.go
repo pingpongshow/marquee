@@ -146,6 +146,9 @@ func isAdmin(ctx context.Context) (authed, admin bool) {
 	return ok, ok && s.User.IsAdmin
 }
 
+// admin reports whether the caller is a signed-in admin.
+func admin(ctx context.Context) bool { _, a := isAdmin(ctx); return a }
+
 func internal(ctx context.Context, op string, err error) error {
 	slog.ErrorContext(ctx, "request failed", "op", op, "err", err)
 	return err // strict handler turns this into a 500

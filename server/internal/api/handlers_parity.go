@@ -523,7 +523,7 @@ func (h *Handlers) GetItemTrailer(ctx context.Context, req GetItemTrailerRequest
 	if _, ok := session(ctx); !ok {
 		return GetItemTrailer401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if h.Metadata == nil || h.Items.Visible(ctx, access(ctx), req.ItemId) != nil {
+	if h.Metadata == nil || h.Items.Visible(ctx, itemAccess(ctx), req.ItemId) != nil {
 		return GetItemTrailer404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
 	t, err := h.Metadata.Trailer(ctx, req.ItemId)
@@ -546,7 +546,7 @@ func (h *Handlers) RemoveFromContinueWatching(ctx context.Context, req RemoveFro
 	if !ok {
 		return RemoveFromContinueWatching401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if h.Items.Visible(ctx, access(ctx), req.ItemId) != nil {
+	if h.Items.Visible(ctx, itemAccess(ctx), req.ItemId) != nil {
 		return RemoveFromContinueWatching404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
 	err := h.Items.HideFromContinue(ctx, s.User.ID, req.ItemId)

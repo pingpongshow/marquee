@@ -47,6 +47,9 @@ const hours = `MIN(MAX(julianday(COALESCE(h.stopped_at, h.started_at)) - juliand
 
 const from = ` FROM play_history h LEFT JOIN items i ON i.id = h.item_id `
 
+// notRecording leaves out items in the Live TV recordings libraries.
+const notRecording = `i.library_id NOT IN (SELECT id FROM libraries WHERE recordings = 1)`
+
 // Build makes a report for the last days days (0 = all time), for one user or everyone.
 func Build(ctx context.Context, db *sql.DB, days int, userID int64, limit int) (Report, error) {
 	r := Report{Methods: map[string]int{}}
@@ -106,9 +109,13 @@ func Build(ctx context.Context, db *sql.DB, days int, userID int64, limit int) (
 		return rows.Err()
 	}
 	steps := []func() error{
-		func() error { return top(&r.Movies, "i.id", "i.title", "i.year", "", "i.type = 'movie'") },
+		// Live TV recordings aren't listed (they're only under Live TV → Recordings); their
+		// plays still count in the totals.
 		func() error {
-			return top(&r.Shows, "i.grandparent_id", "g.title", "g.year", "LEFT JOIN items g ON g.id = i.grandparent_id ", "i.type = 'episode'")
+			return top(&r.Movies, "i.id", "i.title", "i.year", "", "i.type = 'movie' AND "+notRecording)
+		},
+		func() error {
+			return top(&r.Shows, "i.grandparent_id", "g.title", "g.year", "LEFT JOIN items g ON g.id = i.grandparent_id ", "i.type = 'episode' AND "+notRecording)
 		},
 		func() error {
 			return top(&r.Artists, "i.grandparent_id", "g.title", "NULL", "LEFT JOIN items g ON g.id = i.grandparent_id ", "i.type = 'track'")

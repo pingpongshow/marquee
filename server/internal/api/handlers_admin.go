@@ -411,7 +411,7 @@ func (h *Handlers) toAPILibrary(l library.Library) Library {
 	out := Library{
 		Id: l.ID, Name: l.Name, Type: LibraryType(l.Type), Paths: l.Paths, Options: opts,
 		ItemCount: l.ItemCount, ScanStatus: LibraryScanStatusIdle, LastScannedAt: l.LastScannedAt,
-		CreatedAt: l.CreatedAt, UpdatedAt: l.UpdatedAt,
+		CreatedAt: l.CreatedAt, UpdatedAt: l.UpdatedAt, Recordings: nz(l.Recordings),
 	}
 	if h.Scans != nil {
 		st := h.Scans.Status(l.ID)
@@ -439,18 +439,21 @@ func fromAPIOptions(o *LibraryOptions) library.Options {
 	return out
 }
 
-func (h *Handlers) ListLibraries(ctx context.Context, _ ListLibrariesRequestObject) (ListLibrariesResponseObject, error) {
-	if _, ok := session(ctx); !ok {
+func (h *Handlers) ListLibraries(ctx context.Context, req ListLibrariesRequestObject) (ListLibrariesResponseObject, error) {
+	s, ok := session(ctx)
+	if !ok {
 		return ListLibraries401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	// Per-user library restrictions arrive with user management in M1.
 	libs, err := h.Libraries.List(ctx)
 	if err != nil {
 		return nil, internal(ctx, "listLibraries", err)
 	}
+	// The Live TV recordings libraries are listed only to admins managing libraries
+	// (Settings → Libraries): recordings appear only under Live TV → Recordings.
+	manage := s.User.IsAdmin && req.Params.Manage != nil && *req.Params.Manage
 	out := ListLibraries200JSONResponse{}
 	for _, l := range libs {
-		if h.canSeeLibrary(ctx, l.ID) {
+		if (manage && l.Recordings) || h.canSeeLibrary(ctx, l.ID) {
 			out = append(out, h.toAPILibrary(l))
 		}
 	}
@@ -462,7 +465,8 @@ func (h *Handlers) GetLibrary(ctx context.Context, req GetLibraryRequestObject) 
 		return GetLibrary401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	l, err := h.Libraries.Get(ctx, req.LibraryId)
-	if errors.Is(err, library.ErrNotFound) || (err == nil && !h.canSeeLibrary(ctx, req.LibraryId)) {
+	// Admins can still look up a recordings library (to manage it); it isn't browsable.
+	if errors.Is(err, library.ErrNotFound) || (err == nil && !(l.Recordings && admin(ctx)) && !h.canSeeLibrary(ctx, req.LibraryId)) {
 		return GetLibrary404JSONResponse{NotFoundJSONResponse(apiErr("not_found", library.ErrNotFound.Error()))}, nil
 	}
 	if err != nil {

@@ -173,6 +173,9 @@ func (h *Handlers) ListOptimizeJobs(ctx context.Context, req ListOptimizeJobsReq
 	}
 	out := OptimizeJobPage{Items: make([]OptimizeJob, len(page.Jobs)), Total: page.Total, SavedBytes: page.SavedBytes, Optimized: page.Optimized,
 		Paused: nz(svc.HoldReason())}
+	if n, bytes, err := svc.KeptOriginals(ctx); err == nil {
+		out.KeptOriginals, out.KeptOriginalsBytes = ptr(n), ptr(bytes)
+	}
 	for i, j := range page.Jobs {
 		out.Items[i] = OptimizeJob{Id: j.ID, FileId: nz(j.FileID), ItemId: nz(j.ItemID), Title: j.Title, Path: j.Path, PresetId: j.PresetID,
 			PresetName: j.PresetName, State: OptimizeJobState(j.State), Progress: float32(j.Progress), Fps: nz(float32(j.FPS)), Speed: nz(float32(j.Speed)),
@@ -309,7 +312,25 @@ func (h *Handlers) UpdateOptimizeSettings(ctx context.Context, req UpdateOptimiz
 	if err != nil {
 		return nil, internal(ctx, "updateOptimizeSettings", err)
 	}
+	if !next.Optimize.KeepOriginals {
+		h.optimizer().PurgeOriginals(ctx, "keepOriginals was turned off")
+	}
 	return UpdateOptimizeSettings200JSONResponse(h.optimizeConfig(next.Optimize)), nil
+}
+
+// DeleteKeptOriginals deletes the originals of optimized files kept in the media trash.
+func (h *Handlers) DeleteKeptOriginals(ctx context.Context, _ DeleteKeptOriginalsRequestObject) (DeleteKeptOriginalsResponseObject, error) {
+	switch adminOnly(ctx) {
+	case 401:
+		return DeleteKeptOriginals401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case 403:
+		return DeleteKeptOriginals403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	n, freed, err := h.optimizer().DeleteKeptOriginals(ctx, "an admin asked")
+	if err != nil {
+		return nil, internal(ctx, "deleteKeptOriginals", err)
+	}
+	return DeleteKeptOriginals200JSONResponse{Deleted: n, FreedBytes: freed}, nil
 }
 
 // presetHasCodec reports whether a stored preset already uses a codec (kept as it is).

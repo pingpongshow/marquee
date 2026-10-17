@@ -129,6 +129,26 @@ export const recordingRulesQuery = queryOptions({
   queryFn: () => unwrap(api.GET("/livetv/recording-rules")),
 });
 
+/** All recordings the caller may see, or only the ones they scheduled. */
+export type RecordingOwner = "all" | "me";
+
+export const ownRecordingsQuery = (owner: RecordingOwner) =>
+  queryOptions({
+    queryKey: ["livetv", "recordings", owner],
+    queryFn: () =>
+      unwrap(api.GET("/livetv/recordings", { params: { query: { owner } } })),
+    refetchInterval: 30_000,
+  });
+
+export const ownRecordingRulesQuery = (owner: RecordingOwner) =>
+  queryOptions({
+    queryKey: ["livetv", "rules", owner],
+    queryFn: () =>
+      unwrap(
+        api.GET("/livetv/recording-rules", { params: { query: { owner } } }),
+      ),
+  });
+
 export function useSchedule() {
   const qc = useQueryClient();
   return useMutation({

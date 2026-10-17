@@ -12,7 +12,7 @@ func (h *Handlers) SearchSubtitles(ctx context.Context, req SearchSubtitlesReque
 	if _, ok := session(ctx); !ok {
 		return SearchSubtitles401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if h.Subtitles == nil || h.Items.Visible(ctx, access(ctx), req.ItemId) != nil {
+	if h.Subtitles == nil || h.Items.Visible(ctx, itemAccess(ctx), req.ItemId) != nil {
 		return SearchSubtitles404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
 	langs := "en"
@@ -40,7 +40,7 @@ func (h *Handlers) DownloadSubtitle(ctx context.Context, req DownloadSubtitleReq
 	if _, ok := session(ctx); !ok {
 		return DownloadSubtitle401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if h.Subtitles == nil || h.Items.Visible(ctx, access(ctx), req.ItemId) != nil {
+	if h.Subtitles == nil || h.Items.Visible(ctx, itemAccess(ctx), req.ItemId) != nil {
 		return DownloadSubtitle404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
 	b := req.Body

@@ -191,13 +191,13 @@ func (h *Handlers) ListItemChildren(ctx context.Context, req ListItemChildrenReq
 	if _, ok := session(ctx); !ok {
 		return ListItemChildren401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if err := h.Items.Visible(ctx, access(ctx), req.ItemId); errors.Is(err, items.ErrNotFound) {
+	if err := h.Items.Visible(ctx, itemAccess(ctx), req.ItemId); errors.Is(err, items.ErrNotFound) {
 		return ListItemChildren404JSONResponse{NotFoundJSONResponse(apiErr("not_found", err.Error()))}, nil
 	} else if err != nil {
 		return nil, internal(ctx, "children", err)
 	}
 	offset, limit := paging(req.Params.Offset, req.Params.Limit)
-	list, total, err := h.Items.Children(ctx, access(ctx), req.ItemId, offset, limit)
+	list, total, err := h.Items.Children(ctx, itemAccess(ctx), req.ItemId, offset, limit)
 	if err != nil {
 		return nil, internal(ctx, "children", err)
 	}
@@ -208,7 +208,7 @@ func (h *Handlers) ListPopularTracks(ctx context.Context, req ListPopularTracksR
 	if _, ok := session(ctx); !ok {
 		return ListPopularTracks401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if err := h.Items.Visible(ctx, access(ctx), req.ItemId); errors.Is(err, items.ErrNotFound) {
+	if err := h.Items.Visible(ctx, itemAccess(ctx), req.ItemId); errors.Is(err, items.ErrNotFound) {
 		return ListPopularTracks404JSONResponse{NotFoundJSONResponse(apiErr("not_found", err.Error()))}, nil
 	} else if err != nil {
 		return nil, internal(ctx, "popular", err)
@@ -249,7 +249,7 @@ func (h *Handlers) GetItem(ctx context.Context, req GetItemRequestObject) (GetIt
 // detail loads an item as the caller may see it.
 func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 	s, _ := session(ctx)
-	d, err := h.Items.Get(ctx, access(ctx), id, s.User.IsAdmin)
+	d, err := h.Items.Get(ctx, itemAccess(ctx), id, s.User.IsAdmin)
 	if err != nil {
 		return ItemDetail{}, err
 	}
@@ -270,7 +270,7 @@ func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 		Versions: make([]MediaVersion, len(d.Versions)), Chapters: make([]Chapter, len(d.Chapters)),
 		CommunityRating: sum.CommunityRating, AudioFormat: sum.AudioFormat,
 	}
-	if xs, err := h.Items.Extras(ctx, access(ctx), id); err == nil && len(xs) > 0 {
+	if xs, err := h.Items.Extras(ctx, itemAccess(ctx), id); err == nil && len(xs) > 0 {
 		list := make([]ItemSummary, len(xs))
 		for i, x := range xs {
 			list[i] = toAPISummary(x)
@@ -352,7 +352,7 @@ func (h *Handlers) GetImage(ctx context.Context, req GetImageRequestObject) (Get
 	if !s.User.IsAdmin {
 		var itemID int64
 		if h.DB.QueryRowContext(ctx, `SELECT item_id FROM artwork WHERE id = ?`, req.ArtworkId).Scan(&itemID) != nil ||
-			h.Items.Visible(ctx, access(ctx), itemID) != nil {
+			h.Items.Visible(ctx, itemAccess(ctx), itemID) != nil {
 			return GetImage404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "image not found"))}, nil
 		}
 	}

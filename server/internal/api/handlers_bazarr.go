@@ -23,7 +23,7 @@ var bazarrCode = regexp.MustCompile(`^[a-zA-Z]{2,3}(-[a-zA-Z]{2,4})?$`)
 // bazarrTarget checks the caller may see the item and finds it in Bazarr. The error is the
 // API error to send: nf=true for 404 (not set up, not visible, not managed), else 502.
 func (h *Handlers) bazarrTarget(ctx context.Context, itemID int64) (t bazarr.Target, apiError *Error, nf bool) {
-	if h.Items.Visible(ctx, access(ctx), itemID) != nil {
+	if h.Items.Visible(ctx, itemAccess(ctx), itemID) != nil {
 		e := apiErr("not_found", "item not found")
 		return t, &e, true
 	}
@@ -47,7 +47,7 @@ func (h *Handlers) BazarrStatus(ctx context.Context, req BazarrStatusRequestObje
 	if _, ok := session(ctx); !ok {
 		return BazarrStatus401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if h.Items.Visible(ctx, access(ctx), req.ItemId) != nil {
+	if h.Items.Visible(ctx, itemAccess(ctx), req.ItemId) != nil {
 		return BazarrStatus404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
 	out := BazarrStatus200JSONResponse{Configured: h.Bazarr.Configured(), Languages: []BazarrSubtitleLanguage{}}

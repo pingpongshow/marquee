@@ -44,7 +44,7 @@ func (h *Handlers) StartPlayback(ctx context.Context, req StartPlaybackRequestOb
 		return StartPlayback401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	b := req.Body
-	if err := h.Items.Visible(ctx, access(ctx), b.ItemId); errors.Is(err, items.ErrNotFound) {
+	if err := h.Items.Visible(ctx, itemAccess(ctx), b.ItemId); errors.Is(err, items.ErrNotFound) {
 		return StartPlayback404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	} else if err != nil {
 		return nil, internal(ctx, "startPlayback", err)
@@ -244,7 +244,7 @@ func (h *Handlers) MarkWatched(ctx context.Context, req MarkWatchedRequestObject
 	if !ok {
 		return MarkWatched401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if err := h.Items.Visible(ctx, access(ctx), req.ItemId); err != nil {
+	if err := h.Items.Visible(ctx, itemAccess(ctx), req.ItemId); err != nil {
 		return MarkWatched404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
 	// A change made offline and sent later only applies if nothing newer happened (USER-18).
@@ -264,7 +264,7 @@ func (h *Handlers) MarkUnwatched(ctx context.Context, req MarkUnwatchedRequestOb
 	if !ok {
 		return MarkUnwatched401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if err := h.Items.Visible(ctx, access(ctx), req.ItemId); err != nil {
+	if err := h.Items.Visible(ctx, itemAccess(ctx), req.ItemId); err != nil {
 		return MarkUnwatched404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
 	// A change made offline and sent later only applies if nothing newer happened (USER-18).
@@ -283,7 +283,7 @@ func (h *Handlers) NextItem(ctx context.Context, req NextItemRequestObject) (Nex
 	if _, ok := session(ctx); !ok {
 		return NextItem401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	next, err := h.Items.Next(ctx, access(ctx), req.ItemId)
+	next, err := h.Items.Next(ctx, itemAccess(ctx), req.ItemId)
 	if errors.Is(err, items.ErrNotFound) {
 		return NextItem204Response{}, nil
 	}

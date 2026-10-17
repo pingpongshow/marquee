@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Folder, Pencil, Plus, RefreshCw, Square, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { librariesQuery, useCancelScan, useDeleteLibrary, useScanAll, useScanLibrary } from "@/api/queries";
+import { manageLibrariesQuery, useCancelScan, useDeleteLibrary, useScanAll, useScanLibrary } from "@/api/queries";
 import type { Library } from "@/api/types";
 import { libraryIcons } from "@/app/Shell";
 import { Alert, Button, Card, Dialog, Field, Input, Spinner, StringListEditor, Toggle } from "@/components/ui";
@@ -47,7 +47,7 @@ function ScanStatus({ lib }: { lib: Library }) {
 }
 
 export function LibrariesSettings() {
-  const libraries = useQuery(librariesQuery);
+  const libraries = useQuery(manageLibrariesQuery);
   const del = useDeleteLibrary();
   const scan = useScanLibrary();
   const cancel = useCancelScan();
@@ -89,6 +89,7 @@ export function LibrariesSettings() {
                     <span className="font-medium">{lib.name}</span>
                     <span className="text-xs text-faint">{typeLabels[lib.type]}</span>
                   </div>
+                  {lib.recordings && <div className="mt-0.5 text-xs text-accent">Live TV recordings, shown only under Live TV</div>}
                   <ul className="mt-1 space-y-0.5">
                     {lib.paths.map((p) => (
                       <li key={p} className="flex items-center gap-1.5 truncate font-mono text-xs text-muted">

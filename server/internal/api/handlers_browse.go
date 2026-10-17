@@ -72,7 +72,7 @@ func (h *Handlers) RelatedItems(ctx context.Context, req RelatedItemsRequestObje
 	if _, ok := session(ctx); !ok {
 		return RelatedItems401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if err := h.Items.Visible(ctx, access(ctx), req.ItemId); errors.Is(err, items.ErrNotFound) {
+	if err := h.Items.Visible(ctx, itemAccess(ctx), req.ItemId); errors.Is(err, items.ErrNotFound) {
 		return RelatedItems404JSONResponse{NotFoundJSONResponse(apiErr("not_found", err.Error()))}, nil
 	} else if err != nil {
 		return nil, internal(ctx, "related", err)
@@ -92,13 +92,13 @@ func (h *Handlers) ItemLeaves(ctx context.Context, req ItemLeavesRequestObject) 
 	if _, ok := session(ctx); !ok {
 		return ItemLeaves401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if err := h.Items.Visible(ctx, access(ctx), req.ItemId); errors.Is(err, items.ErrNotFound) {
+	if err := h.Items.Visible(ctx, itemAccess(ctx), req.ItemId); errors.Is(err, items.ErrNotFound) {
 		return ItemLeaves404JSONResponse{NotFoundJSONResponse(apiErr("not_found", err.Error()))}, nil
 	} else if err != nil {
 		return nil, internal(ctx, "leaves", err)
 	}
 	unwatched := req.Params.Unwatched != nil && *req.Params.Unwatched
-	list, err := h.Items.Leaves(ctx, access(ctx), req.ItemId, unwatched)
+	list, err := h.Items.Leaves(ctx, itemAccess(ctx), req.ItemId, unwatched)
 	if err != nil {
 		return nil, internal(ctx, "leaves", err)
 	}

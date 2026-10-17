@@ -15,7 +15,7 @@ func (h *Handlers) GetTrickplay(ctx context.Context, req GetTrickplayRequestObje
 		return GetTrickplay401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	notFound := GetTrickplay404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "no previews for this item"))}
-	if h.Trickplay == nil || h.Items.Visible(ctx, access(ctx), req.ItemId) != nil {
+	if h.Trickplay == nil || h.Items.Visible(ctx, itemAccess(ctx), req.ItemId) != nil {
 		return notFound, nil
 	}
 	in, err := h.Trickplay.ForItem(ctx, req.ItemId)
@@ -35,7 +35,7 @@ func (h *Handlers) GetTrickplaySheet(ctx context.Context, req GetTrickplaySheetR
 		return GetTrickplaySheet401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	notFound := GetTrickplaySheet404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "no such sheet"))}
-	if h.Trickplay == nil || h.Items.Visible(ctx, access(ctx), req.ItemId) != nil {
+	if h.Trickplay == nil || h.Items.Visible(ctx, itemAccess(ctx), req.ItemId) != nil {
 		return notFound, nil
 	}
 	in, err := h.Trickplay.ForItem(ctx, req.ItemId)

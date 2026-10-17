@@ -489,8 +489,17 @@ function JobsTab({ config, history }: { config: OptimizeConfig; history: boolean
     },
     onError: (e) => toast(e.message, { tone: "error" }),
   });
+  const purge = useMutation({
+    mutationFn: () => unwrap(api.POST("/optimize/originals/delete")),
+    onSuccess: (r) => {
+      toast(`Deleted ${r.deleted.toLocaleString()} original${r.deleted === 1 ? "" : "s"}, freeing ${size(r.freedBytes)}.`);
+      refresh();
+    },
+    onError: (e) => toast(e.message, { tone: "error" }),
+  });
   const page = jobs.data;
   const total = page?.total ?? 0;
+  const kept = page?.keptOriginals ?? 0;
   return (
     <div className="space-y-4">
       {page && (
@@ -505,6 +514,20 @@ function JobsTab({ config, history }: { config: OptimizeConfig; history: boolean
             )}
             {!history && page.paused && <span className="ml-2 text-muted">· {page.paused}</span>}
           </p>
+          {history && kept > 0 && (
+            <Button
+              size="sm"
+              variant="danger"
+              loading={purge.isPending}
+              onClick={() =>
+                window.confirm(
+                  `Delete the ${kept.toLocaleString()} original${kept === 1 ? "" : "s"} kept in the media trash? They can't be restored afterwards.`,
+                ) && purge.mutate()
+              }
+            >
+              Delete kept originals ({kept.toLocaleString()} file{kept === 1 ? "" : "s"}, {size(page?.keptOriginalsBytes ?? 0)})
+            </Button>
+          )}
           {!history && (
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="secondary" loading={pause.isPending} onClick={() => pause.mutate(!config.settings.paused)}>
@@ -719,7 +742,7 @@ function SettingsTab({ config }: { config: OptimizeConfig }) {
         />
         <Toggle
           label="Keep originals in the media trash"
-          help="On: each original goes to the media trash once its new file is in place, and can be restored for 30 days. Off frees the space at once; originals can't be restored. Either way the original is only touched after the new file has been checked."
+          help="On: each original goes to the media trash once its new file is in place, and can be restored for 30 days. Off frees the space at once, and saving it off also deletes originals kept earlier; originals can't be restored. Either way the original is only touched after the new file has been checked."
           checked={!!draft.keepOriginals}
           onChange={(v) => setDraft({ ...draft, keepOriginals: v })}
         />
