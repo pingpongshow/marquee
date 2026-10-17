@@ -11,7 +11,7 @@ import java.io.IOException
 
 /**
  * One change a person made that the server hasn't got yet (USER-18): a rating, watched or
- * unwatched, a watchlist add or remove, a comment set or deleted, or the progress of a play.
+ * unwatched, a watchlist add or remove, a favourite set or cleared, a comment set or deleted, or the progress of a play.
  * Scoped to a server and a person, and stamped with when it was made ([atMs]), which the
  * server uses to ignore it if something newer happened elsewhere meanwhile.
  */
@@ -24,7 +24,7 @@ data class PendingChange(
     val atMs: Long,
     /** Rating: 0–10, or null to clear. */
     val rating: Double? = null,
-    /** Watched and Watchlist: on (watched, added) or off. */
+    /** Watched, Watchlist and Favorite: on (watched, added) or off. */
     val on: Boolean = true,
     /** Comment: the text; empty deletes your own. */
     val comment: String? = null,
@@ -36,7 +36,7 @@ data class PendingChange(
     /** Order the changes were made in; set by the queue. */
     val seq: Long = 0,
 ) {
-    enum class Kind { Rating, Watched, Watchlist, Comment, Progress }
+    enum class Kind { Rating, Watched, Watchlist, Comment, Progress, Favorite }
 
     /** Only the latest change per key is kept. */
     data class Key(val server: String, val user: Long, val item: Long, val kind: Kind, val reviewUser: Long?)

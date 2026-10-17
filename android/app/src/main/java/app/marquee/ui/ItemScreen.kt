@@ -133,8 +133,9 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 .onFailure { toast(context, it.message ?: "Couldn't start a radio", long = true) }
         }
     }) { Icon(Icons.Filled.Radio, null); Text("Radio") }
-    /** Watchlist (USER-8) and watched state, for movies and shows. */
+    /** The heart (USER-12), watchlist (USER-8) and watched state. */
     @Composable fun StateButtons() {
+        if (d.type in app.marquee.core.FavoriteState.types) FavoriteButton(d.id, d.title, d.favorite)
         // Changes made offline and not yet sent show over the page's older values (USER-18).
         var listed by remember(d.id, d.watchlisted) {
             mutableStateOf(marquee.sync.queued(d.id, app.marquee.core.PendingChange.Kind.Watchlist)?.on ?: (d.watchlisted == true))
@@ -295,6 +296,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                             leadingContent = { Text("${t.index ?: i + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                             trailingContent = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
+                                    FavoriteButton(t, small = true)
                                     app.marquee.music.TrackRating(t, Modifier.padding(end = 8.dp))
                                     Text(t.durationMs?.let { formatTime(it) } ?: "", maxLines = 1, softWrap = false)
                                     if (!marquee.isTv) TrackMenu(t)
@@ -371,7 +373,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
     }
 }
 
-/** A season's episode: plays on a tap; a long press (TV: hold OK, or the menu key) marks it watched or unwatched. */
+/** A season's episode: plays on a tap; the heart; a long press (TV: hold OK, or the menu key) marks it watched or unwatched or a favourite. */
 @Composable
 private fun EpisodeRow(nav: NavHostController, ep: ItemSummary) {
     val marquee = LocalMarquee.current
@@ -383,7 +385,12 @@ private fun EpisodeRow(nav: NavHostController, ep: ItemSummary) {
             headlineContent = { Text("${ep.index ?: ""}. ${ep.title}") },
             supportingContent = { Text(listOfNotNull(ep.durationMs?.let { formatTime(it) }, if (watched) "Watched" else null).joinToString(" · ")) },
             leadingContent = { Artwork(marquee.imageUrl(ep.images?.thumb, 200), ep.title, Shape.Wide, Modifier.width(120.dp)) },
-            trailingContent = if (watched) { { Icon(Icons.Filled.CheckCircle, "Watched", tint = Gold) } } else null,
+            trailingContent = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    FavoriteButton(ep, small = true)
+                    if (watched) Icon(Icons.Filled.CheckCircle, "Watched", tint = Gold)
+                }
+            },
             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
             modifier = Modifier.focusCard({ nav.navigate("player/${ep.id}") }, onLongClick = { menu = true })
                 .semantics { customActions = actions.map { a -> androidx.compose.ui.semantics.CustomAccessibilityAction(a.label) { a.run(); true } } },
@@ -461,6 +468,7 @@ private fun PopularTracks(artist: String, tracks: List<ItemSummary>) {
                 leadingContent = { Text("${i + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 trailingContent = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        FavoriteButton(t, small = true)
                         app.marquee.music.TrackRating(t, Modifier.padding(end = 8.dp))
                         Text(t.durationMs?.let { formatTime(it) } ?: "", maxLines = 1, softWrap = false)
                     }

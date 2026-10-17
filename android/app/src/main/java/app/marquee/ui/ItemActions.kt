@@ -35,7 +35,7 @@ fun watchedNow(marquee: Marquee, item: ItemSummary, marks: Map<Long, WatchState.
 
 /**
  * A tile's context menu (USER-6): Mark as watched or unwatched for videos, shows and seasons,
- * and Remove from Continue Watching on that row's tiles.
+ * Add to / Remove from favourites (USER-12), and Remove from Continue Watching on that row's tiles.
  */
 @Composable
 fun tileActions(item: ItemSummary, continueWatching: Boolean = false, onRemoved: (Long) -> Unit = {}): List<TileAction> {
@@ -44,10 +44,12 @@ fun tileActions(item: ItemSummary, continueWatching: Boolean = false, onRemoved:
     // The app's scope: the tile may leave the screen (its row reloads) before the request ends.
     val scope = marquee.scope
     val watched = isWatched(item)
+    val favorite = favoriteAction(item)
     return buildList {
         if (item.type in WatchState.videoTypes) add(TileAction(if (watched) "Mark as unwatched" else "Mark as watched") {
             scope.launch { if (!marquee.sync.setWatched(item.id, !watched)) toast(context, "Couldn't update “${item.title}”") }
         })
+        favorite?.let(::add)
         if (continueWatching && !marquee.isOffline) add(TileAction("Remove from Continue Watching") {
             scope.launch {
                 withContext(Dispatchers.IO) { runCatching { marquee.hubs.removeFromContinueWatching(item.id) } }

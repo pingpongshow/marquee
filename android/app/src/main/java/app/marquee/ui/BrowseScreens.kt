@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
@@ -104,6 +105,8 @@ fun HomeScreen(nav: NavHostController) {
     }
     // Reloads after watched marks or a removal from Continue Watching (USER-6), keeping the rows shown meanwhile.
     val changes by marquee.watch.changes.collectAsState()
+    // And after a favourite changed, for the Your Favourites row (USER-12).
+    val favoriteChanges by marquee.favorites.changes.collectAsState()
     // Removed from Continue Watching: gone at once, until the row reloads.
     val removed = remember { mutableStateListOf<String>() }
     // Kept while Home is on the back stack: coming back shows the same rows at once (refreshed in place), so it keeps its place.
@@ -114,7 +117,7 @@ fun HomeScreen(nav: NavHostController) {
     var openedKey by rememberCached("home:openedKey") { mutableStateOf<String?>(null) }
     // Films and episodes on demand report where they stopped as their player closes.
     val vodChanged by VodChanges.version.collectAsState()
-    LaunchedEffect(connection, changes, vodChanged) {
+    LaunchedEffect(connection, changes, vodChanged, favoriteChanges) {
         val fresh = withContext(Dispatchers.IO) { runCatching { marquee.hubs.homeHubs() } }
         if (fresh.isSuccess || hubsState.value?.isSuccess != true) { hubsState.value = fresh; if (fresh.isSuccess) removed.clear() }
     }
@@ -263,6 +266,13 @@ fun LibrariesScreen(nav: NavHostController) {
     }
 }
 
+/** A library grid's sort. */
+enum class LibrarySort(val label: String, val api: app.marquee.api.apis.ItemsApi.SortListLibraryItems) {
+    Title("Title", app.marquee.api.apis.ItemsApi.SortListLibraryItems.TITLE),
+    MyRating("My rating", app.marquee.api.apis.ItemsApi.SortListLibraryItems._MY_RATING),
+    Favorited("Date favourited", app.marquee.api.apis.ItemsApi.SortListLibraryItems._FAVORITED),
+}
+
 /** A library's grid, a page at a time as you scroll. */
 @Composable
 fun LibraryScreen(nav: NavHostController, libraryId: Long) {
@@ -275,9 +285,12 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
     var opened by rememberLastOpened("library-$libraryId")
     // Movie libraries also browse by collection (META-7).
     var collections by rememberSaveable { mutableStateOf(false) }
-    // Sort by the person's own rating, and only what they rated 4★ or more.
-    var byMyRating by rememberSaveable { mutableStateOf(false) }
+    // Sort by title, the person's own rating or when they favourited it; only what they rated
+    // 4★ or more; only their favourites (the heart, USER-12).
+    var sort by rememberSaveable { mutableStateOf(LibrarySort.Title) }
+    val byMyRating = sort == LibrarySort.MyRating
     var fav by rememberSaveable { mutableStateOf(false) }
+    var hearts by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     // Bumped when the sort, filter or collections view changes, so a page still loading for the old one is dropped.
     var generation by rememberCached("library-$libraryId-generation") { mutableIntStateOf(0) }
@@ -287,8 +300,9 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
         val gen = generation
         scope.launch {
             withContext(Dispatchers.IO) { runCatching { marquee.items.listLibraryItems(libraryId, if (collections) ItemType.COLLECTION else null,
-                if (byMyRating && !collections) app.marquee.api.apis.ItemsApi.SortListLibraryItems._MY_RATING else app.marquee.api.apis.ItemsApi.SortListLibraryItems.TITLE,
-                offset = items.size, limit = 120, minMyRating = if (fav && !collections) app.marquee.music.FAVORITE_RATING else null) } }
+                if (collections) app.marquee.api.apis.ItemsApi.SortListLibraryItems.TITLE else sort.api,
+                offset = items.size, limit = 120, minMyRating = if (fav && !collections) app.marquee.music.FAVORITE_RATING else null,
+                favorites = if (hearts && !collections) true else null) } }
                 .onSuccess { page -> if (gen == generation) { items.addAll(page.items.filter { n -> items.none { it.id == n.id } }); total = page.total } }
             if (gen == generation) loading = false
         }
@@ -316,14 +330,25 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
         }
         if (!collections) androidx.compose.foundation.lazy.LazyRow(Modifier.semantics { contentDescription = "Sort and filter" },
             contentPadding = PaddingValues(horizontal = sidePadding), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            item { FilterChip(!byMyRating, { if (byMyRating) { byMyRating = false; reload() } }, { Text("Title", maxLines = 1) }, Modifier.focusRing(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))) }
-            item { FilterChip(byMyRating, { if (!byMyRating) { byMyRating = true; reload() } }, { Text("My rating", maxLines = 1) }, Modifier.focusRing(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))) }
+            items(LibrarySort.entries) { o ->
+                FilterChip(sort == o, { if (sort != o) { sort = o; reload() } }, { Text(o.label, maxLines = 1) }, Modifier.focusRing(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)))
+            }
+            item {
+                FilterChip(hearts, { hearts = !hearts; reload() }, { Text("Favourites", maxLines = 1) }, Modifier.focusRing(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+                    leadingIcon = { Icon(Icons.Filled.Favorite, null, Modifier.size(18.dp), tint = Gold) })
+            }
             item {
                 FilterChip(fav, { fav = !fav; reload() }, { Text("Rated 4★+", maxLines = 1) }, Modifier.focusRing(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
                     leadingIcon = { Icon(Icons.Filled.Star, null, Modifier.size(18.dp), tint = Gold) })
             }
         }
-        if (total == 0) Text(if (fav && !collections) "Nothing rated 4★ or more yet." else "Nothing here yet.", Modifier.padding(sidePadding),
+        if (total == 0) Text(when {
+                collections -> "Nothing here yet."
+                hearts && fav -> "Nothing matches these filters."
+                hearts -> "No favourites here yet. Tap the heart on a title to add it."
+                fav -> "Nothing rated 4★ or more yet."
+                else -> "Nothing here yet."
+            }, Modifier.padding(sidePadding),
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         LazyVerticalGrid(GridCells.Adaptive(min), Modifier.semantics { contentDescription = "Library items" }, contentPadding = PaddingValues(sidePadding),
             horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -424,7 +449,12 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
                 headlineContent = { Text(it.title) },
                 supportingContent = { Text(subtitleFor(it)) },
                 leadingContent = if (it.type == ItemType.TRACK) null else { { Artwork(marquee.imageUrl(it.images?.thumb ?: it.images?.poster, 160), it.title, Shape.Wide, Modifier.width(96.dp)) } },
-                trailingContent = if (it.type == ItemType.TRACK) { { app.marquee.music.TrackRating(it) } } else null,
+                trailingContent = if (it.type in app.marquee.core.FavoriteState.types) { {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        FavoriteButton(it, small = true)
+                        if (it.type == ItemType.TRACK) app.marquee.music.TrackRating(it)
+                    }
+                } } else null,
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
                 // A video plays from here on through the rest of the playlist.
                 modifier = Modifier.initialFocus(marquee.isTv && opened == it.id)

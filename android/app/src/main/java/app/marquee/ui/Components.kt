@@ -255,7 +255,7 @@ fun app.marquee.api.models.ItemDetail.summary() = ItemSummary(
     parentId = parentId, grandparentId = grandparentId, parentTitle = parentTitle, grandparentTitle = grandparentTitle,
     artistCredit = artistCredit, durationMs = durationMs, originallyAvailableAt = originallyAvailableAt, images = images,
     viewOffsetMs = viewOffsetMs, viewCount = viewCount, lastViewedAt = lastViewedAt, watchedLeafCount = watchedLeafCount,
-    userRating = userRating, watchlisted = watchlisted, communityRating = communityRating,
+    userRating = userRating, watchlisted = watchlisted, communityRating = communityRating, favorite = favorite,
 )
 
 /** A playlist's poster mosaic: up to four of its items' posters, or its one poster. */

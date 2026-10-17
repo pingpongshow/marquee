@@ -104,7 +104,7 @@ import kotlinx.coroutines.withContext
 /** The music library's own pages, opened from the home's browse row. */
 enum class MusicBrowse(val route: String, val title: String) {
     Artists("artists", "Artists"), Albums("albums", "Albums"), Songs("songs", "Songs"), Genres("genres", "Genres"),
-    Moods("moods", "Moods & Styles"), Decades("decades", "Decades"), Favorites("favorites", "Favorites");
+    Moods("moods", "Moods & Styles"), Decades("decades", "Decades"), Favorites("favorites", "Favourites");
 
     companion object { fun of(route: String) = entries.firstOrNull { it.route == route } ?: Artists }
 }
@@ -117,20 +117,21 @@ private enum class MusicSort(val key: String, val label: String, val api: SortLi
     Year("year", "Year", SortListLibraryItems._YEAR),
     Random("random", "Random", SortListLibraryItems.RANDOM),
     MyRating("rating", "My rating", SortListLibraryItems._MY_RATING),
+    Favorited("favorited", "Date favourited", SortListLibraryItems._FAVORITED),
 }
 
-/** A favourite is anything rated 4 stars or more (0–10 on the server); Plex has no separate favourites. */
+/** "Rated 4★+": what the person rated 4 stars or more (0–10 on the server). Favourites are the heart. */
 const val FAVORITE_RATING = 8
 
 private fun sortsFor(kind: MusicBrowse) = when (kind) {
-    MusicBrowse.Albums -> listOf(MusicSort.Name, MusicSort.Added, MusicSort.Played, MusicSort.Year, MusicSort.MyRating)
-    else -> listOf(MusicSort.Name, MusicSort.Added, MusicSort.Played, MusicSort.MyRating, MusicSort.Random)
+    MusicBrowse.Albums -> listOf(MusicSort.Name, MusicSort.Added, MusicSort.Played, MusicSort.Year, MusicSort.MyRating, MusicSort.Favorited)
+    else -> listOf(MusicSort.Name, MusicSort.Added, MusicSort.Played, MusicSort.MyRating, MusicSort.Favorited, MusicSort.Random)
 }
 
 private class MusicShelves(val recentlyPlayed: List<ItemSummary>, val recentlyAdded: List<ItemSummary>, val playlists: List<Playlist>, val topArtists: List<ItemSummary>,
     val favorites: Favorites = Favorites())
 
-/** Top-rated albums, artists and tracks for the home's Favorites shelf, and how many favourite tracks there are. */
+/** Favourite albums, artists and songs (the heart, newest first) for the home's Favourites shelf, and how many favourite songs there are. */
 private class Favorites(val albums: List<ItemSummary> = emptyList(), val artists: List<ItemSummary> = emptyList(), val tracks: List<ItemSummary> = emptyList(), val trackCount: Int? = null) {
     val isEmpty get() = albums.isEmpty() && artists.isEmpty() && tracks.isEmpty()
 }
@@ -165,7 +166,7 @@ fun MusicHome(nav: NavHostController, library: Library) {
                                 .filter { (it.watchedLeafCount ?: 0) > 0 }
                         }
                 }
-                fun favs(t: ItemType, n: Int) = async { runCatching { marquee.items.listLibraryItems(lib, t, SortListLibraryItems._MY_RATING, limit = n, minMyRating = FAVORITE_RATING) }.getOrNull() }
+                fun favs(t: ItemType, n: Int) = async { runCatching { marquee.items.listLibraryItems(lib, t, SortListLibraryItems._FAVORITED, limit = n, favorites = true) }.getOrNull() }
                 val favAlbums = favs(ItemType.ALBUM, 12)
                 val favArtists = favs(ItemType.ARTIST, 12)
                 val favTracks = favs(ItemType.TRACK, 20)
@@ -253,11 +254,11 @@ fun MusicHome(nav: NavHostController, library: Library) {
             }
             if (!s.favorites.isEmpty) item {
                 val f = s.favorites
-                Section("Favorites", { nav.navigate("musicbrowse/$lib/favorites") }) {
-                    LazyRow(Modifier.semantics { contentDescription = "Favorites shelf" }, contentPadding = pad, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        items(f.albums + f.artists, key = { it.id }) { PosterCard(it, marquee.imageUrl(it.images?.poster, 300), card, { openItem(nav, it) }, showRating = true) }
+                Section("Favourites", { nav.navigate("musicbrowse/$lib/favorites") }) {
+                    LazyRow(Modifier.semantics { contentDescription = "Favourites shelf" }, contentPadding = pad, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        items(f.albums + f.artists, key = { it.id }) { PosterCard(it, marquee.imageUrl(it.images?.poster, 300), card, { openItem(nav, it) }, actions = app.marquee.ui.tileActions(it)) }
                         itemsIndexed(f.tracks, key = { _, it -> it.id }) { i, t ->
-                            PosterCard(t, marquee.imageUrl(t.images?.poster, 300), card, { music.play(f.tracks, i, source = "Favorites") }, showRating = true)
+                            PosterCard(t, marquee.imageUrl(t.images?.poster, 300), card, { music.play(f.tracks, i, source = "Favourite songs") }, actions = app.marquee.ui.tileActions(t))
                         }
                     }
                 }
@@ -278,7 +279,7 @@ fun MusicHome(nav: NavHostController, library: Library) {
                 LibraryRow(Icons.Filled.Person, "Artists", counts[ItemType.ARTIST]) { nav.navigate("musicbrowse/$lib/artists") }
                 LibraryRow(Icons.Filled.Album, "Albums", counts[ItemType.ALBUM]) { nav.navigate("musicbrowse/$lib/albums") }
                 LibraryRow(Icons.Filled.MusicNote, "Songs", counts[ItemType.TRACK]) { nav.navigate("musicbrowse/$lib/songs") }
-                LibraryRow(Icons.Filled.Favorite, "Favorites", s?.favorites?.trackCount) { nav.navigate("musicbrowse/$lib/favorites") }
+                LibraryRow(Icons.Filled.Favorite, "Favourites", s?.favorites?.trackCount) { nav.navigate("musicbrowse/$lib/favorites") }
                 LibraryRow(Icons.AutoMirrored.Filled.QueueMusic, "Playlists", s?.playlists?.size) { nav.navigate("playlists") }
                 LibraryRow(Icons.Filled.Category, "Genres", null) { nav.navigate("musicbrowse/$lib/genres") }
                 if (enabled) LibraryRow(Icons.Filled.Waves, "Moods & Styles", null) { nav.navigate("musicbrowse/$lib/moods") }
@@ -367,8 +368,9 @@ fun MusicBrowseScreen(nav: NavHostController, libraryId: Long, kindRoute: String
     val kind = MusicBrowse.of(kindRoute)
     val sorts = sortsFor(kind)
     var sort by rememberSaveable { mutableStateOf(sorts.firstOrNull { it.key == sortKey }?.key ?: MusicSort.Name.key) }
-    // Only what the person rated 4★ or more.
+    // Only what the person rated 4★ or more; only their favourites (the heart).
     var fav by rememberSaveable { mutableStateOf(false) }
+    var hearts by rememberSaveable { mutableStateOf(false) }
     // Songs and Albums filter by genre and decade (the facets of that type: a song's are its album's).
     var genre by rememberSaveable { mutableStateOf<String?>(null) }
     var decade by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -392,6 +394,10 @@ fun MusicBrowseScreen(nav: NavHostController, libraryId: Long, kindRoute: String
                 FilterChip(sort == s.key, { sort = s.key }, { Text(s.label, maxLines = 1) }, Modifier.focusRing(RoundedCornerShape(8.dp)))
             }
             item {
+                FilterChip(hearts, { hearts = !hearts }, { Text("Favourites", maxLines = 1) }, Modifier.focusRing(RoundedCornerShape(8.dp)),
+                    leadingIcon = { Icon(Icons.Filled.Favorite, null, Modifier.size(18.dp), tint = Gold) })
+            }
+            item {
                 FilterChip(fav, { fav = !fav }, { Text("Rated 4★+", maxLines = 1) }, Modifier.focusRing(RoundedCornerShape(8.dp)),
                     leadingIcon = { Icon(Icons.Filled.Star, null, Modifier.size(18.dp), tint = Gold) })
             }
@@ -403,17 +409,18 @@ fun MusicBrowseScreen(nav: NavHostController, libraryId: Long, kindRoute: String
             }
         }
         val current = sorts.first { it.key == sort }
-        androidx.compose.runtime.key(sort, fav, genre, decade) { PagedMusic(nav, libraryId, kind, current, if (fav) FAVORITE_RATING else null, genre, decade) }
+        androidx.compose.runtime.key(sort, fav, hearts, genre, decade) { PagedMusic(nav, libraryId, kind, current, if (fav) FAVORITE_RATING else null, genre, decade, hearts) }
     }
 }
 
 @Composable
-private fun PagedMusic(nav: NavHostController, libraryId: Long, kind: MusicBrowse, sort: MusicSort, minRating: Int? = null, genre: String? = null, decade: Int? = null) {
+private fun PagedMusic(nav: NavHostController, libraryId: Long, kind: MusicBrowse, sort: MusicSort, minRating: Int? = null, genre: String? = null, decade: Int? = null,
+    favorites: Boolean = false) {
     val marquee = LocalMarquee.current
     val music = LocalMusic.current
     val scope = rememberCoroutineScope()
     // Kept while the page is on the back stack (per sort and filter), so coming back keeps its place.
-    val cacheKey = "music-$libraryId-$kind-${sort.key}-$minRating-$genre-$decade"
+    val cacheKey = "music-$libraryId-$kind-${sort.key}-$minRating-$genre-$decade-$favorites"
     val items = rememberCached("$cacheKey-items") { mutableStateListOf<ItemSummary>() }
     var total by rememberCached("$cacheKey-total") { mutableIntStateOf(-1) }
     var loading by remember { mutableStateOf(false) }
@@ -424,14 +431,18 @@ private fun PagedMusic(nav: NavHostController, libraryId: Long, kind: MusicBrows
         if (loading || (total >= 0 && items.size >= total)) return
         loading = true
         scope.launch {
-            withContext(Dispatchers.IO) { runCatching { marquee.items.listLibraryItems(libraryId, type, sort.api, offset = items.size, limit = 120, genre = genre, decade = decade, minMyRating = minRating) } }
+            withContext(Dispatchers.IO) { runCatching { marquee.items.listLibraryItems(libraryId, type, sort.api, offset = items.size, limit = 120, genre = genre, decade = decade, minMyRating = minRating,
+                favorites = favorites.takeIf { it }) } }
                 .onSuccess { page -> items.addAll(page.items.filter { n -> items.none { it.id == n.id } }); total = page.total }
                 .onFailure { total = items.size }
             loading = false
         }
     }
     LaunchedEffect(Unit) { loadMore() }
-    if (total == 0 && (minRating != null || genre != null || decade != null)) { Text("Nothing matches these filters.", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.onSurfaceVariant); return }
+    if (total == 0 && favorites && minRating == null && genre == null && decade == null) {
+        Text("No favourites here yet. Tap the heart on a song, album or artist to add it.", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.onSurfaceVariant); return
+    }
+    if (total == 0 && (favorites || minRating != null || genre != null || decade != null)) { Text("Nothing matches these filters.", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.onSurfaceVariant); return }
     if (total == 0 && minRating != null) { Text("Nothing rated 4★ or more yet.", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.onSurfaceVariant); return }
     if (total == 0) { Text("Nothing here yet.", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.onSurfaceVariant); return }
     if (kind == MusicBrowse.Songs) {
@@ -442,7 +453,12 @@ private fun PagedMusic(nav: NavHostController, libraryId: Long, kind: MusicBrows
                     headlineContent = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     supportingContent = { Text(subtitleFor(t), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     leadingContent = { Artwork(marquee.imageUrl(t.images?.poster, 120), t.title, Shape.Square, Modifier.width(44.dp)) },
-                    trailingContent = { TrackRating(t) },
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            app.marquee.ui.FavoriteButton(t, small = true)
+                            TrackRating(t)
+                        }
+                    },
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
                     modifier = Modifier.initialFocus(first(i, t.id)).focusCard({ opened = t.id; music.play(items.toList(), i, source = "Songs") }),
                 )
@@ -455,7 +471,7 @@ private fun PagedMusic(nav: NavHostController, libraryId: Long, kind: MusicBrows
             itemsIndexed(items, key = { _, it -> it.id }) { i, it ->
                 if (i >= items.size - 30) LaunchedEffect(i) { loadMore() }
                 PosterCard(it, marquee.imageUrl(it.images?.poster, 240), min, { opened = it.id; openItem(nav, it) }, autoFocus = first(i, it.id),
-                    showRating = sort == MusicSort.MyRating || minRating != null)
+                    showRating = sort == MusicSort.MyRating || minRating != null, actions = app.marquee.ui.tileActions(it))
             }
         }
     }
@@ -475,45 +491,62 @@ private fun FacetChip(label: String, selected: String?, options: List<Pair<Strin
     }
 }
 
-/** Favorites: what the person rated 4★ or more, as Tracks / Albums / Artists. */
+/**
+ * Favourites: the person's favourite songs, albums and artists (the heart, USER-12), newest
+ * first, or what they rated 4★ or more. Favourite songs play or shuffle as a list.
+ */
 @Composable
 private fun FavoritesPage(nav: NavHostController, libraryId: Long) {
     var kind by rememberSaveable { mutableStateOf(ItemType.TRACK.value) }
-    val kinds = listOf(ItemType.TRACK to "Tracks", ItemType.ALBUM to "Albums", ItemType.ARTIST to "Artists")
-    LazyRow(Modifier.semantics { contentDescription = "Favorites type" }, contentPadding = PaddingValues(horizontal = sidePadding, vertical = 8.dp),
+    var rated by rememberSaveable { mutableStateOf(false) }
+    val kinds = listOf(ItemType.TRACK to "Songs", ItemType.ALBUM to "Albums", ItemType.ARTIST to "Artists")
+    LazyRow(Modifier.semantics { contentDescription = "Favourites type" }, contentPadding = PaddingValues(horizontal = sidePadding, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        item {
+            FilterChip(!rated, { rated = false }, { Text("Favourites", maxLines = 1) }, Modifier.focusRing(RoundedCornerShape(8.dp)),
+                leadingIcon = { Icon(Icons.Filled.Favorite, null, Modifier.size(18.dp), tint = Gold) })
+        }
+        item {
+            FilterChip(rated, { rated = true }, { Text("Rated 4★+", maxLines = 1) }, Modifier.focusRing(RoundedCornerShape(8.dp)),
+                leadingIcon = { Icon(Icons.Filled.Star, null, Modifier.size(18.dp), tint = Gold) })
+        }
         items(kinds) { (t, label) ->
             FilterChip(kind == t.value, { kind = t.value }, { Text(label, maxLines = 1) }, Modifier.focusRing(RoundedCornerShape(8.dp)))
         }
     }
     val type = kinds.first { it.first.value == kind }.first
-    androidx.compose.runtime.key(kind) { FavoritesList(nav, libraryId, type, kinds.first { it.first == type }.second) }
+    androidx.compose.runtime.key(kind, rated) { FavoritesList(nav, libraryId, type, kinds.first { it.first == type }.second, rated) }
 }
 
 @Composable
-private fun FavoritesList(nav: NavHostController, libraryId: Long, type: ItemType, label: String) {
+private fun FavoritesList(nav: NavHostController, libraryId: Long, type: ItemType, label: String, rated: Boolean) {
     val marquee = LocalMarquee.current
     val music = LocalMusic.current
-    val list by produceState<Result<List<ItemSummary>>?>(null, libraryId, type) {
+    val list by produceState<Result<List<ItemSummary>>?>(null, libraryId, type, rated) {
         value = withContext(Dispatchers.IO) {
-            runCatching { marquee.items.listLibraryItems(libraryId, type, SortListLibraryItems._MY_RATING, limit = 500, minMyRating = FAVORITE_RATING).items }
+            runCatching {
+                if (rated) marquee.items.listLibraryItems(libraryId, type, SortListLibraryItems._MY_RATING, limit = 500, minMyRating = FAVORITE_RATING).items
+                else marquee.items.listLibraryItems(libraryId, type, SortListLibraryItems._FAVORITED, limit = 500, favorites = true).items
+            }
         }
     }
+    val source = if (rated) "Rated 4★+" else "Favourite songs"
     val l = list ?: return Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-    val items = l.getOrElse { Text("Couldn't load favorites: ${it.message}", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.error); return }
+    val items = l.getOrElse { Text("Couldn't load favourites: ${it.message}", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.error); return }
     if (items.isEmpty()) {
-        Text("Nothing here yet. $label you rate 4 stars or more show up here; rate them with the stars on their page or in Now Playing.",
+        Text(if (rated) "Nothing here yet. $label you rate 4 stars or more show up here; rate them with the stars on their page or in Now Playing."
+            else "Nothing here yet. $label you heart show up here; tap the heart on a page, a song or in Now Playing.",
             Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.onSurfaceVariant)
         return
     }
     if (type == ItemType.TRACK) {
-        LazyColumn(Modifier.semantics { contentDescription = "Favorite tracks" }, contentPadding = PaddingValues(bottom = 16.dp)) {
+        LazyColumn(Modifier.semantics { contentDescription = "Favourite songs" }, contentPadding = PaddingValues(bottom = 16.dp)) {
             item {
                 Row(Modifier.padding(horizontal = sidePadding, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button({ music.play(items, 0, source = "Favorites") }, Modifier.focusRing().initialFocus(marquee.isTv)) {
+                    Button({ music.play(items, 0, source = source) }, Modifier.focusRing().initialFocus(marquee.isTv)) {
                         Icon(Icons.Filled.PlayArrow, null); Text("Play", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
                     }
-                    OutlinedButton({ music.play(items.shuffled(), 0, source = "Favorites") }, Modifier.focusRing()) {
+                    OutlinedButton({ music.play(items.shuffled(), 0, source = source) }, Modifier.focusRing()) {
                         Icon(Icons.Filled.Shuffle, null); Text("Shuffle", Modifier.padding(start = 6.dp), maxLines = 1, softWrap = false)
                     }
                 }
@@ -526,11 +559,12 @@ private fun FavoritesList(nav: NavHostController, libraryId: Long, type: ItemTyp
                     trailingContent = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             app.marquee.ui.CommunityScore(t.communityRating, Modifier.padding(end = 4.dp))
+                            app.marquee.ui.FavoriteButton(t, small = true)
                             TrackRating(t)
                         }
                     },
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                    modifier = Modifier.focusCard({ music.play(items, i, source = "Favorites") }),
+                    modifier = Modifier.focusCard({ music.play(items, i, source = source) }),
                 )
             }
         }
@@ -539,7 +573,8 @@ private fun FavoritesList(nav: NavHostController, libraryId: Long, type: ItemTyp
         LazyVerticalGrid(GridCells.Adaptive(min), contentPadding = PaddingValues(sidePadding), horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)) {
             itemsIndexed(items, key = { _, it -> it.id }) { i, it ->
-                PosterCard(it, marquee.imageUrl(it.images?.poster, 240), min, { openItem(nav, it) }, autoFocus = marquee.isTv && i == 0, showRating = true)
+                PosterCard(it, marquee.imageUrl(it.images?.poster, 240), min, { openItem(nav, it) }, autoFocus = marquee.isTv && i == 0, showRating = rated,
+                    actions = app.marquee.ui.tileActions(it))
             }
         }
     }

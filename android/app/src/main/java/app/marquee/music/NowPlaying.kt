@@ -63,6 +63,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -169,6 +170,9 @@ fun NowPlayingScreen(onClose: () -> Unit, onRemote: ((Long) -> Unit)? = null, on
                 Box(Modifier.height(48.dp), contentAlignment = Alignment.Center) {
                     RatingStars(music.rating.collectAsState().value, music::rate, size = if (marquee.isTv) 22 else 24)
                 }
+                // The heart (USER-12), from the track's current state.
+                app.marquee.ui.FavoriteButton(n.id, n.title, music.favorite.collectAsState().value ?: n.favorite,
+                    Modifier.testTag("now-playing-favorite"))
                 IconButton(::startRadio, Modifier.focusRing()) { Icon(Icons.Filled.Radio, "Start Radio", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 IconButton(::saveQueue, Modifier.focusRing()) {
                     Icon(Icons.AutoMirrored.Filled.PlaylistAdd, "Save as playlist", tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -250,7 +254,7 @@ private fun Transport() {
     }
 }
 
-/** Up Next: tap to jump, with the DJ's picks marked. */
+/** Up Next: tap to jump, with the DJ's picks marked and each track's heart. */
 @Composable
 private fun QueueList(modifier: Modifier, onSave: () -> Unit) {
     val music = LocalMusic.current
@@ -279,6 +283,7 @@ private fun QueueList(modifier: Modifier, onSave: () -> Unit) {
                     Text(listOfNotNull(q.artist.ifBlank { null }, q.dj).joinToString(" · "), style = MaterialTheme.typography.bodySmall,
                         color = if (q.dj != null) Gold else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
+                app.marquee.ui.FavoriteButton(q.id, q.title, if (i == index) music.favorite.collectAsState().value ?: q.favorite else q.favorite, small = true)
             }
         }
     }

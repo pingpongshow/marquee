@@ -24,7 +24,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
 /**
- * Offline sync (USER-18): ratings, watched, watchlist, comments and the progress of plays made
+ * Offline sync (USER-18): ratings, watched, watchlist, favourites, comments and the progress of plays made
  * while the server can't be reached are queued on the device (per server and person) and sent,
  * with when they were made, once it's back: on signing in, when the network returns, when the
  * app comes to the foreground, and with backoff while any remain.
@@ -71,6 +71,7 @@ class OfflineSync(context: Context, private val marquee: Marquee) {
     fun rating(item: Long, rating: Double?) = change(item, PendingChange.Kind.Rating) { it.copy(rating = rating) }
     fun watched(item: Long, on: Boolean) = change(item, PendingChange.Kind.Watched) { it.copy(on = on) }
     fun watchlist(item: Long, on: Boolean) = change(item, PendingChange.Kind.Watchlist) { it.copy(on = on) }
+    fun favorite(item: Long, on: Boolean) = change(item, PendingChange.Kind.Favorite) { it.copy(on = on) }
     /** Your own comment; empty deletes it. */
     fun comment(item: Long, text: String) = change(item, PendingChange.Kind.Comment) { it.copy(comment = text) }
     /** Someone else's comment (admins). */
@@ -114,6 +115,18 @@ class OfflineSync(context: Context, private val marquee: Marquee) {
         return ok
     }
 
+    /**
+     * Sets or clears a favourite (the heart, USER-12): shown at once everywhere, then saved (or
+     * queued offline). A refusal undoes it and returns false.
+     */
+    suspend fun setFavorite(item: Long, on: Boolean): Boolean {
+        marquee.favorites.mark(item, on)
+        val ok = saveShowing(favorite(item, on))
+        if (!ok) marquee.favorites.forget(item)
+        marquee.favorites.changed()
+        return ok
+    }
+
     private fun enqueue(c: PendingChange): Result {
         queue.add(c)
         scheduleRetry()
@@ -137,6 +150,7 @@ class OfflineSync(context: Context, private val marquee: Marquee) {
             PendingChange.Kind.Rating -> items.rateItem(c.item, RateItemRequest(c.rating, at))
             PendingChange.Kind.Watched -> if (c.on) items.markWatched(c.item, at) else items.markUnwatched(c.item, at)
             PendingChange.Kind.Watchlist -> if (c.on) items.addToWatchlist(c.item, at) else items.removeFromWatchlist(c.item, at)
+            PendingChange.Kind.Favorite -> if (c.on) items.addFavorite(c.item, at) else items.removeFavorite(c.item, at)
             PendingChange.Kind.Comment -> c.reviewUser?.let { items.deleteReview(c.item, it, at) }
                 ?: items.setReview(c.item, SetReviewRequest(c.comment.orEmpty(), at))
             PendingChange.Kind.Progress -> marquee.playback.syncProgress(c.item, SyncProgressRequest(c.positionMs, c.watched, at))

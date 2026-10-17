@@ -279,7 +279,8 @@ private fun MixCard(station: Station, index: Int, onPlay: () -> Unit) {
                 .clickable(onClick = onPlay),
             contentAlignment = Alignment.BottomStart,
         ) {
-            Icon(Icons.Filled.Headphones, null, Modifier.align(Alignment.TopEnd).padding(10.dp), tint = Color.White.copy(alpha = 0.8f))
+            // The Favourites Mix (your hearted songs) wears a heart.
+            Icon(if (station.id == "favorites") Icons.Filled.Favorite else Icons.Filled.Headphones, null, Modifier.align(Alignment.TopEnd).padding(10.dp), tint = Color.White.copy(alpha = 0.8f))
             Text(station.title, Modifier.padding(10.dp), color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2)
         }
         station.description?.let { Text(it, Modifier.padding(top = 6.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2) }

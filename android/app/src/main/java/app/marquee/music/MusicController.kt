@@ -32,7 +32,7 @@ import kotlinx.coroutines.withContext
 class MusicController(private val context: Context, private val marquee: Marquee) {
     /** A queued track; dj names the DJ that wove it in. */
     data class Now(val id: Long, val title: String, val artist: String, val album: String, val artwork: Uri?, val dj: String? = null, val albumId: Long? = null,
-        val audio: app.marquee.api.models.AudioFormat? = null)
+        val audio: app.marquee.api.models.AudioFormat? = null, val favorite: Boolean? = null)
 
     /** DJ modes (MUSIC-6): a pick every few of your own tracks. */
     enum class DJ(val label: String, val mode: MusicDJRequest.Mode, val blurb: String) {
@@ -82,6 +82,9 @@ class MusicController(private val context: Context, private val marquee: Marquee
     private val _rating = MutableStateFlow<Double?>(null)
     /** The current track's rating, 0–10 (10 = loved). */
     val rating: StateFlow<Double?> = _rating
+    private val _favorite = MutableStateFlow<Boolean?>(null)
+    /** Whether the current track is a favourite on the server (the heart shows this device's changes over it). */
+    val favorite: StateFlow<Boolean?> = _favorite
     private val _sleep = MutableStateFlow<Sleep?>(null)
     val sleep: StateFlow<Sleep?> = _sleep
     private val _dj = MutableStateFlow(DJ.saved(prefs.getString("dj", null)))
@@ -149,7 +152,8 @@ class MusicController(private val context: Context, private val marquee: Marquee
     private fun meta(item: MediaItem): Now {
         val m = item.mediaMetadata
         return Now(item.mediaId.toLongOrNull() ?: 0, m.title?.toString() ?: "", m.artist?.toString() ?: "", m.albumTitle?.toString() ?: "", m.artworkUri,
-            m.extras?.getString("dj"), m.extras?.getLong("album", 0L)?.takeIf { it > 0 }, AudioQuality.from(m.extras))
+            m.extras?.getString("dj"), m.extras?.getLong("album", 0L)?.takeIf { it > 0 }, AudioQuality.from(m.extras),
+            m.extras?.takeIf { it.containsKey("favorite") }?.getBoolean("favorite"))
     }
 
     private fun sync(p: Player, queueChanged: Boolean) {
@@ -178,14 +182,18 @@ class MusicController(private val context: Context, private val marquee: Marquee
     }
 
     private fun loadRating(id: Long, reset: Boolean = true) {
-        if (reset) _rating.value = null
+        if (reset) { _rating.value = null; _favorite.value = _now.value?.takeIf { it.id == id }?.favorite }
         ratingJob?.cancel()
         // A rating made offline and not yet sent wins over the server's older one (USER-18).
         marquee.sync.queued(id, app.marquee.core.PendingChange.Kind.Rating)?.let { _rating.value = it.rating }
         ratingJob = scope.launch {
-            val r = withContext(Dispatchers.IO) { runCatching { marquee.items.getItem(id).userRating } }
+            val item = withContext(Dispatchers.IO) { runCatching { marquee.items.getItem(id) } }
+            val r = item.map { it.userRating }
             val queued = marquee.sync.queued(id, app.marquee.core.PendingChange.Kind.Rating)
-            if (lastId == id) _rating.value = if (queued != null) queued.rating else r.getOrElse { _rating.value }
+            if (lastId == id) {
+                _rating.value = if (queued != null) queued.rating else r.getOrElse { _rating.value }
+                item.getOrNull()?.let { _favorite.value = it.favorite == true }
+            }
         }
     }
 
