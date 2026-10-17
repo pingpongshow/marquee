@@ -31,6 +31,17 @@ struct PendingQueueTests {
         #expect(q.entries.filter { $0.kind == .comment }.count == 2)
     }
 
+    @Test func aChangeSentDirectlyDropsTheOlderWaitingOne() {
+        var q = PendingQueue()
+        q.add(tagged(.watchlist(1, true), at: 1))
+        q.add(tagged(.watchlist(1, true), user: 2, at: 1)) // another profile's
+        q.add(tagged(.rating(1, 6), at: 2))
+        q.supersede(by: tagged(.watchlist(1, false), at: 3))
+        #expect(q.latest(.watchlist, item: 1, server: "a", user: 1) == nil)
+        #expect(q.latest(.watchlist, item: 1, server: "a", user: 2)?.on == true)
+        #expect(q.latest(.rating, item: 1, server: "a", user: 1)?.rating == 6)
+    }
+
     @Test func unfinishedProgressCoalescesButEveryFinishedPlayCounts() {
         var q = PendingQueue()
         q.add(tagged(.progress(1, positionMs: 1000, watched: false), at: 1))

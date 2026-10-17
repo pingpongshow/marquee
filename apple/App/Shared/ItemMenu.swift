@@ -59,8 +59,8 @@ struct ItemMenuItems: View {
             }
         }
         if showsLibraryState, [.movie, .show, .episode, .video].contains(item._type) {
-            let listed = OfflineSync.shared.pendingWatchlist(item.id) ?? item.watchlisted ?? false
-            Button { ActionError.run { try await app.setWatchlist(item.id, !listed) } } label: {
+            let listed = WatchlistStore.shared.isListed(item)
+            Button { WatchlistStore.shared.set(item, !listed, app: app) } label: {
                 Label(listed ? "Remove from Watchlist" : "Add to Watchlist", systemImage: listed ? "bookmark.slash" : "bookmark")
             }
         }

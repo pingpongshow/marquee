@@ -31,4 +31,10 @@ struct TopShelfSnapshot: Codable {
         guard let url = Self.url, let data = try? JSONEncoder().encode(self) else { return }
         try? data.write(to: url, options: .atomic)
     }
+
+    /// Removes the snapshot (signed out), so the Top Shelf shows nothing of the account.
+    static func clear() {
+        guard let url, FileManager.default.fileExists(atPath: url.path) else { return }
+        try? FileManager.default.removeItem(at: url)
+    }
 }

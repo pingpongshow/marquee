@@ -56,6 +56,8 @@ final class CarPlaySceneDelegate: UIResponder, @preconcurrency CPTemplateApplica
     private func refresh(_ generation: Int) {
         guard generation == watchGeneration, ui != nil, let forYou = forYouTemplate, let downloads = downloadsTemplate else { return }
         let connected = app.client != nil && app.state == .signedIn
+        // Signed out, or moving to another server or profile: its music library is found again.
+        if !connected { musicLibrary = nil }
         if connected != loadedConnected {
             loadedConnected = connected
             Task { await loadForYou(forYou) }

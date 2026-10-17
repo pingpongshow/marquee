@@ -241,9 +241,12 @@ struct HomeView: View {
             TopShelfSnapshot.Section(title: hub.title, items: hub.items.prefix(12).map { it in
                 let wide = hub.id == "continue-watching"
                 let art = wide ? (it.images?.thumb ?? it.images?.backdrop) : it.images?.poster
+                // Only image-key URLs: until the key is known an image URL carries the sign-in
+                // token, which mustn't be written to the shared container's file.
+                let image = app.imageURLsUseKey ? app.imageURL(art, width: wide ? 640 : 300) : nil
                 return TopShelfSnapshot.Item(id: it.id, title: it.title,
                                              subtitle: it._type == .episode ? it.grandparentTitle : it.year.map(String.init),
-                                             imageURL: app.imageURL(art, width: wide ? 640 : 300), wide: wide,
+                                             imageURL: image, wide: wide,
                                              playable: [.movie, .episode, .video].contains(it._type))
             })
         }

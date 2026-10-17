@@ -1,5 +1,8 @@
 import MarqueeKit
 import SwiftUI
+#if os(tvOS)
+import TVServices
+#endif
 
 #if os(iOS)
 /// Hands background download events (the system relaunching the app) to the download manager.
@@ -64,14 +67,50 @@ struct MarqueeApp: App {
 /// Server → sign-in → app.
 struct RootView: View {
     @Environment(AppSession.self) private var app
+    /// The last person signed in (server and user), to notice another one: a profile switch,
+    /// signing out and in as someone else, or another server.
+    @State private var lastUser: String?
+    /// Bumped when another person signs in: the app's pages start again for them (a profile
+    /// switch stays signed in, so Home, the tabs and pushed pages kept the last person's).
+    @State private var userGeneration = 0
 
     var body: some View {
-        switch app.state {
-        case .noServer: ConnectView()
-        case .connecting: ConnectingView()
-        case .signedOut: SignInView()
-        case .signedIn: MainView()
+        Group {
+            switch app.state {
+            case .noServer: ConnectView()
+            case .connecting: ConnectingView()
+            case .signedOut: SignInView()
+            case .signedIn: MainView(generation: userGeneration)
+            }
         }
+        // What one person did this session (watched marks, ratings, favourites, Not interested,
+        // the search) isn't shown to the next.
+        .onChange(of: app.me.map { "\(app.server?.id ?? "-")|\($0.id)" }) { _, new in
+            guard let new, new != lastUser else { return }
+            if lastUser != nil {
+                Self.forgetSessionState()
+                userGeneration += 1
+            }
+            lastUser = new
+        }
+        #if os(tvOS)
+        // Signed out: the Top Shelf no longer shows their Continue Watching.
+        .onChange(of: app.state, initial: true) {
+            guard app.state == .signedOut || app.state == .noServer, TopShelfSnapshot.load() != nil else { return }
+            TopShelfSnapshot.clear()
+            TVTopShelfContentProvider.topShelfContentDidChange()
+        }
+        #endif
+    }
+
+    static func forgetSessionState() {
+        WatchStore.shared.reset()
+        RatingStore.shared.reset()
+        FavoriteStore.shared.reset()
+        WatchlistStore.shared.reset()
+        VodSuggestionHides.shared.reset()
+        SearchText.shared.query = ""
+        RatingPrompt.shared.pending = nil
     }
 }
 

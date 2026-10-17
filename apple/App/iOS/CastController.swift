@@ -135,6 +135,14 @@ final class CastController: NSObject {
         if !active.isEmpty { request.activeTrackIDs = active }
         closeSession()
         session = s
+        if !music, castingMusic {
+            // A video takes the device over from the music queue: the queue stays here, paused,
+            // so the video's progress and end aren't taken for the track's (a finished video
+            // started the next track on the TV, and stopping casting resumed the music).
+            castingMusic = false
+            self.music?.remoteUpdate(playing: false, time: position, duration: duration)
+            self.music?.remote = nil
+        }
         _ = remote.loadMedia(with: request.build())
         return nil
     }

@@ -369,7 +369,16 @@ public final class Downloads {
             asked = true
             let response: Operations.GetDownload.Output
             do { response = try await client.getDownload(path: .init(downloadId: job)) } catch { continue }
+            // Signed out: stop, and start again on signing in (attach).
+            if case .unauthorized = response { continue }
             reached = true
+            if case .notFound = response {
+                // The server no longer has the conversion (removed, or expired): asking again
+                // would poll for ever.
+                entries[e.id]?.state = .failed("The server no longer has this download. Remove it and download it again.")
+                entries[e.id]?.jobID = nil
+                continue
+            }
             guard let info = try? response.ok.body.json else { continue }
             switch info.status {
             case .ready:

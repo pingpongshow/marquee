@@ -22,6 +22,9 @@ struct MainView: View {
     @State private var hasVodShows = false
     /// Why the libraries couldn't be loaded (shown with a retry instead of an empty list).
     @State private var librariesError: String?
+    /// Bumped when another person signs in (a profile switch stays signed in): the tabs and
+    /// their pages start again, so nothing of the last person's stays on screen.
+    var generation = 0
 
     var body: some View {
         TabView {
@@ -63,6 +66,11 @@ struct MainView: View {
             #else
             otherTabs
             #endif
+        }
+        .id(generation)
+        .onChange(of: generation) {
+            video.request = nil
+            linkedItem = nil
         }
         // iPad and Apple TV: a sidebar (Home, the Libraries section, then the rest). On the TV a
         // top bar fits only about six tabs; the sidebar lists them all, and Back from the top of

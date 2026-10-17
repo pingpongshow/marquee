@@ -32,6 +32,9 @@ final class VodSuggestionHides {
     }
 
     func visible(_ list: [VodSuggestion]) -> [VodSuggestion] { list.filter { !isHidden($0) } }
+
+    /// Another person signed in: Not interested was someone else's.
+    func reset() { keys = [] }
 }
 
 /// A row of suggestions (nothing when empty, or once every title in it is hidden).

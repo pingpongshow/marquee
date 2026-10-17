@@ -36,6 +36,43 @@ final class FavoriteStore {
     }
 
     func toggle(_ item: Item, app: AppSession) { set(item, !isFavorite(item), app: app) }
+
+    /// Another person signed in: their own favourites show, not these.
+    func reset() { overrides = [:] }
+}
+
+/// Watchlist changes made in this session, so menus agree with them before their lists are
+/// fetched again (a tile's menu kept offering Add to Watchlist after adding).
+@MainActor @Observable
+final class WatchlistStore {
+    static let shared = WatchlistStore()
+    private var overrides: [Int64: Bool] = [:]
+
+    /// This session's change, one waiting to sync (USER-18), or what the server sent.
+    func isListed(_ item: Item) -> Bool {
+        overrides[item.id] ?? OfflineSync.shared.pendingWatchlist(item.id) ?? item.watchlisted ?? false
+    }
+
+    /// Remembers a change made elsewhere (the item page's own button).
+    func note(_ id: Int64, _ on: Bool?) { overrides[id] = on }
+
+    /// Adds or removes at once, and puts the old state back if the server refuses.
+    func set(_ item: Item, _ on: Bool, app: AppSession) {
+        let id = item.id, old = overrides[id]
+        overrides[id] = on
+        ActionError.run { [self] in
+            do {
+                try await app.setWatchlist(id, on)
+            } catch {
+                overrides[id] = old
+                throw error
+            }
+            HomeChanges.shared.version += 1
+        }
+    }
+
+    /// Another person signed in.
+    func reset() { overrides = [:] }
 }
 
 /// The item page's heart: a bordered button beside Watchlist (focusable on the TV).

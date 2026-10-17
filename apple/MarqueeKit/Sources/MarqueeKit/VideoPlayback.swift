@@ -81,6 +81,9 @@ public final class VideoPlayback {
     @ObservationIgnored private var offlineCounted = false
     public private(set) var offlineTitle: String?
     @ObservationIgnored private static var measured: (kbps: Int, at: Date)?
+    /// Set by `stop()`: a start still under way (the player closed while it loaded) ends there
+    /// rather than play on unseen with a server session nobody stops.
+    @ObservationIgnored private var stopped = false
 
     public init(app: AppSession, playlistID: Int64? = nil, order: [Int64]? = nil) {
         self.app = app
@@ -128,7 +131,7 @@ public final class VideoPlayback {
         errorMessage = nil
         finished = false
         setNearEnd(false)
-        guard let client = app.client else { return }
+        guard !stopped, let client = app.client else { return }
         if fallbackItemID != itemID {
             fallback = 0
             fallbackItemID = itemID
@@ -151,6 +154,10 @@ public final class VideoPlayback {
                 maxBitrateKbps: quality == 0 ? nil : quality, measuredKbps: measured,
                 subtitleOffsetMs: chosenOffsets?.subtitle, audioOffsetMs: chosenOffsets?.audio, profile: profile()))).ok.body.json
             await stopSession()
+            if stopped {
+                _ = try? await client.stopPlayback(path: .init(sessionId: s.id))
+                return
+            }
             session = s
             subtitleOffsetMs = s.subtitleOffsetMs ?? chosenOffsets?.subtitle ?? 0
             audioOffsetMs = s.audioOffsetMs ?? chosenOffsets?.audio ?? 0
@@ -162,6 +169,8 @@ public final class VideoPlayback {
             observe(playerItem)
             player.replaceCurrentItem(with: playerItem)
             if s.startMs > 0 { await player.seek(to: CMTime(seconds: Double(s.startMs) / 1000, preferredTimescale: 600)) }
+            // stop() ran during the seek: it has already let go of the item and ended the session.
+            guard !stopped else { return }
             player.play()
             loadNext(itemID)
         } catch {
@@ -205,6 +214,7 @@ public final class VideoPlayback {
         offline = (itemID, downloads)
         offlineTitle = downloads.entries[itemID]?.item.title
         if app.client != nil { item = try? await app.item(itemID) }
+        guard !stopped else { return }
         let playerItem = AVPlayerItem(url: file)
         playerItem.textStyleRules = app.subtitleStyle.textStyleRules
         describe(playerItem)
@@ -212,6 +222,7 @@ public final class VideoPlayback {
         player.replaceCurrentItem(with: playerItem)
         let resume = downloads.resumePosition(itemID)
         if resume > 0 { await player.seek(to: CMTime(seconds: Double(resume) / 1000, preferredTimescale: 600)) }
+        guard !stopped else { return }
         player.play()
     }
 
@@ -243,6 +254,7 @@ public final class VideoPlayback {
     }
 
     public func stop() async {
+        stopped = true
         offsetRestart?.cancel()
         // The final position reaches the server before the session ends.
         let last = report(.paused, force: true)

@@ -87,6 +87,12 @@ public struct PendingQueue: Codable, Equatable, Sendable {
         entries.append(change)
     }
 
+    /// Drops waiting changes a change the server has just taken replaces: they're older, and
+    /// would otherwise still show in the UI and be sent after it.
+    public mutating func supersede(by change: PendingChange) {
+        entries.removeAll { $0.replaced(by: change) }
+    }
+
     /// The changes that belong to this server and person, oldest first.
     public func flushable(server: String, user: Int64) -> [PendingChange] {
         entries.filter { $0.belongs(server: server, user: user) }
@@ -272,6 +278,9 @@ public final class OfflineSync {
         }
         switch PendingQueue.outcome(status: status) {
         case .sent:
+            let before = queue.entries.count
+            queue.supersede(by: change)
+            if queue.entries.count != before { save() }
             // The server is reachable: anything waiting can go too.
             if !queue.entries.isEmpty { Task { await flush() } }
             return true
