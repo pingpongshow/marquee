@@ -404,6 +404,7 @@ func (h *Handlers) PlayVodMovie(ctx context.Context, req PlayVodMovieRequestObje
 	}
 	link, ua, hls := h.VOD.PlayLink(*m)
 	if hls {
+		h.yieldForVOD(ctx, m.SourceID)
 		st := h.VOD.Streams.Start(s.User.ID, m.ID, link, ua)
 		return PlayVodMovie200JSONResponse(VodSession{Id: st.ID, Url: vod.StreamPrefix + st.ID + "/master.m3u8", MovieId: m.ID,
 			StartMs: nz(m.PositionMS)}), nil
@@ -434,6 +435,14 @@ type vodPlayOptions struct {
 
 // startVodFile makes a remote file (Xtream Codes film or episode) into HLS, like a library
 // transcode. A 503 or 502 error is returned as such; anything else is an internal error.
+// yieldForVOD has VOD downloads give back a connection for a film or episode about to play
+// from a source (when the provider's connection limit is known; vodsave/budget.go).
+func (h *Handlers) yieldForVOD(ctx context.Context, sourceID string) {
+	if h.VODSaves != nil && h.VOD != nil {
+		h.VODSaves.Yield(ctx, h.VOD.SourceHost(sourceID), 1)
+	}
+}
+
 func (h *Handlers) startVodFile(ctx context.Context, s auth.Session, noun, title, link, ua string, startMS int64, sourceID string,
 	o vodPlayOptions) (ps *playback.Session, unavailable, badGateway *Error, err error) {
 	if h.Playback == nil {
@@ -459,6 +468,7 @@ func (h *Handlers) startVodFile(ctx context.Context, s auth.Session, noun, title
 	} else {
 		r.Quality.UserPrefKbps = s.User.Preferences.LocalQualityKbps
 	}
+	h.yieldForVOD(ctx, sourceID)
 	ps, err = h.Playback.StartExternal(ctx, r)
 	switch {
 	case errors.Is(err, playback.ErrBusy):

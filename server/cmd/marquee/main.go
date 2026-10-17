@@ -466,7 +466,7 @@ func run() error {
 		},
 		Activity: func(ctx context.Context) []vodsave.Playing {
 			var out []vodsave.Playing
-			for _, src := range vodSvc.WatchingSources(ctx, time.Minute) {
+			for _, src := range vodSvc.WatchingStreams(ctx, time.Minute) {
 				out = append(out, vodsave.Playing{Kind: "vod", SourceID: src, Host: vodSvc.SourceHost(src)})
 			}
 			for _, ls := range live.Sessions.List() {
@@ -483,6 +483,27 @@ func run() error {
 			}
 			return out
 		},
+		// Downloads use the connections the provider allows (the Live TV source's Maximum
+		// streams on the same host) that viewers and recordings leave free.
+		Connections: func() []vodsave.LiveUse {
+			var out []vodsave.LiveUse
+			for _, src := range store.Get().Integrations.LiveTVSources {
+				if src.MaxStreams <= 0 {
+					continue
+				}
+				inUse, recs := live.Use(src.ID)
+				out = append(out, vodsave.LiveUse{Host: vodsave.HostOf(src.URL), Max: src.MaxStreams, InUse: inUse, Recordings: recs})
+			}
+			return out
+		},
+	}
+	// A live stream or recording about to connect gets its connection from the downloads.
+	live.BeforeConnect = func(sourceID string) {
+		for _, src := range store.Get().Integrations.LiveTVSources {
+			if src.ID == sourceID {
+				vodSaves.Yield(ctx, vodsave.HostOf(src.URL), 0)
+			}
+		}
 	}
 
 	// DVR (LIVE-5): recordings land in "Recorded TV" / "Recorded Movies", made on first use.

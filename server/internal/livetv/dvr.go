@@ -714,6 +714,8 @@ func (r *Recorder) start(ctx context.Context, id int64, end time.Time) {
 		// A recording takes priority over live streams for the source's connections.
 		if a.info.SourceID != "" {
 			r.Live.makeRoom(a.info.SourceID, a.info.ChannelID)
+			// VOD downloads from the same provider give back theirs before it connects.
+			r.Live.beforeConnect(a.info.SourceID)
 		}
 		r.record(rctx, ctx, id)
 	}()

@@ -172,7 +172,10 @@ export function VodSaveSettings() {
                 </Select>
               )}
             </Field>
-            <Field label="Saves at once per source" help="Providers often allow one or two connections.">
+            <Field
+              label="Saves at once per source"
+              help="Providers often allow one or two connections. When the source shares a server with a Live TV source that has Maximum streams set (Settings → Live TV), downloads use that source's free connections instead: as many saves at once (or connections for one large file, up to 4) as viewers and recordings leave free."
+            >
               {(id) => (
                 <Select id={id} value={d.concurrentPerSource ?? 1} onChange={(e) => update({ concurrentPerSource: Number(e.target.value) })}>
                   {[1, 2, 3, 4, 5].map((n) => (
@@ -251,7 +254,7 @@ export function VodSaveSettings() {
           />
           <Toggle
             label="Pause while someone is watching"
-            help="Saves wait while something plays, and go on about 15 seconds after it stops."
+            help="Saves wait while something plays, and go on about 15 seconds after it stops. With Maximum streams known, downloads only give back the connections viewers need, and take them back about 15 seconds after they stop; recordings always get theirs."
             checked={d.pauseWhileWatching ?? true}
             onChange={(v) => update({ pauseWhileWatching: v })}
           />

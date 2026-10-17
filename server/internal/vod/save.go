@@ -71,6 +71,16 @@ func (s *Service) SourceName(sourceID string) string {
 // WatchingSources are the sources films or episodes are being watched from now: sessions
 // that fetched something or reported their position within the last `within`.
 func (s *Service) WatchingSources(ctx context.Context, within time.Duration) []string {
+	return s.watching(ctx, within, true)
+}
+
+// WatchingStreams are the sources of the films and episodes being watched now, one per
+// stream (each holds a connection to the provider).
+func (s *Service) WatchingStreams(ctx context.Context, within time.Duration) []string {
+	return s.watching(ctx, within, false)
+}
+
+func (s *Service) watching(ctx context.Context, within time.Duration, unique bool) []string {
 	if s.Streams == nil {
 		return nil
 	}
@@ -88,7 +98,7 @@ func (s *Service) WatchingSources(ctx context.Context, within time.Duration) []s
 		} else {
 			err = s.DB.QueryRowContext(ctx, "SELECT source_id FROM vod_movies WHERE id=?", st.MovieID).Scan(&src)
 		}
-		if err == nil && !seen[src] {
+		if err == nil && (!unique || !seen[src]) {
 			seen[src] = true
 			out = append(out, src)
 		}

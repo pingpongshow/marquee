@@ -6172,7 +6172,8 @@ components:
         progress: { type: number, description: "0–1 of the current step: download, or conversion while processing." }
         speedBps: { type: number, description: Download speed in bytes a second (while downloading). }
         etaSeconds: { type: integer, format: int64, description: Time left for the download. }
-        pauseReason: { type: string, description: "Why a queued save isn't running: the queue is paused, something is being watched, or the source is unreachable." }
+        connections: { type: integer, description: "Connections the download uses now (while downloading; more than 1 when a large file is fetched over the free connections of the source's Maximum streams)." }
+        pauseReason: { type: string, description: "Why a queued save isn't running: the queue is paused, something is being watched, connections are in use by viewers, or the source is unreachable." }
         attempts: { type: integer, description: Network failures in a row. }
         nextAttemptAt: { type: string, format: date-time, description: When a save waiting after a network error tries again. }
         error: { type: string }

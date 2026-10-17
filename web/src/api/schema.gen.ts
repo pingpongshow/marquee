@@ -5311,7 +5311,9 @@ export interface components {
              * @description Time left for the download.
              */
             etaSeconds?: number;
-            /** @description Why a queued save isn't running: the queue is paused, something is being watched, or the source is unreachable. */
+            /** @description Connections the download uses now (while downloading; more than 1 when a large file is fetched over the free connections of the source's Maximum streams). */
+            connections?: number;
+            /** @description Why a queued save isn't running: the queue is paused, something is being watched, connections are in use by viewers, or the source is unreachable. */
             pauseReason?: string;
             /** @description Network failures in a row. */
             attempts: number;
