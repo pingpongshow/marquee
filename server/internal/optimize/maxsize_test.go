@@ -15,7 +15,7 @@ func TestMaxSizeCapsVideo(t *testing.T) {
 		Audio:     []Stream{{Index: 1, Codec: "dts", Profile: "DTS-HD MA", Channels: 6, Kbps: 4000}},
 		Subtitles: []Stream{{Index: 2, Codec: "hdmv_pgs_subtitle"}, {Index: 3, Codec: "subrip"}}}
 	p := preset("1080p-hevc-balanced") // audio copied
-	p.MaxGBPerHour = 2.5 // a 2-hour film: at most 5 GB
+	p.MaxGBPerHour = 2.5               // a 2-hour film: at most 5 GB
 	pl, err := NewPlan(src, p)
 	if err != nil {
 		t.Fatal(err)
