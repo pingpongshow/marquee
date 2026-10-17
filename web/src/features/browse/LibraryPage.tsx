@@ -134,7 +134,7 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
     queryFn: () => unwrap(api.GET("/libraries/{libraryId}/filters", { params: { path: { libraryId: id }, query: itemType ? { type: itemType } : {} } })),
   });
 
-  const fetchPage = (page: number) => unwrap(api.GET("/libraries/{libraryId}/items", { params: { path: { libraryId: id }, query: { ...query, offset: page * PAGE, limit: PAGE } } }));
+  const fetchPage = (page: number) => unwrap(api.GET("/libraries/{libraryId}/items", { params: { path: { libraryId: id }, query: { ...query, offset: page * PAGE, limit: PAGE, ...(sort === "random" ? { seed } : {}) } } }));
   const keyBase = ["libraries", id, "items", query, sort === "random" ? seed : 0] as const;
   // Loaded pages stay cached for a while, so going Back to the grid (after watching a movie, say)
   // shows it at once at the same scroll position.

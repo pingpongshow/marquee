@@ -9,6 +9,8 @@ import (
 
 // Filter narrows a library listing (the library filter bar).
 type Filter struct {
+	// Seed makes the random sort repeatable across pages (0 = a fresh shuffle each query).
+	Seed int64 `json:"-"`
 	Watch         string `json:"watch,omitempty"` // "", "unwatched", "watched", "in_progress"
 	Genre         string `json:"genre,omitempty"`
 	Decade        int    `json:"decade,omitempty"` // e.g. 1990
