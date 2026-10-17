@@ -297,6 +297,14 @@ export const vodSuggestionsQuery = (kind?: "movie" | "series", limit = 20) =>
     staleTime: 5 * 60_000,
   });
 
+/** The recommendations page's rows: films or series on demand from the person's own taste. */
+export const vodRecommendationsQuery = (kind?: "movie" | "series") =>
+  queryOptions({
+    queryKey: ["vod", "suggestions", "rows", kind ?? "all"],
+    queryFn: () => unwrap(api.GET("/livetv/vod/recommendations", { params: { query: { kind, perRow: 40 } } })),
+    staleTime: 5 * 60_000,
+  });
+
 /** Also on VOD: films or series on demand like a library movie or show. */
 export const itemVodSimilarQuery = (itemId: number) =>
   queryOptions({

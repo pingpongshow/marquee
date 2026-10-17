@@ -167,8 +167,12 @@ export function Shell({ children }: { children: ReactNode }) {
   const vod = useQuery(vodStatusQuery); // movies and shows on demand, pages under Live TV (LIVE-6)
   const location = useRouterState({ select: (r) => r.location });
   const onLive = location.pathname.startsWith("/livetv");
-  // /vod/shows… is VOD Shows; the rest of /vod… (films and their pages) is VOD Movies.
-  const onVodShows = location.pathname === "/vod/shows" || location.pathname.startsWith("/vod/shows/");
+  // /vod/shows… (and recommended shows) is VOD Shows; the rest of /vod… (films and their
+  // pages) is VOD Movies.
+  const onVodShows =
+    location.pathname === "/vod/shows" ||
+    location.pathname.startsWith("/vod/shows/") ||
+    (location.pathname === "/vod/recommended" && (location.search as { kind?: string }).kind === "series");
   const onVod = !onVodShows && (location.pathname === "/vod" || location.pathname.startsWith("/vod/"));
   const sidebar = (
     <nav aria-label="Libraries" className="flex h-full flex-col gap-1 overflow-y-auto p-3">

@@ -307,3 +307,56 @@ func (h *Handlers) markOnDemand(ctx context.Context, page *DiscoverPage) {
 		}
 	}
 }
+
+func (h *Handlers) VodRecommendations(ctx context.Context, req VodRecommendationsRequestObject) (VodRecommendationsResponseObject, error) {
+	if _, _, authed, allowed := h.vodSession(ctx); !authed {
+		return VodRecommendations401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	} else if !allowed {
+		return VodRecommendations403JSONResponse{ForbiddenJSONResponse(errVodNotAllowed)}, nil
+	}
+	u, s, _, ok := h.suggestSession(ctx)
+	if !ok {
+		return VodRecommendations200JSONResponse{}, nil // suggestions aren't set up
+	}
+	perRow, kind := 30, ""
+	set(&perRow, req.Params.PerRow)
+	perRow = min(max(perRow, 4), 60)
+	if req.Params.Kind != nil {
+		kind = string(*req.Params.Kind)
+	}
+	rows, err := h.VODSuggest.Rows(ctx, u, kind, perRow)
+	if err != nil {
+		return nil, internal(ctx, "vodRecommendations", err)
+	}
+	// Load every row's titles at once, then share them out.
+	var all []vodsuggest.Suggestion
+	for _, r := range rows {
+		all = append(all, r.Items...)
+	}
+	loaded, err := h.toAPIVodSuggestions(ctx, s.User.ID, all)
+	if err != nil {
+		return nil, internal(ctx, "vodRecommendations", err)
+	}
+	byKey := make(map[string]VodSuggestion, len(loaded))
+	for _, v := range loaded {
+		byKey[v.Key] = v
+	}
+	out := VodRecommendations200JSONResponse{}
+	for _, r := range rows {
+		row := VodRecommendationRow{Id: r.ID, Title: r.Title, Entries: []VodSuggestion{}}
+		for _, sg := range r.Items {
+			k := "movie:" + itoa(sg.ID)
+			if sg.Kind == vodsuggest.Series {
+				k = "series:" + itoa(sg.ID)
+			}
+			if v, ok := byKey[k]; ok {
+				v.Reason = nz(sg.Reason)
+				row.Entries = append(row.Entries, v)
+			}
+		}
+		if len(row.Entries) > 0 {
+			out = append(out, row)
+		}
+	}
+	return out, nil
+}

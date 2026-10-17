@@ -3253,6 +3253,25 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /livetv/vod/recommendations:
+    get:
+      tags: [livetv]
+      operationId: vodRecommendations
+      summary: "The recommendations page: rows of films or series on demand for the caller, each with its own angle (top picks, Because you love …, more of a favourite genre, critically acclaimed, popular on VOD), all from the caller's own taste: other people's viewing is never used. A title shows in one row only; rows that can't be filled aren't sent. The same exclusions as suggestions apply."
+      parameters:
+        - { name: kind, in: query, description: Only films or only series (omitted = both)., schema: { type: string, enum: [movie, series] } }
+        - { name: perRow, in: query, description: Titles per row at most., schema: { type: integer, minimum: 4, maximum: 60, default: 30 } }
+      responses:
+        "200":
+          description: Rows (empty when suggestions aren't set up).
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VodRecommendationRow" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /livetv/vod/suggestions/{kind}/{vodId}:
     parameters:
       - { name: kind, in: path, required: true, schema: { type: string, enum: [movie, series] } }
@@ -5973,6 +5992,14 @@ components:
           allOf:
             - $ref: "#/components/schemas/VodEpisode"
           description: "The episode the caller would watch next (Continue Watching and the series detail)."
+
+    VodRecommendationRow:
+      type: object
+      required: [id, title, entries]
+      properties:
+        id: { type: string, description: "top, because:<n>, genre:<name>, acclaimed or popular (new kinds may be added)." }
+        title: { type: string, description: "e.g. Because you love Heat." }
+        entries: { type: array, items: { $ref: "#/components/schemas/VodSuggestion" } }
 
     VodSuggestion:
       type: object

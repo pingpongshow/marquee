@@ -2575,6 +2575,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/livetv/vod/recommendations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The recommendations page: rows of films or series on demand for the caller, each with its own angle (top picks, Because you love …, more of a favourite genre, critically acclaimed, popular on VOD), all from the caller's own taste: other people's viewing is never used. A title shows in one row only; rows that can't be filled aren't sent. The same exclusions as suggestions apply. */
+        get: operations["vodRecommendations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/livetv/vod/suggestions/{kind}/{vodId}": {
         parameters: {
             query?: never;
@@ -5046,6 +5063,13 @@ export interface components {
             inLibrary?: boolean;
             /** @description The episode the caller would watch next (Continue Watching and the series detail). */
             nextEpisode?: components["schemas"]["VodEpisode"];
+        };
+        VodRecommendationRow: {
+            /** @description top, because:<n>, genre:<name>, acclaimed or popular (new kinds may be added). */
+            id: string;
+            /** @description e.g. Because you love Heat. */
+            title: string;
+            entries: components["schemas"]["VodSuggestion"][];
         };
         /** @description A film or series on demand suggested for the caller from their taste (Watch on VOD, Also on VOD, Muse, the on-demand pages' Recommended for you). */
         VodSuggestion: {
@@ -12047,6 +12071,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VodSuggestion"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    vodRecommendations: {
+        parameters: {
+            query?: {
+                /** @description Only films or only series (omitted = both). */
+                kind?: "movie" | "series";
+                /** @description Titles per row at most. */
+                perRow?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rows (empty when suggestions aren't set up). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodRecommendationRow"][];
                 };
             };
             401: components["responses"]["Unauthorized"];
