@@ -316,6 +316,17 @@ function Guide({
     c: LiveChannel;
   } | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  // The guide scrolls inside its own box (so the time header sticks), at most the height of
+  // the visible page; past its ends, scrolling moves the page, so the box can be brought fully
+  // into view and its last rows and scrollbar reached.
+  const [guideHeight, setGuideHeight] = useState<number>();
+  useEffect(() => {
+    const main = scroller.current?.closest("main");
+    const fit = () => setGuideHeight(Math.max(320, (main?.clientHeight ?? window.innerHeight) - 24));
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
   const x = (t: Date | string) =>
     ((new Date(t).getTime() - start.getTime()) / 60_000) * PX_PER_MIN;
   const width = WINDOW_HOURS * 60 * PX_PER_MIN;
@@ -363,7 +374,8 @@ function Guide({
       <div
         ref={scroller}
         // Scrolls both ways itself (with a height cap) so the time header can stick to its top.
-        className="relative max-h-[75vh] overflow-auto overscroll-contain rounded-lg bg-surface"
+        className="relative overflow-auto rounded-lg bg-surface"
+        style={{ maxHeight: guideHeight ?? "75vh" }}
         role="grid"
         aria-label="TV guide"
       >
