@@ -29,7 +29,7 @@ func (h *Handlers) ListWatchGroups(ctx context.Context, _ ListWatchGroupsRequest
 	if _, ok := session(ctx); !ok {
 		return ListWatchGroups401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	acc := access(ctx)
+	acc := itemAccess(ctx)
 	out := ListWatchGroups200JSONResponse{}
 	for _, g := range h.SyncPlay.List() {
 		// Only groups watching something this person may see.
@@ -45,7 +45,7 @@ func (h *Handlers) CreateWatchGroup(ctx context.Context, req CreateWatchGroupReq
 	if !ok {
 		return CreateWatchGroup401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	d, err := h.Items.Get(ctx, access(ctx), req.Body.ItemId, false)
+	d, err := h.Items.Get(ctx, itemAccess(ctx), req.Body.ItemId, false)
 	if err != nil {
 		return CreateWatchGroup404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
@@ -88,7 +88,7 @@ func (h *Handlers) JoinWatchGroup(ctx context.Context, req JoinWatchGroupRequest
 	if err != nil {
 		return JoinWatchGroup404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "this group has ended"))}, nil
 	}
-	if _, err := h.Items.Get(ctx, access(ctx), item, false); err != nil {
+	if _, err := h.Items.Get(ctx, itemAccess(ctx), item, false); err != nil {
 		return JoinWatchGroup403JSONResponse{ForbiddenJSONResponse(apiErr("forbidden", "You can't watch this title."))}, nil
 	}
 	g, err := h.SyncPlay.Join(req.GroupId, s.User.ID, s.User.DisplayName, avatarURL(s.User))

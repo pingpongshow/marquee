@@ -34,12 +34,13 @@ func DVRQuota(u auth.User, s settings.Settings) (bytes int64, gb int, own bool) 
 	return int64(gb) * 1_000_000_000, gb, own
 }
 
-// recordingVisible: a recording filed in the library follows the library's rules (libraries,
-// rating limit, DVR viewing); one that isn't yet is judged by the guide's rating, and an
-// unrated one is hidden from profiles with a rating limit, as the library does.
-func recordingVisible(acc items.Access, x livetv.Recording, visibleItems map[int64]bool) bool {
+// recordingVisible: a recording filed in the library follows the library's rules (rating
+// limit, DVR viewing); one that isn't yet is judged by the guide's rating, and an unrated
+// one is hidden from profiles with a rating limit, as the library does.
+func recordingVisible(acc items.Access, x livetv.Recording, visibleItems map[int64]items.Summary) bool {
 	if x.ItemID != nil {
-		return visibleItems[*x.ItemID]
+		_, ok := visibleItems[*x.ItemID]
+		return ok
 	}
 	if lvl := items.RatingLevel(acc.MaxRating); lvl > 0 {
 		r := items.RatingLevel(x.Rating)
@@ -48,23 +49,24 @@ func recordingVisible(acc items.Access, x livetv.Recording, visibleItems map[int
 	return true
 }
 
-// visibleRecordings filters recordings to those the caller may see.
-func (h *Handlers) visibleRecordings(ctx context.Context, list []livetv.Recording) ([]livetv.Recording, error) {
-	acc := access(ctx)
+// visibleRecordings filters recordings to those the caller may see, with their library
+// items (and the caller's watch state on them) by id.
+func (h *Handlers) visibleRecordings(ctx context.Context, list []livetv.Recording) ([]livetv.Recording, map[int64]items.Summary, error) {
+	acc := itemAccess(ctx)
 	var ids []int64
 	for _, x := range list {
 		if x.ItemID != nil {
 			ids = append(ids, *x.ItemID)
 		}
 	}
-	vis := map[int64]bool{}
+	vis := map[int64]items.Summary{}
 	if len(ids) > 0 {
 		got, err := h.Items.ByIDs(ctx, acc, ids)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		for _, it := range got {
-			vis[it.ID] = true
+			vis[it.ID] = it
 		}
 	}
 	out := list[:0:0]
@@ -73,8 +75,11 @@ func (h *Handlers) visibleRecordings(ctx context.Context, list []livetv.Recordin
 			out = append(out, x)
 		}
 	}
-	return out, nil
+	return out, vis, nil
 }
+
+// onlyMine reports whether a list asks for the caller's own recordings or series only.
+func onlyMine[T ~string](owner *T) bool { return owner != nil && *owner == "me" }
 
 func toAPIRecording(x livetv.Recording) Recording {
 	status := RecordingStatus(x.Status)
@@ -89,7 +94,7 @@ func toAPIRule(r livetv.Rule) RecordingRule {
 		UserId: &r.UserID, CreatedAt: r.CreatedAt, OwnerName: nz(r.OwnerName), Paused: ptr(r.Paused)}
 }
 
-func (h *Handlers) ListRecordings(ctx context.Context, _ ListRecordingsRequestObject) (ListRecordingsResponseObject, error) {
+func (h *Handlers) ListRecordings(ctx context.Context, req ListRecordingsRequestObject) (ListRecordingsResponseObject, error) {
 	s, ok := session(ctx)
 	if !ok {
 		return ListRecordings401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
@@ -98,19 +103,31 @@ func (h *Handlers) ListRecordings(ctx context.Context, _ ListRecordingsRequestOb
 		return ListRecordings403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
 	}
 	list, err := h.DVR.List(ctx)
+	var vis map[int64]items.Summary
 	if err == nil {
-		list, err = h.visibleRecordings(ctx, list)
+		list, vis, err = h.visibleRecordings(ctx, list)
 	}
 	if err != nil {
 		return nil, internal(ctx, "listRecordings", err)
 	}
-	out := make(ListRecordings200JSONResponse, len(list))
-	for i, x := range list {
-		out[i] = toAPIRecording(x)
-		out[i].CanDelete = ptr(canManage(s, x.UserID))
-		if s.User.IsAdmin && x.Status == livetv.StatusCompleted && x.ItemID != nil {
-			out[i].Commercials = h.recordingCommercials(ctx, x.Path)
+	mine := onlyMine(req.Params.Owner)
+	out := ListRecordings200JSONResponse{}
+	for _, x := range list {
+		if mine && x.UserID != s.User.ID {
+			continue
 		}
+		r := toAPIRecording(x)
+		r.CanDelete = ptr(canManage(s, x.UserID))
+		if x.Status == livetv.StatusCompleted && x.ItemID != nil {
+			// Recordings aren't in Home's Continue Watching: the list shows where to resume.
+			if it, ok := vis[*x.ItemID]; ok {
+				r.ViewOffsetMs, r.DurationMs, r.Watched = ptr(it.ViewOffsetMS), nz(it.DurationMS), ptr(it.ViewCount > 0 && it.ViewOffsetMS == 0)
+			}
+			if s.User.IsAdmin {
+				r.Commercials = h.recordingCommercials(ctx, x.Path)
+			}
+		}
+		out = append(out, r)
 	}
 	return out, nil
 }
@@ -181,7 +198,7 @@ func (h *Handlers) CancelRecording(ctx context.Context, req CancelRecordingReque
 	return CancelRecording204Response{}, nil
 }
 
-func (h *Handlers) ListRecordingRules(ctx context.Context, _ ListRecordingRulesRequestObject) (ListRecordingRulesResponseObject, error) {
+func (h *Handlers) ListRecordingRules(ctx context.Context, req ListRecordingRulesRequestObject) (ListRecordingRulesResponseObject, error) {
 	s, ok := session(ctx)
 	if !ok {
 		return ListRecordingRules401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
@@ -196,7 +213,7 @@ func (h *Handlers) ListRecordingRules(ctx context.Context, _ ListRecordingRulesR
 	out := ListRecordingRules200JSONResponse{}
 	for _, r := range rules {
 		// A profile that may record but not view recordings sees only its own series.
-		if !canViewDVR(s) && r.UserID != s.User.ID {
+		if (!canViewDVR(s) || onlyMine(req.Params.Owner)) && r.UserID != s.User.ID {
 			continue
 		}
 		x := toAPIRule(r)

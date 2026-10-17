@@ -638,7 +638,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Libraries visible to the current user. */
+        /** Libraries visible to the current user. The Live TV recordings libraries (Recorded TV / Recorded Movies) are left out for everyone, admins included: recordings appear only under Live TV → Recordings (GET /livetv/recordings) and are played from there by item id. */
         get: operations["listLibraries"];
         put?: never;
         /** Create a library (admin only). */
@@ -1740,6 +1740,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/optimize/originals/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Delete the originals of optimized files kept in the media trash, so they can no longer be restored (admin only). Only optimizer originals: nothing else in the media trash is touched. With keepOriginals off this also happens by itself at start-up and when the setting is saved. */
+        post: operations["deleteKeptOriginals"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/optimize/settings": {
         parameters: {
             query?: never;
@@ -2186,7 +2203,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone's recordings are listed to every profile that may view DVR recordings, within the profile's content rating limit (the library item's rating once filed, else the guide's; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings. */
+        /** DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone's recordings are listed to every profile that may view DVR recordings, within the profile's content rating limit (the library item's rating once filed, else the guide's; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings. Recordings appear only here, never in the libraries, Home, search or browse; finished ones carry the caller's resume position (viewOffsetMs, durationMs, watched). */
         get: operations["listRecordings"];
         put?: never;
         /** Record a programme from the guide, or every airing of its title (a series). */
@@ -4636,6 +4653,18 @@ export interface components {
             /** @description The guide's content rating for the programme, e.g. TV-14, when it gave one. */
             rating?: string;
             commercials?: components["schemas"]["CommercialScan"];
+            /**
+             * Format: int64
+             * @description Finished recordings: where the caller stopped watching (0 = not started or finished), to resume from the Recordings list.
+             */
+            viewOffsetMs?: number;
+            /**
+             * Format: int64
+             * @description Finished recordings: the recorded item's length.
+             */
+            durationMs?: number;
+            /** @description Finished recordings: the caller has watched it to the end. */
+            watched?: boolean;
         };
         RecordingRule: {
             /** Format: int64 */
@@ -5454,6 +5483,8 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            /** @description A Live TV recordings library (Recorded TV / Recorded Movies). Only listed to admins with manage=true; its items are shown only under Live TV → Recordings, and browsing it returns 404. */
+            recordings?: boolean;
         };
         LibraryCreate: {
             name: string;
@@ -7042,6 +7073,13 @@ export interface components {
             optimized: number;
             /** @description Why the queue isn't running now, if it isn't. */
             paused?: string;
+            /** @description Originals of optimized files still kept in the media trash (keepOriginals on, or from before it existed). */
+            keptOriginals?: number;
+            /**
+             * Format: int64
+             * @description How much space those originals take.
+             */
+            keptOriginalsBytes?: number;
         };
         /** @description The Large files filters (as the list's query parameters). */
         OptimizeFilter: {
@@ -7114,7 +7152,7 @@ export interface components {
             windowOnly: boolean;
             /** @description The queue is paused by an admin. */
             paused: boolean;
-            /** @description On: originals go to the media trash (restorable for about 30 days). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once. Omitted on update = unchanged. */
+            /** @description On: originals go to the media trash (restorable for about 30 days). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once, and originals kept earlier are deleted too (at start-up and when this is saved off). Omitted on update = unchanged. */
             keepOriginals?: boolean;
         };
         OptimizeConfig: {
@@ -7199,6 +7237,8 @@ export interface components {
         };
     };
     parameters: {
+        /** @description all (default) = every recording or series the caller may see; me = only the ones the caller scheduled. */
+        RecordingOwner: "me" | "all";
         UserId: number;
         ItemId: number;
         /** @description When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. */
@@ -8384,7 +8424,10 @@ export interface operations {
     };
     listLibraries: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Admins (Settings → Libraries): include the Live TV recordings libraries too, flagged recordings: true, so they can be rescanned and configured. Ignored for everyone else. */
+                manage?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -10362,6 +10405,32 @@ export interface operations {
             409: components["responses"]["Conflict"];
         };
     };
+    deleteKeptOriginals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        deleted: number;
+                        /** Format: int64 */
+                        freedBytes: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     getOptimizeSettings: {
         parameters: {
             query?: never;
@@ -11116,7 +11185,10 @@ export interface operations {
     };
     listRecordings: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description all (default) = every recording or series the caller may see; me = only the ones the caller scheduled. */
+                owner?: components["parameters"]["RecordingOwner"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -11261,7 +11333,10 @@ export interface operations {
     };
     listRecordingRules: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description all (default) = every recording or series the caller may see; me = only the ones the caller scheduled. */
+                owner?: components["parameters"]["RecordingOwner"];
+            };
             header?: never;
             path?: never;
             cookie?: never;

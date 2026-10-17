@@ -56,10 +56,11 @@ const resolutionSQL = `(CASE WHEN COALESCE(f.width, 0) >= 3200 OR COALESCE(f.hei
 	WHEN COALESCE(f.width, 0) >= 1200 OR COALESCE(f.height, 0) >= 700 THEN 720 ELSE 480 END)`
 
 // where is the SQL condition and arguments for a filter, over media_files f, items i and
-// libraries l: available movie and episode files (not extras) in video libraries.
+// libraries l: available movie and episode files (not extras) in video libraries, except
+// Live TV recordings (the DVR manages those: commercials, quotas).
 func (flt Filter) where() (string, []any) {
 	conds := []string{"f.available = 1", "f.size > 0", "f.video_codec IS NOT NULL", "i.extra_type IS NULL",
-		"l.type IN ('movies', 'shows', 'anime', 'videos')"}
+		"l.type IN ('movies', 'shows', 'anime', 'videos')", "l.recordings = 0"}
 	var args []any
 	switch flt.Type {
 	case "movie", "episode":

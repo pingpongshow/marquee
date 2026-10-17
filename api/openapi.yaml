@@ -864,7 +864,9 @@ paths:
     get:
       tags: [libraries]
       operationId: listLibraries
-      summary: Libraries visible to the current user.
+      summary: "Libraries visible to the current user. The Live TV recordings libraries (Recorded TV / Recorded Movies) are left out for everyone, admins included: recordings appear only under Live TV → Recordings (GET /livetv/recordings) and are played from there by item id."
+      parameters:
+        - { name: manage, in: query, schema: { type: boolean }, description: "Admins (Settings → Libraries): include the Live TV recordings libraries too, flagged recordings: true, so they can be rescanned and configured. Ignored for everyone else." }
       responses:
         "200":
           description: OK
@@ -2250,6 +2252,25 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /optimize/originals/delete:
+    post:
+      tags: [libraries]
+      operationId: deleteKeptOriginals
+      summary: "Delete the originals of optimized files kept in the media trash, so they can no longer be restored (admin only). Only optimizer originals: nothing else in the media trash is touched. With keepOriginals off this also happens by itself at start-up and when the setting is saved."
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted, freedBytes]
+                properties:
+                  deleted: { type: integer }
+                  freedBytes: { type: integer, format: int64 }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /optimize/settings:
     get:
       tags: [libraries]
@@ -2776,7 +2797,9 @@ paths:
     get:
       tags: [livetv]
       operationId: listRecordings
-      summary: "DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone's recordings are listed to every profile that may view DVR recordings, within the profile's content rating limit (the library item's rating once filed, else the guide's; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings."
+      summary: "DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone's recordings are listed to every profile that may view DVR recordings, within the profile's content rating limit (the library item's rating once filed, else the guide's; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings. Recordings appear only here, never in the libraries, Home, search or browse; finished ones carry the caller's resume position (viewOffsetMs, durationMs, watched)."
+      parameters:
+        - $ref: "#/components/parameters/RecordingOwner"
       responses:
         "200":
           description: Recordings.
@@ -2874,6 +2897,8 @@ paths:
       tags: [livetv]
       operationId: listRecordingRules
       summary: Series being recorded.
+      parameters:
+        - $ref: "#/components/parameters/RecordingOwner"
       responses:
         "200":
           description: Rules.
@@ -4825,6 +4850,11 @@ components:
       scheme: bearer
 
   parameters:
+    RecordingOwner:
+      name: owner
+      in: query
+      description: "all (default) = every recording or series the caller may see; me = only the ones the caller scheduled."
+      schema: { type: string, enum: [me, all], default: all }
     UserId:
       name: userId
       in: path
@@ -5567,6 +5597,9 @@ components:
         canDelete: { type: boolean, description: "The caller may cancel or delete it (whoever scheduled it, or an admin)." }
         rating: { type: string, description: "The guide's content rating for the programme, e.g. TV-14, when it gave one." }
         commercials: { $ref: "#/components/schemas/CommercialScan" }
+        viewOffsetMs: { type: integer, format: int64, description: "Finished recordings: where the caller stopped watching (0 = not started or finished), to resume from the Recordings list." }
+        durationMs: { type: integer, format: int64, description: "Finished recordings: the recorded item's length." }
+        watched: { type: boolean, description: "Finished recordings: the caller has watched it to the end." }
 
     RecordingRule:
       type: object
@@ -6281,6 +6314,7 @@ components:
         lastScannedAt: { type: string, format: date-time, nullable: true }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        recordings: { type: boolean, description: "A Live TV recordings library (Recorded TV / Recorded Movies). Only listed to admins with manage=true; its items are shown only under Live TV → Recordings, and browsing it returns 404." }
 
     LibraryCreate:
       type: object
@@ -7852,6 +7886,8 @@ components:
         savedBytes: { type: integer, format: int64, description: "Space saved by every optimized file (not restored)." }
         optimized: { type: integer, description: "How many files are optimized." }
         paused: { type: string, description: "Why the queue isn't running now, if it isn't." }
+        keptOriginals: { type: integer, description: "Originals of optimized files still kept in the media trash (keepOriginals on, or from before it existed)." }
+        keptOriginalsBytes: { type: integer, format: int64, description: "How much space those originals take." }
 
     OptimizeFilter:
       type: object
@@ -7908,7 +7944,7 @@ components:
         pauseWhileWatching: { type: boolean, description: "Pause while anyone is watching anything, resuming about 15 s after. Default on." }
         windowOnly: { type: boolean, description: "Only run inside the maintenance window." }
         paused: { type: boolean, description: "The queue is paused by an admin." }
-        keepOriginals: { type: boolean, description: "On: originals go to the media trash (restorable for about 30 days). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once. Omitted on update = unchanged." }
+        keepOriginals: { type: boolean, description: "On: originals go to the media trash (restorable for about 30 days). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once, and originals kept earlier are deleted too (at start-up and when this is saved off). Omitted on update = unchanged." }
 
     OptimizeConfig:
       type: object

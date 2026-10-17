@@ -125,3 +125,68 @@ func TestVerifyFailureKeepsOriginal(t *testing.T) {
 		t.Error("work file left behind")
 	}
 }
+
+// Originals kept in the media trash (keepOriginals on, or from before it existed) are
+// deleted once it's off: only optimizer originals, nothing else in the trash, and they
+// can't be restored afterwards.
+func TestPurgeKeptOriginals(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	e, s, _, id, media := keepEnv(t, true, "")
+	go s.Run(ctx)
+	if st, msg := e.finished(t, id); st != StateDone {
+		t.Fatalf("job: %s %q", st, msg)
+	}
+	kept := trashed(media)
+	if len(kept) != 1 {
+		t.Fatalf("trash: %v", kept)
+	}
+	// Something else in the media trash (Library Health's removed files, commercials
+	// originals…): never touched.
+	other := filepath.Join(filepath.Dir(kept[0]), "Removed by Library Health.mkv")
+	if err := os.WriteFile(other, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fi, _ := os.Stat(kept[0])
+	if n, bytes, err := s.KeptOriginals(ctx); err != nil || n != 1 || bytes != fi.Size() {
+		t.Fatalf("kept: %d %d %v", n, bytes, err)
+	}
+	// keepOriginals on: nothing happens.
+	s.PurgeOriginals(ctx, "test")
+	if _, err := os.Stat(kept[0]); err != nil {
+		t.Fatal("purged with keepOriginals on")
+	}
+	e.set(func(c *settings.Settings) { c.Optimize.KeepOriginals = false })
+	s.PurgeOriginals(ctx, "test")
+	if _, err := os.Stat(kept[0]); !os.IsNotExist(err) {
+		t.Error("the kept original is still there")
+	}
+	if _, err := os.Stat(other); err != nil {
+		t.Error("another file in the trash was deleted")
+	}
+	if n, _, _ := s.KeptOriginals(ctx); n != 0 {
+		t.Errorf("still kept: %d", n)
+	}
+	pg, _ := s.Jobs(ctx, true, 0, 10)
+	if len(pg.Jobs) != 1 || !pg.Jobs[0].OriginalDeleted || pg.Jobs[0].CanRestore {
+		t.Fatalf("job after purge: %+v", pg.Jobs)
+	}
+	if err := s.Restore(ctx, id); !errors.Is(err, ErrCantRestore) {
+		t.Errorf("restore after purge: %v", err)
+	}
+}
+
+// A recorded original outside a media trash folder is never deleted.
+func TestPurgeOnlyInsideTrash(t *testing.T) {
+	e := newEnv(t)
+	outside := filepath.Join(e.dir, "Elsewhere.mkv")
+	os.WriteFile(outside, []byte("keep me"), 0o644)
+	e.db.Exec(`INSERT INTO optimize_jobs (title, path, preset_id, preset_name, preset, state, original) VALUES ('X', ?, 'p', 'P', '{}', 'done', ?)`, outside, outside)
+	s := &Service{DB: e.db, Settings: e.settings}
+	if n, _, err := s.DeleteKeptOriginals(context.Background(), "test"); err != nil || n != 0 {
+		t.Fatalf("deleted %d %v", n, err)
+	}
+	if _, err := os.Stat(outside); err != nil {
+		t.Error("a file outside the trash was deleted")
+	}
+}

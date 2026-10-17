@@ -10,7 +10,10 @@ import (
 	"marquee/internal/items"
 )
 
-// access returns the item visibility rules for the caller.
+// access returns the caller's item visibility rules for listings: libraries, Home, search,
+// browse, Discover, collections, playlists, people, "More like this"… Live TV recordings are
+// never listed there, for anyone, admins included: they appear only under Live TV →
+// Recordings and are opened from there (itemAccess).
 func access(ctx context.Context) items.Access {
 	s, ok := session(ctx)
 	if !ok {
@@ -19,13 +22,32 @@ func access(ctx context.Context) items.Access {
 	return userAccess(s.User)
 }
 
-// userAccess returns the item visibility rules for a user.
+// userAccess returns a user's item visibility rules for listings (see access).
 func userAccess(u auth.User) items.Access {
+	acc := userItemAccess(u)
+	acc.HideRecordings, acc.AllowRecordings = true, false
+	return acc
+}
+
+// itemAccess returns the caller's rules for opening an item by id (its page, playback,
+// subtitles, the Recordings list…): Live TV recordings are allowed to who may view DVR
+// recordings, within their rating limit.
+func itemAccess(ctx context.Context) items.Access {
+	s, ok := session(ctx)
+	if !ok {
+		return items.Unrestricted
+	}
+	return userItemAccess(s.User)
+}
+
+// userItemAccess returns a user's rules for opening an item by id (see itemAccess).
+func userItemAccess(u auth.User) items.Access {
 	acc := items.Access{UserID: u.ID}
 	if u.IsAdmin {
 		return acc
 	}
 	acc.HideRecordings = !u.Restrictions.DVRViewAllowed()
+	acc.AllowRecordings = !acc.HideRecordings
 	if r := u.Restrictions; r.LibraryIDs != nil {
 		acc.LibraryIDs = append([]int64{}, *r.LibraryIDs...)
 	}
@@ -35,11 +57,13 @@ func userAccess(u auth.User) items.Access {
 	return acc
 }
 
+// canSeeLibrary reports whether a library is listed to the caller (sidebar, Home, search,
+// browse): never a Live TV recordings library (see access).
 func (h *Handlers) canSeeLibrary(ctx context.Context, id int64) bool {
-	acc := access(ctx)
-	if acc.HideRecordings && h.Libraries != nil && h.Libraries.IsRecordings(ctx, id) {
+	if h.Libraries != nil && h.Libraries.IsRecordings(ctx, id) {
 		return false
 	}
+	acc := access(ctx)
 	if acc.LibraryIDs == nil {
 		return true
 	}

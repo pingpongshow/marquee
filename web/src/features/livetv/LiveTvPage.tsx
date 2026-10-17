@@ -11,7 +11,9 @@ import {
   VolumeX,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { meQuery } from "@/api/queries";
 import { Alert, Button, Select, Spinner } from "@/components/ui";
+import { formatTrackTime } from "@/features/browse/format";
 import {
   type LiveChannel,
   type LiveFilter,
@@ -25,7 +27,9 @@ import {
   useFavorite,
   useHideChannel,
   type Recording,
-  recordingRulesQuery,
+  type RecordingOwner,
+  ownRecordingRulesQuery,
+  ownRecordingsQuery,
   recordingsQuery,
   recordingUsageQuery,
   usageLabel,
@@ -785,8 +789,20 @@ function when(r: Recording) {
 
 /** The DVR: in progress, upcoming, series and finished recordings (LIVE-5). */
 function Recordings({ canRecord }: { canRecord: boolean }) {
-  const recordings = useQuery(recordingsQuery);
-  const rules = useQuery(recordingRulesQuery);
+  const me = useQuery(meQuery);
+  const ownerKey = `marquee.livetv.recordings.owner.${me.data?.id ?? ""}`;
+  const [owner, setOwnerState] = useState<RecordingOwner>("all");
+  // Remembered per user; read once the signed-in user is known.
+  useEffect(() => {
+    if (me.data)
+      setOwnerState(localStorageGet(ownerKey) === "me" ? "me" : "all");
+  }, [me.data, ownerKey]);
+  const setOwner = (o: RecordingOwner) => {
+    setOwnerState(o);
+    localStorageSet(ownerKey, o);
+  };
+  const recordings = useQuery(ownRecordingsQuery(owner));
+  const rules = useQuery(ownRecordingRulesQuery(owner));
   const usage = useQuery({ ...recordingUsageQuery, enabled: canRecord });
   const cancel = useCancelRecording();
   const stopSeries = useDeleteRule();
@@ -837,7 +853,19 @@ function Recordings({ canRecord }: { canRecord: boolean }) {
         {r.commercials && r.itemId && (
           <RecordingCommercials itemId={r.itemId} scan={r.commercials} />
         )}
+        {r.status === "completed" && r.itemId && <RecordingProgress r={r} />}
       </div>
+      {r.status === "completed" && r.itemId && (
+        // The player picks up where the caller left off.
+        <Link
+          to="/play/$itemId"
+          params={{ itemId: String(r.itemId) }}
+          search={{}}
+          className="shrink-0 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-black hover:bg-accent-strong"
+        >
+          {(r.viewOffsetMs ?? 0) > 0 ? "Resume" : "Play"}
+        </Link>
+      )}
       {action}
     </li>
   );
@@ -861,18 +889,49 @@ function Recordings({ canRecord }: { canRecord: boolean }) {
       action={usage.data.quotaAction}
     />
   );
+  const ownerToggle = (
+    <div
+      className="inline-flex rounded-lg bg-surface p-0.5 text-sm"
+      role="group"
+      aria-label="Whose recordings"
+    >
+      {(
+        [
+          ["all", "All recordings"],
+          ["me", "Only mine"],
+        ] as const
+      ).map(([o, label]) => (
+        <button
+          key={o}
+          type="button"
+          aria-pressed={owner === o}
+          onClick={() => setOwner(o)}
+          className={clsx(
+            "rounded-md px-3 py-1",
+            owner === o ? "bg-surface-3 text-text" : "text-muted hover:text-text",
+          )}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
   if (!list.length && !rules.data?.length)
     return (
       <div className="space-y-4">
         {meter}
+        {ownerToggle}
         <p className="text-muted">
-          Nothing recorded yet. Pick a programme in the guide and choose Record.
+          {owner === "me"
+            ? "You haven't recorded anything yet. Pick a programme in the guide and choose Record."
+            : "Nothing recorded yet. Pick a programme in the guide and choose Record."}
         </p>
       </div>
     );
   return (
     <div className="space-y-6">
       {meter}
+      {ownerToggle}
       {cancel.error && <Alert tone="error">{cancel.error.message}</Alert>}
       {section(
         "Recording now",
@@ -960,6 +1019,34 @@ function Recordings({ canRecord }: { canRecord: boolean }) {
       )}
     </div>
   );
+}
+
+/** A finished recording's progress: a bar while part-watched, or "Watched". */
+function RecordingProgress({ r }: { r: Recording }) {
+  const offset = r.viewOffsetMs ?? 0;
+  const total = r.durationMs ?? 0;
+  if (offset > 0 && total > 0) {
+    const pct = Math.min(100, (offset / total) * 100);
+    return (
+      <div className="mt-1.5 flex max-w-sm items-center gap-2 text-xs text-muted">
+        <div
+          className="h-1 flex-1 overflow-hidden rounded-full bg-surface-3"
+          role="progressbar"
+          aria-label="Watched so far"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(pct)}
+        >
+          <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+        </div>
+        <span>
+          {formatTrackTime(offset)} of {formatTrackTime(total)}
+        </span>
+      </div>
+    );
+  }
+  if (r.watched) return <div className="mt-0.5 text-xs text-muted">Watched</div>;
+  return null;
 }
 
 /** The signed-in person's recording space: "12.4 of 50 GB", with a bar when there's a quota. */

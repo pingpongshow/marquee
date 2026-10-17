@@ -197,7 +197,7 @@ func TestDVRSharingAndSwitches(t *testing.T) {
 	}
 	w.as("admin").do("PATCH", "/users/"+itoa(w.ids["noview"]), map[string]any{"restrictions": map[string]any{"canViewDVR": false}}, nil)
 
-	// The library follows the same rules: browse, search, item and playback.
+	// Items and playback follow the same rules; the library isn't listed or browsable.
 	var libs []api.Library
 	w.as("noview").do("GET", "/libraries", nil, &libs)
 	for _, l := range libs {
@@ -213,9 +213,10 @@ func TestDVRSharingAndSwitches(t *testing.T) {
 	if len(found.Groups) != 0 {
 		t.Errorf("noview finds recordings: %+v", found.Groups)
 	}
+	// Recordings are only under Live TV → Recordings: not in search even for who may view them.
 	w.as("alex").do("GET", "/search?q=Family", nil, &found)
-	if len(found.Groups) != 1 {
-		t.Errorf("alex can't find recordings: %+v", found.Groups)
+	if len(found.Groups) != 0 {
+		t.Errorf("alex finds recordings in search: %+v", found.Groups)
 	}
 	for _, c := range []struct {
 		who, title string
@@ -225,19 +226,13 @@ func TestDVRSharingAndSwitches(t *testing.T) {
 			t.Errorf("%s gets %s: %d, want %d", c.who, c.title, code, c.want)
 		}
 		if c.want == 404 {
-			if code := w.as(c.who).do("POST", "/playback", map[string]any{"itemId": w.items[c.title], "device": map[string]any{"clientId": "c", "name": "n", "platform": "web"}}, nil); code != 404 {
+			if code := w.as(c.who).do("POST", "/playback/sessions", map[string]any{"itemId": w.items[c.title], "device": map[string]any{"clientId": "c", "name": "n", "platform": "web"}}, nil); code != 404 {
 				t.Errorf("%s plays %s: %d", c.who, c.title, code)
 			}
 		}
 	}
-	var kidItems struct {
-		Items []api.ItemSummary `json:"items"`
-	}
-	if code := w.as("kid").do("GET", "/libraries/"+itoa(w.lib)+"/items?type=movie", nil, &kidItems); code != 200 {
-		t.Errorf("kid browse: %d", code)
-	}
-	if len(kidItems.Items) != 1 || kidItems.Items[0].Title != "Family" {
-		t.Errorf("kid browses recordings: %+v", kidItems.Items)
+	if code := w.as("kid").do("GET", "/libraries/"+itoa(w.lib)+"/items?type=movie", nil, nil); code != 404 {
+		t.Errorf("kid browses recordings: %d", code)
 	}
 
 	// Live TV status: record buttons and the Recordings tab.

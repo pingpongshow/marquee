@@ -15,7 +15,7 @@ func (h *Handlers) ItemReviews(ctx context.Context, req ItemReviewsRequestObject
 	if !ok {
 		return ItemReviews401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if err := h.Items.Visible(ctx, access(ctx), req.ItemId); err != nil {
+	if err := h.Items.Visible(ctx, itemAccess(ctx), req.ItemId); err != nil {
 		return ItemReviews404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
 	avg, count, list, err := h.Items.Reviews(ctx, req.ItemId)
@@ -42,7 +42,7 @@ func (h *Handlers) SetReview(ctx context.Context, req SetReviewRequestObject) (S
 	if !ok {
 		return SetReview401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if err := h.Items.Visible(ctx, access(ctx), req.ItemId); err != nil {
+	if err := h.Items.Visible(ctx, itemAccess(ctx), req.ItemId); err != nil {
 		return SetReview404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
 	if utf8.RuneCountInString(req.Body.Comment) > 2000 {
@@ -68,7 +68,7 @@ func (h *Handlers) DeleteReview(ctx context.Context, req DeleteReviewRequestObje
 	if req.UserId != s.User.ID && !s.User.IsAdmin {
 		return DeleteReview403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
 	}
-	if err := h.Items.Visible(ctx, access(ctx), req.ItemId); err != nil {
+	if err := h.Items.Visible(ctx, itemAccess(ctx), req.ItemId); err != nil {
 		return DeleteReview404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
 	}
 	// A change made offline and sent later only applies if nothing newer happened (USER-18).

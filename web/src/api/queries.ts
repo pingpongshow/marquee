@@ -30,6 +30,14 @@ export const librariesQuery = queryOptions({
   refetchInterval: (q) => (q.state.data?.some((l) => l.scanStatus !== "idle") ? 1500 : false),
 });
 
+/** Admins' Settings → Libraries: every library, the Live TV recordings ones included (they're
+ *  left out of librariesQuery: recordings appear only under Live TV → Recordings). */
+export const manageLibrariesQuery = queryOptions({
+  queryKey: ["libraries", "manage"],
+  queryFn: () => unwrap(api.GET("/libraries", { params: { query: { manage: true } } })),
+  refetchInterval: (q) => (q.state.data?.some((l) => l.scanStatus !== "idle") ? 1500 : false),
+});
+
 export type ItemSort = "title" | "-title" | "added" | "-added" | "year" | "-year" | "released" | "-released";
 
 export const libraryItemsQuery = (libraryId: number, sort: ItemSort, offset: number, limit: number) =>

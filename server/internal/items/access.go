@@ -12,10 +12,18 @@ type Access struct {
 	LibraryIDs []int64
 	// MaxRating hides movies/TV rated above it (and unrated ones). "" = no limit.
 	MaxRating string
-	// HideRecordings hides the libraries Live TV recordings are filed in (a profile that may
-	// not view DVR recordings, LIVE-5).
+	// HideRecordings hides the libraries Live TV recordings are filed in: always in listings
+	// (libraries, Home, search, browse…), since recordings appear only under Live TV →
+	// Recordings, and everywhere for a profile that may not view DVR recordings (LIVE-5).
 	HideRecordings bool
+	// AllowRecordings lets the recordings libraries through a LibraryIDs restriction: who may
+	// view DVR recordings may open them by id (from Live TV → Recordings) whatever libraries
+	// they're limited to, since those libraries aren't offered as choices any more.
+	AllowRecordings bool
 }
+
+// recordingsLibs is the SQL test for an item in a Live TV recordings library.
+const recordingsLibs = "i.library_id IN (SELECT id FROM libraries WHERE recordings = 1)"
 
 // Unrestricted sees everything (admins, and internal use).
 var Unrestricted = Access{}
@@ -53,16 +61,24 @@ func (a Access) clause() (string, []any) {
 	var args []any
 	if a.LibraryIDs != nil {
 		if len(a.LibraryIDs) == 0 {
-			conds = append(conds, "0")
+			if a.AllowRecordings && !a.HideRecordings {
+				conds = append(conds, recordingsLibs)
+			} else {
+				conds = append(conds, "0")
+			}
 		} else {
-			conds = append(conds, "i.library_id IN (?"+strings.Repeat(",?", len(a.LibraryIDs)-1)+")")
+			in := "i.library_id IN (?" + strings.Repeat(",?", len(a.LibraryIDs)-1) + ")"
+			if a.AllowRecordings && !a.HideRecordings {
+				in = "(" + in + " OR " + recordingsLibs + ")"
+			}
+			conds = append(conds, in)
 			for _, id := range a.LibraryIDs {
 				args = append(args, id)
 			}
 		}
 	}
 	if a.HideRecordings {
-		conds = append(conds, "i.library_id NOT IN (SELECT id FROM libraries WHERE recordings = 1)")
+		conds = append(conds, "NOT "+recordingsLibs)
 	}
 	if lvl := RatingLevel(a.MaxRating); lvl > 0 {
 		// A Live TV recording with no rating of its own (or its show's) has the guide's rating
