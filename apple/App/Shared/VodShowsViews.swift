@@ -19,6 +19,7 @@ struct VodSeriesTile: View {
             NavigationLink(value: Route.vodSeries(series.id)) { poster }
                 .buttonStyle(.card)
                 .accessibilityLabel(series.title)
+                .accessibilityValue(series.inLibrary == true ? VodInLibraryBadge.text : "")
                 .accessibilityIdentifier("vod.showTile")
                 .modifier(RemoveFromContinueMenu(action: onRemove))
             titles
@@ -35,6 +36,7 @@ struct VodSeriesTile: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(series.title)
+        .accessibilityValue(series.inLibrary == true ? VodInLibraryBadge.text : "")
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("vod.showTile")
         .modifier(RemoveFromContinueMenu(action: onRemove))
@@ -42,7 +44,8 @@ struct VodSeriesTile: View {
     }
 
     private var poster: some View {
-        VodArt(title: series.title, path: series.posterUrl, watched: series.watched, progress: series.progress, width: width)
+        VodArt(title: series.title, path: series.posterUrl, watched: series.watched, progress: series.progress, width: width,
+               inLibrary: series.inLibrary == true)
     }
 
     private var titles: some View {
@@ -174,6 +177,7 @@ struct VodSeriesView: View {
         let details = VStack(alignment: .leading, spacing: 10) {
             if let c = s.base.category { Text(c).font(.caption).foregroundStyle(.secondary) }
             Text(s.title).font(isTV ? .title2.bold() : .title.bold()).fixedSize(horizontal: false, vertical: true)
+            if s.base.inLibrary == true { VodInLibraryBadge() }
             let meta = [s.base.year.map(String.init), s.base.contentRating,
                         s.base.seasonCount > 0 ? "\(s.base.seasonCount) \(s.base.seasonCount == 1 ? "season" : "seasons")" : nil]
                 .compactMap { $0 }.filter { !$0.isEmpty }

@@ -52,6 +52,7 @@ import kotlinx.serialization.Contextual
  * @param contentRating e.g. TV-14 (TMDB's, when matched).
  * @param rating Average vote out of 10 (TMDB's when matched, else the source's).
  * @param posterUrl Server-relative; no token needed.
+ * @param inLibrary The library already has this show (any of its episodes; matched by TMDB id, else by title and year) in a library the caller can see.
  * @param nextEpisode The episode the caller would watch next (Continue Watching and the series detail).
  * @param overview 
  * @param director 
@@ -124,6 +125,10 @@ data class VodSeriesDetail (
     /* Server-relative; no token needed. */
     @SerialName(value = "posterUrl")
     val posterUrl: kotlin.String? = null,
+
+    /* The library already has this show (any of its episodes; matched by TMDB id, else by title and year) in a library the caller can see. */
+    @SerialName(value = "inLibrary")
+    val inLibrary: kotlin.Boolean? = null,
 
     /* The episode the caller would watch next (Continue Watching and the series detail). */
     @SerialName(value = "nextEpisode")

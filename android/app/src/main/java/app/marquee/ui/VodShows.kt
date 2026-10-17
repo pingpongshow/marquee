@@ -92,10 +92,10 @@ internal fun VodShowTile(s: VodSeries, width: Dp?, onOpen: () -> Unit) {
     val marquee = LocalMarquee.current
     Column(if (width != null) Modifier.width(width) else Modifier.fillMaxWidth()) {
         Box {
-            Artwork(marquee.absolute(s.posterUrl), s.title, Shape.Poster, Modifier.fillMaxWidth().focusCard(onOpen)
+            Artwork(marquee.absolute(s.posterUrl), s.title, Shape.Poster, Modifier.fillMaxWidth().focusCard(onOpen).inLibraryBorder(s.inLibrary)
                 .semantics {
                     contentDescription = s.title
-                    if (s.watched) stateDescription = "Watched"
+                    vodTileState(s.watched, s.inLibrary)?.let { stateDescription = it }
                 })
             if (s.watched) Icon(Icons.Filled.CheckCircle, null, Modifier.align(Alignment.TopEnd).padding(6.dp).size(20.dp)
                 .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(50)), tint = Gold)
@@ -118,8 +118,10 @@ internal fun VodNextEpisodeTile(s: VodSeries, width: Dp, actions: List<TileActio
         Box {
             Artwork(marquee.absolute(e?.stillUrl ?: s.posterUrl), s.title, Shape.Wide, Modifier.fillMaxWidth()
                 .focusCard(onOpen, onLongClick = if (actions.isEmpty()) null else ({ menu = true }))
+                .inLibraryBorder(s.inLibrary)
                 .semantics {
                     contentDescription = listOfNotNull(s.title, e?.label()).joinToString(", ")
+                    vodTileState(false, s.inLibrary)?.let { stateDescription = it }
                     if (actions.isNotEmpty()) customActions = actions.map { a -> CustomAccessibilityAction(a.label) { a.run(); true } }
                 })
             TileMenu(actions, menu) { menu = false }
@@ -218,6 +220,7 @@ fun VodShowScreen(nav: NavHostController, seriesId: Long) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         s.category?.let { Text("VOD Shows · $it", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge) }
                         Text(s.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        if (s.inLibrary == true) InLibraryLabel()
                         if (meta.isNotEmpty()) Text(meta.joinToString(" · "), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (s.genres.isNotEmpty()) Text(s.genres.joinToString(", "), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                         s.rating?.let {

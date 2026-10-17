@@ -51,6 +51,7 @@ import kotlinx.serialization.Contextual
  * @param encoder nvenc, qsv or software.
  * @param error Why it failed or was skipped.
  * @param paused Why it's waiting (paused while someone is watching, outside the maintenance window, waiting for a viewer to stop before the swap).
+ * @param originalDeleted The original was deleted once the new file was verified and swapped in (keepOriginals off), so it can't be restored.
  * @param startedAt 
  * @param finishedAt 
  */
@@ -121,6 +122,10 @@ data class OptimizeJob (
     /* Why it's waiting (paused while someone is watching, outside the maintenance window, waiting for a viewer to stop before the swap). */
     @SerialName(value = "paused")
     val paused: kotlin.String? = null,
+
+    /* The original was deleted once the new file was verified and swapped in (keepOriginals off), so it can't be restored. */
+    @SerialName(value = "originalDeleted")
+    val originalDeleted: kotlin.Boolean? = null,
 
     @Contextual @SerialName(value = "startedAt")
     val startedAt: java.time.OffsetDateTime? = null,

@@ -48,6 +48,7 @@ import kotlinx.serialization.Contextual
  * @param runtimeMs 
  * @param posterUrl Server-relative; no token needed.
  * @param positionMs The caller's resume point.
+ * @param inLibrary The library already has this film (matched by TMDB id, else by title and year) in a library the caller can see.
  * @param overview 
  * @param tagline 
  * @param director 
@@ -107,6 +108,10 @@ data class VodMovieDetail (
     /* The caller's resume point. */
     @SerialName(value = "positionMs")
     val positionMs: kotlin.Long? = null,
+
+    /* The library already has this film (matched by TMDB id, else by title and year) in a library the caller can see. */
+    @SerialName(value = "inLibrary")
+    val inLibrary: kotlin.Boolean? = null,
 
     @SerialName(value = "overview")
     val overview: kotlin.String? = null,

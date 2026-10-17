@@ -246,7 +246,7 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `PATCH /settings`.
     /// - Remark: Generated from `#/paths//settings/patch(updateSettings)`.
     func updateSettings(_ input: Operations.UpdateSettings.Input) async throws -> Operations.UpdateSettings.Output
-    /// Libraries visible to the current user.
+    /// Libraries visible to the current user. The Live TV recordings libraries (Recorded TV / Recorded Movies) are left out for everyone, admins included: recordings appear only under Live TV → Recordings (GET /livetv/recordings) and are played from there by item id.
     ///
     /// - Remark: HTTP `GET /libraries`.
     /// - Remark: Generated from `#/paths//libraries/get(listLibraries)`.
@@ -615,6 +615,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /optimize/jobs/{jobId}/{action}`.
     /// - Remark: Generated from `#/paths//optimize/jobs/{jobId}/{action}/post(optimizeJobAction)`.
     func optimizeJobAction(_ input: Operations.OptimizeJobAction.Input) async throws -> Operations.OptimizeJobAction.Output
+    /// Delete the originals of optimized files kept in the media trash, so they can no longer be restored (admin only). Only optimizer originals: nothing else in the media trash is touched. With keepOriginals off this also happens by itself at start-up and when the setting is saved.
+    ///
+    /// - Remark: HTTP `POST /optimize/originals/delete`.
+    /// - Remark: Generated from `#/paths//optimize/originals/delete/post(deleteKeptOriginals)`.
+    func deleteKeptOriginals(_ input: Operations.DeleteKeptOriginals.Input) async throws -> Operations.DeleteKeptOriginals.Output
     /// The optimizer's settings and every preset, built-in and custom (admin only).
     ///
     /// - Remark: HTTP `GET /optimize/settings`.
@@ -760,7 +765,7 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /livetv/status`.
     /// - Remark: Generated from `#/paths//livetv/status/get(liveTvStatus)`.
     func liveTvStatus(_ input: Operations.LiveTvStatus.Input) async throws -> Operations.LiveTvStatus.Output
-    /// DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone's recordings are listed to every profile that may view DVR recordings, within the profile's content rating limit (the library item's rating once filed, else the guide's; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings.
+    /// DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone's recordings are listed to every profile that may view DVR recordings, within the profile's content rating limit (the library item's rating once filed, else the guide's; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings. Recordings appear only here, never in the libraries, Home, search or browse; finished ones carry the caller's resume position (viewOffsetMs, durationMs, watched).
     ///
     /// - Remark: HTTP `GET /livetv/recordings`.
     /// - Remark: Generated from `#/paths//livetv/recordings/get(listRecordings)`.
@@ -1183,6 +1188,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /tasks`.
     /// - Remark: Generated from `#/paths//tasks/get(listTasks)`.
     func listTasks(_ input: Operations.ListTasks.Input) async throws -> Operations.ListTasks.Output
+    /// Turn a task on or off (admin only). Off: it never runs on its schedule or automatically; Run now still works.
+    ///
+    /// - Remark: HTTP `PATCH /tasks/{taskId}`.
+    /// - Remark: Generated from `#/paths//tasks/{taskId}/patch(updateTask)`.
+    func updateTask(_ input: Operations.UpdateTask.Input) async throws -> Operations.UpdateTask.Output
     /// Run a task now (admin only).
     ///
     /// - Remark: HTTP `POST /tasks/{taskId}/run`.
@@ -1836,12 +1846,18 @@ extension APIProtocol {
             body: body
         ))
     }
-    /// Libraries visible to the current user.
+    /// Libraries visible to the current user. The Live TV recordings libraries (Recorded TV / Recorded Movies) are left out for everyone, admins included: recordings appear only under Live TV → Recordings (GET /livetv/recordings) and are played from there by item id.
     ///
     /// - Remark: HTTP `GET /libraries`.
     /// - Remark: Generated from `#/paths//libraries/get(listLibraries)`.
-    public func listLibraries(headers: Operations.ListLibraries.Input.Headers = .init()) async throws -> Operations.ListLibraries.Output {
-        try await listLibraries(Operations.ListLibraries.Input(headers: headers))
+    public func listLibraries(
+        query: Operations.ListLibraries.Input.Query = .init(),
+        headers: Operations.ListLibraries.Input.Headers = .init()
+    ) async throws -> Operations.ListLibraries.Output {
+        try await listLibraries(Operations.ListLibraries.Input(
+            query: query,
+            headers: headers
+        ))
     }
     /// Create a library (admin only).
     ///
@@ -2771,6 +2787,13 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// Delete the originals of optimized files kept in the media trash, so they can no longer be restored (admin only). Only optimizer originals: nothing else in the media trash is touched. With keepOriginals off this also happens by itself at start-up and when the setting is saved.
+    ///
+    /// - Remark: HTTP `POST /optimize/originals/delete`.
+    /// - Remark: Generated from `#/paths//optimize/originals/delete/post(deleteKeptOriginals)`.
+    public func deleteKeptOriginals(headers: Operations.DeleteKeptOriginals.Input.Headers = .init()) async throws -> Operations.DeleteKeptOriginals.Output {
+        try await deleteKeptOriginals(Operations.DeleteKeptOriginals.Input(headers: headers))
+    }
     /// The optimizer's settings and every preset, built-in and custom (admin only).
     ///
     /// - Remark: HTTP `GET /optimize/settings`.
@@ -3106,12 +3129,18 @@ extension APIProtocol {
     public func liveTvStatus(headers: Operations.LiveTvStatus.Input.Headers = .init()) async throws -> Operations.LiveTvStatus.Output {
         try await liveTvStatus(Operations.LiveTvStatus.Input(headers: headers))
     }
-    /// DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone's recordings are listed to every profile that may view DVR recordings, within the profile's content rating limit (the library item's rating once filed, else the guide's; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings.
+    /// DVR (LIVE-5): recordings in progress, upcoming (soonest first) and finished (newest first). Everyone's recordings are listed to every profile that may view DVR recordings, within the profile's content rating limit (the library item's rating once filed, else the guide's; unrated ones are hidden from rating-limited profiles). 403 when the caller may not view recordings. Recordings appear only here, never in the libraries, Home, search or browse; finished ones carry the caller's resume position (viewOffsetMs, durationMs, watched).
     ///
     /// - Remark: HTTP `GET /livetv/recordings`.
     /// - Remark: Generated from `#/paths//livetv/recordings/get(listRecordings)`.
-    public func listRecordings(headers: Operations.ListRecordings.Input.Headers = .init()) async throws -> Operations.ListRecordings.Output {
-        try await listRecordings(Operations.ListRecordings.Input(headers: headers))
+    public func listRecordings(
+        query: Operations.ListRecordings.Input.Query = .init(),
+        headers: Operations.ListRecordings.Input.Headers = .init()
+    ) async throws -> Operations.ListRecordings.Output {
+        try await listRecordings(Operations.ListRecordings.Input(
+            query: query,
+            headers: headers
+        ))
     }
     /// Record a programme from the guide, or every airing of its title (a series).
     ///
@@ -3159,8 +3188,14 @@ extension APIProtocol {
     ///
     /// - Remark: HTTP `GET /livetv/recording-rules`.
     /// - Remark: Generated from `#/paths//livetv/recording-rules/get(listRecordingRules)`.
-    public func listRecordingRules(headers: Operations.ListRecordingRules.Input.Headers = .init()) async throws -> Operations.ListRecordingRules.Output {
-        try await listRecordingRules(Operations.ListRecordingRules.Input(headers: headers))
+    public func listRecordingRules(
+        query: Operations.ListRecordingRules.Input.Query = .init(),
+        headers: Operations.ListRecordingRules.Input.Headers = .init()
+    ) async throws -> Operations.ListRecordingRules.Output {
+        try await listRecordingRules(Operations.ListRecordingRules.Input(
+            query: query,
+            headers: headers
+        ))
     }
     /// Stop recording a series. Its upcoming airings are dropped; recordings already made stay. Only whoever made it, or an admin.
     ///
@@ -4120,6 +4155,21 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//tasks/get(listTasks)`.
     public func listTasks(headers: Operations.ListTasks.Input.Headers = .init()) async throws -> Operations.ListTasks.Output {
         try await listTasks(Operations.ListTasks.Input(headers: headers))
+    }
+    /// Turn a task on or off (admin only). Off: it never runs on its schedule or automatically; Run now still works.
+    ///
+    /// - Remark: HTTP `PATCH /tasks/{taskId}`.
+    /// - Remark: Generated from `#/paths//tasks/{taskId}/patch(updateTask)`.
+    public func updateTask(
+        path: Operations.UpdateTask.Input.Path,
+        headers: Operations.UpdateTask.Input.Headers = .init(),
+        body: Operations.UpdateTask.Input.Body
+    ) async throws -> Operations.UpdateTask.Output {
+        try await updateTask(Operations.UpdateTask.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
     }
     /// Run a task now (admin only).
     ///

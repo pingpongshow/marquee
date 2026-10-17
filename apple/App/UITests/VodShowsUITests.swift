@@ -248,6 +248,46 @@ final class VodShowsUITests: XCTestCase {
         XCTAssertTrue(two.waitForExistence(timeout: 10), "back once removed")
     }
 
+    /// Titles a library already has: a green border (read out as "In your library"), the label
+    /// on the film's page, and the In my library filter. Needs the fake Xtream film "10 Xenon"
+    /// (2014), which the e2e Movies library has too.
+    func testInLibraryBorderAndFilter() throws {
+        try ensureShows()
+        let user = try temporaryUser()
+        signIn(user)
+        openLibrariesTab()
+        XCTAssertTrue(moviesEntry.waitForExistence(timeout: 10))
+        moviesEntry.tap()
+        XCTAssertTrue(app.navigationBars["VOD Movies"].waitForExistence(timeout: 10))
+        let film = { (title: String) in
+            self.app.buttons.matching(identifier: "vod.tile").matching(NSPredicate(format: "label == %@", title)).firstMatch
+        }
+        let owned = film("10 Xenon"), other = film("Apple XC Film One")
+        XCTAssertTrue(owned.waitForExistence(timeout: 15), "the film the library has (is the fake Xtream serving 10 Xenon?)")
+        XCTAssertTrue(other.waitForExistence(timeout: 5))
+        XCTAssertEqual(owned.value as? String, "In your library")
+        XCTAssertNotEqual(other.value as? String, "In your library")
+        shot("1-in-library-border")
+
+        filter("In my library", "In my library: Yes")
+        XCTAssertTrue(app.buttons["Remove filter In my library"].waitForExistence(timeout: 5), "shown as a chip")
+        XCTAssertTrue(other.waitForNonExistence(timeout: 10), "only titles the library has")
+        XCTAssertTrue(owned.exists)
+        XCTAssertTrue(app.staticTexts["1 movie"].waitForExistence(timeout: 10))
+        shot("2-in-library-filter")
+        filter("In my library", "In my library: No")
+        XCTAssertTrue(app.buttons["Remove filter Not in my library"].waitForExistence(timeout: 5))
+        XCTAssertTrue(owned.waitForNonExistence(timeout: 10), "only titles the library doesn't have")
+        XCTAssertTrue(other.exists)
+        app.buttons["vod.clearFilters"].tap()
+        XCTAssertTrue(owned.waitForExistence(timeout: 10), "back once cleared")
+
+        owned.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["vod.inLibraryLabel"].waitForExistence(timeout: 15), "the label on the film's page")
+        XCTAssertEqual(app.descendants(matching: .any)["vod.inLibraryLabel"].label, "In your library")
+        shot("3-in-library-page")
+    }
+
     /// A show's page: seasons and episodes, watched by episode, season and show; the next
     /// episode follows.
     func testShowPageWatched() throws {

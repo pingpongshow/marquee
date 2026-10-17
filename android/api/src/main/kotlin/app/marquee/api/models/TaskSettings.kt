@@ -34,6 +34,7 @@ import kotlinx.serialization.Contextual
  * @param maintenanceWindowStart 
  * @param maintenanceWindowHours 
  * @param backupRetention Days to keep nightly backups before they're deleted (the newest is always kept).
+ * @param disabled Ids of the tasks turned off (they don't run on their schedule or automatically; Run now still works). Unknown ids are ignored.
  */
 @Serializable
 
@@ -47,7 +48,11 @@ data class TaskSettings (
 
     /* Days to keep nightly backups before they're deleted (the newest is always kept). */
     @SerialName(value = "backupRetention")
-    val backupRetention: kotlin.Int? = null
+    val backupRetention: kotlin.Int? = null,
+
+    /* Ids of the tasks turned off (they don't run on their schedule or automatically; Run now still works). Unknown ids are ignored. */
+    @SerialName(value = "disabled")
+    val disabled: kotlin.collections.List<kotlin.String>? = null
 
 ) {
 

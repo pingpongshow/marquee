@@ -2787,6 +2787,18 @@ extension Components {
             public var rating: Swift.String?
             /// - Remark: Generated from `#/components/schemas/Recording/commercials`.
             public var commercials: Components.Schemas.CommercialScan?
+            /// Finished recordings: where the caller stopped watching (0 = not started or finished), to resume from the Recordings list.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Recording/viewOffsetMs`.
+            public var viewOffsetMs: Swift.Int64?
+            /// Finished recordings: the recorded item's length.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Recording/durationMs`.
+            public var durationMs: Swift.Int64?
+            /// Finished recordings: the caller has watched it to the end.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Recording/watched`.
+            public var watched: Swift.Bool?
             /// Creates a new `Recording`.
             ///
             /// - Parameters:
@@ -2812,6 +2824,9 @@ extension Components {
             ///   - canDelete: The caller may cancel or delete it (whoever scheduled it, or an admin).
             ///   - rating: The guide's content rating for the programme, e.g. TV-14, when it gave one.
             ///   - commercials:
+            ///   - viewOffsetMs: Finished recordings: where the caller stopped watching (0 = not started or finished), to resume from the Recordings list.
+            ///   - durationMs: Finished recordings: the recorded item's length.
+            ///   - watched: Finished recordings: the caller has watched it to the end.
             public init(
                 id: Swift.Int64,
                 channelId: Swift.Int64? = nil,
@@ -2834,7 +2849,10 @@ extension Components {
                 ownerName: Swift.String? = nil,
                 canDelete: Swift.Bool? = nil,
                 rating: Swift.String? = nil,
-                commercials: Components.Schemas.CommercialScan? = nil
+                commercials: Components.Schemas.CommercialScan? = nil,
+                viewOffsetMs: Swift.Int64? = nil,
+                durationMs: Swift.Int64? = nil,
+                watched: Swift.Bool? = nil
             ) {
                 self.id = id
                 self.channelId = channelId
@@ -2858,6 +2876,9 @@ extension Components {
                 self.canDelete = canDelete
                 self.rating = rating
                 self.commercials = commercials
+                self.viewOffsetMs = viewOffsetMs
+                self.durationMs = durationMs
+                self.watched = watched
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -2882,6 +2903,9 @@ extension Components {
                 case canDelete
                 case rating
                 case commercials
+                case viewOffsetMs
+                case durationMs
+                case watched
             }
         }
         /// - Remark: Generated from `#/components/schemas/RecordingRule`.
@@ -3608,6 +3632,10 @@ extension Components {
             public var positionMs: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/VodMovie/watched`.
             public var watched: Swift.Bool
+            /// The library already has this film (matched by TMDB id, else by title and year) in a library the caller can see.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodMovie/inLibrary`.
+            public var inLibrary: Swift.Bool?
             /// Creates a new `VodMovie`.
             ///
             /// - Parameters:
@@ -3621,6 +3649,7 @@ extension Components {
             ///   - posterUrl: Server-relative; no token needed.
             ///   - positionMs: The caller's resume point.
             ///   - watched:
+            ///   - inLibrary: The library already has this film (matched by TMDB id, else by title and year) in a library the caller can see.
             public init(
                 id: Swift.Int64,
                 title: Swift.String,
@@ -3631,7 +3660,8 @@ extension Components {
                 runtimeMs: Swift.Int64? = nil,
                 posterUrl: Swift.String? = nil,
                 positionMs: Swift.Int64? = nil,
-                watched: Swift.Bool
+                watched: Swift.Bool,
+                inLibrary: Swift.Bool? = nil
             ) {
                 self.id = id
                 self.title = title
@@ -3643,6 +3673,7 @@ extension Components {
                 self.posterUrl = posterUrl
                 self.positionMs = positionMs
                 self.watched = watched
+                self.inLibrary = inLibrary
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -3655,6 +3686,7 @@ extension Components {
                 case posterUrl
                 case positionMs
                 case watched
+                case inLibrary
             }
         }
         /// - Remark: Generated from `#/components/schemas/VodMovieDetail`.
@@ -3924,6 +3956,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/VodSeries/watched`.
             public var watched: Swift.Bool
+            /// The library already has this show (any of its episodes; matched by TMDB id, else by title and year) in a library the caller can see.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSeries/inLibrary`.
+            public var inLibrary: Swift.Bool?
             /// The episode the caller would watch next (Continue Watching and the series detail).
             ///
             /// - Remark: Generated from `#/components/schemas/VodSeries/nextEpisode`.
@@ -3962,6 +3998,7 @@ extension Components {
             ///   - episodeCount: Episodes known (0 until the series is first opened).
             ///   - watchedCount: Episodes the caller has watched.
             ///   - watched: The caller has watched every known episode.
+            ///   - inLibrary: The library already has this show (any of its episodes; matched by TMDB id, else by title and year) in a library the caller can see.
             ///   - nextEpisode: The episode the caller would watch next (Continue Watching and the series detail).
             public init(
                 id: Swift.Int64,
@@ -3975,6 +4012,7 @@ extension Components {
                 episodeCount: Swift.Int,
                 watchedCount: Swift.Int,
                 watched: Swift.Bool,
+                inLibrary: Swift.Bool? = nil,
                 nextEpisode: Components.Schemas.VodSeries.NextEpisodePayload? = nil
             ) {
                 self.id = id
@@ -3988,6 +4026,7 @@ extension Components {
                 self.episodeCount = episodeCount
                 self.watchedCount = watchedCount
                 self.watched = watched
+                self.inLibrary = inLibrary
                 self.nextEpisode = nextEpisode
             }
             public enum CodingKeys: String, CodingKey {
@@ -4002,6 +4041,7 @@ extension Components {
                 case episodeCount
                 case watchedCount
                 case watched
+                case inLibrary
                 case nextEpisode
             }
         }
@@ -6187,25 +6227,33 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TaskSettings/backupRetention`.
             public var backupRetention: Swift.Int?
+            /// Ids of the tasks turned off (they don't run on their schedule or automatically; Run now still works). Unknown ids are ignored.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TaskSettings/disabled`.
+            public var disabled: [Swift.String]?
             /// Creates a new `TaskSettings`.
             ///
             /// - Parameters:
             ///   - maintenanceWindowStart:
             ///   - maintenanceWindowHours:
             ///   - backupRetention: Days to keep nightly backups before they're deleted (the newest is always kept).
+            ///   - disabled: Ids of the tasks turned off (they don't run on their schedule or automatically; Run now still works). Unknown ids are ignored.
             public init(
                 maintenanceWindowStart: Swift.String? = nil,
                 maintenanceWindowHours: Swift.Int? = nil,
-                backupRetention: Swift.Int? = nil
+                backupRetention: Swift.Int? = nil,
+                disabled: [Swift.String]? = nil
             ) {
                 self.maintenanceWindowStart = maintenanceWindowStart
                 self.maintenanceWindowHours = maintenanceWindowHours
                 self.backupRetention = backupRetention
+                self.disabled = disabled
             }
             public enum CodingKeys: String, CodingKey {
                 case maintenanceWindowStart
                 case maintenanceWindowHours
                 case backupRetention
+                case disabled
             }
         }
         /// - Remark: Generated from `#/components/schemas/LibraryType`.
@@ -6312,6 +6360,10 @@ extension Components {
             public var createdAt: Foundation.Date
             /// - Remark: Generated from `#/components/schemas/Library/updatedAt`.
             public var updatedAt: Foundation.Date
+            /// A Live TV recordings library (Recorded TV / Recorded Movies). Only listed to admins with manage=true; its items are shown only under Live TV → Recordings, and browsing it returns 404.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Library/recordings`.
+            public var recordings: Swift.Bool?
             /// Creates a new `Library`.
             ///
             /// - Parameters:
@@ -6328,6 +6380,7 @@ extension Components {
             ///   - lastScannedAt:
             ///   - createdAt:
             ///   - updatedAt:
+            ///   - recordings: A Live TV recordings library (Recorded TV / Recorded Movies). Only listed to admins with manage=true; its items are shown only under Live TV → Recordings, and browsing it returns 404.
             public init(
                 id: Swift.Int64,
                 name: Swift.String,
@@ -6341,7 +6394,8 @@ extension Components {
                 lastScanError: Swift.String? = nil,
                 lastScannedAt: Foundation.Date? = nil,
                 createdAt: Foundation.Date,
-                updatedAt: Foundation.Date
+                updatedAt: Foundation.Date,
+                recordings: Swift.Bool? = nil
             ) {
                 self.id = id
                 self.name = name
@@ -6356,6 +6410,7 @@ extension Components {
                 self.lastScannedAt = lastScannedAt
                 self.createdAt = createdAt
                 self.updatedAt = updatedAt
+                self.recordings = recordings
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -6371,6 +6426,7 @@ extension Components {
                 case lastScannedAt
                 case createdAt
                 case updatedAt
+                case recordings
             }
         }
         /// - Remark: Generated from `#/components/schemas/LibraryCreate`.
@@ -10851,6 +10907,10 @@ extension Components {
             public var running: Swift.Bool
             /// - Remark: Generated from `#/components/schemas/TaskInfo/lastRun`.
             public var lastRun: Components.Schemas.TaskRun?
+            /// Off: the task never runs on its schedule or automatically (after scans, recordings and the like); Run now still works. Default on.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TaskInfo/enabled`.
+            public var enabled: Swift.Bool?
             /// Creates a new `TaskInfo`.
             ///
             /// - Parameters:
@@ -10860,13 +10920,15 @@ extension Components {
             ///   - schedule: Human-readable, e.g. "Daily in the maintenance window".
             ///   - running:
             ///   - lastRun:
+            ///   - enabled: Off: the task never runs on its schedule or automatically (after scans, recordings and the like); Run now still works. Default on.
             public init(
                 id: Swift.String,
                 name: Swift.String,
                 description: Swift.String,
                 schedule: Swift.String,
                 running: Swift.Bool,
-                lastRun: Components.Schemas.TaskRun? = nil
+                lastRun: Components.Schemas.TaskRun? = nil,
+                enabled: Swift.Bool? = nil
             ) {
                 self.id = id
                 self.name = name
@@ -10874,6 +10936,7 @@ extension Components {
                 self.schedule = schedule
                 self.running = running
                 self.lastRun = lastRun
+                self.enabled = enabled
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -10882,6 +10945,7 @@ extension Components {
                 case schedule
                 case running
                 case lastRun
+                case enabled
             }
         }
         /// - Remark: Generated from `#/components/schemas/TaskRun`.
@@ -13316,7 +13380,7 @@ extension Components {
                 case estimatedSize
             }
         }
-        /// verifying = the new file is being checked (or waits for nobody to be watching before it's swapped in); done = optimized, the original is in the media trash; skipped = not worth it (see error); restored = the original was put back.
+        /// verifying = the new file is being checked (or waits for nobody to be watching before it's swapped in); done = optimized (the original was deleted, or kept in the media trash when keepOriginals is on: see originalDeleted); skipped = not worth it (see error); restored = the original was put back.
         ///
         /// - Remark: Generated from `#/components/schemas/OptimizeJobState`.
         @frozen public enum OptimizeJobState: String, Codable, Hashable, Sendable, CaseIterable {
@@ -13381,6 +13445,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OptimizeJob/canRestore`.
             public var canRestore: Swift.Bool
+            /// The original was deleted once the new file was verified and swapped in (keepOriginals off), so it can't be restored.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeJob/originalDeleted`.
+            public var originalDeleted: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/OptimizeJob/createdAt`.
             public var createdAt: Foundation.Date
             /// - Remark: Generated from `#/components/schemas/OptimizeJob/startedAt`.
@@ -13408,6 +13476,7 @@ extension Components {
             ///   - error: Why it failed or was skipped.
             ///   - paused: Why it's waiting (paused while someone is watching, outside the maintenance window, waiting for a viewer to stop before the swap).
             ///   - canRestore: The original is still in the media trash.
+            ///   - originalDeleted: The original was deleted once the new file was verified and swapped in (keepOriginals off), so it can't be restored.
             ///   - createdAt:
             ///   - startedAt:
             ///   - finishedAt:
@@ -13430,6 +13499,7 @@ extension Components {
                 error: Swift.String? = nil,
                 paused: Swift.String? = nil,
                 canRestore: Swift.Bool,
+                originalDeleted: Swift.Bool? = nil,
                 createdAt: Foundation.Date,
                 startedAt: Foundation.Date? = nil,
                 finishedAt: Foundation.Date? = nil
@@ -13452,6 +13522,7 @@ extension Components {
                 self.error = error
                 self.paused = paused
                 self.canRestore = canRestore
+                self.originalDeleted = originalDeleted
                 self.createdAt = createdAt
                 self.startedAt = startedAt
                 self.finishedAt = finishedAt
@@ -13475,6 +13546,7 @@ extension Components {
                 case error
                 case paused
                 case canRestore
+                case originalDeleted
                 case createdAt
                 case startedAt
                 case finishedAt
@@ -13498,6 +13570,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OptimizeJobPage/paused`.
             public var paused: Swift.String?
+            /// Originals of optimized files still kept in the media trash (keepOriginals on, or from before it existed).
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeJobPage/keptOriginals`.
+            public var keptOriginals: Swift.Int?
+            /// How much space those originals take.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeJobPage/keptOriginalsBytes`.
+            public var keptOriginalsBytes: Swift.Int64?
             /// Creates a new `OptimizeJobPage`.
             ///
             /// - Parameters:
@@ -13506,18 +13586,24 @@ extension Components {
             ///   - savedBytes: Space saved by every optimized file (not restored).
             ///   - optimized: How many files are optimized.
             ///   - paused: Why the queue isn't running now, if it isn't.
+            ///   - keptOriginals: Originals of optimized files still kept in the media trash (keepOriginals on, or from before it existed).
+            ///   - keptOriginalsBytes: How much space those originals take.
             public init(
                 items: [Components.Schemas.OptimizeJob],
                 total: Swift.Int,
                 savedBytes: Swift.Int64,
                 optimized: Swift.Int,
-                paused: Swift.String? = nil
+                paused: Swift.String? = nil,
+                keptOriginals: Swift.Int? = nil,
+                keptOriginalsBytes: Swift.Int64? = nil
             ) {
                 self.items = items
                 self.total = total
                 self.savedBytes = savedBytes
                 self.optimized = optimized
                 self.paused = paused
+                self.keptOriginals = keptOriginals
+                self.keptOriginalsBytes = keptOriginalsBytes
             }
             public enum CodingKeys: String, CodingKey {
                 case items
@@ -13525,6 +13611,8 @@ extension Components {
                 case savedBytes
                 case optimized
                 case paused
+                case keptOriginals
+                case keptOriginalsBytes
             }
         }
         /// The Large files filters (as the list's query parameters).
@@ -13705,34 +13793,18 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OptimizePreset/videoKbps`.
             public var videoKbps: Swift.Int?
-            /// copy = every track as it is; default = only the default track, as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1).
+            /// copy = every track as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1). Every audio track (all languages, commentary) and every subtitle is always kept; an MP4 with picture subtitles becomes MKV.
             ///
             /// - Remark: Generated from `#/components/schemas/OptimizePreset/audio`.
             @frozen public enum AudioPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case copy = "copy"
-                case _default = "default"
                 case aacStereo = "aac_stereo"
                 case aac51 = "aac_51"
             }
-            /// copy = every track as it is; default = only the default track, as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1).
+            /// copy = every track as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1). Every audio track (all languages, commentary) and every subtitle is always kept; an MP4 with picture subtitles becomes MKV.
             ///
             /// - Remark: Generated from `#/components/schemas/OptimizePreset/audio`.
             public var audio: Components.Schemas.OptimizePreset.AudioPayload
-            /// Leave out commentary tracks.
-            ///
-            /// - Remark: Generated from `#/components/schemas/OptimizePreset/dropCommentary`.
-            public var dropCommentary: Swift.Bool?
-            /// Picture subtitles (PGS, VobSub); text subtitles are always kept. MP4 files can't hold picture subtitles.
-            ///
-            /// - Remark: Generated from `#/components/schemas/OptimizePreset/imageSubtitles`.
-            @frozen public enum ImageSubtitlesPayload: String, Codable, Hashable, Sendable, CaseIterable {
-                case keep = "keep"
-                case drop = "drop"
-            }
-            /// Picture subtitles (PGS, VobSub); text subtitles are always kept. MP4 files can't hold picture subtitles.
-            ///
-            /// - Remark: Generated from `#/components/schemas/OptimizePreset/imageSubtitles`.
-            public var imageSubtitles: Components.Schemas.OptimizePreset.ImageSubtitlesPayload
             /// keep = HDR stays HDR (10-bit HEVC or AV1; H.264 always tone-maps); tonemap = converted to SDR.
             ///
             /// - Remark: Generated from `#/components/schemas/OptimizePreset/hdr`.
@@ -13754,9 +13826,7 @@ extension Components {
             ///   - codec: AV1 only when the server has an AV1 encoder (av1Available).
             ///   - quality: Constant-quality level, unless videoKbps is set.
             ///   - videoKbps: A target video bitrate instead of a quality; 0 = use the quality.
-            ///   - audio: copy = every track as it is; default = only the default track, as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1).
-            ///   - dropCommentary: Leave out commentary tracks.
-            ///   - imageSubtitles: Picture subtitles (PGS, VobSub); text subtitles are always kept. MP4 files can't hold picture subtitles.
+            ///   - audio: copy = every track as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1). Every audio track (all languages, commentary) and every subtitle is always kept; an MP4 with picture subtitles becomes MKV.
             ///   - hdr: keep = HDR stays HDR (10-bit HEVC or AV1; H.264 always tone-maps); tonemap = converted to SDR.
             public init(
                 id: Swift.String,
@@ -13767,8 +13837,6 @@ extension Components {
                 quality: Components.Schemas.OptimizePreset.QualityPayload,
                 videoKbps: Swift.Int? = nil,
                 audio: Components.Schemas.OptimizePreset.AudioPayload,
-                dropCommentary: Swift.Bool? = nil,
-                imageSubtitles: Components.Schemas.OptimizePreset.ImageSubtitlesPayload,
                 hdr: Components.Schemas.OptimizePreset.HdrPayload
             ) {
                 self.id = id
@@ -13779,8 +13847,6 @@ extension Components {
                 self.quality = quality
                 self.videoKbps = videoKbps
                 self.audio = audio
-                self.dropCommentary = dropCommentary
-                self.imageSubtitles = imageSubtitles
                 self.hdr = hdr
             }
             public enum CodingKeys: String, CodingKey {
@@ -13792,8 +13858,6 @@ extension Components {
                 case quality
                 case videoKbps
                 case audio
-                case dropCommentary
-                case imageSubtitles
                 case hdr
             }
         }
@@ -13825,6 +13889,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OptimizeSettings/paused`.
             public var paused: Swift.Bool
+            /// On: originals go to the media trash (restorable for about 30 days). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once, and originals kept earlier are deleted too (at start-up and when this is saved off). Omitted on update = unchanged.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeSettings/keepOriginals`.
+            public var keepOriginals: Swift.Bool?
             /// Creates a new `OptimizeSettings`.
             ///
             /// - Parameters:
@@ -13835,6 +13903,7 @@ extension Components {
             ///   - pauseWhileWatching: Pause while anyone is watching anything, resuming about 15 s after. Default on.
             ///   - windowOnly: Only run inside the maintenance window.
             ///   - paused: The queue is paused by an admin.
+            ///   - keepOriginals: On: originals go to the media trash (restorable for about 30 days). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once, and originals kept earlier are deleted too (at start-up and when this is saved off). Omitted on update = unchanged.
             public init(
                 presets: [Components.Schemas.OptimizePreset],
                 defaultPreset: Swift.String,
@@ -13842,7 +13911,8 @@ extension Components {
                 minSavingsPercent: Swift.Int,
                 pauseWhileWatching: Swift.Bool,
                 windowOnly: Swift.Bool,
-                paused: Swift.Bool
+                paused: Swift.Bool,
+                keepOriginals: Swift.Bool? = nil
             ) {
                 self.presets = presets
                 self.defaultPreset = defaultPreset
@@ -13851,6 +13921,7 @@ extension Components {
                 self.pauseWhileWatching = pauseWhileWatching
                 self.windowOnly = windowOnly
                 self.paused = paused
+                self.keepOriginals = keepOriginals
             }
             public enum CodingKeys: String, CodingKey {
                 case presets
@@ -13860,6 +13931,7 @@ extension Components {
                 case pauseWhileWatching
                 case windowOnly
                 case paused
+                case keepOriginals
             }
         }
         /// - Remark: Generated from `#/components/schemas/OptimizeConfig`.

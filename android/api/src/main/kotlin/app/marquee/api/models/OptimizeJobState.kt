@@ -29,7 +29,7 @@ import kotlinx.serialization.Serializable
 
 
 /**
- * verifying = the new file is being checked (or waits for nobody to be watching before it's swapped in); done = optimized, the original is in the media trash; skipped = not worth it (see error); restored = the original was put back.
+ * verifying = the new file is being checked (or waits for nobody to be watching before it's swapped in); done = optimized (the original was deleted, or kept in the media trash when keepOriginals is on: see originalDeleted); skipped = not worth it (see error); restored = the original was put back.
  *
  * Values: QUEUED,RUNNING,VERIFYING,DONE,FAILED,CANCELLED,SKIPPED,RESTORED
  */

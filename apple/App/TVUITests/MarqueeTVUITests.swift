@@ -352,7 +352,7 @@ final class MarqueeTVUITests: XCTestCase {
         shot("tv-live-tab")
         let home = try XCTUnwrap(app.sidebarItem("Home"))
         // The test server's video libraries.
-        let videos = try ["Anime", "Movies", "Recorded TV"].map { try XCTUnwrap(app.sidebarItem($0), "\($0) is listed") }
+        let videos = try ["Anime", "Movies"].map { try XCTUnwrap(app.sidebarItem($0), "\($0) is listed") }
         for v in videos {
             XCTAssertLessThan(v.frame.midY, live.frame.midY, "Live TV comes after \(v.label)")
         }

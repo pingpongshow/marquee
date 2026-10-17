@@ -47,7 +47,8 @@ public extension AppSession {
         let page = try await vodAPI.listVodMovies(query: .init(
             category: category, q: query, sort: sort, limit: limit, genre: filters.genre, yearFrom: filters.yearFrom,
             yearTo: filters.yearTo, minRating: filters.minRating.map(Double.init),
-            watched: filters.watched.flatMap { .init(rawValue: $0.rawValue) }, sourceId: filters.sourceId, offset: offset)).ok.body.json
+            watched: filters.watched.flatMap { .init(rawValue: $0.rawValue) }, sourceId: filters.sourceId,
+            inLibrary: filters.inLibrary, offset: offset)).ok.body.json
         return (page.movies, page.total)
     }
 
@@ -159,7 +160,8 @@ public extension AppSession {
         let page = try await vodAPI.listVodSeries(query: .init(
             category: category, q: query, sort: .init(rawValue: sort.rawValue), limit: limit, genre: filters.genre,
             yearFrom: filters.yearFrom, yearTo: filters.yearTo, minRating: filters.minRating.map(Double.init),
-            watched: filters.watched.flatMap { .init(rawValue: $0.rawValue) }, sourceId: filters.sourceId, offset: offset)).ok.body.json
+            watched: filters.watched.flatMap { .init(rawValue: $0.rawValue) }, sourceId: filters.sourceId,
+            inLibrary: filters.inLibrary, offset: offset)).ok.body.json
         return (page.series, page.total)
     }
 
@@ -201,7 +203,7 @@ public extension AppSession {
     }
 }
 
-/// The VOD pages' filters (genre, decade, minimum rating, watched state, source), kept per page.
+/// The VOD pages' filters (genre, decade, minimum rating, watched state, source, in the library), kept per page.
 public struct VodFilters: Codable, Hashable, Sendable {
     public enum Watched: String, Codable, CaseIterable, Sendable {
         case unwatched, inProgress, watched
@@ -215,13 +217,17 @@ public struct VodFilters: Codable, Hashable, Sendable {
     public var watched: Watched?
     /// VodStatus.sources[].id
     public var sourceId: String?
+    /// true = only titles a library the viewer can see already has; false = only those it doesn't.
+    public var inLibrary: Bool?
 
-    public init(genre: String? = nil, decade: Int? = nil, minRating: Int? = nil, watched: Watched? = nil, sourceId: String? = nil) {
+    public init(genre: String? = nil, decade: Int? = nil, minRating: Int? = nil, watched: Watched? = nil, sourceId: String? = nil,
+                inLibrary: Bool? = nil) {
         self.genre = genre
         self.decade = decade
         self.minRating = minRating
         self.watched = watched
         self.sourceId = sourceId
+        self.inLibrary = inLibrary
     }
 
     public var yearFrom: Int? { decade }
@@ -240,6 +246,8 @@ public struct VodFilters: Codable, Hashable, Sendable {
     public var stored: String {
         (try? JSONEncoder().encode(self)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
     }
+
+    public static func inLibraryLabel(_ v: Bool) -> String { v ? "In my library" : "Not in my library" }
 
     public static func label(_ w: Watched, shows: Bool) -> String {
         switch w {

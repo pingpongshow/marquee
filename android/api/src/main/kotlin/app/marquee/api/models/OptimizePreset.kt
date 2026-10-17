@@ -36,12 +36,10 @@ import kotlinx.serialization.Contextual
  * @param maxHeight Resolution cap (never upscaled; letterboxed films fit the frame by width); 0 keeps it.
  * @param codec AV1 only when the server has an AV1 encoder (av1Available).
  * @param quality Constant-quality level, unless videoKbps is set.
- * @param audio copy = every track as it is; default = only the default track, as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1).
- * @param imageSubtitles Picture subtitles (PGS, VobSub); text subtitles are always kept. MP4 files can't hold picture subtitles.
+ * @param audio copy = every track as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1). Every audio track (all languages, commentary) and every subtitle is always kept; an MP4 with picture subtitles becomes MKV.
  * @param hdr keep = HDR stays HDR (10-bit HEVC or AV1; H.264 always tone-maps); tonemap = converted to SDR.
  * @param builtIn 
  * @param videoKbps A target video bitrate instead of a quality; 0 = use the quality.
- * @param dropCommentary Leave out commentary tracks.
  */
 @Serializable
 
@@ -65,13 +63,9 @@ data class OptimizePreset (
     @SerialName(value = "quality")
     val quality: OptimizePreset.Quality,
 
-    /* copy = every track as it is; default = only the default track, as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1). */
+    /* copy = every track as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1). Every audio track (all languages, commentary) and every subtitle is always kept; an MP4 with picture subtitles becomes MKV. */
     @SerialName(value = "audio")
     val audio: OptimizePreset.Audio,
-
-    /* Picture subtitles (PGS, VobSub); text subtitles are always kept. MP4 files can't hold picture subtitles. */
-    @SerialName(value = "imageSubtitles")
-    val imageSubtitles: OptimizePreset.ImageSubtitles,
 
     /* keep = HDR stays HDR (10-bit HEVC or AV1; H.264 always tone-maps); tonemap = converted to SDR. */
     @SerialName(value = "hdr")
@@ -82,11 +76,7 @@ data class OptimizePreset (
 
     /* A target video bitrate instead of a quality; 0 = use the quality. */
     @SerialName(value = "videoKbps")
-    val videoKbps: kotlin.Int? = null,
-
-    /* Leave out commentary tracks. */
-    @SerialName(value = "dropCommentary")
-    val dropCommentary: kotlin.Boolean? = null
+    val videoKbps: kotlin.Int? = null
 
 ) {
 
@@ -126,26 +116,15 @@ data class OptimizePreset (
         @SerialName(value = "small") SMALL("small");
     }
     /**
-     * copy = every track as it is; default = only the default track, as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1).
+     * copy = every track as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1). Every audio track (all languages, commentary) and every subtitle is always kept; an MP4 with picture subtitles becomes MKV.
      *
-     * Values: COPY,DEFAULT,AAC_STEREO,AAC_51
+     * Values: COPY,AAC_STEREO,AAC_51
      */
     @Serializable
     enum class Audio(val value: kotlin.String) {
         @SerialName(value = "copy") COPY("copy"),
-        @SerialName(value = "default") DEFAULT("default"),
         @SerialName(value = "aac_stereo") AAC_STEREO("aac_stereo"),
         @SerialName(value = "aac_51") AAC_51("aac_51");
-    }
-    /**
-     * Picture subtitles (PGS, VobSub); text subtitles are always kept. MP4 files can't hold picture subtitles.
-     *
-     * Values: KEEP,DROP
-     */
-    @Serializable
-    enum class ImageSubtitles(val value: kotlin.String) {
-        @SerialName(value = "keep") KEEP("keep"),
-        @SerialName(value = "drop") DROP("drop");
     }
     /**
      * keep = HDR stays HDR (10-bit HEVC or AV1; H.264 always tone-maps); tonemap = converted to SDR.

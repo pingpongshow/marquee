@@ -39,6 +39,7 @@ import app.marquee.api.models.TestEmail200Response
 import app.marquee.api.models.TestEmailRequest
 import app.marquee.api.models.TestWebhook200Response
 import app.marquee.api.models.TestWebhookRequest
+import app.marquee.api.models.UpdateTaskRequest
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -1401,6 +1402,83 @@ open class SystemApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/webhooks/test",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PATCH /tasks/{taskId}
+     * Turn a task on or off (admin only). Off: it never runs on its schedule or automatically; Run now still works.
+     * 
+     * @param taskId 
+     * @param updateTaskRequest 
+     * @return TaskInfo
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun updateTask(taskId: kotlin.String, updateTaskRequest: UpdateTaskRequest) : TaskInfo {
+        val localVarResponse = updateTaskWithHttpInfo(taskId = taskId, updateTaskRequest = updateTaskRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as TaskInfo
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PATCH /tasks/{taskId}
+     * Turn a task on or off (admin only). Off: it never runs on its schedule or automatically; Run now still works.
+     * 
+     * @param taskId 
+     * @param updateTaskRequest 
+     * @return ApiResponse<TaskInfo?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun updateTaskWithHttpInfo(taskId: kotlin.String, updateTaskRequest: UpdateTaskRequest) : ApiResponse<TaskInfo?> {
+        val localVariableConfig = updateTaskRequestConfig(taskId = taskId, updateTaskRequest = updateTaskRequest)
+
+        return request<UpdateTaskRequest, TaskInfo>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation updateTask
+     *
+     * @param taskId 
+     * @param updateTaskRequest 
+     * @return RequestConfig
+     */
+    fun updateTaskRequestConfig(taskId: kotlin.String, updateTaskRequest: UpdateTaskRequest) : RequestConfig<UpdateTaskRequest> {
+        val localVariableBody = updateTaskRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PATCH,
+            path = "/tasks/{taskId}".replace("{"+"taskId"+"}", encodeURIComponent(taskId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
