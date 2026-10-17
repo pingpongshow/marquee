@@ -36,6 +36,7 @@ type Summary struct {
 	WatchedLeaves int
 	UserRating    float64 // 0 = not rated
 	Watchlisted   bool
+	Favorite      bool   // the person's favourite (the heart)
 	ExtraType     string // trailer, featurette… ("" for main content)
 	ReleaseType   string // albums: album, ep, single, compilation, live… ("" = unknown)
 	Audio         AudioFormat
@@ -157,6 +158,9 @@ var sorts = map[string]string{
 	// The person's own rating (favourites first), unrated last.
 	"-myRating": "(SELECT rating FROM user_item_state WHERE user_id = %UID% AND item_id = i.id) DESC NULLS LAST, i.sort_title COLLATE NOCASE",
 	"myRating":  "(SELECT rating FROM user_item_state WHERE user_id = %UID% AND item_id = i.id) NULLS LAST, i.sort_title COLLATE NOCASE",
+	// When the person made it a favourite (the heart), newest first; the rest last.
+	"-favorited": "(SELECT favorite_at FROM user_item_state WHERE user_id = %UID% AND item_id = i.id) DESC NULLS LAST, i.sort_title COLLATE NOCASE",
+	"favorited":  "(SELECT favorite_at FROM user_item_state WHERE user_id = %UID% AND item_id = i.id) NULLS LAST, i.sort_title COLLATE NOCASE",
 }
 
 var baseCols = `i.id, i.library_id, i.type, i.title, COALESCE(i.original_title, ''), COALESCE(i.year, 0),
@@ -182,7 +186,8 @@ func cols(uid int64) string {
 	COALESCE(i.extra_type, ''), COALESCE(i.release_type, ''),
 	` + audioFormatCol + `,
 	COALESCE((SELECT AVG(rating) FROM user_item_state WHERE item_id = i.id AND rating > 0), 0),
-	(SELECT COUNT(*) FROM user_item_state WHERE item_id = i.id AND rating > 0)`
+	(SELECT COUNT(*) FROM user_item_state WHERE item_id = i.id AND rating > 0),
+	COALESCE((SELECT favorite_at IS NOT NULL FROM user_item_state WHERE user_id = ` + u + ` AND item_id = i.id), 0)`
 }
 
 // audioFormatCol is a track's audio format (codec|kbps|Hz|bits|channels) from its first
@@ -213,7 +218,7 @@ func scanSummary(row interface{ Scan(...any) error }, extra ...any) (Summary, er
 	err := row.Scan(append([]any{&s.ID, &s.LibraryID, &s.Type, &s.Title, &s.OriginalTitle, &s.Year, &s.Index, &s.AbsIndex, &s.Disc,
 		&s.ParentID, &s.GrandparentID, &s.ParentTitle, &s.GrandparentTitle, &s.ArtistCredit, &s.ChildCount, &s.LeafCount,
 		&s.DurationMS, &s.ReleaseDate, &s.Available, &s.MatchState, &added, &s.Poster, &s.Backdrop, &s.Thumb, &s.Logo,
-		&s.ViewOffsetMS, &s.ViewCount, &s.LastViewedAt, &s.WatchedLeaves, &s.UserRating, &s.Watchlisted, &s.ExtraType, &s.ReleaseType, &audio, &s.CommunityRating, &s.CommunityCount}, extra...)...)
+		&s.ViewOffsetMS, &s.ViewCount, &s.LastViewedAt, &s.WatchedLeaves, &s.UserRating, &s.Watchlisted, &s.ExtraType, &s.ReleaseType, &audio, &s.CommunityRating, &s.CommunityCount, &s.Favorite}, extra...)...)
 	s.AddedAt, _ = time.Parse(time.RFC3339Nano, added)
 	s.Audio = parseAudioFormat(audio)
 	return s, err
@@ -249,6 +254,18 @@ func (s *Store) List(ctx context.Context, acc Access, libID int64, typ, sort str
 
 // Children returns an item's direct children in natural order (season/episode/disc/track number).
 func (s *Store) Children(ctx context.Context, acc Access, parentID int64, offset, limit int) ([]Summary, int, error) {
+	return s.ChildrenFavorites(ctx, acc, parentID, false, offset, limit)
+}
+
+// ChildrenFavorites is Children, limited when favOnly is set to the person's favourites and
+// the children holding one (a show's seasons with a favourite episode, an artist's albums
+// with a favourite song).
+func (s *Store) ChildrenFavorites(ctx context.Context, acc Access, parentID int64, favOnly bool, offset, limit int) ([]Summary, int, error) {
+	if favOnly {
+		acc.extra = append(append([]string{}, acc.extra...), `(`+favoriteCond(acc.UserID, "i")+` OR EXISTS (SELECT 1 FROM items fl
+			JOIN user_item_state fx ON fx.item_id = fl.id AND fx.user_id = `+strconv.FormatInt(acc.UserID, 10)+` AND fx.favorite_at IS NOT NULL
+			WHERE fl.parent_id = i.id OR fl.grandparent_id = i.id))`)
+	}
 	// A smart collection's members are whatever its saved filter matches now (META-7).
 	if sc, ok := s.Smart(ctx, parentID); ok {
 		if sc.Max > 0 {
@@ -263,7 +280,7 @@ func (s *Store) Children(ctx context.Context, acc Access, parentID int64, offset
 		if sc.Max > 0 && total > sc.Max {
 			total = sc.Max
 		}
-		if err == nil && acc.LibraryIDs == nil && acc.MaxRating == "" {
+		if err == nil && acc.LibraryIDs == nil && acc.MaxRating == "" && len(acc.extra) == 0 {
 			// Keep the count shown on the collection's card current.
 			s.db.ExecContext(ctx, `UPDATE items SET child_count = ?, leaf_count = ? WHERE id = ? AND child_count IS NOT ?`, total, total, parentID, total)
 		}
@@ -329,11 +346,19 @@ type SearchGroup struct {
 
 // Search does a prefix full-text search over titles in the given libraries.
 func (s *Store) Search(ctx context.Context, acc Access, query string, perType int) ([]SearchGroup, error) {
+	return s.SearchFavorites(ctx, acc, query, perType, false)
+}
+
+// SearchFavorites is Search, limited to the person's favourites when favOnly is set.
+func (s *Store) SearchFavorites(ctx context.Context, acc Access, query string, perType int, favOnly bool) ([]SearchGroup, error) {
 	match := ftsQuery(query)
 	if match == "" {
 		return []SearchGroup{}, nil
 	}
 	ac, aargs := acc.clause()
+	if favOnly {
+		ac += ` AND ` + favoriteCond(acc.UserID, "i")
+	}
 	rows, err := s.db.QueryContext(ctx, `SELECT `+cols(acc.UserID)+` FROM items_fts f JOIN items i ON i.id = f.rowid
 		LEFT JOIN items p ON p.id = i.parent_id LEFT JOIN items g ON g.id = i.grandparent_id
 		WHERE items_fts MATCH ? AND i.extra_type IS NULL AND i.type IN ('movie','show','episode','artist','album','track','video') AND `+ac+`

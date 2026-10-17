@@ -10,6 +10,7 @@ import { Alert, Button, Dialog, Input, Spinner } from "@/components/ui";
 import { formatDuration, formatTrackTime } from "../browse/format";
 import { ItemMenu } from "../browse/ItemMenu";
 import { RowRating } from "../music/Rating";
+import { favoriteTypes, RowFavorite } from "../browse/Favorite";
 import { useMusicState } from "../player/MusicPlayer";
 import { PlaylistMosaic } from "./PlaylistMosaic";
 import { newShuffleSeed, seededShuffle } from "./order";
@@ -214,6 +215,7 @@ export function PlaylistPage() {
               <Link to="/item/$itemId" params={{ itemId: String(it.type === "track" && it.parentId ? it.parentId : it.id) }} className="hidden text-xs text-muted hover:underline md:block">
                 {it.type === "track" ? "Album" : "Details"}
               </Link>
+              {favoriteTypes.has(it.type) && <RowFavorite item={it} />}
               {it.type === "track" && <RowRating item={it} />}
               <span className="w-14 shrink-0 text-right text-sm text-muted tabular-nums">{it.type === "track" ? formatTrackTime(it.durationMs) : formatDuration(it.durationMs)}</span>
               <ItemMenu item={it} />

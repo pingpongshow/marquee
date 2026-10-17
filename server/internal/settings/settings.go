@@ -148,7 +148,7 @@ const (
 	VODSaveTranscode = "transcode"
 )
 
-// Alert types an administrator can turn on (all off by default).
+// Alert types an administrator can turn on (off by default, except DefaultAlerts).
 const (
 	AlertTaskFailed      = "task_failed"
 	AlertDiskLow         = "disk_low"
@@ -168,11 +168,23 @@ const (
 	// unreachable for several runs). Like dvr_quota it isn't in the API's AlertType enum; the
 	// API exposes it as NotificationSettings.plexSyncAlert.
 	AlertPlexSync = "plex_sync"
+	// AlertOptimizeFailed: a Large files conversion failed (not one skipped for saving too
+	// little). Like dvr_quota it isn't in the API's AlertType enum; the API exposes it as
+	// NotificationSettings.optimizeFailedAlert.
+	AlertOptimizeFailed = "optimize_failed"
 )
 
 // AlertTypes lists every alert type.
 var AlertTypes = []string{AlertTaskFailed, AlertDiskLow, AlertRecordingFailed, AlertSourceFailed,
-	AlertIntegrationDown, AlertFailedSignIns, AlertNewAdminDevice, AlertPlaybackFailed, AlertVODSaveFailed, AlertVODSaveDone, AlertDVRQuota, AlertPlexSync}
+	AlertIntegrationDown, AlertFailedSignIns, AlertNewAdminDevice, AlertPlaybackFailed, AlertVODSaveFailed, AlertVODSaveDone, AlertDVRQuota, AlertPlexSync,
+	AlertOptimizeFailed}
+
+// DefaultAlerts are on for new servers, and were turned on once for existing ones by the
+// alerts version 2 upgrade (an admin can turn them off; they stay off).
+var DefaultAlerts = []string{AlertVODSaveFailed, AlertOptimizeFailed}
+
+// AlertsVersion is the current Notifications.AlertsVersion.
+const AlertsVersion = 2
 
 // Notifications configures outgoing email (SMTP) and which alerts administrators get.
 type Notifications struct {
@@ -193,6 +205,9 @@ type Notifications struct {
 	Recipients          []int64 `json:"recipients"`
 	// DiskThresholdPercent: alert when a volume has less free space than this.
 	DiskThresholdPercent int `json:"diskThresholdPercent"`
+	// AlertsVersion records the one-time alert upgrades applied (see upgradeAlerts), so
+	// alerts turned on by an upgrade aren't turned on again after an admin turns them off.
+	AlertsVersion int `json:"alertsVersion"`
 }
 
 // MailConfigured reports whether outgoing mail is set up.
@@ -275,6 +290,11 @@ type Integrations struct {
 	// Movies on demand under Live TV (LIVE-6): off until the admin turns it on.
 	VODEnabled bool        `json:"vodEnabled"`
 	VODSources []VODSource `json:"vodSources"`
+	// VODAutoRefresh reloads the movie sources' lists every VODRefreshHours (1–48) after
+	// the last successful refresh; off, they reload only when an admin presses Refresh (and
+	// at start for a source that has never loaded).
+	VODAutoRefresh  bool `json:"vodAutoRefresh"`
+	VODRefreshHours int  `json:"vodRefreshHours"`
 }
 
 // VODSource is an M3U playlist of films (e.g. Pluto TV's on-demand movies), or an Xtream
@@ -467,12 +487,13 @@ func Defaults() Settings {
 			Trickplay:               true,
 			DetectIntros:            true,
 		},
-		Metadata:     Metadata{AnimeEpisodeOrdering: "seasonal", OMDbDailyLimit: 950},
-		Tasks:        Tasks{MaintenanceWindowStart: "03:00", MaintenanceWindowHours: 4, BackupRetention: 7},
-		Music:        Music{SoundprintAnalysis: true, OnlineLyrics: false, LoudnessAnalysis: true, ArtistDetails: true},
-		Integrations: Integrations{DVRPaddingBefore: 1, DVRPaddingAfter: 3, Commercials: CommercialsOff, DVRQuotaAction: DVRQuotaBlock},
+		Metadata: Metadata{AnimeEpisodeOrdering: "seasonal", OMDbDailyLimit: 950},
+		Tasks:    Tasks{MaintenanceWindowStart: "03:00", MaintenanceWindowHours: 4, BackupRetention: 7},
+		Music:    Music{SoundprintAnalysis: true, OnlineLyrics: false, LoudnessAnalysis: true, ArtistDetails: true},
+		Integrations: Integrations{DVRPaddingBefore: 1, DVRPaddingAfter: 3, Commercials: CommercialsOff, DVRQuotaAction: DVRQuotaBlock,
+			VODAutoRefresh: true, VODRefreshHours: 6},
 		Notifications: Notifications{SMTPPort: 587, SMTPSecurity: "starttls", FromName: "Marquee",
-			RecipientsAllAdmins: true, DiskThresholdPercent: 10},
+			RecipientsAllAdmins: true, DiskThresholdPercent: 10, Alerts: append([]string{}, DefaultAlerts...), AlertsVersion: AlertsVersion},
 		VODSave: VODSave{Quality: VODSaveOriginal, MaxHeight: 1080, VideoCodec: "hevc", VideoQuality: "balanced",
 			Audio: "copy", ConcurrentPerSource: 1, ScanAfterSave: true, SkipExisting: true,
 			PauseWhileWatching: true, PauseScope: "source", RetryFailed: true},
@@ -500,14 +521,41 @@ func Open(ctx context.Context, db *sql.DB) (*Store, error) {
 	case err != nil:
 		return nil, err
 	default:
+		// Stored settings without an alerts version predate the alert upgrades.
+		s.cur.Notifications.AlertsVersion = 0
 		if err := json.Unmarshal([]byte(raw), &s.cur); err != nil {
 			return nil, fmt.Errorf("decode settings: %w", err)
+		}
+		if upgradeAlerts(&s.cur.Notifications) {
+			if out, err := json.Marshal(s.cur); err == nil {
+				if _, err := db.ExecContext(ctx, `UPDATE settings SET value = ? WHERE key = ?`, string(out), keyServer); err != nil {
+					return nil, fmt.Errorf("upgrade settings: %w", err)
+				}
+			}
 		}
 	}
 	if err := s.loadServerID(ctx); err != nil {
 		return nil, err
 	}
 	return s, nil
+}
+
+// upgradeAlerts applies the one-time alert upgrades not applied yet, reporting whether
+// anything changed. Version 2 turns on the VOD download and Large files conversion failure
+// alerts.
+func upgradeAlerts(n *Notifications) bool {
+	if n.AlertsVersion >= AlertsVersion {
+		return false
+	}
+	if n.AlertsVersion < 2 {
+		for _, a := range DefaultAlerts {
+			if !n.AlertOn(a) {
+				n.Alerts = append(n.Alerts, a)
+			}
+		}
+	}
+	n.AlertsVersion = AlertsVersion
+	return true
 }
 
 func (s *Store) loadServerID(ctx context.Context) error {

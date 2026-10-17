@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"math/rand/v2"
 	"slices"
 	"strconv"
 	"strings"
@@ -101,7 +102,8 @@ func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) 
 	}
 	b := req.Body
 	acc := access(ctx)
-	o := soundprint.Options{Length: 50, Keep: keepFor(acc, b.LibraryId), Avoid: h.Soundprint.Avoid(ctx, s.User.ID), Exclude: map[int64]bool{}}
+	o := soundprint.Options{Length: 50, Keep: keepFor(acc, b.LibraryId), Avoid: h.Soundprint.Avoid(ctx, s.User.ID), Exclude: map[int64]bool{},
+		Favour: h.Soundprint.Favour(ctx, s.User.ID)}
 	set(&o.Length, b.Limit)
 	if b.Exclude != nil {
 		for _, id := range *b.Exclude {
@@ -158,11 +160,12 @@ func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) 
 		}
 		st = h.Soundprint.RadioFromVector(v, strings.ToUpper(value[:1])+value[1:]+" Radio", o)
 	case RadioRequestSeedFavourites:
-		liked := h.Soundprint.Liked(ctx, s.User.ID)
-		if len(liked) == 0 {
-			return MusicRadio409JSONResponse{ConflictJSONResponse(apiErr("no_history", "Play or rate some music first."))}, nil
+		// The sound of their favourite songs first, then what they play and rate highly.
+		taste := h.Soundprint.Taste(ctx, s.User.ID, h.Soundprint.Liked(ctx, s.User.ID))
+		if taste == nil {
+			return MusicRadio409JSONResponse{ConflictJSONResponse(apiErr("no_history", "Play, rate or favourite some music first."))}, nil
 		}
-		st = h.Soundprint.RadioFromVector(soundprint.Mean(liked), "Your Favourites Radio", o)
+		st = h.Soundprint.RadioFromVector(taste, "Your Favourites Radio", o)
 	case RadioRequestSeedLibrary:
 		all := h.Soundprint.Index.Where(o.Keep)
 		if len(all) == 0 {
@@ -203,7 +206,8 @@ func (h *Handlers) MusicMuse(ctx context.Context, req MusicMuseRequestObject) (M
 	}
 	n := 30
 	set(&n, req.Body.Limit)
-	o := soundprint.Options{Keep: keepFor(access(ctx), req.Body.LibraryId), Avoid: h.Soundprint.Avoid(ctx, s.User.ID)}
+	o := soundprint.Options{Keep: keepFor(access(ctx), req.Body.LibraryId), Avoid: h.Soundprint.Avoid(ctx, s.User.ID),
+		Favour: h.Soundprint.Favour(ctx, s.User.ID)}
 	// Read the prompt (AI, or keywords against the library's genres and artists), filter,
 	// then rank by sound, "like" artists, genres and, with AI, lyric themes.
 	ctx = ai.WithBudget(ctx, museAIBudget) // see museAIBudget
@@ -280,6 +284,13 @@ func (h *Handlers) MusicMixes(ctx context.Context, req MusicMixesRequestObject) 
 		return MusicMixes401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	out := MusicMixes200JSONResponse{}
+	fav, err := h.favoritesMix(ctx, req.Params.LibraryId)
+	if err != nil {
+		return nil, internal(ctx, "mixes", err)
+	}
+	if fav != nil {
+		out = append(out, *fav)
+	}
 	for i, m := range h.Soundprint.DailyMixes(ctx, s.User.ID, mixScope(req.Params.LibraryId), keepFor(access(ctx), req.Params.LibraryId)) {
 		st, err := h.station(ctx, m.Station)
 		if err != nil {
@@ -296,6 +307,34 @@ func (h *Handlers) MusicMixes(ctx context.Context, req MusicMixesRequestObject) 
 		out = append(out, st)
 	}
 	return out, nil
+}
+
+// favoritesMixSize is how many of the person's favourite songs the Favourites mix plays.
+const favoritesMixSize = 50
+
+// favoritesMix is the person's favourite songs shuffled (nil with fewer than three). It needs
+// no Soundprint analysis.
+func (h *Handlers) favoritesMix(ctx context.Context, libraryID *int64) (*Station, error) {
+	var libs []int64
+	if libraryID != nil {
+		libs = []int64{*libraryID}
+	}
+	all, err := h.Items.Favorites(ctx, access(ctx), []string{"track"}, libs, 2000)
+	if err != nil {
+		return nil, err
+	}
+	var list []items.Summary
+	for _, it := range all {
+		if it.Available {
+			list = append(list, it)
+		}
+	}
+	if len(list) < 3 {
+		return nil, nil
+	}
+	rand.Shuffle(len(list), func(i, j int) { list[i], list[j] = list[j], list[i] })
+	list = list[:min(len(list), favoritesMixSize)]
+	return &Station{Id: ptr("favorites"), Title: "Favourites Mix", Description: ptr("Your favourite songs, shuffled"), Items: summaries(list)}, nil
 }
 
 // mixDescription names a few artists in a mix ("Portishead, Massive Attack and more").

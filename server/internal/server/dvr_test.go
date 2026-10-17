@@ -398,7 +398,7 @@ func TestDVRQuotaAPI(t *testing.T) {
 
 	// The dvr_quota alert is its own switch, kept when the alert list is replaced.
 	w.as("admin").do("PATCH", "/settings", map[string]any{"notifications": map[string]any{"dvrQuotaAlert": true}}, &s)
-	if !*s.Notifications.DvrQuotaAlert || len(*s.Notifications.Alerts) != 0 {
+	if !*s.Notifications.DvrQuotaAlert || len(*s.Notifications.Alerts) != 1 { // vod_save_failed is on by default
 		t.Errorf("alert on: %+v %v", *s.Notifications.DvrQuotaAlert, *s.Notifications.Alerts)
 	}
 	w.as("admin").do("PATCH", "/settings", map[string]any{"notifications": map[string]any{"alerts": []string{"task_failed"}}}, &s)

@@ -125,7 +125,9 @@ type homeRow struct {
 	lib       int64
 	hidden    bool
 	pinned    bool
-	fill      func() ([]items.Summary, error)
+	// hiddenByDefault rows start hidden until the person shows them (favourites).
+	hiddenByDefault bool
+	fill            func() ([]items.Summary, error)
 	// expand, when set, makes the row several hubs (because-you-watched; USER-16).
 	expand func() ([]homeRow, error)
 }
@@ -213,12 +215,20 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow) ([
 				out := make([]homeRow, len(rows))
 				for i, b := range rows {
 					list := b.Items
-					out[i] = homeRow{id: fmt.Sprintf("because-%d", b.Seed.ID), title: "Because you watched " + b.Seed.Title,
+					title := "Because you watched " + b.Seed.Title
+					if b.Favorite {
+						title = "Because you love " + b.Seed.Title
+					}
+					out[i] = homeRow{id: fmt.Sprintf("because-%d", b.Seed.ID), title: title,
 						fill: func() ([]items.Summary, error) { return list, nil }}
 				}
 				return out, err
 			}})
 	}
+	// The person's favourite movies and shows, newest first; hidden until they show it.
+	defaults = append(defaults, homeRow{id: "favorites", title: "Your Favourites", hiddenByDefault: true, fill: func() ([]items.Summary, error) {
+		return h.Items.Favorites(ctx, acc, []string{"movie", "show"}, append([]int64{}, home...), 30)
+	}})
 	for _, l := range libs {
 		if !h.canSeeLibrary(ctx, l.ID) || (l.Options.IncludeInHome != nil && !*l.Options.IncludeInHome) {
 			continue
@@ -252,6 +262,7 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow) ([
 	}
 	for _, r := range defaults {
 		if !used[r.id] {
+			r.hidden = r.hiddenByDefault
 			out = append(out, r) // new rows show up at the end
 		}
 	}

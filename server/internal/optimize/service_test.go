@@ -440,6 +440,8 @@ func TestThresholdAndVerify(t *testing.T) {
 	e.set(func(c *settings.Settings) { c.Optimize.MinSavingsPercent = 90 })
 	s := &Service{DB: e.db, Settings: e.settings, LookPath: noLook, Trash: &mediatrash.Service{DB: e.db}, Tick: 20 * time.Millisecond}
 	s.HasEncoder = func(name string) bool { return name == "libx265" || name == "libx264" }
+	var failures atomic.Int32
+	s.OnFailed = func(Failure) { failures.Add(1) }
 	before, _ := os.ReadFile(p)
 	if _, _, err := s.Enqueue(ctx, []int64{file}, "1080p-hevc-small"); err != nil {
 		t.Fatal(err)
@@ -454,6 +456,9 @@ func TestThresholdAndVerify(t *testing.T) {
 	st, msg := e.state(id)
 	if st != StateSkipped || !strings.Contains(msg, "smaller") {
 		t.Fatalf("threshold: %s %q", st, msg)
+	}
+	if n := failures.Load(); n != 0 {
+		t.Errorf("a skip was reported as a failure %d times", n)
 	}
 	after, _ := os.ReadFile(p)
 	if string(after) != string(before) {
@@ -521,5 +526,41 @@ func TestNVENCYieldsToPlayback(t *testing.T) {
 	s.running = nil
 	if got := s.encoders("av1"); len(got) != 1 || got[0] != "nvenc" {
 		t.Errorf("AV1 encoders: %v", got)
+	}
+}
+
+// A conversion that fails (every encoder errors) is reported to OnFailed with the title and
+// why, so the optimize_failed alert can be raised; the original is left alone.
+func TestFailureReported(t *testing.T) {
+	e := newEnv(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p := filepath.Join(e.dir, "media", "F.mkv")
+	clip(t, p, "2")
+	fi, _ := os.Stat(p)
+	_, file := e.add(fileSpec{path: p, size: fi.Size(), w: 320, h: 240, codec: "mpeg2video", available: true})
+	broken := filepath.Join(e.dir, "broken-ffmpeg")
+	os.WriteFile(broken, []byte("#!/bin/sh\necho 'Conversion failed!' >&2\nexit 1\n"), 0o755)
+	s := &Service{DB: e.db, Settings: e.settings, FFmpeg: broken, LookPath: noLook, Trash: &mediatrash.Service{DB: e.db}, Tick: 20 * time.Millisecond}
+	s.HasEncoder = func(name string) bool { return name == "libx265" || name == "libx264" }
+	got := make(chan Failure, 4)
+	s.OnFailed = func(f Failure) { got <- f }
+	if _, _, err := s.Enqueue(ctx, []int64{file}, "1080p-hevc-small"); err != nil {
+		t.Fatal(err)
+	}
+	go s.Run(ctx)
+	select {
+	case f := <-got:
+		if f.FileID != file || f.JobID == 0 || f.Title == "" || !strings.Contains(f.Error, "re-encode") {
+			t.Errorf("failure = %+v", f)
+		}
+		if st, _ := e.state(f.JobID); st != StateFailed {
+			t.Errorf("state = %s", st)
+		}
+	case <-time.After(60 * time.Second):
+		t.Fatal("the failure wasn't reported")
+	}
+	if fi2, _ := os.Stat(p); fi2 == nil || fi2.Size() != fi.Size() {
+		t.Error("the original changed")
 	}
 }

@@ -2,7 +2,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { clsx } from "clsx";
-import { ChevronLeft, Filter, LayoutGrid, List, Sparkles, Star, X } from "lucide-react";
+import { ChevronLeft, Filter, Heart, LayoutGrid, List, Sparkles, Star, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { librariesQuery, meQuery } from "@/api/queries";
@@ -14,6 +14,7 @@ import { isMusicSection, MusicHome, MusicSectionPage, musicSectionTitles } from 
 import { useMusicActions } from "../player/MusicPlayer";
 import { MuseButton } from "../search/MuseVideo";
 import { RowRating } from "../music/Rating";
+import { favoriteTypes, RowFavorite } from "./Favorite";
 import { FavoritesPage } from "../music/Favorites";
 import { Poster } from "./Poster";
 import { formatDuration, subtitleFor } from "./format";
@@ -28,8 +29,10 @@ export type LibrarySearch = {
   decade?: number;
   rating?: string;
   res?: ListQuery["resolution"];
-  /** Only what the person rated 4 stars or more (favourites). */
+  /** Only what the person rated 4 stars or more. */
   fav?: boolean;
+  /** Only the person's favourites (the heart). */
+  favs?: boolean;
   view?: "grid" | "list";
   /** Movie libraries: browse collections instead of movies. */
   show?: "collections";
@@ -49,6 +52,7 @@ export function validateLibrarySearch(s: Record<string, unknown>): LibrarySearch
     rating: str(s.rating),
     res: str(s.res) as LibrarySearch["res"],
     fav: s.fav === true || s.fav === "1" ? true : undefined,
+    favs: s.favs === true || s.favs === "1" ? true : undefined,
     view: s.view === "list" ? "list" : undefined,
     show: s.show === "collections" ? "collections" : undefined,
   };
@@ -88,7 +92,7 @@ export function LibraryPage() {
   const search = useSearch({ strict: false }) as LibrarySearch;
   const id = Number(params.libraryId);
   const lib = useQuery(librariesQuery).data?.find((l) => l.id === id);
-  const filtered = !!(search.watch || search.genre || search.decade || search.rating || search.res || search.fav);
+  const filtered = !!(search.watch || search.genre || search.decade || search.rating || search.res || search.fav || search.favs);
   const section = lib?.type === "music" && isMusicSection(params.section) ? params.section : undefined;
   if (lib?.type === "music") {
     if (section === "favorites") return <FavoritesPage libraryId={id} name={lib.name} />;
@@ -123,7 +127,7 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
   const collections = lib?.type === "movies" && search.show === "collections";
   const query: ListQuery = collections
     ? { sort, type: "collection" }
-    : { sort, type: itemType, watch: search.watch, genre: search.genre, decade: search.decade, contentRating: search.rating, resolution: search.res, minMyRating: search.fav ? 8 : undefined };
+    : { sort, type: itemType, watch: search.watch, genre: search.genre, decade: search.decade, contentRating: search.rating, resolution: search.res, minMyRating: search.fav ? 8 : undefined, favorites: search.favs || undefined };
 
   const filters = useQuery({
     queryKey: ["libraries", id, "filters", itemType ?? ""],
@@ -206,7 +210,7 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
                   key={label}
                   role="tab"
                   aria-selected={search.show === v}
-                  onClick={() => set({ show: v, watch: undefined, genre: undefined, decade: undefined, rating: undefined, res: undefined, fav: undefined })}
+                  onClick={() => set({ show: v, watch: undefined, genre: undefined, decade: undefined, rating: undefined, res: undefined, fav: undefined, favs: undefined })}
                   className={clsx("rounded px-3 py-1", search.show === v ? "bg-surface-3 text-text" : "text-muted hover:text-text")}
                 >
                   {label}
@@ -220,6 +224,11 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
             {!collections && (
               <Button size="sm" variant={filtersOpen || filtered ? "primary" : "secondary"} onClick={() => setFiltersOpen((v) => !v)} aria-expanded={filtersOpen}>
                 <Filter className="size-4" /> Filter
+              </Button>
+            )}
+            {!collections && (
+              <Button size="sm" variant={search.favs ? "primary" : "secondary"} onClick={() => set({ favs: search.favs ? undefined : true })} aria-pressed={!!search.favs}>
+                <Heart className="size-4" aria-hidden /> Favourites
               </Button>
             )}
             {!collections && (
@@ -317,8 +326,9 @@ function LibraryGrid({ id, section, search, filtered }: { id: number; section?: 
             {search.decade && <Chip label={`${search.decade}s`} onClear={() => set({ decade: undefined })} />}
             {search.rating && <Chip label={search.rating} onClear={() => set({ rating: undefined })} />}
             {search.fav && <Chip label="Rated 4★+" onClear={() => set({ fav: undefined })} />}
+            {search.favs && <Chip label="Favourites" onClear={() => set({ favs: undefined })} />}
             {search.res && <Chip label={search.res === "4k" ? "4K" : search.res === "sd" ? "SD" : `${search.res}p`} onClear={() => set({ res: undefined })} />}
-            <button onClick={() => set({ watch: undefined, genre: undefined, decade: undefined, rating: undefined, res: undefined, fav: undefined })} className="text-xs text-muted hover:text-text">
+            <button onClick={() => set({ watch: undefined, genre: undefined, decade: undefined, rating: undefined, res: undefined, fav: undefined, favs: undefined })} className="text-xs text-muted hover:text-text">
               Clear all
             </button>
           </div>
@@ -417,6 +427,7 @@ function ListRow({ item, shape, onPlay }: { item?: ItemSummary; shape: "poster" 
           <span className="block truncate text-xs text-muted">{subtitleFor(item)}</span>
         </span>
       </Link>
+      {favoriteTypes.has(item.type) && <RowFavorite item={item} />}
       {item.type === "track" && <RowRating item={item} />}
       <span className="hidden w-16 text-sm text-muted sm:block">{item.year ?? ""}</span>
       <span className="hidden w-20 text-right text-sm text-muted tabular-nums md:block">{item.type === "movie" || item.type === "video" ? formatDuration(item.durationMs) : item.type === "show" ? `${item.childCount} seasons` : ""}</span>

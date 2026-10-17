@@ -20,6 +20,8 @@ type Access struct {
 	// view DVR recordings may open them by id (from Live TV → Recordings) whatever libraries
 	// they're limited to, since those libraries aren't offered as choices any more.
 	AllowRecordings bool
+	// extra are further SQL conditions (aliases i, p, g) a listing adds, e.g. favourites only.
+	extra []string
 }
 
 // recordingsLibs is the SQL test for an item in a Live TV recordings library.
@@ -91,6 +93,7 @@ func (a Access) clause() (string, []any) {
 			" WHERE r.path <> '' AND r.rating <> '' AND (e.id = i.id OR e.parent_id = i.id OR e.grandparent_id = i.id)), 99) ELSE 99 END) <= ?)")
 		args = append(args, lvl)
 	}
+	conds = append(conds, a.extra...)
 	if len(conds) == 0 {
 		return "1", nil
 	}

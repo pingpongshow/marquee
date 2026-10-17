@@ -24,6 +24,8 @@ import { useEffect, useState } from "react";
 import { api, imageUrl, unwrap } from "@/api/client";
 import { Menu, MenuItem } from "@/components/Menu";
 import { Rating } from "../music/Rating";
+import { FavoriteButton, RowFavorite } from "../browse/Favorite";
+import { itemQuery } from "@/api/queries";
 import type { ItemSummary } from "@/api/types";
 import { ignoreShortcut } from "@/lib/keys";
 import {
@@ -401,6 +403,7 @@ export function QueueList({ dark }: { dark?: boolean }) {
           </div>
         </div>
       </button>
+      <RowFavorite item={e.item} />
       {!isCurrent && (
         <button
           onClick={() => m.remove(e.key)}
@@ -598,6 +601,7 @@ export function NowPlaying() {
           <Controls large />
           <div className="flex flex-wrap items-center justify-center gap-6">
             <Rating key={t.id} itemId={t.id} value={t.userRating} />
+            <NowPlayingFavorite key={`fav-${t.id}`} item={t} />
             <Volume className="flex" />
             <CrossfadeSelect />
             <DJSelect />
@@ -613,6 +617,12 @@ export function NowPlaying() {
       {eqOpen && <EqualizerSheet onClose={() => setEqOpen(false)} />}
     </div>
   );
+}
+
+/** The playing track's heart, from the track's current state (the queue holds a snapshot). */
+function NowPlayingFavorite({ item }: { item: ItemSummary }) {
+  const fresh = useQuery(itemQuery(item.id)).data;
+  return <FavoriteButton item={{ ...item, favorite: fresh?.favorite ?? item.favorite }} className="hover:bg-white/10" />;
 }
 
 /** Synced lyrics follow the music (the current line is highlighted and kept in view); plain lyrics just scroll. */

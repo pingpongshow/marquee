@@ -22,7 +22,7 @@ export const alertTypes: { id: AlertType; label: string; help: string }[] = [
   { id: "failed_signins", label: "Repeated failed sign-ins", help: "Five wrong passwords for one account within 15 minutes." },
   { id: "new_admin_device", label: "An administrator signed in from a new device", help: "A browser or app that account hasn't used before." },
   { id: "playback_failed", label: "Playback failed", help: "The transcoder couldn't produce video for a stream." },
-  { id: "vod_save_failed", label: "Saving a movie or episode on demand failed", help: "After its retries; see VOD → Saves." },
+  { id: "vod_save_failed", label: "VOD download failed", help: "Saving a movie or episode on demand into the library failed after its retries; see VOD → Saves. On by default." },
   { id: "vod_save_done", label: "Saving to the library finished", help: "One summary when the save queue empties, not one per episode." },
 ];
 
@@ -43,6 +43,7 @@ export function NotificationsSettings() {
       alerts: x.alerts,
       dvrQuotaAlert: x.dvrQuotaAlert,
       plexSyncAlert: x.plexSyncAlert,
+      optimizeFailedAlert: x.optimizeFailedAlert,
       recipientsAllAdmins: x.recipientsAllAdmins,
       recipients: x.recipients,
       diskThresholdPercent: x.diskThresholdPercent,
@@ -117,7 +118,7 @@ export function NotificationsSettings() {
           <TestEmail disabled={s.dirty} configured={!!d.mailConfigured} />
         </Card>
 
-        <Card title="Alerts" description="All are off until you turn them on. Alerts appear under the bell in the top bar for administrators, are mailed to the recipients below when email is set up, and go to webhooks subscribed to “Alerts”. The same alert is sent at most once an hour.">
+        <Card title="Alerts" description="VOD download and Large files conversion failures are on by default; the others are off until you turn them on. Alerts appear under the bell in the top bar for administrators, are mailed to the recipients below when email is set up, and go to webhooks subscribed to “Alerts”. The same alert is sent at most once an hour.">
           <div className="space-y-3">
             {alertTypes.map((a) => (
               <Toggle key={a.id} label={a.label} help={a.help} checked={alerts.includes(a.id)} onChange={(v) => toggleAlert(a.id, v)} />
@@ -133,6 +134,12 @@ export function NotificationsSettings() {
               help="Plex rejects the token, or hasn't been reachable for three sync runs in a row."
               checked={!!d.plexSyncAlert}
               onChange={(v) => update({ plexSyncAlert: v })}
+            />
+            <Toggle
+              label="Large files conversion failed"
+              help="A conversion in Library Health → Large files failed (not one skipped for saving too little); the original is unchanged. On by default."
+              checked={!!d.optimizeFailedAlert}
+              onChange={(v) => update({ optimizeFailedAlert: v })}
             />
           </div>
           {alerts.includes("disk_low") && (

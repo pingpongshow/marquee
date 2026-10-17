@@ -16,6 +16,33 @@ type Seed struct {
 	Rating    float64 // the person's 0–10 rating, 0 = none
 	Finished  bool    // a movie played, or a show with every episode watched
 	WatchedAt string
+	Favorite  bool // one of the person's favourites (the strongest signal)
+}
+
+// favoriteWeight is a favourite's weight in the taste centroid: above a 10/10 rating
+// (10/7), so a favourite counts for more than the highest star rating.
+const favoriteWeight = 2.0
+
+// withFavorites puts uid's favourite movies and shows (most recent first) ahead of seeds,
+// marking seeds that are favourites; at most limit favourites are added.
+func (s *Store) withFavorites(ctx context.Context, uid int64, seeds []Seed, limit int) ([]Seed, error) {
+	favs, err := s.favoriteVideos(ctx, uid, limit)
+	if err != nil || len(favs) == 0 {
+		return seeds, err
+	}
+	isFav := map[int64]bool{}
+	out := make([]Seed, 0, len(favs)+len(seeds))
+	for _, id := range favs {
+		isFav[id] = true
+		out = append(out, Seed{ID: id, Favorite: true})
+	}
+	for _, sd := range seeds {
+		if isFav[sd.ID] {
+			continue
+		}
+		out = append(out, sd)
+	}
+	return out, nil
 }
 
 // recentSeeds lists uid's movies and shows completed in the last days, most recent first:
@@ -91,12 +118,14 @@ func libraryKeep(libIDs []int64) func(*VideoVec) bool {
 
 // Because is one "Because you watched" row.
 type Because struct {
-	Seed  Summary
-	Items []Summary
+	Seed     Summary
+	Items    []Summary
+	Favorite bool // the seed is one of the person's favourites
 }
 
-// BecauseYouWatched builds up to rows rows of n items each: for the person's recently
-// finished movies and shows (last 60 days; ones they rated 7+ or finished come first), the
+// BecauseYouWatched builds up to rows rows of n items each: for the person's favourite
+// movies and shows (most recent first), then their recently finished ones (last 60 days;
+// ones they rated 7+ or finished come first), the
 // most similar ones they haven't started, of the same type first. libIDs limits the
 // suggestions (nil = all the person can see).
 func (s *Store) BecauseYouWatched(ctx context.Context, acc Access, idx *VideoIndex, libIDs []int64, rows, n int) ([]Because, error) {
@@ -104,12 +133,15 @@ func (s *Store) BecauseYouWatched(ctx context.Context, acc Access, idx *VideoInd
 		return nil, nil
 	}
 	seeds, err := s.recentSeeds(ctx, acc.UserID, 60, 50)
-	if err != nil || len(seeds) == 0 {
+	if err != nil {
 		return nil, err
 	}
 	sort.SliceStable(seeds, func(i, j int) bool {
 		return seedPreferred(seeds[i]) && !seedPreferred(seeds[j])
 	})
+	if seeds, err = s.withFavorites(ctx, acc.UserID, seeds, 20); err != nil || len(seeds) == 0 {
+		return nil, err
+	}
 	started, err := s.started(ctx, acc.UserID)
 	if err != nil {
 		return nil, err
@@ -118,6 +150,12 @@ func (s *Store) BecauseYouWatched(ctx context.Context, acc Access, idx *VideoInd
 	if err != nil {
 		return nil, err
 	}
+	var favIDs []int64
+	for _, sd := range seeds {
+		if sd.Favorite {
+			favIDs = append(favIDs, sd.ID)
+		}
+	}
 	full, acc := acc, within(acc, libIDs)
 	inLib := libraryKeep(acc.LibraryIDs)
 	var out []Because
@@ -125,7 +163,7 @@ func (s *Store) BecauseYouWatched(ctx context.Context, acc Access, idx *VideoInd
 		if len(out) == rows {
 			break
 		}
-		if sd.Rating > 0 && sd.Rating < 5 {
+		if sd.Rating > 0 && sd.Rating < 5 && !sd.Favorite {
 			continue // they didn't like it
 		}
 		v := idx.Get(sd.ID)
@@ -146,6 +184,7 @@ func (s *Store) BecauseYouWatched(ctx context.Context, acc Access, idx *VideoInd
 		}
 		ranked = Boosted(ranked, recs)
 		ranked = PenaliseSimilar(ranked, idx, neg)
+		ranked = FavourSimilar(ranked, idx, favIDs)
 		sort.SliceStable(ranked, func(i, j int) bool {
 			ti, tj := idx.Get(ranked[i].ItemID).Type == v.Type, idx.Get(ranked[j].ItemID).Type == v.Type
 			return ti && !tj
@@ -155,13 +194,13 @@ func (s *Store) BecauseYouWatched(ctx context.Context, acc Access, idx *VideoInd
 			return nil, err
 		}
 		if len(items) > 0 {
-			out = append(out, Because{Seed: seed[0], Items: items})
+			out = append(out, Because{Seed: seed[0], Items: items, Favorite: sd.Favorite})
 		}
 	}
 	return out, nil
 }
 
-func seedPreferred(sd Seed) bool { return sd.Rating >= 7 || sd.Finished }
+func seedPreferred(sd Seed) bool { return sd.Favorite || sd.Rating >= 7 || sd.Finished }
 
 func scoredIDs(list []Scored, n int) []int64 {
 	out := make([]int64, 0, min(n, len(list)))
@@ -175,20 +214,29 @@ func scoredIDs(list []Scored, n int) []int64 {
 }
 
 // Recommended ranks the movies and shows the person hasn't started by cosine to the centroid
-// of their last 20 completed ones, weighted by their rating where they gave one.
+// of their favourites and last 20 completed ones, weighted by their rating where they gave
+// one (a favourite counts most), then moves up titles close to a favourite.
 func (s *Store) Recommended(ctx context.Context, acc Access, idx *VideoIndex, libIDs []int64, n int) ([]Summary, error) {
 	if idx.Len() == 0 || acc.UserID == 0 {
 		return nil, nil
 	}
 	seeds, err := s.recentSeeds(ctx, acc.UserID, 3650, 20)
-	if err != nil || len(seeds) == 0 {
+	if err != nil {
+		return nil, err
+	}
+	if seeds, err = s.withFavorites(ctx, acc.UserID, seeds, 20); err != nil || len(seeds) == 0 {
 		return nil, err
 	}
 	ids := make([]int64, len(seeds))
 	weights := make([]float64, len(seeds))
+	var favs []int64
 	for i, sd := range seeds {
 		ids[i], weights[i] = sd.ID, 1
-		if sd.Rating > 0 {
+		switch {
+		case sd.Favorite:
+			weights[i] = favoriteWeight
+			favs = append(favs, sd.ID)
+		case sd.Rating > 0:
 			weights[i] = sd.Rating / 7 // 7/10 counts as usual, 10 a little more, 2 barely
 		}
 	}
@@ -208,6 +256,7 @@ func (s *Store) Recommended(ctx context.Context, acc Access, idx *VideoIndex, li
 		return nil, err
 	}
 	ranked = PenaliseSimilar(ranked, idx, neg)
+	ranked = FavourSimilar(ranked, idx, favs)
 	return s.visibleTop(ctx, acc, scoredIDs(ranked, 400), n)
 }
 
@@ -224,6 +273,12 @@ func (s *Store) RelatedByEmbedding(ctx context.Context, acc Access, idx *VideoIn
 		return nil, true, err
 	}
 	ranked = Boosted(ranked, recs)
+	// Personal ordering: titles close to one of the person's favourites move up a little.
+	favs, err := s.favoriteVideos(ctx, acc.UserID, 50)
+	if err != nil {
+		return nil, true, err
+	}
+	ranked = FavourSimilar(ranked, idx, favs)
 	list, err := s.visibleTop(ctx, acc, scoredIDs(ranked, 400), n)
 	return list, true, err
 }
@@ -279,7 +334,25 @@ func (s *Store) disliked(ctx context.Context, uid int64) ([]int64, error) {
 			out = append(out, id)
 			return nil
 		})
-	return out, err
+	if err != nil || len(out) == 0 {
+		return out, err
+	}
+	// A favourite is never something they turned away from, whatever the stars or history say.
+	favs, err := s.favoriteVideos(ctx, uid, 1000)
+	if err != nil {
+		return nil, err
+	}
+	fav := map[int64]bool{}
+	for _, id := range favs {
+		fav[id] = true
+	}
+	kept := out[:0]
+	for _, id := range out {
+		if !fav[id] {
+			kept = append(kept, id)
+		}
+	}
+	return kept, nil
 }
 
 // Similarity above dislikeFloor to something the person turned away from costs
@@ -289,6 +362,47 @@ const (
 	dislikeFloor  = 0.6
 	dislikeWeight = 0.5
 )
+
+// Similarity above favourFloor to one of the person's favourites adds favourWeight per unit
+// (at most 0.12): among equally good matches, the one nearest a favourite comes first.
+const (
+	favourFloor  = 0.6
+	favourWeight = 0.3
+)
+
+// FavourSimilar raises each candidate by its similarity to the closest favourite and
+// re-sorts, best first. Favourites themselves, candidates that aren't embedded, or no
+// favourites leave it unchanged.
+func FavourSimilar(ranked []Scored, idx *VideoIndex, favorites []int64) []Scored {
+	var favs [][]float32
+	for _, id := range favorites {
+		if v := idx.Get(id); v != nil {
+			favs = append(favs, v.Vec)
+		}
+	}
+	if len(favs) == 0 || len(ranked) == 0 {
+		return ranked
+	}
+	out := make([]Scored, len(ranked))
+	for i, sc := range ranked {
+		out[i] = sc
+		v := idx.Get(sc.ItemID)
+		if v == nil {
+			continue
+		}
+		best := 0.0
+		for _, f := range favs {
+			if sim := dotVec(v.Vec, f); sim < 0.9999 { // not the favourite itself
+				best = max(best, sim)
+			}
+		}
+		if best > favourFloor {
+			out[i].Score += favourWeight * (best - favourFloor)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Score > out[j].Score })
+	return out
+}
 
 // PenaliseSimilar lowers each candidate by its similarity to the closest disliked title and
 // re-sorts, best first. Candidates that aren't embedded, or no dislikes, leave it unchanged.
@@ -321,16 +435,19 @@ func PenaliseSimilar(ranked []Scored, idx *VideoIndex, disliked []int64) []Score
 	return out
 }
 
-// LikedTitles names up to n movies and shows acc's user recently finished or rated 7+, for
-// explaining recommendations.
+// LikedTitles names up to n movies and shows acc's user loves: their favourites first, then
+// ones they recently finished or rated 7+, for explaining recommendations.
 func (s *Store) LikedTitles(ctx context.Context, acc Access, n int) ([]string, error) {
 	seeds, err := s.recentSeeds(ctx, acc.UserID, 365, 40)
 	if err != nil {
 		return nil, err
 	}
+	if seeds, err = s.withFavorites(ctx, acc.UserID, seeds, n); err != nil {
+		return nil, err
+	}
 	var ids []int64
 	for _, sd := range seeds {
-		if seedPreferred(sd) && !(sd.Rating > 0 && sd.Rating < 5) {
+		if sd.Favorite || seedPreferred(sd) && !(sd.Rating > 0 && sd.Rating < 5) {
 			ids = append(ids, sd.ID)
 		}
 		if len(ids) == n {

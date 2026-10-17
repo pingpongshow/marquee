@@ -107,6 +107,7 @@ func toAPISummary(s items.Summary) ItemSummary {
 		out.UserRating = ptr(float32(s.UserRating))
 	}
 	out.Watchlisted = nz(s.Watchlisted)
+	out.Favorite = nz(s.Favorite)
 	if s.ExtraType != "" {
 		out.ExtraType = ptr(ItemSummaryExtraType(s.ExtraType))
 	}
@@ -180,6 +181,7 @@ func (h *Handlers) ListLibraryItems(ctx context.Context, req ListLibraryItemsReq
 	if p.MinMyRating != nil {
 		f.MinMyRating = float64(*p.MinMyRating)
 	}
+	set(&f.Favorites, p.Favorites)
 	list, total, err := h.Items.List(ctx, access(ctx), lib.ID, typ, sort, f, offset, limit)
 	if err != nil {
 		return nil, internal(ctx, "listItems", err)
@@ -197,7 +199,8 @@ func (h *Handlers) ListItemChildren(ctx context.Context, req ListItemChildrenReq
 		return nil, internal(ctx, "children", err)
 	}
 	offset, limit := paging(req.Params.Offset, req.Params.Limit)
-	list, total, err := h.Items.Children(ctx, itemAccess(ctx), req.ItemId, offset, limit)
+	favOnly := req.Params.Favorites != nil && *req.Params.Favorites
+	list, total, err := h.Items.ChildrenFavorites(ctx, itemAccess(ctx), req.ItemId, favOnly, offset, limit)
 	if err != nil {
 		return nil, internal(ctx, "children", err)
 	}
@@ -262,7 +265,7 @@ func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 		OriginallyAvailableAt: sum.OriginallyAvailableAt, Available: sum.Available,
 		MatchState: ItemDetailMatchState(sum.MatchState), AddedAt: sum.AddedAt, Images: sum.Images,
 		ViewOffsetMs: sum.ViewOffsetMs, ViewCount: sum.ViewCount, WatchedLeafCount: sum.WatchedLeafCount, LastViewedAt: sum.LastViewedAt,
-		UserRating: sum.UserRating, Watchlisted: sum.Watchlisted, ExtraType: (*ItemDetailExtraType)(sum.ExtraType),
+		UserRating: sum.UserRating, Watchlisted: sum.Watchlisted, Favorite: sum.Favorite, ExtraType: (*ItemDetailExtraType)(sum.ExtraType),
 		ReleaseType:    (*ItemDetailReleaseType)(sum.ReleaseType),
 		AudienceRating: nz(float32(d.AudienceRating)), Credits: make([]Credit, len(d.Credits)),
 		Summary: nz(d.Plot), Tagline: nz(d.Tagline), ContentRating: nz(d.ContentRating), Studio: nz(d.Studio),

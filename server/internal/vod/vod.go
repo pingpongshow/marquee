@@ -47,13 +47,24 @@ type Service struct {
 	ImageDir string
 	// OnSourceFailed, when set, hears a source that couldn't be loaded (admin alerts).
 	OnSourceFailed func(src settings.VODSource, err error)
+	// Now is the clock and Tick how often Run checks whether a sync is due (tests;
+	// defaults time.Now and a minute).
+	Now  func() time.Time
+	Tick time.Duration
 
-	refreshing sync.Mutex
-	matching   atomic.Bool
+	refreshing  sync.Mutex
+	matching    atomic.Bool
+	lastAttempt atomic.Int64 // unix nanoseconds of the last refresh started
 }
 
-// RefreshEvery is how often lists are reloaded. Pluto's links last about a day.
-const RefreshEvery = 6 * time.Hour
+func now() string { return time.Now().UTC().Format(time.RFC3339) }
+
+func (s *Service) clock() time.Time {
+	if s.Now != nil {
+		return s.Now()
+	}
+	return time.Now()
+}
 
 func (s *Service) client() *http.Client {
 	if s.HTTP != nil {
@@ -102,23 +113,65 @@ func (s *Service) get(ctx context.Context, u, ua string) (io.ReadCloser, error) 
 	return resp.Body, nil
 }
 
-func now() string { return time.Now().UTC().Format(time.RFC3339) }
-
-// Run refreshes at start and every RefreshEvery until ctx ends; wake asks for a refresh now.
+// Run keeps the lists fresh until ctx ends: with automatic sync on (the default), a refresh
+// is due vodRefreshHours after the last successful one (checked every minute, so a changed
+// setting applies at once); off, lists reload only when asked, and once at start for a
+// source that has never loaded. wake asks for a refresh now.
 func (s *Service) Run(ctx context.Context, wake <-chan struct{}) {
-	t := time.NewTicker(RefreshEvery)
+	tick := s.Tick
+	if tick <= 0 {
+		tick = time.Minute
+	}
+	t := time.NewTicker(tick)
 	defer t.Stop()
+	start := true
 	for {
-		if s.Enabled() {
+		if s.due(ctx, start) {
 			s.Refresh(ctx, false)
 		}
+		start = false
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
 		case <-wake:
+			if s.Enabled() {
+				s.Refresh(ctx, false)
+			}
 		}
 	}
+}
+
+// due reports whether an automatic refresh is due: a source has never loaded (at start, or
+// with automatic sync on), or with automatic sync on the oldest successful refresh is
+// vodRefreshHours old. A failing source is tried again after the same interval.
+func (s *Service) due(ctx context.Context, start bool) bool {
+	sources := s.Sources()
+	if len(sources) == 0 {
+		return false
+	}
+	i := s.Settings.Get().Integrations
+	if !i.VODAutoRefresh && !start {
+		return false
+	}
+	now := s.clock()
+	every := time.Duration(max(i.VODRefreshHours, 1)) * time.Hour
+	if last := s.lastAttempt.Load(); last != 0 && now.Sub(time.Unix(0, last)) < every {
+		return false
+	}
+	var oldest time.Time
+	for _, src := range sources {
+		var at sql.NullString
+		s.DB.QueryRowContext(ctx, `SELECT refreshed_at FROM vod_sources WHERE id = ?`, src.ID).Scan(&at)
+		t, err := time.Parse(time.RFC3339, at.String)
+		if !at.Valid || err != nil {
+			return true // never loaded
+		}
+		if oldest.IsZero() || t.Before(oldest) {
+			oldest = t
+		}
+	}
+	return i.VODAutoRefresh && now.Sub(oldest) >= every
 }
 
 // Refresh reloads every source's list, then fetches details and TMDB matches in the
@@ -129,6 +182,7 @@ func (s *Service) Refresh(ctx context.Context, retryFailed bool) {
 		return
 	}
 	s.refreshing.Lock()
+	s.lastAttempt.Store(s.clock().UnixNano())
 	sources := s.Sources()
 	keep := []any{}
 	for _, src := range sources {
@@ -162,12 +216,12 @@ func (s *Service) Refresh(ctx context.Context, retryFailed bool) {
 			s.OnSourceFailed(src, err)
 		}
 		filmsOK := msg == nil || strings.HasPrefix(msg.(string), "series: ")
-		if _, err := s.DB.ExecContext(ctx, `INSERT INTO vod_sources(id, name, movies, series, refreshed_at, error) VALUES(?,?,?,COALESCE(?,0),?,?)
+		if _, err := s.DB.ExecContext(ctx, `INSERT INTO vod_sources(id, name, movies, series, refreshed_at, error) VALUES(?,?,?,COALESCE(?,0),CASE WHEN ? THEN ? END,?)
 			ON CONFLICT(id) DO UPDATE SET name=excluded.name, error=excluded.error,
 			movies=CASE WHEN ? THEN excluded.movies ELSE vod_sources.movies END,
 			series=CASE WHEN ? IS NOT NULL THEN excluded.series ELSE vod_sources.series END,
 			refreshed_at=CASE WHEN ? THEN excluded.refreshed_at ELSE vod_sources.refreshed_at END`,
-			src.ID, src.Name, n, series, now(), msg, filmsOK, series, filmsOK); err != nil {
+			src.ID, src.Name, n, series, filmsOK, s.clock().UTC().Format(time.RFC3339), msg, filmsOK, series, filmsOK); err != nil {
 			slog.Warn("movie source status", "err", err)
 		}
 	}

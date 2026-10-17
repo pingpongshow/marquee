@@ -609,7 +609,7 @@ func (h *Handlers) Search(ctx context.Context, req SearchRequestObject) (SearchR
 		}
 	}
 	acc.LibraryIDs = ids
-	groups, err := h.Items.Search(ctx, acc, req.Params.Q, limit)
+	groups, err := h.Items.SearchFavorites(ctx, acc, req.Params.Q, limit, req.Params.Favorites != nil && *req.Params.Favorites)
 	if err != nil {
 		return nil, internal(ctx, "search", err)
 	}

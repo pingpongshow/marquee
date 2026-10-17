@@ -74,6 +74,8 @@ type Service struct {
 	LookPath func(string) (string, error)
 	// Now is the clock (tests).
 	Now func() time.Time
+	// OnFailed, when set, hears a job that failed (admin alerts); set it before Run.
+	OnFailed func(Failure)
 	// Tick is how often the queue is looked at (default 2 s); Grace how long after the last
 	// viewer paused jobs resume (default 15 s); BusyRetry how often a finished file waits
 	// for nobody to be watching it (default 30 s).

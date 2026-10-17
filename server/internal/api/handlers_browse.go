@@ -98,7 +98,11 @@ func (h *Handlers) ItemLeaves(ctx context.Context, req ItemLeavesRequestObject) 
 		return nil, internal(ctx, "leaves", err)
 	}
 	unwatched := req.Params.Unwatched != nil && *req.Params.Unwatched
-	list, err := h.Items.Leaves(ctx, itemAccess(ctx), req.ItemId, unwatched)
+	acc := itemAccess(ctx)
+	if req.Params.Favorites != nil && *req.Params.Favorites {
+		acc = acc.OnlyFavorites()
+	}
+	list, err := h.Items.Leaves(ctx, acc, req.ItemId, unwatched)
 	if err != nil {
 		return nil, internal(ctx, "leaves", err)
 	}

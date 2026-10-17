@@ -166,6 +166,14 @@ func (h *Handlers) MuseVideo(ctx context.Context, req MuseVideoRequestObject) (M
 		}
 		q.Types = allowed
 	}
+	if q.LikeFavourites {
+		// "More like my favourites": their favourite movies and shows steer the ranking.
+		favs, err := h.Items.FavoriteVideos(ctx, access(ctx).UserID, 10)
+		if err != nil {
+			return nil, internal(ctx, "museVideo", err)
+		}
+		q.Seeds = append(q.Seeds, favs...)
+	}
 	idx := h.videoIndex()
 	var vec []float32
 	if q.Rest != "" {

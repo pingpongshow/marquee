@@ -61,6 +61,47 @@ func (h *Handlers) GetWatchlist(ctx context.Context, _ GetWatchlistRequestObject
 	return out, nil
 }
 
+// ---------- favourites (the heart) ----------
+
+func (h *Handlers) AddFavorite(ctx context.Context, req AddFavoriteRequestObject) (AddFavoriteResponseObject, error) {
+	sess, ok := session(ctx)
+	if !ok {
+		return AddFavorite401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	if err := h.Items.Visible(ctx, itemAccess(ctx), req.ItemId); err != nil {
+		return AddFavorite404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
+	}
+	// A change made offline and sent later only applies if nothing newer happened (USER-18).
+	if fresh, err := h.Items.Fresh(ctx, sess.User.ID, req.ItemId, "favorite", req.Params.At); err != nil {
+		return nil, internal(ctx, "favorite", err)
+	} else if !fresh {
+		return AddFavorite204Response{}, nil
+	}
+	if err := h.Items.SetFavorite(ctx, sess.User.ID, req.ItemId, true); err != nil {
+		return nil, internal(ctx, "favorite", err)
+	}
+	return AddFavorite204Response{}, nil
+}
+
+func (h *Handlers) RemoveFavorite(ctx context.Context, req RemoveFavoriteRequestObject) (RemoveFavoriteResponseObject, error) {
+	sess, ok := session(ctx)
+	if !ok {
+		return RemoveFavorite401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	if err := h.Items.Visible(ctx, itemAccess(ctx), req.ItemId); err != nil {
+		return RemoveFavorite404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
+	}
+	if fresh, err := h.Items.Fresh(ctx, sess.User.ID, req.ItemId, "favorite", req.Params.At); err != nil {
+		return nil, internal(ctx, "favorite", err)
+	} else if !fresh {
+		return RemoveFavorite204Response{}, nil
+	}
+	if err := h.Items.SetFavorite(ctx, sess.User.ID, req.ItemId, false); err != nil {
+		return nil, internal(ctx, "favorite", err)
+	}
+	return RemoveFavorite204Response{}, nil
+}
+
 // ---------- collections (META-7) ----------
 
 func (h *Handlers) CreateCollection(ctx context.Context, req CreateCollectionRequestObject) (CreateCollectionResponseObject, error) {

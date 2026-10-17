@@ -24,6 +24,7 @@ type Filter struct {
 	PersonID    int64   `json:"personId,omitempty"`    // in the cast or crew
 	MinRating   float64 `json:"minRating,omitempty"`   // audience or critic rating, 0–10
 	MinMyRating float64 `json:"minMyRating,omitempty"` // the person's own rating, 0–10 (favourites: 8)
+	Favorites   bool    `json:"favorites,omitempty"`   // only the person's favourites (the heart)
 }
 
 // letterExpr is the A–Z jump-bar bucket of an item: its sort title's first letter, or "#".
@@ -99,6 +100,9 @@ func (f Filter) clause(uid int64) (string, []any) {
 	if f.MinMyRating > 0 {
 		conds = append(conds, `(SELECT rating FROM user_item_state WHERE user_id = `+strconv.FormatInt(uid, 10)+` AND item_id = i.id) >= ?`)
 		args = append(args, f.MinMyRating)
+	}
+	if f.Favorites {
+		conds = append(conds, favoriteCond(uid, "i"))
 	}
 	if f.MinRating > 0 {
 		conds = append(conds, `COALESCE(i.audience_rating, i.imdb_rating, i.critic_rating, 0) >= ?`)

@@ -38,6 +38,8 @@ type videoAnswer struct {
 	Genres        []string `json:"genres"`
 	ExcludeGenres []string `json:"excludeGenres"`
 	Unwatched     bool     `json:"unwatched"`
+	Favourites    bool     `json:"favourites"`
+	LikeFavs      bool     `json:"likeFavourites"`
 	MaxMinutes    int      `json:"maxMinutes"`
 	MinMinutes    int      `json:"minMinutes"`
 	HighlyRated   bool     `json:"highlyRated"`
@@ -63,17 +65,19 @@ func strArray() map[string]any {
 var videoSchema = map[string]any{
 	"type": "object",
 	"properties": map[string]any{
-		"types":         map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": []string{"movie", "show"}}},
-		"yearFrom":      map[string]any{"type": "integer"},
-		"yearTo":        map[string]any{"type": "integer"},
-		"genres":        strArray(),
-		"excludeGenres": strArray(),
-		"unwatched":     map[string]any{"type": "boolean"},
-		"maxMinutes":    map[string]any{"type": "integer"},
-		"minMinutes":    map[string]any{"type": "integer"},
-		"highlyRated":   map[string]any{"type": "boolean"},
-		"kidFriendly":   map[string]any{"type": "boolean"},
-		"people":        strArray(),
+		"types":          map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": []string{"movie", "show"}}},
+		"yearFrom":       map[string]any{"type": "integer"},
+		"yearTo":         map[string]any{"type": "integer"},
+		"genres":         strArray(),
+		"excludeGenres":  strArray(),
+		"unwatched":      map[string]any{"type": "boolean"},
+		"favourites":     map[string]any{"type": "boolean"},
+		"likeFavourites": map[string]any{"type": "boolean"},
+		"maxMinutes":     map[string]any{"type": "integer"},
+		"minMinutes":     map[string]any{"type": "integer"},
+		"highlyRated":    map[string]any{"type": "boolean"},
+		"kidFriendly":    map[string]any{"type": "boolean"},
+		"people":         strArray(),
 		"like": map[string]any{"type": "array", "items": map[string]any{"type": "object",
 			"properties": map[string]any{"title": map[string]any{"type": "string"}, "year": map[string]any{"type": "integer"}},
 			"required":   []string{"title"}}},
@@ -85,7 +89,7 @@ var videoSchema = map[string]any{
 		"meaning":          map[string]any{"type": "string"},
 		"title":            map[string]any{"type": "string"},
 	},
-	"required": []string{"types", "yearFrom", "yearTo", "genres", "excludeGenres", "unwatched", "maxMinutes", "minMinutes",
+	"required": []string{"types", "yearFrom", "yearTo", "genres", "excludeGenres", "unwatched", "favourites", "likeFavourites", "maxMinutes", "minMinutes",
 		"highlyRated", "kidFriendly", "people", "like", "origins", "foreignLanguage", "keywords", "maxContentRating", "minCriticScore", "meaning", "title"},
 }
 
@@ -96,6 +100,8 @@ Fields:
 - genres: genres the request asks for, ONLY from the library's genre list given below, spelled exactly as listed. All must match, so add only what is clearly asked.
 - excludeGenres: genres the request rules out ("not horror"), from the same list.
 - unwatched: true when they want something they haven't seen.
+- favourites: true when they want only their own favourites ("my favourite movies").
+- likeFavourites: true when they want titles LIKE their favourites ("more like my favourites", "something like the shows I love").
 - maxMinutes, minMinutes: running time bounds for movies, 0 when not asked. "short" is about 100, "long" about 140.
 - highlyRated: true for "acclaimed", "best", "highly rated".
 - kidFriendly: true for children or the whole family.
@@ -206,6 +212,8 @@ func validateVideo(ctx context.Context, a videoAnswer, look VideoLookup, acc ite
 		}
 	}
 	q.Unwatched = a.Unwatched
+	q.LikeFavourites = a.LikeFavs
+	q.Favourites = a.Favourites && !a.LikeFavs
 	if a.MaxMinutes >= 20 && a.MaxMinutes <= 600 {
 		q.MaxMinutes = a.MaxMinutes
 	}

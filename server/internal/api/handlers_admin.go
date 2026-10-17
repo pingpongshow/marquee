@@ -98,6 +98,8 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			DvrQuotaAction:    ptr(IntegrationSettingsDvrQuotaAction(s.Integrations.DVRQuotaAction)),
 			DvrFolder:         ptr(s.Integrations.DVRFolder),
 			VodEnabled:        ptr(s.Integrations.VODEnabled),
+			VodAutoRefresh:    ptr(s.Integrations.VODAutoRefresh),
+			VodRefreshHours:   ptr(s.Integrations.VODRefreshHours),
 			VodSources:        ptr(toAPIVodSources(s.Integrations.VODSources)),
 		},
 		Webhooks:      ptr(toAPIWebhooks(s.Webhooks)),
@@ -292,6 +294,8 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 			}
 		}
 		set(&s.Integrations.VODEnabled, i.VodEnabled)
+		set(&s.Integrations.VODAutoRefresh, i.VodAutoRefresh)
+		set(&s.Integrations.VODRefreshHours, i.VodRefreshHours)
 		if i.VodSources != nil {
 			s.Integrations.VODSources = fromAPIVodSources(*i.VodSources, s.Integrations.VODSources)
 		}

@@ -152,3 +152,94 @@ func (s *Service) learned(ctx context.Context, userID int64) map[int64]float64 {
 	}
 	return Negatives(events, ratings, byArtist)
 }
+
+// ---------- favourites (the heart) ----------
+//
+// A favourite song, album or artist is the strongest liking signal, above a high star
+// rating: favourite songs lead the listener's taste (Liked), are never avoided for skips or
+// low ratings, and favourites move up in radios, mixes and Muse (Favour). None of it needs
+// the AI model.
+
+// Favour weights: a favourite song, and a song on a favourite album or by a favourite
+// artist. A 5-star rating alone adds nothing here, so a favourite outranks it.
+const (
+	favourTrack = 0.12
+	favourGroup = 0.05
+)
+
+// favourites returns the listener's favourite tracks (newest first) and their favourite
+// albums and artists.
+func (s *Service) favourites(ctx context.Context, userID int64) (tracks []int64, groups map[int64]bool) {
+	groups = map[int64]bool{}
+	rows, err := s.DB.QueryContext(ctx, `SELECT x.item_id, i.type FROM user_item_state x JOIN items i ON i.id = x.item_id
+		WHERE x.user_id = ? AND x.favorite_at IS NOT NULL AND i.type IN ('track', 'album', 'artist')
+		ORDER BY x.favorite_at DESC, x.item_id DESC`, userID)
+	if err != nil {
+		return nil, groups
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var typ string
+		if rows.Scan(&id, &typ) != nil {
+			continue
+		}
+		if typ == "track" {
+			tracks = append(tracks, id)
+		} else {
+			groups[id] = true
+		}
+	}
+	return tracks, groups
+}
+
+// FavouriteTracks returns the listener's analysed favourite songs, newest favourite first.
+func (s *Service) FavouriteTracks(ctx context.Context, userID int64) []*Track {
+	ids, _ := s.favourites(ctx, userID)
+	var out []*Track
+	for _, id := range ids {
+		if t := s.Index.Get(id); t != nil {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// Favour is the listener's favourites as Options.Favour: favourite songs, and the songs of
+// their favourite albums and artists.
+func (s *Service) Favour(ctx context.Context, userID int64) map[int64]float64 {
+	tracks, groups := s.favourites(ctx, userID)
+	if len(tracks) == 0 && len(groups) == 0 {
+		return nil
+	}
+	out := map[int64]float64{}
+	if len(groups) > 0 && s.Index != nil {
+		for _, t := range s.Index.Where(func(t *Track) bool { return groups[t.AlbumID] || groups[t.ArtistID] }) {
+			out[t.ItemID] = favourGroup
+		}
+	}
+	for _, id := range tracks {
+		out[id] = favourTrack
+	}
+	return out
+}
+
+// Taste is the sound of what the listener loves: their favourite songs (weighted most) with
+// the rest of what they like. nil when there's nothing to go on.
+func (s *Service) Taste(ctx context.Context, userID int64, liked []*Track) []float32 {
+	return BlendVectors([][]float32{Mean(s.FavouriteTracks(ctx, userID)), Mean(liked)}, []float64{0.6, 0.4})
+}
+
+// spareFavourites takes the listener's favourite songs out of avoid, except for the
+// freshness penalty of a recent play (recent), so they're never avoided for skips or
+// low ratings.
+func (s *Service) spareFavourites(ctx context.Context, userID int64, avoid, recent map[int64]float64) {
+	ids, _ := s.favourites(ctx, userID)
+	for _, id := range ids {
+		if r := recent[id]; r > 0 {
+			avoid[id] = r
+		} else {
+			delete(avoid, id)
+		}
+	}
+}

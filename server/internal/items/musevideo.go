@@ -21,6 +21,8 @@ type VideoQuery struct {
 	YearFrom, YearTo int        // 0 = open
 	Genres           [][]string // each group is a set of acceptable genre names; all groups must match
 	Unwatched        bool       // not started
+	Favourites       bool       // only the person's favourites ("my favourite movies")
+	LikeFavourites   bool       // like the person's favourites: the caller adds them to Seeds
 	MaxMinutes       int        // movies only; 0 = any
 	MinMinutes       int
 	MinRating        float64 // audience/IMDb/critic rating, 0–10
@@ -113,6 +115,12 @@ func (q *VideoQuery) Relabel() {
 	}
 	for _, t := range q.SeedTitles {
 		lbl = append(lbl, "Like "+t)
+	}
+	if q.LikeFavourites {
+		lbl = append(lbl, "Like your favourites")
+	}
+	if q.Favourites {
+		lbl = append(lbl, "Your favourites")
 	}
 	if q.Unwatched {
 		lbl = append(lbl, "Unwatched")
@@ -219,8 +227,16 @@ var decadeWords = map[string]int{"twenties": 1920, "thirties": 1930, "forties": 
 
 // phrase lists, matched as whole words (longest first).
 var (
-	movieWords     = []string{"movies", "movie", "films", "film", "flicks", "flick", "feature"}
-	showWords      = []string{"tv shows", "tv show", "tv series", "shows", "show", "series", "tv", "miniseries", "season"}
+	movieWords = []string{"movies", "movie", "films", "film", "flicks", "flick", "feature"}
+	showWords  = []string{"tv shows", "tv show", "tv series", "shows", "show", "series", "tv", "miniseries", "season"}
+	// "Like my favourites" asks for titles like them; "my favourites" for the favourites themselves.
+	likeFavouriteWords = []string{"more like my favourites", "more like my favorites", "like my favourites", "like my favorites",
+		"similar to my favourites", "similar to my favorites", "like my favourite", "like my favorite",
+		"similar to my favourite", "similar to my favorite", "like my favourite movies", "like my favorite movies",
+		"like my favourite shows", "like my favorite shows", "like the ones i love", "like what i love", "like the movies i love",
+		"like the shows i love", "similar to what i love"}
+	favouriteWords = []string{"my favourites", "my favorites", "my favourite", "my favorite", "favourites", "favorites",
+		"ones i love", "movies i love", "shows i love"}
 	unwatchedWords = []string{"i haven't seen", "i have not seen", "i haven't watched", "i have not watched", "haven't seen", "have not seen",
 		"haven't watched", "not seen", "not watched", "never seen", "never watched", "unwatched", "unseen", "new to me", "i've not seen"}
 	shortWords = []string{"short", "quick", "brief"}
@@ -427,6 +443,11 @@ func ParseVideoPromptWith(prompt string, vocab VideoVocab) VideoQuery {
 		}
 	}
 
+	if cut(&s, likeFavouriteWords) {
+		q.LikeFavourites, lbl = true, append(lbl, "Like your favourites")
+	} else if cut(&s, favouriteWords) {
+		q.Favourites, lbl = true, append(lbl, "Your favourites")
+	}
 	if cut(&s, unwatchedWords) {
 		q.Unwatched, lbl = true, append(lbl, "Unwatched")
 	}
@@ -667,6 +688,9 @@ func (s *Store) MuseVideo(ctx context.Context, acc Access, idx *VideoIndex, q Vi
 	if q.Unwatched {
 		where += ` AND ` + notStarted(acc.UserID)
 	}
+	if q.Favourites {
+		where += ` AND ` + favoriteCond(acc.UserID, "i")
+	}
 	if q.MaxMinutes > 0 {
 		where += ` AND (i.type != 'movie' OR COALESCE(i.duration_ms, 0) BETWEEN 1 AND ?)`
 		wargs = append(wargs, int64(q.MaxMinutes)*60000)
@@ -766,6 +790,24 @@ func (s *Store) MuseVideo(ctx context.Context, acc Access, idx *VideoIndex, q Vi
 		}
 		for id, n := range kw {
 			boost[id] += keywordBoost * float64(min(n, 2))
+		}
+	}
+	if vec != nil {
+		// Personal taste: titles close to one of the person's favourites move up a little.
+		favs, err := s.favoriteVideos(ctx, acc.UserID, 50)
+		if err != nil {
+			return res, err
+		}
+		if len(favs) > 0 {
+			ranked := make([]Scored, 0, len(cands))
+			for _, c := range cands {
+				ranked = append(ranked, Scored{ItemID: c.id})
+			}
+			for _, sc := range FavourSimilar(ranked, idx, favs) {
+				if sc.Score > 0 {
+					boost[sc.ItemID] += sc.Score
+				}
+			}
 		}
 	}
 	if vec != nil || len(boost) > 0 {

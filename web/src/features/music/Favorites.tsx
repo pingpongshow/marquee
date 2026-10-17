@@ -9,28 +9,57 @@ import { ItemMenu } from "../browse/ItemMenu";
 import { Poster } from "../browse/Poster";
 import { formatTrackTime, subtitleFor } from "../browse/format";
 import { useMusicState } from "../player/MusicPlayer";
-import { type FavoriteKind, favoritesQuery, SectionHeader } from "./MusicHome";
+import { RowFavorite } from "../browse/Favorite";
+import { type FavoriteKind, type FavoriteSource, favoritesQuery, SectionHeader } from "./MusicHome";
 import { CommunityScore, RatingStars, RowRating } from "./Rating";
 
 const tabs: { kind: FavoriteKind; label: string }[] = [
-  { kind: "track", label: "Tracks" },
+  { kind: "track", label: "Songs" },
   { kind: "album", label: "Albums" },
   { kind: "artist", label: "Artists" },
 ];
 
-/** Favorites: what the person rated 4★ or more, as Tracks / Albums / Artists. */
+const sources: { source: FavoriteSource; label: string }[] = [
+  { source: "hearts", label: "Favourites" },
+  { source: "rated", label: "Rated 4★+" },
+];
+
+/**
+ * Favourites: the person's favourite songs, albums and artists (the heart), newest first, or
+ * what they rated 4★ or more. Favourite songs play or shuffle as a list.
+ */
 export function FavoritesPage({ libraryId, name }: { libraryId: number; name: string }) {
   const [kind, setKind] = useState<FavoriteKind>("track");
-  const list = useQuery(favoritesQuery(libraryId, kind));
+  const [source, setSource] = useState<FavoriteSource>("hearts");
+  const list = useQuery(favoritesQuery(libraryId, kind, 500, source));
   const music = useMusicState();
   const items = list.data?.items ?? [];
+  const what = kind === "track" ? "Songs" : kind === "album" ? "Albums" : "Artists";
+  const playSource = source === "hearts" ? "Favourite songs" : "Rated 4★+";
   return (
     <div className="p-6 lg:p-8">
-      <SectionHeader libraryId={libraryId} name={name} title="Favorites">
-        {list.data && <span className="text-sm text-muted">{list.data.total.toLocaleString()} rated 4★ or more</span>}
+      <SectionHeader libraryId={libraryId} name={name} title={kind === "track" && source === "hearts" ? "Favourite songs" : "Favourites"}>
+        {list.data && (
+          <span className="text-sm text-muted">
+            {list.data.total.toLocaleString()} {source === "hearts" ? (list.data.total === 1 ? "favourite" : "favourites") : "rated 4★ or more"}
+          </span>
+        )}
       </SectionHeader>
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        <div className="flex rounded-md bg-surface-2 p-0.5 text-sm" role="tablist" aria-label="Favorites">
+        <div className="flex rounded-md bg-surface-2 p-0.5 text-sm" role="tablist" aria-label="Which favourites">
+          {sources.map((t) => (
+            <button
+              key={t.source}
+              role="tab"
+              aria-selected={source === t.source}
+              onClick={() => setSource(t.source)}
+              className={clsx("rounded px-3 py-1", source === t.source ? "bg-surface-3 text-text" : "text-muted hover:text-text")}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex rounded-md bg-surface-2 p-0.5 text-sm" role="tablist" aria-label="Favourites">
           {tabs.map((t) => (
             <button
               key={t.kind}
@@ -45,10 +74,10 @@ export function FavoritesPage({ libraryId, name }: { libraryId: number; name: st
         </div>
         {kind === "track" && items.length > 0 && (
           <div className="flex gap-2">
-            <Button size="sm" variant="primary" onClick={() => music.play(items, 0, { source: "Favorites" })}>
+            <Button size="sm" variant="primary" onClick={() => music.play(items, 0, { source: playSource })}>
               <Play className="size-4 fill-current" /> Play
             </Button>
-            <Button size="sm" onClick={() => music.play(items, 0, { shuffle: true, source: "Favorites" })}>
+            <Button size="sm" onClick={() => music.play(items, 0, { shuffle: true, source: playSource })}>
               <Shuffle className="size-4" /> Shuffle
             </Button>
           </div>
@@ -58,7 +87,9 @@ export function FavoritesPage({ libraryId, name }: { libraryId: number; name: st
       {list.isError && <Alert tone="error">{list.error.message}</Alert>}
       {list.data && items.length === 0 && (
         <p className="text-muted">
-          Nothing here yet. {kind === "track" ? "Tracks" : kind === "album" ? "Albums" : "Artists"} you rate 4 stars or more show up here; rate with the stars on a page or in Now Playing.
+          {source === "hearts"
+            ? `Nothing here yet. ${what} you heart show up here; tap the heart on a page, a song or in Now Playing.`
+            : `Nothing here yet. ${what} you rate 4 stars or more show up here; rate with the stars on a page or in Now Playing.`}
         </p>
       )}
       {kind === "track" && items.length > 0 && (
@@ -67,7 +98,7 @@ export function FavoritesPage({ libraryId, name }: { libraryId: number; name: st
             <li key={t.id} className="group flex items-center gap-3 px-3 py-2 hover:bg-surface-2">
               <button
                 type="button"
-                onClick={() => music.play(items, i, { source: "Favorites" })}
+                onClick={() => music.play(items, i, { source: playSource })}
                 className={clsx("flex min-w-0 flex-1 items-center gap-3 text-left", music.current?.item.id === t.id && "text-accent")}
               >
                 <span className="w-10 shrink-0">
@@ -79,6 +110,7 @@ export function FavoritesPage({ libraryId, name }: { libraryId: number; name: st
                 </span>
               </button>
               <CommunityScore rating={t.communityRating} className="hidden sm:inline-flex" />
+              <RowFavorite item={t} />
               <RowRating item={t} />
               <span className="w-12 shrink-0 text-right text-sm text-muted tabular-nums">{formatTrackTime(t.durationMs)}</span>
               <ItemMenu item={t} />

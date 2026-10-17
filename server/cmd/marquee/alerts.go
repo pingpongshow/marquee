@@ -15,6 +15,7 @@ import (
 	"marquee/internal/library"
 	"marquee/internal/livetv"
 	"marquee/internal/notify"
+	"marquee/internal/optimize"
 	"marquee/internal/playback"
 	"marquee/internal/requests"
 	"marquee/internal/settings"
@@ -38,6 +39,7 @@ type alertDeps struct {
 	dvr        *livetv.Recorder
 	vod        *vod.Service
 	saves      *vodsave.Service
+	optimizer  *optimize.Service
 	player     *playback.Manager
 	libraries  *library.Store
 	ai         *ai.Client
@@ -81,6 +83,9 @@ func wireAlerts(ctx context.Context, d alertDeps) *notify.Watcher {
 		}
 		raise(notify.Alert{Type: settings.AlertVODSaveDone, Subject: "vodsave:" + time.Now().UTC().Format(time.RFC3339),
 			Title: "Saving finished", Message: msg + "."})
+	}
+	if d.optimizer != nil {
+		d.optimizer.OnFailed = func(f optimize.Failure) { raise(optimizeFailedAlert(d.store.Get(), f)) }
 	}
 	d.dvr.OnFailed = func(id int64, title, errMsg string) {
 		if title == "" {
@@ -158,4 +163,22 @@ func wireAlerts(ctx context.Context, d alertDeps) *notify.Watcher {
 				}},
 		},
 	}
+}
+
+// optimizeFailedAlert is the alert for a failed Large files conversion: one per file.
+func optimizeFailedAlert(cfg settings.Settings, f optimize.Failure) notify.Alert {
+	title := f.Title
+	if title == "" {
+		title = f.Path
+	}
+	where := "Settings → Library Health → Large files"
+	if base := cfg.LinkBase(); base != "" {
+		where = base + "/settings/library-health#large-files"
+	}
+	subject := "optimize:" + strconv.FormatInt(f.FileID, 10)
+	if f.FileID == 0 {
+		subject = "optimize-job:" + strconv.FormatInt(f.JobID, 10)
+	}
+	return notify.Alert{Type: settings.AlertOptimizeFailed, Subject: subject, Title: "Large file conversion failed: " + title,
+		Message: fmt.Sprintf("Converting %q failed: %s. See %s to retry it.", title, strings.TrimRight(f.Error, "."), where)}
 }

@@ -50,7 +50,7 @@ export const musicSectionTitles: Record<MusicSection, string> = {
   decades: "Decades",
   moods: "Moods & Styles",
   muse: "Muse & Stations",
-  favorites: "Favorites",
+  favorites: "Favourites",
 };
 export const isMusicSection = (s: unknown): s is MusicSection => typeof s === "string" && s in musicSectionTitles;
 
@@ -61,22 +61,30 @@ const countQuery = (libraryId: number, type: "artist" | "album" | "track") => ({
   staleTime: 60_000,
 });
 
-/** A favourite is anything the person rated 4 stars or more (Plex has no separate favourites). */
+/** "Rated 4★+": what the person rated 4 stars or more. */
 export const FAVORITE_RATING = 8;
 
 export type FavoriteKind = "track" | "album" | "artist";
+/** hearts: the person's favourites (the heart), newest first. rated: rated 4★ or more, best first. */
+export type FavoriteSource = "hearts" | "rated";
 
 /**
- * The person's favourites of one type in a library, best first. Keyed under "items" so rating
- * something anywhere (which invalidates "items") refreshes it.
+ * The person's favourites of one type in a library. Keyed under "items" so a heart or rating
+ * changed anywhere (which invalidates "items") refreshes it.
  */
-export function favoritesQuery(libraryId: number, type: FavoriteKind, limit = 500) {
+export function favoritesQuery(libraryId: number, type: FavoriteKind, limit = 500, source: FavoriteSource = "hearts") {
   return {
-    queryKey: ["items", "favorites", libraryId, type, limit],
+    queryKey: ["items", "favorites", libraryId, type, limit, source],
     queryFn: () =>
       unwrap(
         api.GET("/libraries/{libraryId}/items", {
-          params: { path: { libraryId }, query: { type, sort: "-myRating", minMyRating: FAVORITE_RATING, limit } },
+          params: {
+            path: { libraryId },
+            query:
+              source === "hearts"
+                ? { type, sort: "-favorited", favorites: true, limit }
+                : { type, sort: "-myRating", minMyRating: FAVORITE_RATING, limit },
+          },
         }),
       ),
     staleTime: 30_000,
@@ -277,7 +285,7 @@ export function MusicHome({ libraryId, name }: { libraryId: number; name: string
           <LibraryRow icon={<Mic2 />} title="Artists" count={artists.data} libraryId={libraryId} section="artists" />
           <LibraryRow icon={<Disc3 />} title="Albums" count={albums.data} libraryId={libraryId} section="albums" />
           <LibraryRow icon={<Music2 />} title="Songs" count={songs.data} libraryId={libraryId} section="songs" />
-          <LibraryRow icon={<Heart />} title="Favorites" count={favTracks.data?.total} libraryId={libraryId} section="favorites" />
+          <LibraryRow icon={<Heart />} title="Favourites" count={favTracks.data?.total} libraryId={libraryId} section="favorites" />
           <LibraryRow icon={<ListMusic />} title="Playlists" count={playlists.data?.length} libraryId={libraryId} />
           <LibraryRow icon={<Guitar />} title="Genres" libraryId={libraryId} section="genres" />
           {(ready || !!facets.data?.genres.length) && <LibraryRow icon={<Palette />} title="Moods & Styles" libraryId={libraryId} section="moods" />}
@@ -289,12 +297,12 @@ export function MusicHome({ libraryId, name }: { libraryId: number; name: string
   );
 }
 
-/** Top-rated albums, artists and tracks (4★+). Albums and artists open; tracks play from there. */
+/** Favourite albums, artists and songs (the heart). Albums and artists open; songs play from there. */
 function FavoritesShelf({ libraryId, tracks, albums, artists }: { libraryId: number; tracks: ItemSummary[]; albums: ItemSummary[]; artists: ItemSummary[] }) {
   const music = useMusicActions();
   if (!tracks.length && !albums.length && !artists.length) return null;
   return (
-    <Shelf title="Favorites" testId="shelf-favorites" seeAll={<SeeAll libraryId={libraryId} section="favorites" />}>
+    <Shelf title="Favourites" testId="shelf-favorites" seeAll={<SeeAll libraryId={libraryId} section="favorites" />}>
       {[...albums, ...artists].map((it) => (
         <li key={it.id} className="w-36 shrink-0">
           <Link to="/item/$itemId" params={{ itemId: String(it.id) }} className="group block">

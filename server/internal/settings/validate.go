@@ -47,6 +47,9 @@ func (s Settings) Validate() error {
 	if s.Integrations.DVRPaddingBefore < 0 || s.Integrations.DVRPaddingBefore > 60 || s.Integrations.DVRPaddingAfter < 0 || s.Integrations.DVRPaddingAfter > 120 {
 		return invalid("recording padding must be 0–60 minutes before and 0–120 after")
 	}
+	if h := s.Integrations.VODRefreshHours; h < 1 || h > 48 {
+		return invalid("movie sources must sync every 1–48 hours")
+	}
 	switch s.Integrations.Commercials {
 	case CommercialsOff, CommercialsDetect, CommercialsRemove:
 	default:
