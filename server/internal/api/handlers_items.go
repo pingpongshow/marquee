@@ -361,7 +361,8 @@ func (h *Handlers) GetImage(ctx context.Context, req GetImageRequestObject) (Get
 	}
 	w := 0
 	if req.Params.W != nil {
-		w = *req.Params.W
+		// Resized copies are made on request: keep the width sane (0 = original).
+		w = min(max(*req.Params.W, 0), 3840)
 	}
 	path, ctype, err := h.Images.Path(ctx, req.ArtworkId, w)
 	if errors.Is(err, images.ErrNotFound) || errors.Is(err, os.ErrNotExist) {

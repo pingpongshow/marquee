@@ -190,3 +190,41 @@ func userByID(w *dvrWorld, id int64) api.User {
 	w.h.t.Fatalf("user %d not listed", id)
 	return api.User{}
 }
+
+// Recording needs Live TV access too, and a Live TV source's error (which can carry its
+// URL and login) is shown to admins only.
+func TestRecordNeedsLiveTVAndSourceErrorsAdminOnly(t *testing.T) {
+	w := newDVRWorld(t)
+	w.h.db.Exec(`UPDATE users SET restrictions = json_set(restrictions, '$.liveTv', json('false')) WHERE id = ?`, w.ids["alex"])
+	if code, raw := w.schedule("alex", "Later Show"); code != 403 {
+		t.Errorf("no Live TV, still scheduled: %d %s", code, raw)
+	}
+	w.h.db.Exec(`UPDATE users SET restrictions = json_remove(restrictions, '$.liveTv') WHERE id = ?`, w.ids["alex"])
+	if code, raw := w.schedule("alex", "Later Show"); code != 201 {
+		t.Errorf("with Live TV: %d %s", code, raw)
+	}
+	w.h.store.Update(context.Background(), func(c *settings.Settings) error {
+		c.Integrations.LiveTVSources = append(c.Integrations.LiveTVSources, settings.LiveTVSource{ID: "src-err", Name: "Failing", Kind: "m3u", URL: "http://iptv.example/get.php", Enabled: true})
+		return nil
+	})
+	if _, err := w.h.db.Exec(`INSERT INTO live_sources (id, error) VALUES ('src-err', 'GET http://iptv.example/get.php?username=u&password=p: refused')
+		ON CONFLICT(id) DO UPDATE SET error = excluded.error`); err != nil {
+		t.Fatal(err)
+	}
+	var st struct{ Sources []struct{ Error *string } }
+	w.as("alex").do("GET", "/livetv/status", nil, &st)
+	for _, s := range st.Sources {
+		if s.Error != nil {
+			t.Errorf("non-admin sees the source error: %q", *s.Error)
+		}
+	}
+	st.Sources = nil
+	w.as("admin").do("GET", "/livetv/status", nil, &st)
+	seen := false
+	for _, s := range st.Sources {
+		seen = seen || s.Error != nil
+	}
+	if len(st.Sources) == 0 || !seen {
+		t.Error("admin doesn't see the source error")
+	}
+}

@@ -141,7 +141,8 @@ func (h *Handlers) ScheduleRecording(ctx context.Context, req ScheduleRecordingR
 	if !ok {
 		return ScheduleRecording401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if !canRecord(s) || h.DVR == nil {
+	// Recording needs the profile to be allowed Live TV as well as recording.
+	if !canRecord(s) || !liveOK(s) || h.DVR == nil {
 		return ScheduleRecording403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
 	}
 	if !h.DVR.Available() {
