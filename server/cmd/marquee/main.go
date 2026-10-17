@@ -192,6 +192,7 @@ func run() error {
 	meta := &metadata.Service{DB: database, Settings: store, CacheDir: filepath.Join(cfg.ConfigDir, "cache")}
 	var afterMusicScan atomic.Pointer[func()] // set once the scheduler exists
 	var afterVideoScan atomic.Pointer[func()]
+	var taskEnabled atomic.Pointer[func(id string) bool] // the scheduler's: tasks turned off don't run automatically
 	scans.AfterScan = func(ctx context.Context, lib library.Library, report func(scanner.Progress)) error {
 		lang := ""
 		if lib.Options.Language != nil {
@@ -213,7 +214,7 @@ func run() error {
 			return err
 		}
 		announce(ctx, lib.ID) // after matching, so payloads carry proper titles
-		if lib.Type == library.Anime {
+		if on := taskEnabled.Load(); lib.Type == library.Anime && (on == nil || (*on)("anilist")) {
 			go meta.EnrichAnime(ctx) // AniList titles and details for new shows (META-2)
 		}
 		err := meta.RefreshRatings(ctx, lib.ID)
@@ -260,6 +261,8 @@ func run() error {
 	backups := &tasks.Backups{DB: database, Dir: cfg.BackupDir(), ConfigDir: cfg.ConfigDir,
 		Retention: func() int { return store.Get().Tasks.BackupRetention }}
 	scheduler := &tasks.Scheduler{DB: database, Settings: store}
+	schedulerEnabled := scheduler.Enabled
+	taskEnabled.Store(&schedulerEnabled)
 	scheduler.Register(backups.Task())
 	scheduler.Register(tasks.Task{ID: "optimize", Name: "Optimize database", Window: true,
 		Description: "Updates query statistics and compacts the write-ahead log.",
@@ -298,7 +301,7 @@ func run() error {
 		Run: func(ctx context.Context) (string, error) {
 			msg, err := meta.FetchVideoDetails(ctx)
 			if err == nil && strings.HasPrefix(msg, "Fetched") {
-				scheduler.RunNow(ctx, "embeddings") // descriptions now carry keywords and countries
+				scheduler.Trigger(ctx, "embeddings") // descriptions now carry keywords and countries
 			}
 			return msg, err
 		}, Progress: meta.VideoDetailsProgress})
@@ -318,7 +321,7 @@ func run() error {
 	scheduler.Register(tasks.Task{ID: "soundprint", Name: "Soundprint analysis", Every: time.Hour,
 		Description: "Listens to new tracks on the GPU so radios, similar music, mixes and Muse include them.",
 		Run:         soundprintSvc.Analyze})
-	runSoundprint := func() { scheduler.RunNow(ctx, "soundprint") }
+	runSoundprint := func() { scheduler.Trigger(ctx, "soundprint") }
 	afterMusicScan.Store(&runSoundprint)
 	// Muse for movies and recommendations (USER-15, USER-16): text embeddings of movies and shows.
 	// Optional AI (a local Ollama): smarter Muse, re-ranking, reasons and lyric themes. With
@@ -336,8 +339,8 @@ func run() error {
 		Description: "Reads the descriptions of new and changed movies and shows so Muse, recommendations and related items include them.",
 		Run:         embedder.Run, Progress: embedder.Progress})
 	runEmbed := func() {
-		scheduler.RunNow(ctx, "embeddings")
-		scheduler.RunNow(ctx, "thumbnails") // thumbnails for new episodes TMDB has no still for
+		scheduler.Trigger(ctx, "embeddings")
+		scheduler.Trigger(ctx, "thumbnails") // thumbnails for new episodes TMDB has no still for
 	}
 	afterVideoScan.Store(&runEmbed)
 	loud := &loudness.Service{DB: database, FFmpeg: cfg.FFmpegPath, Workers: 4, Analyse: func() bool { return true }} // volume levelling is always on, so every track is measured
@@ -549,7 +552,12 @@ func run() error {
 	if !ads.Available() {
 		slog.Info("commercial detection unavailable: comskip not found", "path", cfg.ComskipPath)
 	}
-	dvr.OnRecorded = func(path string) { ads.RecordingFinished(ctx, path) }
+	dvr.OnRecorded = func(path string) {
+		// Turning the task off (Settings → Scheduled Tasks) stops this too.
+		if scheduler.Enabled("commercials") {
+			ads.RecordingFinished(ctx, path)
+		}
+	}
 	go ads.Run(ctx)
 	scheduler.Register(tasks.Task{ID: "commercials", Name: "Commercials in recordings", Window: true, Bounded: true,
 		Description: "Finds the commercials in Live TV recordings not looked at yet and, when Settings → Live TV says so, cuts them out (the original goes to the media trash). One at a time.",
@@ -575,7 +583,7 @@ func run() error {
 		slog.Warn("lyric themes", "err", err)
 	}
 	// Lyrics for the whole library from LRCLIB, paced; new lyrics are then indexed for themes.
-	lyricsSvc.Fetched = func() { scheduler.RunNow(ctx, "lyric-themes") }
+	lyricsSvc.Fetched = func() { scheduler.Trigger(ctx, "lyric-themes") }
 	scheduler.Register(tasks.Task{ID: "lyrics-fetch", Name: "Fetch lyrics", Every: 24 * time.Hour,
 		Description: "With online lyrics on, looks up lyrics on LRCLIB for tracks that haven't been looked up yet, about one a second (the first run covers the library, later runs new tracks).",
 		Run:         lyricsSvc.FetchAll, Progress: lyricsSvc.FetchProgress})
@@ -591,14 +599,14 @@ func run() error {
 	scheduler.Register(tasks.Task{ID: "music-docs", Name: "Index artists and albums", Every: 24 * time.Hour,
 		Description: "With AI on, reads the descriptions of artists and albums (origin, years, styles, bio, label) with the embedding model, so Muse can find music by what the artists are like.",
 		Run:         musicDocs.Run, Progress: musicDocs.Progress})
-	meta.AfterMusicDetails = func() { scheduler.RunNow(ctx, "music-docs") }
+	meta.AfterMusicDetails = func() { scheduler.Trigger(ctx, "music-docs") }
 	// Turning artist and album details on looks them up straight away.
 	lastDetails := store.Get().Music.ArtistDetails
 	store.Subscribe(func(s settings.Settings) {
 		if s.Music.ArtistDetails != lastDetails {
 			lastDetails = s.Music.ArtistDetails
 			if lastDetails {
-				scheduler.RunNow(ctx, "musicbrainz")
+				scheduler.Trigger(ctx, "musicbrainz")
 			}
 		}
 	})
@@ -610,9 +618,9 @@ func run() error {
 	store.Subscribe(func(s settings.Settings) {
 		if k := aiIndexKey(s); k != lastAIKey {
 			lastAIKey = k
-			scheduler.RunNow(ctx, "embeddings")
-			scheduler.RunNow(ctx, "lyric-themes")
-			scheduler.RunNow(ctx, "music-docs")
+			scheduler.Trigger(ctx, "embeddings")
+			scheduler.Trigger(ctx, "lyric-themes")
+			scheduler.Trigger(ctx, "music-docs")
 		}
 	})
 	// Alerts are wired before the services that raise them start.

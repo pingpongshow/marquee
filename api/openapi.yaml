@@ -2237,7 +2237,7 @@ paths:
       - name: action
         in: path
         required: true
-        description: "cancel = stop a queued or running job (the original stays as it is); retry = queue a failed, cancelled or skipped job again; restore = put an optimized file's original back from the media trash (the optimized file goes there instead)."
+        description: "cancel = stop a queued or running job (the original stays as it is); retry = queue a failed, cancelled or skipped job again; restore = put an optimized file's original back from the media trash (the optimized file goes there instead; only when the original was kept)."
         schema: { type: string, enum: [cancel, retry, restore] }
     post:
       tags: [libraries]
@@ -3121,6 +3121,7 @@ paths:
         - { name: minRating, in: query, description: "Average vote out of 10 at least this (unrated items are left out).", schema: { type: number, minimum: 0, maximum: 10 } }
         - { name: watched, in: query, description: "The caller's state: unwatched (never started), inProgress (started, not finished) or watched.", schema: { type: string, enum: [unwatched, inProgress, watched] } }
         - { name: sourceId, in: query, description: "Only this source's (VodStatus.sources[].id).", schema: { type: string } }
+        - { name: inLibrary, in: query, description: "true = only titles the library already has (in a library the caller can see); false = only those it doesn't. Omitted = any.", schema: { type: boolean } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
         "200":
@@ -3279,6 +3280,7 @@ paths:
         - { name: minRating, in: query, description: "Average vote out of 10 at least this (unrated items are left out).", schema: { type: number, minimum: 0, maximum: 10 } }
         - { name: watched, in: query, description: "The caller's state: unwatched (has episodes not yet watched, including never-opened series), inProgress (started but not every episode watched) or watched (every episode watched).", schema: { type: string, enum: [unwatched, inProgress, watched] } }
         - { name: sourceId, in: query, description: "Only this source's (VodStatus.sources[].id).", schema: { type: string } }
+        - { name: inLibrary, in: query, description: "true = only titles the library already has (in a library the caller can see); false = only those it doesn't. Omitted = any.", schema: { type: boolean } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
         "200":
@@ -4310,6 +4312,36 @@ paths:
                 items: { $ref: "#/components/schemas/TaskInfo" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+
+  /tasks/{taskId}:
+    patch:
+      tags: [system]
+      operationId: updateTask
+      summary: "Turn a task on or off (admin only). Off: it never runs on its schedule or automatically; Run now still works."
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses:
+        "200":
+          description: The task.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskInfo" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /tasks/{taskId}/run:
     post:
@@ -5687,6 +5719,7 @@ components:
         posterUrl: { type: string, description: Server-relative; no token needed. }
         positionMs: { type: integer, format: int64, description: The caller's resume point. }
         watched: { type: boolean }
+        inLibrary: { type: boolean, description: "The library already has this film (matched by TMDB id, else by title and year) in a library the caller can see." }
 
     VodMovieDetail:
       allOf:
@@ -5753,6 +5786,7 @@ components:
         episodeCount: { type: integer, description: "Episodes known (0 until the series is first opened)." }
         watchedCount: { type: integer, description: Episodes the caller has watched. }
         watched: { type: boolean, description: The caller has watched every known episode. }
+        inLibrary: { type: boolean, description: "The library already has this show (any of its episodes; matched by TMDB id, else by title and year) in a library the caller can see." }
         nextEpisode:
           allOf:
             - $ref: "#/components/schemas/VodEpisode"
@@ -6209,6 +6243,7 @@ components:
         maintenanceWindowStart: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", example: "03:00" }
         maintenanceWindowHours: { type: integer, minimum: 1, maximum: 12 }
         backupRetention: { type: integer, minimum: 1, maximum: 365, description: "Days to keep nightly backups before they're deleted (the newest is always kept)." }
+        disabled: { type: array, items: { type: string }, description: "Ids of the tasks turned off (they don't run on their schedule or automatically; Run now still works). Unknown ids are ignored." }
 
     # ---------- Libraries ----------
     LibraryType:
@@ -7247,6 +7282,7 @@ components:
         schedule: { type: string, description: "Human-readable, e.g. \"Daily in the maintenance window\"." }
         running: { type: boolean }
         lastRun: { $ref: "#/components/schemas/TaskRun" }
+        enabled: { type: boolean, description: "Off: the task never runs on its schedule or automatically (after scans, recordings and the like); Run now still works. Default on." }
 
     TaskRun:
       type: object
@@ -7776,7 +7812,7 @@ components:
     OptimizeJobState:
       type: string
       enum: [queued, running, verifying, done, failed, cancelled, skipped, restored]
-      description: "verifying = the new file is being checked (or waits for nobody to be watching before it's swapped in); done = optimized, the original is in the media trash; skipped = not worth it (see error); restored = the original was put back."
+      description: "verifying = the new file is being checked (or waits for nobody to be watching before it's swapped in); done = optimized (the original was deleted, or kept in the media trash when keepOriginals is on: see originalDeleted); skipped = not worth it (see error); restored = the original was put back."
 
     OptimizeJob:
       type: object
@@ -7800,6 +7836,7 @@ components:
         error: { type: string, description: "Why it failed or was skipped." }
         paused: { type: string, description: "Why it's waiting (paused while someone is watching, outside the maintenance window, waiting for a viewer to stop before the swap)." }
         canRestore: { type: boolean, description: "The original is still in the media trash." }
+        originalDeleted: { type: boolean, description: "The original was deleted once the new file was verified and swapped in (keepOriginals off), so it can't be restored." }
         createdAt: { type: string, format: date-time }
         startedAt: { type: string, format: date-time }
         finishedAt: { type: string, format: date-time }
@@ -7871,6 +7908,7 @@ components:
         pauseWhileWatching: { type: boolean, description: "Pause while anyone is watching anything, resuming about 15 s after. Default on." }
         windowOnly: { type: boolean, description: "Only run inside the maintenance window." }
         paused: { type: boolean, description: "The queue is paused by an admin." }
+        keepOriginals: { type: boolean, description: "On: originals go to the media trash (restorable for about 30 days). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once. Omitted on update = unchanged." }
 
     OptimizeConfig:
       type: object

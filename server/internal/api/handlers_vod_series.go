@@ -67,6 +67,8 @@ func (h *Handlers) ListVodSeries(ctx context.Context, req ListVodSeriesRequestOb
 		f.Sort = string(*p.Sort)
 	}
 	applyVodFilters(&f, p.Genre, p.YearFrom, p.YearTo, p.MinRating, (*string)(p.Watched), p.SourceId)
+	idx, vis := h.vodInLibrary(ctx, s)
+	applyInLibraryFilter(&f, p.InLibrary, true, idx, vis)
 	list, total, err := h.VOD.SeriesList(ctx, f)
 	if err != nil {
 		return nil, internal(ctx, "listVodSeries", err)
@@ -75,6 +77,7 @@ func (h *Handlers) ListVodSeries(ctx context.Context, req ListVodSeriesRequestOb
 	for i, m := range list {
 		out.Series[i] = toAPIVodSeries(m)
 	}
+	markVodSeries(out.Series, idx, vis)
 	return out, nil
 }
 
@@ -114,6 +117,8 @@ func (h *Handlers) VodSeriesContinueWatching(ctx context.Context, _ VodSeriesCon
 		out[i] = toAPIVodSeries(u.Series)
 		out[i].NextEpisode = ptr(toAPIVodEpisode(u.Episode))
 	}
+	idx, vis := h.vodInLibrary(ctx, s)
+	markVodSeries(out, idx, vis)
 	return out, nil
 }
 
@@ -185,6 +190,8 @@ func (h *Handlers) GetVodSeries(ctx context.Context, req GetVodSeriesRequestObje
 		WatchedCount: b.WatchedCount, Watched: b.Watched, Overview: nz(m.Overview), Genres: m.Genres,
 		Director: nz(m.Director), TmdbId: nz(m.TMDBID), Matched: m.Matched,
 		Seasons: make([]VodSeason, len(seasons)), Episodes: make([]VodEpisode, len(eps))}
+	idx, vis := h.vodInLibrary(ctx, s)
+	out.InLibrary = ptr(idx.Has(true, m.ID, vis))
 	if out.Genres == nil {
 		out.Genres = []string{}
 	}

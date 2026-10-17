@@ -117,6 +117,7 @@ type Service struct {
 	pendingScan map[int64]bool
 	lastRetry   time.Time
 	drain       drainCount
+	inLibrary   indexCache // the "in library" marks (inlibrary.go)
 
 	// Checking the quality of files on demand.
 	probeMu        sync.Mutex

@@ -216,11 +216,15 @@ func (h *Handlers) ListVodMovies(ctx context.Context, req ListVodMoviesRequestOb
 		f.Offset = *p.Offset
 	}
 	applyVodFilters(&f, p.Genre, p.YearFrom, p.YearTo, p.MinRating, (*string)(p.Watched), p.SourceId)
+	idx, vis := h.vodInLibrary(ctx, s)
+	applyInLibraryFilter(&f, p.InLibrary, false, idx, vis)
 	movies, total, err := h.VOD.Movies(ctx, f)
 	if err != nil {
 		return nil, internal(ctx, "listVodMovies", err)
 	}
-	return ListVodMovies200JSONResponse{Total: total, Movies: toAPIVodMovies(movies)}, nil
+	out := toAPIVodMovies(movies)
+	markVodMovies(out, idx, vis)
+	return ListVodMovies200JSONResponse{Total: total, Movies: out}, nil
 }
 
 func (h *Handlers) VodContinueWatching(ctx context.Context, _ VodContinueWatchingRequestObject) (VodContinueWatchingResponseObject, error) {
@@ -235,7 +239,10 @@ func (h *Handlers) VodContinueWatching(ctx context.Context, _ VodContinueWatchin
 	if err != nil {
 		return nil, internal(ctx, "vodContinueWatching", err)
 	}
-	return VodContinueWatching200JSONResponse(toAPIVodMovies(movies)), nil
+	out := toAPIVodMovies(movies)
+	idx, vis := h.vodInLibrary(ctx, s)
+	markVodMovies(out, idx, vis)
+	return VodContinueWatching200JSONResponse(out), nil
 }
 
 // vodMovie loads a film the user may see; nil when it doesn't exist or is rated above them.
@@ -276,6 +283,8 @@ func (h *Handlers) GetVodMovie(ctx context.Context, req GetVodMovieRequestObject
 		RuntimeMs: b.RuntimeMs, PositionMs: b.PositionMs, Year: b.Year, Rating: b.Rating, PosterUrl: b.PosterUrl,
 		Overview: nz(m.Overview), Tagline: nz(m.Tagline), Genres: m.Genres, Director: nz(m.Director),
 		TmdbId: nz(m.TMDBID), ImdbId: nz(m.IMDBID), Matched: m.Matched}
+	idx, vis := h.vodInLibrary(ctx, s)
+	out.InLibrary = ptr(idx.Has(false, m.ID, vis))
 	if out.Genres == nil {
 		out.Genres = []string{}
 	}
