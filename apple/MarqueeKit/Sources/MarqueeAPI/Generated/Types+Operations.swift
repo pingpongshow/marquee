@@ -7547,17 +7547,24 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/search/GET/query/limit`.
                 public var limit: Swift.Int?
+                /// Only the user's favourites (the heart).
+                ///
+                /// - Remark: Generated from `#/paths/search/GET/query/favorites`.
+                public var favorites: Swift.Bool?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
                 ///   - q:
                 ///   - limit: Maximum results per type.
+                ///   - favorites: Only the user's favourites (the heart).
                 public init(
                     q: Swift.String,
-                    limit: Swift.Int? = nil
+                    limit: Swift.Int? = nil,
+                    favorites: Swift.Bool? = nil
                 ) {
                     self.q = q
                     self.limit = limit
+                    self.favorites = favorites
                 }
             }
             public var query: Operations.Search.Input.Query
@@ -9502,6 +9509,8 @@ public enum Operations {
                     case random = "random"
                     case myRating = "myRating"
                     case _hyphen_myRating = "-myRating"
+                    case favorited = "favorited"
+                    case _hyphen_favorited = "-favorited"
                 }
                 /// Sort order. Prefix with "-" for descending.
                 ///
@@ -9546,6 +9555,10 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/libraries/{libraryId}/items/GET/query/minMyRating`.
                 public var minMyRating: Swift.Int?
+                /// Only the person's favourites (the heart). Combines with the other filters and sorts; sort -favorited lists the newest favourites first.
+                ///
+                /// - Remark: Generated from `#/paths/libraries/{libraryId}/items/GET/query/favorites`.
+                public var favorites: Swift.Bool?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
@@ -9561,6 +9574,7 @@ public enum Operations {
                 ///   - hdr:
                 ///   - letter: Only titles starting with this letter ("#" for anything else).
                 ///   - minMyRating: Only what the person rated at least this (0–10, e.g. 8 = 4 stars: favourites).
+                ///   - favorites: Only the person's favourites (the heart). Combines with the other filters and sorts; sort -favorited lists the newest favourites first.
                 public init(
                     _type: Components.Schemas.ItemType? = nil,
                     sort: Components.Parameters.Sort? = nil,
@@ -9573,7 +9587,8 @@ public enum Operations {
                     resolution: Operations.ListLibraryItems.Input.Query.ResolutionPayload? = nil,
                     hdr: Swift.Bool? = nil,
                     letter: Swift.String? = nil,
-                    minMyRating: Swift.Int? = nil
+                    minMyRating: Swift.Int? = nil,
+                    favorites: Swift.Bool? = nil
                 ) {
                     self._type = _type
                     self.sort = sort
@@ -9587,6 +9602,7 @@ public enum Operations {
                     self.hdr = hdr
                     self.letter = letter
                     self.minMyRating = minMyRating
+                    self.favorites = favorites
                 }
             }
             public var query: Operations.ListLibraryItems.Input.Query
@@ -11505,17 +11521,24 @@ public enum Operations {
                 public var offset: Components.Parameters.Offset?
                 /// - Remark: Generated from `#/paths/items/{itemId}/children/GET/query/limit`.
                 public var limit: Components.Parameters.Limit?
+                /// Only the user's favourites, and children holding one (a show's seasons with a favourite episode, an artist's albums with a favourite song).
+                ///
+                /// - Remark: Generated from `#/paths/items/{itemId}/children/GET/query/favorites`.
+                public var favorites: Swift.Bool?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
                 ///   - offset:
                 ///   - limit:
+                ///   - favorites: Only the user's favourites, and children holding one (a show's seasons with a favourite episode, an artist's albums with a favourite song).
                 public init(
                     offset: Components.Parameters.Offset? = nil,
-                    limit: Components.Parameters.Limit? = nil
+                    limit: Components.Parameters.Limit? = nil,
+                    favorites: Swift.Bool? = nil
                 ) {
                     self.offset = offset
                     self.limit = limit
+                    self.favorites = favorites
                 }
             }
             public var query: Operations.ListItemChildren.Input.Query
@@ -17672,6 +17695,358 @@ public enum Operations {
             }
         }
     }
+    /// Make a movie, show, episode, song, album or artist one of your favourites (the heart). Favourites are yours alone (a managed profile has its own); recommendations, Muse, radios and mixes weight them above star ratings.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/favorite`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/favorite/put(addFavorite)`.
+    public enum AddFavorite {
+        public static let id: Swift.String = "addFavorite"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/items/{itemId}/favorite/PUT/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/favorite/PUT/path/itemId`.
+                public var itemId: Components.Parameters.ItemId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - itemId:
+                public init(itemId: Components.Parameters.ItemId) {
+                    self.itemId = itemId
+                }
+            }
+            public var path: Operations.AddFavorite.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/favorite/PUT/query`.
+            public struct Query: Sendable, Hashable {
+                /// When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                ///
+                /// - Remark: Generated from `#/paths/items/{itemId}/favorite/PUT/query/at`.
+                public var at: Components.Parameters.ChangedAt?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - at: When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                public init(at: Components.Parameters.ChangedAt? = nil) {
+                    self.at = at
+                }
+            }
+            public var query: Operations.AddFavorite.Input.Query
+            /// - Remark: Generated from `#/paths/items/{itemId}/favorite/PUT/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.AddFavorite.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.AddFavorite.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.AddFavorite.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - query:
+            ///   - headers:
+            public init(
+                path: Operations.AddFavorite.Input.Path,
+                query: Operations.AddFavorite.Input.Query = .init(),
+                headers: Operations.AddFavorite.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Added.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/favorite/put(addFavorite)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.AddFavorite.Output.NoContent)
+            /// Added.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/favorite/put(addFavorite)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.AddFavorite.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/favorite/put(addFavorite)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/favorite/put(addFavorite)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// No longer one of your favourites.
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/favorite`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/favorite/delete(removeFavorite)`.
+    public enum RemoveFavorite {
+        public static let id: Swift.String = "removeFavorite"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/items/{itemId}/favorite/DELETE/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/favorite/DELETE/path/itemId`.
+                public var itemId: Components.Parameters.ItemId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - itemId:
+                public init(itemId: Components.Parameters.ItemId) {
+                    self.itemId = itemId
+                }
+            }
+            public var path: Operations.RemoveFavorite.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/favorite/DELETE/query`.
+            public struct Query: Sendable, Hashable {
+                /// When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                ///
+                /// - Remark: Generated from `#/paths/items/{itemId}/favorite/DELETE/query/at`.
+                public var at: Components.Parameters.ChangedAt?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - at: When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored.
+                public init(at: Components.Parameters.ChangedAt? = nil) {
+                    self.at = at
+                }
+            }
+            public var query: Operations.RemoveFavorite.Input.Query
+            /// - Remark: Generated from `#/paths/items/{itemId}/favorite/DELETE/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RemoveFavorite.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RemoveFavorite.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.RemoveFavorite.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - query:
+            ///   - headers:
+            public init(
+                path: Operations.RemoveFavorite.Input.Path,
+                query: Operations.RemoveFavorite.Input.Query = .init(),
+                headers: Operations.RemoveFavorite.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Removed.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/favorite/delete(removeFavorite)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.RemoveFavorite.Output.NoContent)
+            /// Removed.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/favorite/delete(removeFavorite)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.RemoveFavorite.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/favorite/delete(removeFavorite)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/favorite/delete(removeFavorite)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
     /// Your watchlist, most recently added first.
     ///
     /// - Remark: HTTP `GET /watchlist`.
@@ -23068,7 +23443,7 @@ public enum Operations {
     }
     /// Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
     ///
-    /// The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item's last file the item goes too, along with a season or show left empty.
+    /// The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good when the daily Empty media trash task runs. When it was the item's last file the item goes too, along with a season or show left empty.
     ///
     /// - Remark: HTTP `DELETE /files/{fileId}`.
     /// - Remark: Generated from `#/paths//files/{fileId}/delete(deleteMediaFile)`.
@@ -28910,6 +29285,264 @@ public enum Operations {
             }
         }
     }
+    /// Stop a recording in progress now. keep true (the default): what was recorded is finalised as a playable file, filed like a finished recording and marked stoppedEarly. keep false: the partial recording is deleted and it leaves the list. Only whoever scheduled it, or an admin (canDelete). Returns once it has stopped.
+    ///
+    /// - Remark: HTTP `POST /livetv/recordings/{recordingId}/stop`.
+    /// - Remark: Generated from `#/paths//livetv/recordings/{recordingId}/stop/post(stopRecording)`.
+    public enum StopRecording {
+        public static let id: Swift.String = "stopRecording"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/recordings/{recordingId}/stop/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/recordings/{recordingId}/stop/POST/path/recordingId`.
+                public var recordingId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - recordingId:
+                public init(recordingId: Swift.Int64) {
+                    self.recordingId = recordingId
+                }
+            }
+            public var path: Operations.StopRecording.Input.Path
+            /// - Remark: Generated from `#/paths/livetv/recordings/{recordingId}/stop/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.StopRecording.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.StopRecording.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.StopRecording.Input.Headers
+            /// - Remark: Generated from `#/paths/livetv/recordings/{recordingId}/stop/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/recordings/{recordingId}/stop/POST/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// Keep what was recorded (true) or delete it (false).
+                    ///
+                    /// - Remark: Generated from `#/paths/livetv/recordings/{recordingId}/stop/POST/requestBody/json/keep`.
+                    public var keep: Swift.Bool?
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - keep: Keep what was recorded (true) or delete it (false).
+                    public init(keep: Swift.Bool? = nil) {
+                        self.keep = keep
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case keep
+                    }
+                }
+                /// - Remark: Generated from `#/paths/livetv/recordings/{recordingId}/stop/POST/requestBody/content/application\/json`.
+                case json(Operations.StopRecording.Input.Body.JsonPayload)
+            }
+            public var body: Operations.StopRecording.Input.Body?
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.StopRecording.Input.Path,
+                headers: Operations.StopRecording.Input.Headers = .init(),
+                body: Operations.StopRecording.Input.Body? = nil
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// Stopped.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/recordings/{recordingId}/stop/post(stopRecording)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.StopRecording.Output.NoContent)
+            /// Stopped.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/recordings/{recordingId}/stop/post(stopRecording)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.StopRecording.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/recordings/{recordingId}/stop/post(stopRecording)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/recordings/{recordingId}/stop/post(stopRecording)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/recordings/{recordingId}/stop/post(stopRecording)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/recordings/{recordingId}/stop/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/recordings/{recordingId}/stop/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas._Error)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas._Error {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.StopRecording.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.StopRecording.Output.Conflict.Body) {
+                    self.body = body
+                }
+            }
+            /// not_recording: it isn't recording now.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/recordings/{recordingId}/stop/post(stopRecording)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.StopRecording.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.StopRecording.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
     /// Series being recorded.
     ///
     /// - Remark: HTTP `GET /livetv/recording-rules`.
@@ -30786,6 +31419,57 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/play/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/channels/{channelId}/play/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas._Error)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas._Error {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.PlayLiveChannel.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.PlayLiveChannel.Output.Conflict.Body) {
+                    self.body = body
+                }
+            }
+            /// no_tuner: every connection the channel's source allows (maxStreams) is in use by recordings or other viewers; message says by what, e.g. "All connections are in use: recording Gold Rush". A channel being recorded, or already watched, stays watchable: it shares that connection.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/channels/{channelId}/play/post(playLiveChannel)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.PlayLiveChannel.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.PlayLiveChannel.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -42886,17 +43570,24 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/{itemId}/leaves/GET/query/unwatched`.
                 public var unwatched: Swift.Bool?
+                /// Only the user's favourite episodes or songs (e.g. a show's favourite episodes, an artist's favourite songs).
+                ///
+                /// - Remark: Generated from `#/paths/items/{itemId}/leaves/GET/query/favorites`.
+                public var favorites: Swift.Bool?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
                 ///   - shuffle:
                 ///   - unwatched: Start from the first unwatched episode (shows and seasons).
+                ///   - favorites: Only the user's favourite episodes or songs (e.g. a show's favourite episodes, an artist's favourite songs).
                 public init(
                     shuffle: Swift.Bool? = nil,
-                    unwatched: Swift.Bool? = nil
+                    unwatched: Swift.Bool? = nil,
+                    favorites: Swift.Bool? = nil
                 ) {
                     self.shuffle = shuffle
                     self.unwatched = unwatched
+                    self.favorites = favorites
                 }
             }
             public var query: Operations.ItemLeaves.Input.Query
@@ -48213,6 +48904,8 @@ public enum Operations {
         }
     }
     /// Your daily mixes (MUSIC-7), built from your listening; they change once a day.
+    ///
+    /// Also a Favourites mix (id favorites): your favourite songs (the heart) shuffled, first in the list when you have at least three. It needs no Soundprint analysis, so it's there even when the daily mixes aren't.
     ///
     /// - Remark: HTTP `GET /music/mixes`.
     /// - Remark: Generated from `#/paths//music/mixes/get(musicMixes)`.

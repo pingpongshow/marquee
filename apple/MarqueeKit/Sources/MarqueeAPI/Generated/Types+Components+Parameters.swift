@@ -51,6 +51,8 @@ extension Components {
             case random = "random"
             case myRating = "myRating"
             case _hyphen_myRating = "-myRating"
+            case favorited = "favorited"
+            case _hyphen_favorited = "-favorited"
         }
         /// - Remark: Generated from `#/components/parameters/Offset`.
         public typealias Offset = Swift.Int

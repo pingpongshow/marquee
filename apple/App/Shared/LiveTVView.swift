@@ -22,8 +22,13 @@ struct LiveTVView: View {
     @State private var canViewRecordings = false
     /// Why the Live TV status couldn't be read (not the same as "not set up").
     @State private var statusError: String?
-    /// Bumped by pull-to-refresh on the Recordings tab.
+    /// Bumped by pull-to-refresh, and after a recording is stopped.
     @State private var recordingsRefresh = 0
+    /// Recordings stopped here: hidden from Recording now at once (the server can take a few
+    /// seconds to finish them).
+    @State private var stoppedRecordings: Set<Int64> = []
+    /// Why the channel just tapped can't be watched (its connections are in use).
+    @State private var unavailableNotice: String?
     enum Tab: String, CaseIterable { case guide = "Guide", now = "What's On", recordings = "Recordings" }
     init(initialTab: Tab = .guide) {
         _tab = State(initialValue: initialTab)
@@ -63,6 +68,18 @@ struct LiveTVView: View {
         // Checked again each time Live TV opens: channels may have been added or lost (LIVE-1).
         .task { await loadStatus() }
         .task(id: "\(filter)|\(start.timeIntervalSince1970)") { await load() }
+        // Which channels can be tuned changes as connections are used and freed.
+        .task(id: enabled) {
+            while enabled == true {
+                do { try await Task.sleep(for: .seconds(60)) } catch { return }
+                await refreshChannels()
+            }
+        }
+        .alert("Channel unavailable", isPresented: Binding(get: { unavailableNotice != nil }, set: { if !$0 { unavailableNotice = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(unavailableNotice ?? "")
+        }
         #if os(iOS)
         .fullScreenCover(item: $watching) { LiveWatchView(channels: channels, start: $0.id) }
         #else
@@ -70,7 +87,7 @@ struct LiveTVView: View {
         #endif
         .sheet(isPresented: Binding(get: { details != nil }, set: { if !$0 { details = nil } })) {
             if let (p, c) = details {
-                ProgrammeSheet(programme: p, channel: c, canRecord: canRecord) { Task { await load() } }
+                ProgrammeSheet(programme: p, channel: c, canRecord: canRecord, onStopped: { recordingStopped($0) }) { recordingsRefresh += 1; Task { await load() } }
             }
         }
     }
@@ -95,6 +112,10 @@ struct LiveTVView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                if canViewRecordings {
+                    RecordingNowStrip(refresh: recordingsRefresh, stopped: stoppedRecordings) { recordingStopped($0) }
+                    .padding(.horizontal, sidePadding)
+                }
                 controls
                 channelContent
             }
@@ -102,20 +123,18 @@ struct LiveTVView: View {
         }
         // On the scroll view, where pull-to-refresh works (it did nothing on the VStack inside).
         .refreshable {
-            switch tab {
-            case .recordings: recordingsRefresh += 1
-            default: await load()
-            }
+            recordingsRefresh += 1
+            if tab != .recordings { await load() }
         }
     }
 
     @ViewBuilder private var channelContent: some View {
         #if os(iOS)
-        if tab != .recordings, let c = preview ?? channels.first { LivePreview(channel: c) { watching = WatchTarget(id: c.id) } }
+        if tab != .recordings, let c = preview ?? channels.first(where: \.isAvailable) ?? channels.first { LivePreview(channel: c) { watching = WatchTarget(id: c.id) } }
         #endif
         if let error { Text(error).foregroundStyle(.red).padding(.horizontal, sidePadding) }
         if tab == .recordings {
-            RecordingsList(refresh: recordingsRefresh, canRecord: canRecord).padding(.horizontal, sidePadding)
+            RecordingsList(refresh: recordingsRefresh, canRecord: canRecord, stopped: stoppedRecordings) { recordingStopped($0) }.padding(.horizontal, sidePadding)
         } else if channels.isEmpty, enabled == true {
             Text(filter == "favorites" ? "No favourites yet. Add some with the heart next to a channel."
                 : filter == "recent" ? "Channels you watch will appear here."
@@ -136,10 +155,11 @@ struct LiveTVView: View {
     /// On now: preview it (iPhone/iPad) or watch it (Apple TV); a second tap on the channel
     /// being previewed, or anything later, shows the programme's details.
     private func programmeTapped(_ p: LiveProgramme, _ c: LiveChannel) {
+        // An unavailable channel's programme shows its details (which say why) instead.
         #if os(tvOS)
-        if p.isOn { pick(c) } else { details = (p, c) }
+        if p.isOn, c.isAvailable { pick(c) } else { details = (p, c) }
         #else
-        if p.isOn, (preview ?? channels.first)?.id != c.id { pick(c) } else { details = (p, c) }
+        if p.isOn, c.isAvailable, (preview ?? channels.first(where: \.isAvailable))?.id != c.id { pick(c) } else { details = (p, c) }
         #endif
     }
 
@@ -156,6 +176,7 @@ struct LiveTVView: View {
 
     /// iPhone/iPad preview a channel first; Apple TV goes straight to full screen.
     private func pick(_ c: LiveChannel) {
+        guard c.isAvailable else { unavailableNotice = c.unavailableText; return }
         #if os(tvOS)
         watching = WatchTarget(id: c.id)
         #else
@@ -206,7 +227,9 @@ struct LiveTVView: View {
     private var whatsOn: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: tileWidth), spacing: 16)], spacing: 16) {
             ForEach(channels, id: \.id) { c in
-                Button { watching = WatchTarget(id: c.id) } label: {
+                Button {
+                    if c.isAvailable { watching = WatchTarget(id: c.id) } else { unavailableNotice = c.unavailableText }
+                } label: {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 10) {
                             ChannelLogo(channel: c).frame(width: 64, height: 40)
@@ -216,16 +239,19 @@ struct LiveTVView: View {
                             }
                         }
                         if let p = c.now { ProgressView(value: p.progress).tint(Color.marqueeGold) }
-                        if let n = c.next {
+                        if !c.isAvailable {
+                            Text(c.unavailableText).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+                        } else if let n = c.next {
                             Text("Next: \(n.title) at \(n.start.formatted(date: .omitted, time: .shortened))").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                         }
                     }
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
+                    .opacity(c.isAvailable ? 1 : 0.45)
                 }
                 .buttonStyle(cardButtonStyle)
-                .accessibilityLabel("Watch \(c.name)")
+                .accessibilityLabel(c.isAvailable ? "Watch \(c.name)" : "\(c.name), unavailable: \(c.unavailableText)")
             }
         }
         .padding(.horizontal, sidePadding)
@@ -241,6 +267,23 @@ struct LiveTVView: View {
             error = nil
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+
+    /// A recording in progress was stopped: hide it from Recording now, and reload (its
+    /// channel's connection is free again).
+    private func recordingStopped(_ id: Int64) {
+        stoppedRecordings.insert(id)
+        recordingsRefresh += 1
+        Task { await load() }
+    }
+
+    /// Just the channel list (now/next and availability), without the guide.
+    private func refreshChannels() async {
+        guard enabled == true else { return }
+        let group = ["all", "favorites", "recent", "hidden"].contains(filter) ? nil : filter
+        if let list = try? await app.liveChannels(group: group, favorites: filter == "favorites", recent: filter == "recent", hidden: filter == "hidden") {
+            channels = list
         }
     }
 
@@ -312,7 +355,10 @@ struct GuideGrid: View {
                     ZStack(alignment: .topLeading) {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             timeline
-                            ForEach(channels, id: \.id) { c in programmes(c, now: context.date).frame(width: width, height: row, alignment: .leading) }
+                            ForEach(channels, id: \.id) { c in
+                                programmes(c, now: context.date).frame(width: width, height: row, alignment: .leading)
+                                    .opacity(c.isAvailable ? 1 : 0.5)
+                            }
                         }
                         let now = x(context.date)
                         if now > 0 && now < width {
@@ -347,7 +393,8 @@ struct GuideGrid: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(selected == c.id ? "Watch" : "Preview") \(c.name)")
+            .opacity(c.isAvailable ? 1 : 0.4)
+            .accessibilityLabel(c.isAvailable ? "\(selected == c.id ? "Watch" : "Preview") \(c.name)" : "\(c.name), unavailable: \(c.unavailableText)")
             Button { onFavorite(c) } label: {
                 Image(systemName: c.favorite ? "heart.fill" : "heart").foregroundStyle(c.favorite ? Color.marqueeGold : .secondary)
             }
@@ -434,7 +481,7 @@ struct LivePreview: View {
             VideoPlayer(player: player).disabled(true)
             HStack(spacing: 10) {
                 ChannelLogo(channel: channel).frame(width: 48, height: 28)
-                Text(error ?? "Now On: \(channel.now?.title ?? channel.name)").font(.footnote).lineLimit(1)
+                Text(error ?? (channel.isAvailable ? "Now On: \(channel.now?.title ?? channel.name)" : channel.unavailableText)).font(.footnote).lineLimit(1)
                     .foregroundStyle(error == nil ? Color.white : Color.red)
                 Spacer()
             }
@@ -465,17 +512,28 @@ struct LivePreview: View {
 
     private func tune() async {
         stop()
-        do {
-            let s = try await app.playLive(channel.id)
-            // Moved on (another channel, or the preview went away) while tuning: let it go.
-            if Task.isCancelled { await app.stopLive(s.id); return }
-            session = s.id
-            player.replaceCurrentItem(with: AVPlayerItem(url: s.url))
-            player.isMuted = muted
-            player.play()
-            error = nil
-        } catch {
-            if !Task.isCancelled { self.error = error.localizedDescription }
+        error = nil
+        guard channel.isAvailable else { return } // its connections are in use; the caption says why
+        var retried = false
+        while !Task.isCancelled {
+            do {
+                let s = try await app.playLive(channel.id)
+                // Moved on (another channel, or the preview went away) while tuning: let it go.
+                if Task.isCancelled { await app.stopLive(s.id); return }
+                session = s.id
+                player.replaceCurrentItem(with: AVPlayerItem(url: s.url))
+                player.isMuted = muted
+                player.play()
+                error = nil
+                guard let reason = await liveStreamEnd(app, player: player, url: s.url) else { return }
+                session = nil // the server already ended it
+                player.replaceCurrentItem(with: nil)
+                if reason.hasPrefix("Stopped:") || retried { error = reason.isEmpty ? "The stream stopped." : reason; return }
+                retried = true // ended for a reason tuning again fixes: once
+            } catch {
+                if !Task.isCancelled { self.error = error.localizedDescription }
+                return
+            }
         }
     }
 
@@ -532,6 +590,8 @@ struct LiveWatchView: View {
             Color.black.ignoresSafeArea()
             VideoPlayer(player: player).ignoresSafeArea()
                 .accessibilityLabel("Live TV")
+                .accessibilityValue(channel?.name ?? "")
+                .accessibilityIdentifier("liveWatch.player")
             #if os(iOS)
             header
             if let c = overlayChannel { channelOverlay(c).frame(maxHeight: .infinity) }
@@ -617,26 +677,41 @@ struct LiveWatchView: View {
     }
     #endif
 
+    /// The next channel up or down, skipping those that can't be tuned right now.
     private func step(_ d: Int) {
         guard let i = channels.firstIndex(where: { $0.id == current }), !channels.isEmpty else { return }
-        current = channels[(i + d + channels.count) % channels.count].id
+        for n in 1..<max(2, channels.count) {
+            let c = channels[((i + d * n) % channels.count + channels.count) % channels.count]
+            if c.isAvailable || c.id == current { current = c.id; return }
+        }
     }
 
     private func tune() async {
         stop()
-        do {
-            let s = try await app.playLive(current)
-            // Changed channel or closed while tuning: stop the session that just started.
-            if Task.isCancelled { await app.stopLive(s.id); return }
-            session = s.id
-            let item = AVPlayerItem(url: s.url)
-            if let c = channel { item.externalMetadata = metadata(c) }
-            player.replaceCurrentItem(with: item)
-            music.pause() // live TV takes over from the music
-            player.play()
-            error = nil
-        } catch {
-            if !Task.isCancelled { self.error = error.localizedDescription }
+        var retried = false
+        while !Task.isCancelled {
+            do {
+                let s = try await app.playLive(current)
+                // Changed channel or closed while tuning: stop the session that just started.
+                if Task.isCancelled { await app.stopLive(s.id); return }
+                session = s.id
+                let item = AVPlayerItem(url: s.url)
+                if let c = channel { item.externalMetadata = metadata(c) }
+                player.replaceCurrentItem(with: item)
+                music.pause() // live TV takes over from the music
+                player.play()
+                error = nil
+                // The server ended the stream: "Stopped: …" is shown; any other reason means
+                // tuning the channel again works, which is tried once.
+                guard let reason = await liveStreamEnd(app, player: player, url: s.url) else { return }
+                session = nil
+                player.replaceCurrentItem(with: nil)
+                if reason.hasPrefix("Stopped:") || retried { error = reason.isEmpty ? "The stream stopped." : reason; return }
+                retried = true
+            } catch {
+                if !Task.isCancelled { self.error = error.localizedDescription }
+                return
+            }
         }
     }
 
@@ -656,11 +731,24 @@ struct LiveWatchView: View {
     }
 }
 
+/// Waits until the live stream the player is on has ended and returns the server's reason
+/// (see `liveEndReason`); nil when cancelled first. Only asks while the player isn't playing.
+@MainActor
+func liveStreamEnd(_ app: AppSession, player: AVPlayer, url: URL) async -> String? {
+    while !Task.isCancelled {
+        do { try await Task.sleep(for: .seconds(3)) } catch { return nil }
+        guard player.currentItem?.status == .failed || player.timeControlStatus != .playing else { continue }
+        if let reason = await app.liveEndReason(url) { return Task.isCancelled ? nil : reason }
+    }
+    return nil
+}
+
 /// A future programme's details.
 struct ProgrammeSheet: View {
     let programme: LiveProgramme
     let channel: LiveChannel
     var canRecord = false
+    var onStopped: (Int64) -> Void = { _ in }
     var onChange: () -> Void = {}
     @Environment(AppSession.self) private var app
     @Environment(\.dismiss) private var dismiss
@@ -677,6 +765,7 @@ struct ProgrammeSheet: View {
                 Text("\(programme.start.formatted(.dateTime.weekday(.wide).hour().minute())) – \(programme.end.formatted(date: .omitted, time: .shortened))")
                 if let e = programme.episode { Text([e, programme.subtitle].compactMap { $0 }.joined(separator: " · ")).foregroundStyle(.secondary) }
                 if let d = programme.description { Text(d) }
+                if !channel.isAvailable { Label(channel.unavailableText, systemImage: "exclamationmark.circle").foregroundStyle(.secondary) }
                 if canRecord, programme.end > .now, loaded {
                     Section {
                         if programme.series == true { Text("A series recording covers this title.").font(.footnote).foregroundStyle(.secondary) }
@@ -684,8 +773,11 @@ struct ProgrammeSheet: View {
                             // Someone else's: they (or an admin) decide, so no cancel here.
                             Text("\(recording.status == .recording ? "Being recorded" : "Will be recorded")\(recording.ownerName.map { " by \($0)" } ?? "")")
                                 .font(.footnote).foregroundStyle(.secondary)
+                        } else if let recording, recording.status == .recording {
+                            Text("Recording · \(recording.progressLabel())").font(.footnote).foregroundStyle(.secondary)
+                            StopRecordingButtons(recording: recording, onDone: { onStopped(recording.id); dismiss() }, onError: { error = $0 })
                         } else if let recording {
-                            Button(recording.status == .recording ? "Stop Recording" : "Don't Record", role: .destructive) {
+                            Button("Don't Record", role: .destructive) {
                                 act { try await app.cancelRecording(recording.id) }
                             }
                         } else {
@@ -725,13 +817,126 @@ struct ProgrammeSheet: View {
     }
 }
 
+/// Stop and keep / Stop and delete for a recording in progress (owner or admin); deleting
+/// asks first.
+struct StopRecordingButtons: View {
+    @Environment(AppSession.self) private var app
+    let recording: Recording
+    var onDone: () -> Void = {}
+    var onError: (String) -> Void = { _ in }
+    @State private var busy = false
+    @State private var confirmDelete = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Button("Stop and keep", systemImage: "stop.circle") { stop(keep: true) }
+            #if os(tvOS)
+            // A destructive bordered button is red on red on the TV; the confirmation says it.
+            Button("Stop and delete", systemImage: "trash") { confirmDelete = true }
+            #else
+            Button("Stop and delete", systemImage: "trash", role: .destructive) { confirmDelete = true }
+            #endif
+        }
+        .buttonStyle(.bordered)
+        #if os(iOS)
+        .controlSize(.small)
+        #endif
+        .disabled(busy)
+        .confirmationDialog("Stop recording \(recording.title) and delete what has been recorded so far?",
+                            isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Stop and delete", role: .destructive) { stop(keep: false) }
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    private func stop(keep: Bool) {
+        busy = true
+        Task {
+            do {
+                try await app.stopRecording(recording.id, keep: keep)
+                onDone()
+            } catch {
+                onError(error.localizedDescription)
+            }
+            busy = false
+        }
+    }
+}
+
+/// Recordings in progress, at the top of every Live TV tab: channel, title, time in and
+/// left, and Stop and keep / Stop and delete for whoever may (LIVE-5).
+struct RecordingNowStrip: View {
+    @Environment(AppSession.self) private var app
+    /// Changed by the page's pull-to-refresh and after a stop elsewhere.
+    var refresh = 0
+    /// Stopped on this page (the server may still say recording for a moment).
+    var stopped: Set<Int64> = []
+    var onStopped: (Int64) -> Void = { _ in }
+    @State private var all: [Recording] = []
+    private var active: [Recording] { all.filter { !stopped.contains($0.id) } }
+    @State private var error: String?
+
+    var body: some View {
+        // Redrawn every 30 seconds for the time in and left.
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            if !active.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label {
+                        Text("Recording now").font(.headline)
+                    } icon: {
+                        Circle().fill(.red).frame(width: 10, height: 10)
+                    }
+                    ForEach(active, id: \.id) { r in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(r.title).font(.body.weight(.medium)).lineLimit(1)
+                            Text(([r.channelName, r.progressLabel(now: context.date)] + [r.ownerName].compactMap { $0 }).joined(separator: " · "))
+                                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                            if r.canDelete != false {
+                                StopRecordingButtons(recording: r, onDone: { onStopped(r.id) }, onError: { error = $0 })
+                            }
+                        }
+                        .accessibilityElement(children: .contain)
+                    }
+                    if let error { Text(error).font(.caption).foregroundStyle(.red) }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.red.opacity(0.4)))
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("liveTV.recordingNow")
+            }
+        }
+        .task(id: refresh) {
+            // Checked again every 30 seconds: recordings start and finish on their own.
+            while !Task.isCancelled {
+                await load()
+                do { try await Task.sleep(for: .seconds(30)) } catch { return }
+            }
+        }
+    }
+
+    private func load() async {
+        guard let list = try? await app.recordings() else { return }
+        all = list.filter { $0.status == .recording }
+        if active.isEmpty { error = nil }
+    }
+}
+
 /// The DVR (LIVE-5): recording now, upcoming, series and finished recordings.
 struct RecordingsList: View {
     @Environment(AppSession.self) private var app
+    @Environment(VideoPresenter.self) private var video
     /// Changed by the page's pull-to-refresh.
     var refresh = 0
     /// Show the signed-in user's recording space (only for those who may record).
     var canRecord = false
+    /// Stopped on this page (the server may still say recording for a moment).
+    var stopped: Set<Int64> = []
+    /// After a recording in progress is stopped (the page refreshes the strip and the list).
+    var onStopped: (Int64) -> Void = { _ in }
+    /// All recordings, or only the ones the signed-in user scheduled (remembered on the device).
+    @AppStorage("liveTV.recordingsOwner") private var ownerSetting = RecordingOwner.all.rawValue
     @State private var recordings: [Recording] = []
     @State private var usage: DvrUsage?
     @State private var rules: [RecordingRule] = []
@@ -739,16 +944,28 @@ struct RecordingsList: View {
     @State private var error: String?
     @State private var deleting: Recording?
 
+    private var ownerFilter: RecordingOwner { RecordingOwner(rawValue: ownerSetting) ?? .all }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
+            Picker("Show", selection: $ownerSetting) {
+                Text("All recordings").tag(RecordingOwner.all.rawValue)
+                Text("Only mine").tag(RecordingOwner.me.rawValue)
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 420)
+            .accessibilityIdentifier("recordings.owner")
             if let usage, usage.quotaBytes > 0 || usage.usedBytes > 0 { usageMeter(usage) }
             if let error { Text(error).foregroundStyle(.red) }
             if loaded && recordings.isEmpty && rules.isEmpty {
-                Text("Nothing recorded yet. Pick a programme in the guide and choose Record.").foregroundStyle(.secondary)
+                Text(ownerFilter == .me ? "You haven't recorded anything yet. Pick a programme in the guide and choose Record."
+                    : "Nothing recorded yet. Pick a programme in the guide and choose Record.").foregroundStyle(.secondary)
             }
-            section("Recording Now", recordings.filter { $0.status == .recording }) { r in
-                if mine(r.canDelete) { Button("Stop") { act { try await app.cancelRecording(r.id) } } }
-            }
+            section("Recording Now", recordings.filter { $0.status == .recording && !stopped.contains($0.id) }, below: { r in
+                if mine(r.canDelete) {
+                    StopRecordingButtons(recording: r, onDone: { onStopped(r.id) }, onError: { error = $0 })
+                }
+            }) { _ in EmptyView() }
             section("Upcoming", recordings.filter { $0.status == .scheduled }) { r in
                 if mine(r.canDelete) { Button("Cancel") { act { try await app.cancelRecording(r.id) } } }
             }
@@ -773,7 +990,9 @@ struct RecordingsList: View {
                     }
                 }
             }
-            section("Recorded", recordings.filter { $0.status == .completed || $0.status == .failed }) { r in
+            section("Recorded", recordings.filter { $0.status == .completed || $0.status == .failed }, below: { r in
+                if r.status == .completed, let item = r.itemId { playRow(r, item: item) }
+            }) { r in
                 if !mine(r.canDelete) {
                     EmptyView()
                 } else if r.status == .failed {
@@ -784,14 +1003,16 @@ struct RecordingsList: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .task(id: refresh) { await load() }
+        .task(id: "\(refresh)|\(ownerSetting)") { await load() }
         .confirmationDialog("Delete this recording?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), presenting: deleting) { r in
             Button("Delete \(r.title)", role: .destructive) { act { try await app.cancelRecording(r.id, deleteFile: true) } }
         }
     }
 
     @ViewBuilder
-    private func section<A: View>(_ title: String, _ list: [Recording], @ViewBuilder action: @escaping (Recording) -> A) -> some View {
+    private func section<A: View, B: View>(_ title: String, _ list: [Recording],
+                                           @ViewBuilder below: @escaping (Recording) -> B = { _ in EmptyView() },
+                                           @ViewBuilder action: @escaping (Recording) -> A) -> some View {
         if !list.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text(title).font(.headline)
@@ -806,6 +1027,8 @@ struct RecordingsList: View {
                             }
                             Text(detail(r)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                             if r.status == .failed { Text("Failed: \(r.error ?? "unknown error")").font(.caption).foregroundStyle(.red) }
+                            if r.stoppedEarly == true { Text("Stopped early").font(.caption.weight(.medium)).foregroundStyle(.orange) }
+                            below(r).padding(.top, 4)
                         }
                         Spacer()
                         action(r)
@@ -817,10 +1040,39 @@ struct RecordingsList: View {
         }
     }
 
+    /// Resume (or Play) a finished recording, with how much has been watched.
+    private func playRow(_ r: Recording, item: Int64) -> some View {
+        let offset = r.viewOffsetMs ?? 0, total = r.durationMs ?? 0
+        return HStack(spacing: 10) {
+            Button(offset > 0 ? "Resume" : "Play", systemImage: "play.fill") {
+                video.play(item, startMs: offset > 0 ? offset : 0)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Color.marqueeGold)
+            #if os(iOS)
+            .controlSize(.small)
+            #endif
+            if offset > 0, total > 0 {
+                ProgressView(value: min(1, Double(offset) / Double(total)))
+                    .tint(Color.marqueeGold)
+                    .frame(maxWidth: 160)
+                    .accessibilityLabel("Watched so far")
+                Text("\(formatTime(seconds: Double(offset) / 1000)) of \(formatTime(seconds: Double(total) / 1000))")
+                    .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            } else if r.watched == true {
+                Text("Watched").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
     private func detail(_ r: Recording) -> String {
         var parts = [r.episode, r.subtitle].compactMap { $0 }
         parts.append(r.channelName)
-        parts.append("\(r.start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))–\(r.end.formatted(date: .omitted, time: .shortened))")
+        if r.status == .recording {
+            parts.append(r.progressLabel())
+        } else {
+            parts.append("\(r.start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))–\(r.end.formatted(date: .omitted, time: .shortened))")
+        }
         if let b = r.sizeBytes, b > 0 { parts.append(ByteCountFormatter.string(fromByteCount: b, countStyle: .file)) }
         if let o = owner(r.ownerName, userId: r.userId) { parts.append(o) }
         return parts.joined(separator: " · ")
@@ -854,8 +1106,8 @@ struct RecordingsList: View {
 
     private func load() async {
         do {
-            recordings = try await app.recordings()
-            rules = try await app.recordingRules()
+            recordings = try await app.recordings(owner: ownerFilter)
+            rules = try await app.recordingRules(owner: ownerFilter)
             usage = canRecord ? try? await app.recordingUsage() : nil
             error = nil
         } catch {

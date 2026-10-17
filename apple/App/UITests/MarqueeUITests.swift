@@ -916,6 +916,114 @@ final class MarqueeUITests: XCTestCase {
         shot("dvr2-no-recordings-tab")
     }
 
+    /// Connection limits and stopping recordings (LIVE-3, LIVE-5): with the test source limited
+    /// to one connection and a recording on, the Recording now strip offers Stop and keep, the
+    /// other channels are greyed out and skipped by a swipe, and Recordings switches between
+    /// All recordings and Only mine. Needs the source's maxStreams at 1.
+    func testRecordingNowAndConnectionLimits() throws {
+        // Recordings in progress hold the only connection: stop them (keeping what they have).
+        for r in try adminList("/livetv/recordings") where r["status"] as? String == "recording" {
+            try adminAPI("POST", "/livetv/recordings/\(r["id"] as! Int)/stop", ["keep": true])
+        }
+        let user = try temporaryUser()
+        let id = try XCTUnwrap(try adminList("/users").first { $0["username"] as? String == user.name }?["id"] as? Int)
+        try adminAPI("PATCH", "/users/\(id)", ["restrictions": ["allowRemote": true, "liveTv": true, "canRecordDVR": true, "canViewDVR": true]])
+        let login = try adminAPI("POST", "/auth/login", ["username": user.name, "password": user.password,
+                                                         "device": ["clientId": "uitest-\(user.name)", "name": "UI test", "platform": "ios"]])
+        let token = try XCTUnwrap(login["token"] as? String)
+
+        // The user records what's on now (with time to spare); the admin records something later,
+        // which only "All recordings" shows.
+        let channels = try adminList("/livetv/channels")
+        let soon = Date().addingTimeInterval(8 * 60)
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        func date(_ s: Any?) -> Date? { (s as? String).flatMap { iso.date(from: $0) ?? ISO8601DateFormatter().date(from: $0) } }
+        guard let channel = channels.first(where: { date(($0["now"] as? [String: Any])?["end"]).map { $0 > soon } ?? false }) else {
+            throw XCTSkip("nothing on now runs long enough to record")
+        }
+        let name = try XCTUnwrap(channel["name"] as? String)
+        let now = try XCTUnwrap(channel["now"] as? [String: Any])
+        let mine = try adminAPI("POST", "/livetv/recordings", ["channelId": channel["id"] as! Int, "start": now["start"] as! String], as: token)
+        let recID = try XCTUnwrap((mine["recording"] as? [String: Any])?["id"] as? Int, "scheduled: \(mine)")
+        let recURL = "http://\(server)/api/v1/livetv/recordings/\(recID)?deleteFile=true", admin = adminToken
+        addTeardownBlock { Self.send("DELETE", recURL, token: admin) }
+        let other = try XCTUnwrap(channels.first { $0["id"] as? Int != channel["id"] as? Int && $0["next"] != nil })
+        let next = try XCTUnwrap(other["next"] as? [String: Any])
+        let theirs = try adminAPI("POST", "/livetv/recordings", ["channelId": other["id"] as! Int, "start": next["start"] as! String])
+        if let tid = (theirs["recording"] as? [String: Any])?["id"] as? Int {
+            let url = "http://\(server)/api/v1/livetv/recordings/\(tid)"
+            addTeardownBlock { Self.send("DELETE", url, token: admin) }
+        }
+        let otherTitle = try XCTUnwrap(next["title"] as? String)
+        var recording = false
+        for _ in 0..<30 where !recording {
+            recording = try adminList("/livetv/recordings").contains { $0["id"] as? Int == recID && $0["status"] as? String == "recording" }
+            if !recording { sleep(1) }
+        }
+        XCTAssertTrue(recording, "the recording started")
+        let unavailable = try adminList("/livetv/channels").filter { $0["available"] as? Bool == false }
+        guard let blocked = unavailable.first?["name"] as? String else { throw XCTSkip("the test source isn't limited to one connection") }
+
+        signIn(username: user.name, password: user.password)
+        openLibrary("Live TV")
+        XCTAssertTrue(app.navigationBars["Live TV"].waitForExistence(timeout: 10))
+
+        // The Recording now strip.
+        let strip = app.descendants(matching: .any)["liveTV.recordingNow"].firstMatch
+        XCTAssertTrue(strip.waitForExistence(timeout: 15), "the Recording now strip shows")
+        XCTAssertTrue(app.staticTexts["Recording now"].exists)
+        XCTAssertTrue(app.buttons["Stop and keep"].firstMatch.exists)
+        XCTAssertTrue(app.buttons["Stop and delete"].firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS ' in · '")).firstMatch.exists, "time in and left")
+        shot("cl1-recording-now")
+
+        // Another channel is greyed out with the reason, and tapping it says why.
+        let greyed = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(blocked), unavailable: ")).firstMatch
+        XCTAssertTrue(greyed.waitForExistence(timeout: 10), "\(blocked) is marked unavailable")
+        greyed.tap()
+        XCTAssertTrue(app.alerts["Channel unavailable"].waitForExistence(timeout: 5), "tapping says why")
+        shot("cl2-unavailable")
+        app.alerts.buttons["OK"].tap()
+
+        // Full screen on the recorded channel: a swipe skips the unavailable channels.
+        let expand = app.buttons["Watch full screen"]
+        XCTAssertTrue(expand.waitForExistence(timeout: 10))
+        expand.tap()
+        XCTAssertTrue(app.buttons["Close Live TV"].waitForExistence(timeout: 15))
+        let overlay = app.descendants(matching: .any)["liveWatch.channelOverlay"].firstMatch
+        app.windows.firstMatch.swipeLeft()
+        XCTAssertTrue(overlay.waitForExistence(timeout: 3))
+        XCTAssertEqual(overlay.label, name, "the only channel that can be tuned")
+        shot("cl3-swipe-skips")
+        XCTAssertTrue(overlay.waitForNonExistence(timeout: 6))
+        app.windows.firstMatch.swipeRight()
+        XCTAssertTrue(overlay.waitForExistence(timeout: 3))
+        XCTAssertEqual(overlay.label, name)
+        app.buttons["Close Live TV"].tap()
+
+        // Recordings: All recordings, then Only mine.
+        app.buttons["Recordings"].firstMatch.tap()
+        let all = app.buttons["All recordings"], onlyMine = app.buttons["Only mine"]
+        XCTAssertTrue(all.waitForExistence(timeout: 10))
+        all.tap()
+        XCTAssertTrue(app.staticTexts[otherTitle].waitForExistence(timeout: 10), "someone else's recording")
+        shot("cl4-all-recordings")
+        onlyMine.tap()
+        XCTAssertTrue(app.staticTexts[otherTitle].waitForNonExistence(timeout: 10), "only mine")
+        XCTAssertTrue(app.staticTexts["Recording Now"].exists, "my recording is still listed")
+        shot("cl5-only-mine")
+        all.tap()
+
+        // Stop and keep from the strip: it goes, and the recording is kept, stopped early.
+        app.buttons["Stop and keep"].firstMatch.tap()
+        XCTAssertTrue(strip.waitForNonExistence(timeout: 15), "the strip goes")
+        let after = try adminList("/livetv/recordings").first { $0["id"] as? Int == recID }
+        XCTAssertNotEqual(after?["status"] as? String, "recording")
+        XCTAssertNotNil(after, "kept")
+        shot("cl6-stopped")
+    }
+
     // MARK: - Playback and Home extras (PLAY-17/18/19, USER-12/13, META-7, equaliser)
 
     /// Opens a movie by title from the Movies library.
