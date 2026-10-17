@@ -2,6 +2,7 @@ package vodsave
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -58,6 +59,27 @@ func (s *Service) replace(ctx context.Context, v Save, from, to string) (final, 
 		slog.Warn("vod save: upgrade: couldn't point the library at the new file; the scan will", "path", final, "err", err)
 	}
 	return final, paths[0], nil
+}
+
+// checkUpgrade refuses to replace the library's copy (fileID) with a saved file that is
+// worse: a lower resolution, or SDR where the library's is HDR. A copy that went meanwhile
+// is no reason to refuse (the save is then a plain one).
+func (s *Service) checkUpgrade(ctx context.Context, fileID int64, saved mediaInfo) error {
+	lib, err := scanFile(s.DB.QueryRowContext(ctx, "SELECT "+fileCols+" FROM media_files f WHERE f.id=? AND f.available=1", fileID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	q := Quality{Width: saved.Width, Height: saved.Height}
+	if saved.HDR {
+		q.HDR = "hdr"
+	}
+	if v, why := Compare(q, lib.Quality); v == VerdictWorse {
+		return permError{fmt.Errorf("the saved file isn't better than the library's copy, which was kept: %s", why), false}
+	}
+	return nil
 }
 
 // repoint points the kept file record (ids[0]) at the new file, to be read again by the

@@ -79,6 +79,15 @@ func TestContinueWatchingAll(t *testing.T) {
 	if l := list(""); len(l) != 0 {
 		t.Errorf("watched: %+v", l)
 	}
+	// Watched before and started again: back, as on the films row.
+	s.SetProgress(ctx, uid, film, 1_200_000, 5_000_000)
+	at("vod_progress", "movie_id", film, "2099-01-02T00:00:00Z") // after the removal above
+	if l := list(""); len(l) != 1 || l[0].Movie == nil || l[0].PositionMS != 1_200_000 {
+		t.Errorf("rewatching: %+v", l)
+	}
+	if m, _ := s.ContinueWatching(ctx, uid, ""); len(m) != 1 {
+		t.Errorf("films row, rewatching: %+v", m)
+	}
 }
 
 func TestQualityFromInfo(t *testing.T) {

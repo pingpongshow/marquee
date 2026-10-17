@@ -242,11 +242,14 @@ func (r *Recorder) workDir(ctx context.Context, id int64) string {
 
 // Wake makes the scheduler look again now.
 func (r *Recorder) Wake() {
-	if r.wake == nil {
+	r.mu.Lock()
+	w := r.wake // set by Run, perhaps while a request schedules
+	r.mu.Unlock()
+	if w == nil {
 		return
 	}
 	select {
-	case r.wake <- struct{}{}:
+	case w <- struct{}{}:
 	default:
 	}
 }
@@ -322,12 +325,16 @@ func (r *Recorder) Tick(ctx context.Context) {
 }
 
 // followGuide keeps upcoming recordings in step with the guide: a programme that changed
-// name, details or end time is updated; a series airing whose slot now holds another title
-// is dropped (one-off recordings record whatever airs in their slot).
+// name, details or end time is updated; a series airing whose slot the guide now fills
+// with something else (another title, or a programme running over the time it started,
+// when the airing moved) is dropped, and expandRules schedules it where it is now
+// (one-off recordings record whatever airs in their slot).
 func (r *Recorder) followGuide(ctx context.Context) error {
 	if _, err := r.Live.DB.ExecContext(ctx, `DELETE FROM dvr_recordings WHERE status = 'scheduled' AND rule_id IS NOT NULL
-		AND EXISTS (SELECT 1 FROM live_programmes p JOIN dvr_rules d ON d.id = dvr_recordings.rule_id
-			WHERE p.channel_id = dvr_recordings.channel_id AND p.start = dvr_recordings.start AND lower(p.title) <> lower(d.title))`); err != nil {
+		AND NOT EXISTS (SELECT 1 FROM live_programmes p JOIN dvr_rules d ON d.id = dvr_recordings.rule_id
+			WHERE p.channel_id = dvr_recordings.channel_id AND p.start = dvr_recordings.start AND lower(p.title) = lower(d.title))
+		AND EXISTS (SELECT 1 FROM live_programmes p
+			WHERE p.channel_id = dvr_recordings.channel_id AND p.start <= dvr_recordings.start AND p.stop > dvr_recordings.start)`); err != nil {
 		return err
 	}
 	_, err := r.Live.DB.ExecContext(ctx, `UPDATE dvr_recordings SET title = p.title, subtitle = p.subtitle, description = p.description,
@@ -404,14 +411,20 @@ func (r *Recorder) expandRules(ctx context.Context) error {
 // Schedule records the programme on channelID starting at start, or every airing of its
 // title when series is set (on any channel when anyChannel is also set).
 func (r *Recorder) Schedule(ctx context.Context, userID, channelID int64, start time.Time, series, anyChannel bool) (rec *Recording, rule *Rule, err error) {
-	var title, chName string
-	err = r.Live.DB.QueryRowContext(ctx, `SELECT p.title, c.name FROM live_programmes p JOIN live_channels c ON c.id = p.channel_id WHERE p.channel_id = ? AND p.start = ?`,
-		channelID, start.UTC().Format(time.RFC3339)).Scan(&title, &chName)
+	var title, chName, stop string
+	err = r.Live.DB.QueryRowContext(ctx, `SELECT p.title, c.name, p.stop FROM live_programmes p JOIN live_channels c ON c.id = p.channel_id WHERE p.channel_id = ? AND p.start = ?`,
+		channelID, start.UTC().Format(time.RFC3339)).Scan(&title, &chName, &stop)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, ErrProgrammeNotFound
 	}
 	if err != nil {
 		return nil, nil, err
+	}
+	// A programme that has ended (the guide keeps a few hours back) can't be recorded; it
+	// would only fail as missed. A series of it still records its later airings.
+	_, after := r.pad()
+	if end, err := time.Parse(time.RFC3339, stop); err == nil && !series && !end.Add(after).After(r.now()) {
+		return nil, nil, ErrProgrammeNotFound
 	}
 	if r.atQuota(ctx, userID) {
 		return nil, nil, ErrQuotaExceeded
@@ -893,7 +906,15 @@ func (r *Recorder) join(ctx context.Context, parts []string, dest string) (strin
 		}
 	}
 	slog.Warn("dvr: remuxing failed; keeping the longest part as MPEG-TS", "err", lastLine(string(out)))
-	ts := strings.TrimSuffix(dest, filepath.Ext(dest)) + ".ts"
+	// Never over an earlier recording (destination only checked the .mkv name).
+	base := strings.TrimSuffix(dest, filepath.Ext(dest))
+	ts := base + ".ts"
+	for i := 2; ; i++ {
+		if _, err := os.Lstat(ts); errors.Is(err, os.ErrNotExist) {
+			break
+		}
+		ts = fmt.Sprintf("%s (%d).ts", base, i)
+	}
 	return ts, os.Rename(longest, ts)
 }
 

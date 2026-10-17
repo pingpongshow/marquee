@@ -169,8 +169,11 @@ func (h *Handlers) GetVodSeries(ctx context.Context, req GetVodSeriesRequestObje
 		}
 		episodesErr = err
 	}
-	if m, err = h.vodSeries(ctx, s, maxRating, req.SeriesId); err != nil || m == nil {
+	if m, err = h.vodSeries(ctx, s, maxRating, req.SeriesId); err != nil {
 		return nil, internal(ctx, "getVodSeries", fmt.Errorf("series %d: %v", req.SeriesId, err))
+	}
+	if m == nil { // removed by a refresh meanwhile
+		return GetVodSeries404JSONResponse{NotFoundJSONResponse(errVodSeriesNotFound)}, nil
 	}
 	seasons, err := h.VOD.Seasons(ctx, m.ID, s.User.ID)
 	if err != nil {

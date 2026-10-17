@@ -319,6 +319,12 @@ func (s *Service) refreshXtreamSeries(ctx context.Context, src settings.VODSourc
 		existing[k] = id
 	}
 	rows.Close()
+	// An empty list from a server that listed series before is taken as a glitch (some send
+	// {} or null when overloaded), not as every series gone: removing them would take
+	// everyone's progress in them with them.
+	if len(shows) == 0 && len(existing) > 0 {
+		return 0, fmt.Errorf("the server lists no series (keeping the %d listed before)", len(existing))
+	}
 	// The source's details stand until TMDB's replace them (matched). A changed TMDB id is
 	// looked up again; a changed last_modified fetches the episodes again when next opened.
 	stmt, err := tx.PrepareContext(ctx, `INSERT INTO vod_series(source_id, source_key, title, category, logo_url, year,
@@ -567,6 +573,11 @@ func (s *Service) storeEpisodes(ctx context.Context, x *xtream, seriesID int64, 
 		return err
 	}
 	defer stmt.Close()
+	// No episodes where there were some is a glitch, not every episode gone (that would take
+	// everyone's progress in them): keep them.
+	if len(existing) > 0 && !anyEpisode(info.Episodes) {
+		return errors.New("the server gave no episodes for this series")
+	}
 	seen := map[string]bool{}
 	seasons := map[int]bool{}
 	quality := map[string]Quality{} // what the server says the files are
@@ -670,6 +681,16 @@ func (s *Service) storeEpisodes(ctx context.Context, x *xtream, seriesID int64, 
 		return err
 	}
 	return tx.Commit()
+}
+
+// anyEpisode reports whether a server's episodes include one that can be stored.
+func anyEpisode(list []xtreamEpisode) bool {
+	for _, e := range list {
+		if e.ID.Int() > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // episodesFromTMDB adds TMDB's names, overviews and stills to a matched series' episodes,

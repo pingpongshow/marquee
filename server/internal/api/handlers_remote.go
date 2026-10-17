@@ -119,7 +119,7 @@ func (h *Handlers) ReportRemoteState(ctx context.Context, req ReportRemoteStateR
 	}
 	// The contract has no 400 here: a malformed state is dropped rather than shown.
 	if validRemoteState(req.Body) == nil {
-		h.Remote.SetState(s.DeviceID, *req.Body)
+		h.Remote.SetState(s.DeviceID, s.User.ID, *req.Body)
 	}
 	return ReportRemoteState204Response{}, nil
 }

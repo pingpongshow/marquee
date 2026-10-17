@@ -67,7 +67,8 @@ func containingRoot(roots []string, p string) (string, bool) {
 		if err != nil {
 			continue
 		}
-		if p == rr || strings.HasPrefix(p, rr+string(filepath.Separator)) {
+		// TrimSuffix: a root of "/" would otherwise need paths to start with "//".
+		if p == rr || strings.HasPrefix(p, strings.TrimSuffix(rr, string(filepath.Separator))+string(filepath.Separator)) {
 			return rr, true
 		}
 	}

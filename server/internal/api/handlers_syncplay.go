@@ -66,6 +66,10 @@ func (h *Handlers) GetWatchGroup(ctx context.Context, req GetWatchGroupRequestOb
 	if !ok {
 		return GetWatchGroup401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
+	// Like joining: only for people who may see what the group is watching.
+	if item, err := h.SyncPlay.ItemOf(req.GroupId); err != nil || h.Items.Visible(ctx, itemAccess(ctx), item) != nil {
+		return GetWatchGroup404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "this group has ended"))}, nil
+	}
 	since, wait := int64(-1), time.Duration(0)
 	if req.Params.Since != nil {
 		since, wait = *req.Params.Since, 25*time.Second

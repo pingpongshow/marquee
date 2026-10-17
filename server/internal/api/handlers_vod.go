@@ -137,6 +137,7 @@ func (h *Handlers) vodStatus(ctx context.Context) (VodStatus, error) {
 	}
 	out := VodStatus{Movies: st.Movies, Series: st.Series, Matched: st.Matched, Unmatched: st.Unmatched, Matching: h.VOD.Matching()}
 	s, ok := session(ctx)
+	admin := ok && s.User.IsAdmin
 	if ok {
 		allowed, _ := vodAccess(s)
 		out.Enabled = allowed && h.VOD.Enabled() && (st.Movies > 0 || st.Series > 0)
@@ -155,7 +156,12 @@ func (h *Handlers) vodStatus(ctx context.Context) (VodStatus, error) {
 	for i, src := range st.Sources {
 		out.Sources[i].Id, out.Sources[i].Name, out.Sources[i].Movies = src.ID, src.Name, src.Movies
 		out.Sources[i].Series = src.Series
-		out.Sources[i].RefreshedAt, out.Sources[i].Error = src.RefreshedAt, nz(src.Error)
+		out.Sources[i].RefreshedAt = src.RefreshedAt
+		// A source's error can name its address, which may hold its credentials (an M3U
+		// playlist link with a username and password): admins only.
+		if admin {
+			out.Sources[i].Error = nz(src.Error)
+		}
 	}
 	return out, nil
 }

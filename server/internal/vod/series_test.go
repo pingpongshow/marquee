@@ -359,3 +359,52 @@ func TestXtreamDispatcharrErrors(t *testing.T) {
 		t.Errorf("password in %q", err)
 	}
 }
+
+// A server that answers with no series, or a series with no episodes, where it listed some
+// before is having a glitch: what was there stays, with everyone's progress.
+func TestSeriesEmptyAnswerKeepsProgress(t *testing.T) {
+	s, f, _, _, uid := xtreamSetup(t)
+	ctx := context.Background()
+	s.Refresh(ctx, false)
+	settle(t, s)
+	small := seriesByTitle(t, s, uid)["Small Town"]
+	if err := s.LoadEpisodes(ctx, small.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	eps, _ := s.Episodes(ctx, small.ID, uid)
+	if len(eps) == 0 {
+		t.Fatal("no episodes")
+	}
+	s.SetEpisodeProgress(ctx, uid, eps[0].ID, 60_000, 0)
+	progress := func() int {
+		var n int
+		s.DB.QueryRow("SELECT COUNT(*) FROM vod_episode_progress WHERE user_id=?", uid).Scan(&n)
+		return n
+	}
+
+	// The series' episodes come back empty.
+	f.mu.Lock()
+	f.seriesInfo["202"] = `{"seasons":[],"info":{},"episodes":{}}`
+	f.mu.Unlock()
+	if err := s.LoadEpisodes(ctx, small.ID, true); err != nil {
+		t.Fatalf("empty episodes: %v", err)
+	}
+	if got, _ := s.Episodes(ctx, small.ID, uid); len(got) != len(eps) || progress() != 1 {
+		t.Errorf("after empty episodes: %d episodes, %d progress", len(got), progress())
+	}
+
+	// The series list comes back empty ({} or []).
+	for _, empty := range []string{`{}`, `[]`} {
+		f.mu.Lock()
+		f.series = empty
+		f.mu.Unlock()
+		s.Refresh(ctx, false)
+		if _, total, _ := s.SeriesList(ctx, Filter{}); total != 3 || progress() != 1 {
+			t.Errorf("after %s: %d series, %d progress", empty, total, progress())
+		}
+		st, _ := s.Status(ctx)
+		if !strings.HasPrefix(st.Sources[0].Error, "series: ") {
+			t.Errorf("after %s: error %q", empty, st.Sources[0].Error)
+		}
+	}
+}

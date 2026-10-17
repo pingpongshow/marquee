@@ -349,3 +349,49 @@ func TestUpgradeReplacesTheLibraryCopy(t *testing.T) {
 	}
 	e.noSecrets()
 }
+
+// An upgrade is chosen by what the source says its file is; when the file saved turns out
+// worse than the library's copy (here the source claims 4K for a 720p file, and the
+// library has 1080p), the library's copy stays where it is and the save fails.
+func TestUpgradeKeepsABetterLibraryCopy(t *testing.T) {
+	data := clip(t, "mkv") // 720p
+	e := newEnv(t, oneFilm, nil)
+	e.src.files["movie/101.mkv"] = data
+	e.src.info["vod:101"] = `{"info":{"video":{"codec_name":"hevc","width":3840,"height":2160},"bitrate":"20000"}}`
+	ctx := context.Background()
+	e.s.Trash = &mediatrash.Service{DB: e.s.DB}
+
+	dir := filepath.Join(e.movies, "Clip Film (2020)")
+	os.MkdirAll(dir, 0o755)
+	old := filepath.Join(dir, "Clip Film (2020) Bluray-1080p.mkv")
+	if out, err := exec.Command("ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=24:duration=2",
+		"-c:v", "libx264", "-preset", "ultrafast", old).CombinedOutput(); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	libs := library.NewStore(e.s.DB)
+	lib, _ := libs.Get(ctx, e.libID("Movies"))
+	sc := &scanner.Scanner{DB: e.s.DB, Prober: probe.New("ffprobe", 2)}
+	if _, err := sc.Scan(ctx, lib, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	r, err := e.s.SaveMovie(ctx, e.movieID("EN - Clip Film (2020)"), 1, true)
+	if err != nil || r.Upgrades != 1 {
+		t.Fatalf("save: %+v %v", r, err)
+	}
+	e.start()
+	v := e.wait(r.Saves[0].ID, Done, Failed)
+	if v.State != Failed || !strings.Contains(v.Error, "library's copy") || v.ReplacedPath != "" {
+		t.Fatalf("saved: %+v", v)
+	}
+	if _, err := os.Stat(old); err != nil {
+		t.Errorf("the library's copy: %v", err)
+	}
+	if trashed, _ := filepath.Glob(filepath.Join(e.movies, library.TrashDir, "*", "*", "*")); len(trashed) != 0 {
+		t.Errorf("trash: %v", trashed)
+	}
+	var n int
+	e.s.DB.QueryRow("SELECT COUNT(*) FROM media_files WHERE path=? AND available=1", old).Scan(&n)
+	if n != 1 {
+		t.Errorf("the library's record: %d", n)
+	}
+}

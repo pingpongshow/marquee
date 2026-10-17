@@ -511,7 +511,9 @@ func (h *Handlers) SwitchProfile(ctx context.Context, req SwitchProfileRequestOb
 	set(&pin, b.Pin)
 	set(&pw, b.Password)
 	ip := requestInfo(ctx).ClientIP
-	if pw == "" && pinBlockedBy2FA(ctx, target) {
+	// Away from home a two-factor account needs its authenticator code, which switching
+	// doesn't take: a PIN (even sent with a password) or a password alone isn't enough.
+	if pinBlockedBy2FA(ctx, target) {
 		return SwitchProfile401JSONResponse{UnauthorizedJSONResponse(apiErr("password_required", errPinNeeds2FA))}, nil
 	}
 	// Admins can switch into managed profiles without the PIN.

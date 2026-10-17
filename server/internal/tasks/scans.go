@@ -29,6 +29,8 @@ type ScanStatus struct {
 	Progress   *scanner.Progress
 	LastResult string
 	LastError  string
+	// again: the library was queued while it was scanning; it is scanned once more after.
+	again bool
 }
 
 // Scans runs library scans one at a time (they are disk-bound; parallel scans of the same
@@ -94,7 +96,9 @@ func (s *Scans) Run(ctx context.Context) {
 	}
 }
 
-// Queue adds a library to the scan queue. It is a no-op if already queued or running.
+// Queue adds a library to the scan queue. It is a no-op if already queued; while the library
+// is scanning, it is queued again for when that scan ends (the scan may already have walked
+// past whatever changed).
 func (s *Scans) Queue(libID int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -104,9 +108,17 @@ func (s *Scans) Queue(libID int64) {
 		st = &ScanStatus{State: Idle}
 		s.status[libID] = st
 	}
+	if st.State == Scanning {
+		st.again = true
+		return
+	}
 	if st.State != Idle {
 		return
 	}
+	s.enqueueLocked(libID, st)
+}
+
+func (s *Scans) enqueueLocked(libID int64, st *ScanStatus) {
 	st.State = Queued
 	s.queue = append(s.queue, libID)
 	select {
@@ -133,6 +145,9 @@ func (s *Scans) Cancel(libID int64) {
 	s.init()
 	if c := s.cancel[libID]; c != nil {
 		c()
+	}
+	if st := s.status[libID]; st != nil {
+		st.again = false
 	}
 	for i, id := range s.queue {
 		if id == libID {
@@ -249,6 +264,12 @@ func (s *Scans) finish(libID int64, result string, err error) {
 		}
 	}
 	delete(s.cancel, libID)
+	if st.again {
+		st.again = false
+		if err == nil || !errors.Is(err, context.Canceled) {
+			s.enqueueLocked(libID, st)
+		}
+	}
 }
 
 // queueDue queues libraries whose scan interval has elapsed.

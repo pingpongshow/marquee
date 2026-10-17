@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"marquee/internal/ai"
 	"marquee/internal/items"
@@ -14,6 +16,23 @@ import (
 	"marquee/internal/muse"
 	"marquee/internal/soundprint"
 )
+
+// clampCount keeps a client's count within the API's bounds: the server doesn't validate
+// requests against the spec, and the station builders' work grows with the count (a huge
+// Sound Journey length scans the whole index once per step; a negative one panicked).
+func clampCount(n, lo, hi int) int {
+	return min(max(n, lo), hi)
+}
+
+// upperFirst capitalises the first letter, whole ("électro" → "Électro"; slicing its first
+// byte split the letter into invalid UTF-8).
+func upperFirst(s string) string {
+	r, n := utf8.DecodeRuneInString(s)
+	if r == utf8.RuneError {
+		return s
+	}
+	return string(unicode.ToUpper(r)) + s[n:]
+}
 
 // keepFor limits Soundprint results to libraries the user can see (and optionally one library).
 func keepFor(acc items.Access, libraryID *int64) soundprint.Filter {
@@ -66,6 +85,7 @@ func (h *Handlers) SoundsLike(ctx context.Context, req SoundsLikeRequestObject) 
 	}
 	limit := 20
 	set(&limit, req.Params.Limit)
+	limit = clampCount(limit, 1, 50)
 	keep := keepFor(acc, nil)
 	var ids []int64
 	switch d.Type {
@@ -105,6 +125,7 @@ func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) 
 	o := soundprint.Options{Length: 50, Keep: keepFor(acc, b.LibraryId), Avoid: h.Soundprint.Avoid(ctx, s.User.ID), Exclude: map[int64]bool{},
 		Favour: h.Soundprint.Favour(ctx, s.User.ID)}
 	set(&o.Length, b.Limit)
+	o.Length = clampCount(o.Length, 5, 100)
 	if b.Exclude != nil {
 		for _, id := range *b.Exclude {
 			o.Exclude[id] = true
@@ -158,7 +179,7 @@ func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) 
 			err = verr
 			break
 		}
-		st = h.Soundprint.RadioFromVector(v, strings.ToUpper(value[:1])+value[1:]+" Radio", o)
+		st = h.Soundprint.RadioFromVector(v, upperFirst(value)+" Radio", o)
 	case RadioRequestSeedFavourites:
 		// The sound of their favourite songs first, then what they play and rate highly.
 		taste := h.Soundprint.Taste(ctx, s.User.ID, h.Soundprint.Liked(ctx, s.User.ID))
@@ -206,6 +227,7 @@ func (h *Handlers) MusicMuse(ctx context.Context, req MusicMuseRequestObject) (M
 	}
 	n := 30
 	set(&n, req.Body.Limit)
+	n = clampCount(n, 5, 100)
 	o := soundprint.Options{Keep: keepFor(access(ctx), req.Body.LibraryId), Avoid: h.Soundprint.Avoid(ctx, s.User.ID),
 		Favour: h.Soundprint.Favour(ctx, s.User.ID)}
 	// Read the prompt (AI, or keywords against the library's genres and artists), filter,
@@ -270,6 +292,7 @@ func (h *Handlers) MusicJourney(ctx context.Context, req MusicJourneyRequestObje
 	}
 	n := 15
 	set(&n, b.Length)
+	n = clampCount(n, 3, 60)
 	ts := h.Soundprint.Index.Journey(from, to, n, soundprint.Options{Keep: keepFor(acc, nil)})
 	out, err := h.station(ctx, soundprint.Station{Title: "Sound Journey", IDs: soundprint.TrackIDs(ts)})
 	if err != nil {

@@ -256,6 +256,7 @@ func (m *Sessions) start(ctx context.Context, channelID, userID int64, url strin
 			if c, ok := cmd.Stdin.(io.Closer); ok {
 				c.Close()
 			}
+			os.RemoveAll(s.dir)
 			return nil, err
 		}
 		go func() {

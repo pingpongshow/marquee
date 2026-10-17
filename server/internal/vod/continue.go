@@ -21,13 +21,13 @@ type InProgress struct {
 }
 
 // ContinueWatchingAll is every film and episode the user stopped part-way through (one
-// episode per series, the latest), newest first, leaving out what they removed from
+// episode per series, the latest; a film watched before and started again counts), newest first, leaving out what they removed from
 // Continue Watching since (until they watch it again) and what's rated above maxRating.
 func (s *Service) ContinueWatchingAll(ctx context.Context, userID int64, maxRating string) ([]InProgress, error) {
 	where, args := ratingClause(maxRating)
 	rows, err := s.DB.QueryContext(ctx, "SELECT "+movieCols+`, p.updated_at FROM vod_movies m
 		JOIN vod_progress p ON p.movie_id=m.id AND p.user_id=?
-		WHERE p.position_ms>0 AND p.watched=0 AND `+where+`
+		WHERE p.position_ms>0 AND `+where+`
 		AND NOT EXISTS (SELECT 1 FROM vod_continue_hidden h WHERE h.user_id=p.user_id AND h.movie_id=m.id AND h.hidden_at>=p.updated_at)
 		ORDER BY p.updated_at DESC`, append([]any{userID}, args...)...)
 	if err != nil {

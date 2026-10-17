@@ -21,6 +21,8 @@ type fakeSeerr struct {
 	mu       sync.Mutex
 	made     []map[string]any
 	declined bool
+	// hold, when set, makes POST /request wait for it to close (after signalling entered).
+	hold, entered chan struct{}
 }
 
 func (f *fakeSeerr) handler(t *testing.T) http.Handler {
@@ -52,6 +54,10 @@ func (f *fakeSeerr) handler(t *testing.T) http.Handler {
 		case r.URL.Path == "/api/v1/request" && r.Method == http.MethodPost:
 			var body map[string]any
 			json.NewDecoder(r.Body).Decode(&body)
+			if f.hold != nil {
+				close(f.entered)
+				<-f.hold
+			}
 			f.mu.Lock()
 			f.made = append(f.made, body)
 			f.mu.Unlock()
@@ -234,5 +240,43 @@ func TestOldFinishedRequestsArePruned(t *testing.T) {
 	}
 	if !got["approved "+old] || !got["pending "+old] {
 		t.Errorf("waiting requests pruned: %v", got)
+	}
+}
+
+// A decline or cancel while an approval is with Seerr waits for it, so a request Seerr has
+// taken isn't left marked declined (or deleted) here.
+func TestDeclineWaitsForApproval(t *testing.T) {
+	s, f, admin, kid := setup(t)
+	ctx := context.Background()
+	r, err := s.Create(ctx, kid, "movie", 11, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.hold, f.entered = make(chan struct{}), make(chan struct{})
+	approved := make(chan error)
+	go func() {
+		_, err := s.Approve(ctx, r.ID, admin, func(int64) *int64 { return nil })
+		approved <- err
+	}()
+	<-f.entered
+	declined, cancelled := make(chan error), make(chan error)
+	go func() {
+		_, err := s.Decline(ctx, r.ID, admin, "no")
+		declined <- err
+	}()
+	go func() { cancelled <- s.Cancel(ctx, r.ID) }()
+	time.Sleep(100 * time.Millisecond)
+	close(f.hold)
+	if err := <-approved; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-declined; !errors.Is(err, ErrDecided) {
+		t.Errorf("decline during approval: %v", err)
+	}
+	if err := <-cancelled; !errors.Is(err, ErrDecided) {
+		t.Errorf("cancel during approval: %v", err)
+	}
+	if got, err := s.Get(ctx, r.ID); err != nil || got.Status != "approved" {
+		t.Errorf("after: %+v %v", got, err)
 	}
 }

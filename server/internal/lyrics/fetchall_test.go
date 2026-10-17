@@ -78,3 +78,38 @@ func TestFetchAll(t *testing.T) {
 		t.Error("expected a message when online lyrics are off")
 	}
 }
+
+// LRCLIB failing (down, rate limiting, a timeout) isn't "no lyrics": the track is asked
+// again next time instead of being remembered as having none for a month.
+func TestLRCLIBFailureNotCachedAsNone(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	d, err := db.Open(ctx, filepath.Join(dir, "t.db"), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	d.Exec(`INSERT INTO libraries (id, name, type) VALUES (1, 'Music', 'music')`)
+	d.Exec(`INSERT INTO items (id, library_id, type, title, sort_title, duration_ms) VALUES (1, 1, 'track', 'Song', 'Song', 200000)`)
+	d.Exec(`INSERT INTO media_versions (id, item_id) VALUES (1, 1)`)
+	d.Exec(`INSERT INTO media_files (version_id, library_id, path, size, mtime) VALUES (1, 1, ?, 1, 1)`, filepath.Join(dir, "Song.flac"))
+	var down atomic.Bool
+	down.Store(true)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if down.Load() {
+			http.Error(w, "busy", http.StatusServiceUnavailable)
+			return
+		}
+		w.Write([]byte(`{"plainLyrics":"la la la"}`))
+	}))
+	defer srv.Close()
+	s := &Service{DB: d, Online: func() bool { return true }, BaseURL: srv.URL}
+	if _, err := s.Get(ctx, 1); err != ErrNone {
+		t.Fatalf("while LRCLIB is down: %v", err)
+	}
+	down.Store(false)
+	l, err := s.Get(ctx, 1)
+	if err != nil || len(l.Lines) != 1 || l.Source != "lrclib" {
+		t.Fatalf("after LRCLIB recovered: %+v %v", l, err)
+	}
+}

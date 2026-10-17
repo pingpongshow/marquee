@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"sync"
 	"time"
 
 	"marquee/internal/settings"
@@ -110,6 +111,7 @@ type Dispatcher struct {
 	HTTP     *http.Client
 
 	queue chan delivery
+	once  sync.Once
 }
 
 func (d *Dispatcher) client() *http.Client {
@@ -148,10 +150,10 @@ func (d *Dispatcher) Run(ctx context.Context) {
 	}
 }
 
+// init makes the queue once: Run and Publish start concurrently, and two queues would
+// leave Run reading one while events go to the other.
 func (d *Dispatcher) init() {
-	if d.queue == nil {
-		d.queue = make(chan delivery, 256)
-	}
+	d.once.Do(func() { d.queue = make(chan delivery, 256) })
 }
 
 // Publish queues ev for every enabled webhook subscribed to it. It never blocks: when the

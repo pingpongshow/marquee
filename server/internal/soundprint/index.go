@@ -138,6 +138,9 @@ type Filter func(*Track) bool
 
 // Nearest returns the k most similar tracks to v that pass keep, best first.
 func (x *Index) Nearest(v []float32, k int, keep Filter) []Scored {
+	if k <= 0 {
+		return nil
+	}
 	x.mu.RLock()
 	all := make([]Scored, 0, len(x.tracks))
 	for _, t := range x.tracks {

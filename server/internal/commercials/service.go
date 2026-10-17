@@ -343,6 +343,14 @@ func (s *Service) Queue(ctx context.Context, fileID int64, cut bool) (Status, er
 	if err != nil {
 		return Status{}, err
 	}
+	// Cut already: never twice (the cut file would replace the original in the media trash).
+	var cur string
+	if err := s.DB.QueryRowContext(ctx, `SELECT status FROM commercial_scans WHERE file_id = ?`, f.id).Scan(&cur); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return Status{}, err
+	}
+	if cur == StatusCut {
+		return s.Status(ctx, fileID)
+	}
 	s.mu.Lock()
 	found := false
 	for i, j := range s.queue {
@@ -356,7 +364,7 @@ func (s *Service) Queue(ctx context.Context, fileID int64, cut bool) (Status, er
 	}
 	s.mu.Unlock()
 	if _, err := s.DB.ExecContext(ctx, `INSERT INTO commercial_scans (file_id, mtime, status) VALUES (?, ?, 'queued')
-		ON CONFLICT(file_id) DO UPDATE SET status = 'queued', error = '' WHERE status <> 'running'`, f.id, f.mtime); err != nil {
+		ON CONFLICT(file_id) DO UPDATE SET status = 'queued', error = '' WHERE status NOT IN ('running', 'cut')`, f.id, f.mtime); err != nil {
 		return Status{}, err
 	}
 	s.kick()

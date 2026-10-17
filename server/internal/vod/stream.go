@@ -213,6 +213,12 @@ func (s *Stream) rewrite(body []byte, base *url.URL) []byte {
 // Handler serves StreamPrefix<session>/master.m3u8 and the links it rewrites.
 func (st *Streams) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Only reads go to the source: the request's method is passed on.
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.Header().Set("Allow", "GET, HEAD")
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
 		id, name, ok := strings.Cut(strings.TrimPrefix(r.URL.Path, StreamPrefix), "/")
 		s := st.Get(id)
 		if !ok || s == nil || s.master == "" {

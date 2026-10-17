@@ -43,9 +43,9 @@ type Service struct {
 	web        *musicbrainz.Web
 	ani        *anilist.Client
 	aniRun     sync.Mutex
-	client     *tmdb.Client
+	client     *tmdb.Client            // for key; its rate limit is shared by clients
+	clients    map[string]*tmdb.Client // by language
 	key        string
-	lang       string
 	trailers   trailerCache // TMDB trailer lookups (only the video id; nothing is downloaded)
 }
 
@@ -56,11 +56,19 @@ func (s *Service) tmdb(lang string) (*tmdb.Client, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.client == nil || s.key != key || s.lang != lang {
-		s.client = tmdb.New(key, lang)
-		s.key, s.lang = key, lang
+	// One client per key, and one per language sharing its rate limit: libraries, VOD and
+	// the nightly tasks ask in different languages, and a new client for each switch both
+	// lost the rate limit and (before tmdb's limiter changed) leaked a goroutine.
+	if s.client == nil || s.key != key {
+		s.client, s.key = tmdb.New(key, ""), key
+		s.clients = map[string]*tmdb.Client{"": s.client}
 	}
-	return s.client, nil
+	c, ok := s.clients[lang]
+	if !ok {
+		c = s.client.WithLanguage(lang)
+		s.clients[lang] = c
+	}
+	return c, nil
 }
 
 type pending struct {

@@ -147,11 +147,17 @@ func (s *Service) Get(ctx context.Context, itemID int64) (Lyrics, error) {
 	if text == "" {
 		text, source = sidecar(t.path), "sidecar"
 	}
+	asked := false
 	if text == "" && s.Online() {
-		text, source = s.lrclib(ctx, t), "lrclib"
+		var answered bool
+		text, answered = s.lrclib(ctx, t)
+		source, asked = "lrclib", answered
 	}
-	if text == "" && !s.Online() {
-		source = "embedded" // remember that only local sources were tried
+	if text == "" && !asked {
+		// Remember that only local sources were tried: online lookups are off, or LRCLIB
+		// couldn't be asked (down, rate limiting, a timeout), so it's asked again later
+		// rather than recorded as having nothing for a month.
+		source = "embedded"
 	}
 	lines, sy := Parse(text)
 	s.DB.ExecContext(ctx, `INSERT INTO lyrics(item_id, synced, text, source) VALUES (?, ?, ?, ?)
@@ -210,7 +216,9 @@ func sidecar(path string) string {
 	return ""
 }
 
-func (s *Service) lrclib(ctx context.Context, t track) string {
+// lrclib asks LRCLIB for a track's lyrics. answered is false when LRCLIB couldn't say (a
+// network error, a timeout, an error status), as opposed to having none (404, or empty).
+func (s *Service) lrclib(ctx context.Context, t track) (text string, answered bool) {
 	base := s.BaseURL
 	if base == "" {
 		base = "https://lrclib.net"
@@ -232,23 +240,26 @@ func (s *Service) lrclib(ctx context.Context, t track) string {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return ""
+		return "", false
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return "", true
+	}
 	if resp.StatusCode != http.StatusOK {
-		return ""
+		return "", false
 	}
 	var r struct {
 		Synced string `json:"syncedLyrics"`
 		Plain  string `json:"plainLyrics"`
 	}
 	if json.NewDecoder(resp.Body).Decode(&r) != nil {
-		return ""
+		return "", false
 	}
 	if r.Synced != "" {
-		return r.Synced
+		return r.Synced, true
 	}
-	return r.Plain
+	return r.Plain, true
 }
 
 // CacheLocal looks for a track's lyrics in the file's tags and an .lrc next to it (never

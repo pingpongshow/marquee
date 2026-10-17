@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -214,7 +215,19 @@ func (h *Handlers) LiveChannelLogo(ctx context.Context, req LiveChannelLogoReque
 	if err != nil {
 		return LiveChannelLogo404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "no logo"))}, nil
 	}
-	return LiveChannelLogo200ImageResponse{Body: bytes.NewReader(b), ContentType: ct, ContentLength: int64(len(b))}, nil
+	return logoResponse{LiveChannelLogo200ImageResponse{Body: bytes.NewReader(b), ContentType: ct, ContentLength: int64(len(b))}}, nil
+}
+
+// logoResponse serves a channel logo fetched from a Live TV source. Logos may be SVG,
+// which can carry scripts: opened on its own on the server's origin, one could read the
+// web app's sign-in. The policy keeps it an inert image.
+type logoResponse struct {
+	LiveChannelLogo200ImageResponse
+}
+
+func (r logoResponse) VisitLiveChannelLogoResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox; frame-ancestors 'none'")
+	return r.LiveChannelLogo200ImageResponse.VisitLiveChannelLogoResponse(w)
 }
 
 func (h *Handlers) PlayLiveChannel(ctx context.Context, req PlayLiveChannelRequestObject) (PlayLiveChannelResponseObject, error) {

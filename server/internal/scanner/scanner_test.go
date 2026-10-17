@@ -3,10 +3,14 @@ package scanner
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"marquee/internal/db"
 	"marquee/internal/library"
@@ -260,5 +264,39 @@ func TestScanIgnoresMediaTrash(t *testing.T) {
 	}
 	if n := e.count(`SELECT COUNT(*) FROM media_files WHERE path LIKE '%' || ? || '%'`, library.TrashDir); n != 0 {
 		t.Errorf("trashed files scanned: %d", n)
+	}
+}
+
+// closingProber closes the database on its first probe, so the scan fails writing the
+// first result.
+type closingProber struct {
+	fakeProber
+	once *sync.Once
+	db   *sql.DB
+}
+
+func (p closingProber) Probe(ctx context.Context, path string) (*probe.Result, error) {
+	p.once.Do(func() { p.db.Close() })
+	return p.fakeProber.Probe(ctx, path)
+}
+
+// A scan that stops on an error leaves no probe workers behind blocked on their results.
+func TestScanErrorStopsWorkers(t *testing.T) {
+	e := newEnv(t)
+	l := e.lib("Movies", library.Movies, "movies")
+	for i := range 20 {
+		e.touch(fmt.Sprintf("movies/Film %d (2001)/Film %d (2001).mkv", i, i))
+	}
+	before := runtime.NumGoroutine()
+	e.sc.Prober = closingProber{fakeProber: e.sc.Prober.(fakeProber), once: &sync.Once{}, db: e.db}
+	if _, err := e.sc.Scan(context.Background(), l, nil, nil); err == nil {
+		t.Fatal("scan should fail once the database is closed")
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for runtime.NumGoroutine() > before && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if n := runtime.NumGoroutine(); n > before {
+		t.Fatalf("%d goroutines left running after the scan (%d before)", n, before)
 	}
 }

@@ -160,6 +160,10 @@ func (s *Scanner) Scan(ctx context.Context, lib library.Library, ignore []string
 		w.tx = nil
 	}
 
+	// Returning early (a write failing) must stop the probe workers and the feeder too,
+	// which would otherwise wait forever to hand over their next result.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	jobs := make(chan candidate)
 	results := make(chan probed)
 	workers := s.Workers

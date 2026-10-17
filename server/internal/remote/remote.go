@@ -208,13 +208,14 @@ func last(cmds []Command, cursor int64) int64 {
 }
 
 // SetState stores what a device is playing and wakes anyone waiting for a change. Devices
-// that haven't polled their inbox yet aren't players, so their state is ignored.
-func (h *Hub) SetState(deviceID int64, state any) bool {
+// that haven't polled their inbox yet aren't players, so their state is ignored, and so is
+// state from a user the player doesn't belong to (a device id reused after a sign-out).
+func (h *Hub) SetState(deviceID, userID int64, state any) bool {
 	h.init()
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	d := h.devices[deviceID]
-	if d == nil {
+	if d == nil || d.Info.UserID != userID {
 		return false
 	}
 	d.State = state

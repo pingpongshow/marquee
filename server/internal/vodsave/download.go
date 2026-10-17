@@ -106,6 +106,12 @@ func (s *Service) run(ctx context.Context, j *job, v Save) (outcome, error) {
 	}
 	var final, replaced string
 	if v.ReplaceFileID > 0 {
+		// The upgrade was chosen by what the source said the file is; what was saved (after
+		// any conversion, which may cap the resolution or tone-map HDR) must not be worse
+		// than the library's copy it replaces.
+		if err := s.checkUpgrade(ctx, v.ReplaceFileID, info); err != nil {
+			return outcome{}, err
+		}
 		final, replaced, err = s.replace(ctx, v, out, withTag(prov, info.Width, info.Height))
 	} else {
 		final, err = place(out, withTag(prov, info.Width, info.Height))

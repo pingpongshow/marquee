@@ -505,9 +505,12 @@ func Defaults() Settings {
 }
 
 type Store struct {
-	db       *sql.DB
-	mu       sync.RWMutex
-	cur      Settings
+	db  *sql.DB
+	mu  sync.RWMutex
+	cur Settings
+	// notifyMu delivers updates to subscribers one at a time, in the order they were saved.
+	// Subscribers must not call Update.
+	notifyMu sync.Mutex
 	serverID string
 	subs     []func(Settings)
 }
@@ -606,7 +609,9 @@ func (s *Store) Update(ctx context.Context, fn func(*Settings) error) (Settings,
 	}
 	s.cur = next
 	subs := append([]func(Settings){}, s.subs...)
+	s.notifyMu.Lock() // taken before mu is released, so notifications keep the save order
 	s.mu.Unlock()
+	defer s.notifyMu.Unlock()
 	for _, fn := range subs {
 		fn(clone(next))
 	}

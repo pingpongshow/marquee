@@ -52,6 +52,7 @@ func DatabasePath(plexRoot string) (string, error) {
 type Source struct {
 	db       *sql.DB
 	plexRoot string
+	path     string // the copy, removed on Close
 	TakenAt  time.Time
 }
 
@@ -86,7 +87,7 @@ func Snapshot(ctx context.Context, plexRoot, workDir string) (*Source, error) {
 		// PRAGMA quick_check can't be used: Plex's indexes use its custom ICU collation.
 		// Reading every table the importer uses through a full scan catches a torn copy.
 		if err := verify(ctx, db); err == nil {
-			return &Source{db: db, plexRoot: plexRoot, TakenAt: time.Now()}, nil
+			return &Source{db: db, plexRoot: plexRoot, path: dst, TakenAt: time.Now()}, nil
 		} else {
 			lastErr = err
 		}
@@ -135,7 +136,16 @@ func copyIfExists(src, dst string) error {
 	return out.Close()
 }
 
-func (s *Source) Close() error { return s.db.Close() }
+// Close closes the copy and deletes it (a large Plex database's copy is gigabytes).
+func (s *Source) Close() error {
+	err := s.db.Close()
+	if s.path != "" {
+		for _, suffix := range []string{"", "-wal", "-shm"} {
+			os.Remove(s.path + suffix)
+		}
+	}
+	return err
+}
 
 type Section struct {
 	ID    int64
