@@ -157,7 +157,7 @@ function DvrPermissions({
       />
       <Toggle
         label="Can watch recordings"
-        help="See and play the household's recordings (within their rating limit): the Recordings tab and the Recorded TV and Recorded Movies libraries."
+        help="See and play the household's recordings (within their rating limit): under Live TV → Recordings."
         checked={value.canViewDVR !== false}
         onChange={(v) => onChange({ ...value, canViewDVR: v })}
       />

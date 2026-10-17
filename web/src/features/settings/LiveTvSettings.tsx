@@ -260,7 +260,7 @@ function RecordingSettings() {
       title="Recording"
       description={
         status.data?.dvrAvailable ? (
-          "Recordings appear in the Recorded TV and Recorded Movies libraries, and everyone who may view recordings sees them (within their rating limit). Who may record or view, and per-person quotas, are in Settings → Users."
+          "Recordings appear only under Live TV → Recordings (not in the libraries, Home or search), and everyone who may view recordings sees them (within their rating limit). Who may record or view, and per-person quotas, are in Settings → Users."
         ) : (
           <span className="text-danger">
             The recordings folder ({i?.dvrFolder || i?.dvrFolderDefault || "/recordings"}) can't be

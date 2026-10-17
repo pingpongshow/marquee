@@ -16,13 +16,16 @@ Marquee organises the films, shows, music and recordings already on your disks a
 - **One server, every screen:** a web app built into the server, plus native apps for iPhone, iPad, Apple TV, Android phones, tablets and Android TV.
 - **Plays anything:** direct play when the device can, otherwise a remux or a hardware-accelerated transcode (NVIDIA, Intel Quick Sync or CPU) sized to the connection.
 - **A music player worth using:** gapless playback, loudness levelling, crossfade, synced lyrics, radios and mixes built from how your music actually sounds.
-- **Live TV and DVR** from any M3U/XMLTV source or Dispatcharr.
+- **Live TV, DVR and on-demand films and shows** from any M3U/XMLTV source or Dispatcharr, with commercials cut from recordings and films on demand saved straight into your library.
 - **A household, not just a login:** profiles with optional PINs, kids' profiles with limits, per-person progress, ratings and recommendations.
 
 ---
 
+> **New here?** The **[Marquee guide](guide/README.md)** walks through installing, setting up and every setting, including Dispatcharr, Live TV and VOD.
+
 ## Contents
 
+- [The guide](guide/README.md)
 - [Features](#features)
 - [Apps](#apps)
 - [Requirements](#requirements)
@@ -48,7 +51,9 @@ Marquee organises the films, shows, music and recordings already on your disks a
 - Collections (automatic film series, manual, and **smart collections** built from filters), extras, multiple versions and editions, and cast and crew pages.
 - **Trailers** for any film or show: a local trailer file if you have one, otherwise the official trailer, played in the app.
 - Fix Match, metadata editing with locked fields, and custom artwork.
-- **Library Health:** duplicates (compare every copy's details and move the one you don't want to a recoverable trash), unmatched items, missing or unplayable files, upgrade candidates, playback errors, missing artwork and missing subtitles.
+- **Library Health:** duplicates (compare every copy's details and move the one you don't want to a recoverable trash), unmatched items, unplayable files, upgrade candidates, playback errors, missing artwork and missing subtitles.
+- **Large files optimizer:** re-encode oversized films and episodes to HEVC (on an NVIDIA GPU end to end), keeping every audio and subtitle track, with an optional size cap per hour of running time.
+- Two-way sync of watch state with a Plex server.
 - Import watch history, ratings, playlists, markers and accounts from an existing Plex server.
 
 ### Playback
@@ -73,16 +78,20 @@ Marquee organises the films, shows, music and recordings already on your disks a
 - "Recommended for You" and "Because you watched…" rows, and "More like this".
 - A Home screen each person can reorder, hide and pin rows on.
 - Personal ratings, a household community rating with comments, a watchlist and statistics.
+- Favourites (the heart) on films, shows, episodes and music, which also steer recommendations.
 - Requests through [Seerr](https://github.com/seerr-team/seerr), approved by an admin.
 
-### Live TV
-- A channel guide from any M3U/XMLTV source or Dispatcharr, What's On, favourites, and per-profile channel groups.
-- DVR: one-off and series recordings, which become normal library items.
+### Live TV and on demand
+- A channel guide from any M3U/XMLTV source or Dispatcharr, What's On and favourite channels.
+- DVR: one-off and series recordings, commercials cut out with Comskip, quotas per person and a shared or personal view of recordings.
+- **VOD Movies and VOD Shows** from Dispatcharr or any Xtream Codes source, matched to TMDB, with filters, Continue Watching and suggestions picked from each person's taste.
+- **Save to library** (admins): films and whole series from VOD downloaded, checked and named for your library, using the provider connections nobody is watching on.
 
 ### People and administration
 - Local accounts with profiles and optional PINs, managed profiles for children (rating and library limits), two-factor sign-in, and Quick Connect for TVs.
 - Share with friends through one-time invite links.
-- Dashboard, activity, logs, scheduled tasks, backups and restore, an internet speed test, webhooks and Prometheus metrics.
+- Dashboard, activity, logs, scheduled tasks (each can be switched off), backups and restore, an internet speed test, webhooks and Prometheus metrics.
+- Email: admin alerts (failed tasks, downloads and conversions, low disk space and more) and password or PIN resets by email.
 
 ## Apps
 
@@ -128,7 +137,7 @@ VIDEO_DIR=/srv/media/video
 MUSIC_DIR=/srv/media/music
 ```
 
-Your video folder is mounted read-only unless you set `VIDEO_MODE=` (empty), which lets Library Health move unwanted duplicates to a trash folder you can recover from for 30 days.
+Your video folder is mounted read-only unless you set `VIDEO_MODE=` (empty), which lets Library Health move unwanted duplicates to a trash folder (emptied by the nightly "Empty media trash" task), the Large files optimizer replace files, and VOD downloads go into your library.
 
 **3. Start it**
 
@@ -219,7 +228,7 @@ The apps find the server on your network automatically, or you can type its addr
 
 Marquee works over any connection that reaches port 32500.
 
-- **Tailscale (recommended):** install [Tailscale](https://tailscale.com) on the server and your devices, then add the server's Tailscale address in the apps as a second address. The apps use the home address when they can reach it and the Tailscale one otherwise, and remote streams adapt their quality to the connection.
+- **Tailscale (recommended):** install [Tailscale](https://tailscale.com) on the server and your devices, then enter the server's Tailscale address as the **Remote server address** under **Settings → Remote Access**. The apps learn it from the server, use the home address when they can reach it and the Tailscale one otherwise, and remote streams adapt their quality to the connection.
 - **Friends:** share the server's machine with them from the Tailscale admin console, then send an invite link from **Settings → Users**. Friends get their own account with the libraries and limits you choose.
 - **Reverse proxy:** you can also publish Marquee through a reverse proxy with HTTPS (Caddy, Nginx, Traefik). Set the remote address and your upload speed under **Settings → Remote Access** so remote quality is chosen well (there's a built-in speed test).
 
@@ -280,10 +289,13 @@ Database changes are applied automatically on start. A backup is taken first.
 | `config/marquee.db` | The database: libraries, people, watch history, ratings, settings |
 | `config/backups/` | Database backups |
 | `config/logs/` | Logs (also under **Settings → Logs**) |
+| `config/subtitles/`, `config/avatars/` | Downloaded subtitles and profile pictures (keep these) |
 | `config/` (the rest) | Artwork, thumbnails and other caches; safe to delete, rebuilt as needed |
 | `models/` | Soundprint's models |
 
 ## Troubleshooting
+
+More problems and fixes are in the guide's [troubleshooting page](guide/troubleshooting.md).
 
 <details>
 <summary><b>The apps don't find the server</b></summary>
@@ -345,6 +357,7 @@ The API is defined in [`api/openapi.yaml`](api/openapi.yaml); the server stubs a
 | `android/` | Android phone, tablet and TV app (Kotlin, Jetpack Compose) |
 | `soundprint/` | Music analysis and text-embedding service (Python) |
 | `deploy/` | Dockerfile, compose files and example settings |
+| `guide/` | The user guide: install, setup and every setting |
 | `scripts/` | Development helpers: end-to-end test setup, fake IPTV and Bazarr servers |
 
 ## Contributing
