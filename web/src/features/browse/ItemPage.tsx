@@ -15,6 +15,7 @@ import { DownloadOriginal, DownloadZip, EpisodeDownloadLink } from "./Download";
 import { ItemMenu } from "./ItemMenu";
 import { PlayOnButton } from "../remote/PlayOn";
 import { RowRating } from "../music/Rating";
+import { FavoriteButton, favoriteTypes, RowFavorite } from "./Favorite";
 import { ItemRatings, Reviews } from "./Reviews";
 import { PlayButtons } from "./PlayButtons";
 import { isWatched } from "./watched";
@@ -205,6 +206,7 @@ function Children({ item }: { item: ItemDetail }) {
                   <span className={c.available ? "block truncate" : "block truncate text-faint line-through"}>{c.title}</span>
                   {c.type === "track" && c.artistCredit && c.artistCredit !== item.artistCredit && <span className="block truncate text-xs text-muted">{c.artistCredit}</span>}
                 </span>
+                {(c.type === "track" || c.type === "episode") && <RowFavorite item={c} />}
                 {c.type === "track" && <RowRating item={c} />}
                 {showQuality && c.audioFormat && (
                   <span className="hidden shrink-0 text-[11px] text-faint sm:inline" data-testid="track-quality">
@@ -291,6 +293,7 @@ function PopularTracks({ artist }: { artist: ItemDetail }) {
                 <span className="block truncate text-xs text-muted">{t.parentTitle}</span>
               </span>
             </button>
+            <RowFavorite item={t} />
             <RowRating item={t} />
             <span className="shrink-0 text-sm text-muted tabular-nums">{formatTrackTime(t.durationMs)}</span>
           </li>
@@ -467,6 +470,7 @@ export function ItemPage() {
           <ItemRatings item={d} />
           <PlayButtons key={d.id} item={d} />
           <div className="mt-4 flex flex-wrap items-center gap-3">
+            {favoriteTypes.has(d.type) && <FavoriteButton key={d.id} item={d} />}
             <ItemMenu item={d} />
             {d.type !== "collection" && (
               <PlayOnButton itemIds={[d.id]} className="rounded-full p-1.5 text-muted hover:bg-surface-3 hover:text-text" />

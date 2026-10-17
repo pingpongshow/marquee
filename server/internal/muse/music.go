@@ -32,6 +32,7 @@ type musicAnswer struct {
 	Artists         []string `json:"artists"`
 	LikeArtists     []string `json:"likeArtists"`
 	Favourites      bool     `json:"favourites"`
+	LikeFavourites  bool     `json:"likeFavourites"`
 	Unplayed        bool     `json:"unplayed"`
 	New             bool     `json:"recentlyAdded"`
 	Rediscover      bool     `json:"rediscover"`
@@ -72,6 +73,7 @@ var musicSchema = map[string]any{
 		"artists":           strArray(),
 		"likeArtists":       strArray(),
 		"favourites":        map[string]any{"type": "boolean"},
+		"likeFavourites":    map[string]any{"type": "boolean"},
 		"unplayed":          map[string]any{"type": "boolean"},
 		"recentlyAdded":     map[string]any{"type": "boolean"},
 		"rediscover":        map[string]any{"type": "boolean"},
@@ -95,7 +97,7 @@ var musicSchema = map[string]any{
 		"describe":          map[string]any{"type": "string"},
 		"name":              map[string]any{"type": "string"},
 	},
-	"required": []string{"genres", "yearFrom", "yearTo", "artists", "likeArtists", "favourites", "unplayed", "recentlyAdded",
+	"required": []string{"genres", "yearFrom", "yearTo", "artists", "likeArtists", "favourites", "likeFavourites", "unplayed", "recentlyAdded",
 		"rediscover", "maxTrackMinutes", "totalMinutes", "sound", "theme", "tempoMin", "tempoMax", "energy", "mode", "key", "popularity",
 		"origins", "artistType", "gender", "activeFrom", "activeTo", "albumTypes", "excludeAlbumTypes", "describe", "name"},
 }
@@ -106,7 +108,7 @@ Fields:
 - yearFrom, yearTo: release year bounds, 0 when open. "80s" is 1980-1989.
 - artists: artists the playlist must be BY ("songs by Queen"), else [].
 - likeArtists: artists it should SOUND like ("like Radiohead", "in the style of"), else [].
-- favourites: their own favourites. unplayed: music they haven't heard. recentlyAdded: new additions. rediscover: old favourites they haven't played in a while.
+- favourites: only their own favourites ("my favourites", "songs I love"). likeFavourites: music that SOUNDS like their favourites, not only the favourites themselves ("more like my favourites", "similar to songs I love"). unplayed: music they haven't heard. recentlyAdded: new additions. rediscover: old favourites they haven't played in a while.
 - maxTrackMinutes: longest track allowed, 0 when not asked. totalMinutes: playlist length ("an hour of" = 60), 0 when not asked.
 - sound: how the music should sound or feel, in a few words for an audio model (mood, energy, instruments, tempo, setting), e.g. "mellow acoustic guitar, rainy evening". Empty when the request is only filters.
 - theme: what the LYRICS should be about when the request says so ("songs about the ocean" = "the ocean", "breakup songs" = "breakups"), else "".
@@ -195,10 +197,14 @@ func validateMusic(a musicAnswer, lib MusicLibrary, prompt string) (MusicReading
 		}
 	}
 	q.Favourites, q.Unplayed, q.New, q.Rediscover = a.Favourites, a.Unplayed, a.New, a.Rediscover
+	q.LikeFavourites = a.LikeFavourites || q.Favourites && likesFavourites(strings.ToLower(prompt))
+	if q.LikeFavourites {
+		q.Favourites = false // like them, not only them
+	}
 	for _, f := range []struct {
 		on   bool
 		name string
-	}{{q.Favourites, "Favourites"}, {q.Unplayed, "Unplayed"}, {q.New, "Recently added"}, {q.Rediscover, "Rediscover"}} {
+	}{{q.Favourites, "Favourites"}, {q.LikeFavourites, "Like your favourites"}, {q.Unplayed, "Unplayed"}, {q.New, "Recently added"}, {q.Rediscover, "Rediscover"}} {
 		if f.on {
 			lbl = append(lbl, f.name)
 		}
@@ -476,13 +482,31 @@ func (a artists) find(name string) (int64, string, bool) {
 
 // ---------- keyword reading (no AI) ----------
 
+// likesFavourites reports a prompt (lower case) asking for music like the person's
+// favourites ("more like my favourites", "similar to songs i love").
+func likesFavourites(low string) bool {
+	low = " " + strings.Join(strings.Fields(low), " ") + " "
+	for _, l := range likeWords {
+		for _, f := range favouriteWords {
+			for _, mid := range []string{" ", " the ", " what ", " all "} {
+				if strings.Contains(low, " "+l+mid+f+" ") {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 var (
 	reAbout = regexp.MustCompile(`\b(?:songs?|tracks?|music|lyrics)\s+about\s+(.+)$`)
 	reNoun  = regexp.MustCompile(`\b(breakup|heartbreak|love|party|summer|christmas|road trip|drinking)\s+songs\b`)
 )
 
 var (
-	favouriteWords  = []string{"my favourites", "my favorites", "my favourite", "my favorite", "favourites", "favorites", "songs i love", "loved tracks"}
+	favouriteWords = []string{"my favourites", "my favorites", "my favourite", "my favorite", "favourites", "favorites", "songs i love", "loved tracks"}
+	// likeWords before a favourites phrase ask for music like the favourites, not only them.
+	likeWords       = []string{"like", "similar to", "sounds like", "sound like", "in the style of", "inspired by", "reminds me of"}
 	unplayedWords   = []string{"haven't heard", "have not heard", "never heard", "never played", "not played", "unplayed", "unheard", "new to me"}
 	newWords        = []string{"recently added", "new additions", "newly added", "just added", "new music", "new arrivals"}
 	rediscoverWords = []string{"rediscover", "forgotten favourites", "forgotten favorites", "haven't played in a while", "haven't listened to in a while", "old favourites", "old favorites"}
@@ -651,12 +675,15 @@ func KeywordMusic(lib MusicLibrary, prompt string) MusicReading {
 	}
 	q.Rediscover = has(rediscoverWords)
 	q.Favourites = !q.Rediscover && has(favouriteWords)
+	if q.Favourites && likesFavourites(low) {
+		q.Favourites, q.LikeFavourites = false, true
+	}
 	q.Unplayed = has(unplayedWords)
 	q.New = has(newWords)
 	for _, f := range []struct {
 		on   bool
 		name string
-	}{{q.Favourites, "Favourites"}, {q.Unplayed, "Unplayed"}, {q.New, "Recently added"}, {q.Rediscover, "Rediscover"}} {
+	}{{q.Favourites, "Favourites"}, {q.LikeFavourites, "Like your favourites"}, {q.Unplayed, "Unplayed"}, {q.New, "Recently added"}, {q.Rediscover, "Rediscover"}} {
 		if f.on {
 			lbl = append(lbl, f.name)
 		}
@@ -668,6 +695,30 @@ func KeywordMusic(lib MusicLibrary, prompt string) MusicReading {
 		q.Theme = m[1]
 	}
 	q.Sound = strings.TrimSpace(prompt)
+	if q.LikeFavourites {
+		// Their favourites give the sound; only what else the prompt says goes to the audio model.
+		q.Sound = withoutFavouriteWords(low)
+	}
 	q.Title = strings.TrimSpace(prompt)
 	return MusicReading{Query: q, Understood: lbl}
+}
+
+// favouriteFiller are words that, around a favourites phrase, say nothing about the sound.
+var favouriteFiller = map[string]bool{"more": true, "music": true, "songs": true, "song": true, "tracks": true, "play": true,
+	"me": true, "some": true, "the": true, "what": true, "all": true, "stuff": true, "give": true, "a": true, "mix": true, "of": true, "playlist": true}
+
+// withoutFavouriteWords is a prompt (lower case) without its favourites and "like" phrases
+// and filler: "" for "more like my favourites", "mellow" for "mellow songs like my favourites".
+func withoutFavouriteWords(low string) string {
+	s := " " + strings.Join(strings.Fields(low), " ") + " "
+	for _, w := range append(append([]string{}, favouriteWords...), likeWords...) {
+		s = strings.ReplaceAll(s, " "+w+" ", " ")
+	}
+	var rest []string
+	for _, w := range strings.Fields(s) {
+		if w != "," && !favouriteFiller[w] {
+			rest = append(rest, w)
+		}
+	}
+	return strings.Join(rest, " ")
 }

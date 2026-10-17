@@ -20,6 +20,10 @@ type Options struct {
 	Jitter float64
 	// Boost raises these tracks' scores in Pick (a lyric theme's matches); 0–~0.4 each.
 	Boost map[int64]float64
+	// Favour raises the listener's favourites (and their favourite albums' and artists'
+	// tracks) among the candidates in Flow and Pick, without widening the search the way
+	// Boost does (see Service.Favour).
+	Favour map[int64]float64
 }
 
 func (o *Options) rng() *rand.Rand {
@@ -74,6 +78,7 @@ func (x *Index) Flow(anchor []float32, first *Track, o Options) []*Track {
 				}
 			}
 			s -= 0.3 * o.Avoid[c.ItemID]
+			s += o.Favour[c.ItemID]
 			s += r.Float64() * 0.04
 			if s > bestScore {
 				best, bestScore = i, s
@@ -128,7 +133,7 @@ func (x *Index) Pick(v []float32, n int, o Options) []*Track {
 					sim = math.Max(sim, 0.97)
 				}
 			}
-			s := 0.75*c.Score - 0.25*sim - 0.3*o.Avoid[c.ItemID]
+			s := 0.75*c.Score - 0.25*sim - 0.3*o.Avoid[c.ItemID] + o.Favour[c.ItemID]
 			if o.Jitter > 0 {
 				s += o.Jitter * o.rng().Float64()
 			}

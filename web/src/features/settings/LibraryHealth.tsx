@@ -30,7 +30,8 @@ const healthQuery = {
 export function LibraryHealthSettings() {
   const checks = useQuery(healthQuery);
   const [open, setOpen] = useState<HealthCheck | null>(null);
-  const [largeFiles, setLargeFiles] = useState(false);
+  // Alerts about failed conversions link to #large-files.
+  const [largeFiles, setLargeFiles] = useState(() => window.location.hash === "#large-files");
   if (largeFiles) return <LargeFilesTool onBack={() => setLargeFiles(false)} />;
   if (open) return <CheckIssues check={open} onBack={() => setOpen(null)} />;
   if (checks.isPending) return <Spinner />;

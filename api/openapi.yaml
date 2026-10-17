@@ -820,6 +820,10 @@ paths:
           in: query
           description: Maximum results per type.
           schema: { type: integer, minimum: 1, maximum: 50, default: 10 }
+        - name: favorites
+          in: query
+          description: Only the user's favourites (the heart).
+          schema: { type: boolean }
       responses:
         "200":
           description: Results grouped by item type, best matches first.
@@ -1015,6 +1019,10 @@ paths:
           in: query
           description: "Only what the person rated at least this (0–10, e.g. 8 = 4 stars: favourites)."
           schema: { type: integer, minimum: 1, maximum: 10 }
+        - name: favorites
+          in: query
+          description: "Only the person's favourites (the heart). Combines with the other filters and sorts; sort -favorited lists the newest favourites first."
+          schema: { type: boolean }
       responses:
         "200":
           description: OK
@@ -1190,6 +1198,10 @@ paths:
       parameters:
         - $ref: "#/components/parameters/Offset"
         - $ref: "#/components/parameters/Limit"
+        - name: favorites
+          in: query
+          description: "Only the user's favourites, and children holding one (a show's seasons with a favourite episode, an artist's albums with a favourite song)."
+          schema: { type: boolean }
       responses:
         "200":
           description: OK
@@ -1745,6 +1757,30 @@ paths:
     delete:
       tags: [items]
       operationId: removeFromWatchlist
+      parameters:
+        - $ref: "#/components/parameters/ChangedAt"
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/favorite:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    put:
+      tags: [items]
+      operationId: addFavorite
+      summary: "Make a movie, show, episode, song, album or artist one of your favourites (the heart). Favourites are yours alone (a managed profile has its own); recommendations, Muse, radios and mixes weight them above star ratings."
+      parameters:
+        - $ref: "#/components/parameters/ChangedAt"
+      responses:
+        "204": { description: Added. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [items]
+      operationId: removeFavorite
+      summary: No longer one of your favourites.
       parameters:
         - $ref: "#/components/parameters/ChangedAt"
       responses:
@@ -4187,6 +4223,10 @@ paths:
           in: query
           description: Start from the first unwatched episode (shows and seasons).
           schema: { type: boolean }
+        - name: favorites
+          in: query
+          description: "Only the user's favourite episodes or songs (e.g. a show's favourite episodes, an artist's favourite songs)."
+          schema: { type: boolean }
       responses:
         "200":
           description: OK
@@ -4709,6 +4749,7 @@ paths:
       tags: [music]
       operationId: musicMixes
       summary: Your daily mixes (MUSIC-7), built from your listening; they change once a day.
+      description: "Also a Favourites mix (id favorites): your favourite songs (the heart) shuffled, first in the list when you have at least three. It needs no Soundprint analysis, so it's there even when the daily mixes aren't."
       parameters:
         - name: libraryId
           in: query
@@ -4912,7 +4953,7 @@ components:
       description: Sort order. Prefix with "-" for descending.
       schema:
         type: string
-        enum: [title, -title, added, -added, year, -year, released, -released, rating, -rating, duration, -duration, -viewed, random, myRating, -myRating]
+        enum: [title, -title, added, -added, year, -year, released, -released, rating, -rating, duration, -duration, -viewed, random, myRating, -myRating, favorited, -favorited]
         default: title
     Offset:
       name: offset
@@ -5286,10 +5327,11 @@ components:
         linkUrl: { type: string, description: "Address links in mail start with (e.g. reset links). Empty = the Remote Access URL." }
         alerts:
           type: array
-          description: Alert types that are on. All are off by default.
+          description: "Alert types that are on. All are off by default except vod_save_failed."
           items: { $ref: "#/components/schemas/AlertType" }
         dvrQuotaAlert: { type: boolean, description: "The dvr_quota alert is on: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Off by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.)" }
         plexSyncAlert: { type: boolean, description: "The plex_sync alert is on: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Off by default. (Not in AlertType; notifications carry type plex_sync.)" }
+        optimizeFailedAlert: { type: boolean, description: "The optimize_failed alert is on: a Library Health → Large files conversion failed (not one skipped for saving too little). On by default. (Not in AlertType; notifications carry type optimize_failed.)" }
         recipientsAllAdmins: { type: boolean, description: Mail alerts to every administrator with an email address. }
         recipients:
           type: array
@@ -5311,10 +5353,11 @@ components:
         linkUrl: { type: string }
         alerts:
           type: array
-          description: "Replaces the list; the dvr_quota and plex_sync alerts are kept as they were unless dvrQuotaAlert or plexSyncAlert is sent."
+          description: "Replaces the list; the dvr_quota, plex_sync and optimize_failed alerts are kept as they were unless dvrQuotaAlert, plexSyncAlert or optimizeFailedAlert is sent."
           items: { $ref: "#/components/schemas/AlertType" }
         dvrQuotaAlert: { type: boolean }
         plexSyncAlert: { type: boolean }
+        optimizeFailedAlert: { type: boolean }
         recipientsAllAdmins: { type: boolean }
         recipients:
           type: array
@@ -6255,6 +6298,8 @@ components:
           type: array
           items: { $ref: "#/components/schemas/LiveTvSource" }
         vodEnabled: { type: boolean, description: "Movies on demand appear under Live TV (LIVE-6)." }
+        vodAutoRefresh: { type: boolean, description: "The movie sources' lists reload every vodRefreshHours after the last successful refresh (default on). Off: they reload only when an admin presses Refresh (and at start for a source that has never loaded)." }
+        vodRefreshHours: { type: integer, minimum: 1, maximum: 48, description: "Hours between automatic syncs of the movie sources (default 6)." }
         vodSources:
           type: array
           items: { $ref: "#/components/schemas/VodSource" }
@@ -6279,6 +6324,8 @@ components:
           description: Replaces the whole list when sent.
           items: { $ref: "#/components/schemas/LiveTvSource" }
         vodEnabled: { type: boolean }
+        vodAutoRefresh: { type: boolean }
+        vodRefreshHours: { type: integer, minimum: 1, maximum: 48 }
         vodSources:
           type: array
           description: Replaces the whole list when sent.
@@ -7140,7 +7187,7 @@ components:
     HomeLayout:
       type: object
       required: [rows]
-      description: "The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two \"Because you watched X\" rows with hub ids because-<itemId>; USER-16), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones."
+      description: "The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two \"Because you watched X\" rows with hub ids because-<itemId>, \"Because you love X\" when X is a favourite; USER-16), favorites (your favourite movies and shows, newest first; hidden until shown), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones."
       properties:
         rows:
           type: array
@@ -7405,7 +7452,7 @@ components:
       type: object
       required: [seed]
       properties:
-        seed: { type: string, enum: [item, genre, decade, mood, favourites, library] }
+        seed: { type: string, enum: [item, genre, decade, mood, favourites, library], description: "favourites: from your favourite songs, albums and artists (the heart) and what you play and rate highly." }
         itemId: { type: integer, format: int64, description: "With seed item: a track, album or artist." }
         value: { type: string, description: "With genre: the genre; decade: e.g. 1990; mood: a word or phrase." }
         libraryId: { type: integer, format: int64 }
@@ -7584,6 +7631,7 @@ components:
         watchedLeafCount: { type: integer, description: "Shows, seasons, artists, albums: how many episodes/tracks the user has watched." }
         userRating: { type: number, description: "The user's rating, 0–10 (10 = loved)." }
         watchlisted: { type: boolean, description: On the user's watchlist (USER-8). }
+        favorite: { type: boolean, description: "One of the user's favourites (the heart). Absent or false when it isn't." }
         extraType:
           type: string
           description: Set for extras (LIB-8).

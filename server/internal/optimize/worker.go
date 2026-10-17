@@ -165,9 +165,25 @@ func (s *Service) loadJob(ctx context.Context, id int64) (jobRow, error) {
 	return r, nil
 }
 
-// fail records a job's end: failed, skipped or cancelled, with why.
+// end records a job's end: failed, skipped or cancelled, with why. A failure is reported
+// to OnFailed (admin alerts); a skip isn't.
 func (s *Service) end(id int64, state, msg string) {
 	s.DB.Exec(`UPDATE optimize_jobs SET state = ?, error = ?, finished_at = ? WHERE id = ?`, state, msg, s.stamp(), id)
+	if state != StateFailed || s.OnFailed == nil {
+		return
+	}
+	f := Failure{JobID: id, Error: msg}
+	var fileID sql.NullInt64
+	s.DB.QueryRow(`SELECT file_id, title, path FROM optimize_jobs WHERE id = ?`, id).Scan(&fileID, &f.Title, &f.Path)
+	f.FileID = fileID.Int64
+	s.OnFailed(f)
+}
+
+// Failure is a conversion that failed, as OnFailed hears it.
+type Failure struct {
+	JobID, FileID int64
+	Title, Path   string
+	Error         string
 }
 
 func (s *Service) setState(j *job, state string) {

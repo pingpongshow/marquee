@@ -1302,6 +1302,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/items/{itemId}/favorite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Make a movie, show, episode, song, album or artist one of your favourites (the heart). Favourites are yours alone (a managed profile has its own); recommendations, Muse, radios and mixes weight them above star ratings. */
+        put: operations["addFavorite"];
+        post?: never;
+        /** No longer one of your favourites. */
+        delete: operations["removeFavorite"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/watchlist": {
         parameters: {
             query?: never;
@@ -3862,7 +3882,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Your daily mixes (MUSIC-7), built from your listening; they change once a day. */
+        /**
+         * Your daily mixes (MUSIC-7), built from your listening; they change once a day.
+         * @description Also a Favourites mix (id favorites): your favourite songs (the heart) shuffled, first in the list when you have at least three. It needs no Soundprint analysis, so it's there even when the daily mixes aren't.
+         */
         get: operations["musicMixes"];
         put?: never;
         post?: never;
@@ -4301,12 +4324,14 @@ export interface components {
             readonly mailConfigured?: boolean;
             /** @description Address links in mail start with (e.g. reset links). Empty = the Remote Access URL. */
             linkUrl?: string;
-            /** @description Alert types that are on. All are off by default. */
+            /** @description Alert types that are on. All are off by default except vod_save_failed. */
             alerts?: components["schemas"]["AlertType"][];
             /** @description The dvr_quota alert is on: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Off by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.) */
             dvrQuotaAlert?: boolean;
             /** @description The plex_sync alert is on: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Off by default. (Not in AlertType; notifications carry type plex_sync.) */
             plexSyncAlert?: boolean;
+            /** @description The optimize_failed alert is on: a Library Health → Large files conversion failed (not one skipped for saving too little). On by default. (Not in AlertType; notifications carry type optimize_failed.) */
+            optimizeFailedAlert?: boolean;
             /** @description Mail alerts to every administrator with an email address. */
             recipientsAllAdmins?: boolean;
             /** @description Administrators (user ids) who get alert mail when recipientsAllAdmins is off. */
@@ -4325,10 +4350,11 @@ export interface components {
             fromAddress?: string;
             fromName?: string;
             linkUrl?: string;
-            /** @description Replaces the list; the dvr_quota and plex_sync alerts are kept as they were unless dvrQuotaAlert or plexSyncAlert is sent. */
+            /** @description Replaces the list; the dvr_quota, plex_sync and optimize_failed alerts are kept as they were unless dvrQuotaAlert, plexSyncAlert or optimizeFailedAlert is sent. */
             alerts?: components["schemas"]["AlertType"][];
             dvrQuotaAlert?: boolean;
             plexSyncAlert?: boolean;
+            optimizeFailedAlert?: boolean;
             recipientsAllAdmins?: boolean;
             recipients?: number[];
             diskThresholdPercent?: number;
@@ -5421,6 +5447,10 @@ export interface components {
             liveTvSources?: components["schemas"]["LiveTvSource"][];
             /** @description Movies on demand appear under Live TV (LIVE-6). */
             vodEnabled?: boolean;
+            /** @description The movie sources' lists reload every vodRefreshHours after the last successful refresh (default on). Off: they reload only when an admin presses Refresh (and at start for a source that has never loaded). */
+            vodAutoRefresh?: boolean;
+            /** @description Hours between automatic syncs of the movie sources (default 6). */
+            vodRefreshHours?: number;
             vodSources?: components["schemas"]["VodSource"][];
         };
         IntegrationSettingsUpdate: {
@@ -5446,6 +5476,8 @@ export interface components {
             /** @description Replaces the whole list when sent. */
             liveTvSources?: components["schemas"]["LiveTvSource"][];
             vodEnabled?: boolean;
+            vodAutoRefresh?: boolean;
+            vodRefreshHours?: number;
             /** @description Replaces the whole list when sent. */
             vodSources?: components["schemas"]["VodSource"][];
         };
@@ -6346,7 +6378,7 @@ export interface components {
             title?: string;
             rules: components["schemas"]["SmartCollectionRules"];
         };
-        /** @description The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two "Because you watched X" rows with hub ids because-<itemId>; USER-16), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones. */
+        /** @description The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two "Because you watched X" rows with hub ids because-<itemId>, "Because you love X" when X is a favourite; USER-16), favorites (your favourite movies and shows, newest first; hidden until shown), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones. */
         HomeLayout: {
             rows: components["schemas"]["HomeLayoutRow"][];
         };
@@ -6565,7 +6597,10 @@ export interface components {
             runTotal?: number;
         };
         RadioRequest: {
-            /** @enum {string} */
+            /**
+             * @description favourites: from your favourite songs, albums and artists (the heart) and what you play and rate highly.
+             * @enum {string}
+             */
             seed: "item" | "genre" | "decade" | "mood" | "favourites" | "library";
             /**
              * Format: int64
@@ -6763,6 +6798,8 @@ export interface components {
             userRating?: number;
             /** @description On the user's watchlist (USER-8). */
             watchlisted?: boolean;
+            /** @description One of the user's favourites (the heart). Absent or false when it isn't. */
+            favorite?: boolean;
             /**
              * @description Set for extras (LIB-8).
              * @enum {string}
@@ -7284,7 +7321,7 @@ export interface components {
         /** @description Desired width in pixels; rounded up to 120, 240, 360, 480, 720, 960, 1280 or 1920. */
         ImageWidth: number;
         /** @description Sort order. Prefix with "-" for descending. */
-        Sort: "title" | "-title" | "added" | "-added" | "year" | "-year" | "released" | "-released" | "rating" | "-rating" | "duration" | "-duration" | "-viewed" | "random" | "myRating" | "-myRating";
+        Sort: "title" | "-title" | "added" | "-added" | "year" | "-year" | "released" | "-released" | "rating" | "-rating" | "duration" | "-duration" | "-viewed" | "random" | "myRating" | "-myRating" | "favorited" | "-favorited";
         Offset: number;
         Limit: number;
         PlaylistId: number;
@@ -8392,6 +8429,8 @@ export interface operations {
                 q: string;
                 /** @description Maximum results per type. */
                 limit?: number;
+                /** @description Only the user's favourites (the heart). */
+                favorites?: boolean;
             };
             header?: never;
             path?: never;
@@ -8675,6 +8714,8 @@ export interface operations {
                 letter?: string;
                 /** @description Only what the person rated at least this (0–10, e.g. 8 = 4 stars: favourites). */
                 minMyRating?: number;
+                /** @description Only the person's favourites (the heart). Combines with the other filters and sorts; sort -favorited lists the newest favourites first. */
+                favorites?: boolean;
             };
             header?: never;
             path: {
@@ -8919,6 +8960,8 @@ export interface operations {
             query?: {
                 offset?: components["parameters"]["Offset"];
                 limit?: components["parameters"]["Limit"];
+                /** @description Only the user's favourites, and children holding one (a show's seasons with a favourite episode, an artist's albums with a favourite song). */
+                favorites?: boolean;
             };
             header?: never;
             path: {
@@ -9738,6 +9781,56 @@ export interface operations {
         };
     };
     removeFromWatchlist: {
+        parameters: {
+            query?: {
+                /** @description When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. */
+                at?: components["parameters"]["ChangedAt"];
+            };
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addFavorite: {
+        parameters: {
+            query?: {
+                /** @description When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. */
+                at?: components["parameters"]["ChangedAt"];
+            };
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Added. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    removeFavorite: {
         parameters: {
             query?: {
                 /** @description When the change was made (USER-18). Apps send changes made offline when they reconnect; a change older than the last one for this item is ignored. */
@@ -13297,6 +13390,8 @@ export interface operations {
                 shuffle?: boolean;
                 /** @description Start from the first unwatched episode (shows and seasons). */
                 unwatched?: boolean;
+                /** @description Only the user's favourite episodes or songs (e.g. a show's favourite episodes, an artist's favourite songs). */
+                favorites?: boolean;
             };
             header?: never;
             path: {

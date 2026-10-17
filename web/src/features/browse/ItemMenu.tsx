@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Bookmark, BookmarkMinus, CircleCheck, CircleSlash, Compass, Disc3, EyeOff, Layers, ListEnd, ListPlus, ListStart, MoreHorizontal, Radio, Shuffle, UserRound } from "lucide-react";
+import { Bookmark, BookmarkMinus, CircleCheck, CircleSlash, Compass, Disc3, EyeOff, Heart, HeartOff, Layers, ListEnd, ListPlus, ListStart, MoreHorizontal, Radio, Shuffle, UserRound } from "lucide-react";
 import { clsx } from "clsx";
 import { useState, type MouseEvent } from "react";
 import { api, unwrap } from "@/api/client";
@@ -12,6 +12,7 @@ import { useRadio } from "../music/useRadio";
 import { AddToPlaylistDialog } from "../playlists/AddToPlaylist";
 import { useMusicActions } from "../player/MusicPlayer";
 import { AddToCollectionDialog } from "./AddToCollection";
+import { favoriteTypes, useSetFavorite } from "./Favorite";
 import { isWatched, markableTypes, useMarkWatched, useRemoveFromContinueWatching } from "./watched";
 
 const music = new Set(["track", "album", "artist"]);
@@ -52,6 +53,7 @@ export function ItemMenu({
         : unwrap(api.DELETE("/items/{itemId}/watchlist", { params: { path: { itemId: item.id } } })),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["items"] }),
   });
+  const setFavorite = useSetFavorite();
   const isMusic = music.has(item.type);
   const leaves = async () => (item.type === "track" ? [item] : await fetchLeaves(item.id));
   return (
@@ -89,6 +91,11 @@ export function ItemMenu({
               </MenuItem>
             )}
           </>
+        )}
+        {favoriteTypes.has(item.type) && (
+          <MenuItem icon={item.favorite ? <HeartOff /> : <Heart />} onClick={() => setFavorite.mutate({ itemId: item.id, on: !item.favorite })}>
+            {item.favorite ? "Remove from favourites" : "Add to favourites"}
+          </MenuItem>
         )}
         {watchable.has(item.type) && (
           <MenuItem icon={item.watchlisted ? <BookmarkMinus /> : <Bookmark />} onClick={() => watchlist.mutate(!item.watchlisted)}>

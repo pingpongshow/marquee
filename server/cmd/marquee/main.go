@@ -577,7 +577,7 @@ func run() error {
 		HasEncoder: encode.Available(cfg.FFmpegPath), Trash: mediaTrash, Rescan: scans.Queue,
 		Playing:  ads.Playing,
 		Watching: func() bool { return len(vodSaves.Activity(ctx)) > 0 }}
-	go optimizer.Run(ctx)
+	// optimizer.Run starts once its failure alert is wired (wireAlerts, below).
 	// The optimizer in Scheduled Tasks: no schedule of its own (it works through its queue,
 	// inside the maintenance window when set to); off holds the queue; Run now wakes it.
 	scheduler.Register(tasks.Task{ID: optimize.TaskID, Name: "Optimize large files",
@@ -641,8 +641,9 @@ func run() error {
 	})
 	// Alerts are wired before the services that raise them start.
 	alertWatcher := wireAlerts(ctx, alertDeps{cfg: &cfg, store: store, alerts: alerts, auth: authSvc, scheduler: scheduler,
-		live: live, dvr: dvr, vod: vodSvc, saves: vodSaves, player: player, libraries: libraries, ai: aiClient, soundprint: soundprintSvc})
+		live: live, dvr: dvr, vod: vodSvc, saves: vodSaves, optimizer: optimizer, player: player, libraries: libraries, ai: aiClient, soundprint: soundprintSvc})
 	go alertWatcher.Run(ctx)
+	go optimizer.Run(ctx)
 	go live.Run(ctx, liveWake)
 	// Two-way Plex sync (watch state, plays, ratings): off until the admin turns it on.
 	plexSync := &plexsync.Service{DB: database, Settings: store, Alerts: alerts}

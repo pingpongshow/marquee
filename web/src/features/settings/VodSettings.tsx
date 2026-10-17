@@ -12,7 +12,9 @@ import { VodSaveSettings } from "./VodSaveSettings";
 import { VodDownloadsPanel } from "@/features/livetv/VodSaves";
 
 type Source = components["schemas"]["VodSource"];
-type Draft = { enabled: boolean; sources: Source[] };
+type Draft = { enabled: boolean; sources: Source[]; autoRefresh: boolean; refreshHours: number };
+
+const syncHours = [1, 2, 3, 4, 6, 8, 12, 24, 48];
 
 /** Checks a source as it stands in the form (a saved password is used when none is typed). */
 function SourceTest({ source }: { source: Source }) {
@@ -56,6 +58,8 @@ export function VodSettings() {
   const server: Draft = {
     enabled: !!query.data?.integrations?.vodEnabled,
     sources: query.data?.integrations?.vodSources ?? [],
+    autoRefresh: query.data?.integrations?.vodAutoRefresh ?? true,
+    refreshHours: query.data?.integrations?.vodRefreshHours ?? 6,
   };
   const [draft, setDraft] = useState<Draft | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -77,7 +81,7 @@ export function VodSettings() {
         Films from an M3U playlist, such as Pluto TV&apos;s free movies, or from a Dispatcharr (Xtream Codes) server appear
         on the VOD Movies page (and a Dispatcharr server&apos;s series on VOD Shows) for everyone who may watch Live TV (and within each profile&apos;s rating limit). Titles
         stream from the source while someone watches; nothing is downloaded unless an admin saves it to the library
-        (below). Marquee reloads the lists every six hours and
+        (below). Marquee reloads the lists on the schedule below and
         matches each film to TMDB.
       </p>
       <VodDownloadsPanel />
@@ -88,6 +92,29 @@ export function VodSettings() {
           checked={d.enabled}
           onChange={(v) => setDraft({ ...d, enabled: v })}
         />
+      </Card>
+      <Card title="Sync" description="When the sources' film and show lists are reloaded. Each source shows when it last loaded.">
+        <div className="space-y-4">
+          <Toggle
+            label="Sync automatically"
+            help="Off: the lists reload only when you press Refresh now (and once at start for a source that has never loaded). Links from some sources, such as Pluto TV, expire after about a day."
+            checked={d.autoRefresh}
+            onChange={(v) => setDraft({ ...d, autoRefresh: v })}
+          />
+          {d.autoRefresh && (
+            <Field label="Every" help="Counted from the last successful sync.">
+              {(id) => (
+                <Select id={id} value={d.refreshHours} onChange={(e) => setDraft({ ...d, refreshHours: Number(e.target.value) })}>
+                  {(syncHours.includes(d.refreshHours) ? syncHours : [...syncHours, d.refreshHours].sort((a, b) => a - b)).map((h) => (
+                    <option key={h} value={h}>
+                      {h === 1 ? "1 hour" : `${h} hours`}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          )}
+        </div>
       </Card>
       {st?.tmdbConfigured === false && (
         <Alert>
@@ -210,7 +237,7 @@ export function VodSettings() {
         </Button>
         {server.enabled && server.sources.length > 0 && (
           <Button variant="ghost" onClick={() => refresh.mutate()} disabled={refresh.isPending}>
-            <RefreshCw className={refresh.isPending ? "size-4 animate-spin" : "size-4"} /> Reload movies now
+            <RefreshCw className={refresh.isPending ? "size-4 animate-spin" : "size-4"} /> Refresh now
           </Button>
         )}
       </div>
@@ -230,7 +257,14 @@ export function VodSettings() {
         savedAt={savedAt}
         onSave={() =>
           save.mutate(
-            { integrations: { vodEnabled: d.enabled, vodSources: d.sources } },
+            {
+              integrations: {
+                vodEnabled: d.enabled,
+                vodSources: d.sources,
+                vodAutoRefresh: d.autoRefresh,
+                vodRefreshHours: d.refreshHours,
+              },
+            },
             {
               onSuccess: () => {
                 setDraft(null);

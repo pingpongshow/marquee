@@ -15,15 +15,25 @@ import (
 
 // ---------- settings ----------
 
-// hiddenAlert are alert types the API exposes as their own booleans, not as AlertType values.
-var hiddenAlert = map[string]bool{settings.AlertDVRQuota: true, settings.AlertPlexSync: true}
+// hiddenAlerts are alert types the API exposes as their own booleans, not as AlertType
+// values (shipped apps decode the enum strictly).
+var hiddenAlerts = []string{settings.AlertDVRQuota, settings.AlertPlexSync, settings.AlertOptimizeFailed}
+
+func hiddenAlert(kind string) bool {
+	for _, a := range hiddenAlerts {
+		if a == kind {
+			return true
+		}
+	}
+	return false
+}
 
 func toAPINotifications(n settings.Notifications) *NotificationSettings {
-	// dvr_quota and plex_sync aren't AlertType values (shipped apps decode the enum
-	// strictly): they're dvrQuotaAlert and plexSyncAlert instead.
+	// dvr_quota, plex_sync and optimize_failed aren't AlertType values: they're
+	// dvrQuotaAlert, plexSyncAlert and optimizeFailedAlert instead.
 	alerts := make([]AlertType, 0, len(n.Alerts))
 	for _, a := range n.Alerts {
-		if !hiddenAlert[a] {
+		if !hiddenAlert(a) {
 			alerts = append(alerts, AlertType(a))
 		}
 	}
@@ -32,8 +42,9 @@ func toAPINotifications(n settings.Notifications) *NotificationSettings {
 		SmtpUsername: ptr(n.SMTPUsername), SmtpPasswordSet: ptr(n.SMTPPassword != ""),
 		FromAddress: ptr(n.FromAddress), FromName: ptr(n.FromName), MailConfigured: ptr(n.MailConfigured()),
 		LinkUrl: ptr(n.LinkURL), Alerts: &alerts, DvrQuotaAlert: ptr(n.AlertOn(settings.AlertDVRQuota)),
-		PlexSyncAlert: ptr(n.AlertOn(settings.AlertPlexSync)), RecipientsAllAdmins: ptr(n.RecipientsAllAdmins),
-		Recipients: ptr(append([]int64{}, n.Recipients...)), DiskThresholdPercent: ptr(n.DiskThresholdPercent),
+		PlexSyncAlert: ptr(n.AlertOn(settings.AlertPlexSync)), OptimizeFailedAlert: ptr(n.AlertOn(settings.AlertOptimizeFailed)),
+		RecipientsAllAdmins: ptr(n.RecipientsAllAdmins),
+		Recipients:          ptr(append([]int64{}, n.Recipients...)), DiskThresholdPercent: ptr(n.DiskThresholdPercent),
 	}
 }
 
@@ -56,29 +67,34 @@ func applyNotifications(n *settings.Notifications, u NotificationSettingsUpdate)
 		n.LinkURL = strings.TrimRight(strings.TrimSpace(*u.LinkUrl), "/")
 	}
 	// Alert types outside the AlertType enum keep their state unless their own flag is sent.
-	flags := map[string]bool{settings.AlertDVRQuota: n.AlertOn(settings.AlertDVRQuota), settings.AlertPlexSync: n.AlertOn(settings.AlertPlexSync)}
-	if u.DvrQuotaAlert != nil {
-		flags[settings.AlertDVRQuota] = *u.DvrQuotaAlert
+	flags := map[string]bool{}
+	for _, a := range hiddenAlerts {
+		flags[a] = n.AlertOn(a)
 	}
-	if u.PlexSyncAlert != nil {
-		flags[settings.AlertPlexSync] = *u.PlexSyncAlert
+	sent := map[string]*bool{settings.AlertDVRQuota: u.DvrQuotaAlert, settings.AlertPlexSync: u.PlexSyncAlert,
+		settings.AlertOptimizeFailed: u.OptimizeFailedAlert}
+	changed := u.Alerts != nil
+	for a, v := range sent {
+		if v != nil {
+			flags[a], changed = *v, true
+		}
 	}
 	if u.Alerts != nil {
 		n.Alerts = []string{}
 		for _, a := range *u.Alerts {
-			if !hiddenAlert[string(a)] {
+			if !hiddenAlert(string(a)) {
 				n.Alerts = append(n.Alerts, string(a))
 			}
 		}
 	}
-	if u.Alerts != nil || u.DvrQuotaAlert != nil || u.PlexSyncAlert != nil {
+	if changed {
 		kept := n.Alerts[:0:0]
 		for _, a := range n.Alerts {
-			if !hiddenAlert[a] {
+			if !hiddenAlert(a) {
 				kept = append(kept, a)
 			}
 		}
-		for _, a := range []string{settings.AlertDVRQuota, settings.AlertPlexSync} {
+		for _, a := range hiddenAlerts {
 			if flags[a] {
 				kept = append(kept, a)
 			}

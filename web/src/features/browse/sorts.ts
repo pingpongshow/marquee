@@ -12,6 +12,7 @@ export const sortOptions: { value: LibrarySort; label: string; video?: boolean; 
   { value: "year", label: "Year (oldest)" },
   { value: "-rating", label: "Rating" },
   { value: "-myRating", label: "My rating", personal: true },
+  { value: "-favorited", label: "Date favourited", personal: true },
   { value: "-viewed", label: "Last watched" },
   { value: "-duration", label: "Duration", video: true },
   { value: "random", label: "Random" },

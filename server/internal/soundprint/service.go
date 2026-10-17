@@ -255,6 +255,7 @@ func (s *Service) indexOne(ctx context.Context, itemID int64, r Analysis) {
 // Avoid weights tracks the user played recently (so radios feel fresh) or skipped.
 func (s *Service) Avoid(ctx context.Context, userID int64) map[int64]float64 {
 	out := map[int64]float64{}
+	recent := map[int64]float64{}
 	rows, err := s.DB.QueryContext(ctx, `SELECT item_id, last_viewed_at FROM user_item_state
 		WHERE user_id = ? AND last_viewed_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-3 days')`, userID)
 	if err == nil {
@@ -263,9 +264,12 @@ func (s *Service) Avoid(ctx context.Context, userID int64) map[int64]float64 {
 			var at string
 			rows.Scan(&id, &at)
 			out[id] = 0.6
+			recent[id] = 0.6
 		}
 		rows.Close()
 	}
+	// Favourite songs are never avoided for skips or low ratings.
+	defer s.spareFavourites(ctx, userID, out, recent)
 	if s.Learn != nil && s.Learn() {
 		for id, w := range s.learned(ctx, userID) {
 			out[id] = max(out[id], w)
@@ -298,12 +302,12 @@ func (s *Service) Avoid(ctx context.Context, userID int64) map[int64]float64 {
 	return out
 }
 
-// Liked returns the user's taste: tracks played more than once or rated 4+ stars, most
-// recent first (at most 2,000).
+// Liked returns the user's taste: their favourite songs first (newest favourite first),
+// then tracks played more than once or rated 4+ stars, most recent first (at most 2,000).
 func (s *Service) Liked(ctx context.Context, userID int64) []*Track {
 	rows, err := s.DB.QueryContext(ctx, `SELECT item_id FROM user_item_state
-		WHERE user_id = ? AND (play_count > 1 OR rating >= 8 OR (play_count > 0 AND last_viewed_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-90 days')))
-		ORDER BY last_viewed_at DESC LIMIT 2000`, userID)
+		WHERE user_id = ? AND (favorite_at IS NOT NULL OR play_count > 1 OR rating >= 8 OR (play_count > 0 AND last_viewed_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-90 days')))
+		ORDER BY favorite_at IS NULL, favorite_at DESC, last_viewed_at DESC LIMIT 2000`, userID)
 	if err != nil {
 		return nil
 	}
@@ -496,15 +500,16 @@ func (s *Service) dailyMixes(ctx context.Context, userID int64, scope string, ke
 	recentMu.Unlock()
 	var mixes []Mix
 	used := map[int64]bool{}
+	favour := s.Favour(ctx, userID)
 	for i, c := range Clusters(keepLiked, k, r) {
-		o := Options{Keep: keep, Avoid: avoid, Exclude: used, Rand: r, Jitter: mixJitter}
+		o := Options{Keep: keep, Avoid: avoid, Exclude: used, Rand: r, Jitter: mixJitter, Favour: favour}
 		ts := s.Index.Pick(dayCentre(c, keepLiked, r), 25, o)
 		for _, t := range ts {
 			used[t.ItemID] = true
 		}
 		mixes = append(mixes, Mix{Station: Station{Title: fmt.Sprintf("Daily Mix %d", i+1), IDs: TrackIDs(ts)}, ID: fmt.Sprintf("daily-%d", i+1)})
 	}
-	mixes = append(mixes, s.historyMixes(ctx, userID, keep, keepLiked, avoid, r)...)
+	mixes = append(mixes, s.historyMixes(ctx, userID, keep, keepLiked, avoid, favour, r)...)
 	var today []int64
 	for _, m := range mixes {
 		today = append(today, m.IDs...)
@@ -555,8 +560,8 @@ func dayCentre(centre []float32, liked []*Track, r *rand.Rand) []float32 {
 // Discovery (never-played tracks close to their taste, favouring artists they rarely play),
 // Rediscover (favourites not played for six months), New Music (recent additions that fit
 // their taste) and their favourite decade.
-func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, liked []*Track, avoid map[int64]float64, r *rand.Rand) []Mix {
-	taste := Mean(liked)
+func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, liked []*Track, avoid, favour map[int64]float64, r *rand.Rand) []Mix {
+	taste := s.Taste(ctx, userID, liked)
 	if taste == nil {
 		return nil
 	}
@@ -590,9 +595,9 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 			Description: "Tracks in your library you haven't played yet, close to what you love"})
 	}
 
-	// Rediscover: favourites (4+ stars, or played 3+ times) not played for six months.
+	// Rediscover: favourites (the heart, 4+ stars, or played 3+ times) not played for six months.
 	var old []*Track
-	rows, err = s.DB.QueryContext(ctx, `SELECT item_id FROM user_item_state WHERE user_id = ? AND (rating >= 8 OR play_count >= 3)
+	rows, err = s.DB.QueryContext(ctx, `SELECT item_id FROM user_item_state WHERE user_id = ? AND (favorite_at IS NOT NULL OR rating >= 8 OR play_count >= 3)
 		AND (last_viewed_at IS NULL OR last_viewed_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-180 days'))`, userID)
 	if err == nil {
 		for rows.Next() {
@@ -625,7 +630,7 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 		rows.Close()
 	}
 	if len(fresh) >= 10 {
-		o := Options{Keep: func(t *Track) bool { return allowed(t) && fresh[t.ItemID] }, Avoid: avoid, Rand: r, Jitter: mixJitter}
+		o := Options{Keep: func(t *Track) bool { return allowed(t) && fresh[t.ItemID] }, Avoid: avoid, Rand: r, Jitter: mixJitter, Favour: favour}
 		if ts := s.Index.Pick(taste, 25, o); len(ts) >= 10 {
 			out = append(out, Mix{Station: Station{Title: "New Music Mix", IDs: TrackIDs(ts)}, ID: "new",
 				Description: "Recently added music that fits your taste"})
@@ -646,7 +651,7 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 		}
 	}
 	if n >= 10 {
-		o := Options{Keep: func(t *Track) bool { return allowed(t) && t.Year/10*10 == best }, Avoid: avoid, Rand: r, Jitter: mixJitter}
+		o := Options{Keep: func(t *Track) bool { return allowed(t) && t.Year/10*10 == best }, Avoid: avoid, Rand: r, Jitter: mixJitter, Favour: favour}
 		var inDecade []*Track
 		for _, t := range liked {
 			if t.Year/10*10 == best {

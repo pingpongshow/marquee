@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -352,4 +353,26 @@ func TestLyricThemesIndexAndBoost(t *testing.T) {
 		t.Fatal("rebuild")
 	}
 	_ = lyricsFor
+}
+
+// "More like my favourites" asks for music like the favourites (their sound steers), not
+// only the favourites; "songs I love" alone still means only them.
+func TestKeywordMusicLikeFavourites(t *testing.T) {
+	cases := []struct {
+		prompt     string
+		fav, like  bool
+		sound      string
+		understood string
+	}{
+		{prompt: "more like my favourites", like: true, sound: "", understood: "Like your favourites"},
+		{prompt: "mellow songs similar to songs I love", like: true, sound: "mellow", understood: "Like your favourites"},
+		{prompt: "songs I love", fav: true, sound: "songs I love", understood: "Favourites"},
+	}
+	for _, c := range cases {
+		r := KeywordMusic(musicLib, c.prompt)
+		q := r.Query
+		if q.Favourites != c.fav || q.LikeFavourites != c.like || q.Sound != c.sound || !slices.Contains(r.Understood, c.understood) {
+			t.Errorf("%q: fav=%v like=%v sound=%q understood=%v", c.prompt, q.Favourites, q.LikeFavourites, q.Sound, r.Understood)
+		}
+	}
 }

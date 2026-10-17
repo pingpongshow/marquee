@@ -14,7 +14,8 @@ type MusicQuery struct {
 	YearFrom, YearTo int      // 0 = open
 	ArtistIDs        []int64  // only these artists
 	LikeArtistIDs    []int64  // sound like these artists
-	Favourites       bool     // tracks they love (played often or rated 4+ stars)
+	Favourites       bool     // tracks they love (favourite songs, played often or rated 4+ stars)
+	LikeFavourites   bool     // sound like their favourite songs ("more like my favourites")
 	Unplayed         bool     // never played
 	New              bool     // added in the last 60 days
 	Rediscover       bool     // favourites not played for six months
@@ -79,6 +80,7 @@ func (s *Service) TextVectorMulti(ctx context.Context, texts []string) ([]float3
 type MuseFilters struct {
 	GenreTracks map[int64]bool  // tracks tagged with any of the genres (nil = no genre filter)
 	Liked       map[int64]bool  // favourites
+	Loved       []float32       // the sound of their favourites (for LikeFavourites)
 	Played      map[int64]bool  // ever played
 	Fresh       map[int64]bool  // added in the last 60 days
 	Old         map[int64]bool  // favourites not played for six months
@@ -354,6 +356,9 @@ func (s *Service) museQuery(ctx context.Context, q MusicQuery, f MuseFilters, n 
 		}
 		seeds = Mean(s.Index.Where(func(t *Track) bool { return like[t.ArtistID] }))
 	}
+	if f.Loved != nil {
+		seeds = BlendVectors([][]float32{seeds, f.Loved}, []float64{0.5, 0.5})
+	}
 	if f.GenreTracks != nil {
 		genres = Mean(s.Index.Where(func(t *Track) bool { return f.GenreTracks[t.ItemID] && (o.Keep == nil || o.Keep(t)) }))
 	}
@@ -393,7 +398,7 @@ func cloneBoost(b map[int64]float64) map[int64]float64 {
 
 func (q MusicQuery) filtered() bool {
 	return len(q.Genres) > 0 || q.YearFrom > 0 || q.YearTo > 0 || len(q.ArtistIDs) > 0 || len(q.LikeArtistIDs) > 0 ||
-		q.Favourites || q.Unplayed || q.New || q.Rediscover || q.MaxTrackMinutes > 0 ||
+		q.Favourites || q.LikeFavourites || q.Unplayed || q.New || q.Rediscover || q.MaxTrackMinutes > 0 ||
 		q.TempoMin > 0 || q.TempoMax > 0 || q.Energy != "" || q.Popular != 0 || q.artistFiltered() ||
 		len(q.AlbumTypes) > 0 || len(q.ExcludeAlbumTypes) > 0 || len(q.ArtistScores) > 0 || len(q.AlbumScores) > 0
 }
@@ -433,8 +438,11 @@ func (s *Service) museFilters(ctx context.Context, userID int64, q MusicQuery) M
 		for _, t := range s.Liked(ctx, userID) {
 			f.Liked[t.ItemID] = true
 		}
-		f.Old = ids(`SELECT item_id FROM user_item_state WHERE user_id = ? AND (rating >= 8 OR play_count >= 3)
+		f.Old = ids(`SELECT item_id FROM user_item_state WHERE user_id = ? AND (favorite_at IS NOT NULL OR rating >= 8 OR play_count >= 3)
 			AND (last_viewed_at IS NULL OR last_viewed_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-180 days'))`, userID)
+	}
+	if q.LikeFavourites {
+		f.Loved = s.Taste(ctx, userID, s.Liked(ctx, userID))
 	}
 	if q.Unplayed {
 		f.Played = ids(`SELECT item_id FROM user_item_state WHERE user_id = ? AND play_count > 0`, userID)

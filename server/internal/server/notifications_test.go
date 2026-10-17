@@ -10,7 +10,48 @@ import (
 
 	"marquee/internal/api"
 	"marquee/internal/notify/fakesmtp"
+	"marquee/internal/settings"
 )
+
+// The failure alerts are on by default; optimize_failed is its own boolean (not an
+// AlertType), kept when the list is replaced; the VOD sync settings round-trip.
+func TestFailureAlertAndVODSyncSettings(t *testing.T) {
+	h := newHarness(t)
+	var res api.AuthResult
+	h.do("POST", "/setup", map[string]any{"serverName": "T", "username": "admin", "password": "correct horse", "device": device}, &res)
+	h.token = res.Token
+	var s api.ServerSettings
+	if code := h.do("GET", "/settings", nil, &s); code != 200 {
+		t.Fatalf("get: %d", code)
+	}
+	n, i := s.Notifications, s.Integrations
+	if !*n.OptimizeFailedAlert || len(*n.Alerts) != 1 || (*n.Alerts)[0] != api.AlertType(settings.AlertVODSaveFailed) {
+		t.Errorf("defaults: %v %v", *n.OptimizeFailedAlert, *n.Alerts)
+	}
+	if !*i.VodAutoRefresh || *i.VodRefreshHours != 6 {
+		t.Errorf("VOD sync defaults: %v %v", *i.VodAutoRefresh, *i.VodRefreshHours)
+	}
+	h.do("PATCH", "/settings", map[string]any{"notifications": map[string]any{"alerts": []string{"task_failed"}}}, &s)
+	if !*s.Notifications.OptimizeFailedAlert || !h.store.Get().Notifications.AlertOn(settings.AlertOptimizeFailed) {
+		t.Error("optimize_failed dropped when the list was replaced")
+	}
+	h.do("PATCH", "/settings", map[string]any{"notifications": map[string]any{"optimizeFailedAlert": false}}, &s)
+	if *s.Notifications.OptimizeFailedAlert || h.store.Get().Notifications.AlertOn(settings.AlertOptimizeFailed) || len(*s.Notifications.Alerts) != 1 {
+		t.Errorf("off: %v %v", *s.Notifications.OptimizeFailedAlert, *s.Notifications.Alerts)
+	}
+	h.do("PATCH", "/settings", map[string]any{"notifications": map[string]any{"optimizeFailedAlert": true}}, &s)
+	if !*s.Notifications.OptimizeFailedAlert {
+		t.Error("on again")
+	}
+
+	if code := h.do("PATCH", "/settings", map[string]any{"integrations": map[string]any{"vodAutoRefresh": false, "vodRefreshHours": 12}}, &s); code != 200 ||
+		*s.Integrations.VodAutoRefresh || *s.Integrations.VodRefreshHours != 12 {
+		t.Errorf("VOD sync: %d %v %v", code, *s.Integrations.VodAutoRefresh, *s.Integrations.VodRefreshHours)
+	}
+	if code := h.do("PATCH", "/settings", map[string]any{"integrations": map[string]any{"vodRefreshHours": 49}}, nil); code != 400 {
+		t.Errorf("49 hours: %d", code)
+	}
+}
 
 // TestForgotAndReset covers mail settings, email addresses, the forgot-password request
 // (which never says whether an account exists) and resetting with the mailed link.
