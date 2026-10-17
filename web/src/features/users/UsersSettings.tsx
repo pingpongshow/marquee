@@ -354,7 +354,8 @@ function AddUserDialog({ onClose }: { onClose: () => void }) {
   // Only administrators need a password; anyone else may have a password, a PIN, both or neither.
   const valid =
     username.trim() &&
-    (!password || password.length >= 8) &&
+    // A managed profile has no password: one typed before switching to it is ignored.
+    (managed || !password || password.length >= 8) &&
     (!isAdmin || managed || password.length >= 8) &&
     (!pin || /^\d{4}$/.test(pin));
 

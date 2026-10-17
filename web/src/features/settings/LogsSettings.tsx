@@ -27,11 +27,15 @@ export function LogsSettings() {
   });
   const download = () => {
     const text = (logs.data ?? []).map(line).join("\n");
+    const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+    a.href = url;
     a.download = `marquee-${new Date().toISOString().slice(0, 19)}.log`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(a.href);
+    a.remove();
+    // Revoking at once can cancel the download (Safari, Firefox): give it time to start.
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
   };
   return (
     <Card

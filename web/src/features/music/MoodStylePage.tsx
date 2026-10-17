@@ -14,7 +14,8 @@ export function MoodStylePage() {
     from: "/music/$libraryId/$kind/$name",
   });
   const lib = Number(libraryId);
-  const value = decodeURIComponent(name);
+  // The router has already decoded the parameter (decoding again breaks names with "%").
+  const value = name;
   const isMood = kind === "mood";
   const seed = isMood
     ? ({ seed: "mood", value: value.toLowerCase(), libraryId: lib } as const)

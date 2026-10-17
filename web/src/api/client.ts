@@ -78,13 +78,31 @@ export function deviceInfo() {
   };
 }
 
+/** 401 codes about the credentials just entered, not about the session. */
+const credentialCodes = new Set([
+  "wrong_pin",
+  "password_required",
+  "invalid_device",
+  "invalid_credentials",
+  "totp_required",
+  "invalid_totp",
+]);
+
 const authMiddleware: Middleware = {
   onRequest({ request }) {
     if (token) request.headers.set("Authorization", `Bearer ${token}`);
     return request;
   },
-  onResponse({ response, request }) {
+  async onResponse({ response, request }) {
     if (response.status === 401 && request.headers.has("Authorization")) {
+      // A wrong PIN or password while signed in (switching profile) answers 401 too, but the
+      // session is fine: only an expired or revoked one signs out.
+      const code = await response
+        .clone()
+        .json()
+        .then((b: { code?: string }) => b?.code)
+        .catch(() => undefined);
+      if (code && credentialCodes.has(code)) return response;
       session.set(null);
       unauthorizedListeners.forEach((fn) => fn());
     }

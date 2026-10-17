@@ -350,7 +350,7 @@ export function QueueList({ dark }: { dark?: boolean }) {
       onDragStart={() => setDragKey(e.key)}
       onDragOver={(ev) => {
         ev.preventDefault();
-        setOverIndex(i);
+        setOverIndex(Math.max(i, m.queue.index + 1));
       }}
       onDragEnd={() => {
         setDragKey(null);
@@ -358,7 +358,8 @@ export function QueueList({ dark }: { dark?: boolean }) {
       }}
       onDrop={(ev) => {
         ev.preventDefault();
-        if (dragKey !== null) m.move(dragKey, i);
+        // Dropped on the playing track: it goes next, not into what's been played.
+        if (dragKey !== null) m.move(dragKey, Math.max(i, m.queue.index + 1));
         setDragKey(null);
         setOverIndex(null);
       }}

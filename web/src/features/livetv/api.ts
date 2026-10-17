@@ -3,7 +3,13 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-import { api, unwrap } from "@/api/client";
+import { ApiError, api, unwrap } from "@/api/client";
+
+/** Deleting something that's already gone (a second click, another device) succeeded. */
+const goneIsDone = (e: unknown) => {
+  if (e instanceof ApiError && e.status === 404) return undefined;
+  throw e;
+};
 import type { components } from "@/api/schema.gen";
 
 export type LiveChannel = components["schemas"]["LiveChannel"];
@@ -170,7 +176,7 @@ export function useCancelRecording() {
         api.DELETE("/livetv/recordings/{recordingId}", {
           params: { path: { recordingId: id }, query: { deleteFile } },
         }),
-      ),
+      ).catch(goneIsDone),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["livetv"] }),
   });
 }
@@ -216,7 +222,7 @@ export function useDeleteRule() {
         api.DELETE("/livetv/recording-rules/{ruleId}", {
           params: { path: { ruleId: id } },
         }),
-      ),
+      ).catch(goneIsDone),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["livetv"] }),
   });
 }

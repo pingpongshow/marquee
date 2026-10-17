@@ -216,8 +216,13 @@ function Children({ item }: { item: ItemDetail }) {
                 )}
                 <span className="shrink-0 text-sm text-muted tabular-nums">{c.type === "track" ? formatTrackTime(c.durationMs) : formatDuration(c.durationMs)}</span>
                 {c.type === "episode" && <EpisodeWatchState episode={c} />}
-                {(c.type === "track" || c.type === "episode") && <ItemMenu item={c} className="-my-1" />}
               </Link>
+              {/* Outside the link: clicks in the menu's dialogs would otherwise play or open the row. */}
+              {(c.type === "track" || c.type === "episode") && (
+                <span className="pr-2">
+                  <ItemMenu item={c} />
+                </span>
+              )}
               {c.type === "episode" && c.available && (
                 <span className="pr-2">
                   <EpisodeDownloadLink itemId={c.id} title={c.title} />

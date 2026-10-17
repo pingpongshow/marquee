@@ -65,17 +65,18 @@ export function useCommercials(itemId: number, enabled: boolean) {
   });
 }
 
-function useDone(itemId: number) {
+function useDone(itemId: number, onDone?: (c: CommercialScan) => void) {
   const qc = useQueryClient();
   return (c: CommercialScan) => {
+    onDone?.(c);
     qc.setQueryData(["commercials", itemId], c);
     qc.invalidateQueries({ queryKey: ["livetv", "recordings"] });
     qc.invalidateQueries({ queryKey: ["items", itemId] });
   };
 }
 
-export function useRemoveCommercials(itemId: number) {
-  const done = useDone(itemId);
+export function useRemoveCommercials(itemId: number, onDone?: (c: CommercialScan) => void) {
+  const done = useDone(itemId, onDone);
   return useMutation({
     mutationFn: () =>
       unwrap(
@@ -87,8 +88,8 @@ export function useRemoveCommercials(itemId: number) {
   });
 }
 
-export function useRestoreCommercials(itemId: number) {
-  const done = useDone(itemId);
+export function useRestoreCommercials(itemId: number, onDone?: (c: CommercialScan) => void) {
+  const done = useDone(itemId, onDone);
   return useMutation({
     mutationFn: () =>
       unwrap(

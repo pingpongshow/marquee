@@ -251,7 +251,7 @@ function ProfilePicker({
         {chosen.requires === "pin" ? "Forgot PIN?" : "Forgot password?"}
       </button>
       <button
-        onClick={() => (setChosen(null), setPassword(""), login.reset())}
+        onClick={() => (setChosen(null), setPassword(""), setCode(null), login.reset())}
         className="w-full text-center text-sm text-muted hover:text-text"
       >
         Choose a different profile

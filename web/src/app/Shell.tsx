@@ -312,7 +312,11 @@ export function Shell({ children }: { children: ReactNode }) {
                 ? undefined
                 : () => setSwitching(true)
             }
-            onSignOut={() => void signOut()}
+            onSignOut={() => {
+              // Stop music (and its server sessions) while the token still works.
+              music.close();
+              void signOut();
+            }}
           />
         </div>
       </header>

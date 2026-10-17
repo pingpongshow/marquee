@@ -27,7 +27,8 @@ export function useRequestAction<T>(fn: (v: T) => Promise<unknown>) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: fn,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["requests"] }),
+    // Also after a failure (already decided elsewhere, say): the list shows where it stands.
+    onSettled: () => qc.invalidateQueries({ queryKey: ["requests"] }),
   });
 }
 

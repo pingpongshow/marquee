@@ -52,6 +52,7 @@ import {
   type CommercialScan,
 } from "./commercials";
 import type { LiveTab } from "@/app/router";
+import { ignoreShortcut } from "@/lib/keys";
 
 const PX_PER_MIN = 6; // 30 minutes = 180 px
 const WINDOW_HOURS = 6;
@@ -74,17 +75,26 @@ export function LiveTvPage() {
   const search = useSearch({ from: "/livetv" });
   const tab: LiveTab =
     search.tab && tabs.includes(search.tab) ? search.tab : (tabs[0] ?? "guide");
-  const [filter, setFilter] = useState<LiveFilter>(
+  const [chosenFilter, setFilter] = useState<LiveFilter>(
     () => localStorageGet("marquee.livetv.filter") ?? "all",
   );
+  // A remembered group that no longer exists would leave an empty guide under a select
+  // showing "All channels": it means all channels.
+  const filter =
+    groups.data &&
+    !["all", "favorites", "recent", "hidden"].includes(chosenFilter) &&
+    !groups.data.some((g) => g.name === chosenFilter)
+      ? "all"
+      : chosenFilter;
   const channels = useQuery({ ...liveChannelsQuery(filter), enabled: liveOn });
   const [preview, setPreview] = useState<number | null>(null);
   const [muted, setMuted] = useState(true);
-  const [previewError, setPreviewError] = useState<string | null>(null);
+  // The preview's error, with the channel it came from (it belongs to that channel only).
+  const [previewFailure, setPreviewFailure] = useState<{ id: number; error: string | null }>();
   const navigate = useNavigate();
   const setTab = (t: LiveTab) =>
     navigate({ to: "/livetv", search: { tab: t }, replace: true });
-  useEffect(() => localStorageSet("marquee.livetv.filter", filter), [filter]);
+  useEffect(() => localStorageSet("marquee.livetv.filter", chosenFilter), [chosenFilter]);
   // The preview starts on a channel that can be tuned (at a source's connection limit, the
   // others can't).
   const current =
@@ -94,8 +104,16 @@ export function LiveTvPage() {
   const canViewRecordings = !!(
     status.data?.canViewRecordings ?? status.data?.canRecord
   );
+  const previewError =
+    current && previewFailure?.id === current.id ? previewFailure.error : null;
 
   if (status.isPending) return <Spinner />;
+  if (status.isError)
+    return (
+      <div className="p-6">
+        <Alert tone="error">{status.error.message}</Alert>
+      </div>
+    );
   if (!tabs.length)
     return (
       <div className="p-6">
@@ -170,7 +188,7 @@ export function LiveTvPage() {
               channelId={current.id}
               muted={muted}
               className="size-full"
-              onError={setPreviewError}
+              onError={(error) => setPreviewFailure({ id: current.id, error })}
             />
           )}
           <button
@@ -671,8 +689,10 @@ export function LiveWatchPage({ channelId }: { channelId: number }) {
   const go = (d: number) => {
     if (!list.length) return;
     let next: LiveChannel | undefined;
+    // Not in the list (hidden, or gone): up goes to the last channel, down to the first.
+    const from = i >= 0 ? i : d > 0 ? -1 : list.length;
     for (let k = 1; k <= list.length; k++) {
-      const cand = list[(i + d * k + list.length * k) % list.length];
+      const cand = list[(from + d * k + list.length * k) % list.length];
       if (cand && (cand.available !== false || cand.id === channelId)) {
         next = cand;
         break;
@@ -687,6 +707,7 @@ export function LiveWatchPage({ channelId }: { channelId: number }) {
   };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (ignoreShortcut(e)) return;
       if (e.key === "ArrowUp" || e.key === "PageUp") go(-1);
       if (e.key === "ArrowDown" || e.key === "PageDown") go(1);
       if (e.key === "Escape") navigate({ to: "/livetv" });
@@ -875,6 +896,9 @@ function Recordings({ canRecord }: { canRecord: boolean }) {
   const done = list.filter(
     (r) => r.status === "completed" || r.status === "failed",
   );
+  // A row's Cancel, Delete or Stop series waits for the answer (a second click would fail).
+  const cancelling = (id: number) =>
+    cancel.isPending && cancel.variables?.id === id;
   const row = (r: Recording, action: React.ReactNode) => (
     <li
       key={r.id}
@@ -998,8 +1022,10 @@ function Recordings({ canRecord }: { canRecord: boolean }) {
     <div className="space-y-6">
       {meter}
       {ownerToggle}
-      {(cancel.error ?? stop.error) && (
-        <Alert tone="error">{(cancel.error ?? stop.error)?.message}</Alert>
+      {(cancel.error ?? stop.error ?? stopSeries.error) && (
+        <Alert tone="error">
+          {(cancel.error ?? stop.error ?? stopSeries.error)?.message}
+        </Alert>
       )}
       {section(
         "Recording now",
@@ -1015,6 +1041,8 @@ function Recordings({ canRecord }: { canRecord: boolean }) {
             mine(r) && (
               <Button
                 variant="ghost"
+                loading={cancelling(r.id)}
+                disabled={cancelling(r.id)}
                 onClick={() => cancel.mutate({ id: r.id })}
               >
                 Cancel
@@ -1043,7 +1071,12 @@ function Recordings({ canRecord }: { canRecord: boolean }) {
               )}
             </div>
             {mine(s) && (
-              <Button variant="ghost" onClick={() => stopSeries.mutate(s.id)}>
+              <Button
+                variant="ghost"
+                loading={stopSeries.isPending && stopSeries.variables === s.id}
+                disabled={stopSeries.isPending && stopSeries.variables === s.id}
+                onClick={() => stopSeries.mutate(s.id)}
+              >
                 Stop series
               </Button>
             )}
@@ -1058,6 +1091,8 @@ function Recordings({ canRecord }: { canRecord: boolean }) {
             mine(r) && (
               <Button
                 variant="ghost"
+                loading={cancelling(r.id)}
+                disabled={cancelling(r.id)}
                 onClick={() => {
                   if (
                     r.status === "failed" ||
@@ -1248,9 +1283,12 @@ function RecordingCommercials({
   itemId: number;
   scan: CommercialScan;
 }) {
-  const remove = useRemoveCommercials(itemId);
-  const restore = useRestoreCommercials(itemId);
-  const c = remove.data ?? restore.data ?? scan;
+  // The latest answer to Remove or Restore shows until the list brings a newer scan.
+  const [answer, setAnswer] = useState<{ c: CommercialScan; scan: CommercialScan }>();
+  const keep = (c: CommercialScan) => setAnswer({ c, scan });
+  const remove = useRemoveCommercials(itemId, keep);
+  const restore = useRestoreCommercials(itemId, keep);
+  const c = answer && answer.scan === scan ? answer.c : scan;
   const error = remove.error ?? restore.error;
   return (
     <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-muted">

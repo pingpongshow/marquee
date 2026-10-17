@@ -264,6 +264,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     gains: GainNode[];
     eq: EqChain;
     limiter: DynamicsCompressorNode;
+    dispose: () => void;
   } | null>(null);
   const ensureGraph = useCallback(() => {
     if (graph.current || typeof AudioContext === "undefined")
@@ -301,7 +302,17 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       };
       ctx.addEventListener("statechange", wake);
       document.addEventListener("visibilitychange", wake);
-      graph.current = { ctx, master, gains, eq: chain, limiter };
+      graph.current = {
+        ctx,
+        master,
+        gains,
+        eq: chain,
+        limiter,
+        dispose: () => {
+          document.removeEventListener("visibilitychange", wake);
+          ctx.close().catch(() => {});
+        },
+      };
     } catch {
       graph.current = null;
     }
@@ -357,6 +368,22 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     queueRef.current = queue;
   }, [queue]);
+  // Signed out (or the token expired): stop both elements, end their sessions and release
+  // the audio graph, whose document listener would otherwise outlive the player.
+  useEffect(
+    () => () => {
+      for (const i of [0, 1]) {
+        loadGen.current[i]!++;
+        const l = loaded.current[i];
+        loaded.current[i] = null;
+        audios.current[i]?.pause();
+        if (l?.sessionId) stopSession(l.sessionId);
+      }
+      graph.current?.dispose();
+      graph.current = null;
+    },
+    [],
+  );
 
   const el = (i: number) => audios.current[i]!;
   const activeEl = useCallback(

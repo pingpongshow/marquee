@@ -158,6 +158,7 @@ function AvatarEditor({
 }) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ zoom: 1, x: 0, y: 0 });
   const drag = useRef<{ px: number; py: number; x: number; y: number } | null>(
     null,
@@ -248,12 +249,17 @@ function AvatarEditor({
             variant="primary"
             disabled={!img}
             loading={save.isPending}
-            onClick={async () =>
-              save.mutate(
-                { userId: user.id, blob: await export_() },
-                { onSuccess: onClose },
-              )
-            }
+            onClick={async () => {
+              setExportError(null);
+              let blob: Blob;
+              try {
+                blob = await export_();
+              } catch (e) {
+                setExportError((e as Error).message);
+                return;
+              }
+              save.mutate({ userId: user.id, blob }, { onSuccess: onClose });
+            }}
           >
             Save
           </Button>
@@ -267,6 +273,7 @@ function AvatarEditor({
           </Alert>
         )}
         {save.isError && <Alert tone="error">{save.error.message}</Alert>}
+        {exportError && <Alert tone="error">Couldn&apos;t make the picture: {exportError}</Alert>}
         <p className="text-center text-sm text-muted">
           Drag to position. Zoom with the slider or scroll wheel.
         </p>

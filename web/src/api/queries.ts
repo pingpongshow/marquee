@@ -147,11 +147,18 @@ export const searchQuery = (q: string, limit = 10) =>
     staleTime: 30_000,
   });
 
+/** After a user changes: the users list, the profile picker, and (editing yourself) the shell. */
+function invalidateUsers(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ["users"] });
+  qc.invalidateQueries({ queryKey: ["profiles"] });
+  qc.invalidateQueries({ queryKey: meQuery.queryKey });
+}
+
 export function useCreateUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: UserCreate) => unwrap(api.POST("/users", { body })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: () => invalidateUsers(qc),
   });
 }
 
@@ -160,7 +167,7 @@ export function useUpdateUser() {
   return useMutation({
     mutationFn: ({ id, body }: { id: number; body: UserUpdate }) => unwrap(api.PATCH("/users/{userId}", { params: { path: { userId: id } }, body })),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["users"] });
+      invalidateUsers(qc);
       qc.invalidateQueries({ queryKey: ["livetv", "usage"] }); // quotas show in the usage lists
     },
   });
@@ -170,7 +177,7 @@ export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => unwrap(api.DELETE("/users/{userId}", { params: { path: { userId: id } } })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: () => invalidateUsers(qc),
   });
 }
 

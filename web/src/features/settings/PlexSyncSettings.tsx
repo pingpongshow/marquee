@@ -339,7 +339,8 @@ export function PlexSyncSettings() {
 
         <section>
           <h3 className="mb-3 text-sm font-semibold">Connection and what to sync</h3>
-          <ConnectionAndOptions st={st} key={JSON.stringify(st.settings)} />
+          {/* Not keyed on the settings: the draft holds only edits, so a sign-in elsewhere keeps them. */}
+          <ConnectionAndOptions st={st} />
         </section>
 
         <section>

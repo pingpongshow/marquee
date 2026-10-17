@@ -95,6 +95,8 @@ export function useWatchTogether(
   useEffect(() => {
     if (!id) return;
     let stop = false;
+    // Ends the waiting request on leaving, so it doesn't hold a connection for its full wait.
+    const abort = new AbortController();
     (async () => {
       let failures = 0;
       while (!stop) {
@@ -103,6 +105,7 @@ export function useWatchTogether(
           const g = await unwrap(
             api.GET("/syncplay/groups/{groupId}", {
               params: { path: { groupId: id }, query: { since } },
+              signal: abort.signal,
             }),
           );
           failures = 0;
@@ -129,6 +132,7 @@ export function useWatchTogether(
     })();
     return () => {
       stop = true;
+      abort.abort();
     };
   }, [id, apply]);
 
