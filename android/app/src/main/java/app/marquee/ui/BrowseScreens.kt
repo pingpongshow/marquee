@@ -372,6 +372,10 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
     }
 }
 
+/** Where entry [i] of [items] is among those that [match] (-1 when it doesn't): a duplicate gets its own place, not the first's. */
+internal fun <T> positionAmong(items: List<T>, i: Int, match: (T) -> Boolean): Int =
+    if (i !in items.indices || !match(items[i])) -1 else (0 until i).count { match(items[it]) }
+
 @Composable
 fun PlaylistsScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
@@ -417,7 +421,8 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
     val tracks = entries.map { it.item }
     var opened by rememberLastOpened("playlist-$playlistId")
     // A video playlist plays in the video player, in order, each video going on to the next (USER-7).
-    val videos = tracks.filter { it.type in app.marquee.core.WatchState.videoTypes && it.type != ItemType.SHOW && it.type != ItemType.SEASON }
+    fun isVideo(x: ItemSummary) = x.type in app.marquee.core.WatchState.videoTypes && x.type != ItemType.SHOW && x.type != ItemType.SEASON
+    val videos = tracks.filter(::isVideo)
     fun playVideos(list: List<ItemSummary>) {
         if (list.isEmpty()) return
         marquee.videoQueue = list.map { it.id }
@@ -454,7 +459,8 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
         }
         items(entries.size) { i ->
             val it = entries[i].item
-            val vi = videos.indexOf(it)
+            // Its own place among the videos (a video in the playlist twice plays on from this copy, not the first).
+            val vi = positionAmong(entries, i) { e -> isVideo(e.item) }
             ListItem(
                 headlineContent = { Text(it.title) },
                 supportingContent = { Text(subtitleFor(it)) },
@@ -477,7 +483,8 @@ fun PlaylistScreen(nav: NavHostController, playlistId: Long) {
 @Composable
 fun SearchScreen(nav: NavHostController) {
     val marquee = LocalMarquee.current
-    var q by remember { mutableStateOf("") }
+    // Saved, so coming back from a result (or another tab) keeps the search and runs it again.
+    var q by rememberSaveable { mutableStateOf("") }
     var results by remember { mutableStateOf<SearchResults?>(null) }
     LaunchedEffect(q) {
         if (q.trim().length < 2) { results = null; return@LaunchedEffect }

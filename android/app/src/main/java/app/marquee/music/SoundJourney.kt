@@ -60,10 +60,12 @@ fun SoundJourneyDialog(fromId: Long, fromTitle: String, onDone: () -> Unit) {
         if (query.trim().length < 2) { tracks = emptyList(); return@LaunchedEffect }
         delay(250)
         searching = true
-        tracks = withContext(Dispatchers.IO) {
-            runCatching { marquee.search.search(query.trim(), 15).groups.firstOrNull { it.type == ItemType.TRACK }?.items.orEmpty() }.getOrDefault(emptyList())
-        }.filter { it.id != fromId }
-        searching = false
+        // A search cut short by more typing must not leave the spinner up.
+        try {
+            tracks = withContext(Dispatchers.IO) {
+                runCatching { marquee.search.search(query.trim(), 15).groups.firstOrNull { it.type == ItemType.TRACK }?.items.orEmpty() }.getOrDefault(emptyList())
+            }.filter { it.id != fromId }
+        } finally { searching = false }
     }
     fun go(to: ItemSummary) {
         busy = true

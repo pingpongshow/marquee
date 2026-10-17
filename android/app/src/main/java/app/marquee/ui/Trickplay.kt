@@ -54,7 +54,7 @@ class TrickplayThumbs(private val marquee: Marquee, private val itemId: Long, va
 
     companion object {
         suspend fun load(marquee: Marquee, itemId: Long): TrickplayThumbs? = withContext(Dispatchers.IO) {
-            runCatching { marquee.playback.getTrickplay(itemId) }.getOrNull()?.takeIf { it.count > 0 }?.let { TrickplayThumbs(marquee, itemId, it) }
+            runCatching { marquee.playback.getTrickplay(itemId) }.getOrNull()?.takeIf { it.count > 0 && it.intervalMs > 0 && it.columns > 0 && it.rows > 0 && it.width > 0 && it.height > 0 }?.let { TrickplayThumbs(marquee, itemId, it) }
         }
     }
 }

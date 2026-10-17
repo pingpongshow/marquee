@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -45,6 +46,7 @@ import app.marquee.api.models.HomeLayoutRow
 import app.marquee.core.Marquee
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -76,10 +78,18 @@ fun EditHomeScreen(nav: NavHostController) {
     var error by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { runCatching { HomeRows.load(marquee) }.onSuccess { rows = it }.onFailure { error = it.message } }
 
-    // Shows the change at once and saves it; the server's answer is the truth.
+    // Saves go one at a time, in order, so quick moves reach the server in the order they were made.
+    val saving = remember { kotlinx.coroutines.sync.Mutex() }
+    var latest by remember { mutableIntStateOf(0) }
+    // Shows the change at once and saves it; the server's answer is the truth (the latest change's,
+    // so an earlier save's answer doesn't undo a later move on screen).
     fun commit(next: List<HomeLayoutRow>) {
         rows = next
-        scope.launch { runCatching { HomeRows.save(marquee, next) }.onSuccess { rows = it; error = null }.onFailure { error = it.message ?: "Couldn't save" } }
+        val n = ++latest
+        scope.launch {
+            saving.withLock { runCatching { HomeRows.save(marquee, next) } }
+                .onSuccess { if (n == latest) { rows = it; error = null } }.onFailure { error = it.message ?: "Couldn't save" }
+        }
     }
     fun move(i: Int, by: Int) {
         val list = rows?.toMutableList() ?: return
@@ -95,9 +105,10 @@ fun EditHomeScreen(nav: NavHostController) {
             Row(Modifier.padding(horizontal = sidePadding, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Edit Home", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 OutlinedButton({
+                    val n = ++latest
                     scope.launch {
-                        runCatching { withContext(Dispatchers.IO) { marquee.hubs.setHomeLayout(HomeLayout(emptyList())).rows } }
-                            .onSuccess { rows = it }.onFailure { error = it.message }
+                        saving.withLock { runCatching { withContext(Dispatchers.IO) { marquee.hubs.setHomeLayout(HomeLayout(emptyList())).rows } } }
+                            .onSuccess { if (n == latest) rows = it }.onFailure { error = it.message }
                     }
                 }, Modifier.focusRing()) { Text("Reset") }
             }

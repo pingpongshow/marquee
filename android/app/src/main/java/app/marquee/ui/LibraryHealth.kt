@@ -154,9 +154,11 @@ fun HealthIssuesScreen(nav: NavHostController, checkId: String) {
         scope.launch {
             val ok = withContext(Dispatchers.IO) { runCatching { marquee.libraries.ignoreHealthIssue(checkId, issue.item.id) } }
             if (ok.isFailure) { issues.add(at.coerceIn(0, issues.size), issue); snackbar.showSnackbar("Couldn't ignore it: ${ok.exceptionOrNull()?.message}"); return@launch }
+            // It's gone from the server's list: the next page starts one earlier, and there's one fewer.
+            offset = (offset - 1).coerceAtLeast(0); if (total > 0) total--
             if (snackbar.showSnackbar("Ignored “${issue.item.title}”", actionLabel = "Undo", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) {
                 withContext(Dispatchers.IO) { runCatching { marquee.libraries.unignoreHealthIssue(checkId, issue.item.id) } }
-                    .onSuccess { issues.add(at.coerceIn(0, issues.size), issue) }
+                    .onSuccess { issues.add(at.coerceIn(0, issues.size), issue); offset++; if (total >= 0) total++ }
                     .onFailure { snackbar.showSnackbar("Couldn't undo: ${it.message}") }
             }
         }

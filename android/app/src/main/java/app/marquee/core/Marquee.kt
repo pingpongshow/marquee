@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
@@ -84,7 +85,10 @@ class Marquee(context: Context) {
         .addInterceptor { chain ->
             if (simulateOffline) throw java.io.IOException("Offline (test)")
             val t = token
-            val req = if (t != null) chain.request().newBuilder().header("Authorization", "Bearer $t").build() else chain.request()
+            // The sign-in token goes only to this server's own addresses: the same client loads
+            // images from elsewhere too (TMDB posters in Discover), which must never receive it.
+            val own = t != null && isServerUrl(chain.request().url, listOfNotNull(baseUrl) + server?.candidates.orEmpty())
+            val req = if (own) chain.request().newBuilder().header("Authorization", "Bearer $t").build() else chain.request()
             chain.proceed(req)
         }
         .build()
@@ -331,6 +335,15 @@ class Marquee(context: Context) {
         server = null
         token = null
         baseUrl = null
+        info = null
+        // Nothing of this server's account carries over to the next one (its image key would
+        // otherwise go out in the next server's avatar and artwork URLs).
+        _me.value = null
+        _liveTv.value = false
+        _vod.value = false
+        _vodMovies.value = false
+        _vodShows.value = false
+        _ratingRequest.value = null
         _state.value = State.NoServer
     }
 
@@ -363,3 +376,12 @@ class Marquee(context: Context) {
 
 /** What a rating request shows (USER-19): the item, its title line and artwork. */
 data class RatingRequest(val itemId: Long, val title: String, val imageUrl: String?)
+
+/**
+ * Whether a request goes to one of the server's own addresses (same scheme, host and port as
+ * one of [origins]), the only place the sign-in token may be sent.
+ */
+fun isServerUrl(url: okhttp3.HttpUrl, origins: List<String>): Boolean = origins.any { o ->
+    val h = o.toHttpUrlOrNull()
+    h != null && h.scheme == url.scheme && h.host == url.host && h.port == url.port
+}

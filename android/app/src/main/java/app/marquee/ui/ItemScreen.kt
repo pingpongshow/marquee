@@ -220,7 +220,12 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                         Text("From start")
                     }
                 }
-                ItemType.SHOW, ItemType.SEASON -> Button(onClick = { leaves(unwatched = true) { l -> l.firstOrNull()?.let { nav.navigate("player/${it.id}") } } }, modifier = Modifier.focusRing().initialFocus(marquee.isTv)) {
+                // Everything watched: from the first episode again (there's no unwatched one to go to).
+                ItemType.SHOW, ItemType.SEASON -> Button(onClick = {
+                    leaves(unwatched = true) { l ->
+                        l.firstOrNull()?.let { nav.navigate("player/${it.id}") } ?: leaves { all -> all.firstOrNull()?.let { nav.navigate("player/${it.id}?start=0") } }
+                    }
+                }, modifier = Modifier.focusRing().initialFocus(marquee.isTv)) {
                     Icon(Icons.Filled.PlayArrow, null)
                     Text(if ((d.watchedLeafCount ?: 0) > 0) "Continue" else "Play")
                 }

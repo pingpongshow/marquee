@@ -141,6 +141,8 @@ fun DiscoverScreen(nav: NavHostController) {
     var page by remember { mutableIntStateOf(1) }
     var hasMore by remember { mutableStateOf(false) }
     var loadingMore by remember { mutableStateOf(false) }
+    // Bumped when the search or filters change, so a next page still loading for the old ones is dropped.
+    var generation by remember { mutableIntStateOf(0) }
     val filters by produceState<app.marquee.api.models.DiscoverFilters200Response?>(null) {
         value = withContext(Dispatchers.IO) { runCatching { marquee.requests.discoverFilters() }.getOrNull() }
     }
@@ -154,22 +156,27 @@ fun DiscoverScreen(nav: NavHostController) {
     LaunchedEffect(status, category, query, reload, network, studio, genre, sort) {
         val s = status ?: return@LaunchedEffect
         if (!s.enabled || !s.canRequest) return@LaunchedEffect
+        val gen = ++generation
+        hasMore = false
+        loadingMore = false
         if (query.isNotBlank()) delay(350)
         runCatching { fetch(1) }
-            .onSuccess { items = it.results; page = it.page; hasMore = it.page < it.totalPages; error = null }
+            .onSuccess { if (gen == generation) { items = it.results; page = it.page; hasMore = it.page < it.totalPages; error = null } }
             .onFailure { error = it.message }
     }
     fun loadMore() {
         if (!hasMore || loadingMore) return
         loadingMore = true
+        val gen = generation
         scope.launch {
             runCatching { fetch(page + 1) }.onSuccess { p ->
+                if (gen != generation) return@onSuccess
                 val seen = items.orEmpty().map { "${it.mediaType}-${it.tmdbId}" }.toSet()
                 items = items.orEmpty() + p.results.filter { "${it.mediaType}-${it.tmdbId}" !in seen }
                 page = p.page
                 hasMore = p.page < p.totalPages
             }
-            loadingMore = false
+            if (gen == generation) loadingMore = false
         }
     }
 
