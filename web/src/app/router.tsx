@@ -52,6 +52,7 @@ const VodPlayerPage = lazyRouteComponent(
   "VodPlayerPage",
 );
 const VodShowsPage = lazyRouteComponent(() => import("@/features/livetv/Vod"), "VodShowsPage");
+const VodRecommendationsPage = lazyRouteComponent(() => import("@/features/livetv/VodSuggestions"), "VodRecommendationsPage");
 const VodShowPage = lazyRouteComponent(() => import("@/features/livetv/VodShows"), "VodShowPage");
 const VodEpisodePlayerPage = lazyRouteComponent(
   () => import("@/features/livetv/VodShows"),
@@ -260,6 +261,17 @@ const vodShowsRoute = createRoute({
   path: "/vod/shows",
   component: VodShowsPage,
 });
+// Recommended films or shows on demand: many rows from the person's own taste. ("recommended"
+// ranks above /vod/$movieId like "shows".)
+const vodRecommendedRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/vod/recommended",
+  validateSearch: (s: Record<string, unknown>): { kind: "movie" | "series" } => ({ kind: s.kind === "series" ? "series" : "movie" }),
+  component: function VodRecommended() {
+    const { kind } = vodRecommendedRoute.useSearch();
+    return <VodRecommendationsPage kind={kind} />;
+  },
+});
 // The download queue moved to Settings → VOD; old links land there. ("saves" ranks above
 // /vod/$movieId like "shows".)
 const vodSavesRoute = createRoute({
@@ -358,6 +370,7 @@ const routeTree = rootRoute.addChildren([
   vodMovieRoute,
   vodPlayRoute,
   vodShowsRoute,
+  vodRecommendedRoute,
   vodSavesRoute,
   vodShowRoute,
   vodEpisodePlayRoute,

@@ -7,7 +7,8 @@ import { Menu, MenuItem } from "@/components/Menu";
 import { toast } from "@/components/Toast";
 import { formatDuration } from "@/features/browse/format";
 import { Poster } from "@/features/browse/Poster";
-import { itemVodSimilarQuery, useHideVodSuggestion, vodStatusQuery, vodSuggestionsQuery, type VodSuggestion } from "./vodApi";
+import { Spinner } from "@/components/ui";
+import { itemVodSimilarQuery, useHideVodSuggestion, vodRecommendationsQuery, vodStatusQuery, vodSuggestionsQuery, type VodSuggestion } from "./vodApi";
 
 // Suggestions from the films and series on demand: Home's Watch on VOD row, Also on VOD on
 // a movie's or show's page, the on-demand pages' Recommended for you, and Muse's on-demand
@@ -112,11 +113,18 @@ export function VodSuggestionTile({ s, className = "w-36 shrink-0" }: { s: VodSu
 }
 
 /** A row of suggestions (nothing when empty). */
-export function VodSuggestionRow({ title, list, className }: { title: string; list?: VodSuggestion[]; className?: string }) {
+export function VodSuggestionRow({ title, list, className, kind }: { title: string; list?: VodSuggestion[]; className?: string; kind?: "movie" | "series" }) {
   if (!list?.length) return null;
   return (
     <section className={className}>
-      <h2 className="mb-3 text-lg font-semibold">{title}</h2>
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        {kind && (
+          <Link to="/vod/recommended" search={{ kind }} className="text-sm text-accent hover:underline">
+            See all
+          </Link>
+        )}
+      </div>
       <ul className="flex gap-4 overflow-x-auto pb-2">
         {list.map((s) => (
           <VodSuggestionTile key={s.key} s={s} />
@@ -129,7 +137,38 @@ export function VodSuggestionRow({ title, list, className }: { title: string; li
 /** Recommended for you, at the top of VOD Movies or VOD Shows. */
 export function RecommendedRow({ kind }: { kind: "movie" | "series" }) {
   const q = useQuery(vodSuggestionsQuery(kind, 20));
-  return <VodSuggestionRow title="Recommended for you" list={q.data} />;
+  return <VodSuggestionRow title="Recommended for you" list={q.data} kind={kind} />;
+}
+
+/** The recommendations page: many rows, each with its own angle, from the person's own taste. */
+export function VodRecommendationsPage({ kind }: { kind: "movie" | "series" }) {
+  const q = useQuery(vodRecommendationsQuery(kind));
+  return (
+    <div className="space-y-8 p-4 sm:p-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold">Recommended {kind === "series" ? "shows" : "movies"} on VOD</h1>
+        <nav className="flex gap-1 rounded-lg border border-border p-1 text-sm" aria-label="Movies or shows">
+          {(["movie", "series"] as const).map((k) => (
+            <Link
+              key={k}
+              to="/vod/recommended"
+              search={{ kind: k }}
+              className={clsx("rounded-md px-3 py-1", k === kind ? "bg-accent/15 text-accent" : "text-muted hover:text-text")}
+            >
+              {k === "movie" ? "Movies" : "Shows"}
+            </Link>
+          ))}
+        </nav>
+      </header>
+      <p className="text-sm text-muted">Picked from your favourites, ratings and what you watch. Nothing here comes from what other people watch.</p>
+      {q.isPending && <Spinner />}
+      {q.isError && <p className="text-danger">{q.error.message}</p>}
+      {q.data?.length === 0 && <p className="text-muted">Nothing to recommend yet. Watch, rate or heart a few titles and come back.</p>}
+      {q.data?.map((r) => (
+        <VodSuggestionRow key={r.id} title={r.title} list={r.entries} />
+      ))}
+    </div>
+  );
 }
 
 /** Also on VOD: films (for a movie) or series (for a show) on demand like this one. */

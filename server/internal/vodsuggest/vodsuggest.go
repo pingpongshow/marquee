@@ -74,11 +74,16 @@ type Service struct {
 	wg      sync.WaitGroup
 }
 
-// keep is how many suggestions are kept per person.
-const keep = 300
+// keep is how many suggestions are kept per person (diversified); maxRanked how many of
+// the rest are kept in order for the recommendations page.
+const (
+	keep      = 300
+	maxRanked = 5000
+)
 
 type entry struct {
 	list     []scored
+	ranked   []scored // every candidate, best first (for the recommendations page's rows)
 	prof     *profile
 	cat      *catalog
 	built    time.Time
@@ -367,6 +372,7 @@ func (s *Service) build(ctx context.Context, u User) (*entry, error) {
 			prof.top = ranked[0].score
 		}
 		e.list = diversify(ranked, keep)
+		e.ranked = ranked[:min(len(ranked), maxRanked)]
 	} else {
 		e.list = diversifyBy(popular(cat, x), keep, 0.85)
 	}

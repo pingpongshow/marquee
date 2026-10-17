@@ -64,6 +64,7 @@ type profile struct {
 	topGenre string
 	total    float64
 	liked    map[key]bool // the liked titles themselves
+	seeds    []seed       // the liked titles, strongest first (for Because you watched rows)
 	top      float64      // the best score in the catalogue, for normalising
 }
 
@@ -119,6 +120,7 @@ func buildProfile(liked, disliked []seed) *profile {
 			continue
 		}
 		p.total += sd.weight
+		p.seeds = append(p.seeds, sd)
 		if sd.tmdb > 0 {
 			p.liked[key{sd.kind, sd.tmdb}] = true
 		}
