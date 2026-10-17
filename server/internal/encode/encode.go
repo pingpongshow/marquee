@@ -236,7 +236,7 @@ func DecodeCheck(ctx context.Context, ffmpeg, path string, at, seconds float64, 
 	if err != nil {
 		return errors.New(LastLine(stderr.String(), err))
 	}
-	if msg := strings.TrimSpace(stderr.String()); msg != "" {
+	if msg := decodeErrors(stderr.String()); msg != "" {
 		return errors.New(FirstLine(msg))
 	}
 	frames := 0
@@ -249,6 +249,19 @@ func DecodeCheck(ctx context.Context, ffmpeg, path string, at, seconds float64, 
 		return errors.New("no frames")
 	}
 	return nil
+}
+
+// decodeErrors is FFmpeg's error output without the null muxer's own complaints (such as
+// "non monotonically increasing dts" after seeking into a stream with uneven timestamps):
+// nothing is written anywhere, so they say nothing about whether the file decodes.
+func decodeErrors(stderr string) string {
+	var keep []string
+	for _, line := range strings.Split(stderr, "\n") {
+		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "[null @") {
+			keep = append(keep, line)
+		}
+	}
+	return strings.Join(keep, "\n")
 }
 
 // LowPriority wraps a command in nice -n 19 and ionice -c3 (idle I/O) when they exist.
