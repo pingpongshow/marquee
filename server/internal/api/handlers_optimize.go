@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"math"
 	"strconv"
 	"strings"
 
@@ -31,7 +32,7 @@ func adminOnly(ctx context.Context) int {
 	return 0
 }
 
-func optimizeFilter(libraryID *int64, typ *string, minGB, minMbps *float32, res *int, codecs []string, hdr *string) optimize.Filter {
+func optimizeFilter(libraryID *int64, typ *string, minGB, minMbps *float32, res *int, codecs []string, hdr, optimized *string) optimize.Filter {
 	var f optimize.Filter
 	if libraryID != nil {
 		f.LibraryID = *libraryID
@@ -57,6 +58,10 @@ func optimizeFilter(libraryID *int64, typ *string, minGB, minMbps *float32, res 
 		b := *hdr == "yes"
 		f.HDR = &b
 	}
+	if optimized != nil {
+		b := *optimized == "yes"
+		f.Optimized = &b
+	}
 	return f
 }
 
@@ -81,7 +86,7 @@ func (h *Handlers) ListLargeFiles(ctx context.Context, req ListLargeFilesRequest
 	if p.Codecs != nil {
 		codecs = strings.Split(*p.Codecs, ",")
 	}
-	f := optimizeFilter(p.LibraryId, (*string)(p.Type), p.MinSizeGb, p.MinBitrateMbps, (*int)(p.Resolution), codecs, (*string)(p.Hdr))
+	f := optimizeFilter(p.LibraryId, (*string)(p.Type), p.MinSizeGb, p.MinBitrateMbps, (*int)(p.Resolution), codecs, (*string)(p.Hdr), (*string)(p.Optimized))
 	if p.Sort != nil {
 		f.Sort = string(*p.Sort)
 	}
@@ -131,7 +136,7 @@ func (h *Handlers) QueueOptimizeJobs(ctx context.Context, req QueueOptimizeJobsR
 			codecs = *fl.Codecs
 		}
 		var err error
-		ids, err = svc.Matching(ctx, optimizeFilter(fl.LibraryId, (*string)(fl.Type), fl.MinSizeGb, fl.MinBitrateMbps, (*int)(fl.Resolution), codecs, (*string)(fl.Hdr)))
+		ids, err = svc.Matching(ctx, optimizeFilter(fl.LibraryId, (*string)(fl.Type), fl.MinSizeGb, fl.MinBitrateMbps, (*int)(fl.Resolution), codecs, (*string)(fl.Hdr), (*string)(fl.Optimized)))
 		if err != nil {
 			return nil, internal(ctx, "queueOptimizeJobs", err)
 		}
@@ -238,9 +243,13 @@ func (h *Handlers) OptimizeJobAction(ctx context.Context, req OptimizeJobActionR
 }
 
 func toAPIOptimizePreset(p settings.OptimizePreset) OptimizePreset {
-	return OptimizePreset{Id: p.ID, Name: p.Name, BuiltIn: ptr(p.BuiltIn), MaxHeight: OptimizePresetMaxHeight(p.MaxHeight), Codec: OptimizePresetCodec(p.Codec),
+	out := OptimizePreset{Id: p.ID, Name: p.Name, BuiltIn: ptr(p.BuiltIn), MaxHeight: OptimizePresetMaxHeight(p.MaxHeight), Codec: OptimizePresetCodec(p.Codec),
 		Quality: OptimizePresetQuality(p.Quality), VideoKbps: nz(p.VideoKbps), Audio: OptimizePresetAudio(p.Audio),
 		Hdr: OptimizePresetHdr(p.HDR)}
+	if p.MaxSizeGB > 0 {
+		out.MaxSizeGb = ptr(float32(p.MaxSizeGB))
+	}
+	return out
 }
 
 func fromAPIOptimizePreset(p OptimizePreset) settings.OptimizePreset {
@@ -248,6 +257,10 @@ func fromAPIOptimizePreset(p OptimizePreset) settings.OptimizePreset {
 		Quality: string(p.Quality), Audio: string(p.Audio), HDR: string(p.Hdr)}
 	if p.VideoKbps != nil {
 		out.VideoKbps = *p.VideoKbps
+	}
+	if p.MaxSizeGb != nil {
+		// Two decimals: float32 → float64 would otherwise turn 5.5 into 5.499999…
+		out.MaxSizeGB = math.Round(float64(*p.MaxSizeGb)*100) / 100
 	}
 	return out
 }

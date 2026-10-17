@@ -40,6 +40,10 @@ type Video struct {
 	Preset  string // the encoder's own preset name (playback.EncoderPreset)
 	Quality string // high, balanced, small (used unless Kbps is set)
 	Kbps    int    // a target bitrate; 0 = constant quality
+	// MaxKbps caps a constant-quality encode's bitrate (a capped CRF/CQ, through the VBV):
+	// scenes that need less stay smaller, none goes over. 0 = no cap. Quick Sync's constant
+	// quality can't be capped, so there it becomes the target bitrate.
+	MaxKbps int
 	// TenBit makes a 10-bit (Main 10) stream.
 	TenBit bool
 	// HDRTransfer keeps HDR: the stream is tagged BT.2020 with this transfer (smpte2084 for
@@ -73,6 +77,9 @@ func (v Video) codecName() string { return EncoderName(v.Encoder, v.Codec) }
 // HDR10 tagging when asked.
 func (v Video) Args() []string {
 	var a []string
+	if v.Kbps == 0 && v.MaxKbps > 0 && v.Encoder == "qsv" {
+		v.Kbps = v.MaxKbps
+	}
 	q := CRF(v.Encoder, v.Codec, v.Quality)
 	switch v.Encoder {
 	case "nvenc":
@@ -113,6 +120,10 @@ func (v Video) Args() []string {
 	}
 	if k := v.Kbps; k > 0 {
 		a = append(a, "-b:v", fmt.Sprintf("%dk", k), "-maxrate", fmt.Sprintf("%dk", k*3/2), "-bufsize", fmt.Sprintf("%dk", k*2))
+	} else if m := v.MaxKbps; m > 0 {
+		// A buffer of a few seconds lets a demanding scene borrow from the calm ones around
+		// it while the whole stays under the cap.
+		a = append(a, "-maxrate", fmt.Sprintf("%dk", m), "-bufsize", fmt.Sprintf("%dk", m*4))
 	}
 	if v.HDRTransfer != "" {
 		a = append(a, "-color_primaries", "bt2020", "-color_trc", v.HDRTransfer, "-colorspace", "bt2020nc")

@@ -29,6 +29,8 @@ type probeOut struct {
 		Height      int    `json:"height"`
 		Channels    int    `json:"channels"`
 		PixFmt      string `json:"pix_fmt"`
+		Profile     string `json:"profile"`
+		BitRate     string `json:"bit_rate"`
 		Transfer    string `json:"color_transfer"`
 		Disposition struct {
 			Default     int `json:"default"`
@@ -37,6 +39,8 @@ type probeOut struct {
 		} `json:"disposition"`
 		Tags struct {
 			Title string `json:"title"`
+			BPS   string `json:"BPS"`
+			BPSEn string `json:"BPS-eng"`
 		} `json:"tags"`
 		SideData []struct {
 			Type      string `json:"side_data_type"`
@@ -81,6 +85,7 @@ func (s *Service) Probe(ctx context.Context, path string) (Source, error) {
 			}
 		case "audio":
 			src.Audio = append(src.Audio, Stream{Index: st.Index, Codec: st.CodecName, Channels: st.Channels, Title: st.Tags.Title,
+				Profile: st.Profile, Kbps: streamKbps(st.BitRate, st.Tags.BPS, st.Tags.BPSEn),
 				Default: st.Disposition.Default == 1, Comment: st.Disposition.Comment == 1 || strings.Contains(strings.ToLower(st.Tags.Title), "commentary")})
 		case "subtitle":
 			src.Subtitles = append(src.Subtitles, Stream{Index: st.Index, Codec: st.CodecName, Title: st.Tags.Title, Default: st.Disposition.Default == 1})
@@ -95,6 +100,18 @@ func (s *Service) Probe(ctx context.Context, path string) (Source, error) {
 		return src, errors.New("its length is unknown")
 	}
 	return src, nil
+}
+
+// streamKbps is a stream's bitrate in kb/s from ffprobe's bit_rate or Matroska's BPS
+// statistics tags (mkvmerge writes them; FFmpeg's bit_rate is often missing in MKV); 0 =
+// unknown.
+func streamKbps(vals ...string) int {
+	for _, v := range vals {
+		if n, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64); err == nil && n > 0 {
+			return int(n / 1000)
+		}
+	}
+	return 0
 }
 
 func or(a, b string) string {

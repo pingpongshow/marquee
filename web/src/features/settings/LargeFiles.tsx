@@ -151,6 +151,7 @@ type Filters = {
   resolution?: 2160 | 1080 | 720 | 480;
   codecs: string[];
   hdr?: "yes" | "no";
+  optimized?: "yes" | "no";
   sort: "size" | "bitrate" | "title" | "savings";
 };
 
@@ -177,6 +178,7 @@ function FilesTab({ config, onQueued }: { config: OptimizeConfig; onQueued: () =
     resolution: filters.resolution,
     codecs: filters.codecs.length ? filters.codecs.join(",") : undefined,
     hdr: filters.hdr,
+    optimized: filters.optimized,
     presetId,
     sort: filters.sort,
     offset,
@@ -203,6 +205,7 @@ function FilesTab({ config, onQueued }: { config: OptimizeConfig; onQueued: () =
         resolution: filters.resolution,
         codecs: filters.codecs.length ? filters.codecs : undefined,
         hdr: filters.hdr,
+        optimized: filters.optimized,
       };
       return unwrap(api.POST("/optimize/jobs", { body: allMatching ? { presetId, filter } : { presetId, fileIds: [...selected] } }));
     },
@@ -301,6 +304,15 @@ function FilesTab({ config, onQueued }: { config: OptimizeConfig; onQueued: () =
               <option value="">HDR and SDR</option>
               <option value="yes">Only HDR</option>
               <option value="no">Only SDR</option>
+            </Select>
+          )}
+        </Field>
+        <Field label="Optimized before" help="Optimized files can be queued again, e.g. with a smaller preset.">
+          {(id) => (
+            <Select id={id} value={filters.optimized ?? ""} onChange={(e) => update({ optimized: (e.target.value || undefined) as Filters["optimized"] })}>
+              <option value="">Any</option>
+              <option value="no">Not yet optimized</option>
+              <option value="yes">Already optimized (re-optimize)</option>
             </Select>
           )}
         </Field>
@@ -460,6 +472,7 @@ function FileRow({ file: f, checked, onToggle }: { file: LargeFile; checked: boo
 function JobsTab({ config, history }: { config: OptimizeConfig; history: boolean }) {
   const qc = useQueryClient();
   const [offset, setOffset] = useState(0);
+  const [reoptPreset, setReoptPreset] = useState(config.settings.defaultPreset || config.presets[0]?.id || "");
   const key = ["optimize", "jobs", history ? "history" : "queue", offset];
   const jobs = useQuery({
     queryKey: key,
@@ -472,6 +485,14 @@ function JobsTab({ config, history }: { config: OptimizeConfig; history: boolean
       unwrap(api.POST("/optimize/jobs/{jobId}/{action}", { params: { path: { jobId: job.id, action: act } } })),
     onSuccess: (_d, { job, act }) => {
       if (act === "restore") toast(`The original of “${job.title}” is back.`);
+      refresh();
+    },
+    onError: (e) => toast(e.message, { tone: "error" }),
+  });
+  const reoptimize = useMutation({
+    mutationFn: (job: Job) => unwrap(api.POST("/optimize/jobs", { body: { presetId: reoptPreset, fileIds: job.fileId ? [job.fileId] : [] } })),
+    onSuccess: (r, job) => {
+      toast(r.queued ? `“${job.title}” is queued to be optimized again.` : `“${job.title}” is already queued or no longer in the library.`);
       refresh();
     },
     onError: (e) => toast(e.message, { tone: "error" }),
@@ -516,6 +537,18 @@ function JobsTab({ config, history }: { config: OptimizeConfig; history: boolean
             )}
             {!history && page.paused && <span className="ml-2 text-muted">· {page.paused}</span>}
           </p>
+          {history && page.optimized > 0 && (
+            <label className="flex items-center gap-2 text-sm text-muted">
+              Re-optimize with
+              <Select value={reoptPreset} onChange={(e) => setReoptPreset(e.target.value)} aria-label="Preset for re-optimizing">
+                {config.presets.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          )}
           {history && kept > 0 && (
             <Button
               size="sm"
@@ -548,7 +581,13 @@ function JobsTab({ config, history }: { config: OptimizeConfig; history: boolean
       {page?.items.length === 0 && <p className="text-muted">{history ? "No optimized files yet." : "The queue is empty. Pick files in Files and queue them."}</p>}
       <ul className="divide-y divide-border rounded-lg border border-border bg-surface" aria-label={history ? "Optimized files" : "Optimizer queue"}>
         {page?.items.map((j) => (
-          <JobRow key={j.id} job={j} busy={action.isPending && action.variables?.job.id === j.id} onAction={(act) => action.mutate({ job: j, act })} />
+          <JobRow
+            key={j.id}
+            job={j}
+            busy={(action.isPending && action.variables?.job.id === j.id) || (reoptimize.isPending && reoptimize.variables?.id === j.id)}
+            onAction={(act) => action.mutate({ job: j, act })}
+            onReoptimize={history && j.state === "done" && j.fileId ? () => reoptimize.mutate(j) : undefined}
+          />
         ))}
       </ul>
       {total > PAGE && (
@@ -568,7 +607,17 @@ function JobsTab({ config, history }: { config: OptimizeConfig; history: boolean
   );
 }
 
-function JobRow({ job: j, busy, onAction }: { job: Job; busy: boolean; onAction: (a: "cancel" | "retry" | "restore") => void }) {
+function JobRow({
+  job: j,
+  busy,
+  onAction,
+  onReoptimize,
+}: {
+  job: Job;
+  busy: boolean;
+  onAction: (a: "cancel" | "retry" | "restore") => void;
+  onReoptimize?: () => void;
+}) {
   const active = j.state === "running" || j.state === "verifying";
   const saved = j.beforeSize - j.afterSize;
   return (
@@ -598,6 +647,11 @@ function JobRow({ job: j, busy, onAction }: { job: Job; busy: boolean; onAction:
           {(j.state === "failed" || j.state === "cancelled" || j.state === "skipped") && (
             <Button size="sm" variant="ghost" disabled={busy} onClick={() => onAction("retry")}>
               <RotateCcw className="size-4" /> Retry
+            </Button>
+          )}
+          {onReoptimize && (
+            <Button size="sm" variant="ghost" disabled={busy} onClick={onReoptimize}>
+              <RotateCcw className="size-4" /> Re-optimize
             </Button>
           )}
           {j.canRestore && (
@@ -656,6 +710,7 @@ const presetSummary = (p: Preset) =>
     p.maxHeight ? `${p.maxHeight === 2160 ? "4K" : `${p.maxHeight}p`}` : "Same resolution",
     { hevc: "HEVC", h264: "H.264", av1: "AV1" }[p.codec],
     p.videoKbps ? `${(p.videoKbps / 1000).toFixed(1)} Mb/s` : `${p.quality} quality`,
+    p.maxSizeGb ? `at most ${p.maxSizeGb} GB` : "",
     { copy: "audio copied", default: "default audio track only", aac_stereo: "AAC stereo", aac_51: "AAC up to 5.1" }[p.audio],
     p.hdr === "tonemap" ? "HDR to SDR" : "HDR kept",
   ]
@@ -821,7 +876,10 @@ function PresetDialog({ preset, av1, onSave, onClose }: { preset: Preset; av1: b
   const [p, setP] = useState<Preset>(preset);
   const [useBitrate, setUseBitrate] = useState(!!preset.videoKbps);
   const set = (patch: Partial<Preset>) => setP((x) => ({ ...x, ...patch }));
-  const valid = p.name.trim() !== "" && (!useBitrate || (p.videoKbps ?? 0) > 0);
+  const [maxSize, setMaxSize] = useState(preset.maxSizeGb ? String(preset.maxSizeGb) : "");
+  const maxSizeGb = maxSize.trim() === "" ? 0 : Number(maxSize);
+  const maxSizeOK = maxSizeGb === 0 || (Number.isFinite(maxSizeGb) && maxSizeGb >= 0.5 && maxSizeGb <= 1000);
+  const valid = p.name.trim() !== "" && (!useBitrate || (p.videoKbps ?? 0) > 0) && maxSizeOK;
   return (
     <Dialog
       open
@@ -832,7 +890,7 @@ function PresetDialog({ preset, av1, onSave, onClose }: { preset: Preset; av1: b
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={!valid} onClick={() => onSave({ ...p, name: p.name.trim(), videoKbps: useBitrate ? p.videoKbps : 0 })}>
+          <Button variant="primary" disabled={!valid} onClick={() => onSave({ ...p, name: p.name.trim(), videoKbps: useBitrate ? p.videoKbps : 0, maxSizeGb: maxSizeGb || undefined })}>
             Done
           </Button>
         </>
@@ -886,6 +944,13 @@ function PresetDialog({ preset, av1, onSave, onClose }: { preset: Preset; av1: b
               )}
             </Field>
           )}
+          <Field
+            label="Maximum file size (GB)"
+            help="Optional. Each file's video bitrate is capped so it fits with its audio and subtitles; files that need less stay smaller. Pair it with AAC audio: copied lossless tracks take 1.5–2 GB an hour."
+            error={maxSizeOK ? undefined : "0.5–1000 GB, or empty for no limit"}
+          >
+            {(id) => <Input id={id} type="number" min={0.5} max={1000} step="0.5" value={maxSize} placeholder="No limit" onChange={(e) => setMaxSize(e.target.value)} />}
+          </Field>
           <Field label="Audio">
             {(id) => (
               <Select id={id} value={p.audio} onChange={(e) => set({ audio: e.target.value as Preset["audio"] })}>

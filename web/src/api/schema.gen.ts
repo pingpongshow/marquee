@@ -1714,7 +1714,7 @@ export interface paths {
         /** The optimizer queue (running and queued jobs first, then finished ones not cleared) or its history (optimized and restored files, newest first), with the space saved so far (admin only). */
         get: operations["listOptimizeJobs"];
         put?: never;
-        /** Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren't available movies or episodes, are skipped. */
+        /** Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren't available movies or episodes, are skipped. Files optimized before can be queued again (re-optimized). */
         post: operations["queueOptimizeJobs"];
         delete?: never;
         options?: never;
@@ -7262,6 +7262,11 @@ export interface components {
             codecs?: string[];
             /** @enum {string} */
             hdr?: "yes" | "no";
+            /**
+             * @description Only files already optimized (yes) or not yet (no).
+             * @enum {string}
+             */
+            optimized?: "yes" | "no";
         };
         OptimizeQueueRequest: {
             presetId: string;
@@ -7295,6 +7300,8 @@ export interface components {
             quality: "high" | "balanced" | "small";
             /** @description A target video bitrate instead of a quality; 0 = use the quality. */
             videoKbps?: number;
+            /** @description The largest a result may be, in GB (10^9 bytes): each file's video bitrate is capped so that, with its audio and subtitles, it fits (files that need less stay smaller). 0 or omitted = no limit. */
+            maxSizeGb?: number;
             /**
              * @description copy = every track as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1). Every audio track (all languages, commentary) and every subtitle is always kept; an MP4 with picture subtitles becomes MKV.
              * @enum {string}
@@ -10502,6 +10509,8 @@ export interface operations {
                 codecs?: string;
                 /** @description Only HDR (yes) or only SDR (no) files. */
                 hdr?: "yes" | "no";
+                /** @description Only files the optimizer has already replaced (yes, to optimize them again) or only ones it hasn't (no). */
+                optimized?: "yes" | "no";
                 /** @description The preset the estimates are for (default: the default preset). */
                 presetId?: string;
                 sort?: "size" | "bitrate" | "title" | "savings";

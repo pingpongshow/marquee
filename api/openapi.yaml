@@ -2205,6 +2205,7 @@ paths:
         - { name: resolution, in: query, description: "Only this resolution class (by width or height, so letterboxed films count): 2160 = 4K, 480 = SD.", schema: { type: integer, enum: [2160, 1080, 720, 480] } }
         - { name: codecs, in: query, description: "Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9).", schema: { type: string } }
         - { name: hdr, in: query, description: "Only HDR (yes) or only SDR (no) files.", schema: { type: string, enum: ["yes", "no"] } }
+        - { name: optimized, in: query, description: "Only files the optimizer has already replaced (yes, to optimize them again) or only ones it hasn't (no).", schema: { type: string, enum: ["yes", "no"] } }
         - { name: presetId, in: query, description: "The preset the estimates are for (default: the default preset).", schema: { type: string } }
         - { name: sort, in: query, schema: { type: string, enum: [size, bitrate, title, savings], default: size } }
         - $ref: "#/components/parameters/Offset"
@@ -2239,7 +2240,7 @@ paths:
     post:
       tags: [libraries]
       operationId: queueOptimizeJobs
-      summary: "Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren't available movies or episodes, are skipped."
+      summary: "Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren't available movies or episodes, are skipped. Files optimized before can be queued again (re-optimized)."
       requestBody:
         required: true
         content:
@@ -8089,6 +8090,7 @@ components:
         resolution: { type: integer, enum: [2160, 1080, 720, 480] }
         codecs: { type: array, items: { type: string } }
         hdr: { type: string, enum: ["yes", "no"] }
+        optimized: { type: string, enum: ["yes", "no"], description: "Only files already optimized (yes) or not yet (no)." }
 
     OptimizeQueueRequest:
       type: object
@@ -8116,6 +8118,7 @@ components:
         codec: { type: string, enum: [hevc, h264, av1], description: "AV1 only when the server has an AV1 encoder (av1Available)." }
         quality: { type: string, enum: [high, balanced, small], description: "Constant-quality level, unless videoKbps is set." }
         videoKbps: { type: integer, minimum: 0, maximum: 100000, description: "A target video bitrate instead of a quality; 0 = use the quality." }
+        maxSizeGb: { type: number, minimum: 0, maximum: 1000, description: "The largest a result may be, in GB (10^9 bytes): each file's video bitrate is capped so that, with its audio and subtitles, it fits (files that need less stay smaller). 0 or omitted = no limit." }
         audio: { type: string, enum: [copy, aac_stereo, aac_51], description: "copy = every track as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1). Every audio track (all languages, commentary) and every subtitle is always kept; an MP4 with picture subtitles becomes MKV." }
         hdr: { type: string, enum: [keep, tonemap], description: "keep = HDR stays HDR (10-bit HEVC or AV1; H.264 always tone-maps); tonemap = converted to SDR." }
 
