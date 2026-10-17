@@ -237,10 +237,17 @@ function Approvals() {
   );
   const [declining, setDeclining] = useState<MediaRequest | null>(null);
   const [reason, setReason] = useState("");
+  const [now] = useState(() => Date.now());
   if (list.isPending) return <Spinner />;
   const pending = list.data?.filter((r) => r.status === "pending") ?? [];
-  const decided =
-    list.data?.filter((r) => r.status !== "pending").slice(0, 50) ?? [];
+  // Recent requests: the 5 most recently decided in the last 10 days (the server deletes
+  // finished ones after 10 days).
+  const since = now - 10 * 24 * 3600 * 1000;
+  const decidedAt = (r: MediaRequest) => Date.parse(r.decidedAt ?? r.createdAt);
+  const decided = (list.data ?? [])
+    .filter((r) => r.status !== "pending" && decidedAt(r) >= since)
+    .sort((a, b) => decidedAt(b) - decidedAt(a))
+    .slice(0, 5);
   return (
     <>
       <Card
