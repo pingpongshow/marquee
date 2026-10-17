@@ -447,12 +447,12 @@ struct NowPlayingView: View {
             // Stars and the menus on one row when they fit, otherwise on two.
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 18) {
-                    RatingStars(itemID: t.id, rating: t.userRating).id(t.id)
+                    HStack(spacing: 10) { favorite(t); RatingStars(itemID: t.id, rating: t.userRating).id(t.id) }
                     Spacer(minLength: 8)
                     actionMenus
                 }
                 VStack(spacing: 12) {
-                    RatingStars(itemID: t.id, rating: t.userRating).id(t.id)
+                    HStack(spacing: 10) { favorite(t); RatingStars(itemID: t.id, rating: t.userRating).id(t.id) }
                     actionMenus
                 }
             }
@@ -461,6 +461,7 @@ struct NowPlayingView: View {
             .frame(maxWidth: .infinity)
             #else
             HStack(spacing: 24) {
+                favorite(t)
                 Button { panel = panel == .lyrics ? .queue : .lyrics } label: {
                     Label(panel == .lyrics ? "Show Up Next" : "Lyrics", systemImage: panel == .lyrics ? "list.bullet" : "quote.bubble")
                         .labelStyle(.iconOnly)
@@ -479,6 +480,15 @@ struct NowPlayingView: View {
             .frame(maxWidth: .infinity) // full width, so up/down from any button reaches the row
             .focusSection()
             #endif
+    }
+
+    /// The playing song's heart (USER-12).
+    private func favorite(_ t: Item) -> some View {
+        #if os(tvOS)
+        RowFavorite(item: t, size: 30, identifier: "np.favorite")
+        #else
+        RowFavorite(item: t, size: 22, identifier: "np.favorite")
+        #endif
     }
 
     #if os(iOS)
@@ -543,6 +553,13 @@ struct NowPlayingView: View {
     }
 
     private func row(_ e: PlayQueue.Entry, current: Bool) -> some View {
+        HStack(spacing: 4) {
+            queueButton(e, current: current)
+            if FavoriteStore.canFavorite(e.item) { RowFavorite(item: e.item) }
+        }
+    }
+
+    private func queueButton(_ e: PlayQueue.Entry, current: Bool) -> some View {
         Button { if !current { music.jump(e.id) } } label: {
             HStack(spacing: 12) {
                 ArtworkView(item: e.item, shape: .square, width: 44).frame(width: 44)
@@ -555,7 +572,9 @@ struct NowPlayingView: View {
                     }
                     Text(e.item.artistCredit ?? e.item.grandparentTitle ?? "").font(.caption).foregroundStyle(Color.secondary).lineLimit(1)
                 }
+                Spacer(minLength: 0)
             }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

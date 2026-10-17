@@ -173,7 +173,8 @@ struct PlaylistView: View {
                     }
                     .buttonStyle(.plain)
                     .contextMenu { ItemMenuItems(item: e.item) }
-                    if e.item._type == .track { RowRating(item: e.item) }
+                    if FavoriteStore.canFavorite(e.item) { RowFavorite(item: e.item) }
+                    if e.item._type == .track { RowRating(item: e.item, gap: isTV ? 8 : 4) }
                 }
             }
         }

@@ -16,7 +16,7 @@ struct MusicHomeView: View {
     @State private var topArtists: [Item] = []
     @State private var decades: [String] = []
     @State private var counts: [MusicBrowse: Int] = [:]
-    /// What this person rated 4 stars or more: albums and artists first, then tracks.
+    /// This person's favourites (the heart): albums and artists first, then songs.
     @State private var favorites: [Item] = []
     @State private var busy: String?
     @State private var error: String?
@@ -53,7 +53,7 @@ struct MusicHomeView: View {
                         }
                     }
                     if !favorites.isEmpty {
-                        ShelfRow(title: "Favorites", destination: .musicBrowse(library: libraryID, .favorites)) {
+                        ShelfRow(title: "Favourites", destination: .musicBrowse(library: libraryID, .favorites)) {
                             ForEach(favorites, id: \.id) { PosterCard(item: $0) }
                         }
                         .accessibilityElement(children: .contain)
@@ -90,7 +90,7 @@ struct MusicHomeView: View {
                 row("Albums", "square.stack", .musicBrowse(library: libraryID, .albums), count: counts[.albums], id: "albums")
                 row("Songs", "music.note", .musicBrowse(library: libraryID, .songs), count: counts[.songs], id: "songs")
                 row("Playlists", "music.note.list", .playlists, count: playlists.count, id: "playlists")
-                row("Favorites", "heart", .musicBrowse(library: libraryID, .favorites), count: counts[.favorites], id: "favorites")
+                row("Favourites", "heart", .musicBrowse(library: libraryID, .favorites), count: counts[.favorites], id: "favorites")
                 row("Genres", "guitars", .musicBrowse(library: libraryID, .genres), id: "genres")
                 if soundprint {
                     row("Moods & Styles", "theatermasks", .musicBrowse(library: libraryID, .moodsAndStyles), id: "moods")
@@ -249,7 +249,8 @@ struct MusicHomeView: View {
         async let countsCall = libraryCounts()
         async let favoritesCall = favoritesShelf()
         status = await statusCall
-        if soundprint { mixes = (try? await app.mixes(library: libraryID)) ?? [] }
+        // The Favourites Mix needs no Soundprint analysis: ask either way (empty without both).
+        mixes = (try? await app.mixes(library: libraryID)) ?? []
         recentlyPlayed = await playedCall ?? []
         recentlyAdded = await addedCall ?? []
         playlists = await playlistsCall ?? []
@@ -263,10 +264,11 @@ struct MusicHomeView: View {
     private func libraryCounts() async -> [MusicBrowse: Int] {
         let app = app
         let id = libraryID
-        let wanted: [(MusicBrowse, Schemas.ItemType, Int?)] = [(.artists, .artist, nil), (.albums, .album, nil), (.songs, .track, nil), (.favorites, .track, 8)]
+        // Favourites counts the favourite songs (the heart).
+        let wanted: [(MusicBrowse, Schemas.ItemType, Bool)] = [(.artists, .artist, false), (.albums, .album, false), (.songs, .track, false), (.favorites, .track, true)]
         return await withTaskGroup(of: (MusicBrowse, Int?).self) { group in
-            for (kind, type, min) in wanted {
-                group.addTask { @MainActor in (kind, try? await app.items(library: id, limit: 1, type: type, minMyRating: min).total) }
+            for (kind, type, favs) in wanted {
+                group.addTask { @MainActor in (kind, try? await app.items(library: id, limit: 1, type: type, favorites: favs).total) }
             }
             var out: [MusicBrowse: Int] = [:]
             for await (kind, total) in group { if let total { out[kind] = total } }
@@ -274,11 +276,11 @@ struct MusicHomeView: View {
         }
     }
 
-    /// Favourites (rated 4 stars or more): albums, artists, then tracks, best first.
+    /// Favourites (the heart): albums, artists, then songs, newest favourites first.
     private func favoritesShelf() async -> [Item] {
-        async let albums = try? app.items(library: libraryID, sort: ._hyphen_myRating, limit: 10, type: .album, minMyRating: 8).items
-        async let artists = try? app.items(library: libraryID, sort: ._hyphen_myRating, limit: 10, type: .artist, minMyRating: 8).items
-        async let tracks = try? app.items(library: libraryID, sort: ._hyphen_myRating, limit: 20, type: .track, minMyRating: 8).items
+        async let albums = try? app.items(library: libraryID, sort: ._hyphen_favorited, limit: 10, type: .album, favorites: true).items
+        async let artists = try? app.items(library: libraryID, sort: ._hyphen_favorited, limit: 10, type: .artist, favorites: true).items
+        async let tracks = try? app.items(library: libraryID, sort: ._hyphen_favorited, limit: 20, type: .track, favorites: true).items
         return Array(((await albums ?? []) + (await artists ?? []) + (await tracks ?? [])).prefix(30))
     }
 
@@ -302,6 +304,8 @@ struct MusicSongsView: View {
     let libraryID: Int64
     @State private var sort: ItemSort = .title
     @State private var ratedOnly = false
+    /// Only this person's favourite songs (the heart, USER-12).
+    @State private var favoritesOnly = false
     @State private var genre: String?
     @State private var decade: Int?
     /// The songs' own genres and decades (asked for with type=track).
@@ -316,6 +320,13 @@ struct MusicSongsView: View {
 
     private static let page = 200
 
+    private var emptyTitle: String {
+        let facet = genre != nil || decade != nil
+        if favoritesOnly, !ratedOnly, !facet { return "No favourite songs yet" }
+        if ratedOnly, !favoritesOnly, !facet { return "No songs rated 4★ or more" }
+        return favoritesOnly || ratedOnly || facet ? "No songs match" : "No songs"
+    }
+
     private var sortMenu: some View {
         Menu {
             Picker("Sort", selection: $sort) {
@@ -323,9 +334,11 @@ struct MusicSongsView: View {
                 Text("Recently added").tag(ItemSort._hyphen_added)
                 Text("Rating").tag(ItemSort._hyphen_rating)
                 Text("My rating").tag(ItemSort._hyphen_myRating)
+                Text("Date favourited").tag(ItemSort._hyphen_favorited)
                 Text("Recently played").tag(ItemSort._hyphen_viewed)
                 Text("Random").tag(ItemSort.random)
             }
+            Toggle("Favourites", isOn: $favoritesOnly)
             Toggle("Rated 4★+", isOn: $ratedOnly)
             FacetPickers(facets: facets, genre: $genre, decade: $decade)
         } label: {
@@ -356,13 +369,14 @@ struct MusicSongsView: View {
                     .buttonStyle(.plain)
                     .contextMenu { ItemMenuItems(item: t) }
                     .accessibilityIdentifier("songRow.\(t.id)")
-                    RowRating(item: t)
+                    RowFavorite(item: t)
+                    RowRating(item: t, gap: isTV ? 8 : 4)
                 }
                 .onAppear { if i >= tracks.count - 40 { Task { await loadMore() } } }
             }
             if loading { ProgressView() }
             if !loading, error == nil, tracks.isEmpty {
-                ContentUnavailableView(ratedOnly ? "No songs rated 4★ or more" : genre != nil || decade != nil ? "No songs match" : "No songs", systemImage: "music.note")
+                ContentUnavailableView(emptyTitle, systemImage: favoritesOnly ? "heart" : "music.note")
             }
         }
         .listStyle(.plain)
@@ -379,10 +393,10 @@ struct MusicSongsView: View {
         .toolbar { ToolbarItem { sortMenu } }
         #endif
         .task { if facets == nil { facets = try? await app.filters(library: libraryID, type: .track) } }
-        .task(id: "\(sort)-\(ratedOnly)-\(genre ?? "")-\(decade ?? 0)") {
+        .task(id: "\(sort)-\(ratedOnly)-\(favoritesOnly)-\(genre ?? "")-\(decade ?? 0)") {
             // Back from an album or artist re-runs this: the list keeps its place unless the
             // sort or filters changed.
-            let key = "\(sort)-\(ratedOnly)-\(genre ?? "")-\(decade ?? 0)"
+            let key = "\(sort)-\(ratedOnly)-\(favoritesOnly)-\(genre ?? "")-\(decade ?? 0)"
             if loadedKey == key {
                 if tracks.isEmpty || tracks.count < total { await loadMore() }
                 return
@@ -403,7 +417,7 @@ struct MusicSongsView: View {
         defer { if gen == generation { loading = false } }
         do {
             let page = try await app.items(library: libraryID, sort: sort, offset: tracks.count, limit: Self.page, genre: genre, type: .track,
-                                           decade: decade, minMyRating: ratedOnly ? 8 : nil)
+                                           decade: decade, minMyRating: ratedOnly ? 8 : nil, favorites: favoritesOnly)
             guard gen == generation else { return }
             let have = Set(tracks.map(\.id))
             tracks += page.items.filter { !have.contains($0.id) }
@@ -555,7 +569,8 @@ struct MusicDecadeView: View {
     #endif
 }
 
-/// Favourites: the tracks, albums and artists this person rated 4 stars or more, best first.
+/// Favourites: this person's favourite tracks, albums and artists (the heart, USER-12), newest
+/// first, or what they rated 4 stars or more, best first.
 struct MusicFavoritesView: View {
     enum Kind: String, CaseIterable, Identifiable {
         case tracks = "Tracks", albums = "Albums", artists = "Artists"
@@ -567,11 +582,14 @@ struct MusicFavoritesView: View {
     @Environment(MusicPlayer.self) private var music
     let libraryID: Int64
     @State private var kind: Kind = .tracks
-    @State private var items: [Kind: [Item]] = [:]
+    /// What they rated 4 stars or more instead of the hearts.
+    @State private var rated = false
+    @State private var items: [String: [Item]] = [:]
     @State private var error: String?
     @State private var busy = false
 
-    private var current: [Item]? { items[kind] }
+    private var key: String { "\(kind.rawValue)-\(rated)" }
+    private var current: [Item]? { items[key] }
 
     var body: some View {
         ScrollView {
@@ -582,17 +600,26 @@ struct MusicFavoritesView: View {
                 .pickerStyle(.segmented)
                 .accessibilityIdentifier("favoritesKind")
                 .padding(.horizontal, sidePadding)
+                Picker("Which", selection: $rated) {
+                    Text("Favourites").tag(false)
+                    Text("Rated 4★+").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("favoritesSource")
+                .padding(.horizontal, sidePadding)
                 if let error {
                     VStack(alignment: .leading, spacing: 8) {
                         ErrorBanner(message: error)
-                        Button("Try Again") { Task { await load(kind, force: true) } }.buttonStyle(.bordered)
+                        Button("Try Again") { Task { await load(force: true) } }.buttonStyle(.bordered)
                     }
                     .padding(.horizontal, sidePadding)
                 }
                 if let list = current {
                     if list.isEmpty {
-                        ContentUnavailableView("No favorite \(kind.rawValue.lowercased()) yet", systemImage: "heart",
-                                               description: Text("Rate something 4 stars or more and it shows up here."))
+                        ContentUnavailableView(rated ? "Nothing rated 4★ or more yet" : "No favourite \(kind.rawValue.lowercased()) yet",
+                                               systemImage: rated ? "star" : "heart",
+                                               description: Text(rated ? "Rate something 4 stars or more and it shows up here."
+                                                                 : "Use the heart on a song, album or artist and it shows up here."))
                     } else if kind == .tracks {
                         tracks(list)
                     } else {
@@ -612,24 +639,24 @@ struct MusicFavoritesView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle("Favorites")
-        .task(id: kind) { await load(kind) }
-        .refreshable { await load(kind, force: true) }
+        .navigationTitle("Favourites")
+        .task(id: key) { await load() }
+        .refreshable { await load(force: true) }
     }
 
     private func tracks(_ list: [Item]) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
-                Button { music.play(list, source: "Favorites") } label: { Label("Play", systemImage: "play.fill") }
+                Button { music.play(list, source: "Favourites") } label: { Label("Play", systemImage: "play.fill") }
                     .buttonStyle(.borderedProminent)
-                Button { music.play(list, shuffle: true, source: "Favorites") } label: { Label("Shuffle", systemImage: "shuffle") }
+                Button { music.play(list, shuffle: true, source: "Favourites") } label: { Label("Shuffle", systemImage: "shuffle") }
                     .buttonStyle(.bordered)
             }
             .padding(.horizontal, sidePadding)
             .padding(.bottom, 10)
             ForEach(Array(list.enumerated()), id: \.element.id) { i, t in
                 HStack(spacing: 4) {
-                    Button { music.play(list, start: i, source: "Favorites") } label: {
+                    Button { music.play(list, start: i, source: "Favourites") } label: {
                         HStack(spacing: 12) {
                             ArtworkView(item: t, shape: .square, width: 60).frame(width: isTV ? 80 : 44)
                             VStack(alignment: .leading, spacing: 2) {
@@ -647,19 +674,22 @@ struct MusicFavoritesView: View {
                     .buttonStyle(.plain)
                     .contextMenu { ItemMenuItems(item: t) }
                     .accessibilityIdentifier("favoriteTrack.\(t.id)")
-                    RowRating(item: t)
+                    RowFavorite(item: t)
+                    RowRating(item: t, gap: isTV ? 8 : 4)
                 }
                 .padding(.trailing, sidePadding - 6)
             }
         }
     }
 
-    private func load(_ k: Kind, force: Bool = false) async {
-        guard force || items[k] == nil else { return }
+    private func load(force: Bool = false) async {
+        let k = kind, rated = rated, key = key
+        guard force || items[key] == nil else { return }
         do {
-            let page = try await app.items(library: libraryID, sort: ._hyphen_myRating, limit: k == .tracks ? 500 : 300,
-                                           type: k.type, minMyRating: 8)
-            items[k] = page.items
+            let page = try await app.items(library: libraryID, sort: rated ? ._hyphen_myRating : ._hyphen_favorited,
+                                           limit: k == .tracks ? 500 : 300, type: k.type,
+                                           minMyRating: rated ? 8 : nil, favorites: !rated)
+            items[key] = page.items
             error = nil
         } catch is CancellationError {
         } catch {

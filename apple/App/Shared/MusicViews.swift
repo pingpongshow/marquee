@@ -171,7 +171,9 @@ struct MixCard: View {
             Button(action: action) {
                 ZStack {
                     LinearGradient(colors: [hue.opacity(0.9), hue.opacity(0.35)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    Image(systemName: "dot.radiowaves.left.and.right").font(.system(size: width / 4)).foregroundStyle(.white.opacity(0.85))
+                    // The Favourites Mix (the heart's songs, USER-12) shows a heart.
+                    Image(systemName: station.id == "favorites" ? "heart.fill" : "dot.radiowaves.left.and.right")
+                        .font(.system(size: width / 4)).foregroundStyle(.white.opacity(0.85))
                 }
                 .frame(width: width, height: width)
                 .clipShape(RoundedRectangle(cornerRadius: 8))

@@ -50,8 +50,10 @@ struct LibraryGrid: View {
     @State private var total = 0
     @State private var loading = false
     @State private var unwatchedOnly = false
-    /// Only what this person rated 4 stars or more (favourites).
+    /// Only what this person rated 4 stars or more.
     @State private var ratedOnly = false
+    /// Only this person's favourites (the heart, USER-12).
+    @State private var favoritesOnly = false
     @State private var genre: String?
     @State private var decade: Int?
     /// This grid's genres and decades (asked for with its type: albums, artists…).
@@ -125,9 +127,12 @@ struct LibraryGrid: View {
             .accessibilityIdentifier("libraryGrid")
             if loading { ProgressView().padding() }
             if !loading, error == nil, items.isEmpty, generation > 0 {
-                ContentUnavailableView(ratedOnly ? "Nothing rated 4★ or more" : unwatchedOnly ? "Nothing left to watch" : "Nothing here yet",
-                                       systemImage: ratedOnly ? "star" : "square.grid.2x2",
-                                       description: Text(ratedOnly || unwatchedOnly ? "Try turning the filter off." : "This library is empty, or still being scanned."))
+                let favs = favoritesOnly && !showCollections
+                ContentUnavailableView(favs ? "No favourites here yet" : ratedOnly ? "Nothing rated 4★ or more" : unwatchedOnly ? "Nothing left to watch" : "Nothing here yet",
+                                       systemImage: favs ? "heart" : ratedOnly ? "star" : "square.grid.2x2",
+                                       description: Text(favs && !ratedOnly && !unwatchedOnly && genre == nil && decade == nil
+                                                         ? "Use the heart on an item's page to add it."
+                                                         : favs || ratedOnly || unwatchedOnly ? "Try turning the filter off." : "This library is empty, or still being scanned."))
             }
         }
     }
@@ -152,12 +157,16 @@ struct LibraryGrid: View {
                 Text("Recently added").tag(ItemSort._hyphen_added)
                 Text("Release date").tag(ItemSort._hyphen_released)
                 Text("Rating").tag(ItemSort._hyphen_rating)
-                if !showCollections { Text("My rating").tag(ItemSort._hyphen_myRating) }
+                if !showCollections {
+                    Text("My rating").tag(ItemSort._hyphen_myRating)
+                    Text("Date favourited").tag(ItemSort._hyphen_favorited)
+                }
                 Text(isMusic ? "Recently played" : "Last watched").tag(ItemSort._hyphen_viewed)
                 Text("Random").tag(ItemSort.random)
             }
             Toggle(isMusic ? "Unplayed only" : "Unwatched only", isOn: $unwatchedOnly)
             if !showCollections {
+                Toggle("Favourites", isOn: $favoritesOnly)
                 Toggle("Rated 4★+", isOn: $ratedOnly)
                 FacetPickers(facets: facets, genre: $genre, decade: $decade)
             }
@@ -176,7 +185,7 @@ struct LibraryGrid: View {
     #endif
 
     private var queryKey: String {
-        "\(sort)-\(unwatchedOnly)-\(ratedOnly)-\(showCollections)-\(genre ?? "")-\(decade ?? 0)"
+        "\(sort)-\(unwatchedOnly)-\(ratedOnly)-\(favoritesOnly)-\(showCollections)-\(genre ?? "")-\(decade ?? 0)"
     }
 
     private func reloadIfChanged() async {
@@ -204,10 +213,13 @@ struct LibraryGrid: View {
         loading = true
         defer { if gen == generation { loading = false } }
         do {
+            // Collections have no favourites or ratings of their own: their sorts fall back.
+            let sort: ItemSort = showCollections && (self.sort == ._hyphen_favorited || self.sort == ._hyphen_myRating) ? .title : self.sort
             let page = try await app.items(library: libraryID, sort: sort, offset: items.count, limit: Self.page,
                                            watch: unwatchedOnly && !showCollections ? .unwatched : nil,
                                            genre: showCollections ? nil : genre, type: showCollections ? .collection : type,
-                                           decade: showCollections ? nil : decade, minMyRating: ratedOnly && !showCollections ? 8 : nil)
+                                           decade: showCollections ? nil : decade, minMyRating: ratedOnly && !showCollections ? 8 : nil,
+                                           favorites: favoritesOnly && !showCollections)
             guard gen == generation else { return }
             var fresh: [Item] = []
             for item in page.items where positions[item.id] == nil {

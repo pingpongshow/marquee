@@ -43,7 +43,7 @@ enum SettingsPage: Hashable {
 /// The full lists behind a music library's landing page.
 enum MusicBrowse: Hashable {
     case artists, albums, recentAlbums, recentlyPlayed, songs, genres, moodsAndStyles, decades
-    /// What this person rated 4 stars or more (Plex ratings carry over: a favourite is a high rating).
+    /// This person's favourites (the heart, USER-12), or what they rated 4 stars or more.
     case favorites
     /// Albums from the decade starting in this year, with its radio.
     case decade(Int)
