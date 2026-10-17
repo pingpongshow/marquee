@@ -823,4 +823,141 @@ extension MarqueeTVUITests {
         XCTAssertFalse(app.buttons["Recordings"].exists, "no Recordings tab")
         shot("tv-dvr2-no-recordings-tab")
     }
+
+    /// Connection limits and stopping recordings on the TV (LIVE-3, LIVE-5): with the test
+    /// source limited to one connection and a recording on, the Recording now strip offers Stop
+    /// and keep, the other channels are greyed out and channel up/down skips them, and
+    /// Recordings switches between All recordings and Only mine. Needs the source's maxStreams at 1.
+    func testRecordingNowAndConnectionLimitsTV() throws {
+        func focusLabel() -> String {
+            let f = app.buttons.matching(NSPredicate(format: "hasFocus == true")).firstMatch
+            return f.exists ? f.label : ""
+        }
+        func focusFrame() -> CGRect {
+            let f = app.buttons.matching(NSPredicate(format: "hasFocus == true")).firstMatch
+            return f.exists ? f.frame : .zero
+        }
+        // Focus moves (and a segment is chosen) a moment after each press.
+        func settle(_ e: XCUIElement, _ d: XCUIRemote.Button) {
+            for _ in 0..<4 where !e.hasFocus {
+                remote.press(d)
+                usleep(600_000)
+            }
+            XCTAssertTrue(e.hasFocus, "focus is on \(focusLabel())")
+        }
+        guard let admin = adminToken else { throw XCTSkip("MARQUEE_TEST_ADMIN_TOKEN not set") }
+        for r in try list("/livetv/recordings", token: admin) where r["status"] as? String == "recording" {
+            try api("POST", "/livetv/recordings/\(r["id"] as! Int)/stop", ["keep": true])
+        }
+        let channels = try list("/livetv/channels", token: admin)
+        let soon = Date().addingTimeInterval(8 * 60)
+        func date(_ s: Any?) -> Date? {
+            let f = ISO8601DateFormatter()
+            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return (s as? String).flatMap { f.date(from: $0) ?? ISO8601DateFormatter().date(from: $0) }
+        }
+        guard let channel = channels.first(where: { date(($0["now"] as? [String: Any])?["end"]).map { $0 > soon } ?? false }) else {
+            throw XCTSkip("nothing on now runs long enough to record")
+        }
+        let name = try XCTUnwrap(channel["name"] as? String)
+        let now = try XCTUnwrap(channel["now"] as? [String: Any])
+        let other = try XCTUnwrap(channels.first { $0["id"] as? Int != channel["id"] as? Int && $0["next"] != nil })
+        let next = try XCTUnwrap(other["next"] as? [String: Any])
+        let theirs = try api("POST", "/livetv/recordings", ["channelId": other["id"] as! Int, "start": next["start"] as! String])
+        if let tid = (theirs["recording"] as? [String: Any])?["id"] as? Int {
+            let url = server + "/api/v1/livetv/recordings/\(tid)"
+            addTeardownBlock { Self.send("DELETE", url, token: admin) }
+        }
+        let otherTitle = try XCTUnwrap(next["title"] as? String)
+
+        let token = try signInTemporaryUser()
+        let id = try XCTUnwrap(try api("GET", "/me", token: token)["id"] as? Int)
+        try api("PATCH", "/users/\(id)", ["restrictions": ["allowRemote": true, "liveTv": true, "canRecordDVR": true, "canViewDVR": true]])
+        let mine = try api("POST", "/livetv/recordings", ["channelId": channel["id"] as! Int, "start": now["start"] as! String], token: token)
+        let recID = try XCTUnwrap((mine["recording"] as? [String: Any])?["id"] as? Int, "scheduled: \(mine)")
+        let recURL = server + "/api/v1/livetv/recordings/\(recID)?deleteFile=true"
+        addTeardownBlock { Self.send("DELETE", recURL, token: admin) }
+        var rec: [String: Any]?
+        for _ in 0..<45 where rec?["status"] as? String != "recording" {
+            rec = try list("/livetv/recordings", token: admin).first { $0["id"] as? Int == recID }
+            if rec?["status"] as? String != "recording" { sleep(1) }
+        }
+        XCTAssertEqual(rec?["status"] as? String, "recording", "the recording started: \(rec ?? [:])")
+        guard let blocked = try list("/livetv/channels", token: admin).first(where: { $0["available"] as? Bool == false })?["name"] as? String else {
+            throw XCTSkip("the test source isn't limited to one connection")
+        }
+
+        app.openSection("Live TV")
+        let strip = app.descendants(matching: .any)["liveTV.recordingNow"].firstMatch
+        XCTAssertTrue(strip.waitForExistence(timeout: 15), "the Recording now strip shows")
+        let keep = app.buttons["Stop and keep"].firstMatch
+        XCTAssertTrue(keep.exists)
+        XCTAssertTrue(app.buttons["Stop and delete"].firstMatch.exists)
+        let greyed = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(blocked), unavailable: ")).firstMatch
+        XCTAssertTrue(greyed.waitForExistence(timeout: 10), "\(blocked) is marked unavailable")
+        sleep(1)
+        shot("tv-cl1-recording-now")
+
+        // What's On: watch the recorded channel; channel up and down stay on it (the others
+        // can't be tuned).
+        let segments = ["Guide", "What's On", "Recordings"]
+        for _ in 0..<10 where !segments.contains(focusLabel()) { remote.press(.down); usleep(400_000) }
+        let whatsOn = app.buttons["What's On"].firstMatch
+        settle(whatsOn, .right)
+        remote.press(.select)
+        let watch = app.buttons["Watch \(name)"]
+        XCTAssertTrue(watch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(blocked), unavailable: ")).firstMatch.exists, "greyed in What's On")
+        for _ in 0..<6 where !watch.hasFocus { remote.press(.down) }
+        XCTAssertTrue(watch.hasFocus, "focus is on \(focusLabel())")
+        sleep(1)
+        shot("tv-cl2-whats-on")
+        remote.press(.select)
+        let player = app.descendants(matching: .any)["liveWatch.player"].firstMatch
+        XCTAssertTrue(player.waitForExistence(timeout: 15))
+        sleep(4)
+        remote.press(.down)
+        sleep(2)
+        XCTAssertEqual(player.value as? String, name, "channel down skips the unavailable channels")
+        remote.press(.up)
+        sleep(2)
+        XCTAssertEqual(player.value as? String, name, "channel up too")
+        shot("tv-cl3-watching")
+        remote.press(.menu)
+        XCTAssertTrue(player.waitForNonExistence(timeout: 10))
+        sleep(1)
+
+        // Recordings: All recordings, then Only mine.
+        let recordings = app.buttons["Recordings"].firstMatch
+        for _ in 0..<10 where !segments.contains(focusLabel()) { remote.press(.up); usleep(400_000) }
+        settle(recordings, .right)
+        remote.press(.select)
+        let all = app.buttons["All recordings"], onlyMine = app.buttons["Only mine"]
+        XCTAssertTrue(all.waitForExistence(timeout: 10))
+        remote.press(.down)
+        settle(all, .left)
+        remote.press(.select)
+        XCTAssertTrue(app.staticTexts[otherTitle].waitForExistence(timeout: 10), "someone else's recording")
+        shot("tv-cl4-all")
+        settle(onlyMine, .right)
+        remote.press(.select)
+        XCTAssertTrue(app.staticTexts[otherTitle].waitForNonExistence(timeout: 10), "only mine")
+        sleep(1)
+        shot("tv-cl5-only-mine")
+        settle(all, .left)
+        remote.press(.select)
+
+        // Stop and keep from the strip.
+        let stripKeep = strip.buttons["Stop and keep"].firstMatch
+        XCTAssertTrue(stripKeep.exists)
+        for _ in 0..<8 where !stripKeep.hasFocus {
+            remote.press(stripKeep.frame.midY < focusFrame().midY - 20 ? .up : .left)
+            usleep(600_000)
+        }
+        XCTAssertTrue(stripKeep.hasFocus, "focus is on \(focusLabel())")
+        remote.press(.select)
+        XCTAssertTrue(strip.waitForNonExistence(timeout: 15), "the strip goes")
+        sleep(1)
+        shot("tv-cl6-stopped")
+    }
 }

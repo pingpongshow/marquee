@@ -485,6 +485,16 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /items/{itemId}/watchlist`.
     /// - Remark: Generated from `#/paths//items/{itemId}/watchlist/delete(removeFromWatchlist)`.
     func removeFromWatchlist(_ input: Operations.RemoveFromWatchlist.Input) async throws -> Operations.RemoveFromWatchlist.Output
+    /// Make a movie, show, episode, song, album or artist one of your favourites (the heart). Favourites are yours alone (a managed profile has its own); recommendations, Muse, radios and mixes weight them above star ratings.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/favorite`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/favorite/put(addFavorite)`.
+    func addFavorite(_ input: Operations.AddFavorite.Input) async throws -> Operations.AddFavorite.Output
+    /// No longer one of your favourites.
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/favorite`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/favorite/delete(removeFavorite)`.
+    func removeFavorite(_ input: Operations.RemoveFavorite.Input) async throws -> Operations.RemoveFavorite.Output
     /// Your watchlist, most recently added first.
     ///
     /// - Remark: HTTP `GET /watchlist`.
@@ -632,7 +642,7 @@ public protocol APIProtocol: Sendable {
     func updateOptimizeSettings(_ input: Operations.UpdateOptimizeSettings.Input) async throws -> Operations.UpdateOptimizeSettings.Output
     /// Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
     ///
-    /// The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item's last file the item goes too, along with a season or show left empty.
+    /// The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good when the daily Empty media trash task runs. When it was the item's last file the item goes too, along with a season or show left empty.
     ///
     /// - Remark: HTTP `DELETE /files/{fileId}`.
     /// - Remark: Generated from `#/paths//files/{fileId}/delete(deleteMediaFile)`.
@@ -790,6 +800,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /livetv/recordings/{recordingId}`.
     /// - Remark: Generated from `#/paths//livetv/recordings/{recordingId}/delete(cancelRecording)`.
     func cancelRecording(_ input: Operations.CancelRecording.Input) async throws -> Operations.CancelRecording.Output
+    /// Stop a recording in progress now. keep true (the default): what was recorded is finalised as a playable file, filed like a finished recording and marked stoppedEarly. keep false: the partial recording is deleted and it leaves the list. Only whoever scheduled it, or an admin (canDelete). Returns once it has stopped.
+    ///
+    /// - Remark: HTTP `POST /livetv/recordings/{recordingId}/stop`.
+    /// - Remark: Generated from `#/paths//livetv/recordings/{recordingId}/stop/post(stopRecording)`.
+    func stopRecording(_ input: Operations.StopRecording.Input) async throws -> Operations.StopRecording.Output
     /// Series being recorded.
     ///
     /// - Remark: HTTP `GET /livetv/recording-rules`.
@@ -1279,6 +1294,8 @@ public protocol APIProtocol: Sendable {
     /// - Remark: Generated from `#/paths//music/dj/post(musicDJ)`.
     func musicDJ(_ input: Operations.MusicDJ.Input) async throws -> Operations.MusicDJ.Output
     /// Your daily mixes (MUSIC-7), built from your listening; they change once a day.
+    ///
+    /// Also a Favourites mix (id favorites): your favourite songs (the heart) shuffled, first in the list when you have at least three. It needs no Soundprint analysis, so it's there even when the daily mixes aren't.
     ///
     /// - Remark: HTTP `GET /music/mixes`.
     /// - Remark: Generated from `#/paths//music/mixes/get(musicMixes)`.
@@ -2465,6 +2482,36 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// Make a movie, show, episode, song, album or artist one of your favourites (the heart). Favourites are yours alone (a managed profile has its own); recommendations, Muse, radios and mixes weight them above star ratings.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/favorite`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/favorite/put(addFavorite)`.
+    public func addFavorite(
+        path: Operations.AddFavorite.Input.Path,
+        query: Operations.AddFavorite.Input.Query = .init(),
+        headers: Operations.AddFavorite.Input.Headers = .init()
+    ) async throws -> Operations.AddFavorite.Output {
+        try await addFavorite(Operations.AddFavorite.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// No longer one of your favourites.
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/favorite`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/favorite/delete(removeFavorite)`.
+    public func removeFavorite(
+        path: Operations.RemoveFavorite.Input.Path,
+        query: Operations.RemoveFavorite.Input.Query = .init(),
+        headers: Operations.RemoveFavorite.Input.Headers = .init()
+    ) async throws -> Operations.RemoveFavorite.Output {
+        try await removeFavorite(Operations.RemoveFavorite.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
     /// Your watchlist, most recently added first.
     ///
     /// - Remark: HTTP `GET /watchlist`.
@@ -2816,7 +2863,7 @@ extension APIProtocol {
     }
     /// Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
     ///
-    /// The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item's last file the item goes too, along with a season or show left empty.
+    /// The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good when the daily Empty media trash task runs. When it was the item's last file the item goes too, along with a season or show left empty.
     ///
     /// - Remark: HTTP `DELETE /files/{fileId}`.
     /// - Remark: Generated from `#/paths//files/{fileId}/delete(deleteMediaFile)`.
@@ -3182,6 +3229,21 @@ extension APIProtocol {
             path: path,
             query: query,
             headers: headers
+        ))
+    }
+    /// Stop a recording in progress now. keep true (the default): what was recorded is finalised as a playable file, filed like a finished recording and marked stoppedEarly. keep false: the partial recording is deleted and it leaves the list. Only whoever scheduled it, or an admin (canDelete). Returns once it has stopped.
+    ///
+    /// - Remark: HTTP `POST /livetv/recordings/{recordingId}/stop`.
+    /// - Remark: Generated from `#/paths//livetv/recordings/{recordingId}/stop/post(stopRecording)`.
+    public func stopRecording(
+        path: Operations.StopRecording.Input.Path,
+        headers: Operations.StopRecording.Input.Headers = .init(),
+        body: Operations.StopRecording.Input.Body? = nil
+    ) async throws -> Operations.StopRecording.Output {
+        try await stopRecording(Operations.StopRecording.Input(
+            path: path,
+            headers: headers,
+            body: body
         ))
     }
     /// Series being recorded.
@@ -4359,6 +4421,8 @@ extension APIProtocol {
         ))
     }
     /// Your daily mixes (MUSIC-7), built from your listening; they change once a day.
+    ///
+    /// Also a Favourites mix (id favorites): your favourite songs (the heart) shuffled, first in the list when you have at least three. It needs no Soundprint analysis, so it's there even when the daily mixes aren't.
     ///
     /// - Remark: HTTP `GET /music/mixes`.
     /// - Remark: Generated from `#/paths//music/mixes/get(musicMixes)`.

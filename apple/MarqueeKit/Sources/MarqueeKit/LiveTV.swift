@@ -8,6 +8,7 @@ public typealias LiveGuideRow = Operations.LiveGuide.Output.Ok.Body.JsonPayloadP
 public typealias Recording = Components.Schemas.Recording
 public typealias RecordingRule = Components.Schemas.RecordingRule
 public typealias DvrUsage = Components.Schemas.DvrUsage
+public typealias RecordingOwner = Components.Parameters.RecordingOwner
 
 /// Live TV (LIVE-1..4): channels, the guide, favourites and live streams.
 @MainActor
@@ -71,8 +72,21 @@ public extension AppSession {
             return (s.id, url)
         case let .badGateway(e): throw MarqueeError((try? e.body.json.message) ?? "The channel isn't available right now")
         case let .forbidden(e): throw MarqueeError((try? e.body.json.message) ?? "Live TV isn't available here")
+        // no_tuner: every connection to the channel's source is in use.
+        case let .conflict(e): throw MarqueeError((try? e.body.json.message) ?? "No connection is free for this channel right now")
         default: throw MarqueeError("Couldn't tune the channel")
         }
+    }
+
+    /// Why a live stream ended: once it has, its playlist answers 410 with a plain-text
+    /// reason. nil while it's still going (or the server can't be reached). A reason starting
+    /// "Stopped:" is for the viewer; after any other, tuning the channel again works.
+    nonisolated func liveEndReason(_ url: URL) async -> String? {
+        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10)
+        req.httpMethod = "GET"
+        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+              (resp as? HTTPURLResponse)?.statusCode == 410 else { return nil }
+        return (String(data: data, encoding: .utf8) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func stopLive(_ session: String) async {
@@ -84,12 +98,24 @@ public extension AppSession {
 
     // MARK: DVR (LIVE-5)
 
-    func recordings() async throws -> [Recording] {
-        try await liveAPI.listRecordings().ok.body.json
+    /// Recordings the caller may see; `.me` = only the ones they scheduled.
+    func recordings(owner: RecordingOwner? = nil) async throws -> [Recording] {
+        try await liveAPI.listRecordings(query: .init(owner: owner)).ok.body.json
     }
 
-    func recordingRules() async throws -> [RecordingRule] {
-        try await liveAPI.listRecordingRules().ok.body.json
+    func recordingRules(owner: RecordingOwner? = nil) async throws -> [RecordingRule] {
+        try await liveAPI.listRecordingRules(query: .init(owner: owner)).ok.body.json
+    }
+
+    /// Stops a recording in progress, keeping what's been recorded so far or deleting it.
+    func stopRecording(_ id: Int64, keep: Bool) async throws {
+        switch try await liveAPI.stopRecording(path: .init(recordingId: id), body: .json(.init(keep: keep))) {
+        case .noContent: return
+        case let .forbidden(e): throw MarqueeError((try? e.body.json.message) ?? "Only whoever scheduled this recording, or an admin, can stop it")
+        case .conflict: throw MarqueeError("That recording has already finished")
+        case .notFound: throw MarqueeError("That recording no longer exists")
+        default: throw MarqueeError("Couldn't stop the recording")
+        }
     }
 
     /// Records a programme, or every airing of its title (on any channel) when `series` is set.
@@ -152,6 +178,25 @@ public extension DvrUsage {
         return quotaAction == .deleteOldest
             ? "You're over your recording space; your oldest watched recordings will be removed to make room."
             : "You're over your recording space; new recordings won't start until you delete some."
+    }
+}
+
+public extension LiveChannel {
+    /// False while every connection the channel needs is in use (absent = available).
+    var isAvailable: Bool { available != false }
+    /// Why the channel can't be watched right now.
+    var unavailableText: String { unavailableReason ?? "This channel isn't available right now." }
+}
+
+public extension Recording {
+    /// "12 min in · 48 min left" for a recording in progress.
+    func progressLabel(now: Date = .now) -> String {
+        func fmt(_ s: TimeInterval) -> String {
+            let m = max(0, Int((s / 60).rounded()))
+            return m >= 60 ? "\(m / 60) h \(m % 60) min" : "\(m) min"
+        }
+        let left = end.timeIntervalSince(now)
+        return "\(fmt(now.timeIntervalSince(start))) in · \(left > 0 ? "\(fmt(left)) left" : "finishing")"
     }
 }
 

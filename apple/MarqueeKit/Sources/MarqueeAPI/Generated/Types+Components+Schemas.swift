@@ -480,7 +480,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/canViewDVR`.
             public var canViewDVR: Swift.Bool?
-            /// This user's DVR quota in GB (10^9 bytes). Null or absent = the server default (integrations.dvrDefaultQuotaGb); 0 = unlimited.
+            /// This user's DVR quota in GB (10^9 bytes). Null or absent = the server default (integrations.dvrDefaultQuotaGb) for everyone but admins, who then have no limit; 0 = unlimited. An admin's own quota applies to them like anyone's. Admins may set it for anyone, admins and themselves included.
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/dvrQuotaGb`.
             public var dvrQuotaGb: Swift.Int?
@@ -488,9 +488,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/liveTv`.
             public var liveTv: Swift.Bool?
-            /// Channel groups this user may watch. Null or absent = all.
+            /// Deprecated and ignored: channel groups no longer limit anyone (everyone who may watch Live TV sees every group). The server ignores it when written and never returns it.
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/liveTvGroups`.
+            @available(*, deprecated)
             public var liveTvGroups: [Swift.String]?
             /// The Seerr user requests are made as. Null = Seerr's API key owner.
             ///
@@ -511,9 +512,9 @@ extension Components {
             ///   - canRecord: Deprecated: the same as canRecordDVR (kept for older clients). Read only when canRecordDVR isn't sent.
             ///   - canRecordDVR: May schedule Live TV recordings (LIVE-5). Default true; admins always may. A user who may not has their series paused.
             ///   - canViewDVR: May see and play the household's Live TV recordings (the DVR list and the recordings libraries). Default true; admins always may.
-            ///   - dvrQuotaGb: This user's DVR quota in GB (10^9 bytes). Null or absent = the server default (integrations.dvrDefaultQuotaGb); 0 = unlimited.
+            ///   - dvrQuotaGb: This user's DVR quota in GB (10^9 bytes). Null or absent = the server default (integrations.dvrDefaultQuotaGb) for everyone but admins, who then have no limit; 0 = unlimited. An admin's own quota applies to them like anyone's. Admins may set it for anyone, admins and themselves included.
             ///   - liveTv: May watch Live TV (LIVE-4). Default true.
-            ///   - liveTvGroups: Channel groups this user may watch. Null or absent = all.
+            ///   - liveTvGroups: Deprecated and ignored: channel groups no longer limit anyone (everyone who may watch Live TV sees every group). The server ignores it when written and never returns it.
             ///   - seerrUserId: The Seerr user requests are made as. Null = Seerr's API key owner.
             ///   - friend: Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker.
             public init(
@@ -1317,7 +1318,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/NotificationSettings/linkUrl`.
             public var linkUrl: Swift.String?
-            /// Alert types that are on. All are off by default.
+            /// Alert types that are on. All are off by default except vod_save_failed.
             ///
             /// - Remark: Generated from `#/components/schemas/NotificationSettings/alerts`.
             public var alerts: [Components.Schemas.AlertType]?
@@ -1329,6 +1330,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/NotificationSettings/plexSyncAlert`.
             public var plexSyncAlert: Swift.Bool?
+            /// The optimize_failed alert is on: a Library Health → Large files conversion failed (not one skipped for saving too little). On by default. (Not in AlertType; notifications carry type optimize_failed.)
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/optimizeFailedAlert`.
+            public var optimizeFailedAlert: Swift.Bool?
             /// Mail alerts to every administrator with an email address.
             ///
             /// - Remark: Generated from `#/components/schemas/NotificationSettings/recipientsAllAdmins`.
@@ -1353,9 +1358,10 @@ extension Components {
             ///   - fromName:
             ///   - mailConfigured: Host, port and from address are set.
             ///   - linkUrl: Address links in mail start with (e.g. reset links). Empty = the Remote Access URL.
-            ///   - alerts: Alert types that are on. All are off by default.
+            ///   - alerts: Alert types that are on. All are off by default except vod_save_failed.
             ///   - dvrQuotaAlert: The dvr_quota alert is on: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Off by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.)
             ///   - plexSyncAlert: The plex_sync alert is on: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Off by default. (Not in AlertType; notifications carry type plex_sync.)
+            ///   - optimizeFailedAlert: The optimize_failed alert is on: a Library Health → Large files conversion failed (not one skipped for saving too little). On by default. (Not in AlertType; notifications carry type optimize_failed.)
             ///   - recipientsAllAdmins: Mail alerts to every administrator with an email address.
             ///   - recipients: Administrators (user ids) who get alert mail when recipientsAllAdmins is off.
             ///   - diskThresholdPercent: Alert when a volume has less free space than this.
@@ -1372,6 +1378,7 @@ extension Components {
                 alerts: [Components.Schemas.AlertType]? = nil,
                 dvrQuotaAlert: Swift.Bool? = nil,
                 plexSyncAlert: Swift.Bool? = nil,
+                optimizeFailedAlert: Swift.Bool? = nil,
                 recipientsAllAdmins: Swift.Bool? = nil,
                 recipients: [Swift.Int64]? = nil,
                 diskThresholdPercent: Swift.Int? = nil
@@ -1388,6 +1395,7 @@ extension Components {
                 self.alerts = alerts
                 self.dvrQuotaAlert = dvrQuotaAlert
                 self.plexSyncAlert = plexSyncAlert
+                self.optimizeFailedAlert = optimizeFailedAlert
                 self.recipientsAllAdmins = recipientsAllAdmins
                 self.recipients = recipients
                 self.diskThresholdPercent = diskThresholdPercent
@@ -1405,6 +1413,7 @@ extension Components {
                 case alerts
                 case dvrQuotaAlert
                 case plexSyncAlert
+                case optimizeFailedAlert
                 case recipientsAllAdmins
                 case recipients
                 case diskThresholdPercent
@@ -1436,7 +1445,7 @@ extension Components {
             public var fromName: Swift.String?
             /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/linkUrl`.
             public var linkUrl: Swift.String?
-            /// Replaces the list; the dvr_quota and plex_sync alerts are kept as they were unless dvrQuotaAlert or plexSyncAlert is sent.
+            /// Replaces the list; the dvr_quota, plex_sync and optimize_failed alerts are kept as they were unless dvrQuotaAlert, plexSyncAlert or optimizeFailedAlert is sent.
             ///
             /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/alerts`.
             public var alerts: [Components.Schemas.AlertType]?
@@ -1444,6 +1453,8 @@ extension Components {
             public var dvrQuotaAlert: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/plexSyncAlert`.
             public var plexSyncAlert: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/optimizeFailedAlert`.
+            public var optimizeFailedAlert: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/recipientsAllAdmins`.
             public var recipientsAllAdmins: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/recipients`.
@@ -1461,9 +1472,10 @@ extension Components {
             ///   - fromAddress:
             ///   - fromName:
             ///   - linkUrl:
-            ///   - alerts: Replaces the list; the dvr_quota and plex_sync alerts are kept as they were unless dvrQuotaAlert or plexSyncAlert is sent.
+            ///   - alerts: Replaces the list; the dvr_quota, plex_sync and optimize_failed alerts are kept as they were unless dvrQuotaAlert, plexSyncAlert or optimizeFailedAlert is sent.
             ///   - dvrQuotaAlert:
             ///   - plexSyncAlert:
+            ///   - optimizeFailedAlert:
             ///   - recipientsAllAdmins:
             ///   - recipients:
             ///   - diskThresholdPercent:
@@ -1479,6 +1491,7 @@ extension Components {
                 alerts: [Components.Schemas.AlertType]? = nil,
                 dvrQuotaAlert: Swift.Bool? = nil,
                 plexSyncAlert: Swift.Bool? = nil,
+                optimizeFailedAlert: Swift.Bool? = nil,
                 recipientsAllAdmins: Swift.Bool? = nil,
                 recipients: [Swift.Int64]? = nil,
                 diskThresholdPercent: Swift.Int? = nil
@@ -1494,6 +1507,7 @@ extension Components {
                 self.alerts = alerts
                 self.dvrQuotaAlert = dvrQuotaAlert
                 self.plexSyncAlert = plexSyncAlert
+                self.optimizeFailedAlert = optimizeFailedAlert
                 self.recipientsAllAdmins = recipientsAllAdmins
                 self.recipients = recipients
                 self.diskThresholdPercent = diskThresholdPercent
@@ -1510,6 +1524,7 @@ extension Components {
                 case alerts
                 case dvrQuotaAlert
                 case plexSyncAlert
+                case optimizeFailedAlert
                 case recipientsAllAdmins
                 case recipients
                 case diskThresholdPercent
@@ -2417,7 +2432,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/LibraryGlobalSettings/trickplay`.
             public var trickplay: Swift.Bool?
-            /// Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good after 30 days.
+            /// Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good by the daily Empty media trash task.
             ///
             /// - Remark: Generated from `#/components/schemas/LibraryGlobalSettings/allowMediaDeletion`.
             public var allowMediaDeletion: Swift.Bool?
@@ -2431,7 +2446,7 @@ extension Components {
             ///   - watchedThresholdPercent:
             ///   - detectIntros: Find intros and end credits in TV episodes by comparing their audio, for Skip Intro and Skip Credits (PLAY-12). Markers from Plex or the files take precedence.
             ///   - trickplay: Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie.
-            ///   - allowMediaDeletion: Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good after 30 days.
+            ///   - allowMediaDeletion: Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good by the daily Empty media trash task.
             public init(
                 watchFilesystem: Swift.Bool? = nil,
                 scanOnStartup: Swift.Bool? = nil,
@@ -2640,6 +2655,14 @@ extension Components {
                 public var refreshedAt: Foundation.Date?
                 /// - Remark: Generated from `#/components/schemas/LiveTvStatus/SourcesPayload/error`.
                 public var error: Swift.String?
+                /// Connections the source allows at once (0 = unlimited).
+                ///
+                /// - Remark: Generated from `#/components/schemas/LiveTvStatus/SourcesPayload/maxStreams`.
+                public var maxStreams: Swift.Int?
+                /// Connections in use now: recordings in progress plus live streams (shared ones count once).
+                ///
+                /// - Remark: Generated from `#/components/schemas/LiveTvStatus/SourcesPayload/inUse`.
+                public var inUse: Swift.Int?
                 /// Creates a new `SourcesPayloadPayload`.
                 ///
                 /// - Parameters:
@@ -2649,13 +2672,17 @@ extension Components {
                 ///   - programmes:
                 ///   - refreshedAt:
                 ///   - error:
+                ///   - maxStreams: Connections the source allows at once (0 = unlimited).
+                ///   - inUse: Connections in use now: recordings in progress plus live streams (shared ones count once).
                 public init(
                     id: Swift.String,
                     name: Swift.String,
                     channels: Swift.Int,
                     programmes: Swift.Int,
                     refreshedAt: Foundation.Date? = nil,
-                    error: Swift.String? = nil
+                    error: Swift.String? = nil,
+                    maxStreams: Swift.Int? = nil,
+                    inUse: Swift.Int? = nil
                 ) {
                     self.id = id
                     self.name = name
@@ -2663,6 +2690,8 @@ extension Components {
                     self.programmes = programmes
                     self.refreshedAt = refreshedAt
                     self.error = error
+                    self.maxStreams = maxStreams
+                    self.inUse = inUse
                 }
                 public enum CodingKeys: String, CodingKey {
                     case id
@@ -2671,6 +2700,8 @@ extension Components {
                     case programmes
                     case refreshedAt
                     case error
+                    case maxStreams
+                    case inUse
                 }
             }
             /// - Remark: Generated from `#/components/schemas/LiveTvStatus/sources`.
@@ -2799,6 +2830,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Recording/watched`.
             public var watched: Swift.Bool?
+            /// Someone stopped it before the programme ended (Stop and keep): what was recorded until then was kept as a playable file.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Recording/stoppedEarly`.
+            public var stoppedEarly: Swift.Bool?
             /// Creates a new `Recording`.
             ///
             /// - Parameters:
@@ -2827,6 +2862,7 @@ extension Components {
             ///   - viewOffsetMs: Finished recordings: where the caller stopped watching (0 = not started or finished), to resume from the Recordings list.
             ///   - durationMs: Finished recordings: the recorded item's length.
             ///   - watched: Finished recordings: the caller has watched it to the end.
+            ///   - stoppedEarly: Someone stopped it before the programme ended (Stop and keep): what was recorded until then was kept as a playable file.
             public init(
                 id: Swift.Int64,
                 channelId: Swift.Int64? = nil,
@@ -2852,7 +2888,8 @@ extension Components {
                 commercials: Components.Schemas.CommercialScan? = nil,
                 viewOffsetMs: Swift.Int64? = nil,
                 durationMs: Swift.Int64? = nil,
-                watched: Swift.Bool? = nil
+                watched: Swift.Bool? = nil,
+                stoppedEarly: Swift.Bool? = nil
             ) {
                 self.id = id
                 self.channelId = channelId
@@ -2879,6 +2916,7 @@ extension Components {
                 self.viewOffsetMs = viewOffsetMs
                 self.durationMs = durationMs
                 self.watched = watched
+                self.stoppedEarly = stoppedEarly
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -2906,6 +2944,7 @@ extension Components {
                 case viewOffsetMs
                 case durationMs
                 case watched
+                case stoppedEarly
             }
         }
         /// - Remark: Generated from `#/components/schemas/RecordingRule`.
@@ -3011,14 +3050,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/DvrUsage/quotaGb`.
             public var quotaGb: Swift.Int?
-            /// default = the server default applies; user = the user's own quota (which may be 0, unlimited).
+            /// default = the server default applies (for an admin without a quota of their own: no limit, so quotaBytes is 0); user = the user's own quota (which may be 0, unlimited).
             ///
             /// - Remark: Generated from `#/components/schemas/DvrUsage/quotaSource`.
             @frozen public enum QuotaSourcePayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case _default = "default"
                 case user = "user"
             }
-            /// default = the server default applies; user = the user's own quota (which may be 0, unlimited).
+            /// default = the server default applies (for an admin without a quota of their own: no limit, so quotaBytes is 0); user = the user's own quota (which may be 0, unlimited).
             ///
             /// - Remark: Generated from `#/components/schemas/DvrUsage/quotaSource`.
             public var quotaSource: Components.Schemas.DvrUsage.QuotaSourcePayload
@@ -3050,7 +3089,7 @@ extension Components {
             ///   - recordings: Recordings counted.
             ///   - quotaBytes: The quota in bytes; 0 = unlimited.
             ///   - quotaGb: The quota in GB; 0 = unlimited.
-            ///   - quotaSource: default = the server default applies; user = the user's own quota (which may be 0, unlimited).
+            ///   - quotaSource: default = the server default applies (for an admin without a quota of their own: no limit, so quotaBytes is 0); user = the user's own quota (which may be 0, unlimited).
             ///   - overQuota: At or over the quota.
             ///   - quotaAction: What happens to new recordings over quota.
             ///   - canRecord:
@@ -3120,6 +3159,14 @@ extension Components {
             public var now: Components.Schemas.LiveProgramme?
             /// - Remark: Generated from `#/components/schemas/LiveChannel/next`.
             public var next: Components.Schemas.LiveProgramme?
+            /// False while every connection its source allows is in use (recordings and viewers) and this channel isn't one of those being received; tuning it would answer 409 no_tuner. Absent = available (older servers). Channel up/down should skip unavailable channels.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveChannel/available`.
+            public var available: Swift.Bool?
+            /// Why it isn't available, e.g. "All connections are in use: recording Gold Rush".
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveChannel/unavailableReason`.
+            public var unavailableReason: Swift.String?
             /// Creates a new `LiveChannel`.
             ///
             /// - Parameters:
@@ -3132,6 +3179,8 @@ extension Components {
             ///   - hidden: The caller hid it (listed only with hidden=true).
             ///   - now:
             ///   - next:
+            ///   - available: False while every connection its source allows is in use (recordings and viewers) and this channel isn't one of those being received; tuning it would answer 409 no_tuner. Absent = available (older servers). Channel up/down should skip unavailable channels.
+            ///   - unavailableReason: Why it isn't available, e.g. "All connections are in use: recording Gold Rush".
             public init(
                 id: Swift.Int64,
                 number: Swift.String? = nil,
@@ -3141,7 +3190,9 @@ extension Components {
                 favorite: Swift.Bool,
                 hidden: Swift.Bool? = nil,
                 now: Components.Schemas.LiveProgramme? = nil,
-                next: Components.Schemas.LiveProgramme? = nil
+                next: Components.Schemas.LiveProgramme? = nil,
+                available: Swift.Bool? = nil,
+                unavailableReason: Swift.String? = nil
             ) {
                 self.id = id
                 self.number = number
@@ -3152,6 +3203,8 @@ extension Components {
                 self.hidden = hidden
                 self.now = now
                 self.next = next
+                self.available = available
+                self.unavailableReason = unavailableReason
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -3163,6 +3216,8 @@ extension Components {
                 case hidden
                 case now
                 case next
+                case available
+                case unavailableReason
             }
         }
         /// - Remark: Generated from `#/components/schemas/LiveProgramme`.
@@ -3261,7 +3316,7 @@ extension Components {
         public struct LiveSession: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/LiveSession/id`.
             public var id: Swift.String
-            /// The live HLS playlist (server-relative; the session id is its credential).
+            /// The live HLS playlist (server-relative; the session id is its credential). Once the stream has ended the playlist answers 410 with a plain-text reason. A reason starting with "Stopped:" (e.g. "Stopped: a recording needed the connection") should be shown to the viewer; any other (the recording it shared ended, or it moved to a recording's stream) means tuning the channel again will work.
             ///
             /// - Remark: Generated from `#/components/schemas/LiveSession/url`.
             public var url: Swift.String
@@ -3282,7 +3337,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id:
-            ///   - url: The live HLS playlist (server-relative; the session id is its credential).
+            ///   - url: The live HLS playlist (server-relative; the session id is its credential). Once the stream has ended the playlist answers 410 with a plain-text reason. A reason starting with "Stopped:" (e.g. "Stopped: a recording needed the connection") should be shown to the viewer; any other (the recording it shared ended, or it moved to a recording's stream) means tuning the channel again will work.
             ///   - channelId:
             ///   - method:
             ///   - videoCodec:
@@ -3340,6 +3395,10 @@ extension Components {
             public var userAgent: Swift.String?
             /// - Remark: Generated from `#/components/schemas/LiveTvSource/enabled`.
             public var enabled: Swift.Bool?
+            /// Connections the provider allows at once (0 or absent = unlimited). At the limit other channels of this source are unavailable, a channel being recorded is watched from the recording's own connection, and a recording that needs a connection stops live streams on other channels of the source.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTvSource/maxStreams`.
+            public var maxStreams: Swift.Int?
             /// Creates a new `LiveTvSource`.
             ///
             /// - Parameters:
@@ -3350,6 +3409,7 @@ extension Components {
             ///   - epgUrl: XMLTV guide (m3u sources; optional, else the playlist's url-tvg).
             ///   - userAgent:
             ///   - enabled:
+            ///   - maxStreams: Connections the provider allows at once (0 or absent = unlimited). At the limit other channels of this source are unavailable, a channel being recorded is watched from the recording's own connection, and a recording that needs a connection stops live streams on other channels of the source.
             public init(
                 id: Swift.String? = nil,
                 name: Swift.String,
@@ -3357,7 +3417,8 @@ extension Components {
                 url: Swift.String,
                 epgUrl: Swift.String? = nil,
                 userAgent: Swift.String? = nil,
-                enabled: Swift.Bool? = nil
+                enabled: Swift.Bool? = nil,
+                maxStreams: Swift.Int? = nil
             ) {
                 self.id = id
                 self.name = name
@@ -3366,6 +3427,7 @@ extension Components {
                 self.epgUrl = epgUrl
                 self.userAgent = userAgent
                 self.enabled = enabled
+                self.maxStreams = maxStreams
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -3375,6 +3437,7 @@ extension Components {
                 case epgUrl
                 case userAgent
                 case enabled
+                case maxStreams
             }
         }
         /// A source of films (LIVE-6): an M3U playlist, e.g. Pluto TV's on-demand movies (each entry's group-title is its category), or an Xtream Codes server such as Dispatcharr (its VOD categories and movies).
@@ -4665,6 +4728,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/VodSaveSettings/retryFailed`.
             public var retryFailed: Swift.Bool?
+            /// Download only during the maintenance window (Scheduled Tasks); outside it running saves stop and keep what they downloaded. Default off: any time.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/windowOnly`.
+            public var windowOnly: Swift.Bool?
             /// More save folders besides moviesFolder and showsFolder (e.g. Anime), offered as "Save to {name}". Sending the list replaces it; an item without an id is new.
             ///
             /// - Remark: Generated from `#/components/schemas/VodSaveSettings/destinations`.
@@ -4686,6 +4753,7 @@ extension Components {
             ///   - pauseWhileWatching: Pause saves while someone watches (see pauseScope), resuming 15 s after. Default on.
             ///   - pauseScope: source: something from the same source, or Live TV from the same host (Dispatcharr). any: any playback on the server.
             ///   - retryFailed: Queue failed saves again every few hours. Default on.
+            ///   - windowOnly: Download only during the maintenance window (Scheduled Tasks); outside it running saves stop and keep what they downloaded. Default off: any time.
             ///   - destinations: More save folders besides moviesFolder and showsFolder (e.g. Anime), offered as "Save to {name}". Sending the list replaces it; an item without an id is new.
             public init(
                 moviesFolder: Swift.String? = nil,
@@ -4702,6 +4770,7 @@ extension Components {
                 pauseWhileWatching: Swift.Bool? = nil,
                 pauseScope: Components.Schemas.VodSaveSettings.PauseScopePayload? = nil,
                 retryFailed: Swift.Bool? = nil,
+                windowOnly: Swift.Bool? = nil,
                 destinations: [Components.Schemas.VodSaveDestination]? = nil
             ) {
                 self.moviesFolder = moviesFolder
@@ -4718,6 +4787,7 @@ extension Components {
                 self.pauseWhileWatching = pauseWhileWatching
                 self.pauseScope = pauseScope
                 self.retryFailed = retryFailed
+                self.windowOnly = windowOnly
                 self.destinations = destinations
             }
             public enum CodingKeys: String, CodingKey {
@@ -4735,6 +4805,7 @@ extension Components {
                 case pauseWhileWatching
                 case pauseScope
                 case retryFailed
+                case windowOnly
                 case destinations
             }
         }
@@ -5878,6 +5949,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/IntegrationSettings/vodEnabled`.
             public var vodEnabled: Swift.Bool?
+            /// The movie sources' lists reload every vodRefreshHours after the last successful refresh (default on). Off: they reload only when an admin presses Refresh (and at start for a source that has never loaded).
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/vodAutoRefresh`.
+            public var vodAutoRefresh: Swift.Bool?
+            /// Hours between automatic syncs of the movie sources (default 6).
+            ///
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettings/vodRefreshHours`.
+            public var vodRefreshHours: Swift.Int?
             /// - Remark: Generated from `#/components/schemas/IntegrationSettings/vodSources`.
             public var vodSources: [Components.Schemas.VodSource]?
             /// Creates a new `IntegrationSettings`.
@@ -5899,6 +5978,8 @@ extension Components {
             ///   - comskipAvailable: This server's build includes Comskip, so commercials can be found.
             ///   - liveTvSources:
             ///   - vodEnabled: Movies on demand appear under Live TV (LIVE-6).
+            ///   - vodAutoRefresh: The movie sources' lists reload every vodRefreshHours after the last successful refresh (default on). Off: they reload only when an admin presses Refresh (and at start for a source that has never loaded).
+            ///   - vodRefreshHours: Hours between automatic syncs of the movie sources (default 6).
             ///   - vodSources:
             public init(
                 seerrUrl: Swift.String? = nil,
@@ -5917,6 +5998,8 @@ extension Components {
                 comskipAvailable: Swift.Bool? = nil,
                 liveTvSources: [Components.Schemas.LiveTvSource]? = nil,
                 vodEnabled: Swift.Bool? = nil,
+                vodAutoRefresh: Swift.Bool? = nil,
+                vodRefreshHours: Swift.Int? = nil,
                 vodSources: [Components.Schemas.VodSource]? = nil
             ) {
                 self.seerrUrl = seerrUrl
@@ -5935,6 +6018,8 @@ extension Components {
                 self.comskipAvailable = comskipAvailable
                 self.liveTvSources = liveTvSources
                 self.vodEnabled = vodEnabled
+                self.vodAutoRefresh = vodAutoRefresh
+                self.vodRefreshHours = vodRefreshHours
                 self.vodSources = vodSources
             }
             public enum CodingKeys: String, CodingKey {
@@ -5954,6 +6039,8 @@ extension Components {
                 case comskipAvailable
                 case liveTvSources
                 case vodEnabled
+                case vodAutoRefresh
+                case vodRefreshHours
                 case vodSources
             }
         }
@@ -6010,6 +6097,10 @@ extension Components {
             public var liveTvSources: [Components.Schemas.LiveTvSource]?
             /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/vodEnabled`.
             public var vodEnabled: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/vodAutoRefresh`.
+            public var vodAutoRefresh: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/vodRefreshHours`.
+            public var vodRefreshHours: Swift.Int?
             /// Replaces the whole list when sent.
             ///
             /// - Remark: Generated from `#/components/schemas/IntegrationSettingsUpdate/vodSources`.
@@ -6031,6 +6122,8 @@ extension Components {
             ///   - dvrFolder: Checked when it changes: it must exist and be writable.
             ///   - liveTvSources: Replaces the whole list when sent.
             ///   - vodEnabled:
+            ///   - vodAutoRefresh:
+            ///   - vodRefreshHours:
             ///   - vodSources: Replaces the whole list when sent.
             public init(
                 seerrUrl: Swift.String? = nil,
@@ -6047,6 +6140,8 @@ extension Components {
                 dvrFolder: Swift.String? = nil,
                 liveTvSources: [Components.Schemas.LiveTvSource]? = nil,
                 vodEnabled: Swift.Bool? = nil,
+                vodAutoRefresh: Swift.Bool? = nil,
+                vodRefreshHours: Swift.Int? = nil,
                 vodSources: [Components.Schemas.VodSource]? = nil
             ) {
                 self.seerrUrl = seerrUrl
@@ -6063,6 +6158,8 @@ extension Components {
                 self.dvrFolder = dvrFolder
                 self.liveTvSources = liveTvSources
                 self.vodEnabled = vodEnabled
+                self.vodAutoRefresh = vodAutoRefresh
+                self.vodRefreshHours = vodRefreshHours
                 self.vodSources = vodSources
             }
             public enum CodingKeys: String, CodingKey {
@@ -6080,6 +6177,8 @@ extension Components {
                 case dvrFolder
                 case liveTvSources
                 case vodEnabled
+                case vodAutoRefresh
+                case vodRefreshHours
                 case vodSources
             }
         }
@@ -6596,6 +6695,10 @@ extension Components {
             public var libraryId: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/ActivityTask/progress`.
             public var progress: Components.Schemas.ScanProgress?
+            /// Web app path that shows this task, e.g. /livetv?tab=recordings for a recording in progress (id recording:<recordingId>, kind task, progress done/total = seconds elapsed/scheduled length).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ActivityTask/link`.
+            public var link: Swift.String?
             /// Creates a new `ActivityTask`.
             ///
             /// - Parameters:
@@ -6605,13 +6708,15 @@ extension Components {
             ///   - state:
             ///   - libraryId:
             ///   - progress:
+            ///   - link: Web app path that shows this task, e.g. /livetv?tab=recordings for a recording in progress (id recording:<recordingId>, kind task, progress done/total = seconds elapsed/scheduled length).
             public init(
                 id: Swift.String,
                 kind: Components.Schemas.ActivityTask.KindPayload,
                 title: Swift.String,
                 state: Components.Schemas.ActivityTask.StatePayload,
                 libraryId: Swift.Int64? = nil,
-                progress: Components.Schemas.ScanProgress? = nil
+                progress: Components.Schemas.ScanProgress? = nil,
+                link: Swift.String? = nil
             ) {
                 self.id = id
                 self.kind = kind
@@ -6619,6 +6724,7 @@ extension Components {
                 self.state = state
                 self.libraryId = libraryId
                 self.progress = progress
+                self.link = link
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -6627,6 +6733,7 @@ extension Components {
                 case state
                 case libraryId
                 case progress
+                case link
             }
         }
         /// - Remark: Generated from `#/components/schemas/LogEntry`.
@@ -10109,7 +10216,7 @@ extension Components {
                 case rules
             }
         }
-        /// The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two "Because you watched X" rows with hub ids because-<itemId>; USER-16), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones.
+        /// The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two "Because you watched X" rows with hub ids because-<itemId>, "Because you love X" when X is a favourite; USER-16), favorites (your favourite movies and shows, newest first; hidden until shown), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones.
         ///
         /// - Remark: Generated from `#/components/schemas/HomeLayout`.
         public struct HomeLayout: Codable, Hashable, Sendable {
@@ -11147,6 +11254,8 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/RadioRequest`.
         public struct RadioRequest: Codable, Hashable, Sendable {
+            /// favourites: from your favourite songs, albums and artists (the heart) and what you play and rate highly.
+            ///
             /// - Remark: Generated from `#/components/schemas/RadioRequest/seed`.
             @frozen public enum SeedPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case item = "item"
@@ -11156,6 +11265,8 @@ extension Components {
                 case favourites = "favourites"
                 case library = "library"
             }
+            /// favourites: from your favourite songs, albums and artists (the heart) and what you play and rate highly.
+            ///
             /// - Remark: Generated from `#/components/schemas/RadioRequest/seed`.
             public var seed: Components.Schemas.RadioRequest.SeedPayload
             /// With seed item: a track, album or artist.
@@ -11177,7 +11288,7 @@ extension Components {
             /// Creates a new `RadioRequest`.
             ///
             /// - Parameters:
-            ///   - seed:
+            ///   - seed: favourites: from your favourite songs, albums and artists (the heart) and what you play and rate highly.
             ///   - itemId: With seed item: a track, album or artist.
             ///   - value: With genre: the genre; decade: e.g. 1990; mood: a word or phrase.
             ///   - libraryId:
@@ -11948,6 +12059,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ItemSummary/watchlisted`.
             public var watchlisted: Swift.Bool?
+            /// One of the user's favourites (the heart). Absent or false when it isn't.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemSummary/favorite`.
+            public var favorite: Swift.Bool?
             /// Set for extras (LIB-8).
             ///
             /// - Remark: Generated from `#/components/schemas/ItemSummary/extraType`.
@@ -12018,6 +12133,7 @@ extension Components {
             ///   - watchedLeafCount: Shows, seasons, artists, albums: how many episodes/tracks the user has watched.
             ///   - userRating: The user's rating, 0–10 (10 = loved).
             ///   - watchlisted: On the user's watchlist (USER-8).
+            ///   - favorite: One of the user's favourites (the heart). Absent or false when it isn't.
             ///   - extraType: Set for extras (LIB-8).
             ///   - releaseType: Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
             ///   - audioFormat:
@@ -12051,6 +12167,7 @@ extension Components {
                 watchedLeafCount: Swift.Int? = nil,
                 userRating: Swift.Double? = nil,
                 watchlisted: Swift.Bool? = nil,
+                favorite: Swift.Bool? = nil,
                 extraType: Components.Schemas.ItemSummary.ExtraTypePayload? = nil,
                 releaseType: Components.Schemas.ItemSummary.ReleaseTypePayload? = nil,
                 audioFormat: Components.Schemas.AudioFormat? = nil,
@@ -12084,6 +12201,7 @@ extension Components {
                 self.watchedLeafCount = watchedLeafCount
                 self.userRating = userRating
                 self.watchlisted = watchlisted
+                self.favorite = favorite
                 self.extraType = extraType
                 self.releaseType = releaseType
                 self.audioFormat = audioFormat
@@ -12118,6 +12236,7 @@ extension Components {
                 case watchedLeafCount
                 case userRating
                 case watchlisted
+                case favorite
                 case extraType
                 case releaseType
                 case audioFormat
@@ -13889,7 +14008,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OptimizeSettings/paused`.
             public var paused: Swift.Bool
-            /// On: originals go to the media trash (restorable for about 30 days). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once, and originals kept earlier are deleted too (at start-up and when this is saved off). Omitted on update = unchanged.
+            /// On: originals go to the media trash (restorable until the daily Empty media trash task runs). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once, and originals kept earlier are deleted too (at start-up and when this is saved off). Omitted on update = unchanged.
             ///
             /// - Remark: Generated from `#/components/schemas/OptimizeSettings/keepOriginals`.
             public var keepOriginals: Swift.Bool?
@@ -13903,7 +14022,7 @@ extension Components {
             ///   - pauseWhileWatching: Pause while anyone is watching anything, resuming about 15 s after. Default on.
             ///   - windowOnly: Only run inside the maintenance window.
             ///   - paused: The queue is paused by an admin.
-            ///   - keepOriginals: On: originals go to the media trash (restorable for about 30 days). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once, and originals kept earlier are deleted too (at start-up and when this is saved off). Omitted on update = unchanged.
+            ///   - keepOriginals: On: originals go to the media trash (restorable until the daily Empty media trash task runs). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once, and originals kept earlier are deleted too (at start-up and when this is saved off). Omitted on update = unchanged.
             public init(
                 presets: [Components.Schemas.OptimizePreset],
                 defaultPreset: Swift.String,
