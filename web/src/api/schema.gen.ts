@@ -8807,6 +8807,8 @@ export interface operations {
                 minMyRating?: number;
                 /** @description Only the person's favourites (the heart). Combines with the other filters and sorts; sort -favorited lists the newest favourites first. */
                 favorites?: boolean;
+                /** @description With sort=random: the same seed gives the same shuffle on every page (send one per shuffle). Without it each page is shuffled on its own. */
+                seed?: number;
             };
             header?: never;
             path: {

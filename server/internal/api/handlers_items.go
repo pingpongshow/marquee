@@ -182,6 +182,7 @@ func (h *Handlers) ListLibraryItems(ctx context.Context, req ListLibraryItemsReq
 		f.MinMyRating = float64(*p.MinMyRating)
 	}
 	set(&f.Favorites, p.Favorites)
+	set(&f.Seed, p.Seed)
 	list, total, err := h.Items.List(ctx, access(ctx), lib.ID, typ, sort, f, offset, limit)
 	if err != nil {
 		return nil, internal(ctx, "listItems", err)

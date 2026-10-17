@@ -231,6 +231,12 @@ func (s *Store) List(ctx context.Context, acc Access, libID int64, typ, sort str
 		order = sorts["title"]
 	}
 	order = strings.ReplaceAll(order, "%UID%", strconv.FormatInt(acc.UserID, 10))
+	if sort == "random" && f.Seed != 0 {
+		// A seeded shuffle: the same order on every page, so paging neither repeats nor
+		// skips titles (random() reshuffles each query).
+		seed := f.Seed % 2147483647
+		order = "((i.id * 1103515245 + " + strconv.FormatInt(seed, 10) + ") % 2147483647), i.id"
+	}
 	var total int
 	ac, aargs := acc.clause()
 	fc, fargs := f.clause(acc.UserID)

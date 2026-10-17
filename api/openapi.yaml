@@ -1023,6 +1023,10 @@ paths:
           in: query
           description: "Only the person's favourites (the heart). Combines with the other filters and sorts; sort -favorited lists the newest favourites first."
           schema: { type: boolean }
+        - name: seed
+          in: query
+          description: "With sort=random: the same seed gives the same shuffle on every page (send one per shuffle). Without it each page is shuffled on its own."
+          schema: { type: integer, format: int64 }
       responses:
         "200":
           description: OK
