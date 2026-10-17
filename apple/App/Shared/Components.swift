@@ -195,6 +195,12 @@ final class RatingStore {
 
     func set(_ id: Int64, _ rating: Double?) { overrides[id] = rating ?? 0 }
 
+    /// Another person signed in: their own ratings show, not these.
+    func reset() {
+        overrides = [:]
+        saves = [:]
+    }
+
     /// Rates (0–10, half stars; nil clears) at once, and puts the old value back if the server
     /// refuses. Offline, the rating stays and syncs later (USER-18).
     func rate(_ id: Int64, _ rating: Double?, was old: Double?, app: AppSession) {
@@ -278,6 +284,9 @@ final class WatchStore {
         marks[id] = nil
         marks = marks.filter { !$0.value.container }
     }
+
+    /// Another person signed in: their own watched state shows, not these marks.
+    func reset() { marks = [:] }
 }
 
 /// A row's own rating that can be changed in place: small stars when rated, a faint outline

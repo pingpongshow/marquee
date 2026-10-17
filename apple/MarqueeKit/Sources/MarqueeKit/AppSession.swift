@@ -100,6 +100,8 @@ public final class AppSession {
     @ObservationIgnored private var lastPath: String?
     @ObservationIgnored private var pathDebounce: Task<Void, Never>?
     @ObservationIgnored private var reconnectTask: Task<Void, Never>?
+    /// The server `reconnectTask` is connecting to.
+    @ObservationIgnored private var reconnectServerID: String?
     /// The URL sessions behind `client` and `longPollClient`, invalidated when they're replaced.
     @ObservationIgnored private var urlSessions: [URLSession] = []
 
@@ -231,6 +233,16 @@ public final class AppSession {
     }
 
     private func use(_ record: ServerRecord) {
+        if server?.id != record.id {
+            // Another server: the old one's clients mustn't carry this server's token, and its
+            // person and details don't belong here.
+            dropClients()
+            baseURL = nil
+            info = nil
+            me = nil
+        }
+        // A reconnect already running is for the server as it was: the next one starts afresh.
+        reconnectServerID = nil
         ServerStore.save(record)
         ServerStore.currentServerID = record.id
         server = record
@@ -241,11 +253,14 @@ public final class AppSession {
     /// Picks the best address for the current network and checks the session. Calls while
     /// one is already running wait for it rather than starting another.
     public func reconnect() async {
-        if let running = reconnectTask { await running.value; return }
+        // Only a reconnect to the current server is joined: one still running for a server
+        // that was forgotten or replaced meanwhile gives up when it notices, without connecting.
+        if let running = reconnectTask, reconnectServerID != nil, reconnectServerID == server?.id { await running.value; return }
         let task = Task { await performReconnect() }
         reconnectTask = task
+        reconnectServerID = server?.id
         await task.value
-        reconnectTask = nil
+        if reconnectTask == task { reconnectTask = nil }
     }
 
     private func performReconnect() async {
@@ -391,6 +406,7 @@ public final class AppSession {
         onUserChange?()
         if let id = server?.id { ServerStore.forget(id) }
         server = nil
+        reconnectServerID = nil
         dropClients()
         baseURL = nil
         info = nil
@@ -406,7 +422,11 @@ public final class AppSession {
     }
 
     public func refreshMe() async {
-        if let me = try? await client?.getMe().ok.body.json { self.me = me }
+        let sentToken = token
+        guard let me = try? await client?.getMe().ok.body.json else { return }
+        // Signed out, or another person signed in, while it was asked: the answer is stale.
+        guard sentToken != nil, token == sentToken else { return }
+        self.me = me
     }
 
     /// Fetches /system/info again: the admin may have changed a switch it carries, such as

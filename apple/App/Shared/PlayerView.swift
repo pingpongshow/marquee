@@ -27,6 +27,8 @@ struct PlayerView: View {
     @State private var trailerIndex: Int?
     /// Subtitle or audio timing being adjusted (PLAY-17).
     @State private var timing: TimingKind?
+    /// Set when the player closes: a stream that finishes starting after that is stopped again.
+    @State private var life = PlayerLife()
     #if os(iOS)
     @State private var casting = false
     @State private var castError: String?
@@ -62,7 +64,7 @@ struct PlayerView: View {
             #if os(iOS)
             // Downloaded: play from the device (works offline, saves bandwidth).
             if let file = downloads.localURL(request.itemID) {
-                await p.startLocal(itemID: request.itemID, file: file, downloads: downloads)
+                await begin(p) { await p.startLocal(itemID: request.itemID, file: file, downloads: downloads) }
                 return
             }
             #endif
@@ -70,12 +72,13 @@ struct PlayerView: View {
             if !reel.isEmpty {
                 trailers = reel
                 trailerIndex = 0
-                await p.start(itemID: reel[0].id, startMs: 0)
+                await begin(p) { await p.start(itemID: reel[0].id, startMs: 0) }
                 return
             }
             await startFeature(p)
         }
         .onDisappear {
+            life.closed = true
             #if os(iOS)
             let cast = CastController.shared
             cast.videoActive = false
@@ -201,7 +204,7 @@ struct PlayerView: View {
         cast.onVideoEnded = { at in
             casting = false
             let s = p.session
-            Task { await p.start(itemID: request.itemID, startMs: Int64(at * 1000), audio: s?.audioStreamId, subtitle: s?.subtitleStreamId, fileID: s?.fileId) }
+            Task { await begin(p) { await p.start(itemID: request.itemID, startMs: Int64(at * 1000), audio: s?.audioStreamId, subtitle: s?.subtitleStreamId, fileID: s?.fileId) } }
         }
         if cast.device != nil { handOff(p) } // already casting when the video opened
     }
@@ -220,7 +223,7 @@ struct PlayerView: View {
                 // Couldn't cast: say why and carry on here.
                 castError = err
                 casting = false
-                await p.start(itemID: request.itemID, startMs: Int64(at * 1000), audio: s?.audioStreamId, subtitle: s?.subtitleStreamId, fileID: s?.fileId)
+                await begin(p) { await p.start(itemID: request.itemID, startMs: Int64(at * 1000), audio: s?.audioStreamId, subtitle: s?.subtitleStreamId, fileID: s?.fileId) }
             }
         }
     }
@@ -267,19 +270,37 @@ struct PlayerView: View {
     private func startFeature(_ p: VideoPlayback) async {
         trailerIndex = nil
         let tracks = PendingTracks.shared.take(request.itemID)
-        await p.start(itemID: request.itemID, startMs: request.startMs,
-                      audio: tracks.audio, subtitle: tracks.subtitle, fileID: tracks.file)
+        guard await begin(p, {
+            await p.start(itemID: request.itemID, startMs: request.startMs,
+                          audio: tracks.audio, subtitle: tracks.subtitle, fileID: tracks.file)
+        }) else { return }
         if let g = request.groupID, let t = together { await t.join(g) }
         #if os(iOS)
         watchCast(p)
         #endif
     }
 
+    /// Starts (or restarts) the stream unless the player has closed meanwhile. One that
+    /// finishes starting after it closed (a slow server, a trailer lookup) is stopped again, so
+    /// nothing plays behind the page or keeps a session open on the server. False when closed.
+    @discardableResult
+    private func begin(_ p: VideoPlayback, _ start: () async -> Void) async -> Bool {
+        let life = life // read while the view is installed
+        guard !life.closed else { return false }
+        await start()
+        if life.closed {
+            await p.stop()
+            return false
+        }
+        return true
+    }
+
     private func nextTrailer() {
         guard let i = trailerIndex, let p = playback else { return }
         if i + 1 < trailers.count {
             trailerIndex = i + 1
-            Task { await p.start(itemID: trailers[i + 1].id, startMs: 0) }
+            let next = trailers[i + 1].id
+            Task { await begin(p) { await p.start(itemID: next, startMs: 0) } }
         } else {
             skipTrailers()
         }
@@ -384,6 +405,11 @@ struct PlayerView: View {
         if !duration.isFinite || duration <= 0, let ms = p.item?.base.durationMs { duration = Double(ms) / 1000 }
         return duration.isFinite && duration > 0 && p.position >= duration * 0.9
     }
+}
+
+/// Whether the player has closed (a reference, so work that outlives the view can see it).
+@MainActor final class PlayerLife {
+    var closed = false
 }
 
 /// The countdown to the next episode at the end of one (library and on-demand shows).

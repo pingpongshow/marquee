@@ -52,7 +52,8 @@ public extension AppSession {
 
     func liveGuide(from: Date, to: Date, group: String? = nil, favorites: Bool = false, recent: Bool = false) async throws -> [Int64: [LiveProgramme]] {
         let rows = try await liveAPI.liveGuide(query: .init(start: from, end: to, group: group, favorites: favorites ? true : nil, recent: recent ? true : nil)).ok.body.json
-        return Dictionary(uniqueKeysWithValues: rows.map { ($0.channelId, $0.programmes) })
+        // A channel listed twice is merged rather than crashing the guide.
+        return Dictionary(rows.map { ($0.channelId, $0.programmes) }, uniquingKeysWith: { $0 + $1 })
     }
 
     func setFavorite(_ channel: Int64, _ on: Bool) async throws {

@@ -51,6 +51,15 @@ public final class WatchTogether {
         }
     }
 
+    /// For the group's long poll: the server holds it up to 25 s, longer than the regular
+    /// client waits, so an idle group would time out again and again and be left.
+    private var longPollClient: Client {
+        get throws {
+            guard let c = app.longPollClient else { throw MarqueeError("Not connected") }
+            return c
+        }
+    }
+
     /// Starts a group at the current position.
     public func start() async {
         do {
@@ -92,7 +101,7 @@ public final class WatchTogether {
             while !Task.isCancelled {
                 guard let self, let g = self.group else { return }
                 do {
-                    switch try await self.client.getWatchGroup(path: .init(groupId: g.id), query: .init(since: g.version)) {
+                    switch try await self.longPollClient.getWatchGroup(path: .init(groupId: g.id), query: .init(since: g.version)) {
                     case let .ok(ok):
                         let next = try ok.body.json
                         failures = 0

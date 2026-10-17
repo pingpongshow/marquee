@@ -301,7 +301,7 @@ struct ItemDetailView: View {
         switch d.type {
         case .movie, .episode, .video:
             let resume = WatchStore.shared.canResume(d.base)
-            Button { video.play(d.id) } label: {
+            Button { playHere(d) } label: {
                 Label(resume ? "Resume" : "Play", systemImage: "play.fill")
             }
             .buttonStyle(.borderedProminent)
@@ -330,7 +330,7 @@ struct ItemDetailView: View {
 
     @ViewBuilder private func secondaryButtons(_ d: ItemDetail) -> some View {
         if [.movie, .episode, .video].contains(d.type), WatchStore.shared.canResume(d.base) {
-            Button { video.play(d.id, startMs: 0) } label: { Label("From start", systemImage: "arrow.counterclockwise") }.buttonStyle(.bordered)
+            Button { playHere(d, startMs: 0) } label: { Label("From start", systemImage: "arrow.counterclockwise") }.buttonStyle(.bordered)
         }
         if let trailer, d.type == .movie || d.type == .show { TrailerButton(trailer: trailer, title: d.title) }
         if [.album, .artist, .track].contains(d.type) { radioButton(d) }
@@ -343,7 +343,13 @@ struct ItemDetailView: View {
             Button {
                 watchlisted.toggle()
                 let on = watchlisted
-                Task { do { try await app.setWatchlist(d.id, on) } catch { watchlisted = !on } }
+                WatchlistStore.shared.note(d.id, on)
+                Task {
+                    do { try await app.setWatchlist(d.id, on) } catch {
+                        watchlisted = !on
+                        WatchlistStore.shared.note(d.id, nil)
+                    }
+                }
             } label: {
                 Label(watchlisted ? "On Watchlist" : "Watchlist", systemImage: watchlisted ? "bookmark.fill" : "bookmark")
             }
@@ -389,6 +395,16 @@ struct ItemDetailView: View {
             Label("Radio", systemImage: "dot.radiowaves.left.and.right")
         }
         .buttonStyle(.bordered)
+    }
+
+    /// Plays this video with the version and tracks picked on the page. The player takes the
+    /// choice when it starts, so it's given again each time (a second play had lost it while
+    /// the chips still showed it).
+    private func playHere(_ d: ItemDetail, startMs: Int64? = nil) {
+        if audioID != nil || subtitleID != nil || fileID != nil {
+            PendingTracks.shared.set(item: d.id, audio: audioID, subtitle: subtitleID, file: fileID)
+        }
+        video.play(d.id, startMs: startMs)
     }
 
     /// Runs a play action, showing what went wrong instead of doing nothing.
@@ -574,8 +590,12 @@ struct ItemDetailView: View {
             case .album:
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Tracks").font(.title3.bold()).padding(.horizontal, sidePadding).padding(.bottom, 6)
-                    ForEach(Array(children.enumerated()), id: \.element.id) { i, t in
-                        TrackRow(track: t, album: d.base) { music.play(children.filter { $0._type == .track }, start: i, source: d.title) }
+                    ForEach(children, id: \.id) { t in
+                        TrackRow(track: t, album: d.base) {
+                            // From this track's place among the tracks (not among all children).
+                            let tracks = children.filter { $0._type == .track }
+                            music.play(tracks, start: tracks.firstIndex { $0.id == t.id } ?? 0, source: d.title)
+                        }
                     }
                 }
             default:

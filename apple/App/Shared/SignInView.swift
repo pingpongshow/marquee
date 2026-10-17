@@ -6,6 +6,8 @@ struct SignInView: View {
     @Environment(AppSession.self) private var app
     @State private var profiles: [Schemas.Profile] = []
     @State private var chosen: Schemas.Profile?
+    /// The profile picked that signs in with a password: its name goes in the username field.
+    @State private var passwordProfile: String?
     @State private var mode: Mode = .profiles
     @State private var error: String?
     @State private var busy = false
@@ -24,7 +26,7 @@ struct SignInView: View {
                     if let lastError = app.lastError { ErrorBanner(message: lastError).frame(maxWidth: 520) }
                     switch mode {
                     case .profiles: profilePicker
-                    case .password: PasswordForm(prefill: chosen?.displayName, onError: { error = $0 })
+                    case .password: PasswordForm(prefill: passwordProfile, onError: { error = $0 })
                     case .quickConnect: QuickConnectView(onError: { error = $0 })
                     }
                     modeButtons
@@ -62,7 +64,7 @@ struct SignInView: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: avatarSize + 30), spacing: 24)], spacing: 24) {
                 ForEach(profiles, id: \.id) { p in
                     Button {
-                        if p.requires == .none { Task { await pinSignIn(p, pin: nil) } } else if p.requires == .password { chosen = nil; mode = .password } else { chosen = p }
+                        if p.requires == .none { Task { await pinSignIn(p, pin: nil) } } else if p.requires == .password { chosen = nil; passwordProfile = p.displayName; mode = .password } else { chosen = p }
                     } label: {
                         VStack(spacing: 8) {
                             AvatarView(name: p.displayName, url: p.avatarUrl, size: avatarSize)
