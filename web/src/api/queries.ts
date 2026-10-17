@@ -159,7 +159,10 @@ export function useUpdateUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, body }: { id: number; body: UserUpdate }) => unwrap(api.PATCH("/users/{userId}", { params: { path: { userId: id } }, body })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["livetv", "usage"] }); // quotas show in the usage lists
+    },
   });
 }
 
