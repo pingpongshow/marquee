@@ -29,6 +29,8 @@ fun trackItem(marquee: Marquee, t: ItemSummary, dj: String? = null): MediaItem =
                 if (dj != null) putString("dj", dj)
                 t.parentId?.let { putLong("album", it) }
                 t.audioFormat?.let { AudioQuality.put(this, it) }
+                // The heart as the list had it, for Up Next rows (Now Playing loads the current track's own).
+                t.favorite?.let { putBoolean("favorite", it) }
             })
             .build(),
     )

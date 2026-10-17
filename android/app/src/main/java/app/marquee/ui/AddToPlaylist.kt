@@ -112,19 +112,21 @@ fun AddToPlaylistDialog(itemId: Long, music: Boolean, onDone: () -> Unit) {
     )
 }
 
-/** The "…" menu on a track: play next, add to the queue, add to a playlist, a Sound Journey. */
+/** The "…" menu on a track: play next, add to the queue, add to a playlist, add to or remove from favourites, a Sound Journey. */
 @Composable
 fun TrackMenu(track: ItemSummary) {
     val music = LocalMusic.current
     var open by remember { mutableStateOf(false) }
     var playlist by remember { mutableStateOf(false) }
     var journey by remember { mutableStateOf(false) }
+    val favorite = favoriteAction(track)
     Box {
         IconButton({ open = true }, Modifier.focusRing()) { Icon(Icons.Filled.MoreVert, "More actions for ${track.title}") }
         DropdownMenu(open, { open = false }) {
             DropdownMenuItem({ Text("Play next") }, { music.enqueue(listOf(track), next = true); open = false })
             DropdownMenuItem({ Text("Add to queue") }, { music.enqueue(listOf(track), next = false); open = false })
             DropdownMenuItem({ Text("Add to playlist…") }, { playlist = true; open = false })
+            favorite?.let { f -> DropdownMenuItem({ Text(f.label) }, { f.run(); open = false }) }
             DropdownMenuItem({ Text("Sound Journey…") }, { journey = true; open = false })
         }
     }

@@ -2113,8 +2113,76 @@ class MarqueeUiTest {
     }
 
     /**
+     * Favourites (the heart, USER-12): heart a movie on its page and find it with the library's
+     * Favourites filter; heart the playing song in Now Playing. Clears both after.
+     */
+    @Test fun favouriteHearts() {
+        assumeTrue("phones", !isTv)
+        connectAndSignIn()
+        val movie = 359L // 00 Preview Test
+        val song = 312L // Album 1 / Song 1-3
+        fun unfavourite(id: Long) = adminApi("DELETE", "/items/$id/favorite", asToken = appToken)
+        fun favourite(id: Long) = org.json.JSONObject(adminApi("GET", "/items/$id", asToken = appToken)).optBoolean("favorite", false)
+        // Only when needed: the app stamps changes with the device's clock, and a removal stamped by
+        // the server just now could be newer than the app's heart a moment later.
+        listOf(movie, song).filter(::favourite).forEach { unfavourite(it) }
+        val app = context.applicationContext as MarqueeApplication
+        try {
+            // The movie's page: the heart fills at once and the server has it.
+            openLibrary("Movies")
+            rule.waitText("00 Preview Test")
+            tap("00 Preview Test")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Add 00 Preview Test to favourites"), 15_000)
+            rule.onNode(hasContentDescription("Add 00 Preview Test to favourites")).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Remove 00 Preview Test from favourites"), 5_000)
+            rule.waitUntil(10_000) { favourite(movie) }
+            shot("fh1-movie-hearted")
+            back()
+
+            // The library's Favourites filter shows it, and only favourites.
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Sort and filter"), 10_000)
+            rule.waitUntil(10_000) { scrollTo(hasText("Favourites") and hasClickAction()) }
+            rule.onNode(hasText("Favourites") and hasClickAction()).performClick()
+            rule.waitUntilAtLeastOneExists(hasText("Favourites") and isSelected(), 5_000)
+            rule.waitText("00 Preview Test")
+            rule.waitUntil(10_000) { rule.onAllNodesWithText("00 Long Test").fetchSemanticsNodes().isEmpty() }
+            shot("fh2-favourites-filter")
+            rule.waitUntil(10_000) { scrollTo(hasText("Date favourited") and hasClickAction()) }
+            rule.onNode(hasText("Date favourited") and hasClickAction()).assertExists()
+            rule.waitUntil(10_000) { scrollTo(hasText("Favourites") and hasClickAction()) }
+            rule.onNode(hasText("Favourites") and hasClickAction()).performClick()
+            back()
+
+            // Now Playing: heart the playing song.
+            openLibrary("Music")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Music home"), 20_000)
+            rule.waitUntil(10_000) { scrollTo(hasText("Albums") and hasClickAction()) }
+            rule.onNode(hasText("Albums") and hasClickAction()).performClick()
+            rule.waitUntil(20_000) { scrollTo(hasContentDescription("Album 1")) }
+            rule.onAllNodes(hasContentDescription("Album 1")).onFirst().performClick()
+            rule.waitText("Song 1-3")
+            tap("Song 1-3")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Open Now Playing"), 20_000)
+            rule.waitUntil(10_000) { app.music.now.value?.id == song }
+            rule.onNode(hasContentDescription("Open Now Playing")).performClick()
+            val heart = hasTestTag("now-playing-favorite")
+            rule.waitUntilAtLeastOneExists(heart and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Not a favourite"), 10_000)
+            rule.onNode(heart).performClick()
+            rule.waitUntilAtLeastOneExists(heart and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Favourite"), 5_000)
+            rule.waitUntil(10_000) { favourite(song) }
+            shot("fh3-now-playing-hearted")
+            rule.onNode(hasContentDescription("Close Now Playing")).performClick()
+            // The album's row follows.
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Remove Song 1-3 from favourites"), 5_000)
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
+        } finally {
+            unfavourite(movie); unfavourite(song)
+        }
+    }
+
+    /**
      * Ratings & favourites (Plex ratings carry over): small read-only stars on rated track rows,
-     * tap-to-rate on item pages, Favorites in the music home (row, shelf and page with Play), and
+     * tap-to-rate on item pages, Rated 4★+ on the music Favourites page (with Play), and
      * the My rating sort and Rated 4★+ filter on library grids. Rates test tracks in setup and
      * clears them after.
      */
@@ -2131,16 +2199,15 @@ class MarqueeUiTest {
         try {
             openLibrary("Music")
             rule.waitUntilAtLeastOneExists(hasContentDescription("Music home"), 20_000)
-            // The Favorites shelf and the Library row with its count.
-            rule.waitUntil(20_000) { scrollTo(hasContentDescription("Favorites shelf")) }
-            rule.onNode(hasContentDescription("Favorites shelf")).assertExists()
-            rule.waitUntil(15_000) { scrollTo(hasText("Favorites") and hasClickAction()) &&
-                rule.onAllNodes(hasText("Favorites") and hasClickAction()).onFirst().fetchSemanticsNode().config[SemanticsProperties.Text].any { it.text == "1" } }
+            // The Favourites page (hearts by default; Rated 4★+ lists what's rated 4★ or more).
+            rule.waitUntil(20_000) { scrollTo(hasText("Favourites") and hasClickAction()) }
             shot("rf1-home")
-            rule.onNode(hasText("Favorites") and hasClickAction()).performClick()
+            rule.onAllNodes(hasText("Favourites") and hasClickAction()).onFirst().performClick()
+            rule.waitUntilAtLeastOneExists(hasText("Rated 4★+") and hasClickAction(), 15_000)
+            rule.onNode(hasText("Rated 4★+") and hasClickAction()).performClick()
 
-            // The Favorites page: the rated track with its stars, Play and Shuffle.
-            rule.waitUntilAtLeastOneExists(hasContentDescription("Favorite tracks"), 15_000)
+            // Rated 4★+: the rated track with its stars, Play and Shuffle.
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Favourite songs"), 15_000)
             rule.waitText("Song 1-2")
             assertTrue(rule.onAllNodesWithText("Song 2-1").fetchSemanticsNodes().isEmpty())
             rule.onNode(hasContentDescription("Rated 4.5 stars")).assertExists()
@@ -2148,7 +2215,7 @@ class MarqueeUiTest {
             shot("rf2-favorites")
             rule.onNode(hasText("Albums") and hasClickAction()).performClick()
             rule.waitText("Albums you rate 4 stars or more", substring = true)
-            rule.onNode(hasText("Tracks") and hasClickAction()).performClick()
+            rule.onNode(hasText("Songs") and hasClickAction()).performClick()
             rule.waitText("Song 1-2")
             rule.onNode(hasText("Play") and hasClickAction()).performClick()
             rule.waitUntilAtLeastOneExists(hasContentDescription("Open Now Playing"), 20_000)
@@ -2230,7 +2297,7 @@ class MarqueeUiTest {
      * Community ratings and comments (USER-17), as Kiddo with the admin as the other person: the
      * item page's Community rating opens Ratings & comments; Kiddo adds, edits and deletes a
      * comment, can't delete the admin's; rating updates the community average and Now Playing;
-     * the Favorites page shows the community score; Songs filter by real genres.
+     * the Favourites page (Rated 4★+) shows the community score; Songs filter by real genres.
      */
     @Test fun communityRatingsAndComments() {
         assumeTrue("phones", !isTv)
@@ -2301,11 +2368,13 @@ class MarqueeUiTest {
             rule.onNode(hasContentDescription("Close Now Playing")).performClick()
             InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
 
-            // Favorites shows the community score.
+            // Favourites (Rated 4★+) shows the community score.
             back(); back()
             openLibrary("Music")
-            rule.waitUntil(20_000) { scrollTo(hasText("Favorites") and hasClickAction()) }
-            rule.onNode(hasText("Favorites") and hasClickAction()).performClick()
+            rule.waitUntil(20_000) { scrollTo(hasText("Favourites") and hasClickAction()) }
+            rule.onAllNodes(hasText("Favourites") and hasClickAction()).onFirst().performClick()
+            rule.waitUntilAtLeastOneExists(hasText("Rated 4★+") and hasClickAction(), 15_000)
+            rule.onNode(hasText("Rated 4★+") and hasClickAction()).performClick()
             rule.waitText("Song 1-2")
             rule.onNode(hasContentDescription("Community rating 4.5 from 2 ratings")).assertExists()
             shot("cr5-favorites")

@@ -46,6 +46,7 @@ class Marquee(context: Context) {
     val sync: OfflineSync by lazy { OfflineSync(appContext, this) }
     /** Watched marks shown at once, and a signal for rows and pages to reload (USER-6). */
     val watch = WatchState()
+    val favorites = FavoriteState()
     /**
      * Videos playing in order (a video playlist, USER-7): the player moves on to the next of
      * these when one ends. Cleared when a video outside it is played.
