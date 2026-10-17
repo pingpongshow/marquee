@@ -3158,4 +3158,52 @@ class MarqueeUiTest {
             adminApi("DELETE", "/livetv/vod/series/$id/watched", asToken = appToken)
         }
     }
+
+    // ---------- VOD suggestions (LIVE-6, USER-16) ----------
+
+    /**
+     * Home's Watch on VOD row opens a film's page, and Not interested takes a title out; a
+     * movie's page has Also on VOD. Needs a server whose profile has suggestions (VOD films
+     * with TMDB ids that a favourite's TMDB recommendations point at); skipped otherwise.
+     */
+    @Test fun vodSuggestions() {
+        connectAndSignIn()
+        val hubs = org.json.JSONArray(adminApi("GET", "/hubs/home?vod=true", asToken = appToken))
+        val vod = (0 until hubs.length()).map { hubs.getJSONObject(it) }.firstOrNull { it.getString("id") == "vod-suggestions" }
+            ?.optJSONArray("vodEntries")?.takeIf { it.length() >= 2 }
+        assumeTrue("no Watch on VOD suggestions for this profile", vod != null)
+        fun label(i: Int) = vod!!.getJSONObject(i).let { e -> listOf(e.getJSONObject("movie").getString("title"), e.optString("reason")).filter { it.isNotBlank() }.joinToString(", ") }
+        val row = hasContentDescription("Watch on VOD")
+        rule.waitUntil(20_000) { scrollTo(row) }
+        val first = hasContentDescription(label(0)) and hasClickAction()
+        rule.waitUntilAtLeastOneExists(first, 15_000)
+        shot("vs-home-row")
+        // Opens the film's page.
+        rule.onNode(first).performClick()
+        rule.waitUntilAtLeastOneExists(hasText("Play") and hasClickAction(), 15_000)
+        rule.waitText(vod!!.getJSONObject(0).getJSONObject("movie").getString("title"))
+        shot("vs-film-page")
+        back()
+        // Not interested: the tile goes and the server stops offering it.
+        val second = hasContentDescription(label(1)) and hasClickAction()
+        rule.waitUntil(15_000) { scrollTo(row) }
+        rule.waitUntilAtLeastOneExists(second, 15_000)
+        rule.onNode(second).performTouchInput { longClick() }
+        rule.waitText("Not interested")
+        rule.waitText("Go to film")
+        shot("vs-menu")
+        tap("Not interested")
+        rule.waitUntil(10_000) { rule.onAllNodes(second).fetchSemanticsNodes().isEmpty() }
+        val key = vod.getJSONObject(1).getString("key")
+        assertTrue("hidden on the server", !adminApi("GET", "/livetv/vod/suggestions?kind=movie&limit=50", asToken = appToken).contains("\"key\":\"$key\""))
+        shot("vs-hidden")
+        // A movie's page: Also on VOD.
+        openLibrary("Movies")
+        rule.waitText("00 Preview Test")
+        tap("00 Preview Test")
+        rule.waitUntilAtLeastOneExists(hasText("Play") or hasText("Resume"), 15_000)
+        rule.waitUntil(20_000) { scrollTo(hasText("Also on VOD")) }
+        rule.waitUntilAtLeastOneExists(hasText("Also on VOD"), 10_000)
+        shot("vs-also-on-vod")
+    }
 }

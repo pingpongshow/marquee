@@ -35,6 +35,7 @@ import kotlinx.serialization.Contextual
  * @param libraryId Only this library.
  * @param types Default movies and shows.
  * @param limit Default 40.
+ * @param includeVod Also suggest films and series on demand that fit (in vod; the caller must be allowed on demand).
  */
 @Serializable
 
@@ -53,7 +54,11 @@ data class MuseVideoRequest (
 
     /* Default 40. */
     @SerialName(value = "limit")
-    val limit: kotlin.Int? = null
+    val limit: kotlin.Int? = null,
+
+    /* Also suggest films and series on demand that fit (in vod; the caller must be allowed on demand). */
+    @SerialName(value = "includeVod")
+    val includeVod: kotlin.Boolean? = false
 
 ) {
 

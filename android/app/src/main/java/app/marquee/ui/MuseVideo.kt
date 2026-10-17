@@ -45,6 +45,10 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import app.marquee.api.models.ItemSummary
 import app.marquee.api.models.MuseVideoRequest
+import app.marquee.api.models.VodSuggestion
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.Checkbox
+import androidx.compose.runtime.collectAsState
 import app.marquee.api.models.PlaylistCreate
 import app.marquee.api.models.PlaylistKind
 import kotlinx.coroutines.Dispatchers
@@ -82,6 +86,14 @@ fun MuseVideoPanel(nav: NavHostController, libraryId: Long?, focusPrompt: Boolea
     var understood by rememberSaveable { mutableStateOf<String?>(null) }
     var analysed by rememberSaveable { mutableStateOf<Double?>(null) }
     var results by androidx.compose.runtime.remember { mutableStateOf<List<ItemSummary>?>(null) }
+    // Include VOD (LIVE-6): films and series on demand that fit, beside the libraries' (not within one library); remembered on this device.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = androidx.compose.runtime.remember { context.getSharedPreferences("marquee.muse", android.content.Context.MODE_PRIVATE) }
+    val vodOn by marquee.vod.collectAsState()
+    val canVod = vodOn && libraryId == null
+    var includeVod by androidx.compose.runtime.remember { mutableStateOf(prefs.getBoolean("includeVod", false)) }
+    var vodResults by androidx.compose.runtime.remember { mutableStateOf<List<VodSuggestion>>(emptyList()) }
+    val vodHidden = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateListOf<String>() }
     var saved by rememberSaveable { mutableStateOf<Pair<Long, String>?>(null) }
     var saving by rememberSaveable { mutableStateOf(false) }
 
@@ -93,8 +105,8 @@ fun MuseVideoPanel(nav: NavHostController, libraryId: Long?, focusPrompt: Boolea
         error = null
         saved = null
         scope.launch {
-            withContext(Dispatchers.IO) { runCatching { marquee.items.museVideo(MuseVideoRequest(p, libraryId = libraryId)) } }
-                .onSuccess { r -> results = r.items; understood = r.understood; analysed = r.analysed; asked = p }
+            withContext(Dispatchers.IO) { runCatching { marquee.items.museVideo(MuseVideoRequest(p, libraryId = libraryId, includeVod = canVod && includeVod)) } }
+                .onSuccess { r -> results = r.items; vodResults = r.vod.orEmpty(); vodHidden.clear(); understood = r.understood; analysed = r.analysed; asked = p }
                 .onFailure { error = it.message ?: "Muse couldn't answer that" }
             busy = false
         }
@@ -132,6 +144,12 @@ fun MuseVideoPanel(nav: NavHostController, libraryId: Long?, focusPrompt: Boolea
                         AssistChip({ prompt = s; ask(s) }, { Text(s) }, Modifier.focusRing(RoundedCornerShape(8.dp)))
                     }
                 }
+                if (canVod) Row(Modifier.focusRing(RoundedCornerShape(8.dp)).toggleable(includeVod, role = androidx.compose.ui.semantics.Role.Checkbox) { on ->
+                    includeVod = on; prefs.edit().putBoolean("includeVod", on).apply()
+                }, verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(includeVod, null)
+                    Text("Include VOD", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 understood?.let { u ->
                     Text(u, Modifier.semantics { contentDescription = "Muse understood: $u" }, style = MaterialTheme.typography.titleSmall, color = Gold)
@@ -141,7 +159,7 @@ fun MuseVideoPanel(nav: NavHostController, libraryId: Long?, focusPrompt: Boolea
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 val list = results
-                if (list != null && list.isEmpty()) Text("Nothing in your library fits that. Try saying it another way.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (list != null && list.isEmpty()) Text(if (vodResults.isEmpty()) "Nothing in your library fits that. Try saying it another way." else "Nothing in your library fits that.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (!list.isNullOrEmpty()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(if (list.size == 1) "1 title" else "${list.size} titles", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                     val sv = saved
@@ -154,6 +172,18 @@ fun MuseVideoPanel(nav: NavHostController, libraryId: Long?, focusPrompt: Boolea
         }
         itemsIndexed(results.orEmpty(), key = { _, it -> it.id }) { _, it ->
             PosterCard(it, marquee.imageUrl(it.images?.poster ?: it.images?.thumb, 240), min, { openItem(nav, it) })
+        }
+        // On VOD: films and series on demand that fit (with Include VOD).
+        val vodShown = vodResults.filter { it.key !in vodHidden && vodRoute(it) != null }
+        if (vodShown.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }, key = "onVod") {
+                Text("On VOD", Modifier.padding(top = 12.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+            itemsIndexed(vodShown, key = { _, it -> "vod:" + it.key }) { _, s ->
+                VodSuggestionTile(nav, s, null) {
+                    hideVodSuggestion(marquee, context, s, onHidden = { vodHidden.add(s.key) }, onFailed = { vodHidden.remove(s.key) })
+                }
+            }
         }
     }
 }

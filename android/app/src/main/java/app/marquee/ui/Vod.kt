@@ -104,6 +104,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.navigation.NavHostController
+import app.marquee.api.apis.LivetvApi
 import app.marquee.api.apis.LivetvApi.SortListVodMovies
 import app.marquee.api.apis.LivetvApi.SortListVodSeries
 import app.marquee.api.apis.LivetvApi.WatchedListVodMovies
@@ -264,6 +265,12 @@ fun VodBrowse(nav: NavHostController, shows: Boolean, header: @Composable () -> 
     val resumeShows by cachedLoad<List<VodSeries>>("vodshows:continue", changed) {
         if (!shows) null else withContext(Dispatchers.IO) { runCatching { marquee.livetv.vodSeriesContinueWatching() }.getOrNull() }
     }
+    // Recommended for you (USER-16): films or series on demand picked from this person's taste.
+    val recommended by cachedLoad<List<app.marquee.api.models.VodSuggestion>>("$kind:suggestions", changed) {
+        withContext(Dispatchers.IO) {
+            runCatching { marquee.livetv.vodSuggestions(if (shows) LivetvApi.KindVodSuggestions.SERIES else LivetvApi.KindVodSuggestions.MOVIE, 20) }.getOrNull()
+        }
+    }
     val state = rememberCached("$kind:list") { VodList() }
     var items by state.items
 
@@ -363,6 +370,9 @@ fun VodBrowse(nav: NavHostController, shows: Boolean, header: @Composable () -> 
                 }
                 VodActiveFilters(filters, shows, sources, ::setFilters)
             }
+        }
+        if (!searched && !recommended.isNullOrEmpty()) item(span = full, key = "recommended") {
+            HeaderNoPadding { VodSuggestionRow(nav, "Recommended for you", recommended) }
         }
         val rm = resumeMovies
         val rs = resumeShows

@@ -53,6 +53,7 @@ import app.marquee.api.models.RecommendationReason
 import app.marquee.api.models.RecommendationReasonsRequest
 import app.marquee.api.models.SetReviewRequest
 import app.marquee.api.models.SmartCollectionSave
+import app.marquee.api.models.VodSuggestion
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -1591,6 +1592,87 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/items/{itemId}/reviews".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /items/{itemId}/vod-similar
+     * Also on VOD: films (for a movie) or series (for a show) on demand like this one that the caller&#39;s libraries don&#39;t have, best first by TMDB&#39;s recommendations and the caller&#39;s taste. Empty for other types, or when on demand is off or not the caller&#39;s to watch.
+     * 
+     * @param itemId 
+     * @param limit  (optional, default to 20)
+     * @return kotlin.collections.List<VodSuggestion>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun itemVodSimilar(itemId: kotlin.Long, limit: kotlin.Int? = 20) : kotlin.collections.List<VodSuggestion> {
+        val localVarResponse = itemVodSimilarWithHttpInfo(itemId = itemId, limit = limit)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<VodSuggestion>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /items/{itemId}/vod-similar
+     * Also on VOD: films (for a movie) or series (for a show) on demand like this one that the caller&#39;s libraries don&#39;t have, best first by TMDB&#39;s recommendations and the caller&#39;s taste. Empty for other types, or when on demand is off or not the caller&#39;s to watch.
+     * 
+     * @param itemId 
+     * @param limit  (optional, default to 20)
+     * @return ApiResponse<kotlin.collections.List<VodSuggestion>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun itemVodSimilarWithHttpInfo(itemId: kotlin.Long, limit: kotlin.Int?) : ApiResponse<kotlin.collections.List<VodSuggestion>?> {
+        val localVariableConfig = itemVodSimilarRequestConfig(itemId = itemId, limit = limit)
+
+        return request<Unit, kotlin.collections.List<VodSuggestion>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation itemVodSimilar
+     *
+     * @param itemId 
+     * @param limit  (optional, default to 20)
+     * @return RequestConfig
+     */
+    fun itemVodSimilarRequestConfig(itemId: kotlin.Long, limit: kotlin.Int?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (limit != null) {
+                    put("limit", listOf(limit.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/items/{itemId}/vod-similar".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

@@ -2,6 +2,7 @@ package app.marquee.ui
 
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenu
@@ -222,7 +223,7 @@ fun DiscoverScreen(nav: NavHostController) {
             }
         }
     }
-    picked?.let { RequestDialog(it) { done -> picked = null; if (done) reload++ } }
+    picked?.let { RequestDialog(it, onVod = { v -> picked = null; nav.navigate(vodRoute(v)) }) { done -> picked = null; if (done) reload++ } }
 }
 
 @Composable
@@ -238,7 +239,7 @@ private fun DiscoverCard(it: DiscoverItem, onClick: () -> Unit) {
     Column {
         Box(
             Modifier.fillMaxWidth().aspectRatio(2f / 3f).focusCard(onClick)
-                .semantics { contentDescription = if (it.requestable()) "Request ${it.title}" else listOf(it.title, it.availability.label).filter { s -> s.isNotBlank() }.joinToString(", ") },
+                .semantics { contentDescription = (if (it.requestable()) "Request ${it.title}" else listOf(it.title, it.availability.label).filter { s -> s.isNotBlank() }.joinToString(", ")) + if (it.vod != null) ", on VOD" else "" },
         ) {
             Box(Modifier.matchParentSize().background(Surface2)) {
                 Text(it.title, Modifier.align(Alignment.BottomStart).padding(8.dp), style = MaterialTheme.typography.labelMedium)
@@ -249,6 +250,12 @@ private fun DiscoverCard(it: DiscoverItem, onClick: () -> Unit) {
                 Modifier.padding(6.dp).background(if (it.availability == Availability.AVAILABLE) Color(0xFF2E7D32) else Color.Black.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
                     .padding(horizontal = 6.dp, vertical = 2.dp),
                 color = Color.White, style = MaterialTheme.typography.labelSmall,
+            )
+            // On VOD too: opening it offers Watch now on VOD.
+            if (it.vod != null) Text(
+                "VOD",
+                Modifier.align(Alignment.TopEnd).padding(6.dp).background(Gold, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
+                color = Color.Black, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
             )
         }
         Text(it.title, Modifier.padding(top = 6.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
@@ -273,7 +280,7 @@ private fun RequestRow(r: MediaRequest, action: String?, secondary: String? = nu
 
 /** A title's details, and asking for a movie or chosen seasons of a show. */
 @Composable
-private fun RequestDialog(item: DiscoverItem, onDone: (Boolean) -> Unit) {
+private fun RequestDialog(item: DiscoverItem, onVod: (app.marquee.api.models.VodRef) -> Unit, onDone: (Boolean) -> Unit) {
     val marquee = LocalMarquee.current
     val can = item.requestable()
     val scope = rememberCoroutineScope()
@@ -307,6 +314,13 @@ private fun RequestDialog(item: DiscoverItem, onDone: (Boolean) -> Unit) {
                         )
                         if (chips.isNotEmpty()) Text(chips.joinToString("  ·  "), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                         Text(item.overview ?: "No description available.", maxLines = 14, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                // Watch now on VOD: the same title on demand (LIVE-6), beside Request.
+                item.vod?.let { v ->
+                    Button({ onVod(v) }, Modifier.focusRing().initialFocus(marquee.isTv && !can)) {
+                        Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp))
+                        Text("Watch now on VOD", Modifier.padding(start = 6.dp))
                     }
                 }
                 if (can) Text("An admin approves requests before they're downloaded.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

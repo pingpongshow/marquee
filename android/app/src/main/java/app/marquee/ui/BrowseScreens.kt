@@ -117,8 +117,10 @@ fun HomeScreen(nav: NavHostController) {
     var openedKey by rememberCached("home:openedKey") { mutableStateOf<String?>(null) }
     // Films and episodes on demand report where they stopped as their player closes.
     val vodChanged by VodChanges.version.collectAsState()
+    // Watch on VOD's title opens VOD Movies while it's listed.
+    val vodMovies by marquee.vodMovies.collectAsState()
     LaunchedEffect(connection, changes, vodChanged, favoriteChanges) {
-        val fresh = withContext(Dispatchers.IO) { runCatching { marquee.hubs.homeHubs() } }
+        val fresh = withContext(Dispatchers.IO) { runCatching { marquee.hubs.homeHubs(vod = true) } }
         if (fresh.isSuccess || hubsState.value?.isSuccess != true) { hubsState.value = fresh; if (fresh.isSuccess) removed.clear() }
     }
     val cardWidth = if (marquee.isTv) 130.dp else 120.dp
@@ -166,6 +168,14 @@ fun HomeScreen(nav: NavHostController) {
                 if (hub.id == CONTINUE_HUB) {
                     ContinueRow(nav, hub, removed, cardWidth * 1.6f, focusFirst = first, openedKey = openedKey,
                         onOpen = { k -> openedKey = k; opened = null }, onRemoved = { k -> removed.add(k) })
+                    return@itemsIndexed
+                }
+                // Watch on VOD: films and series on demand picked for this person (LIVE-6, USER-16), hidden when empty.
+                hub.vodEntries?.let { vod ->
+                    VodSuggestionRow(nav, hub.title, vod, autoFocusKey = openedKey?.takeIf { it.startsWith("vodsug:") }?.removePrefix("vodsug:")
+                        ?: if (first) vod.firstOrNull()?.key else null,
+                        onTitle = if (vodMovies) ({ nav.navigate("vod") }) else null,
+                        onOpen = { k -> openedKey = "vodsug:$k"; opened = null })
                     return@itemsIndexed
                 }
                 if (hub.items.isEmpty()) return@itemsIndexed

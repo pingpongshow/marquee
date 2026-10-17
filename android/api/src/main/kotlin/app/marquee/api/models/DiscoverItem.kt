@@ -24,6 +24,7 @@
 package app.marquee.api.models
 
 import app.marquee.api.models.Availability
+import app.marquee.api.models.VodRef
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -43,6 +44,7 @@ import kotlinx.serialization.Contextual
  * @param tmdbRating TMDB's user score, 0–10 (absent with too few votes).
  * @param itemId The title in this library, when it's here.
  * @param requestId The caller's open Marquee request for it.
+ * @param vod The same title (TMDB id and type) on demand, when the caller may watch it there: show Watch now on VOD.
  */
 @Serializable
 
@@ -82,7 +84,11 @@ data class DiscoverItem (
 
     /* The caller's open Marquee request for it. */
     @SerialName(value = "requestId")
-    val requestId: kotlin.Long? = null
+    val requestId: kotlin.Long? = null,
+
+    /* The same title (TMDB id and type) on demand, when the caller may watch it there: show Watch now on VOD. */
+    @SerialName(value = "vod")
+    val vod: VodRef? = null
 
 ) {
 
