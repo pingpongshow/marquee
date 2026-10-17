@@ -114,7 +114,7 @@ func (m *Manager) StartExternal(ctx context.Context, r ExternalRequest) (*Sessio
 		}
 	}
 	if a := res.Audio(); a != nil {
-		s.Media.Audio = &AudioStream{Index: a.Index, Codec: a.Codec, Channels: a.Channels, BitrateKbps: a.BitrateKbps, Language: a.Language}
+		s.Media.Audio = &AudioStream{Index: a.Index, Codec: a.Codec, Profile: a.Profile, Channels: a.Channels, BitrateKbps: a.BitrateKbps, Language: a.Language}
 	}
 	switch {
 	case s.Media.Video == nil:
