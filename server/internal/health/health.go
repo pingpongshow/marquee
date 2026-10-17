@@ -86,12 +86,6 @@ var checks = []check{
 		WHERE f.available = 1 AND i.extra_type IS NULL AND i.type NOT IN ('photo')
 			AND (pf.path IS NOT NULL OR COALESCE(f.duration_ms, 0) <= 0
 				OR NOT EXISTS (SELECT 1 FROM streams s WHERE s.file_id = f.id AND s.kind IN ('video', 'audio')))`},
-	{id: "unavailable", title: "Missing files", severity: "error",
-		description: "Titles whose files are no longer on disk (deleted, moved, or on a drive that's offline).",
-		query: `SELECT i.id AS item_id, f.id AS file_id, f.path AS path, 'File not found' AS detail, 0 AS rank
-		FROM items i CROSS JOIN media_versions v ON v.item_id = i.id CROSS JOIN media_files f ON f.version_id = v.id AND f.part_index = 0
-		WHERE i.available = 0 AND i.type IN ('movie', 'episode', 'track', 'video') AND i.extra_type IS NULL
-		GROUP BY i.id`},
 	{id: "playbackErrors", title: "Playback errors", severity: "error",
 		description: "Titles that failed to play in the last 30 days.",
 		query: `SELECT pe.item_id AS item_id, pe.file_id AS file_id, f.path AS path,

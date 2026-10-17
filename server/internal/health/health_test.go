@@ -123,7 +123,7 @@ func TestChecks(t *testing.T) {
 	e.exec(`INSERT INTO playback_errors(item_id, at, message) VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-40 days'), 'ancient')`, m2)
 
 	c := counts(t, s)
-	want := map[string]int{"duplicates": 3, "unmatched": 2, "unavailable": 1, "unplayable": 3, "upgrades": 4,
+	want := map[string]int{"duplicates": 3, "unmatched": 2, "unplayable": 3, "upgrades": 4,
 		"playbackErrors": 1, "missingArtwork": 2, "missingSubtitles": 0}
 	for id, n := range want {
 		if c[id].Count != n {
@@ -192,9 +192,8 @@ func TestChecks(t *testing.T) {
 	if un := details("unmatched"); un[byTitle("Odd Show")] != "Matching failed" || un[byTitle("Mystery")] != "Not matched" {
 		t.Errorf("unmatched: %v", un)
 	}
-	if list := issues("unavailable"); list[0].ItemID != gone || list[0].Path != "/m/gone.mkv" ||
-		len(list[0].Files) != 1 || list[0].Files[0].FileID != list[0].FileID {
-		t.Errorf("unavailable: %+v", list)
+	if _, ok := c["unavailable"]; ok {
+		t.Error("the missing files check is back")
 	}
 
 	// Paging and ignoring.
