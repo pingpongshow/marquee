@@ -7300,8 +7300,8 @@ export interface components {
             quality: "high" | "balanced" | "small";
             /** @description A target video bitrate instead of a quality; 0 = use the quality. */
             videoKbps?: number;
-            /** @description The largest a result may be, in GB (10^9 bytes): each file's video bitrate is capped so that, with its audio and subtitles, it fits (files that need less stay smaller). 0 or omitted = no limit. */
-            maxSizeGb?: number;
+            /** @description The largest a result may be per hour of running time, in GB (10^9 bytes): 5 = a 2-hour film at most 10 GB. Each file's video bitrate is capped so that, with its audio and subtitles, it fits (files that need less stay smaller). 0 or omitted = no limit. */
+            maxGbPerHour?: number;
             /**
              * @description copy = every track as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1). Every audio track (all languages, commentary) and every subtitle is always kept; an MP4 with picture subtitles becomes MKV.
              * @enum {string}
