@@ -345,6 +345,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
         if (controls && playing && !settings && !menuOpen && !groupPanel && scrub == null) { delay(3000); controls = false }
     }
     VideoWindow()
+    PauseInBackground(player)
     DisposableEffect(Unit) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -742,7 +743,9 @@ private fun PlayerSettings(
             if ((detail?.versions?.size ?: 0) > 1) {
                 item { Heading("Version") }
                 items(detail!!.versions) { v ->
-                    Option(versionLabel(v), v.id == version?.id, first = false) { onPick(choice.copy(fileId = v.files.first().id, audio = null, subtitle = null)) }
+                    Option(versionLabel(v), v.id == version?.id, first = false) {
+                        v.files.firstOrNull()?.let { f -> onPick(choice.copy(fileId = f.id, audio = null, subtitle = null)) }
+                    }
                 }
             }
             if (audio.size > 1) {
@@ -925,6 +928,35 @@ internal fun videoPlayer(context: android.content.Context, seekIncrements: Boole
         .build()
 
 internal val videoAudio: AudioAttributes = AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build()
+
+/**
+ * Pauses [player] when the app goes to the background (Home, the screen turning off, another
+ * app on top): a video doesn't carry on unseen with its sound and its stream. With [live] it
+ * plays again from the live edge when the app comes back; other videos wait for Play.
+ */
+@Composable
+internal fun PauseInBackground(player: Player, live: Boolean = false) {
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(owner, player) {
+        var resume = false
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_STOP -> {
+                    resume = live && player.playWhenReady
+                    player.pause()
+                }
+                androidx.lifecycle.Lifecycle.Event.ON_START -> if (resume) {
+                    resume = false
+                    player.seekToDefaultPosition()
+                    player.play()
+                }
+                else -> {}
+            }
+        }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
+    }
+}
 
 /**
  * While a video screen is up: keeps the screen on and, on phones, goes full screen in

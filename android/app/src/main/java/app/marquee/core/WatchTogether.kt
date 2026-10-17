@@ -7,6 +7,7 @@ import app.marquee.api.models.WatchGroupCommandRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
@@ -85,7 +86,10 @@ class WatchTogether(private val marquee: Marquee, private val player: Player, pr
                 val cur = _group.value ?: return@launch
                 val next = withContext(Dispatchers.IO) { runCatching { marquee.syncplay.getWatchGroup(cur.id, cur.version) } }
                 if (!isActive || _group.value == null) return@launch
-                next.onSuccess(::apply).onFailure {
+                next.onSuccess(::apply).onFailure { e ->
+                    // A network blip or a server hiccup isn't the end: poll again shortly (well
+                    // within the server's idle limit, so this viewer stays in the group).
+                    if (e !is app.marquee.api.infrastructure.ClientException) { delay(3_000); return@onFailure }
                     _error.value = "The group has ended."
                     _group.value = null
                     player.removeListener(listener)

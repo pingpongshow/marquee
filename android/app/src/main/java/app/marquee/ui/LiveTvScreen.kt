@@ -461,6 +461,7 @@ private fun LiveVideo(channelId: Long, muted: Boolean, modifier: Modifier, onSta
             session[0]?.let { id -> marquee.scope.launch { runCatching { marquee.livetv.stopLiveSession(id) } } }
         }
     }
+    PauseInBackground(player, live = true)
     AndroidView({ PlayerView(it).apply { this.player = player; useController = false; resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT } }, modifier,
         update = { it.player = player })
 }

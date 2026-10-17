@@ -207,6 +207,15 @@ private class VodList {
     val grid = LazyGridState()
 }
 
+/** [current] then those of [page] whose [key] isn't already in it (a list's next page, after the list moved). */
+internal fun <T> appendUnseen(current: List<T>, page: List<T>, key: (T) -> Any): List<T> {
+    val seen = current.mapTo(HashSet(), key)
+    return current + page.filter { seen.add(key(it)) }
+}
+
+/** A film's or show's key in a VOD page's grid. */
+private fun vodKey(x: Any): String = if (x is VodSeries) "s${x.id}" else "m${(x as VodMovie).id}"
+
 /** What a VOD page's list is for. */
 private data class VodQuery(val category: String, val q: String, val sort: String, val filters: VodFilters)
 
@@ -311,7 +320,12 @@ fun VodBrowse(nav: NavHostController, shows: Boolean, header: @Composable () -> 
         if (state.loadingMore.value || have.size >= state.total.intValue) return
         state.loadingMore.value = true
         scope.launch {
-            fetch(key, have.size, PAGE).onSuccess { (page, _) -> if (state.loadedFor == key) items = (items ?: emptyList()) + page }
+            // Only titles not already shown: the list may have moved meanwhile (new titles, a refresh in place),
+            // and a repeated key would bring the grid down.
+            fetch(key, have.size, PAGE).onSuccess { (page, _) ->
+                if (state.loadedFor != key) return@onSuccess
+                items = appendUnseen(items ?: emptyList(), page, ::vodKey)
+            }
             state.loadingMore.value = false
         }
     }
@@ -408,7 +422,7 @@ fun VodBrowse(nav: NavHostController, shows: Boolean, header: @Composable () -> 
                     else -> "No $noun here yet."
                 }, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            else -> items(list, key = { if (it is VodSeries) "s${it.id}" else "m${(it as VodMovie).id}" }) { x ->
+            else -> items(list, key = ::vodKey) { x ->
                 when (x) {
                     is VodSeries -> VodShowTile(x, null) { openShow(x) }
                     is VodMovie -> VodTile(x, null) { openMovie(x) }
@@ -655,6 +669,7 @@ private fun VodVideo(nav: NavHostController, movieId: Long?, seriesId: Long?, ep
         playNext()
     }
     VideoWindow()
+    PauseInBackground(player)
     DisposableEffect(Unit) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {

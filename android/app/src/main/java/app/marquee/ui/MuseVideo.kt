@@ -81,21 +81,22 @@ fun MuseVideoPanel(nav: NavHostController, libraryId: Long?, focusPrompt: Boolea
     val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     var prompt by rememberSaveable { mutableStateOf("") }
     var asked by rememberSaveable { mutableStateOf("") }
-    var busy by rememberSaveable { mutableStateOf(false) }
+    var busy by androidx.compose.runtime.remember { mutableStateOf(false) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var understood by rememberSaveable { mutableStateOf<String?>(null) }
     var analysed by rememberSaveable { mutableStateOf<Double?>(null) }
-    var results by androidx.compose.runtime.remember { mutableStateOf<List<ItemSummary>?>(null) }
+    // Kept while the page is on the back stack, so coming back from a title shows the same answer.
+    var results by rememberCached("muse-$libraryId:results") { mutableStateOf<List<ItemSummary>?>(null) }
     // Include VOD (LIVE-6): films and series on demand that fit, beside the libraries' (not within one library); remembered on this device.
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = androidx.compose.runtime.remember { context.getSharedPreferences("marquee.muse", android.content.Context.MODE_PRIVATE) }
     val vodOn by marquee.vod.collectAsState()
     val canVod = vodOn && libraryId == null
     var includeVod by androidx.compose.runtime.remember { mutableStateOf(prefs.getBoolean("includeVod", false)) }
-    var vodResults by androidx.compose.runtime.remember { mutableStateOf<List<VodSuggestion>>(emptyList()) }
+    var vodResults by rememberCached("muse-$libraryId:vod") { mutableStateOf<List<VodSuggestion>>(emptyList()) }
     val vodHidden = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateListOf<String>() }
     var saved by rememberSaveable { mutableStateOf<Pair<Long, String>?>(null) }
-    var saving by rememberSaveable { mutableStateOf(false) }
+    var saving by androidx.compose.runtime.remember { mutableStateOf(false) }
 
     fun ask(text: String) {
         val p = text.trim()

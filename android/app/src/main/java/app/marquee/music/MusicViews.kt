@@ -339,7 +339,9 @@ fun TrackRating(track: app.marquee.api.models.ItemSummary, modifier: Modifier = 
     val scope = rememberCoroutineScope()
     // A rating made offline and not yet sent shows over the list's older value (USER-18).
     var rating by remember(track.id, track.userRating) {
-        mutableStateOf(marquee.sync.queued(track.id, app.marquee.core.PendingChange.Kind.Rating)?.let { it.rating } ?: track.userRating?.takeIf { it > 0 })
+        // A queued clear (rating null) wins too, rather than falling back to the old rating.
+        val queued = marquee.sync.queued(track.id, app.marquee.core.PendingChange.Kind.Rating)
+        mutableStateOf(if (queued != null) queued.rating else track.userRating?.takeIf { it > 0 })
     }
     var open by remember { mutableStateOf(false) }
     val music = LocalMusic.current
