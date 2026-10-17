@@ -55,6 +55,8 @@ func (f *fakeMatcher) MatchMovie(_ context.Context, title string, year int) (*tm
 		VoteAverage: 6.4, Genres: []tmdb.Genre{{Name: "Comedy"}, {Name: "Romance"}}, PosterPath: "/p.jpg", IMDBID: "tt0243736"}
 	m.Credits.Cast = []tmdb.Cast{{Name: "Josh", Character: "Matt"}}
 	m.Credits.Crew = []tmdb.Crew{{Name: "Michael", Job: "Director"}}
+	m.Recommendations.Results = []tmdb.SearchResult{{ID: 7}, {ID: 9}}
+	m.Keywords.Keywords = []tmdb.Keyword{{Name: "Wedding"}}
 	return m, nil
 }
 
@@ -161,6 +163,12 @@ func TestRefreshDetailsAndMatching(t *testing.T) {
 	if !a.Matched || a.TMDBID != 42 || a.Overview != "TMDB's plot." || a.RuntimeMS != 96*60000 || a.Year != 2002 ||
 		a.ContentRating != "R" || a.Director != "Michael" || len(a.Cast) != 1 || a.Rating != 6.4 || len(a.Genres) != 2 || !a.HasBackdrop {
 		t.Errorf("alpha: %+v", a)
+	}
+	// TMDB's recommendations and keywords are kept for suggestions.
+	var recs, keywords string
+	s.DB.QueryRow("SELECT tmdb_recs, keywords FROM vod_movies WHERE id=?", a.ID).Scan(&recs, &keywords)
+	if recs != "[7,9]" || keywords != `["wedding"]` {
+		t.Errorf("recommendations %s, keywords %s", recs, keywords)
 	}
 	b, _ := s.Movie(ctx, list[1].ID, uid)
 	// Unmatched: Pluto's details stand in.

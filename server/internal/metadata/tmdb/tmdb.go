@@ -265,6 +265,7 @@ type Movie struct {
 	ReleaseDate   string         `json:"release_date"`
 	Runtime       int            `json:"runtime"`
 	VoteAverage   float64        `json:"vote_average"`
+	VoteCount     int            `json:"vote_count"`
 	Genres        []Genre        `json:"genres"`
 	Companies     []Company      `json:"production_companies"`
 	PosterPath    string         `json:"poster_path"`
@@ -445,6 +446,7 @@ type TVShow struct {
 	Tagline        string          `json:"tagline"`
 	FirstAirDate   string          `json:"first_air_date"`
 	VoteAverage    float64         `json:"vote_average"`
+	VoteCount      int             `json:"vote_count"`
 	Genres         []Genre         `json:"genres"`
 	Networks       []Company       `json:"networks"`
 	PosterPath     string          `json:"poster_path"`

@@ -2558,6 +2558,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/livetv/vod/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recommended for you: films and series on demand picked for the caller from their taste (favourites, ratings and what they watched), best first, leaving out titles their libraries have, ones they've started or watched and ones they said they're not interested in. */
+        get: operations["vodSuggestions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/suggestions/{kind}/{vodId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "movie" | "series";
+                /** @description The film's or series' id. */
+                vodId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Not interested: stops suggesting this film or series to the caller (anywhere suggestions show). */
+        delete: operations["hideVodSuggestion"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/livetv/vod/continue": {
         parameters: {
             query?: never;
@@ -3475,6 +3513,25 @@ export interface paths {
         };
         /** Similar items from the same library ("More like this"), by what they're about (Muse's index, USER-16) when it's ready, else shared genres and people. */
         get: operations["relatedItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/vod-similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        /** Also on VOD: films (for a movie) or series (for a show) on demand like this one that the caller's libraries don't have, best first by TMDB's recommendations and the caller's taste. Empty for other types, or when on demand is off or not the caller's to watch. */
+        get: operations["itemVodSimilar"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4990,6 +5047,29 @@ export interface components {
             /** @description The episode the caller would watch next (Continue Watching and the series detail). */
             nextEpisode?: components["schemas"]["VodEpisode"];
         };
+        /** @description A film or series on demand suggested for the caller from their taste (Watch on VOD, Also on VOD, Muse, the on-demand pages' Recommended for you). */
+        VodSuggestion: {
+            /** @enum {string} */
+            kind: "movie" | "series";
+            /** @description Unique within a list, e.g. movie:5, series:7. */
+            key: string;
+            movie?: components["schemas"]["VodMovie"];
+            series?: components["schemas"]["VodSeries"];
+            /** @description Why it's suggested, e.g. "Because you love Heat" or "Similar to Arrival". */
+            reason?: string;
+            /** @description How well it fits, higher is better (for ordering only; not comparable between requests). */
+            score?: number;
+        };
+        /** @description A film or series on demand. */
+        VodRef: {
+            /** @enum {string} */
+            kind: "movie" | "series";
+            /**
+             * Format: int64
+             * @description The film's or series' id (GET /livetv/vod/movies/{id} or /livetv/vod/series/{id}).
+             */
+            id: number;
+        };
         VodSeriesDetail: components["schemas"]["VodSeries"] & {
             overview?: string;
             genres: string[];
@@ -5326,6 +5406,8 @@ export interface components {
              * @description The caller's open Marquee request for it.
              */
             requestId?: number;
+            /** @description The same title (TMDB id and type) on demand, when the caller may watch it there: show Watch now on VOD. */
+            vod?: components["schemas"]["VodRef"];
         };
         ScrobbleStatus: {
             connected: boolean;
@@ -6294,6 +6376,11 @@ export interface components {
             types?: ("movie" | "show")[];
             /** @description Default 40. */
             limit?: number;
+            /**
+             * @description Also suggest films and series on demand that fit (in vod; the caller must be allowed on demand).
+             * @default false
+             */
+            includeVod: boolean;
         };
         MuseVideoResult: {
             items: components["schemas"]["ItemSummary"][];
@@ -6305,6 +6392,8 @@ export interface components {
             title?: string;
             /** @description One-line reasons for the top results, when AI re-ranked them. */
             reasons?: components["schemas"]["RecommendationReason"][];
+            /** @description With includeVod: films and series on demand that fit, best first (not in the caller's libraries). */
+            vod?: components["schemas"]["VodSuggestion"][];
         };
         HealthCheck: {
             /** @enum {string} */
@@ -6442,6 +6531,8 @@ export interface components {
             entries?: components["schemas"]["ContinueEntry"][];
             /** @description Continue Watching only: how many entries there are in all (GET /hubs/continue-watching); more than entries holds means a View more link. */
             total?: number;
+            /** @description Watch on VOD (id vod-suggestions) only, sent when the request asks with vod=true: films and series on demand picked for the caller, best first (items is empty). */
+            vodEntries?: components["schemas"]["VodSuggestion"][];
         };
         /** @description A Continue Watching entry: a library item (an in-progress movie, episode or video, or a show's next episode) or a film or episode on demand stopped part-way through. */
         ContinueEntry: {
@@ -10803,7 +10894,10 @@ export interface operations {
     };
     homeHubs: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Include the Watch on VOD row (id vod-suggestions; films and series on demand picked for the caller, in vodEntries, with items empty). Only apps that show vodEntries should ask for it; without it the row is left out. */
+                vod?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -11918,6 +12012,57 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    vodSuggestions: {
+        parameters: {
+            query?: {
+                /** @description Only films or only series (omitted = both). */
+                kind?: "movie" | "series";
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Suggestions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodSuggestion"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    hideVodSuggestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "movie" | "series";
+                /** @description The film's or series' id. */
+                vodId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hidden. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     vodContinueWatching: {
@@ -13378,6 +13523,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ItemSummary"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    itemVodSimilar: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodSuggestion"][];
                 };
             };
             401: components["responses"]["Unauthorized"];

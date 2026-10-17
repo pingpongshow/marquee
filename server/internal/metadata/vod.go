@@ -46,6 +46,25 @@ func (s *Service) TVByID(ctx context.Context, id int) (*tmdb.TVShow, error) {
 	return c.TV(ctx, id)
 }
 
+// MovieExtras returns a film's TMDB recommendations, keywords and votes (with its basic
+// details) in one request, for suggestions from on demand. Without a key: tmdb.ErrNoKey.
+func (s *Service) MovieExtras(ctx context.Context, id int) (*tmdb.Movie, error) {
+	c, err := s.tmdb(s.Settings.Get().General.MetadataLanguage)
+	if err != nil {
+		return nil, err
+	}
+	return c.MovieExtras(ctx, id)
+}
+
+// TVExtras is MovieExtras for a series.
+func (s *Service) TVExtras(ctx context.Context, id int) (*tmdb.TVShow, error) {
+	c, err := s.tmdb(s.Settings.Get().General.MetadataLanguage)
+	if err != nil {
+		return nil, err
+	}
+	return c.TVExtras(ctx, id)
+}
+
 // TVSeason returns a season of a series on TMDB with its episodes (names, overviews, stills).
 func (s *Service) TVSeason(ctx context.Context, showID, season int) (*tmdb.Season, error) {
 	c, err := s.tmdb(s.Settings.Get().General.MetadataLanguage)

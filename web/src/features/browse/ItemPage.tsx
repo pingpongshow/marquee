@@ -18,6 +18,7 @@ import { RowRating } from "../music/Rating";
 import { FavoriteButton, favoriteTypes, RowFavorite } from "./Favorite";
 import { ItemRatings, Reviews } from "./Reviews";
 import { PlayButtons } from "./PlayButtons";
+import { AlsoOnVod } from "../livetv/VodSuggestions";
 import { isWatched } from "./watched";
 import { Poster } from "./Poster";
 import { formatBytes, formatDuration, formatTrackTime, languageName, subtitleFor } from "./format";
@@ -509,6 +510,7 @@ export function ItemPage() {
       <CollectionShelves item={d} />
       <Cast credits={d.credits} />
       <Related item={d} />
+      {(d.type === "movie" || d.type === "show") && <AlsoOnVod key={d.id} itemId={d.id} type={d.type} />}
       <Reviews key={d.id} item={d} />
       <MediaInfo item={d} isAdmin={!!me.data?.isAdmin} />
     </div>

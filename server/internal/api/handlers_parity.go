@@ -130,6 +130,8 @@ type homeRow struct {
 	fill            func() ([]items.Summary, error)
 	// expand, when set, makes the row several hubs (because-you-watched; USER-16).
 	expand func() ([]homeRow, error)
+	// vod rows hold films and series on demand (vodEntries), not items.
+	vod bool
 }
 
 func (h *Handlers) savedLayout(ctx context.Context, uid int64) []savedRow {
@@ -225,6 +227,12 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow) ([
 				return out, err
 			}})
 	}
+	// Films and series on demand picked for them (Watch on VOD), when on demand is theirs to
+	// watch. Its content (vodEntries) is only sent to apps that ask for it (HomeHubs).
+	if _, _, _, allowed := h.suggestSession(ctx); allowed {
+		defaults = append(defaults, homeRow{id: vodSuggestRow, title: "Watch on VOD", vod: true,
+			fill: func() ([]items.Summary, error) { return nil, nil }})
+	}
 	// The person's favourite movies and shows, newest first; hidden until they show it.
 	defaults = append(defaults, homeRow{id: "favorites", title: "Your Favourites", hiddenByDefault: true, fill: func() ([]items.Summary, error) {
 		return h.Items.Favorites(ctx, acc, []string{"movie", "show"}, append([]int64{}, home...), 30)
@@ -277,7 +285,7 @@ func layoutToAPI(rows []homeRow) HomeLayout {
 	return out
 }
 
-func (h *Handlers) HomeHubs(ctx context.Context, _ HomeHubsRequestObject) (HomeHubsResponseObject, error) {
+func (h *Handlers) HomeHubs(ctx context.Context, req HomeHubsRequestObject) (HomeHubsResponseObject, error) {
 	s, ok := session(ctx)
 	if !ok {
 		return HomeHubs401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
@@ -293,6 +301,20 @@ func (h *Handlers) HomeHubs(ctx context.Context, _ HomeHubsRequestObject) (HomeH
 	out := HomeHubs200JSONResponse{}
 	for _, r := range rows {
 		if r.hidden {
+			continue
+		}
+		if r.vod {
+			// Only for apps that show vodEntries: older ones would show an empty row.
+			if req.Params.Vod == nil || !*req.Params.Vod {
+				continue
+			}
+			hub, ok, err := h.vodSuggestHub(ctx, r)
+			if err != nil {
+				return nil, internal(ctx, "hubs", err)
+			}
+			if ok {
+				out = append(out, hub)
+			}
 			continue
 		}
 		if r.id == "continue-watching" {

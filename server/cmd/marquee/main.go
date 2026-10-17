@@ -62,6 +62,7 @@ import (
 	"marquee/internal/trickplay"
 	"marquee/internal/vod"
 	"marquee/internal/vodsave"
+	"marquee/internal/vodsuggest"
 	"marquee/internal/watcher"
 	"marquee/internal/webhooks"
 )
@@ -648,6 +649,13 @@ func run() error {
 	// Two-way Plex sync (watch state, plays, ratings): off until the admin turns it on.
 	plexSync := &plexsync.Service{DB: database, Settings: store, Alerts: alerts}
 	scheduler.Register(plexSync.Task())
+	itemStore := items.NewStore(database)
+	itemStore.Learn = func() bool { return store.Get().AI.LearnFromBehaviour }
+	// Suggestions from on demand, and the data they need for titles matched before it was kept.
+	vodSuggest := &vodsuggest.Service{DB: database, Items: itemStore, VOD: vodSvc, InLibrary: vodSaves.InLibrary}
+	vodBackfill := &vodsuggest.Backfill{VOD: vodSvc, Suggest: vodSuggest, Scheduler: scheduler, Settings: store}
+	scheduler.Register(vodBackfill.Task())
+	vodSvc.OnMatched = vodBackfill.AfterRefresh
 	go vodSvc.Run(ctx, vodWake)
 	go vodSaves.Run(ctx)
 	live.DVR = dvr // recordings in progress hold source connections (tuners.go)
@@ -664,8 +672,6 @@ func run() error {
 	store.Subscribe(advertise)
 	defer bonjour.Stop()
 
-	itemStore := items.NewStore(database)
-	itemStore.Learn = func() bool { return store.Get().AI.LearnFromBehaviour }
 	apiHandlers := &api.Handlers{
 		DB: database, Auth: authSvc, Settings: store, Libraries: libraries,
 		Items: itemStore, Scans: scans, Version: config.Version,
@@ -674,6 +680,7 @@ func run() error {
 		LiveTV:      live,
 		VOD:         vodSvc,
 		VODSaves:    vodSaves,
+		VODSuggest:  vodSuggest,
 		Scrobble:    scrobbler,
 		DVR:         dvr,
 		Commercials: ads,

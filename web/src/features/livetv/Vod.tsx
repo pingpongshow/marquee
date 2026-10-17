@@ -30,6 +30,7 @@ import {
   vodStatusQuery,
 } from "./vodApi";
 import { SaveMovieButton, SavesLink } from "./VodSaves";
+import { RecommendedRow } from "./VodSuggestions";
 
 // Movies and shows on demand (LIVE-6): two pages, VOD Movies (/vod) and VOD Shows
 // (/vod/shows), each browsed by category, search, sort and filters; a film's page; and the
@@ -396,6 +397,8 @@ export function VodBrowse({ kind }: { kind: "movies" | "shows" }) {
           </div>
         )}
       </div>
+
+      {!category && !q && !filtered && <RecommendedRow kind={shows ? "series" : "movie"} />}
 
       {showResumeRow && (
         <section>

@@ -80,6 +80,10 @@ export function withoutContinueWatching(hubs: Hub[] | undefined, targetId: numbe
 
 export const hubsKey = ["items", "hubs"] as const;
 
+/** Home's rows (Home and music libraries share them), with Watch on VOD's films and series
+ * (vodEntries): older apps don't ask for that row, this one does. */
+export const fetchHubs = () => unwrap(api.GET("/hubs/home", { params: { query: { vod: true } } }));
+
 /** Refreshes everything that shows watch state: item pages, Home rows, library grids, playlists, search. */
 export function refreshWatchState(qc: QueryClient) {
   for (const key of [["items"], ["libraries"], ["playlists"], ["search"], ["continue-watching"]]) void qc.invalidateQueries({ queryKey: key });
