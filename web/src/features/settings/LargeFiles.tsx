@@ -101,8 +101,17 @@ type Tab = "files" | "queue" | "history" | "settings";
 
 /** Library Health → Large files: find oversized files, queue them, follow the queue. Admins only. */
 export function LargeFilesTool({ onBack }: { onBack: () => void }) {
+  const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>("files");
   const config = useQuery(configQuery);
+  const resume = useMutation({
+    mutationFn: (c: OptimizeConfig) => unwrap(api.PUT("/optimize/settings", { body: { ...c.settings, paused: false } })),
+    onSuccess: (c) => {
+      qc.setQueryData(configQuery.queryKey, c);
+      qc.invalidateQueries({ queryKey: ["optimize", "jobs"] });
+    },
+    onError: (e) => toast(e.message, { tone: "error" }),
+  });
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -133,6 +142,16 @@ export function LargeFilesTool({ onBack }: { onBack: () => void }) {
       </div>
       {config.isPending && <Spinner />}
       {config.isError && <Alert tone="error">{config.error.message}</Alert>}
+      {config.data?.settings.paused && (
+        <Alert tone="info">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span>The queue is paused: nothing is converted until you resume it.</span>
+            <Button size="sm" variant="secondary" loading={resume.isPending} onClick={() => config.data && resume.mutate(config.data)}>
+              <Play className="size-4" /> Resume queue
+            </Button>
+          </div>
+        </Alert>
+      )}
       {config.data && tab === "files" && <FilesTab config={config.data} onQueued={() => setTab("queue")} />}
       {config.data && tab === "queue" && <JobsTab config={config.data} history={false} />}
       {config.data && tab === "history" && <JobsTab config={config.data} history />}
@@ -721,9 +740,14 @@ function SettingsTab({ config }: { config: OptimizeConfig }) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState<OptimizeSettings>(config.settings);
   const [editing, setEditing] = useState<Preset | null>(null);
-  const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(config.settings), [draft, config.settings]);
+  // Pausing belongs to the queue (Pause queue / Resume queue), not to this form: saving never
+  // brings back a paused state from when the form was opened.
+  const dirty = useMemo(() => JSON.stringify({ ...draft, paused: false }) !== JSON.stringify({ ...config.settings, paused: false }), [draft, config.settings]);
   const save = useMutation({
-    mutationFn: (s: OptimizeSettings) => unwrap(api.PUT("/optimize/settings", { body: s })),
+    mutationFn: (s: OptimizeSettings) => {
+      const current = qc.getQueryData<OptimizeConfig>(configQuery.queryKey);
+      return unwrap(api.PUT("/optimize/settings", { body: { ...s, paused: current?.settings.paused ?? s.paused } }));
+    },
     onSuccess: (c) => {
       qc.setQueryData(configQuery.queryKey, c);
       setDraft(c.settings);
