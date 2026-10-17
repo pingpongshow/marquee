@@ -80,6 +80,7 @@ import kotlinx.serialization.Contextual
  * @param releaseType Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
  * @param audioFormat 
  * @param communityRating 
+ * @param placementOverride Tracks, for admins; moved to another album by hand (see /items/{itemId}/music-placement).
  * @param collections Collections the item belongs to (META-7).
  * @param smartRules 
  * @param extras Trailers, featurettes and other extras (LIB-8), trailers first.
@@ -223,6 +224,10 @@ data class ItemDetail (
 
     @SerialName(value = "communityRating")
     val communityRating: CommunityRating? = null,
+
+    /* Tracks, for admins; moved to another album by hand (see /items/{itemId}/music-placement). */
+    @SerialName(value = "placementOverride")
+    val placementOverride: kotlin.Boolean? = null,
 
     /* Collections the item belongs to (META-7). */
     @SerialName(value = "collections")

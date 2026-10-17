@@ -923,6 +923,23 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      }
 
     /**
+     * enum for parameter optimized
+     */
+     enum class OptimizedListLargeFiles(val value: kotlin.String) {
+         @SerialName(value = "yes") YES("yes"),
+         @SerialName(value = "no") NO("no");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
      * enum for parameter sort
      */
      enum class SortListLargeFiles(val value: kotlin.String) {
@@ -952,6 +969,7 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      * @param resolution Only this resolution class (by width or height, so letterboxed films count): 2160 &#x3D; 4K, 480 &#x3D; SD. (optional)
      * @param codecs Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9). (optional)
      * @param hdr Only HDR (yes) or only SDR (no) files. (optional)
+     * @param optimized Only files the optimizer has already replaced (yes, to optimize them again) or only ones it hasn&#39;t (no). (optional)
      * @param presetId The preset the estimates are for (default: the default preset). (optional)
      * @param sort  (optional, default to Sort.SIZE)
      * @param offset  (optional, default to 0)
@@ -965,8 +983,8 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun listLargeFiles(libraryId: kotlin.Long? = null, type: TypeListLargeFiles? = null, minSizeGb: kotlin.Double? = null, minBitrateMbps: kotlin.Double? = null, resolution: ResolutionListLargeFiles? = null, codecs: kotlin.String? = null, hdr: HdrListLargeFiles? = null, presetId: kotlin.String? = null, sort: SortListLargeFiles? = SortListLargeFiles.SIZE, offset: kotlin.Int? = 0, limit: kotlin.Int? = 100) : LargeFilePage {
-        val localVarResponse = listLargeFilesWithHttpInfo(libraryId = libraryId, type = type, minSizeGb = minSizeGb, minBitrateMbps = minBitrateMbps, resolution = resolution, codecs = codecs, hdr = hdr, presetId = presetId, sort = sort, offset = offset, limit = limit)
+    fun listLargeFiles(libraryId: kotlin.Long? = null, type: TypeListLargeFiles? = null, minSizeGb: kotlin.Double? = null, minBitrateMbps: kotlin.Double? = null, resolution: ResolutionListLargeFiles? = null, codecs: kotlin.String? = null, hdr: HdrListLargeFiles? = null, optimized: OptimizedListLargeFiles? = null, presetId: kotlin.String? = null, sort: SortListLargeFiles? = SortListLargeFiles.SIZE, offset: kotlin.Int? = 0, limit: kotlin.Int? = 100) : LargeFilePage {
+        val localVarResponse = listLargeFilesWithHttpInfo(libraryId = libraryId, type = type, minSizeGb = minSizeGb, minBitrateMbps = minBitrateMbps, resolution = resolution, codecs = codecs, hdr = hdr, optimized = optimized, presetId = presetId, sort = sort, offset = offset, limit = limit)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as LargeFilePage
@@ -994,6 +1012,7 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      * @param resolution Only this resolution class (by width or height, so letterboxed films count): 2160 &#x3D; 4K, 480 &#x3D; SD. (optional)
      * @param codecs Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9). (optional)
      * @param hdr Only HDR (yes) or only SDR (no) files. (optional)
+     * @param optimized Only files the optimizer has already replaced (yes, to optimize them again) or only ones it hasn&#39;t (no). (optional)
      * @param presetId The preset the estimates are for (default: the default preset). (optional)
      * @param sort  (optional, default to Sort.SIZE)
      * @param offset  (optional, default to 0)
@@ -1004,8 +1023,8 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun listLargeFilesWithHttpInfo(libraryId: kotlin.Long?, type: TypeListLargeFiles?, minSizeGb: kotlin.Double?, minBitrateMbps: kotlin.Double?, resolution: ResolutionListLargeFiles?, codecs: kotlin.String?, hdr: HdrListLargeFiles?, presetId: kotlin.String?, sort: SortListLargeFiles?, offset: kotlin.Int?, limit: kotlin.Int?) : ApiResponse<LargeFilePage?> {
-        val localVariableConfig = listLargeFilesRequestConfig(libraryId = libraryId, type = type, minSizeGb = minSizeGb, minBitrateMbps = minBitrateMbps, resolution = resolution, codecs = codecs, hdr = hdr, presetId = presetId, sort = sort, offset = offset, limit = limit)
+    fun listLargeFilesWithHttpInfo(libraryId: kotlin.Long?, type: TypeListLargeFiles?, minSizeGb: kotlin.Double?, minBitrateMbps: kotlin.Double?, resolution: ResolutionListLargeFiles?, codecs: kotlin.String?, hdr: HdrListLargeFiles?, optimized: OptimizedListLargeFiles?, presetId: kotlin.String?, sort: SortListLargeFiles?, offset: kotlin.Int?, limit: kotlin.Int?) : ApiResponse<LargeFilePage?> {
+        val localVariableConfig = listLargeFilesRequestConfig(libraryId = libraryId, type = type, minSizeGb = minSizeGb, minBitrateMbps = minBitrateMbps, resolution = resolution, codecs = codecs, hdr = hdr, optimized = optimized, presetId = presetId, sort = sort, offset = offset, limit = limit)
 
         return request<Unit, LargeFilePage>(
             localVariableConfig
@@ -1022,13 +1041,14 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      * @param resolution Only this resolution class (by width or height, so letterboxed films count): 2160 &#x3D; 4K, 480 &#x3D; SD. (optional)
      * @param codecs Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9). (optional)
      * @param hdr Only HDR (yes) or only SDR (no) files. (optional)
+     * @param optimized Only files the optimizer has already replaced (yes, to optimize them again) or only ones it hasn&#39;t (no). (optional)
      * @param presetId The preset the estimates are for (default: the default preset). (optional)
      * @param sort  (optional, default to Sort.SIZE)
      * @param offset  (optional, default to 0)
      * @param limit  (optional, default to 100)
      * @return RequestConfig
      */
-    fun listLargeFilesRequestConfig(libraryId: kotlin.Long?, type: TypeListLargeFiles?, minSizeGb: kotlin.Double?, minBitrateMbps: kotlin.Double?, resolution: ResolutionListLargeFiles?, codecs: kotlin.String?, hdr: HdrListLargeFiles?, presetId: kotlin.String?, sort: SortListLargeFiles?, offset: kotlin.Int?, limit: kotlin.Int?) : RequestConfig<Unit> {
+    fun listLargeFilesRequestConfig(libraryId: kotlin.Long?, type: TypeListLargeFiles?, minSizeGb: kotlin.Double?, minBitrateMbps: kotlin.Double?, resolution: ResolutionListLargeFiles?, codecs: kotlin.String?, hdr: HdrListLargeFiles?, optimized: OptimizedListLargeFiles?, presetId: kotlin.String?, sort: SortListLargeFiles?, offset: kotlin.Int?, limit: kotlin.Int?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -1052,6 +1072,9 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
                 }
                 if (hdr != null) {
                     put("hdr", listOf(hdr.value))
+                }
+                if (optimized != null) {
+                    put("optimized", listOf(optimized.value))
                 }
                 if (presetId != null) {
                     put("presetId", listOf(presetId.toString()))
@@ -1358,7 +1381,7 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
 
     /**
      * POST /optimize/jobs
-     * Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren&#39;t available movies or episodes, are skipped.
+     * Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren&#39;t available movies or episodes, are skipped. Files optimized before can be queued again (re-optimized).
      * 
      * @param optimizeQueueRequest 
      * @return OptimizeQueueResult
@@ -1390,7 +1413,7 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
 
     /**
      * POST /optimize/jobs
-     * Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren&#39;t available movies or episodes, are skipped.
+     * Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren&#39;t available movies or episodes, are skipped. Files optimized before can be queued again (re-optimized).
      * 
      * @param optimizeQueueRequest 
      * @return ApiResponse<OptimizeQueueResult?>

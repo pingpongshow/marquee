@@ -38,6 +38,7 @@ import kotlinx.serialization.Contextual
  * @param resolution 
  * @param codecs 
  * @param hdr 
+ * @param optimized Only files already optimized (yes) or not yet (no).
  */
 @Serializable
 
@@ -62,7 +63,11 @@ data class OptimizeFilter (
     val codecs: kotlin.collections.List<kotlin.String>? = null,
 
     @SerialName(value = "hdr")
-    val hdr: OptimizeFilter.Hdr? = null
+    val hdr: OptimizeFilter.Hdr? = null,
+
+    /* Only files already optimized (yes) or not yet (no). */
+    @SerialName(value = "optimized")
+    val optimized: OptimizeFilter.Optimized? = null
 
 ) {
 
@@ -95,6 +100,16 @@ data class OptimizeFilter (
      */
     @Serializable
     enum class Hdr(val value: kotlin.String) {
+        @SerialName(value = "yes") YES("yes"),
+        @SerialName(value = "no") NO("no");
+    }
+    /**
+     * Only files already optimized (yes) or not yet (no).
+     *
+     * Values: YES,NO
+     */
+    @Serializable
+    enum class Optimized(val value: kotlin.String) {
         @SerialName(value = "yes") YES("yes"),
         @SerialName(value = "no") NO("no");
     }

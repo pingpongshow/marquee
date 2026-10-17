@@ -27,6 +27,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -114,8 +115,12 @@ fun AddToPlaylistDialog(itemId: Long, music: Boolean, onDone: () -> Unit) {
 
 /** The "…" menu on a track: play next, add to the queue, add to a playlist, add to or remove from favourites, a Sound Journey. */
 @Composable
-fun TrackMenu(track: ItemSummary) {
+fun TrackMenu(track: ItemSummary, onMoved: (() -> Unit)? = null) {
     val music = LocalMusic.current
+    val marquee = LocalMarquee.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val me by marquee.me.collectAsState()
+    var move by remember { mutableStateOf(false) }
     var open by remember { mutableStateOf(false) }
     var playlist by remember { mutableStateOf(false) }
     var journey by remember { mutableStateOf(false) }
@@ -128,7 +133,13 @@ fun TrackMenu(track: ItemSummary) {
             DropdownMenuItem({ Text("Add to playlist…") }, { playlist = true; open = false })
             favorite?.let { f -> DropdownMenuItem({ Text(f.label) }, { f.run(); open = false }) }
             DropdownMenuItem({ Text("Sound Journey…") }, { journey = true; open = false })
+            // Admins (META-3): put the track on another album without editing its file.
+            if (onMoved != null && me?.isAdmin == true) DropdownMenuItem({ Text("Move to album…") }, { move = true; open = false })
         }
+    }
+    if (move) MoveTrackDialog(track.id, track.title) { moved ->
+        move = false
+        if (moved != null) { toast(context, "Moved “${moved.title}”"); onMoved?.invoke() }
     }
     if (playlist) AddToPlaylistDialog(track.id, music = true) { playlist = false }
     if (journey) app.marquee.music.SoundJourneyDialog(track.id, track.title) { journey = false }

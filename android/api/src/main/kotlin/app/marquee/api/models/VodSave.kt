@@ -51,7 +51,8 @@ import kotlinx.serialization.Contextual
  * @param seriesId The episode's series.
  * @param speedBps Download speed in bytes a second (while downloading).
  * @param etaSeconds Time left for the download.
- * @param pauseReason Why a queued save isn't running: the queue is paused, something is being watched, or the source is unreachable.
+ * @param connections Connections the download uses now (while downloading; more than 1 when a large file is fetched over the free connections of the source's Maximum streams).
+ * @param pauseReason Why a queued save isn't running: the queue is paused, something is being watched, connections are in use by viewers, or the source is unreachable.
  * @param nextAttemptAt When a save waiting after a network error tries again.
  * @param error 
  * @param verifyNote 
@@ -136,7 +137,11 @@ data class VodSave (
     @SerialName(value = "etaSeconds")
     val etaSeconds: kotlin.Long? = null,
 
-    /* Why a queued save isn't running: the queue is paused, something is being watched, or the source is unreachable. */
+    /* Connections the download uses now (while downloading; more than 1 when a large file is fetched over the free connections of the source's Maximum streams). */
+    @SerialName(value = "connections")
+    val connections: kotlin.Int? = null,
+
+    /* Why a queued save isn't running: the queue is paused, something is being watched, connections are in use by viewers, or the source is unreachable. */
     @SerialName(value = "pauseReason")
     val pauseReason: kotlin.String? = null,
 

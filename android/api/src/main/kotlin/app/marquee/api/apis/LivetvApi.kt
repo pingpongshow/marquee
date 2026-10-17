@@ -48,6 +48,7 @@ import app.marquee.api.models.VodCategory
 import app.marquee.api.models.VodMovie
 import app.marquee.api.models.VodMovieDetail
 import app.marquee.api.models.VodMoviePage
+import app.marquee.api.models.VodRecommendationRow
 import app.marquee.api.models.VodSaveQueue
 import app.marquee.api.models.VodSaveResult
 import app.marquee.api.models.VodSeries
@@ -237,8 +238,9 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
 
     /**
      * POST /livetv/vod/saves/clear
-     * Remove finished saves (done, failed, cancelled, skipped) from the list (admin only). Failed saves&#39; partial files are deleted.
+     * Remove finished saves (done, cancelled, skipped) from the list, or with failed&#x3D;true the failed ones (their partial files are deleted). Admin only. Failed saves are never removed automatically.
      * 
+     * @param failed Clear the failed saves instead of the finished ones. (optional)
      * @return void
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -247,8 +249,8 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * @throws ServerException If the API returns a server error response
      */
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun clearVodSaves() : Unit {
-        val localVarResponse = clearVodSavesWithHttpInfo()
+    fun clearVodSaves(failed: kotlin.Boolean? = null) : Unit {
+        val localVarResponse = clearVodSavesWithHttpInfo(failed = failed)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> Unit
@@ -267,15 +269,16 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
 
     /**
      * POST /livetv/vod/saves/clear
-     * Remove finished saves (done, failed, cancelled, skipped) from the list (admin only). Failed saves&#39; partial files are deleted.
+     * Remove finished saves (done, cancelled, skipped) from the list, or with failed&#x3D;true the failed ones (their partial files are deleted). Admin only. Failed saves are never removed automatically.
      * 
+     * @param failed Clear the failed saves instead of the finished ones. (optional)
      * @return ApiResponse<Unit?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Throws(IllegalStateException::class, IOException::class)
-    fun clearVodSavesWithHttpInfo() : ApiResponse<Unit?> {
-        val localVariableConfig = clearVodSavesRequestConfig()
+    fun clearVodSavesWithHttpInfo(failed: kotlin.Boolean?) : ApiResponse<Unit?> {
+        val localVariableConfig = clearVodSavesRequestConfig(failed = failed)
 
         return request<Unit, Unit>(
             localVariableConfig
@@ -285,11 +288,17 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     /**
      * To obtain the request config of the operation clearVodSaves
      *
+     * @param failed Clear the failed saves instead of the finished ones. (optional)
      * @return RequestConfig
      */
-    fun clearVodSavesRequestConfig() : RequestConfig<Unit> {
+    fun clearVodSavesRequestConfig(failed: kotlin.Boolean?) : RequestConfig<Unit> {
         val localVariableBody = null
-        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (failed != null) {
+                    put("failed", listOf(failed.toString()))
+                }
+            }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
         localVariableHeaders["Accept"] = "application/json"
 
@@ -4599,6 +4608,107 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/livetv/vod/episodes/{episodeId}/next".replace("{"+"episodeId"+"}", encodeURIComponent(episodeId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * enum for parameter kind
+     */
+     enum class KindVodRecommendations(val value: kotlin.String) {
+         @SerialName(value = "movie") MOVIE("movie"),
+         @SerialName(value = "series") SERIES("series");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * GET /livetv/vod/recommendations
+     * The recommendations page: rows of films or series on demand for the caller, each with its own angle (top picks, Because you love …, more of a favourite genre, critically acclaimed, popular on VOD), all from the caller&#39;s own taste: other people&#39;s viewing is never used. A title shows in one row only; rows that can&#39;t be filled aren&#39;t sent. The same exclusions as suggestions apply.
+     * 
+     * @param kind Only films or only series (omitted &#x3D; both). (optional)
+     * @param perRow Titles per row at most. (optional, default to 30)
+     * @return kotlin.collections.List<VodRecommendationRow>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun vodRecommendations(kind: KindVodRecommendations? = null, perRow: kotlin.Int? = 30) : kotlin.collections.List<VodRecommendationRow> {
+        val localVarResponse = vodRecommendationsWithHttpInfo(kind = kind, perRow = perRow)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<VodRecommendationRow>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /livetv/vod/recommendations
+     * The recommendations page: rows of films or series on demand for the caller, each with its own angle (top picks, Because you love …, more of a favourite genre, critically acclaimed, popular on VOD), all from the caller&#39;s own taste: other people&#39;s viewing is never used. A title shows in one row only; rows that can&#39;t be filled aren&#39;t sent. The same exclusions as suggestions apply.
+     * 
+     * @param kind Only films or only series (omitted &#x3D; both). (optional)
+     * @param perRow Titles per row at most. (optional, default to 30)
+     * @return ApiResponse<kotlin.collections.List<VodRecommendationRow>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun vodRecommendationsWithHttpInfo(kind: KindVodRecommendations?, perRow: kotlin.Int?) : ApiResponse<kotlin.collections.List<VodRecommendationRow>?> {
+        val localVariableConfig = vodRecommendationsRequestConfig(kind = kind, perRow = perRow)
+
+        return request<Unit, kotlin.collections.List<VodRecommendationRow>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation vodRecommendations
+     *
+     * @param kind Only films or only series (omitted &#x3D; both). (optional)
+     * @param perRow Titles per row at most. (optional, default to 30)
+     * @return RequestConfig
+     */
+    fun vodRecommendationsRequestConfig(kind: KindVodRecommendations?, perRow: kotlin.Int?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (kind != null) {
+                    put("kind", listOf(kind.value))
+                }
+                if (perRow != null) {
+                    put("perRow", listOf(perRow.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/livetv/vod/recommendations",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

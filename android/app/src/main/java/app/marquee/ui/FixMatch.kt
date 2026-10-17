@@ -92,7 +92,8 @@ fun FileName(path: String, modifier: Modifier = Modifier, label: String? = null)
 
 /**
  * Fix match (admins): the item's files at the top so it's clear what's being matched, then a
- * TMDB search by title and year (pre-filled) and its candidates; picking one applies it.
+ * TMDB search by title and year (pre-filled), or a TMDB or IMDb link or ID, and its candidates;
+ * picking one applies it.
  * [onDone] gets the re-matched item, or null when cancelled.
  */
 @Composable
@@ -152,7 +153,8 @@ fun FixMatchDialog(itemId: Long, onDone: (ItemDetail?) -> Unit) {
                         files.forEach { (path, label) -> FileName(path, label = label) }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(title, { title = it }, Modifier.weight(1f).testTag("matchTitle"), singleLine = true, label = { Text("Title") })
+                        OutlinedTextField(title, { title = it }, Modifier.weight(1f).testTag("matchTitle"), singleLine = true, label = { Text("Title") },
+                            placeholder = { Text("Title, or a TMDB or IMDb link or ID") })
                         OutlinedTextField(year, { v -> year = v.filter(Char::isDigit).take(4) }, Modifier.width(92.dp).testTag("matchYear"), singleLine = true,
                             label = { Text("Year") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                     }

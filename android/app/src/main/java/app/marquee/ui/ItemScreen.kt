@@ -10,6 +10,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Theaters
 
 import androidx.compose.runtime.setValue
@@ -114,6 +115,9 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                 Page(d, children, related, similar, popular)
             }
         }
+        // Gone since it was shown (an album emptied by moving its tracks, an artist merged by a match): back.
+        val gone = (fresh.exceptionOrNull() as? app.marquee.api.infrastructure.ClientException)?.statusCode == 404
+        if (gone && value?.isSuccess == true) { nav.popBackStack(); return@LaunchedEffect }
         // A reload that fails keeps the page already shown.
         if (fresh.isSuccess || value?.isSuccess != true) pageState.value = fresh
     }
@@ -167,24 +171,35 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
         if (!marquee.isTv && d.type in listOf(ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO, ItemType.TRACK, ItemType.ALBUM, ItemType.ARTIST, ItemType.SEASON, ItemType.SHOW))
             DownloadButton(d.summary())
     }
-    /** The "…" menu: Fix match for admins (movies and shows), Sound Journey for tracks. */
+    /**
+     * The "…" menu: Fix match for admins (movies and shows on TMDB, artists and albums on MusicBrainz),
+     * Sound Journey for tracks and Move to album for admins (META-3).
+     */
     @Composable fun MoreMenu() {
-        val admin = me?.isAdmin == true && matchable(d.type)
+        val isAdmin = me?.isAdmin == true
+        val admin = isAdmin && (matchable(d.type) || musicMatchable(d.type))
         val track = d.type == ItemType.TRACK
         if (!admin && !track) return
         var open by remember { mutableStateOf(false) }
         var match by remember { mutableStateOf(false) }
         var journey by remember { mutableStateOf(false) }
+        var move by remember { mutableStateOf(false) }
         Box {
             IconButton({ open = true }, Modifier.focusRing()) { Icon(Icons.Filled.MoreVert, "More actions") }
             DropdownMenu(open, { open = false }) {
                 if (admin) DropdownMenuItem({ Text("Fix match…") }, { match = true; open = false }, leadingIcon = { Icon(Icons.Filled.Search, null) })
                 if (track) DropdownMenuItem({ Text("Sound Journey…") }, { journey = true; open = false }, leadingIcon = { Icon(Icons.Filled.Explore, null) })
+                if (track && isAdmin) DropdownMenuItem({ Text("Move to album…") }, { move = true; open = false }, leadingIcon = { Icon(Icons.Filled.Album, null) })
             }
         }
-        if (match) FixMatchDialog(d.id) { updated ->
+        val matched = { updated: ItemDetail? ->
             match = false
             if (updated != null) { Toast.makeText(context, "Matched “${updated.title}”", Toast.LENGTH_SHORT).show(); reload++ }
+        }
+        if (match) { if (musicMatchable(d.type)) MusicMatchDialog(d, matched) else FixMatchDialog(d.id, matched) }
+        if (move) MoveTrackDialog(d.id, d.title) { moved ->
+            move = false
+            if (moved != null) { Toast.makeText(context, "Moved “${moved.title}”", Toast.LENGTH_SHORT).show(); reload++ }
         }
         if (journey) app.marquee.music.SoundJourneyDialog(d.id, d.title) { journey = false }
     }
@@ -311,7 +326,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                                     FavoriteButton(t, small = true)
                                     app.marquee.music.TrackRating(t, Modifier.padding(end = 8.dp))
                                     Text(t.durationMs?.let { formatTime(it) } ?: "", maxLines = 1, softWrap = false)
-                                    if (!marquee.isTv) TrackMenu(t)
+                                    if (!marquee.isTv) TrackMenu(t, onMoved = { reload++ })
                                 }
                             },
                             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),

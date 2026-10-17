@@ -47,12 +47,15 @@ import app.marquee.api.models.MatchCandidate
 import app.marquee.api.models.MatchRequest
 import app.marquee.api.models.MuseVideoRequest
 import app.marquee.api.models.MuseVideoResult
+import app.marquee.api.models.MusicMatchCandidate
+import app.marquee.api.models.MusicMatchRequest
 import app.marquee.api.models.PersonDetail
 import app.marquee.api.models.RateItemRequest
 import app.marquee.api.models.RecommendationReason
 import app.marquee.api.models.RecommendationReasonsRequest
 import app.marquee.api.models.SetReviewRequest
 import app.marquee.api.models.SmartCollectionSave
+import app.marquee.api.models.TrackPlacementRequest
 import app.marquee.api.models.VodSuggestion
 
 import kotlinx.serialization.SerialName
@@ -392,6 +395,83 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
+     * PUT /items/{itemId}/music-match
+     * Match a music artist or album to a MusicBrainz artist or release group and look its details up again (admin only). The choice outlasts rescans and wins over MBIDs in tags; locked fields are kept.
+     * 
+     * @param itemId 
+     * @param musicMatchRequest 
+     * @return ItemDetail
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun applyMusicMatch(itemId: kotlin.Long, musicMatchRequest: MusicMatchRequest) : ItemDetail {
+        val localVarResponse = applyMusicMatchWithHttpInfo(itemId = itemId, musicMatchRequest = musicMatchRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ItemDetail
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /items/{itemId}/music-match
+     * Match a music artist or album to a MusicBrainz artist or release group and look its details up again (admin only). The choice outlasts rescans and wins over MBIDs in tags; locked fields are kept.
+     * 
+     * @param itemId 
+     * @param musicMatchRequest 
+     * @return ApiResponse<ItemDetail?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun applyMusicMatchWithHttpInfo(itemId: kotlin.Long, musicMatchRequest: MusicMatchRequest) : ApiResponse<ItemDetail?> {
+        val localVariableConfig = applyMusicMatchRequestConfig(itemId = itemId, musicMatchRequest = musicMatchRequest)
+
+        return request<MusicMatchRequest, ItemDetail>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation applyMusicMatch
+     *
+     * @param itemId 
+     * @param musicMatchRequest 
+     * @return RequestConfig
+     */
+    fun applyMusicMatchRequestConfig(itemId: kotlin.Long, musicMatchRequest: MusicMatchRequest) : RequestConfig<MusicMatchRequest> {
+        val localVariableBody = musicMatchRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/items/{itemId}/music-match".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * POST /items/{itemId}/subtitles/bazarr
      * Ask Bazarr to find and download the best subtitle in a language. Runs in the background; the new subtitle appears on the item when Bazarr has saved it.
      * 
@@ -680,6 +760,79 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/items/{itemId}/subtitles/bazarr".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /items/{itemId}/music-placement
+     * Put a moved track back where its file&#39;s tags say it belongs (admin only, tracks only).
+     * 
+     * @param itemId 
+     * @return ItemDetail
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun clearTrackPlacement(itemId: kotlin.Long) : ItemDetail {
+        val localVarResponse = clearTrackPlacementWithHttpInfo(itemId = itemId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ItemDetail
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /items/{itemId}/music-placement
+     * Put a moved track back where its file&#39;s tags say it belongs (admin only, tracks only).
+     * 
+     * @param itemId 
+     * @return ApiResponse<ItemDetail?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun clearTrackPlacementWithHttpInfo(itemId: kotlin.Long) : ApiResponse<ItemDetail?> {
+        val localVariableConfig = clearTrackPlacementRequestConfig(itemId = itemId)
+
+        return request<Unit, ItemDetail>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation clearTrackPlacement
+     *
+     * @param itemId 
+     * @return RequestConfig
+     */
+    fun clearTrackPlacementRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/items/{itemId}/music-placement".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -1942,6 +2095,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param letter Only titles starting with this letter (\&quot;#\&quot; for anything else). (optional)
      * @param minMyRating Only what the person rated at least this (0–10, e.g. 8 &#x3D; 4 stars: favourites). (optional)
      * @param favorites Only the person&#39;s favourites (the heart). Combines with the other filters and sorts; sort -favorited lists the newest favourites first. (optional)
+     * @param seed With sort&#x3D;random: the same seed gives the same shuffle on every page (send one per shuffle). Without it each page is shuffled on its own. (optional)
      * @return ItemPage
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -1951,8 +2105,8 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun listLibraryItems(libraryId: kotlin.Long, type: ItemType? = null, sort: SortListLibraryItems? = SortListLibraryItems.TITLE, offset: kotlin.Int? = 0, limit: kotlin.Int? = 100, watch: WatchListLibraryItems? = null, genre: kotlin.String? = null, decade: kotlin.Int? = null, contentRating: kotlin.String? = null, resolution: ResolutionListLibraryItems? = null, hdr: kotlin.Boolean? = null, letter: kotlin.String? = null, minMyRating: kotlin.Int? = null, favorites: kotlin.Boolean? = null) : ItemPage {
-        val localVarResponse = listLibraryItemsWithHttpInfo(libraryId = libraryId, type = type, sort = sort, offset = offset, limit = limit, watch = watch, genre = genre, decade = decade, contentRating = contentRating, resolution = resolution, hdr = hdr, letter = letter, minMyRating = minMyRating, favorites = favorites)
+    fun listLibraryItems(libraryId: kotlin.Long, type: ItemType? = null, sort: SortListLibraryItems? = SortListLibraryItems.TITLE, offset: kotlin.Int? = 0, limit: kotlin.Int? = 100, watch: WatchListLibraryItems? = null, genre: kotlin.String? = null, decade: kotlin.Int? = null, contentRating: kotlin.String? = null, resolution: ResolutionListLibraryItems? = null, hdr: kotlin.Boolean? = null, letter: kotlin.String? = null, minMyRating: kotlin.Int? = null, favorites: kotlin.Boolean? = null, seed: kotlin.Long? = null) : ItemPage {
+        val localVarResponse = listLibraryItemsWithHttpInfo(libraryId = libraryId, type = type, sort = sort, offset = offset, limit = limit, watch = watch, genre = genre, decade = decade, contentRating = contentRating, resolution = resolution, hdr = hdr, letter = letter, minMyRating = minMyRating, favorites = favorites, seed = seed)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as ItemPage
@@ -1987,14 +2141,15 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param letter Only titles starting with this letter (\&quot;#\&quot; for anything else). (optional)
      * @param minMyRating Only what the person rated at least this (0–10, e.g. 8 &#x3D; 4 stars: favourites). (optional)
      * @param favorites Only the person&#39;s favourites (the heart). Combines with the other filters and sorts; sort -favorited lists the newest favourites first. (optional)
+     * @param seed With sort&#x3D;random: the same seed gives the same shuffle on every page (send one per shuffle). Without it each page is shuffled on its own. (optional)
      * @return ApiResponse<ItemPage?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun listLibraryItemsWithHttpInfo(libraryId: kotlin.Long, type: ItemType?, sort: SortListLibraryItems?, offset: kotlin.Int?, limit: kotlin.Int?, watch: WatchListLibraryItems?, genre: kotlin.String?, decade: kotlin.Int?, contentRating: kotlin.String?, resolution: ResolutionListLibraryItems?, hdr: kotlin.Boolean?, letter: kotlin.String?, minMyRating: kotlin.Int?, favorites: kotlin.Boolean?) : ApiResponse<ItemPage?> {
-        val localVariableConfig = listLibraryItemsRequestConfig(libraryId = libraryId, type = type, sort = sort, offset = offset, limit = limit, watch = watch, genre = genre, decade = decade, contentRating = contentRating, resolution = resolution, hdr = hdr, letter = letter, minMyRating = minMyRating, favorites = favorites)
+    fun listLibraryItemsWithHttpInfo(libraryId: kotlin.Long, type: ItemType?, sort: SortListLibraryItems?, offset: kotlin.Int?, limit: kotlin.Int?, watch: WatchListLibraryItems?, genre: kotlin.String?, decade: kotlin.Int?, contentRating: kotlin.String?, resolution: ResolutionListLibraryItems?, hdr: kotlin.Boolean?, letter: kotlin.String?, minMyRating: kotlin.Int?, favorites: kotlin.Boolean?, seed: kotlin.Long?) : ApiResponse<ItemPage?> {
+        val localVariableConfig = listLibraryItemsRequestConfig(libraryId = libraryId, type = type, sort = sort, offset = offset, limit = limit, watch = watch, genre = genre, decade = decade, contentRating = contentRating, resolution = resolution, hdr = hdr, letter = letter, minMyRating = minMyRating, favorites = favorites, seed = seed)
 
         return request<Unit, ItemPage>(
             localVariableConfig
@@ -2018,9 +2173,10 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param letter Only titles starting with this letter (\&quot;#\&quot; for anything else). (optional)
      * @param minMyRating Only what the person rated at least this (0–10, e.g. 8 &#x3D; 4 stars: favourites). (optional)
      * @param favorites Only the person&#39;s favourites (the heart). Combines with the other filters and sorts; sort -favorited lists the newest favourites first. (optional)
+     * @param seed With sort&#x3D;random: the same seed gives the same shuffle on every page (send one per shuffle). Without it each page is shuffled on its own. (optional)
      * @return RequestConfig
      */
-    fun listLibraryItemsRequestConfig(libraryId: kotlin.Long, type: ItemType?, sort: SortListLibraryItems?, offset: kotlin.Int?, limit: kotlin.Int?, watch: WatchListLibraryItems?, genre: kotlin.String?, decade: kotlin.Int?, contentRating: kotlin.String?, resolution: ResolutionListLibraryItems?, hdr: kotlin.Boolean?, letter: kotlin.String?, minMyRating: kotlin.Int?, favorites: kotlin.Boolean?) : RequestConfig<Unit> {
+    fun listLibraryItemsRequestConfig(libraryId: kotlin.Long, type: ItemType?, sort: SortListLibraryItems?, offset: kotlin.Int?, limit: kotlin.Int?, watch: WatchListLibraryItems?, genre: kotlin.String?, decade: kotlin.Int?, contentRating: kotlin.String?, resolution: ResolutionListLibraryItems?, hdr: kotlin.Boolean?, letter: kotlin.String?, minMyRating: kotlin.Int?, favorites: kotlin.Boolean?, seed: kotlin.Long?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -2062,6 +2218,9 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
                 }
                 if (favorites != null) {
                     put("favorites", listOf(favorites.toString()))
+                }
+                if (seed != null) {
+                    put("seed", listOf(seed.toString()))
                 }
             }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
@@ -3133,7 +3292,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * Candidate matches for Fix Match (admin only, movies and shows).
      * 
      * @param itemId 
-     * @param title Defaults to the item&#39;s title. (optional)
+     * @param title Defaults to the item&#39;s title. A TMDB link (themoviedb.org/movie/603, /tv/1399), tmdb:603, an IMDb id (tt0133093) or an IMDb link is looked up directly and returns that one entry (none when TMDB doesn&#39;t have it; 400 when it is a show for a movie or a movie for a show). Plain numbers are titles (1917). (optional)
      * @param year  (optional)
      * @return kotlin.collections.List<MatchCandidate>
      * @throws IllegalStateException If the request is not correctly configured
@@ -3167,7 +3326,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * Candidate matches for Fix Match (admin only, movies and shows).
      * 
      * @param itemId 
-     * @param title Defaults to the item&#39;s title. (optional)
+     * @param title Defaults to the item&#39;s title. A TMDB link (themoviedb.org/movie/603, /tv/1399), tmdb:603, an IMDb id (tt0133093) or an IMDb link is looked up directly and returns that one entry (none when TMDB doesn&#39;t have it; 400 when it is a show for a movie or a movie for a show). Plain numbers are titles (1917). (optional)
      * @param year  (optional)
      * @return ApiResponse<kotlin.collections.List<MatchCandidate>?>
      * @throws IllegalStateException If the request is not correctly configured
@@ -3187,7 +3346,7 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * To obtain the request config of the operation searchMatches
      *
      * @param itemId 
-     * @param title Defaults to the item&#39;s title. (optional)
+     * @param title Defaults to the item&#39;s title. A TMDB link (themoviedb.org/movie/603, /tv/1399), tmdb:603, an IMDb id (tt0133093) or an IMDb link is looked up directly and returns that one entry (none when TMDB doesn&#39;t have it; 400 when it is a show for a movie or a movie for a show). Plain numbers are titles (1917). (optional)
      * @param year  (optional)
      * @return RequestConfig
      */
@@ -3208,6 +3367,93 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/items/{itemId}/match".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /items/{itemId}/music-match
+     * MusicBrainz candidates for Fix match of a music artist or album (admin only; 400 for anything else).
+     * 
+     * @param itemId 
+     * @param q Artist name or album title; defaults to the item&#39;s. A MusicBrainz id or musicbrainz.org link (artist, release group or release) is looked up directly. (optional)
+     * @param artist Albums only; defaults to the album&#39;s artist. (optional)
+     * @return kotlin.collections.List<MusicMatchCandidate>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun searchMusicMatches(itemId: kotlin.Long, q: kotlin.String? = null, artist: kotlin.String? = null) : kotlin.collections.List<MusicMatchCandidate> {
+        val localVarResponse = searchMusicMatchesWithHttpInfo(itemId = itemId, q = q, artist = artist)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<MusicMatchCandidate>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /items/{itemId}/music-match
+     * MusicBrainz candidates for Fix match of a music artist or album (admin only; 400 for anything else).
+     * 
+     * @param itemId 
+     * @param q Artist name or album title; defaults to the item&#39;s. A MusicBrainz id or musicbrainz.org link (artist, release group or release) is looked up directly. (optional)
+     * @param artist Albums only; defaults to the album&#39;s artist. (optional)
+     * @return ApiResponse<kotlin.collections.List<MusicMatchCandidate>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun searchMusicMatchesWithHttpInfo(itemId: kotlin.Long, q: kotlin.String?, artist: kotlin.String?) : ApiResponse<kotlin.collections.List<MusicMatchCandidate>?> {
+        val localVariableConfig = searchMusicMatchesRequestConfig(itemId = itemId, q = q, artist = artist)
+
+        return request<Unit, kotlin.collections.List<MusicMatchCandidate>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation searchMusicMatches
+     *
+     * @param itemId 
+     * @param q Artist name or album title; defaults to the item&#39;s. A MusicBrainz id or musicbrainz.org link (artist, release group or release) is looked up directly. (optional)
+     * @param artist Albums only; defaults to the album&#39;s artist. (optional)
+     * @return RequestConfig
+     */
+    fun searchMusicMatchesRequestConfig(itemId: kotlin.Long, q: kotlin.String?, artist: kotlin.String?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (q != null) {
+                    put("q", listOf(q.toString()))
+                }
+                if (artist != null) {
+                    put("artist", listOf(artist.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/items/{itemId}/music-match".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -3283,6 +3529,83 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.PUT,
             path = "/items/{itemId}/reviews".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /items/{itemId}/music-placement
+     * Move a track to another album without editing its file (admin only, tracks only). Kept through rescans; albums and artists left empty are removed.
+     * 
+     * @param itemId 
+     * @param trackPlacementRequest 
+     * @return ItemDetail
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun setTrackPlacement(itemId: kotlin.Long, trackPlacementRequest: TrackPlacementRequest) : ItemDetail {
+        val localVarResponse = setTrackPlacementWithHttpInfo(itemId = itemId, trackPlacementRequest = trackPlacementRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ItemDetail
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /items/{itemId}/music-placement
+     * Move a track to another album without editing its file (admin only, tracks only). Kept through rescans; albums and artists left empty are removed.
+     * 
+     * @param itemId 
+     * @param trackPlacementRequest 
+     * @return ApiResponse<ItemDetail?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun setTrackPlacementWithHttpInfo(itemId: kotlin.Long, trackPlacementRequest: TrackPlacementRequest) : ApiResponse<ItemDetail?> {
+        val localVariableConfig = setTrackPlacementRequestConfig(itemId = itemId, trackPlacementRequest = trackPlacementRequest)
+
+        return request<TrackPlacementRequest, ItemDetail>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation setTrackPlacement
+     *
+     * @param itemId 
+     * @param trackPlacementRequest 
+     * @return RequestConfig
+     */
+    fun setTrackPlacementRequestConfig(itemId: kotlin.Long, trackPlacementRequest: TrackPlacementRequest) : RequestConfig<TrackPlacementRequest> {
+        val localVariableBody = trackPlacementRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/items/{itemId}/music-placement".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

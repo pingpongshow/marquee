@@ -40,6 +40,7 @@ import kotlinx.serialization.Contextual
  * @param hdr keep = HDR stays HDR (10-bit HEVC or AV1; H.264 always tone-maps); tonemap = converted to SDR.
  * @param builtIn 
  * @param videoKbps A target video bitrate instead of a quality; 0 = use the quality.
+ * @param maxGbPerHour The largest a result may be per hour of running time, in GB (10^9 bytes): 5 = a 2-hour film at most 10 GB. Each file's video bitrate is capped so that, with its audio and subtitles, it fits (files that need less stay smaller). 0 or omitted = no limit.
  */
 @Serializable
 
@@ -76,7 +77,11 @@ data class OptimizePreset (
 
     /* A target video bitrate instead of a quality; 0 = use the quality. */
     @SerialName(value = "videoKbps")
-    val videoKbps: kotlin.Int? = null
+    val videoKbps: kotlin.Int? = null,
+
+    /* The largest a result may be per hour of running time, in GB (10^9 bytes): 5 = a 2-hour film at most 10 GB. Each file's video bitrate is capped so that, with its audio and subtitles, it fits (files that need less stay smaller). 0 or omitted = no limit. */
+    @SerialName(value = "maxGbPerHour")
+    val maxGbPerHour: kotlin.Double? = null
 
 ) {
 
