@@ -65,7 +65,7 @@ export function LiveTvSettings() {
                 st.error ? (
                   <span className="text-danger">{st.error}</span>
                 ) : (
-                  `${st.channels} channels, ${st.programmes} guide entries${st.refreshedAt ? ` · loaded ${new Date(st.refreshedAt).toLocaleString()}` : ""}`
+                  `${st.channels} channels, ${st.programmes} guide entries${st.refreshedAt ? ` · loaded ${new Date(st.refreshedAt).toLocaleString()}` : ""}${st.maxStreams ? ` · ${st.inUse ?? 0} of ${st.maxStreams} connections in use` : st.inUse ? ` · ${st.inUse} connection${st.inUse === 1 ? "" : "s"} in use` : ""}`
                 )
               ) : undefined
             }
@@ -143,6 +143,25 @@ export function LiveTvSettings() {
                   )}
                 </Field>
               )}
+              <Field
+                label="Connections allowed"
+                help="How many channels the provider lets you stream at once (0 = no limit). At the limit a recording keeps its connection: its channel can still be watched, other channels show as unavailable, and a recording that needs a connection stops live TV on another channel."
+              >
+                {(id) => (
+                  <Input
+                    id={id}
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={s.maxStreams ?? 0}
+                    onChange={(e) =>
+                      edit(i, {
+                        maxStreams: Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                      })
+                    }
+                  />
+                )}
+              </Field>
               <Field
                 label="User agent"
                 help="Only if the provider needs a particular one."
@@ -298,7 +317,7 @@ function RecordingSettings() {
                 can't be found.
               </span>
             ) : (
-              "Found with Comskip when a recording finishes, and nightly for older ones. Removing cuts them out of the file; the original goes to the media trash, where it can be restored from the recording's menu for 30 days."
+              "Found with Comskip when a recording finishes, and nightly for older ones. Removing cuts them out of the file; the original goes to the media trash, where it can be restored from the recording's menu until the media trash is emptied (every night)."
             )
           }
         >
@@ -335,7 +354,7 @@ function RecordingSettings() {
         </Field>
         <Field
           label="When someone is over quota"
-          help="Recordings in progress always finish. Removed recordings go to the media trash (restorable for 30 days); one being watched is never removed."
+          help="Recordings in progress always finish. Removed recordings go to the media trash (restorable until it's emptied, every night); one being watched is never removed."
         >
           {(id) => (
             <Select

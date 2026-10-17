@@ -25,9 +25,13 @@ func canViewDVR(s auth.Session) bool { return s.User.IsAdmin || s.User.Restricti
 func canManage(s auth.Session, owner int64) bool { return s.User.IsAdmin || s.User.ID == owner }
 
 // DVRQuota is a user's DVR quota: in bytes and GB (0 = unlimited), and whether it's their
-// own rather than the server default.
+// own rather than the server default. Admins aren't subject to the default: without a
+// quota of their own they have no limit; one set for them applies as to anyone.
 func DVRQuota(u auth.User, s settings.Settings) (bytes int64, gb int, own bool) {
 	gb = s.Integrations.DVRDefaultQuotaGB
+	if u.IsAdmin {
+		gb = 0
+	}
 	if q := u.Restrictions.DVRQuotaGB; q != nil {
 		gb, own = *q, true
 	}
@@ -86,7 +90,7 @@ func toAPIRecording(x livetv.Recording) Recording {
 	return Recording{Id: x.ID, ChannelId: x.ChannelID, ChannelName: x.ChannelName, Start: x.Start, End: x.Stop, Title: x.Title,
 		Subtitle: nz(x.Subtitle), Description: nz(x.Description), Episode: nz(x.Episode), Category: nz(x.Category), ImageUrl: nz(x.Image),
 		Status: status, Series: x.RuleID != nil, RuleId: x.RuleID, Error: nz(x.Error), SizeBytes: nz(x.Size), ItemId: x.ItemID, UserId: &x.UserID,
-		OwnerName: nz(x.OwnerName), Rating: nz(x.Rating)}
+		OwnerName: nz(x.OwnerName), Rating: nz(x.Rating), StoppedEarly: nz(x.StoppedEarly)}
 }
 
 func toAPIRule(r livetv.Rule) RecordingRule {
@@ -144,11 +148,7 @@ func (h *Handlers) ScheduleRecording(ctx context.Context, req ScheduleRecordingR
 		return ScheduleRecording503JSONResponse{ServiceUnavailableJSONResponse(apiErr("dvr_unavailable", livetv.ErrDVRUnavailable.Error()))}, nil
 	}
 	b := req.Body
-	if c, err := h.LiveTV.Channel(ctx, b.ChannelId); err == nil && !liveAllowed(s, c.Group) {
-		return ScheduleRecording403JSONResponse{ForbiddenJSONResponse(apiErr("not_allowed", "This channel isn't available for this profile."))}, nil
-	}
-	// A profile limited to some channel groups records series on the chosen channel only.
-	anyChannel := b.AnyChannel != nil && *b.AnyChannel && liveGroups(s) == nil
+	anyChannel := b.AnyChannel != nil && *b.AnyChannel
 	rec, rule, err := h.DVR.Schedule(ctx, s.User.ID, b.ChannelId, b.Start, b.Series != nil && *b.Series, anyChannel)
 	if errors.Is(err, livetv.ErrProgrammeNotFound) {
 		return ScheduleRecording404JSONResponse{NotFoundJSONResponse(apiErr("not_found", err.Error()))}, nil
@@ -196,6 +196,36 @@ func (h *Handlers) CancelRecording(ctx context.Context, req CancelRecordingReque
 		return nil, internal(ctx, "cancelRecording", err)
 	}
 	return CancelRecording204Response{}, nil
+}
+
+func (h *Handlers) StopRecording(ctx context.Context, req StopRecordingRequestObject) (StopRecordingResponseObject, error) {
+	s, ok := session(ctx)
+	if !ok {
+		return StopRecording401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	}
+	if !(canRecord(s) || canViewDVR(s)) || h.DVR == nil {
+		return StopRecording403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	x, err := h.DVR.Get(ctx, req.RecordingId)
+	if errors.Is(err, livetv.ErrRecordingNotFound) {
+		return StopRecording404JSONResponse{NotFoundJSONResponse(apiErr("not_found", err.Error()))}, nil
+	}
+	if err != nil {
+		return nil, internal(ctx, "stopRecording", err)
+	}
+	if !canManage(s, x.UserID) {
+		return StopRecording403JSONResponse{ForbiddenJSONResponse(apiErr("forbidden", "only an admin or whoever scheduled it can stop a recording"))}, nil
+	}
+	keep := req.Body == nil || req.Body.Keep == nil || *req.Body.Keep
+	// Filing a long recording takes a while; it carries on if the caller goes away.
+	err = h.DVR.Stop(context.WithoutCancel(ctx), x.ID, keep)
+	if errors.Is(err, livetv.ErrNotRecording) {
+		return StopRecording409JSONResponse(apiErr("not_recording", "It isn't recording now.")), nil
+	}
+	if err != nil {
+		return nil, internal(ctx, "stopRecording", err)
+	}
+	return StopRecording204Response{}, nil
 }
 
 func (h *Handlers) ListRecordingRules(ctx context.Context, req ListRecordingRulesRequestObject) (ListRecordingRulesResponseObject, error) {

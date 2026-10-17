@@ -5,7 +5,6 @@ import (
 	"crypto/sha1"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -34,8 +33,12 @@ type Service struct {
 	Sessions *Sessions
 	// OnSourceFailed, when set, hears a source that couldn't be loaded (admin alerts).
 	OnSourceFailed func(src settings.LiveTVSource, err error)
+	// DVR, when set, is the recorder, whose recordings in progress hold connections
+	// (tuners.go).
+	DVR *Recorder
 
 	refreshing sync.Mutex
+	tuneMu     sync.Mutex
 }
 
 func (s *Service) client() *http.Client {
@@ -287,8 +290,8 @@ type Filter struct {
 	Recent bool
 	// Hidden lists only the channels the user hid; otherwise they're left out.
 	Hidden bool
-	// Groups limits a restricted profile to these channel groups (nil = all).
-	Groups *[]string
+	// None lists nothing (a profile that may not watch Live TV).
+	None bool
 }
 
 // RecentLimit is how many recently watched channels are listed.
@@ -313,10 +316,8 @@ func (s *Service) channels(ctx context.Context, userID int64, f Filter) ([]Chann
 	} else {
 		q += ` AND h.user_id IS NULL`
 	}
-	if f.Groups != nil {
-		q += ` AND c.group_name IN (SELECT value FROM json_each(?))`
-		b, _ := json.Marshal(*f.Groups)
-		args = append(args, string(b))
+	if f.None {
+		q += ` AND 0`
 	}
 	order := ` ORDER BY c.sort_key, c.name`
 	if f.Recent {

@@ -273,9 +273,16 @@ func run() error {
 			_, err := database.ExecContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`)
 			return "Done", err
 		}})
-	mediaTrash := &mediatrash.Service{DB: database}
+	mediaTrash := &mediatrash.Service{DB: database, Playing: func(path string) bool {
+		for _, ps := range player.List() {
+			if ps.Path == path {
+				return true
+			}
+		}
+		return false
+	}}
 	scheduler.Register(tasks.Task{ID: "empty-trash", Name: "Empty media trash", Window: true,
-		Description: "Removes files deleted from Library Health more than 30 days ago from the .marquee-trash folders in library folders.",
+		Description: "Permanently deletes everything in the .marquee-trash folders in library folders: files deleted from Library Health, originals the optimizer or commercial removal kept, recordings removed for the DVR quota. Nothing outside those folders is touched.",
 		Run:         mediaTrash.Empty})
 	scheduler.Register(tasks.Task{ID: "scan-all", Name: "Scan all libraries",
 		Description: "Looks for new, changed and removed files in every library now. Libraries also rescan on their own schedule, and the file watcher catches most changes as they happen.",
@@ -571,6 +578,15 @@ func run() error {
 		Playing:  ads.Playing,
 		Watching: func() bool { return len(vodSaves.Activity(ctx)) > 0 }}
 	go optimizer.Run(ctx)
+	// The optimizer in Scheduled Tasks: no schedule of its own (it works through its queue,
+	// inside the maintenance window when set to); off holds the queue; Run now wakes it.
+	scheduler.Register(tasks.Task{ID: optimize.TaskID, Name: "Optimize large files",
+		Description: "Converts the files queued in Library Health → Large files, one at a time, giving way to playback. Turned off, the queue waits (running conversions are suspended).",
+		Status:      func() string { return optimizer.QueueState(ctx) },
+		Run: func(context.Context) (string, error) {
+			optimizer.Wake()
+			return optimizer.QueueState(ctx), nil
+		}})
 
 	watchTogether := &syncplay.Service{}
 	go watchTogether.Run(ctx)
@@ -633,6 +649,7 @@ func run() error {
 	scheduler.Register(plexSync.Task())
 	go vodSvc.Run(ctx, vodWake)
 	go vodSaves.Run(ctx)
+	live.DVR = dvr // recordings in progress hold source connections (tuners.go)
 	go dvr.Run(ctx)
 	go scheduler.Run(ctx)
 

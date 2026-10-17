@@ -285,6 +285,9 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 				if src.UserAgent != nil {
 					out.UserAgent = strings.TrimSpace(*src.UserAgent)
 				}
+				if src.MaxStreams != nil {
+					out.MaxStreams = min(max(*src.MaxStreams, 0), 1000)
+				}
 				s.Integrations.LiveTVSources[k] = out
 			}
 		}
@@ -592,7 +595,7 @@ func (h *Handlers) librariesChanged() {
 func toAPILiveSources(in []settings.LiveTVSource) []LiveTvSource {
 	out := make([]LiveTvSource, len(in))
 	for i, s := range in {
-		out[i] = LiveTvSource{Id: ptr(s.ID), Name: s.Name, Kind: LiveTvSourceKind(s.Kind), Url: s.URL, EpgUrl: nz(s.EPGURL), UserAgent: nz(s.UserAgent), Enabled: ptr(s.Enabled)}
+		out[i] = LiveTvSource{Id: ptr(s.ID), Name: s.Name, Kind: LiveTvSourceKind(s.Kind), Url: s.URL, EpgUrl: nz(s.EPGURL), UserAgent: nz(s.UserAgent), Enabled: ptr(s.Enabled), MaxStreams: nz(s.MaxStreams)}
 	}
 	return out
 }

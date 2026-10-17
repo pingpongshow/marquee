@@ -188,25 +188,46 @@ func TestDeleteFromReadOnlyFolderFails(t *testing.T) {
 	}
 }
 
-func TestEmptyRemovesOnlyOldTrash(t *testing.T) {
+// Emptying deletes everything in the trash folders and nothing else: not the library's
+// files, not a link's target, not a file being played; it reports the space freed.
+func TestEmptyDeletesAllTrashAndNothingElse(t *testing.T) {
 	e := newEnv(t, library.Movies)
 	trash := filepath.Join(e.root, library.TrashDir)
-	e.touch(library.TrashDir + "/2026-08-01/Old/Old.mkv")       // 62 days ago
-	e.touch(library.TrashDir + "/2026-09-01/Edge/Edge.mkv")     // a day over 30 days
-	e.touch(library.TrashDir + "/2026-09-20/Recent/Recent.mkv") // 12 days ago
-	e.touch(library.TrashDir + "/notes.txt")                    // not a date folder: left alone
-	os.MkdirAll(filepath.Join(trash, "2026-09-25", "Empty"), 0o755)
+	big := e.touch(library.TrashDir + "/2026-10-01/Old/Old.mkv")
+	os.WriteFile(big, make([]byte, 1_500_000), 0o644)
+	e.touch(library.TrashDir + "/2026-10-02/New/New.mkv") // today's: goes too
+	e.touch(library.TrashDir + "/notes.txt")
+	playing := e.touch(library.TrashDir + "/2026-10-02/Playing.mkv")
+	keep := e.touch("Movie/Movie.mkv") // in the library, outside the trash
+	outside := filepath.Join(t.TempDir(), "elsewhere.mkv")
+	os.WriteFile(outside, []byte("x"), 0o644)
+	if err := os.Symlink(outside, filepath.Join(trash, "link.mkv")); err != nil {
+		t.Fatal(err)
+	}
+	e.svc.Playing = func(p string) bool { return p == playing }
 
 	msg, err := e.svc.Empty(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if msg != "Removed 2 files deleted over 30 days ago" {
-		t.Errorf("message %q", msg)
+	if want := "Freed 1.5 MB (4 files); 1 file being played kept for next time"; msg != want {
+		t.Errorf("message %q, want %q", msg, want)
 	}
-	for dir, want := range map[string]bool{"2026-08-01": false, "2026-09-01": false, "2026-09-20": true, "2026-09-25": false, "notes.txt": true} {
-		if got := exists(filepath.Join(trash, dir)); got != want {
-			t.Errorf("%s exists = %v, want %v", dir, got, want)
+	for p, want := range map[string]bool{big: false, filepath.Join(trash, "2026-10-01"): false, filepath.Join(trash, "notes.txt"): false,
+		filepath.Join(trash, "link.mkv"): false, playing: true, keep: true, outside: true} {
+		if got := exists(p); got != want {
+			t.Errorf("%s exists = %v, want %v", p, got, want)
 		}
+	}
+	// Next time (nobody watching) the rest goes, the trash folder with it.
+	e.svc.Playing = nil
+	if msg, _ := e.svc.Empty(context.Background()); msg != "Freed 37 bytes (1 file)" {
+		t.Errorf("second run: %q", msg)
+	}
+	if exists(trash) || !exists(keep) {
+		t.Errorf("trash folder left (%v) or library file gone (%v)", exists(trash), !exists(keep))
+	}
+	if msg, _ := e.svc.Empty(context.Background()); msg != "The media trash was empty" {
+		t.Errorf("empty trash: %q", msg)
 	}
 }

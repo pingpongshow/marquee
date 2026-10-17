@@ -21,6 +21,7 @@ import (
 	"marquee/internal/mediatrash"
 	"marquee/internal/metadata/tmdb"
 	"marquee/internal/settings"
+	"marquee/internal/tasks"
 	"marquee/internal/vod"
 )
 
@@ -38,8 +39,8 @@ const (
 )
 
 var (
-	ErrNotFound    = errors.New("not found")
-	ErrNoFolder    = errors.New("choose a folder to save to in Settings → VOD")
+	ErrNotFound = errors.New("not found")
+	ErrNoFolder = errors.New("choose a folder to save to in Settings → VOD")
 	// ErrDestination is an unknown save folder, or one that doesn't take the kind saved.
 	ErrDestination = errors.New("no such save folder")
 	ErrNotSavable  = vod.ErrNotSavable
@@ -116,6 +117,7 @@ type Service struct {
 	lastScan    map[int64]time.Time
 	pendingScan map[int64]bool
 	lastRetry   time.Time
+	lastPrune   time.Time
 	drain       drainCount
 	inLibrary   indexCache // the "in library" marks (inlibrary.go)
 
@@ -271,6 +273,7 @@ func (s *Service) List(ctx context.Context) ([]Save, error) {
 		return nil, err
 	}
 	paused := s.QueuePaused(ctx)
+	waitWindow := s.outsideWindow()
 	if s.Libraries != nil {
 		if libs, err := s.Libraries(ctx); err == nil {
 			for i := range out {
@@ -294,6 +297,8 @@ func (s *Service) List(ctx context.Context) ([]Save, error) {
 			switch {
 			case paused:
 				v.PauseReason = "Queue paused"
+			case waitWindow:
+				v.PauseReason = "Waiting for the maintenance window"
 			case s.pauseReason[v.SourceID] != "":
 				v.PauseReason = s.pauseReason[v.SourceID]
 			case s.down[v.SourceID].err != "":
@@ -418,6 +423,77 @@ func (s *Service) MoveToTop(ctx context.Context, id int64) error {
 	}
 	s.Wake()
 	return nil
+}
+
+// outsideWindow reports that downloads are limited to the maintenance window and it's
+// closed now.
+func (s *Service) outsideWindow() bool {
+	if s.Settings == nil {
+		return false
+	}
+	c := s.Settings.Get()
+	return c.VODSave.WindowOnly && !tasks.InWindow(time.Now(), c.Tasks)
+}
+
+// History limits: finished saves (done, failed, cancelled, skipped) are kept this many days,
+// and at most HistoryMax of them (the newest).
+const (
+	HistoryDays = 5
+	HistoryMax  = 10
+)
+
+// pruneHistory drops finished saves older than HistoryDays and beyond the newest HistoryMax
+// (failed ones' partial files go too). It runs at most once a minute.
+func (s *Service) pruneHistory(ctx context.Context) {
+	s.mu.Lock()
+	due := time.Since(s.lastPrune) >= time.Minute
+	if due {
+		s.lastPrune = time.Now()
+	}
+	s.mu.Unlock()
+	if !due {
+		return
+	}
+	cutoff := time.Now().UTC().AddDate(0, 0, -HistoryDays).Format(time.RFC3339)
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, state, target_path FROM vod_saves WHERE state IN (`+in(len(finishedStates))+`)
+		ORDER BY COALESCE(finished_at, created_at) DESC, id DESC`, finishedStates...)
+	if err != nil {
+		return
+	}
+	type row struct {
+		id          int64
+		state, path string
+	}
+	var drop []row
+	n := 0
+	for rows.Next() {
+		var r row
+		if rows.Scan(&r.id, &r.state, &r.path) != nil {
+			continue
+		}
+		n++
+		if n > HistoryMax {
+			drop = append(drop, r)
+		}
+	}
+	rows.Close()
+	old, err := s.DB.QueryContext(ctx, `SELECT id, state, target_path FROM vod_saves WHERE state IN (`+in(len(finishedStates))+`)
+		AND COALESCE(finished_at, created_at) < ?`, append(append([]any{}, finishedStates...), cutoff)...)
+	if err == nil {
+		for old.Next() {
+			var r row
+			if old.Scan(&r.id, &r.state, &r.path) == nil {
+				drop = append(drop, r)
+			}
+		}
+		old.Close()
+	}
+	for _, r := range drop {
+		if r.state == Failed {
+			removeParts(r.path)
+		}
+		s.DB.ExecContext(ctx, `DELETE FROM vod_saves WHERE id = ?`, r.id)
+	}
 }
 
 // ClearFinished removes done, failed, cancelled and skipped saves from the list (failed

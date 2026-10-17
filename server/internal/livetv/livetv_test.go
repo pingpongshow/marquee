@@ -265,12 +265,8 @@ func TestHiddenRecentAndGroups(t *testing.T) {
 	if l, _ := s.Channels(ctx, uid, Filter{Recent: true}); len(l) != 2 || l[0].ID != all[0].ID || l[1].ID != all[2].ID {
 		t.Errorf("recent: %+v", l)
 	}
-	// A restricted profile sees only its groups; an empty list means none.
-	kids := []string{"Kids, Family"}
-	if l, _ := s.Channels(ctx, uid, Filter{Groups: &kids}); len(l) != 1 || l[0].Group != "Kids, Family" {
-		t.Errorf("groups: %+v", l)
-	}
-	if l, _ := s.Channels(ctx, uid, Filter{Groups: &[]string{}}); len(l) != 0 {
+	// A profile that may not watch Live TV sees nothing.
+	if l, _ := s.Channels(ctx, uid, Filter{None: true}); len(l) != 0 {
 		t.Errorf("no live tv: %+v", l)
 	}
 }

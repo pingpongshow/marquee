@@ -33,11 +33,10 @@ type Restrictions struct {
 	ViewDVR   *bool `json:"canViewDVR,omitempty"`
 	// DVRQuotaGB is this user's recording quota: nil = the server default, 0 = unlimited.
 	DVRQuotaGB *int `json:"dvrQuotaGB,omitempty"`
-	// LiveTV: nil or true = may watch Live TV (LIVE-4); LiveTVGroups limits it to these
-	// channel groups (nil = all).
-	LiveTV       *bool     `json:"liveTv,omitempty"`
-	LiveTVGroups *[]string `json:"liveTvGroups,omitempty"`
-	SeerrUserID  *int64    `json:"seerrUserId,omitempty"`
+	// LiveTV: nil or true = may watch Live TV (LIVE-4), every channel group (per-user group
+	// limits were dropped; a stored "liveTvGroups" is ignored and removed by migration 46).
+	LiveTV      *bool  `json:"liveTv,omitempty"`
+	SeerrUserID *int64 `json:"seerrUserId,omitempty"`
 	// Friend: joined through an invite (USER-13). Signs in with a password, isn't on the
 	// profile picker, and can't switch to household profiles.
 	Friend bool `json:"friend,omitempty"`

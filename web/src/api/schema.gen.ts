@@ -1789,7 +1789,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
-         * @description The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item's last file the item goes too, along with a season or show left empty.
+         * @description The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good when the daily Empty media trash task runs. When it was the item's last file the item goes too, along with a season or show left empty.
          */
         delete: operations["deleteMediaFile"];
         options?: never;
@@ -2262,6 +2262,25 @@ export interface paths {
         post?: never;
         /** Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list. Only whoever scheduled it, or an admin. */
         delete: operations["cancelRecording"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/recordings/{recordingId}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recordingId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop a recording in progress now. keep true (the default): what was recorded is finalised as a playable file, filed like a finished recording and marked stoppedEarly. keep false: the partial recording is deleted and it leaves the list. Only whoever scheduled it, or an admin (canDelete). Returns once it has stopped. */
+        post: operations["stopRecording"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4099,11 +4118,14 @@ export interface components {
             canRecordDVR?: boolean;
             /** @description May see and play the household's Live TV recordings (the DVR list and the recordings libraries). Default true; admins always may. */
             canViewDVR?: boolean;
-            /** @description This user's DVR quota in GB (10^9 bytes). Null or absent = the server default (integrations.dvrDefaultQuotaGb); 0 = unlimited. */
+            /** @description This user's DVR quota in GB (10^9 bytes). Null or absent = the server default (integrations.dvrDefaultQuotaGb) for everyone but admins, who then have no limit; 0 = unlimited. An admin's own quota applies to them like anyone's. Admins may set it for anyone, admins and themselves included. */
             dvrQuotaGb?: number | null;
             /** @description May watch Live TV (LIVE-4). Default true. */
             liveTv?: boolean;
-            /** @description Channel groups this user may watch. Null or absent = all. */
+            /**
+             * @deprecated
+             * @description Deprecated and ignored: channel groups no longer limit anyone (everyone who may watch Live TV sees every group). The server ignores it when written and never returns it.
+             */
             liveTvGroups?: string[] | null;
             /**
              * Format: int64
@@ -4531,7 +4553,7 @@ export interface components {
             /** @description Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie. */
             trickplay?: boolean;
             /**
-             * @description Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good after 30 days.
+             * @description Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good by the daily Empty media trash task.
              * @default false
              */
             allowMediaDeletion: boolean;
@@ -4605,6 +4627,10 @@ export interface components {
                 /** Format: date-time */
                 refreshedAt?: string;
                 error?: string;
+                /** @description Connections the source allows at once (0 = unlimited). */
+                maxStreams?: number;
+                /** @description Connections in use now: recordings in progress plus live streams (shared ones count once). */
+                inUse?: number;
             }[];
         };
         Recording: {
@@ -4665,6 +4691,8 @@ export interface components {
             durationMs?: number;
             /** @description Finished recordings: the caller has watched it to the end. */
             watched?: boolean;
+            /** @description Someone stopped it before the programme ended (Stop and keep): what was recorded until then was kept as a playable file. */
+            stoppedEarly?: boolean;
         };
         RecordingRule: {
             /** Format: int64 */
@@ -4708,7 +4736,7 @@ export interface components {
             /** @description The quota in GB; 0 = unlimited. */
             quotaGb?: number;
             /**
-             * @description default = the server default applies; user = the user's own quota (which may be 0, unlimited).
+             * @description default = the server default applies (for an admin without a quota of their own: no limit, so quotaBytes is 0); user = the user's own quota (which may be 0, unlimited).
              * @enum {string}
              */
             quotaSource: "default" | "user";
@@ -4736,6 +4764,10 @@ export interface components {
             hidden?: boolean;
             now?: components["schemas"]["LiveProgramme"];
             next?: components["schemas"]["LiveProgramme"];
+            /** @description False while every connection its source allows is in use (recordings and viewers) and this channel isn't one of those being received; tuning it would answer 409 no_tuner. Absent = available (older servers). Channel up/down should skip unavailable channels. */
+            available?: boolean;
+            /** @description Why it isn't available, e.g. "All connections are in use: recording Gold Rush". */
+            unavailableReason?: string;
         };
         LiveProgramme: {
             /** Format: int64 */
@@ -4762,7 +4794,7 @@ export interface components {
         };
         LiveSession: {
             id: string;
-            /** @description The live HLS playlist (server-relative; the session id is its credential). */
+            /** @description The live HLS playlist (server-relative; the session id is its credential). Once the stream has ended the playlist answers 410 with a plain-text reason. A reason starting with "Stopped:" (e.g. "Stopped: a recording needed the connection") should be shown to the viewer; any other (the recording it shared ended, or it moved to a recording's stream) means tuning the channel again will work. */
             url: string;
             /** Format: int64 */
             channelId: number;
@@ -4785,6 +4817,8 @@ export interface components {
             epgUrl?: string;
             userAgent?: string;
             enabled?: boolean;
+            /** @description Connections the provider allows at once (0 or absent = unlimited). At the limit other channels of this source are unavailable, a channel being recorded is watched from the recording's own connection, and a recording that needs a connection stops live streams on other channels of the source. */
+            maxStreams?: number;
         };
         /** @description A source of films (LIVE-6): an M3U playlist, e.g. Pluto TV's on-demand movies (each entry's group-title is its category), or an Xtream Codes server such as Dispatcharr (its VOD categories and movies). */
         VodSource: {
@@ -5086,6 +5120,8 @@ export interface components {
             pauseScope?: "source" | "any";
             /** @description Queue failed saves again every few hours. Default on. */
             retryFailed?: boolean;
+            /** @description Download only during the maintenance window (Scheduled Tasks); outside it running saves stop and keep what they downloaded. Default off: any time. */
+            windowOnly?: boolean;
             /** @description More save folders besides moviesFolder and showsFolder (e.g. Anime), offered as "Save to {name}". Sending the list replaces it; an item without an id is new. */
             destinations?: components["schemas"]["VodSaveDestination"][];
         };
@@ -5525,6 +5561,8 @@ export interface components {
             /** Format: int64 */
             libraryId?: number;
             progress?: components["schemas"]["ScanProgress"];
+            /** @description Web app path that shows this task, e.g. /livetv?tab=recordings for a recording in progress (id recording:<recordingId>, kind task, progress done/total = seconds elapsed/scheduled length). */
+            link?: string;
         };
         LogEntry: {
             /** Format: date-time */
@@ -7152,7 +7190,7 @@ export interface components {
             windowOnly: boolean;
             /** @description The queue is paused by an admin. */
             paused: boolean;
-            /** @description On: originals go to the media trash (restorable for about 30 days). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once, and originals kept earlier are deleted too (at start-up and when this is saved off). Omitted on update = unchanged. */
+            /** @description On: originals go to the media trash (restorable until the daily Empty media trash task runs). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once, and originals kept earlier are deleted too (at start-up and when this is saved off). Omitted on update = unchanged. */
             keepOriginals?: boolean;
         };
         OptimizeConfig: {
@@ -11331,6 +11369,48 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    stopRecording: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recordingId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /**
+                     * @description Keep what was recorded (true) or delete it (false).
+                     * @default true
+                     */
+                    keep?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Stopped. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description not_recording: it isn't recording now. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listRecordingRules: {
         parameters: {
             query?: {
@@ -11605,6 +11685,15 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            /** @description no_tuner: every connection the channel's source allows (maxStreams) is in use by recordings or other viewers; message says by what, e.g. "All connections are in use: recording Gold Rush". A channel being recorded, or already watched, stays watchable: it shares that connection. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             502: components["responses"]["BadGateway"];
             503: components["responses"]["ServiceUnavailable"];
         };

@@ -35,6 +35,9 @@ type Task struct {
 	Run       func(ctx context.Context) (string, error)
 	// Progress, when set, reports a running task's progress for the activity indicator.
 	Progress func() (done, total int)
+	// Status, when set, is shown in place of the schedule: for a task with no schedule of
+	// its own that works continuously (the optimizer's queue).
+	Status func() string
 }
 
 // interval is how often an interval task runs (0 = not on a timer).
@@ -46,6 +49,9 @@ func (t Task) interval() time.Duration {
 }
 
 func (t Task) Schedule() string {
+	if t.Status != nil {
+		return t.Status()
+	}
 	every := t.interval()
 	switch {
 	case t.Window:

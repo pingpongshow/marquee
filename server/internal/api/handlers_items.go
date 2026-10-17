@@ -454,6 +454,7 @@ func (h *Handlers) GetActivity(ctx context.Context, _ GetActivityRequestObject) 
 				Progress: &ScanProgress{Phase: Metadata, Done: done, Total: total}})
 		}
 	}
+	out.Tasks = append(out.Tasks, h.recordingActivity()...)
 	out.Tasks = append(out.Tasks, h.vodSaveActivity(ctx)...)
 	out.Tasks = append(out.Tasks, h.optimizeActivity(ctx)...)
 	if h.Scans == nil {
@@ -487,6 +488,33 @@ func (h *Handlers) GetActivity(ctx context.Context, _ GetActivityRequestObject) 
 		out.Tasks = append(out.Tasks, t)
 	}
 	return GetActivity200JSONResponse(out), nil
+}
+
+// recordingActivity lists the Live TV recordings in progress (LIVE-5): "Recording Gold Rush
+// on Discovery", progress = time elapsed of the programme's scheduled length, linking to
+// Live TV → Recordings, where they can be stopped.
+func (h *Handlers) recordingActivity() []ActivityTask {
+	if h.DVR == nil {
+		return nil
+	}
+	var out []ActivityTask
+	now := time.Now()
+	for _, r := range h.DVR.ActiveRecordings() {
+		title := "Recording " + r.Title
+		if r.Channel != "" {
+			title += " on " + r.Channel
+		}
+		total := int(r.Stop.Sub(r.Start).Seconds())
+		done := min(max(int(now.Sub(r.Start).Seconds()), 0), max(total, 0))
+		left := r.Stop.Sub(now).Round(time.Minute)
+		detail := "Finishing"
+		if left > 0 {
+			detail = fmt.Sprintf("%s left", strings.TrimSuffix(left.String(), "0s"))
+		}
+		out = append(out, ActivityTask{Id: fmt.Sprintf("recording:%d", r.ID), Kind: ActivityTaskKindTask, State: ActivityTaskStateRunning, Title: title,
+			Progress: &ScanProgress{Phase: Probing, Done: done, Total: total, Current: ptr(detail)}, Link: ptr("/livetv?tab=recordings")})
+	}
+	return out
 }
 
 // vodSaveActivity lists the VOD downloads that are running, and one line for the ones waiting

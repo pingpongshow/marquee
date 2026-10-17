@@ -742,7 +742,7 @@ function SettingsTab({ config }: { config: OptimizeConfig }) {
         />
         <Toggle
           label="Keep originals in the media trash"
-          help="On: each original goes to the media trash once its new file is in place, and can be restored for 30 days. Off frees the space at once, and saving it off also deletes originals kept earlier; originals can't be restored. Either way the original is only touched after the new file has been checked."
+          help="On: each original goes to the media trash once its new file is in place, and can be restored until the media trash is emptied (every night, in Scheduled Tasks). Off frees the space at once, and saving it off also deletes originals kept earlier; originals can't be restored. Either way the original is only touched after the new file has been checked."
           checked={!!draft.keepOriginals}
           onChange={(v) => setDraft({ ...draft, keepOriginals: v })}
         />
