@@ -222,6 +222,11 @@ func (s *Service) next(ctx context.Context) bool {
 	}
 	s.cancel[j.ID] = cancel
 	s.mu.Unlock()
+	// Deleted while it was being prepared (before it could be cancelled): skip it.
+	var exists int
+	if s.DB.QueryRowContext(ctx, `SELECT 1 FROM download_jobs WHERE id = ?`, j.ID).Scan(&exists) != nil {
+		cancel()
+	}
 	err = s.Playback.RunOffline(jobCtx, job, dur, func(p float64) {
 		s.mu.Lock()
 		s.live[j.ID] = p
@@ -245,9 +250,24 @@ func (s *Service) next(ctx context.Context) bool {
 	if err != nil {
 		return fail(err)
 	}
-	s.DB.ExecContext(ctx, `UPDATE download_jobs SET status = 'ready', progress = 1, size = ?, path = ?,
+	res, err := s.DB.ExecContext(context.WithoutCancel(ctx), `UPDATE download_jobs SET status = 'ready', progress = 1, size = ?, path = ?,
 		finished_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`, st.Size(), out, j.ID)
+	n, err := rowsAffected(res, err)
+	if err != nil {
+		os.Remove(out)
+		return fail(err)
+	}
+	if n == 0 {
+		os.Remove(out) // deleted as it finished: nothing else would ever remove the file
+	}
 	return true
+}
+
+func rowsAffected(res sql.Result, err error) (int64, error) {
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 func (s *Service) cleanup(ctx context.Context) {

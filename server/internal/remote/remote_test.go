@@ -31,10 +31,14 @@ func TestPresenceAndExpiry(t *testing.T) {
 	if _, err := h.Player(7); err != ErrNotFound {
 		t.Fatalf("unknown device: %v", err)
 	}
-	if h.SetState(7, "x") {
+	if h.SetState(7, 1, "x") {
 		t.Error("state from a device that never polled was kept")
 	}
 	h.Inbox(context.Background(), tv, []string{"video"}, nil, 0, 0)
+	// Another user reusing the device id can't set this player's state.
+	if h.SetState(7, 2, "x") {
+		t.Error("state from another user's device was kept")
+	}
 	p, err := h.Player(7)
 	if err != nil || p.Name != "Living room TV" || p.Version != 1 || len(p.Capabilities) != 1 {
 		t.Fatalf("after first poll: %+v %v", p, err)
@@ -166,7 +170,7 @@ func TestStateLongPoll(t *testing.T) {
 		done <- p
 	}()
 	time.Sleep(50 * time.Millisecond)
-	h.SetState(7, "playing")
+	h.SetState(7, 1, "playing")
 	select {
 	case p := <-done:
 		if p.State != "playing" || p.Version != 3 {

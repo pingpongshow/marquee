@@ -523,6 +523,9 @@ func (s *Service) Approve(ctx context.Context, id, adminID int64, seerrUser func
 }
 
 func (s *Service) Decline(ctx context.Context, id, adminID int64, reason string) (Request, error) {
+	// Not while an approval is with Seerr: it would be declined here but requested there.
+	s.approveMu.Lock()
+	defer s.approveMu.Unlock()
 	r, err := s.Get(ctx, id)
 	if err != nil {
 		return r, err
@@ -537,6 +540,8 @@ func (s *Service) Decline(ctx context.Context, id, adminID int64, reason string)
 
 // Cancel withdraws a pending request.
 func (s *Service) Cancel(ctx context.Context, id int64) error {
+	s.approveMu.Lock() // not while an approval is with Seerr (see Decline)
+	defer s.approveMu.Unlock()
 	r, err := s.Get(ctx, id)
 	if err != nil {
 		return err

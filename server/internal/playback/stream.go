@@ -286,7 +286,7 @@ func (m *Manager) serveFromTranscoder(w http.ResponseWriter, r *http.Request, s 
 		p, err = t.Segment(r.Context(), k)
 	}
 	if err != nil {
-		if !errors.Is(err, context.Canceled) {
+		if !errors.Is(err, context.Canceled) && !errors.Is(err, errStopped) {
 			if s.redact != nil {
 				err = errors.New(s.redact(err.Error()))
 			}
@@ -315,7 +315,13 @@ func (m *Manager) serveSubtitle(w http.ResponseWriter, r *http.Request, s *Sessi
 		return
 	}
 	out := filepath.Join(cacheDir, fmt.Sprintf("%d-%d.%s", s.FileID, streamID, format))
-	if _, err := os.Stat(out); err != nil {
+	src := s.Path
+	if external != "" {
+		src = external
+	}
+	// Convert again when the source changed since: stream ids are reused (a downloaded
+	// subtitle removed and another added, a file rescanned), and files get replaced.
+	if cached, err := os.Stat(out); err != nil || newerThan(src, cached.ModTime()) {
 		os.MkdirAll(cacheDir, 0o755)
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 		defer cancel()
@@ -325,7 +331,7 @@ func (m *Manager) serveSubtitle(w http.ResponseWriter, r *http.Request, s *Sessi
 		} else {
 			args = append(args, "-i", s.Path, "-map", fmt.Sprintf("0:%d", index))
 		}
-		tmp := out + ".tmp"
+		tmp := out + "." + newID()[:8] + ".tmp" // unique: players fetch the same track at once
 		if format == "ass" {
 			args = append(args, "-c:s", "ass", "-f", "ass", tmp)
 		} else {
@@ -373,6 +379,12 @@ func (m *Manager) serveSubtitle(w http.ResponseWriter, r *http.Request, s *Sessi
 		return
 	}
 	w.Write(data)
+}
+
+// newerThan reports whether the file at path was modified after t.
+func newerThan(path string, t time.Time) bool {
+	st, err := os.Stat(path)
+	return err == nil && st.ModTime().After(t)
 }
 
 type fontAttachment struct {
@@ -432,12 +444,13 @@ func (m *Manager) serveFont(w http.ResponseWriter, r *http.Request, s *Session, 
 	out := filepath.Join(cacheDir, fmt.Sprintf("%d-font-%d", s.FileID, index))
 	if _, err := os.Stat(out); err != nil {
 		os.MkdirAll(cacheDir, 0o755)
-		tmp := out + ".tmp"
+		tmp := out + "." + newID()[:8] + ".tmp"
 		ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
 		defer cancel()
 		// -dump_attachment writes the file and then complains there's no output; the file is what we want.
 		exec.CommandContext(ctx, m.FFmpeg, "-hide_banner", "-v", "error", "-y", fmt.Sprintf("-dump_attachment:%d", index), tmp, "-i", s.Path).Run()
 		if st, err := os.Stat(tmp); err != nil || st.Size() == 0 {
+			os.Remove(tmp)
 			http.Error(w, "font extraction failed", http.StatusUnprocessableEntity)
 			return
 		}

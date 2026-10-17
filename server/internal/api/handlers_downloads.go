@@ -270,7 +270,9 @@ func (h *Handlers) serveZip(w http.ResponseWriter, r *http.Request, itemID int64
 		}
 	}
 	rows.Close()
-	acc := access(ctx)
+	// Rules for opening items by id (as the season itself was checked): listing rules hide
+	// Live TV recordings, which emptied a recorded season's zip.
+	acc := itemAccess(ctx)
 	name := title
 	if typ == "season" && parent != "" {
 		name = parent + " - " + title

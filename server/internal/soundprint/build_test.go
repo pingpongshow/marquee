@@ -101,3 +101,20 @@ func TestSimilarSkipsOwnAlbumAndClustersFindGenres(t *testing.T) {
 		t.Errorf("clusters should find the three genres: %v", found)
 	}
 }
+
+// A zero or negative count (a client's limit) returns nothing rather than panicking.
+func TestNonPositiveCounts(t *testing.T) {
+	x := testIndex()
+	seed := x.Get(5)
+	for _, n := range []int{0, -1, -7} {
+		if got := x.Nearest(seed.Vec, n, nil); len(got) != 0 {
+			t.Errorf("Nearest(%d): %d", n, len(got))
+		}
+		if got := x.Similar(seed, n, nil); len(got) != 0 {
+			t.Errorf("Similar(%d): %d", n, len(got))
+		}
+		if got := x.SimilarGroups(seed.Vec, true, 0, n, nil); len(got) != 0 {
+			t.Errorf("SimilarGroups(%d): %d", n, len(got))
+		}
+	}
+}

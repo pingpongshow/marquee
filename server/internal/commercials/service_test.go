@@ -644,3 +644,24 @@ func TestRealComskip(t *testing.T) {
 		}
 	}
 }
+
+// A recording already cut isn't queued again: asking to remove commercials once more (or a
+// retry) must not cut the cut file, which would replace the original in the media trash.
+func TestQueueKeepsCut(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	s := f.service(f.comskip(`0.00\t30.00\t0\n`, 0), settings.CommercialsRemove)
+	path := filepath.Join(f.rec, "TV", "Show", "Show - S01E01.mkv")
+	_, file := f.addFile(path, 1_800_000)
+	original := filepath.Join(f.rec, "TV", library.TrashDir, "2026-10-01", "Show", "Show - S01E01.mkv")
+	f.exec(`INSERT INTO commercial_scans (file_id, mtime, status, breaks, removed_ms, original) VALUES (?, 100, 'cut', 1, 25000, ?)`, file, original)
+	st, err := s.Queue(ctx, file, true)
+	if err != nil || st.Status != StatusCut {
+		t.Fatalf("queue a cut recording: %+v %v", st, err)
+	}
+	var status, orig string
+	f.db.QueryRow(`SELECT status, original FROM commercial_scans WHERE file_id = ?`, file).Scan(&status, &orig)
+	if status != StatusCut || orig != original {
+		t.Errorf("scan row: %s %q", status, orig)
+	}
+}

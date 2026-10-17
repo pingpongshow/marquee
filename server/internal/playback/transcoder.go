@@ -251,6 +251,10 @@ func (t *Transcoder) waitFor(ctx context.Context, p string, k int) error {
 			return nil
 		}
 		t.mu.Lock()
+		if t.stopped {
+			t.mu.Unlock()
+			return errStopped // the session ended meanwhile: not a transcoder failure
+		}
 		exited := isClosed(t.exited)
 		failed := exited && t.exitErr != nil
 		noOutput := t.produced < t.startSeg && !exists(t.segPath(t.startSeg))

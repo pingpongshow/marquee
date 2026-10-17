@@ -47,6 +47,11 @@ func (c *Client) ByIMDbID(ctx context.Context, imdbID string) (Ratings, error) {
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
+		// A *url.Error carries the whole URL, apikey included, into logs.
+		var ue *url.Error
+		if errors.As(err, &ue) && c.Key != "" {
+			err = &url.Error{Op: ue.Op, URL: strings.ReplaceAll(ue.URL, url.QueryEscape(c.Key), "REDACTED"), Err: ue.Err}
+		}
 		return r, err
 	}
 	defer resp.Body.Close()

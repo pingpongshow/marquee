@@ -20,7 +20,7 @@ func (h *Handlers) GetStats(ctx context.Context, req GetStatsRequestObject) (Get
 		days = *req.Params.Days
 	}
 	if req.Params.Limit != nil {
-		limit = *req.Params.Limit
+		limit = min(max(*req.Params.Limit, 1), 100) // a negative LIMIT is no limit in SQLite
 	}
 	user := sess.User.ID // people see their own statistics
 	if sess.User.IsAdmin {

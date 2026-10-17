@@ -232,6 +232,15 @@ func newID() string {
 	return hex.EncodeToString(b)
 }
 
+// isSessionID reports whether name has the shape of a session id (newID).
+func isSessionID(name string) bool {
+	if len(name) != 32 {
+		return false
+	}
+	_, err := hex.DecodeString(name)
+	return err == nil
+}
+
 // Get returns an active session.
 func (m *Manager) Get(id string) (*Session, bool) {
 	m.mu.Lock()
@@ -847,10 +856,13 @@ func (m *Manager) Reap(ctx context.Context, idle time.Duration) {
 
 // Run reaps idle sessions until ctx ends, then stops everything.
 func (m *Manager) Run(ctx context.Context) {
-	// No session survives a restart, so anything left in the transcode directory is stale.
+	// No session survives a restart, so session folders left in the transcode directory are
+	// stale. Only those: offline downloads (kept for a week) and Live TV share the directory.
 	if entries, err := os.ReadDir(m.TranscodeDir); err == nil {
 		for _, e := range entries {
-			os.RemoveAll(filepath.Join(m.TranscodeDir, e.Name()))
+			if e.IsDir() && isSessionID(e.Name()) {
+				os.RemoveAll(filepath.Join(m.TranscodeDir, e.Name()))
+			}
 		}
 	}
 	t := time.NewTicker(30 * time.Second)

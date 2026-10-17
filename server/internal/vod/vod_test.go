@@ -257,8 +257,10 @@ func TestProgress(t *testing.T) {
 func TestStreamRewritesAndProxies(t *testing.T) {
 	var upstream *httptest.Server
 	var gotUA string
+	var methods []string
 	upstream = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotUA = r.Header.Get("User-Agent")
+		methods = append(methods, r.Method)
 		switch r.URL.Path {
 		case "/ep/master.m3u8":
 			w.Header().Set("Content-Type", "application/x-mpegURL")
@@ -308,6 +310,22 @@ func TestStreamRewritesAndProxies(t *testing.T) {
 	get("1.m3u8")
 	if n := len(sess.urls); n != 5 {
 		t.Errorf("links = %d", n)
+	}
+	// Only reads reach the source.
+	methods = nil
+	for _, m := range []string{http.MethodPost, http.MethodDelete, http.MethodPut} {
+		req, _ := http.NewRequest(m, h.URL+StreamPrefix+sess.ID+"/master.m3u8", strings.NewReader("x"))
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusMethodNotAllowed {
+			t.Errorf("%s: %d", m, resp.StatusCode)
+		}
+	}
+	if len(methods) != 0 {
+		t.Errorf("the source got %v", methods)
 	}
 	if body, _ := get("99.ts"); !strings.Contains(body, "not found") {
 		t.Errorf("unknown link: %q", body)

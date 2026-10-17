@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -31,24 +32,61 @@ type Client struct {
 	Language string
 	BaseURL  string
 	HTTP     *http.Client
-	limiter  chan struct{}
+	limiter  *limiter
+}
+
+// limiter spaces requests every apart. It needs no goroutine: a client used to start a
+// ticker goroutine that never stopped, one more each time a client was made.
+type limiter struct {
+	every time.Duration
+	mu    sync.Mutex
+	next  time.Time
+}
+
+func (l *limiter) wait(ctx context.Context) error {
+	l.mu.Lock()
+	now := time.Now()
+	at := l.next
+	if at.Before(now) {
+		at = now
+	}
+	l.next = at.Add(l.every)
+	l.mu.Unlock()
+	d := time.Until(at)
+	if d <= 0 {
+		return ctx.Err()
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // New returns a client limited to ~20 requests/second (TMDB allows ~50).
 func New(key, language string) *Client {
-	c := &Client{Key: key, Language: language, BaseURL: defaultBase, HTTP: &http.Client{Timeout: 20 * time.Second},
-		limiter: make(chan struct{}, 1)}
-	go func() {
-		t := time.NewTicker(50 * time.Millisecond)
-		defer t.Stop()
-		for range t.C {
-			select {
-			case c.limiter <- struct{}{}:
-			default:
-			}
-		}
-	}()
-	return c
+	return &Client{Key: key, Language: language, BaseURL: defaultBase, HTTP: &http.Client{Timeout: 20 * time.Second},
+		limiter: &limiter{every: 50 * time.Millisecond}}
+}
+
+// WithLanguage returns a client for another language sharing this one's rate limit.
+func (c *Client) WithLanguage(language string) *Client {
+	cp := *c
+	cp.Language = language
+	return &cp
+}
+
+// redact keeps the API key out of a request error (a *url.Error carries the whole URL,
+// api_key included, into logs and task messages).
+func (c *Client) redact(err error) error {
+	var ue *url.Error
+	if errors.As(err, &ue) && c.Key != "" && strings.Contains(ue.URL, c.Key) {
+		return &url.Error{Op: ue.Op, URL: strings.ReplaceAll(ue.URL, url.QueryEscape(c.Key), "REDACTED"), Err: ue.Err}
+	}
+	return err
 }
 
 func (c *Client) get(ctx context.Context, path string, q url.Values, out any) error {
@@ -69,10 +107,8 @@ func (c *Client) get(ctx context.Context, path string, q url.Values, out any) er
 
 	for attempt := 0; ; attempt++ {
 		if c.limiter != nil {
-			select {
-			case <-c.limiter:
-			case <-ctx.Done():
-				return ctx.Err()
+			if err := c.limiter.wait(ctx); err != nil {
+				return err
 			}
 		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
@@ -89,7 +125,7 @@ func (c *Client) get(ctx context.Context, path string, q url.Values, out any) er
 				time.Sleep(time.Second << attempt)
 				continue
 			}
-			return err
+			return c.redact(err)
 		}
 		body, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 		resp.Body.Close()

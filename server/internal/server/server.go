@@ -64,10 +64,17 @@ func New(d Deps) http.Handler {
 	return recoverer(logRequests(withIdentity(d, mux)))
 }
 
+// maxBodyBytes bounds API request bodies (JSON, and avatar uploads of up to 10 MB), so a
+// client, signed in or not, can't make the server read an endless body into memory.
+const maxBodyBytes = 16 << 20
+
 // withIdentity classifies the network and resolves the bearer token (if any) into a session.
 // Endpoints decide for themselves whether a session is required.
 func withIdentity(d Deps, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Body != nil && strings.HasPrefix(r.URL.Path, "/api/") {
+			r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+		}
 		ip := netclass.ClientIP(r)
 		ctx := api.WithRequestInfo(r.Context(), api.RequestInfo{ClientIP: ip.String(), Class: d.Classifier.Classify(r)})
 		if tok := auth.BearerToken(r); tok != "" {

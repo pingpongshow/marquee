@@ -232,6 +232,9 @@ type Group struct {
 
 // SimilarGroups ranks albums (byAlbum) or artists by how close their average sound is to v.
 func (x *Index) SimilarGroups(v []float32, byAlbum bool, exclude int64, n int, keep Filter) []Group {
+	if n <= 0 {
+		return nil
+	}
 	members := map[int64][]*Track{}
 	for _, t := range x.Where(func(t *Track) bool { return keep == nil || keep(t) }) {
 		id := t.ArtistID

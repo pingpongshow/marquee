@@ -32,6 +32,9 @@ var ErrNotFound = errors.New("image not found")
 // Widths are the sizes images are resized to; requests snap up to the next one.
 var Widths = []int{120, 240, 360, 480, 720, 960, 1280, 1920}
 
+// maxPixels bounds the source images decoded (a 100-megapixel RGBA image takes 400 MB).
+const maxPixels = 100_000_000
+
 type Service struct {
 	DB       *sql.DB
 	CacheDir string
@@ -150,6 +153,10 @@ func (s *Service) render(ctx context.Context, a artwork, key string, width int, 
 	src, err := s.original(ctx, a, key)
 	if err != nil {
 		return err
+	}
+	// Decoding allocates the full image first: refuse sizes that would exhaust memory.
+	if cfg, _, err := image.DecodeConfig(bytes.NewReader(src)); err == nil && cfg.Width*cfg.Height > maxPixels {
+		return fmt.Errorf("image too large: %dx%d", cfg.Width, cfg.Height)
 	}
 	img, _, err := image.Decode(bytes.NewReader(src))
 	if err != nil {
