@@ -24,6 +24,7 @@ import type { ItemSummary } from "@/api/types";
 import { Alert, Spinner } from "@/components/ui";
 import { Poster } from "../browse/Poster";
 import { subtitleFor } from "../browse/format";
+import { fetchHubs, hubsKey } from "../browse/watched";
 import { useMusicActions } from "../player/MusicPlayer";
 import { PlaylistMosaic } from "../playlists/PlaylistMosaic";
 import {
@@ -204,7 +205,7 @@ export function MusicHome({ libraryId, name }: { libraryId: number; name: string
   const { ready, status } = useMusicStatus();
   const radio = useRadio();
   const shuffle = useShuffleAll(libraryId);
-  const hubs = useQuery({ queryKey: ["items", "hubs"], queryFn: () => unwrap(api.GET("/hubs/home")) });
+  const hubs = useQuery({ queryKey: hubsKey, queryFn: fetchHubs });
   const played = hubs.data?.find((h) => h.id === `played-${libraryId}`)?.items ?? [];
   const added = useQuery({
     queryKey: ["libraries", libraryId, "items", "recent-albums"],

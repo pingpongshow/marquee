@@ -18,6 +18,7 @@ import {
   requestsStatusQuery,
 } from "./api";
 import { RequestDialog } from "./RequestDialog";
+import { WatchOnVod } from "./WatchOnVod";
 
 const categories = [
   { id: "trending", label: "Trending" },
@@ -319,8 +320,9 @@ function DetailsDialog({
               Open in library
             </Link>
           ) : null}
+          {!item.itemId && <WatchOnVod item={item} />}
           {requestable(item) && (
-            <Button variant="primary" onClick={onRequest}>
+            <Button variant={item.vod ? "secondary" : "primary"} onClick={onRequest}>
               Request
             </Button>
           )}
@@ -523,11 +525,16 @@ function Card({
             .filter(Boolean)
             .join(" · ")}
         </span>
+        {!item.itemId && item.vod && (
+          <span className="ml-auto">
+            <WatchOnVod item={item} size="sm" />
+          </span>
+        )}
         {requestable(item) && (
           <Button
             size="sm"
-            variant="primary"
-            className="ml-auto"
+            variant={item.vod ? "secondary" : "primary"}
+            className={item.vod && !item.itemId ? undefined : "ml-auto"}
             onClick={onRequest}
           >
             Request

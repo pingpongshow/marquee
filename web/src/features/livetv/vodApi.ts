@@ -15,6 +15,7 @@ export type VodSort = "title" | "added" | "year" | "rating";
 export type VodSeries = components["schemas"]["VodSeries"];
 export type VodSeriesDetail = components["schemas"]["VodSeriesDetail"];
 export type VodEpisode = components["schemas"]["VodEpisode"];
+export type VodSuggestion = components["schemas"]["VodSuggestion"];
 
 /** List filters shared by films and shows (remembered per page). */
 export interface VodFilters {
@@ -282,5 +283,41 @@ export function useSaveAction() {
       }
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["vod"] }),
+  });
+}
+
+// ---- suggestions from the films and series on demand
+
+/** Recommended for you: films and series on demand picked from the caller's taste. */
+export const vodSuggestionsQuery = (kind?: "movie" | "series", limit = 20) =>
+  queryOptions({
+    queryKey: ["vod", "suggestions", kind ?? "all", limit],
+    queryFn: () => unwrap(api.GET("/livetv/vod/suggestions", { params: { query: { kind, limit } } })),
+    staleTime: 5 * 60_000,
+  });
+
+/** Also on VOD: films or series on demand like a library movie or show. */
+export const itemVodSimilarQuery = (itemId: number) =>
+  queryOptions({
+    queryKey: ["vod", "similar", itemId],
+    queryFn: () => unwrap(api.GET("/items/{itemId}/vod-similar", { params: { path: { itemId } } })),
+    staleTime: 5 * 60_000,
+  });
+
+/** Not interested: stops suggesting a film or series (everywhere suggestions show). */
+export function useHideVodSuggestion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (s: VodSuggestion) =>
+      unwrap(
+        api.DELETE("/livetv/vod/suggestions/{kind}/{vodId}", {
+          params: { path: { kind: s.kind, vodId: s.movie?.id ?? s.series?.id ?? 0 } },
+        }),
+      ),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["vod", "suggestions"] });
+      qc.invalidateQueries({ queryKey: ["vod", "similar"] });
+      qc.invalidateQueries({ queryKey: ["items", "hubs"] });
+    },
   });
 }

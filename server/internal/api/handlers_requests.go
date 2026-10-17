@@ -88,7 +88,9 @@ func (h *Handlers) SearchRequestable(ctx context.Context, req SearchRequestableR
 			return SearchRequestable502JSONResponse{BadGatewayJSONResponse(e)}, nil
 		}
 	}
-	return SearchRequestable200JSONResponse(toAPIDiscover(items, p, total)), nil
+	res := toAPIDiscover(items, p, total)
+	h.markOnDemand(ctx, &res)
+	return SearchRequestable200JSONResponse(res), nil
 }
 
 func (h *Handlers) DiscoverRequestable(ctx context.Context, req DiscoverRequestableRequestObject) (DiscoverRequestableResponseObject, error) {
@@ -127,7 +129,9 @@ func (h *Handlers) DiscoverRequestable(ctx context.Context, req DiscoverRequesta
 			return DiscoverRequestable502JSONResponse{BadGatewayJSONResponse(e)}, nil
 		}
 	}
-	return DiscoverRequestable200JSONResponse(toAPIDiscover(items, p, total)), nil
+	res := toAPIDiscover(items, p, total)
+	h.markOnDemand(ctx, &res)
+	return DiscoverRequestable200JSONResponse(res), nil
 }
 
 func (h *Handlers) RequestableShow(ctx context.Context, req RequestableShowRequestObject) (RequestableShowResponseObject, error) {

@@ -47,6 +47,8 @@ type Service struct {
 	ImageDir string
 	// OnSourceFailed, when set, hears a source that couldn't be loaded (admin alerts).
 	OnSourceFailed func(src settings.VODSource, err error)
+	// OnMatched, when set, hears that a refresh's TMDB matching finished (suggestion data).
+	OnMatched func(ctx context.Context)
 	// Now is the clock and Tick how often Run checks whether a sync is due (tests;
 	// defaults time.Now and a minute).
 	Now  func() time.Time
@@ -55,6 +57,7 @@ type Service struct {
 	refreshing  sync.Mutex
 	matching    atomic.Bool
 	lastAttempt atomic.Int64 // unix nanoseconds of the last refresh started
+	bf          backfill
 }
 
 func now() string { return time.Now().UTC().Format(time.RFC3339) }
@@ -235,7 +238,12 @@ func (s *Service) Refresh(ctx context.Context, retryFailed bool) {
 	s.DB.ExecContext(ctx, "DELETE FROM vod_sources WHERE id NOT IN ("+in+")", keep...)
 	s.refreshing.Unlock()
 	if len(sources) > 0 {
-		go s.enrich(context.WithoutCancel(ctx), retryFailed)
+		go func() {
+			ctx := context.WithoutCancel(ctx)
+			if s.enrich(ctx, retryFailed) && s.OnMatched != nil {
+				s.OnMatched(ctx)
+			}
+		}()
 	}
 }
 
@@ -313,10 +321,11 @@ func (s *Service) refreshSource(ctx context.Context, src settings.VODSource) (in
 	return len(seen), tx.Commit()
 }
 
-// enrich fills in source details (Pluto's catalogue), then TMDB matches. One run at a time.
-func (s *Service) enrich(ctx context.Context, retryFailed bool) {
+// enrich fills in source details (Pluto's catalogue), then TMDB matches. One run at a time:
+// it reports false when another was running.
+func (s *Service) enrich(ctx context.Context, retryFailed bool) bool {
 	if !s.matching.CompareAndSwap(false, true) {
-		return
+		return false
 	}
 	defer s.matching.Store(false)
 	if err := s.fetchPlutoDetails(ctx); err != nil {
@@ -324,6 +333,7 @@ func (s *Service) enrich(ctx context.Context, retryFailed bool) {
 	}
 	s.match(ctx, retryFailed)
 	s.matchSeries(ctx, retryFailed)
+	return true
 }
 
 var titleYear = regexp.MustCompile(`^(.*?)\s*\((\d{4})\)\s*$`)
@@ -443,11 +453,11 @@ func (s *Service) applyTMDB(ctx context.Context, id int64, m *tmdb.Movie) error 
 		runtime_ms=CASE WHEN ?>0 THEN ? ELSE runtime_ms END,
 		director=CASE WHEN ?<>'' THEN ? ELSE director END, cast_json=?,
 		poster_url=CASE WHEN ?<>'' THEN ? ELSE poster_url END,
-		backdrop_url=CASE WHEN ?<>'' THEN ? ELSE backdrop_url END WHERE id=?`,
+		backdrop_url=CASE WHEN ?<>'' THEN ? ELSE backdrop_url END, tmdb_recs=?, keywords=?, votes=? WHERE id=?`,
 		m.ID, m.IMDBID, year, m.Overview, m.Overview, m.Tagline, string(gj),
 		m.Certification("US"), m.Certification("US"), m.VoteAverage,
 		m.Runtime, int64(m.Runtime)*60000, strings.Join(directors, ", "), strings.Join(directors, ", "), string(cj),
-		poster, poster, backdrop, backdrop, id)
+		poster, poster, backdrop, backdrop, jsonList(m.Recommendations.IDs()), jsonList(m.KeywordNames()), m.VoteCount, id)
 	return err
 }
 
@@ -835,4 +845,27 @@ func (s *Service) UserAgent(sourceID string) string {
 		}
 	}
 	return ""
+}
+
+// MoviesByID loads films with the user's progress, by id (missing ones are left out).
+func (s *Service) MoviesByID(ctx context.Context, ids []int64, userID int64) (map[int64]Movie, error) {
+	out := map[int64]Movie{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	b, _ := json.Marshal(ids)
+	rows, err := s.DB.QueryContext(ctx, "SELECT "+movieCols+` FROM vod_movies m LEFT JOIN vod_progress p ON p.movie_id=m.id AND p.user_id=?
+		WHERE m.id IN (SELECT value FROM json_each(?))`, userID, string(b))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		m, err := scanMovie(rows)
+		if err != nil {
+			return nil, err
+		}
+		out[m.ID] = m
+	}
+	return out, rows.Err()
 }

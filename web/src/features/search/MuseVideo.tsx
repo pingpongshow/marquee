@@ -8,6 +8,18 @@ import { Alert, Button } from "@/components/ui";
 import { toast } from "@/components/Toast";
 import { Poster } from "../browse/Poster";
 import { subtitleFor } from "../browse/format";
+import { vodStatusQuery } from "../livetv/vodApi";
+import { VodSuggestionTile } from "../livetv/VodSuggestions";
+
+const includeVodKey = "marquee.muse.includeVod";
+
+function readIncludeVod() {
+  try {
+    return localStorage.getItem(includeVodKey) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export const museVideoPrompts = ["90s sci-fi with time travel", "feel-good comedy under 90 minutes", "acclaimed war films I haven't seen", "family animation"];
 
@@ -16,8 +28,20 @@ export function MuseVideo({ libraryId, initialPrompt = "" }: { libraryId?: numbe
   const [prompt, setPrompt] = useState(initialPrompt);
   const libraries = useQuery(librariesQuery);
   const library = libraries.data?.find((l) => l.id === libraryId);
+  // Include VOD: films and series on demand that fit, beside the library's (not within one library).
+  const vodStatus = useQuery(vodStatusQuery);
+  const canVod = !!vodStatus.data?.enabled && !libraryId;
+  const [includeVod, setIncludeVod] = useState(readIncludeVod);
+  const toggleVod = (on: boolean) => {
+    setIncludeVod(on);
+    try {
+      localStorage.setItem(includeVodKey, on ? "1" : "0");
+    } catch {
+      // private mode: just this visit
+    }
+  };
   const muse = useMutation({
-    mutationFn: (p: string) => unwrap(api.POST("/muse/video", { body: { prompt: p, libraryId } })),
+    mutationFn: (p: string) => unwrap(api.POST("/muse/video", { body: { prompt: p, libraryId, includeVod: canVod && includeVod } })),
   });
   const save = useMutation({
     mutationFn: () =>
@@ -64,6 +88,17 @@ export function MuseVideo({ libraryId, initialPrompt = "" }: { libraryId?: numbe
             {muse.isPending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Find
           </button>
         </div>
+        {canVod && (
+          <label className="mt-3 flex w-fit items-center gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              className="size-4 accent-[var(--color-accent)]"
+              checked={includeVod}
+              onChange={(e) => toggleVod(e.target.checked)}
+            />
+            Include VOD
+          </label>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           {museVideoPrompts.map((p) => (
             <button key={p} type="button" onClick={() => ask(p)} disabled={muse.isPending} className="rounded-full bg-surface-2 px-3 py-1 text-xs text-muted hover:text-text">
@@ -93,7 +128,9 @@ export function MuseVideo({ libraryId, initialPrompt = "" }: { libraryId?: numbe
             </div>
           )}
           {r.items.length === 0 ? (
-            <p className="text-muted">Nothing in your libraries matches that. Try describing it differently.</p>
+            <p className="text-muted">
+              Nothing in your libraries matches that.{r.vod?.length ? "" : " Try describing it differently."}
+            </p>
           ) : (
             <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-x-4 gap-y-6">
               {r.items.map((it) => (
@@ -106,6 +143,16 @@ export function MuseVideo({ libraryId, initialPrompt = "" }: { libraryId?: numbe
                 </li>
               ))}
             </ul>
+          )}
+          {r.vod && r.vod.length > 0 && (
+            <div className="mt-8">
+              <h2 className="mb-3 text-lg font-semibold">On VOD</h2>
+              <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-x-4 gap-y-6">
+                {r.vod.map((s) => (
+                  <VodSuggestionTile key={s.key} s={s} className="min-w-0" />
+                ))}
+              </ul>
+            </div>
           )}
         </section>
       )}

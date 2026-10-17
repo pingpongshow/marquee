@@ -250,5 +250,15 @@ func (h *Handlers) MuseVideo(ctx context.Context, req MuseVideoRequestObject) (M
 	if len(reasons) > 0 {
 		out.Reasons = &reasons
 	}
+	if b.IncludeVod != nil && *b.IncludeVod && lib == 0 { // not when limited to one library
+		vodRerank := cfg.On(cfg.RerankMovies) && h.AI != nil && h.AI.Ready()
+		list, err := h.museVod(ctx, prompt, q, vodRerank, min(limit, 40))
+		if err != nil {
+			return nil, internal(ctx, "museVideo", err)
+		}
+		if list != nil {
+			out.Vod = &list
+		}
+	}
 	return out, nil
 }

@@ -41,6 +41,7 @@ import (
 	"marquee/internal/trickplay"
 	"marquee/internal/vod"
 	"marquee/internal/vodsave"
+	"marquee/internal/vodsuggest"
 	"marquee/internal/webhooks"
 )
 
@@ -108,6 +109,9 @@ type Handlers struct {
 	Alerts *notify.Alerts
 	// VODSaves saves films and episodes on demand into the library (admins only); may be nil.
 	VODSaves *vodsave.Service
+	// VODSuggest suggests films and series on demand from each person's taste; may be nil
+	// (no suggestions).
+	VODSuggest *vodsuggest.Service
 	// Optimize is the library optimizer (Library Health → Large files, admins only); may be nil.
 	Optimize *optimize.Service
 }

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { Alert, Button, Dialog, Spinner } from "@/components/ui";
 import { availabilityLabel, type DiscoverItem, useRequestAction } from "./api";
+import { WatchOnVod } from "./WatchOnVod";
 
 /** Ask for a movie, or chosen seasons of a show. An admin approves it before it goes to Seerr. */
 export function RequestDialog({
@@ -81,6 +82,12 @@ export function RequestDialog({
               .join(" · ")}
           </p>
           {item.overview && <p className="line-clamp-6">{item.overview}</p>}
+          {item.vod && (
+            <div className="flex flex-wrap items-center gap-3 rounded-md bg-accent/10 p-3">
+              <span>It's on VOD now: no need to wait.</span>
+              <WatchOnVod item={item} />
+            </div>
+          )}
           <p className="text-faint">
             An admin approves requests before they're downloaded.
           </p>

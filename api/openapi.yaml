@@ -2469,6 +2469,11 @@ paths:
       tags: [hubs]
       operationId: homeHubs
       summary: Rows for the Home screen (Continue Watching, Recently Added…).
+      parameters:
+        - name: vod
+          in: query
+          description: "Include the Watch on VOD row (id vod-suggestions; films and series on demand picked for the caller, in vodEntries, with items empty). Only apps that show vodEntries should ask for it; without it the row is left out."
+          schema: { type: boolean, default: false }
       responses:
         "200":
           description: OK
@@ -3223,6 +3228,39 @@ paths:
               schema: { $ref: "#/components/schemas/VodMoviePage" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+
+  /livetv/vod/suggestions:
+    get:
+      tags: [livetv]
+      operationId: vodSuggestions
+      summary: "Recommended for you: films and series on demand picked for the caller from their taste (favourites, ratings and what they watched), best first, leaving out titles their libraries have, ones they've started or watched and ones they said they're not interested in."
+      parameters:
+        - { name: kind, in: query, description: Only films or only series (omitted = both)., schema: { type: string, enum: [movie, series] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        "200":
+          description: Suggestions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VodSuggestion" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /livetv/vod/suggestions/{kind}/{vodId}:
+    parameters:
+      - { name: kind, in: path, required: true, schema: { type: string, enum: [movie, series] } }
+      - { name: vodId, in: path, required: true, description: The film's or series' id., schema: { type: integer, format: int64 } }
+    delete:
+      tags: [livetv]
+      operationId: hideVodSuggestion
+      summary: "Not interested: stops suggesting this film or series to the caller (anywhere suggestions show)."
+      responses:
+        "204": { description: Hidden. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /livetv/vod/continue:
     get:
@@ -4205,6 +4243,26 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/ItemSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/vod-similar:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [items]
+      operationId: itemVodSimilar
+      summary: "Also on VOD: films (for a movie) or series (for a show) on demand like this one that the caller's libraries don't have, best first by TMDB's recommendations and the caller's taste. Empty for other types, or when on demand is off or not the caller's to watch."
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VodSuggestion" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
@@ -5906,6 +5964,26 @@ components:
             - $ref: "#/components/schemas/VodEpisode"
           description: "The episode the caller would watch next (Continue Watching and the series detail)."
 
+    VodSuggestion:
+      type: object
+      description: "A film or series on demand suggested for the caller from their taste (Watch on VOD, Also on VOD, Muse, the on-demand pages' Recommended for you)."
+      required: [kind, key]
+      properties:
+        kind: { type: string, enum: [movie, series] }
+        key: { type: string, description: "Unique within a list, e.g. movie:5, series:7." }
+        movie: { $ref: "#/components/schemas/VodMovie" }
+        series: { $ref: "#/components/schemas/VodSeries" }
+        reason: { type: string, description: "Why it's suggested, e.g. \"Because you love Heat\" or \"Similar to Arrival\"." }
+        score: { type: number, description: "How well it fits, higher is better (for ordering only; not comparable between requests)." }
+
+    VodRef:
+      type: object
+      description: A film or series on demand.
+      required: [kind, id]
+      properties:
+        kind: { type: string, enum: [movie, series] }
+        id: { type: integer, format: int64, description: "The film's or series' id (GET /livetv/vod/movies/{id} or /livetv/vod/series/{id})." }
+
     VodSeriesDetail:
       allOf:
         - $ref: "#/components/schemas/VodSeries"
@@ -6172,6 +6250,10 @@ components:
         availability: { $ref: "#/components/schemas/Availability" }
         itemId: { type: integer, format: int64, description: "The title in this library, when it's here." }
         requestId: { type: integer, format: int64, description: The caller's open Marquee request for it. }
+        vod:
+          allOf:
+            - $ref: "#/components/schemas/VodRef"
+          description: "The same title (TMDB id and type) on demand, when the caller may watch it there: show Watch now on VOD."
 
     ScrobbleStatus:
       type: object
@@ -7096,6 +7178,7 @@ components:
           description: Default movies and shows.
           items: { type: string, enum: [movie, show] }
         limit: { type: integer, minimum: 1, maximum: 100, description: Default 40. }
+        includeVod: { type: boolean, default: false, description: "Also suggest films and series on demand that fit (in vod; the caller must be allowed on demand)." }
 
     MuseVideoResult:
       type: object
@@ -7109,6 +7192,10 @@ components:
           type: array
           description: "One-line reasons for the top results, when AI re-ranked them."
           items: { $ref: "#/components/schemas/RecommendationReason" }
+        vod:
+          type: array
+          description: "With includeVod: films and series on demand that fit, best first (not in the caller's libraries)."
+          items: { $ref: "#/components/schemas/VodSuggestion" }
 
     HealthCheck:
       type: object
@@ -7260,6 +7347,10 @@ components:
           description: "Continue Watching only: the row's entries, library items and films and episodes on demand together, newest first (up to 20; items stays library-only for older apps). When it's present show it instead of items. The row is sent when either has something."
           items: { $ref: "#/components/schemas/ContinueEntry" }
         total: { type: integer, description: "Continue Watching only: how many entries there are in all (GET /hubs/continue-watching); more than entries holds means a View more link." }
+        vodEntries:
+          type: array
+          description: "Watch on VOD (id vod-suggestions) only, sent when the request asks with vod=true: films and series on demand picked for the caller, best first (items is empty)."
+          items: { $ref: "#/components/schemas/VodSuggestion" }
 
     ContinueEntry:
       type: object

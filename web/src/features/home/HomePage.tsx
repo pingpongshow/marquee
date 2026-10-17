@@ -10,14 +10,13 @@ import { EditHomeDialog } from "./EditHome";
 import { GettingStarted } from "./GettingStarted";
 import { pinnedTarget } from "./layout";
 import { MuseButton } from "../search/MuseVideo";
+import { fetchHubs, hubsKey } from "../browse/watched";
+import { VodSuggestionTile } from "../livetv/VodSuggestions";
 
 export function HomePage() {
   const libraries = useQuery(librariesQuery);
   const me = useQuery(meQuery);
-  const hubs = useQuery({
-    queryKey: ["items", "hubs"],
-    queryFn: () => unwrap(api.GET("/hubs/home")),
-  });
+  const hubs = useQuery({ queryKey: hubsKey, queryFn: fetchHubs });
   const [editing, setEditing] = useState(false);
   if (libraries.isPending || hubs.isPending) return <Spinner />;
 
@@ -52,6 +51,9 @@ export function HomePage() {
         const wide = hub.id === "continue-watching";
         // Continue Watching: entries holds the library's and on-demand titles together.
         const entries = wide ? hub.entries : undefined;
+        // Watch on VOD: films and series on demand picked for you (items is empty).
+        const vod = hub.vodEntries;
+        if (vod && !vod.length) return null;
         // A pinned collection or playlist opens itself (USER-12).
         const pinned = pinnedTarget(hub.id);
         return (
@@ -82,6 +84,10 @@ export function HomePage() {
                 >
                   <ChevronRight className="size-5" />
                 </Link>
+              ) : vod ? (
+                <Link to="/vod" className="text-muted hover:text-text" aria-label="Open VOD Movies">
+                  <ChevronRight className="size-5" />
+                </Link>
               ) : hub.libraryId && (
                 <Link
                   to="/library/$libraryId"
@@ -94,7 +100,9 @@ export function HomePage() {
               )}
             </div>
             <ul className="flex gap-4 overflow-x-auto px-6 pb-2 lg:px-8">
-              {entries
+              {vod
+                ? vod.map((s) => <VodSuggestionTile key={s.key} s={s} />)
+                : entries
                 ? entries.map((e) => <ContinueTile key={e.key} e={e} />)
                 : hub.items.map((it) => <HubItem key={it.id} it={it} wide={wide} continueWatching={wide} />)}
               {entries && (hub.total ?? 0) > entries.length && <ViewMoreTile total={hub.total ?? 0} />}

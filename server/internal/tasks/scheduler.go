@@ -313,6 +313,12 @@ func InWindow(now time.Time, cfg settings.Tasks) bool {
 	return in
 }
 
+// WindowEnd is when the current maintenance window closes, when now is inside it.
+func WindowEnd(now time.Time, cfg settings.Tasks) (time.Time, bool) {
+	in, ws := inWindow(now, cfg.MaintenanceWindowStart, cfg.MaintenanceWindowHours)
+	return ws.Add(time.Duration(cfg.MaintenanceWindowHours) * time.Hour), in
+}
+
 // due reports whether t should run now.
 func (s *Scheduler) due(ctx context.Context, t Task, now time.Time) bool {
 	last := s.lastStart(ctx, t.ID)

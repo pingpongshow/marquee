@@ -453,9 +453,9 @@ func (s *Service) applyTMDBTV(ctx context.Context, id int64, t *tmdb.TVShow) err
 		content_rating=CASE WHEN ?<>'' THEN ? ELSE content_rating END, rating=COALESCE(?, rating),
 		cast_json=CASE WHEN ?<>'[]' THEN ? ELSE cast_json END,
 		poster_url=CASE WHEN ?<>'' THEN ? ELSE poster_url END,
-		backdrop_url=CASE WHEN ?<>'' THEN ? ELSE backdrop_url END WHERE id=?`,
+		backdrop_url=CASE WHEN ?<>'' THEN ? ELSE backdrop_url END, tmdb_recs=?, keywords=?, votes=? WHERE id=?`,
 		year, t.Overview, t.Overview, jsonList(genres), jsonList(genres), t.Certification("US"), t.Certification("US"), rating,
-		jsonList(cast), jsonList(cast), poster, poster, backdrop, backdrop, id)
+		jsonList(cast), jsonList(cast), poster, poster, backdrop, backdrop, jsonList(t.Recommendations.IDs()), jsonList(t.KeywordNames()), t.VoteCount, id)
 	return err
 }
 
@@ -1124,4 +1124,26 @@ func (s *Service) EpisodePlayLink(e Episode) (link, userAgent string, ok bool) {
 		return "", "", false
 	}
 	return s.xtream(src).seriesStreamURL(e.StreamURL), src.UserAgent, true
+}
+
+// SeriesByID loads series with the user's counts, by id (missing ones are left out).
+func (s *Service) SeriesByID(ctx context.Context, ids []int64, userID int64) (map[int64]Series, error) {
+	out := map[int64]Series{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	b, _ := json.Marshal(ids)
+	rows, err := s.DB.QueryContext(ctx, "SELECT "+seriesCols+" FROM vod_series m WHERE m.id IN (SELECT value FROM json_each(?))", userID, string(b))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		m, err := scanSeries(rows)
+		if err != nil {
+			return nil, err
+		}
+		out[m.ID] = m
+	}
+	return out, rows.Err()
 }
