@@ -37,6 +37,9 @@ import {
   useCancelRecording,
   useDeleteRule,
   useSchedule,
+  useStopRecording,
+  stopDeleteConfirm,
+  recordingProgress,
 } from "./api";
 import { LivePlayer } from "./LivePlayer";
 import {
@@ -82,8 +85,15 @@ export function LiveTvPage() {
   const setTab = (t: LiveTab) =>
     navigate({ to: "/livetv", search: { tab: t }, replace: true });
   useEffect(() => localStorageSet("marquee.livetv.filter", filter), [filter]);
+  // The preview starts on a channel that can be tuned (at a source's connection limit, the
+  // others can't).
   const current =
-    channels.data?.find((c) => c.id === preview) ?? channels.data?.[0];
+    channels.data?.find((c) => c.id === preview) ??
+    channels.data?.find((c) => c.available !== false) ??
+    channels.data?.[0];
+  const canViewRecordings = !!(
+    status.data?.canViewRecordings ?? status.data?.canRecord
+  );
 
   if (status.isPending) return <Spinner />;
   if (!tabs.length)
@@ -146,15 +156,23 @@ export function LiveTvPage() {
         </div>
       </div>
 
+      {liveOn && canViewRecordings && <RecordingNow />}
+
       {current && tab !== "recordings" && (
         <div className="relative mx-auto aspect-video max-h-[42vh] overflow-hidden rounded-lg bg-black">
-          <LivePlayer
-            key={current.id}
-            channelId={current.id}
-            muted={muted}
-            className="size-full"
-            onError={setPreviewError}
-          />
+          {current.available === false ? (
+            <div className="grid size-full place-items-center p-6 text-center text-sm text-muted">
+              {current.unavailableReason ?? "This channel isn't available right now."}
+            </div>
+          ) : (
+            <LivePlayer
+              key={current.id}
+              channelId={current.id}
+              muted={muted}
+              className="size-full"
+              onError={setPreviewError}
+            />
+          )}
           <button
             className="absolute top-3 left-3 rounded-full bg-black/60 p-2"
             onClick={() => setMuted((m) => !m)}
@@ -411,8 +429,12 @@ function Guide({
               >
                 <button
                   onClick={() => onPick(c.id)}
-                  className="flex min-w-0 flex-1 items-center gap-2"
+                  className={clsx(
+                    "flex min-w-0 flex-1 items-center gap-2",
+                    c.available === false && "opacity-40",
+                  )}
                   aria-label={`Preview ${c.name}`}
+                  title={c.available === false ? c.unavailableReason : undefined}
                 >
                   <ChannelLogo channel={c} className="h-9 w-14 shrink-0" />
                   <span className="text-xs text-faint">{c.number}</span>
@@ -456,7 +478,7 @@ function Guide({
                       key={p.id}
                       role="gridcell"
                       onClick={() =>
-                        onAir && c.id !== selected
+                        onAir && c.id !== selected && c.available !== false
                           ? onPick(c.id)
                           : setDetails({ p, c })
                       }
@@ -466,6 +488,7 @@ function Guide({
                         onAir
                           ? "border border-border bg-surface-3 hover:border-accent"
                           : "bg-surface-2 hover:bg-surface-3",
+                        onAir && c.available === false && "opacity-50",
                       )}
                     >
                       <div className="flex items-center gap-1.5 truncate text-sm font-medium">
@@ -534,6 +557,12 @@ function Guide({
             {details.p.description && (
               <p className="text-sm">{details.p.description}</p>
             )}
+            {details.c.available === false && (
+              <p className="text-sm text-muted">
+                {details.c.unavailableReason ??
+                  "This channel isn't available right now."}
+              </p>
+            )}
             {canRecord && new Date(details.p.end) > now && (
               <RecordButtons
                 programme={details.p}
@@ -585,7 +614,9 @@ function WhatsOn({
           <button
             key={c.id}
             onClick={() => onPick(c.id)}
-            className="space-y-2 rounded-lg bg-surface p-3 text-left hover:bg-surface-2"
+            disabled={c.available === false}
+            title={c.available === false ? c.unavailableReason : undefined}
+            className="space-y-2 rounded-lg bg-surface p-3 text-left enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
             aria-label={`Watch ${c.name}`}
           >
             <div className="flex items-center gap-3">
@@ -609,10 +640,16 @@ function WhatsOn({
                 />
               </div>
             )}
-            {c.next && (
-              <div className="truncate text-xs text-faint">
-                Next: {c.next.title} at {timeLabel(c.next.start)}
+            {c.available === false ? (
+              <div className="text-xs text-muted">
+                {c.unavailableReason ?? "Not available right now"}
               </div>
+            ) : (
+              c.next && (
+                <div className="truncate text-xs text-faint">
+                  Next: {c.next.title} at {timeLabel(c.next.start)}
+                </div>
+              )
             )}
           </button>
         );
@@ -629,10 +666,19 @@ export function LiveWatchPage({ channelId }: { channelId: number }) {
   const i = list.findIndex((c) => c.id === channelId);
   const c = list[i];
   const [error, setError] = useState<string | null>(null);
+  // Channel up/down skips channels that can't be tuned now (every connection of their
+  // source in use); the ones already coming in stay.
   const go = (d: number) => {
     if (!list.length) return;
-    const next = list[(i + d + list.length) % list.length];
-    if (!next) return;
+    let next: LiveChannel | undefined;
+    for (let k = 1; k <= list.length; k++) {
+      const cand = list[(i + d * k + list.length * k) % list.length];
+      if (cand && (cand.available !== false || cand.id === channelId)) {
+        next = cand;
+        break;
+      }
+    }
+    if (!next || next.id === channelId) return;
     navigate({
       to: "/livetv/watch/$channelId",
       params: { channelId: String(next.id) },
@@ -714,6 +760,7 @@ function RecordButtons({
 }) {
   const schedule = useSchedule();
   const cancel = useCancelRecording();
+  const stop = useStopRecording();
   const recordings = useQuery(recordingsQuery);
   const rec = recordings.data?.find(
     (r) =>
@@ -722,7 +769,7 @@ function RecordButtons({
       (r.status === "scheduled" || r.status === "recording"),
   );
   const usage = useQuery(recordingUsageQuery);
-  const error = schedule.error ?? cancel.error;
+  const error = schedule.error ?? cancel.error ?? stop.error;
   if (recordings.isPending) return <Spinner />;
   const theirs = rec && rec.canDelete === false;
   return (
@@ -747,13 +794,15 @@ function RecordButtons({
         </Alert>
       )}
       <div className="flex flex-wrap gap-2">
-        {theirs ? null : rec ? (
+        {theirs ? null : rec?.status === "recording" ? (
+          <StopButtons r={rec} stop={stop} onDone={onDone} />
+        ) : rec ? (
           <Button
             variant="ghost"
             loading={cancel.isPending}
             onClick={() => cancel.mutate({ id: rec.id }, { onSuccess: onDone })}
           >
-            {rec.status === "recording" ? "Stop recording" : "Don't record"}
+            Don't record
           </Button>
         ) : (
           <Button
@@ -817,6 +866,7 @@ function Recordings({ canRecord }: { canRecord: boolean }) {
   const rules = useQuery(ownRecordingRulesQuery(owner));
   const usage = useQuery({ ...recordingUsageQuery, enabled: canRecord });
   const cancel = useCancelRecording();
+  const stop = useStopRecording();
   const stopSeries = useDeleteRule();
   if (recordings.isPending) return <Spinner />;
   const list = recordings.data ?? [];
@@ -856,7 +906,11 @@ function Recordings({ canRecord }: { canRecord: boolean }) {
           {r.channelName} · {when(r)}
           {r.sizeBytes ? ` · ${formatSize(r.sizeBytes)}` : ""}
           {r.ownerName ? ` · Recorded by ${r.ownerName}` : ""}
+          {r.stoppedEarly ? " · Stopped early" : ""}
         </div>
+        {r.status === "recording" && (
+          <div className="text-xs text-muted">{recordingProgress(r)}</div>
+        )}
         {r.status === "failed" && (
           <div className="truncate text-sm text-danger">
             Failed: {r.error || "unknown error"}
@@ -944,21 +998,13 @@ function Recordings({ canRecord }: { canRecord: boolean }) {
     <div className="space-y-6">
       {meter}
       {ownerToggle}
-      {cancel.error && <Alert tone="error">{cancel.error.message}</Alert>}
+      {(cancel.error ?? stop.error) && (
+        <Alert tone="error">{(cancel.error ?? stop.error)?.message}</Alert>
+      )}
       {section(
         "Recording now",
         active.map((r) =>
-          row(
-            r,
-            mine(r) && (
-              <Button
-                variant="ghost"
-                onClick={() => cancel.mutate({ id: r.id })}
-              >
-                Stop
-              </Button>
-            ),
-          ),
+          row(r, mine(r) && <StopButtons r={r} stop={stop} />),
         ),
       )}
       {section(
@@ -1030,6 +1076,86 @@ function Recordings({ canRecord }: { canRecord: boolean }) {
         ),
       )}
     </div>
+  );
+}
+
+/** Stop and keep / Stop and delete for a recording in progress (owner or admin). */
+function StopButtons({
+  r,
+  stop,
+  onDone,
+}: {
+  r: Recording;
+  stop: ReturnType<typeof useStopRecording>;
+  onDone?: () => void;
+}) {
+  const busy = stop.isPending && stop.variables?.id === r.id;
+  return (
+    <div className="flex shrink-0 flex-wrap gap-2">
+      <Button
+        size="sm"
+        variant="ghost"
+        loading={busy && stop.variables?.keep}
+        disabled={busy}
+        onClick={() =>
+          stop.mutate({ id: r.id, keep: true }, { onSuccess: onDone })
+        }
+      >
+        Stop and keep
+      </Button>
+      <Button
+        size="sm"
+        variant="danger"
+        loading={busy && !stop.variables?.keep}
+        disabled={busy}
+        onClick={() =>
+          window.confirm(stopDeleteConfirm(r.title)) &&
+          stop.mutate({ id: r.id, keep: false }, { onSuccess: onDone })
+        }
+      >
+        Stop and delete
+      </Button>
+    </div>
+  );
+}
+
+/** Recordings in progress, at the top of every Live TV tab: channel, title, time in and
+ * left, and Stop and keep / Stop and delete for whoever may (LIVE-5). */
+function RecordingNow() {
+  const recordings = useQuery(recordingsQuery);
+  const stop = useStopRecording();
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  const active = (recordings.data ?? []).filter((r) => r.status === "recording");
+  if (!active.length) return null;
+  return (
+    <section
+      aria-label="Recording now"
+      className="space-y-2 rounded-lg border border-red-500/40 bg-surface px-4 py-3"
+    >
+      <h2 className="flex items-center gap-2 text-sm font-semibold">
+        <span className="size-2.5 animate-pulse rounded-full bg-red-500" aria-hidden />
+        Recording now
+      </h2>
+      <ul className="divide-y divide-border">
+        {active.map((r) => (
+          <li key={r.id} className="flex flex-wrap items-center gap-3 py-2">
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-medium">{r.title}</div>
+              <div className="truncate text-xs text-muted">
+                {r.channelName} · {recordingProgress(r)}
+                {r.ownerName ? ` · ${r.ownerName}` : ""}
+              </div>
+            </div>
+            {r.canDelete !== false && <StopButtons r={r} stop={stop} />}
+          </li>
+        ))}
+      </ul>
+      {stop.error && <Alert tone="error">{stop.error.message}</Alert>}
+    </section>
   );
 }
 

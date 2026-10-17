@@ -213,6 +213,13 @@ func (s *Service) step(ctx context.Context) {
 	sources := s.pendingSources(ctx)
 	s.autoPause(ctx, c, sources)
 	queuePaused := s.QueuePaused(ctx)
+	// Outside the maintenance window (when downloads are limited to it), running saves stop
+	// and keep their partial files, like a paused queue.
+	if s.outsideWindow() {
+		s.stopJobs(func(*job) bool { return true }, errQueuePaused)
+		queuePaused = true
+	}
+	s.pruneHistory(ctx)
 
 	if !queuePaused {
 		for _, src := range sources {

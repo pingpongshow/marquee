@@ -14,6 +14,8 @@ function taskDetail(t: Task) {
   // VOD downloads: sizes, speed and time left, or why the queue waits.
   if (t.kind === "download") return p?.current ?? (t.state === "queued" ? "Waiting…" : "");
   if (t.kind === "optimize") return p && p.total > 0 ? `${Math.round((p.done / p.total) * 100)}%` : "";
+  // A Live TV recording in progress: time left.
+  if (isRecording(t)) return p?.current ?? "";
   if (t.state === "queued" || !p) return "Waiting…";
   if (t.kind === "stream") {
     const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -23,6 +25,8 @@ function taskDetail(t: Task) {
   if (p.phase === "cleanup") return "Finishing up…";
   return `${p.done.toLocaleString()} of ${p.total.toLocaleString()}`;
 }
+
+const isRecording = (t: Task) => t.id.startsWith("recording:");
 
 function pct(t: Task) {
   const p = t.progress;
@@ -121,12 +125,17 @@ export function ActivityIndicator() {
                       />
                     </div>
                   )}
-                  {t.progress?.current && t.kind !== "download" && (
+                  {t.progress?.current && t.kind !== "download" && !isRecording(t) && (
                     <div className="mt-1 truncate text-[11px] text-faint">{t.progress.current}</div>
                   )}
                   {t.kind === "optimize" && (
                     <Link to="/settings/$section" params={{ section: "library-health" }} onClick={() => setOpen(false)} className="mt-1 inline-block text-[11px] text-muted hover:text-text">
                       Open Library Health
+                    </Link>
+                  )}
+                  {isRecording(t) && (
+                    <Link to="/livetv" search={{ tab: "recordings" }} onClick={() => setOpen(false)} className="mt-1 inline-block text-[11px] text-muted hover:text-text">
+                      Open Live TV recordings
                     </Link>
                   )}
                   {t.kind === "download" && (

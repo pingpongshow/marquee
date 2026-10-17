@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { api, unwrap } from "@/api/client";
-import { allRecordingUsageQuery, liveGroupsQuery, liveStatusQuery, usageLabel } from "../livetv/api";
+import { allRecordingUsageQuery, liveStatusQuery, usageLabel } from "../livetv/api";
 import { requestsStatusQuery } from "../requests/api";
 import {
   librariesQuery,
@@ -54,8 +54,6 @@ function describe(r: UserRestrictions, libraryNames: Map<number, string>) {
   if (r.remoteQualityKbps)
     parts.push(`Remote ≤ ${(r.remoteQualityKbps / 1000).toFixed(0)} Mbps`);
   if (r.liveTv === false) parts.push("No Live TV");
-  else if (r.liveTvGroups)
-    parts.push(`Live TV: ${r.liveTvGroups.join(", ") || "none"}`);
   if ((r.canRecordDVR ?? r.canRecord) === false) parts.push("No recording");
   if (r.canViewDVR === false) parts.push("Can't watch recordings");
   return parts.join(" · ");
@@ -114,7 +112,7 @@ function RequestPermission({
   );
 }
 
-/** May this person watch Live TV, and which channel groups (LIVE-4). */
+/** May this person watch Live TV (LIVE-4): every channel group, or none. */
 function LiveTvPermission({
   value,
   onChange,
@@ -123,52 +121,17 @@ function LiveTvPermission({
   onChange: (r: UserRestrictions) => void;
 }) {
   const status = useQuery(liveStatusQuery);
-  const groups = useQuery({
-    ...liveGroupsQuery,
-    enabled: !!status.data?.enabled,
-  });
   if (!status.data?.enabled) return null;
-  const allowed = value.liveTv !== false;
-  const chosen = value.liveTvGroups ?? null;
-  const toggle = (g: string, on: boolean) => {
-    const all = groups.data?.map((x) => x.name) ?? [];
-    const next = new Set(chosen ?? all);
-    if (on) next.add(g);
-    else next.delete(g);
-    onChange({
-      ...value,
-      liveTvGroups: next.size === all.length ? null : [...next],
-    });
-  };
   return (
-    <div className="space-y-3">
-      <Toggle
-        label="Can watch Live TV"
-        checked={allowed}
-        onChange={(v) => onChange({ ...value, liveTv: v })}
-      />
-      {allowed && !!groups.data?.length && (
-        <Field
-          label="Channel groups"
-          help="Only channels in the ticked groups appear for this person."
-        >
-          {() => (
-            <div className="flex flex-wrap gap-x-5 gap-y-2">
-              {groups.data.map((g) => (
-                <label key={g.name} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={chosen === null || chosen.includes(g.name)}
-                    onChange={(e) => toggle(g.name, e.target.checked)}
-                  />
-                  {g.name}
-                </label>
-              ))}
-            </div>
-          )}
-        </Field>
-      )}
-    </div>
+    <Toggle
+      label="Can watch Live TV"
+      checked={value.liveTv !== false}
+      onChange={(v) => {
+        const next = { ...value, liveTv: v };
+        delete next.liveTvGroups; // no longer used
+        onChange(next);
+      }}
+    />
   );
 }
 
@@ -182,12 +145,8 @@ function DvrPermissions({
   onChange: (r: UserRestrictions) => void;
 }) {
   const status = useQuery(liveStatusQuery);
-  const settings = useQuery({ ...settingsQuery, retry: false });
   if (!status.data?.dvrAvailable) return null;
   const record = value.canRecordDVR ?? value.canRecord ?? true;
-  const quota = value.dvrQuotaGb;
-  const mode = quota == null ? "default" : quota === 0 ? "unlimited" : "own";
-  const def = settings.data?.integrations?.dvrDefaultQuotaGb ?? 0;
   return (
     <div className="space-y-3">
       <Toggle
@@ -202,6 +161,27 @@ function DvrPermissions({
         checked={value.canViewDVR !== false}
         onChange={(v) => onChange({ ...value, canViewDVR: v })}
       />
+      <DvrQuotaField value={value} onChange={onChange} />
+    </div>
+  );
+}
+
+/** A person's recording quota: the server default (none for admins), no limit, or their
+ * own. Admins can set it for anyone, admins and themselves included (LIVE-5). */
+function DvrQuotaField({
+  value,
+  onChange,
+  admin,
+}: {
+  value: UserRestrictions;
+  onChange: (r: UserRestrictions) => void;
+  admin?: boolean;
+}) {
+  const settings = useQuery({ ...settingsQuery, retry: false });
+  const quota = value.dvrQuotaGb;
+  const mode = quota == null ? "default" : quota === 0 ? "unlimited" : "own";
+  const def = settings.data?.integrations?.dvrDefaultQuotaGb ?? 0;
+  return (
       <Field
         label="Recording quota"
         help="Space their recordings may take. Recordings in progress always finish."
@@ -221,10 +201,12 @@ function DvrPermissions({
               }}
             >
               <option value="default">
-                Use the default ({def ? `${def} GB` : "no limit"})
+                {admin
+                  ? "Use the default (no limit for admins)"
+                  : `Use the default (${def ? `${def} GB` : "no limit"})`}
               </option>
               <option value="unlimited">No limit</option>
-              <option value="own">Their own</option>
+              <option value="own">A set amount</option>
             </Select>
             {mode === "own" && (
               <>
@@ -248,7 +230,6 @@ function DvrPermissions({
           </div>
         )}
       </Field>
-    </div>
   );
 }
 
@@ -685,12 +666,27 @@ function EditUserDialog({
             onChange={setIsAdmin}
           />
         )}
-        {!isAdmin && (
+        {!isAdmin ? (
           <RestrictionsEditor value={restrictions} onChange={setRestrictions} />
+        ) : (
+          <AdminDvrQuota value={restrictions} onChange={setRestrictions} />
         )}
       </div>
     </Dialog>
   );
+}
+
+/** Admins have every permission; only their recording quota can be set (none by default). */
+function AdminDvrQuota({
+  value,
+  onChange,
+}: {
+  value: UserRestrictions;
+  onChange: (r: UserRestrictions) => void;
+}) {
+  const status = useQuery(liveStatusQuery);
+  if (!status.data?.dvrAvailable) return null;
+  return <DvrQuotaField value={value} onChange={onChange} admin />;
 }
 
 /** Turns off another user's two-factor sign-in, e.g. when they've lost their phone (USER-9). */

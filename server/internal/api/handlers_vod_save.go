@@ -30,7 +30,7 @@ func toAPIVodSaveSettings(v settings.VODSave) *VodSaveSettings {
 		VideoQuality: ptr(VodSaveSettingsVideoQuality(v.VideoQuality)), VideoKbps: ptr(v.VideoKbps),
 		Audio: ptr(VodSaveSettingsAudio(v.Audio)), ConcurrentPerSource: ptr(v.ConcurrentPerSource),
 		ScanAfterSave: ptr(v.ScanAfterSave), SkipExisting: ptr(v.SkipExisting), PauseWhileWatching: ptr(v.PauseWhileWatching),
-		PauseScope: ptr(VodSaveSettingsPauseScope(v.PauseScope)), RetryFailed: ptr(v.RetryFailed),
+		PauseScope: ptr(VodSaveSettingsPauseScope(v.PauseScope)), RetryFailed: ptr(v.RetryFailed), WindowOnly: ptr(v.WindowOnly),
 		Destinations: ptr(toAPIVodSaveDestinations(v.Destinations, nil)),
 	}
 }
@@ -138,6 +138,7 @@ func applyVodSaveSettings(v *settings.VODSave, u VodSaveSettings) {
 	set(&v.SkipExisting, u.SkipExisting)
 	set(&v.PauseWhileWatching, u.PauseWhileWatching)
 	set(&v.RetryFailed, u.RetryFailed)
+	set(&v.WindowOnly, u.WindowOnly)
 	if u.Destinations != nil {
 		v.Destinations = fromAPIVodSaveDestinations(*u.Destinations)
 	}

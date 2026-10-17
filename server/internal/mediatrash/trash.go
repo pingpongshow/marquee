@@ -1,8 +1,7 @@
 // Package mediatrash deletes media files from Library Health (ADM-11). A deleted file,
 // with the subtitles and artwork beside it that belong only to it, moves into a
 // .marquee-trash folder in its library folder (<root>/.marquee-trash/<YYYY-MM-DD>/<path
-// relative to the root>) and is removed for good after Retention by the "Empty media
-// trash" task. Moves are renames, so the trash stays on the same filesystem.
+// relative to the root>) and is removed for good by the nightly "Empty media trash" task. Moves are renames, so the trash stays on the same filesystem.
 package mediatrash
 
 import (
@@ -22,9 +21,6 @@ import (
 	"marquee/internal/scanner"
 )
 
-// Retention is how long deleted files wait in the trash.
-const Retention = 30 * 24 * time.Hour
-
 const dateLayout = "2006-01-02"
 
 var ErrNotFound = errors.New("file not found")
@@ -38,6 +34,8 @@ func (e *MoveError) Error() string { return e.Msg }
 type Service struct {
 	DB  *sql.DB
 	Now func() time.Time
+	// Playing, when set, reports whether a file is being played now (Empty skips it).
+	Playing func(path string) bool
 }
 
 func (s *Service) now() time.Time {
@@ -325,15 +323,17 @@ func moveError(err error) error {
 	return &MoveError{"Marquee couldn't move the file to the trash: " + err.Error()}
 }
 
-// Empty removes trash older than Retention, and empty date folders, in every library
-// folder. It is the "Empty media trash" task.
+// Empty permanently deletes everything in the media trash folders (.marquee-trash in each
+// library folder), the "Empty media trash" task that runs every night. Nothing outside a
+// trash folder is touched: symbolic links are removed, never followed, and a file being
+// played is skipped. It reports what it freed ("Freed 112 GB (37 files)").
 func (s *Service) Empty(ctx context.Context) (string, error) {
 	libs, err := library.NewStore(s.DB).List(ctx)
 	if err != nil {
 		return "", err
 	}
-	cutoff := s.now().Add(-Retention)
-	removed, failed := 0, 0
+	var freed int64
+	removed, failed, skipped := 0, 0, 0
 	seen := map[string]bool{}
 	for _, l := range libs {
 		for _, root := range l.Paths {
@@ -342,52 +342,94 @@ func (s *Service) Empty(ctx context.Context) (string, error) {
 				continue
 			}
 			seen[trash] = true
-			entries, err := os.ReadDir(trash)
-			if err != nil {
-				continue // no trash here
+			if fi, err := os.Lstat(trash); err != nil || !fi.IsDir() {
+				continue // no trash here (or something that isn't ours)
 			}
-			for _, e := range entries {
+			var dirs []string
+			err := filepath.WalkDir(trash, func(p string, d os.DirEntry, err error) error {
+				if err != nil {
+					return nil
+				}
 				if ctx.Err() != nil {
-					return "", ctx.Err()
+					return ctx.Err()
 				}
-				p := filepath.Join(trash, e.Name())
-				day, perr := time.ParseInLocation(dateLayout, e.Name(), s.now().Location())
-				switch {
-				case !e.IsDir() || perr != nil:
-					continue // not ours
-				case day.AddDate(0, 0, 1).Before(cutoff) || day.AddDate(0, 0, 1).Equal(cutoff):
-					n := countFiles(p)
-					if err := os.RemoveAll(p); err != nil {
-						slog.WarnContext(ctx, "empty media trash", "folder", p, "err", err)
-						failed++
-						continue
+				if d.IsDir() {
+					if p != trash {
+						dirs = append(dirs, p)
 					}
-					removed += n
-				case countFiles(p) == 0:
-					os.RemoveAll(p) // only empty folders left
+					return nil
 				}
+				if !inside(trash, p) {
+					return nil
+				}
+				if s.Playing != nil && s.Playing(p) {
+					skipped++
+					return nil
+				}
+				var size int64
+				if fi, err := d.Info(); err == nil && fi.Mode().IsRegular() {
+					size = fi.Size()
+				}
+				if err := os.Remove(p); err != nil && !errors.Is(err, os.ErrNotExist) {
+					slog.WarnContext(ctx, "empty media trash", "file", p, "err", err)
+					failed++
+					return nil
+				}
+				removed++
+				freed += size
+				return nil
+			})
+			if err != nil {
+				return "", err
 			}
-			if left, err := os.ReadDir(trash); err == nil && len(left) == 0 {
-				os.Remove(trash)
+			// Folders left empty go, deepest first, then the trash folder itself.
+			for i := len(dirs) - 1; i >= 0; i-- {
+				os.Remove(dirs[i]) // only when empty
 			}
+			os.Remove(trash)
 		}
 	}
-	if failed > 0 {
-		return "", fmt.Errorf("removed %d files; %d trash folders couldn't be removed", removed, failed)
-	}
+	msg := fmt.Sprintf("Freed %s (%d file%s)", humanBytes(freed), removed, plural(removed))
 	if removed == 0 {
-		return "Nothing old enough to remove", nil
+		msg = "The media trash was empty"
 	}
-	return fmt.Sprintf("Removed %d files deleted over 30 days ago", removed), nil
+	if skipped > 0 {
+		msg += fmt.Sprintf("; %d file%s being played kept for next time", skipped, plural(skipped))
+	}
+	slog.InfoContext(ctx, "media trash emptied", "files", removed, "bytes", freed, "failed", failed, "skipped", skipped)
+	if failed > 0 {
+		return "", fmt.Errorf("%s; %d file%s couldn't be deleted", msg, failed, plural(failed))
+	}
+	return msg, nil
 }
 
-func countFiles(dir string) int {
-	n := 0
-	filepath.WalkDir(dir, func(_ string, d os.DirEntry, err error) error {
-		if err == nil && !d.IsDir() {
-			n++
-		}
-		return nil
-	})
-	return n
+// inside reports whether p is within dir (and not dir itself).
+func inside(dir, p string) bool {
+	rel, err := filepath.Rel(dir, p)
+	return err == nil && rel != "." && !strings.HasPrefix(rel, "..") && !filepath.IsAbs(rel)
+}
+
+func plural(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
+
+// humanBytes writes a size in decimal units, as disks are sold: 112 GB, 3.4 MB.
+func humanBytes(b int64) string {
+	const k = 1000
+	switch {
+	case b >= k*k*k*k:
+		return fmt.Sprintf("%.1f TB", float64(b)/(k*k*k*k))
+	case b >= 100*k*k*k:
+		return fmt.Sprintf("%.0f GB", float64(b)/(k*k*k))
+	case b >= k*k*k:
+		return fmt.Sprintf("%.1f GB", float64(b)/(k*k*k))
+	case b >= k*k:
+		return fmt.Sprintf("%.1f MB", float64(b)/(k*k))
+	case b >= k:
+		return fmt.Sprintf("%.0f KB", float64(b)/k)
+	}
+	return fmt.Sprintf("%d bytes", b)
 }

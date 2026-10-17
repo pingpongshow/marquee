@@ -175,6 +175,39 @@ export function useCancelRecording() {
   });
 }
 
+/** Stop a recording in progress: keep what was recorded, or delete it (LIVE-5). */
+export function useStopRecording() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, keep }: { id: number; keep: boolean }) =>
+      unwrap(
+        api.POST("/livetv/recordings/{recordingId}/stop", {
+          params: { path: { recordingId: id } },
+          body: { keep },
+        }),
+      ),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["livetv"] });
+      void qc.invalidateQueries({ queryKey: ["activity"] });
+    },
+  });
+}
+
+export const stopDeleteConfirm = (title: string) =>
+  `Stop recording ${title} and delete what has been recorded so far?`;
+
+/** "12 min in · 48 min left" for a recording in progress. */
+export function recordingProgress(r: Recording, now = Date.now()) {
+  const start = new Date(r.start).getTime();
+  const end = new Date(r.end).getTime();
+  const fmt = (ms: number) => {
+    const m = Math.max(0, Math.round(ms / 60_000));
+    return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`;
+  };
+  const left = end - now;
+  return `${fmt(now - start)} in · ${left > 0 ? `${fmt(left)} left` : "finishing"}`;
+}
+
 export function useDeleteRule() {
   const qc = useQueryClient();
   return useMutation({

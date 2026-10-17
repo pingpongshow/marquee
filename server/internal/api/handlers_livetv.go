@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"slices"
 	"strconv"
 	"time"
 
@@ -27,9 +26,9 @@ func toAPIProg(p *livetv.Prog) *LiveProgramme {
 	return out
 }
 
-// liveFilter builds a channel filter, limited to what the user may watch (LIVE-4).
+// liveFilter builds a channel filter; a profile that may not watch Live TV gets nothing.
 func liveFilter(s auth.Session, group *string, fav, recent, hidden *bool) livetv.Filter {
-	f := livetv.Filter{Groups: liveGroups(s)}
+	f := livetv.Filter{None: !liveOK(s)}
 	if group != nil {
 		f.Group = *group
 	}
@@ -39,23 +38,9 @@ func liveFilter(s auth.Session, group *string, fav, recent, hidden *bool) livetv
 	return f
 }
 
-// liveGroups is the channel groups a user is limited to (nil = all; empty = no Live TV).
-func liveGroups(s auth.Session) *[]string {
-	r := s.User.Restrictions
-	switch {
-	case s.User.IsAdmin:
-		return nil
-	case !r.LiveTVAllowed():
-		return &[]string{}
-	}
-	return r.LiveTVGroups
-}
-
-// liveAllowed reports whether the user may watch a channel in this group.
-func liveAllowed(s auth.Session, group string) bool {
-	g := liveGroups(s)
-	return g == nil || slices.Contains(*g, group)
-}
+// liveOK reports whether the user may watch Live TV (LIVE-4). Everyone who may sees every
+// channel group: per-user group limits were dropped (a stored liveTvGroups is ignored).
+func liveOK(s auth.Session) bool { return s.User.IsAdmin || s.User.Restrictions.LiveTVAllowed() }
 
 func (h *Handlers) LiveTvStatus(ctx context.Context, _ LiveTvStatusRequestObject) (LiveTvStatusResponseObject, error) {
 	if _, ok := session(ctx); !ok {
@@ -70,7 +55,7 @@ func (h *Handlers) liveStatus(ctx context.Context) LiveTvStatus {
 	// apps an empty Live TV.
 	out := LiveTvStatus{Enabled: h.LiveTV.Enabled() && n > 0, Channels: n, GuideUntil: until}
 	if s, ok := session(ctx); ok {
-		if g := liveGroups(s); g != nil && len(*g) == 0 {
+		if !liveOK(s) {
 			out.Enabled = false // this profile may not watch Live TV
 		}
 	}
@@ -86,6 +71,8 @@ func (h *Handlers) liveStatus(ctx context.Context) LiveTvStatus {
 		Channels    int        `json:"channels"`
 		Error       *string    `json:"error,omitempty"`
 		Id          string     `json:"id"`
+		InUse       *int       `json:"inUse,omitempty"`
+		MaxStreams  *int       `json:"maxStreams,omitempty"`
 		Name        string     `json:"name"`
 		Programmes  int        `json:"programmes"`
 		RefreshedAt *time.Time `json:"refreshedAt,omitempty"`
@@ -93,6 +80,8 @@ func (h *Handlers) liveStatus(ctx context.Context) LiveTvStatus {
 	for i, s := range sources {
 		out.Sources[i].Id, out.Sources[i].Name, out.Sources[i].Channels, out.Sources[i].Programmes = s.ID, s.Name, s.Channels, s.Programmes
 		out.Sources[i].RefreshedAt, out.Sources[i].Error = s.RefreshedAt, nz(s.Error)
+		// Connections in use against the source's limit (LIVE-3).
+		out.Sources[i].MaxStreams, out.Sources[i].InUse = ptr(h.LiveTV.MaxStreams(s.ID)), ptr(h.LiveTV.InUse(s.ID))
 	}
 	return out
 }
@@ -107,9 +96,11 @@ func (h *Handlers) ListLiveChannels(ctx context.Context, req ListLiveChannelsReq
 		return nil, internal(ctx, "liveChannels", err)
 	}
 	out := make(ListLiveChannels200JSONResponse, len(list))
+	avail := h.LiveTV.Availability()
 	for i, c := range list {
+		ok, why := avail(c)
 		out[i] = LiveChannel{Id: c.ID, Number: nz(c.Number), Name: c.Name, Group: nz(c.Group), Favorite: c.Favorite, Hidden: nz(c.Hidden),
-			Now: toAPIProg(c.Now), Next: toAPIProg(c.Next)}
+			Now: toAPIProg(c.Now), Next: toAPIProg(c.Next), Available: ptr(ok), UnavailableReason: nz(why)}
 		if c.HasLogo {
 			out[i].LogoUrl = ptr(logoURL(c.ID))
 		}
@@ -132,7 +123,7 @@ func (h *Handlers) ListLiveGroups(ctx context.Context, _ ListLiveGroupsRequestOb
 	}
 	out := ListLiveGroups200JSONResponse{}
 	for _, g := range order {
-		if liveAllowed(s, g) {
+		if liveOK(s) {
 			out = append(out, struct {
 				Channels int    `json:"channels"`
 				Name     string `json:"name"`
@@ -243,8 +234,8 @@ func (h *Handlers) PlayLiveChannel(ctx context.Context, req PlayLiveChannelReque
 	} else if err != nil {
 		return nil, internal(ctx, "playLive", err)
 	}
-	if !liveAllowed(s, c.Group) {
-		return PlayLiveChannel403JSONResponse{ForbiddenJSONResponse(apiErr("not_allowed", "This channel isn't available for this profile."))}, nil
+	if !liveOK(s) {
+		return PlayLiveChannel403JSONResponse{ForbiddenJSONResponse(apiErr("not_allowed", "Live TV isn't available for this profile."))}, nil
 	}
 	o := livetv.Options{VideoCodecs: req.Body.Profile.HlsVideoCodecs, AudioCodecs: req.Body.Profile.HlsAudioCodecs, Remote: remote, UserAgent: h.LiveTV.UserAgent(c.SourceID)}
 	if req.Body.MaxBitrateKbps != nil {
@@ -253,8 +244,11 @@ func (h *Handlers) PlayLiveChannel(ctx context.Context, req PlayLiveChannelReque
 	if remote && u.Restrictions.RemoteQualityKbps > 0 && (o.MaxKbps == 0 || u.Restrictions.RemoteQualityKbps < o.MaxKbps) {
 		o.MaxKbps = u.Restrictions.RemoteQualityKbps
 	}
-	ls, err := h.LiveTV.Sessions.Start(ctx, c.ID, u.ID, c.StreamURL, o)
+	ls, err := h.LiveTV.Tune(ctx, c, u.ID, o)
 	if err != nil {
+		if livetv.IsNoTuner(err) {
+			return PlayLiveChannel409JSONResponse(apiErr("no_tuner", err.Error())), nil
+		}
 		if errors.Is(err, livetv.ErrUnavailable) {
 			return PlayLiveChannel502JSONResponse{BadGatewayJSONResponse(apiErr("unavailable", err.Error()))}, nil
 		}
@@ -273,9 +267,8 @@ func (h *Handlers) StopLiveSession(ctx context.Context, req StopLiveSessionReque
 	if !ok {
 		return StopLiveSession401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	if ls := h.LiveTV.Sessions.Get(req.SessionId); ls != nil && (ls.UserID == s.User.ID || s.User.IsAdmin) {
-		h.LiveTV.Sessions.Stop(req.SessionId)
-	}
+	// A stream others joined (no connection was free) keeps going for them.
+	h.LiveTV.Sessions.Release(req.SessionId, s.User.ID, s.User.IsAdmin)
 	return StopLiveSession204Response{}, nil
 }
 

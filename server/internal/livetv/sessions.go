@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -40,7 +41,25 @@ type Sessions struct {
 	once sync.Once
 	mu   sync.Mutex
 	live map[string]*Session
+	// pending counts streams being tuned per source, so they hold a connection (see Tune).
+	pending map[string]int
+	// gone remembers why recently ended streams ended, for their playlist's 410.
+	gone map[string]goneInfo
 }
+
+type goneInfo struct {
+	reason string
+	at     time.Time
+}
+
+// Why a stream ended, as its playlist's 410 says. Players show a reason starting with
+// "Stopped:"; after any other, tuning the channel again works.
+const (
+	ReasonPreempted     = "Stopped: a recording needed the connection"
+	ReasonMoved         = "Moved to the recording's stream: tune the channel again"
+	ReasonRecordingDone = "The recording this stream shared has ended: tune the channel again"
+	ReasonEnded         = "This stream has ended"
+)
 
 // Session is one viewer's live stream.
 type Session struct {
@@ -51,6 +70,15 @@ type Session struct {
 	VideoCodec string
 	AudioCodec string
 	Encoder    string
+	// SourceID is the channel's source; Shared streams read a recording's input and use no
+	// connection of their own (Tune).
+	SourceID    string
+	ChannelName string
+	Shared      bool
+
+	users   map[int64]int // who holds it: the viewer, and others who joined it (Tune)
+	ended   bool          // FFmpeg exited: what's left is served a little longer
+	endedAt time.Time
 
 	dir    string
 	cancel context.CancelFunc
@@ -66,6 +94,9 @@ type Options struct {
 	MaxKbps     int  // 0 = no cap
 	Remote      bool // away from home: transcode to a lighter stream
 	UserAgent   string
+	// SourceID and ChannelName label the stream for connection accounting (Tune).
+	SourceID    string
+	ChannelName string
 }
 
 type probe struct {
@@ -77,6 +108,8 @@ type probe struct {
 func (m *Sessions) init() {
 	m.once.Do(func() {
 		m.live = map[string]*Session{}
+		m.pending = map[string]int{}
+		m.gone = map[string]goneInfo{}
 		os.RemoveAll(m.Dir) // leftovers from a previous run
 		go m.reap()
 	})
@@ -92,6 +125,11 @@ func (m *Sessions) reap() {
 				idle = append(idle, s)
 			}
 			s.mu.Unlock()
+		}
+		for id, g := range m.gone {
+			if time.Since(g.at) > 10*time.Minute {
+				delete(m.gone, id)
+			}
 		}
 		m.mu.Unlock()
 		for _, s := range idle {
@@ -154,6 +192,28 @@ func (m *Sessions) Start(ctx context.Context, channelID, userID int64, url strin
 	if err != nil {
 		return nil, err
 	}
+	return m.start(ctx, channelID, userID, url, nil, p, o)
+}
+
+// StartShared streams a channel from a recording in progress of it: FFmpeg reads the parts
+// the recorder writes in work (from near their end, following them as they grow) instead
+// of opening another connection to the source. capturing reports whether the recorder is
+// still writing; once it isn't and everything is read, the stream ends.
+func (m *Sessions) StartShared(ctx context.Context, channelID, userID int64, work string, capturing func() bool, o Options) (*Session, error) {
+	m.init()
+	part, err := waitPart(ctx, work, capturing)
+	if err != nil {
+		return nil, err
+	}
+	p, err := m.probe(ctx, part, "")
+	if err != nil {
+		return nil, err
+	}
+	in := func(runCtx context.Context) (io.Reader, error) { return openTail(runCtx, work, capturing, tailBack) }
+	return m.start(ctx, channelID, userID, "pipe:0", in, p, o)
+}
+
+func (m *Sessions) start(ctx context.Context, channelID, userID int64, url string, input func(context.Context) (io.Reader, error), p probe, o Options) (*Session, error) {
 	copyVideo := p.Video == "h264" && slices.Contains(o.VideoCodecs, "h264") && !p.Interlaced && o.MaxKbps == 0 && !o.Remote
 	copyAudio := p.Audio == "aac" && slices.Contains(o.AudioCodecs, "aac")
 	encoders := []string{"software"}
@@ -162,7 +222,8 @@ func (m *Sessions) Start(ctx context.Context, channelID, userID int64, url strin
 	}
 	var last error
 	for _, enc := range encoders {
-		s := &Session{ID: newID(), ChannelID: channelID, UserID: userID, Encoder: enc, last: time.Now(), done: make(chan struct{})}
+		s := &Session{ID: newID(), ChannelID: channelID, UserID: userID, Encoder: enc, last: time.Now(), done: make(chan struct{}),
+			SourceID: o.SourceID, ChannelName: o.ChannelName, Shared: input != nil, users: map[int64]int{userID: 1}}
 		s.Method, s.VideoCodec, s.AudioCodec = "transcode", "h264", "aac"
 		if copyVideo {
 			s.Method = "copy"
@@ -180,12 +241,31 @@ func (m *Sessions) Start(ctx context.Context, channelID, userID int64, url strin
 		cmd := exec.CommandContext(runCtx, m.FFmpeg, args...)
 		var stderr bytes.Buffer
 		cmd.Stderr = &stderr
+		if input != nil {
+			r, err := input(runCtx)
+			if err != nil {
+				cancel()
+				os.RemoveAll(s.dir)
+				return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
+			}
+			cmd.Stdin = r
+			cmd.WaitDelay = 5 * time.Second
+		}
 		if err := cmd.Start(); err != nil {
 			cancel()
+			if c, ok := cmd.Stdin.(io.Closer); ok {
+				c.Close()
+			}
 			return nil, err
 		}
 		go func() {
 			cmd.Wait()
+			if c, ok := cmd.Stdin.(io.Closer); ok {
+				c.Close()
+			}
+			s.mu.Lock()
+			s.ended, s.endedAt = true, time.Now()
+			s.mu.Unlock()
 			close(s.done)
 		}()
 		if err := waitReady(ctx, s); err != nil {
@@ -212,7 +292,7 @@ func (m *Sessions) Start(ctx context.Context, channelID, userID int64, url strin
 		m.mu.Lock()
 		m.live[s.ID] = s
 		m.mu.Unlock()
-		slog.Info("live stream started", "channel", channelID, "method", s.Method, "encoder", enc, "video", p.Video, "audio", p.Audio)
+		slog.Info("live stream started", "channel", channelID, "method", s.Method, "encoder", enc, "video", p.Video, "audio", p.Audio, "shared", s.Shared)
 		return s, nil
 	}
 	return nil, last
@@ -248,8 +328,11 @@ func (m *Sessions) args(url, dir string, p probe, o Options, copyVideo, copyAudi
 	if strings.HasPrefix(url, "http") {
 		a = append(a, "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5", "-rw_timeout", "15000000")
 	}
-	if o.UserAgent != "" {
+	if o.UserAgent != "" && strings.HasPrefix(url, "http") {
 		a = append(a, "-user_agent", o.UserAgent)
+	}
+	if url == "pipe:0" {
+		a = append(a, "-f", "mpegts") // a recording's parts (StartShared)
 	}
 	if enc == "qsv" && !copyVideo {
 		a = append(a, "-init_hw_device", "qsv=qs:"+m.QSVDevice, "-filter_hw_device", "qs")
@@ -318,11 +401,17 @@ func (m *Sessions) args(url, dir string, p probe, o Options, copyVideo, copyAudi
 }
 
 // Stop ends a stream.
-func (m *Sessions) Stop(id string) bool {
+func (m *Sessions) Stop(id string) bool { return m.StopWithReason(id, ReasonEnded) }
+
+// StopWithReason ends a stream; its playlist then answers 410 with reason.
+func (m *Sessions) StopWithReason(id, reason string) bool {
 	m.init()
 	m.mu.Lock()
 	s := m.live[id]
 	delete(m.live, id)
+	if s != nil {
+		m.gone[id] = goneInfo{reason, time.Now()}
+	}
 	m.mu.Unlock()
 	if s == nil {
 		return false
@@ -331,6 +420,78 @@ func (m *Sessions) Stop(id string) bool {
 	<-s.done
 	os.RemoveAll(s.dir)
 	return true
+}
+
+// Release lets go of a stream for one of its viewers; it stops once nobody holds it (or
+// when nothing fetches it for Idle). It reports whether userID held it.
+func (m *Sessions) Release(id string, userID int64, admin bool) bool {
+	m.init()
+	m.mu.Lock()
+	s := m.live[id]
+	if s == nil {
+		m.mu.Unlock()
+		return false
+	}
+	s.mu.Lock()
+	held := s.users[userID] > 0
+	switch {
+	case held:
+		if s.users[userID]--; s.users[userID] == 0 {
+			delete(s.users, userID)
+		}
+	case admin:
+		clear(s.users)
+	}
+	left := len(s.users)
+	s.mu.Unlock()
+	m.mu.Unlock()
+	if !held && !admin {
+		return false
+	}
+	if left == 0 {
+		m.Stop(id)
+	}
+	return true
+}
+
+// join adds a viewer to a running stream (Tune, when no connection is free).
+func (m *Sessions) join(s *Session, userID int64) {
+	s.mu.Lock()
+	s.users[userID]++
+	s.last = time.Now()
+	s.mu.Unlock()
+}
+
+// Ended reports whether a stream's FFmpeg has exited.
+func (s *Session) Ended() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.ended
+}
+
+func (m *Sessions) addPending(src string, d int) {
+	m.init()
+	m.mu.Lock()
+	m.pending[src] += d
+	if m.pending[src] <= 0 {
+		delete(m.pending, src)
+	}
+	m.mu.Unlock()
+}
+
+func (m *Sessions) pendingFor(src string) int {
+	m.init()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.pending[src]
+}
+
+// goneReason is why a recently ended stream ended ("" when unknown).
+func (m *Sessions) goneReason(id string) string {
+	m.init()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.gone[id].reason
 }
 
 // Get returns a running stream.
@@ -375,12 +536,27 @@ func (m *Sessions) Handler() http.Handler {
 		}
 		s := m.Get(id)
 		if s == nil {
-			http.Error(w, "this stream has ended", http.StatusGone)
+			reason := m.goneReason(id)
+			if reason == "" {
+				reason = ReasonEnded
+			}
+			http.Error(w, reason, http.StatusGone)
 			return
 		}
 		s.mu.Lock()
 		s.last = time.Now()
+		// FFmpeg exited (the source or the recording it shared ended): what's left is served
+		// for a little while, then the playlist says it's over, so players can tune again.
+		over := s.ended && time.Since(s.endedAt) > 15*time.Second && file == "index.m3u8"
 		s.mu.Unlock()
+		if over {
+			reason := ReasonEnded
+			if s.Shared {
+				reason = ReasonRecordingDone
+			}
+			http.Error(w, reason, http.StatusGone)
+			return
+		}
 		path := filepath.Join(s.dir, file)
 		if file == "index.m3u8" {
 			w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")

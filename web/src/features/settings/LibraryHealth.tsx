@@ -74,8 +74,34 @@ export function LibraryHealthSettings() {
       <section className="space-y-2" aria-label="Tools">
         <h3 className="text-sm font-medium text-muted">Tools</h3>
         <LargeFilesEntry onOpen={() => setLargeFiles(true)} />
+        <TrashLastEmptied />
       </section>
     </div>
+  );
+}
+
+/** When the media trash (.marquee-trash in library folders) was last emptied, and what that
+ * freed: the nightly "Empty media trash" task. */
+function TrashLastEmptied() {
+  const tasks = useQuery({ queryKey: ["tasks"], queryFn: () => unwrap(api.GET("/tasks")), retry: false });
+  const t = tasks.data?.find((x) => x.id === "empty-trash");
+  if (!t) return null;
+  const run = t.lastRun;
+  const when = run?.finishedAt ?? run?.startedAt;
+  return (
+    <p className="px-1 text-sm text-muted">
+      Media trash:{" "}
+      {run?.status === "running"
+        ? "being emptied now"
+        : when
+          ? `last emptied ${new Date(when).toLocaleString()}${run?.message ? ` · ${run.message}` : ""}`
+          : "not emptied yet"}
+      {t.enabled === false ? " · emptying is turned off" : " · emptied every night"} (
+      <Link to="/settings/$section" params={{ section: "scheduled-tasks" }} className="underline">
+        Scheduled Tasks
+      </Link>
+      )
+    </p>
   );
 }
 

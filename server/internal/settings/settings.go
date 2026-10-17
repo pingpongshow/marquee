@@ -103,6 +103,8 @@ type VODSave struct {
 	PauseScope         string `json:"pauseScope"`
 	// RetryFailed queues failed saves again every few hours.
 	RetryFailed bool `json:"retryFailed"`
+	// WindowOnly downloads only during the maintenance window (Tasks); off = any time.
+	WindowOnly bool `json:"windowOnly"`
 	// Destinations are more folders to save to besides the two above (e.g. Anime), chosen
 	// when saving ("Save to Anime").
 	Destinations []VODSaveDestination `json:"destinations,omitempty"`
@@ -318,6 +320,8 @@ type LiveTVSource struct {
 	EPGURL    string `json:"epgUrl"`
 	UserAgent string `json:"userAgent"`
 	Enabled   bool   `json:"enabled"`
+	// MaxStreams is how many connections the provider allows at once (0 = unlimited).
+	MaxStreams int `json:"maxStreams,omitempty"`
 }
 
 // Webhook is a URL told about events (ADM-5).

@@ -2,7 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { deviceProfile } from "@/features/player/deviceProfile";
 
-/** Plays a channel's live stream (LIVE-3). Stops the server stream when it goes away. */
+/** Why a live stream ended: its playlist answers 410 with a reason (null when it didn't end). */
+async function endReason(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url, { cache: "no-store" });
+    return r.status === 410 ? (await r.text()).trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Plays a channel's live stream (LIVE-3). Stops the server stream when it goes away. When
+ * the server ends it (the recording it shared finished, or it moved to a recording's stream)
+ * it tunes again by itself; a reason starting "Stopped:" is shown instead. */
 export function LivePlayer({
   channelId,
   muted,
@@ -18,6 +30,9 @@ export function LivePlayer({
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const [loading, setLoading] = useState(true);
+  // Bumped to tune again after the server ended the stream (callers key the player by
+  // channel, so it starts at 0 for each one).
+  const [attempt, setAttempt] = useState(0);
   // React doesn't keep the muted property in step with the attribute; autoplay needs it.
   useEffect(() => {
     if (video.current) video.current.muted = !!muted;
@@ -59,10 +74,20 @@ export function LivePlayer({
         // Try to recover once, as the video player does, before giving up.
         let recovered = false;
         h.on(Hls.Events.ERROR, (_, d) => {
-          if (!d.fatal) return;
-          if (!recovered && d.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            recovered = true;
-            h.startLoad();
+          if (!d.fatal || cancelled) return;
+          if (d.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            // Ended by the server? Its reason says whether tuning again will work.
+            void endReason(s.url).then((reason) => {
+              if (cancelled) return;
+              if (reason !== null) {
+                session = null; // already gone
+                if (!reason.startsWith("Stopped:") && attempt < 3) setAttempt((a) => a + 1);
+                else onError?.(reason || "The stream stopped.");
+              } else if (!recovered) {
+                recovered = true;
+                h.startLoad();
+              } else onError?.("The stream stopped.");
+            });
           } else if (!recovered && d.type === Hls.ErrorTypes.MEDIA_ERROR) {
             recovered = true;
             h.recoverMediaError();
@@ -87,7 +112,7 @@ export function LivePlayer({
       if (session) stop(session);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelId]);
+  }, [channelId, attempt]);
   return (
     <div className={`relative bg-black ${className ?? ""}`}>
       <video

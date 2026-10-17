@@ -79,7 +79,7 @@ func toAPIRestrictions(r auth.Restrictions) UserRestrictions {
 	out := UserRestrictions{LibraryIds: r.LibraryIDs, AllowRemote: ptr(r.RemoteAllowed()), RemoteQualityKbps: ptr(r.RemoteQualityKbps),
 		CanRequest: ptr(r.CanRequest), CanRecord: ptr(r.DVRRecordAllowed()), SeerrUserId: r.SeerrUserID,
 		CanRecordDVR: ptr(r.DVRRecordAllowed()), CanViewDVR: ptr(r.DVRViewAllowed()), DvrQuotaGb: r.DVRQuotaGB,
-		LiveTv: ptr(r.LiveTVAllowed()), LiveTvGroups: r.LiveTVGroups, Friend: ptr(r.Friend)}
+		LiveTv: ptr(r.LiveTVAllowed()), Friend: ptr(r.Friend)}
 	if r.MaxContentRating != nil {
 		out.MaxContentRating = ptr(UserRestrictionsMaxContentRating(*r.MaxContentRating))
 	}
@@ -128,7 +128,7 @@ func fromAPIRestrictions(r *UserRestrictions) (auth.Restrictions, error) {
 	if r.LiveTv != nil && !*r.LiveTv {
 		out.LiveTV = r.LiveTv // only "no" is stored; absent means allowed
 	}
-	out.LiveTVGroups = r.LiveTvGroups
+	// liveTvGroups is deprecated and ignored: channel groups no longer limit anyone.
 	out.SeerrUserID = r.SeerrUserId
 	set(&out.Friend, r.Friend)
 	return out, nil

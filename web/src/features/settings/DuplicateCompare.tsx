@@ -184,7 +184,7 @@ export function DuplicateCompare({ files }: { files: IssueFile[] }) {
           <div className="space-y-3 text-sm text-muted">
             <div className="rounded-lg bg-surface-2 p-3">{confirm.file.path ? <FileName path={confirm.file.path} /> : confirm.itemTitle}</div>
             <p>
-              The file moves to the <code className="text-text">.marquee-trash</code> folder in its library folder and is deleted for good after 30 days. Until then you
+              The file moves to the <code className="text-text">.marquee-trash</code> folder in its library folder and is deleted for good when the media trash is emptied (every night, in the maintenance window). Until then you
               can move it back by hand.
             </p>
             {del.isError && <Alert tone="error">{del.error.message}</Alert>}

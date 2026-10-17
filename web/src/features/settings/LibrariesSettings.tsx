@@ -152,7 +152,7 @@ export function LibrariesSettings() {
           <Card title="Media files">
             <Toggle
               label="Allow deleting media files"
-              help="Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good after 30 days."
+              help="Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good by the nightly Empty media trash task."
               checked={!!scanning.draft.allowMediaDeletion}
               onChange={(v) => scanning.update({ allowMediaDeletion: v })}
             />

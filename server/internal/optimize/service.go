@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"sync"
 	"time"
 
@@ -293,9 +294,42 @@ func (s *Service) Run(ctx context.Context) {
 	}
 }
 
+// TaskID is the optimizer's row in Scheduled Tasks; turning it off there holds the queue.
+const TaskID = "optimize-files"
+
+// HoldDisabled is the hold reason while the task is turned off in Scheduled Tasks.
+const HoldDisabled = "Turned off in Scheduled Tasks"
+
+// Wake makes the worker look at the queue now (the task's Run now).
+func (s *Service) Wake() { s.kick() }
+
+// QueueState describes the queue for Scheduled Tasks: why it's held, else what's queued.
+func (s *Service) QueueState(ctx context.Context) string {
+	var queued, running int
+	s.DB.QueryRowContext(ctx, `SELECT COALESCE(SUM(state = 'queued'), 0), COALESCE(SUM(state IN ('running', 'verifying')), 0) FROM optimize_jobs`).Scan(&queued, &running)
+	if r := s.hold(s.cfg()); r != "" {
+		if queued+running > 0 {
+			return fmt.Sprintf("%s · %d queued", r, queued+running)
+		}
+		return r
+	}
+	switch {
+	case running > 0 && queued > 0:
+		return fmt.Sprintf("Converting · %d more queued", queued)
+	case running > 0:
+		return "Converting"
+	case queued > 0:
+		return fmt.Sprintf("%d queued", queued)
+	}
+	return "Nothing queued"
+}
+
 // hold says why jobs shouldn't run now ("" = they may).
 func (s *Service) hold(c settings.Optimize) string {
 	now := s.now()
+	if s.Settings != nil && slices.Contains(s.Settings().Tasks.Disabled, TaskID) {
+		return HoldDisabled
+	}
 	if c.Paused {
 		return "Paused"
 	}

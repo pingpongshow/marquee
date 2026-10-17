@@ -2314,7 +2314,7 @@ paths:
       tags: [libraries]
       operationId: deleteMediaFile
       summary: Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
-      description: "The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item's last file the item goes too, along with a season or show left empty."
+      description: "The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good when the daily Empty media trash task runs. When it was the item's last file the item goes too, along with a season or show left empty."
       responses:
         "204": { description: Moved to the trash. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -2892,6 +2892,32 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /livetv/recordings/{recordingId}/stop:
+    parameters:
+      - { name: recordingId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [livetv]
+      operationId: stopRecording
+      summary: "Stop a recording in progress now. keep true (the default): what was recorded is finalised as a playable file, filed like a finished recording and marked stoppedEarly. keep false: the partial recording is deleted and it leaves the list. Only whoever scheduled it, or an admin (canDelete). Returns once it has stopped."
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                keep: { type: boolean, default: true, description: "Keep what was recorded (true) or delete it (false)." }
+      responses:
+        "204": { description: Stopped. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "not_recording: it isn't recording now."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
   /livetv/recording-rules:
     get:
       tags: [livetv]
@@ -3073,6 +3099,11 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "no_tuner: every connection the channel's source allows (maxStreams) is in use by recordings or other viewers; message says by what, e.g. \"All connections are in use: recording Gold Rush\". A channel being recorded, or already watched, stays watchable: it shares that connection."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "502": { $ref: "#/components/responses/BadGateway" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
 
@@ -5060,12 +5091,13 @@ components:
         canRecord: { type: boolean, description: "Deprecated: the same as canRecordDVR (kept for older clients). Read only when canRecordDVR isn't sent." }
         canRecordDVR: { type: boolean, description: "May schedule Live TV recordings (LIVE-5). Default true; admins always may. A user who may not has their series paused." }
         canViewDVR: { type: boolean, description: "May see and play the household's Live TV recordings (the DVR list and the recordings libraries). Default true; admins always may." }
-        dvrQuotaGb: { type: integer, minimum: 0, nullable: true, description: "This user's DVR quota in GB (10^9 bytes). Null or absent = the server default (integrations.dvrDefaultQuotaGb); 0 = unlimited." }
+        dvrQuotaGb: { type: integer, minimum: 0, nullable: true, description: "This user's DVR quota in GB (10^9 bytes). Null or absent = the server default (integrations.dvrDefaultQuotaGb) for everyone but admins, who then have no limit; 0 = unlimited. An admin's own quota applies to them like anyone's. Admins may set it for anyone, admins and themselves included." }
         liveTv: { type: boolean, description: "May watch Live TV (LIVE-4). Default true." }
         liveTvGroups:
           type: array
           nullable: true
-          description: Channel groups this user may watch. Null or absent = all.
+          deprecated: true
+          description: "Deprecated and ignored: channel groups no longer limit anyone (everyone who may watch Live TV sees every group). The server ignores it when written and never returns it."
           items: { type: string }
         seerrUserId: { type: integer, format: int64, nullable: true, description: The Seerr user requests are made as. Null = Seerr's API key owner. }
         friend: { type: boolean, description: "Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker." }
@@ -5519,7 +5551,7 @@ components:
         watchedThresholdPercent: { type: integer, minimum: 50, maximum: 100 }
         detectIntros: { type: boolean, description: "Find intros and end credits in TV episodes by comparing their audio, for Skip Intro and Skip Credits (PLAY-12). Markers from Plex or the files take precedence." }
         trickplay: { type: boolean, description: "Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie." }
-        allowMediaDeletion: { type: boolean, default: false, description: "Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good after 30 days." }
+        allowMediaDeletion: { type: boolean, default: false, description: "Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good by the daily Empty media trash task." }
 
     WatchGroup:
       type: object
@@ -5570,6 +5602,8 @@ components:
               programmes: { type: integer }
               refreshedAt: { type: string, format: date-time }
               error: { type: string }
+              maxStreams: { type: integer, description: "Connections the source allows at once (0 = unlimited)." }
+              inUse: { type: integer, description: "Connections in use now: recordings in progress plus live streams (shared ones count once)." }
 
     Recording:
       type: object
@@ -5600,6 +5634,7 @@ components:
         viewOffsetMs: { type: integer, format: int64, description: "Finished recordings: where the caller stopped watching (0 = not started or finished), to resume from the Recordings list." }
         durationMs: { type: integer, format: int64, description: "Finished recordings: the recorded item's length." }
         watched: { type: boolean, description: "Finished recordings: the caller has watched it to the end." }
+        stoppedEarly: { type: boolean, description: "Someone stopped it before the programme ended (Stop and keep): what was recorded until then was kept as a playable file." }
 
     RecordingRule:
       type: object
@@ -5626,7 +5661,7 @@ components:
         recordings: { type: integer, description: Recordings counted. }
         quotaBytes: { type: integer, format: int64, description: "The quota in bytes; 0 = unlimited." }
         quotaGb: { type: integer, description: "The quota in GB; 0 = unlimited." }
-        quotaSource: { type: string, enum: [default, user], description: "default = the server default applies; user = the user's own quota (which may be 0, unlimited)." }
+        quotaSource: { type: string, enum: [default, user], description: "default = the server default applies (for an admin without a quota of their own: no limit, so quotaBytes is 0); user = the user's own quota (which may be 0, unlimited)." }
         overQuota: { type: boolean, description: At or over the quota. }
         quotaAction: { type: string, enum: [block, deleteOldest], description: What happens to new recordings over quota. }
         canRecord: { type: boolean }
@@ -5645,6 +5680,8 @@ components:
         hidden: { type: boolean, description: The caller hid it (listed only with hidden=true). }
         now: { $ref: "#/components/schemas/LiveProgramme" }
         next: { $ref: "#/components/schemas/LiveProgramme" }
+        available: { type: boolean, description: "False while every connection its source allows is in use (recordings and viewers) and this channel isn't one of those being received; tuning it would answer 409 no_tuner. Absent = available (older servers). Channel up/down should skip unavailable channels." }
+        unavailableReason: { type: string, description: "Why it isn't available, e.g. \"All connections are in use: recording Gold Rush\"." }
 
     LiveProgramme:
       type: object
@@ -5667,7 +5704,7 @@ components:
       required: [id, url, channelId, method]
       properties:
         id: { type: string }
-        url: { type: string, description: The live HLS playlist (server-relative; the session id is its credential). }
+        url: { type: string, description: "The live HLS playlist (server-relative; the session id is its credential). Once the stream has ended the playlist answers 410 with a plain-text reason. A reason starting with \"Stopped:\" (e.g. \"Stopped: a recording needed the connection\") should be shown to the viewer; any other (the recording it shared ended, or it moved to a recording's stream) means tuning the channel again will work." }
         channelId: { type: integer, format: int64 }
         method: { type: string, enum: [copy, transcode] }
         videoCodec: { type: string }
@@ -5687,6 +5724,7 @@ components:
         epgUrl: { type: string, description: "XMLTV guide (m3u sources; optional, else the playlist's url-tvg)." }
         userAgent: { type: string }
         enabled: { type: boolean }
+        maxStreams: { type: integer, minimum: 0, description: "Connections the provider allows at once (0 or absent = unlimited). At the limit other channels of this source are unavailable, a channel being recorded is watched from the recording's own connection, and a recording that needs a connection stops live streams on other channels of the source." }
 
     VodSource:
       type: object
@@ -5949,6 +5987,7 @@ components:
         pauseWhileWatching: { type: boolean, description: "Pause saves while someone watches (see pauseScope), resuming 15 s after. Default on." }
         pauseScope: { type: string, enum: [source, any], description: "source: something from the same source, or Live TV from the same host (Dispatcharr). any: any playback on the server." }
         retryFailed: { type: boolean, description: "Queue failed saves again every few hours. Default on." }
+        windowOnly: { type: boolean, description: "Download only during the maintenance window (Scheduled Tasks); outside it running saves stop and keep what they downloaded. Default off: any time." }
         destinations:
           type: array
           description: "More save folders besides moviesFolder and showsFolder (e.g. Anime), offered as \"Save to {name}\". Sending the list replaces it; an item without an id is new."
@@ -6367,6 +6406,7 @@ components:
         state: { type: string, enum: [queued, running] }
         libraryId: { type: integer, format: int64 }
         progress: { $ref: "#/components/schemas/ScanProgress" }
+        link: { type: string, description: "Web app path that shows this task, e.g. /livetv?tab=recordings for a recording in progress (id recording:<recordingId>, kind task, progress done/total = seconds elapsed/scheduled length)." }
 
     LogEntry:
       type: object
@@ -7944,7 +7984,7 @@ components:
         pauseWhileWatching: { type: boolean, description: "Pause while anyone is watching anything, resuming about 15 s after. Default on." }
         windowOnly: { type: boolean, description: "Only run inside the maintenance window." }
         paused: { type: boolean, description: "The queue is paused by an admin." }
-        keepOriginals: { type: boolean, description: "On: originals go to the media trash (restorable for about 30 days). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once, and originals kept earlier are deleted too (at start-up and when this is saved off). Omitted on update = unchanged." }
+        keepOriginals: { type: boolean, description: "On: originals go to the media trash (restorable until the daily Empty media trash task runs). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once, and originals kept earlier are deleted too (at start-up and when this is saved off). Omitted on update = unchanged." }
 
     OptimizeConfig:
       type: object

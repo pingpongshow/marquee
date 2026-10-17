@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -27,6 +28,7 @@ var (
 	ErrProgrammeNotFound = errors.New("that programme isn't in the guide")
 	ErrDVRUnavailable    = errors.New("recording isn't available: the recordings folder can't be written")
 	ErrQuotaExceeded     = errors.New("you're at your recording quota: delete some recordings to record more")
+	ErrNotRecording      = errors.New("it isn't recording now")
 )
 
 // Messages for recordings that weren't made.
@@ -85,9 +87,30 @@ type Recorder struct {
 	OnQuota func(userID int64, owner, title, msg string)
 
 	mu     sync.Mutex
-	active map[int64]context.CancelFunc
+	active map[int64]*activeRec
 	wake   chan struct{}
 	wg     sync.WaitGroup
+}
+
+// activeRec is a recording in progress.
+type activeRec struct {
+	cancel context.CancelFunc
+	done   chan struct{} // closed once it has stopped and been filed (or discarded)
+	info   ActiveRecording
+	// capturing: the recorder is still writing parts (shared live streams follow them).
+	capturing bool
+	// stopped: someone stopped it early (Stop); discard: and its recording is deleted.
+	stopped, discard bool
+}
+
+// ActiveRecording is a recording in progress: what it is, and where its parts are written
+// (Work, "" until it starts writing).
+type ActiveRecording struct {
+	ID, ChannelID, UserID    int64
+	SourceID, Title, Channel string
+	Start, Stop              time.Time // the programme's
+	Began                    time.Time
+	Work                     string
 }
 
 // Recording is one scheduled, running or finished recording.
@@ -102,6 +125,8 @@ type Recording struct {
 	ItemID                                                         *int64
 	// Rating is the guide's content rating ("" = unknown); OwnerName is who scheduled it.
 	Rating, OwnerName string
+	// StoppedEarly: someone stopped it before the programme ended, keeping what was recorded.
+	StoppedEarly bool
 }
 
 // Rule records every airing of a title.
@@ -232,7 +257,7 @@ func (r *Recorder) Run(ctx context.Context) {
 	if r.wake == nil {
 		r.wake = make(chan struct{}, 1)
 	}
-	r.active = map[int64]context.CancelFunc{}
+	r.active = map[int64]*activeRec{}
 	r.mu.Unlock()
 	// Recordings cut short by a restart carry on (in a new part) if their programme hasn't ended.
 	r.Live.DB.ExecContext(ctx, `UPDATE dvr_recordings SET status = 'scheduled' WHERE status = 'recording'`)
@@ -447,13 +472,13 @@ func (r *Recorder) Schedule(ctx context.Context, userID, channelID int64, start 
 const recCols = `r.id, r.user_id, r.rule_id, r.channel_id, r.channel_name, r.start, r.stop, r.title, r.subtitle, r.description, r.category, r.episode,
 	r.image_url, r.status, r.path, r.error, r.size,
 	(SELECT v.item_id FROM media_files f JOIN media_versions v ON v.id = f.version_id WHERE r.path <> '' AND f.path = r.path),
-	r.rating, COALESCE((SELECT u.display_name FROM users u WHERE u.id = r.user_id), '')`
+	r.rating, COALESCE((SELECT u.display_name FROM users u WHERE u.id = r.user_id), ''), r.stopped_early`
 
 func scanRec(row interface{ Scan(...any) error }) (Recording, error) {
 	var x Recording
 	var start, stop string
 	err := row.Scan(&x.ID, &x.UserID, &x.RuleID, &x.ChannelID, &x.ChannelName, &start, &stop, &x.Title, &x.Subtitle, &x.Description, &x.Category,
-		&x.Episode, &x.Image, &x.Status, &x.Path, &x.Error, &x.Size, &x.ItemID, &x.Rating, &x.OwnerName)
+		&x.Episode, &x.Image, &x.Status, &x.Path, &x.Error, &x.Size, &x.ItemID, &x.Rating, &x.OwnerName, &x.StoppedEarly)
 	x.Start, _ = time.Parse(time.RFC3339, start)
 	x.Stop, _ = time.Parse(time.RFC3339, stop)
 	return x, err
@@ -546,8 +571,9 @@ func (r *Recorder) DeleteRule(ctx context.Context, id int64) error {
 	return err
 }
 
-// Cancel cancels an upcoming recording, stops one in progress (keeping what was recorded),
-// or removes a finished one from the list, deleting its file too when deleteFile is set.
+// Cancel cancels an upcoming recording, stops one in progress (keeping what was recorded,
+// as Stop with keep does), or removes a finished one from the list, deleting its file too
+// when deleteFile is set.
 func (r *Recorder) Cancel(ctx context.Context, id int64, deleteFile bool) error {
 	x, err := r.Get(ctx, id)
 	if err != nil {
@@ -559,11 +585,8 @@ func (r *Recorder) Cancel(ctx context.Context, id int64, deleteFile bool) error 
 		_, err = r.Live.DB.ExecContext(ctx, `UPDATE dvr_recordings SET status = 'cancelled' WHERE id = ? AND status = 'scheduled'`, id)
 		return err
 	case StatusRecording:
-		r.mu.Lock()
-		stop := r.active[id]
-		r.mu.Unlock()
-		if stop != nil {
-			stop()
+		if err := r.Stop(ctx, id, true); err != nil && !errors.Is(err, ErrNotRecording) {
+			return err
 		}
 		return nil
 	}
@@ -588,6 +611,53 @@ func (r *Recorder) forget(ctx context.Context, x Recording) error {
 	return err
 }
 
+// Stop stops a recording in progress now. With keep, what was recorded is filed as a
+// finished recording (a playable file, marked StoppedEarly); without, the partial
+// recording is deleted and it leaves the list. It returns once the recording has stopped
+// and been filed or deleted (or ctx ends).
+func (r *Recorder) Stop(ctx context.Context, id int64, keep bool) error {
+	r.mu.Lock()
+	a := r.active[id]
+	if a == nil {
+		r.mu.Unlock()
+		return ErrNotRecording
+	}
+	a.stopped, a.discard = true, !keep
+	cancel, done := a.cancel, a.done
+	r.mu.Unlock()
+	slog.Info("dvr: stopping a recording early", "id", id, "keep", keep)
+	cancel()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// ActiveRecordings lists the recordings in progress.
+func (r *Recorder) ActiveRecordings() []ActiveRecording {
+	if r == nil {
+		return nil
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]ActiveRecording, 0, len(r.active))
+	for _, a := range r.active {
+		out = append(out, a.info)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Began.Before(out[j].Began) })
+	return out
+}
+
+// Capturing reports whether a recording is still writing its parts.
+func (r *Recorder) Capturing(id int64) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	a := r.active[id]
+	return a != nil && a.capturing
+}
+
 // Active is the number of recordings in progress.
 func (r *Recorder) Active() int {
 	r.mu.Lock()
@@ -598,16 +668,26 @@ func (r *Recorder) Active() int {
 func (r *Recorder) start(ctx context.Context, id int64, end time.Time) {
 	r.mu.Lock()
 	if r.active == nil {
-		r.active = map[int64]context.CancelFunc{}
+		r.active = map[int64]*activeRec{}
 	}
 	if _, running := r.active[id]; running {
 		r.mu.Unlock()
 		return
 	}
 	rctx, cancel := context.WithDeadline(ctx, end)
-	r.active[id] = cancel
+	a := &activeRec{cancel: cancel, done: make(chan struct{}), capturing: true, info: ActiveRecording{ID: id, Began: r.now()}}
+	if x, err := r.Get(ctx, id); err == nil {
+		a.info.UserID, a.info.Title, a.info.Channel, a.info.Start, a.info.Stop = x.UserID, x.Title, x.ChannelName, x.Start, x.Stop
+		if x.ChannelID != nil {
+			a.info.ChannelID = *x.ChannelID
+			if ch, err := r.Live.Channel(ctx, *x.ChannelID); err == nil {
+				a.info.SourceID = ch.SourceID
+			}
+		}
+	}
+	r.active[id] = a
 	r.mu.Unlock()
-	r.Live.DB.ExecContext(ctx, `UPDATE dvr_recordings SET status = 'recording', error = '' WHERE id = ?`, id)
+	r.Live.DB.ExecContext(ctx, `UPDATE dvr_recordings SET status = 'recording', error = '', stopped_early = 0 WHERE id = ?`, id)
 	r.wg.Add(1)
 	go func() {
 		defer r.wg.Done()
@@ -616,7 +696,12 @@ func (r *Recorder) start(ctx context.Context, id int64, end time.Time) {
 			delete(r.active, id)
 			r.mu.Unlock()
 			cancel()
+			close(a.done)
 		}()
+		// A recording takes priority over live streams for the source's connections.
+		if a.info.SourceID != "" {
+			r.Live.makeRoom(a.info.SourceID, a.info.ChannelID)
+		}
 		r.record(rctx, ctx, id)
 	}()
 }
@@ -643,6 +728,12 @@ func (r *Recorder) record(rctx, ctx context.Context, id int64) {
 		r.finish(ctx, id, nil, err.Error())
 		return
 	}
+	r.mu.Lock()
+	a := r.active[id]
+	if a != nil {
+		a.info.Work = work
+	}
+	r.mu.Unlock()
 	slog.Info("dvr: recording", "id", id, "title", x.Title, "channel", ch.Name)
 	ua := r.Live.UserAgent(ch.SourceID)
 	var lastErr string
@@ -653,7 +744,8 @@ func (r *Recorder) record(rctx, ctx context.Context, id int64) {
 		if left < 2*time.Second {
 			break
 		}
-		args := []string{"-hide_banner", "-loglevel", "error", "-nostdin"}
+		// Not -nostdin: FFmpeg is stopped by a "q" on its input (see below).
+		args := []string{"-hide_banner", "-loglevel", "error"}
 		if ua != "" {
 			args = append(args, "-user_agent", ua)
 		}
@@ -663,8 +755,22 @@ func (r *Recorder) record(rctx, ctx context.Context, id int64) {
 		args = append(args, "-i", ch.StreamURL, "-map", "0:v:0?", "-map", "0:a?", "-c", "copy", "-f", "mpegts",
 			"-t", strconv.Itoa(int(left.Seconds())+1), "-y", out)
 		cmd := exec.CommandContext(rctx, r.FFmpeg, args...)
-		cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) } // lets FFmpeg finish the file
-		cmd.WaitDelay = 5 * time.Second
+		// Stopping (the programme's end, or Stop): "q" makes FFmpeg finish cleanly. An
+		// interrupt cuts off the packet it's reading, leaving a damaged frame in the file,
+		// so it's only the fallback if FFmpeg doesn't quit (stuck on the network); a kill
+		// is the last resort.
+		stdin, perr := cmd.StdinPipe()
+		cmd.Cancel = func() error {
+			if perr == nil {
+				if _, err := io.WriteString(stdin, "q"); err == nil {
+					p := cmd.Process
+					time.AfterFunc(4*time.Second, func() { p.Signal(os.Interrupt) })
+					return nil
+				}
+			}
+			return cmd.Process.Signal(os.Interrupt)
+		}
+		cmd.WaitDelay = 10 * time.Second
 		msg, err := cmd.CombinedOutput()
 		if err != nil && rctx.Err() == nil {
 			lastErr = strings.TrimSpace(lastLine(string(msg)))
@@ -682,8 +788,24 @@ func (r *Recorder) record(rctx, ctx context.Context, id int64) {
 		case <-time.After(3 * time.Second):
 		}
 	}
+	r.mu.Lock()
+	var stopped, discard bool
+	if a != nil {
+		a.capturing = false
+		stopped, discard = a.stopped, a.discard
+	}
+	r.mu.Unlock()
 	if ctx.Err() != nil {
 		return // shutting down: the parts stay and recording resumes after the restart
+	}
+	if discard {
+		// Stop and delete: the partial recording goes, and so does its row.
+		os.RemoveAll(work)
+		if x, err := r.Get(ctx, id); err == nil {
+			r.forget(ctx, x)
+		}
+		slog.Info("dvr: recording stopped and deleted", "id", id)
+		return
 	}
 	parts, _ := filepath.Glob(filepath.Join(work, "part-*.ts"))
 	sort.Strings(parts)
@@ -706,6 +828,9 @@ func (r *Recorder) record(rctx, ctx context.Context, id int64) {
 	}
 	os.RemoveAll(work)
 	r.finish(ctx, id, &dest, "")
+	if stopped {
+		r.Live.DB.ExecContext(ctx, `UPDATE dvr_recordings SET stopped_early = 1 WHERE id = ?`, id)
+	}
 	if r.Library != nil {
 		sub := "TV"
 		if movies {

@@ -271,6 +271,12 @@ export function VodSaveSettings() {
             checked={d.retryFailed ?? true}
             onChange={(v) => update({ retryFailed: v })}
           />
+          <Toggle
+            label="Only during the maintenance window"
+            help="Off: downloads run any time. On: they run only inside the maintenance window set in Scheduled Tasks; outside it they stop and keep what they downloaded."
+            checked={!!d.windowOnly}
+            onChange={(v) => update({ windowOnly: v })}
+          />
         </div>
       </Card>
       <SaveBar dirty={s.dirty} saving={s.saving} error={s.error} savedAt={s.savedAt} onSave={s.save} onReset={s.reset} />
