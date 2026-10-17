@@ -5,11 +5,11 @@ import Observation
 import OpenAPIRuntime
 
 /// A change the person made that hasn't reached the server yet (USER-18): a rating, watched
-/// state, watchlist, comment, or progress from an offline play. Tagged with the server and
+/// state, watchlist, favourite, comment, or progress from an offline play. Tagged with the server and
 /// person it belongs to, and the time it was made, which the server uses to ignore it when a
 /// newer change of the same kind was made elsewhere.
 public struct PendingChange: Codable, Equatable, Sendable {
-    public enum Kind: String, Codable, Sendable { case rating, watched, watchlist, comment, progress }
+    public enum Kind: String, Codable, Sendable { case rating, watched, watchlist, favorite, comment, progress }
 
     public var kind: Kind
     public var itemID: Int64
@@ -20,7 +20,7 @@ public struct PendingChange: Codable, Equatable, Sendable {
     public var user: Int64?
     /// rating: 0–10, nil clears.
     public var rating: Double?
-    /// watched: true = watched; watchlist: true = on the list.
+    /// watched: true = watched; watchlist: true = on the list; favorite: true = a favourite.
     public var on: Bool?
     /// comment: the text ("" removes it), or nil with `reviewUser` to delete that person's review.
     public var comment: String?
@@ -48,6 +48,7 @@ public struct PendingChange: Codable, Equatable, Sendable {
     public static func rating(_ item: Int64, _ rating: Double?) -> PendingChange { .init(kind: .rating, itemID: item, rating: rating) }
     public static func watched(_ item: Int64, _ on: Bool) -> PendingChange { .init(kind: .watched, itemID: item, on: on) }
     public static func watchlist(_ item: Int64, _ on: Bool) -> PendingChange { .init(kind: .watchlist, itemID: item, on: on) }
+    public static func favorite(_ item: Int64, _ on: Bool) -> PendingChange { .init(kind: .favorite, itemID: item, on: on) }
     public static func comment(_ item: Int64, _ text: String) -> PendingChange { .init(kind: .comment, itemID: item, comment: text) }
     public static func deleteReview(_ item: Int64, user: Int64) -> PendingChange { .init(kind: .comment, itemID: item, reviewUser: user) }
     public static func progress(_ item: Int64, positionMs: Int64, watched: Bool) -> PendingChange {
@@ -133,6 +134,7 @@ struct OfflineChangesMiddleware: ClientMiddleware {
     static let operations: Set<String> = [
         Operations.RateItem.id, Operations.MarkWatched.id, Operations.MarkUnwatched.id,
         Operations.AddToWatchlist.id, Operations.RemoveFromWatchlist.id,
+        Operations.AddFavorite.id, Operations.RemoveFavorite.id,
         Operations.SetReview.id, Operations.DeleteReview.id, Operations.SyncProgress.id,
     ]
     func intercept(_ request: HTTPRequest, body: HTTPBody?, baseURL: URL, operationID: String,
@@ -238,6 +240,8 @@ public final class OfflineSync {
     public func pendingWatched(_ item: Int64) -> Bool? { latest(.watched, item)?.on }
 
     public func pendingWatchlist(_ item: Int64) -> Bool? { latest(.watchlist, item)?.on }
+
+    public func pendingFavorite(_ item: Int64) -> Bool? { latest(.favorite, item)?.on }
 
     /// A waiting comment of your own ("" = removed).
     public func pendingComment(_ item: Int64) -> String? {
@@ -394,6 +398,21 @@ public final class OfflineSync {
                 }
             }
             switch try await client.removeFromWatchlist(path: .init(itemId: c.itemID), query: .init(at: c.at)) {
+            case .noContent: return (204, nil)
+            case .unauthorized: return (401, nil)
+            case .notFound: return (404, nil)
+            case let .undocumented(code, _): return (code, nil)
+            }
+        case .favorite:
+            if c.on == true {
+                switch try await client.addFavorite(path: .init(itemId: c.itemID), query: .init(at: c.at)) {
+                case .noContent: return (204, nil)
+                case .unauthorized: return (401, nil)
+                case .notFound: return (404, nil)
+                case let .undocumented(code, _): return (code, nil)
+                }
+            }
+            switch try await client.removeFavorite(path: .init(itemId: c.itemID), query: .init(at: c.at)) {
             case .noContent: return (204, nil)
             case .unauthorized: return (401, nil)
             case .notFound: return (404, nil)

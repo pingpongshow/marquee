@@ -1,7 +1,7 @@
 import XCTest
 
-/// Ratings and favourites carried over from Plex (stars on rows and item pages, the Favorites
-/// page, the My rating sort), and header layout checks on iPhone (a stacked movie header, a More
+/// Ratings carried over from Plex (stars on rows and item pages, the Favourites page's Rated
+/// 4★+ view, the My rating sort), and header layout checks on iPhone (a stacked movie header, a More
 /// button as tall as its neighbours). Each test uses a temporary account, so the ratings it adds
 /// go with it.
 final class RatingsUITests: XCTestCase {
@@ -137,12 +137,13 @@ final class RatingsUITests: XCTestCase {
         try api("PUT", "/items/\(track)/rating", ["rating": 9], token: user.token)
         signIn(user.name, user.password)
 
-        // The Music home: Favorites in the Library list, with its count.
+        // The Music home: Favourites in the Library list; its Rated 4★+ view lists the track.
         openLibrary("Music")
         openMusicRow("favorites")
-        XCTAssertTrue(app.navigationBars["Favorites"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Favourites"].waitForExistence(timeout: 10))
+        app.buttons["Rated 4★+"].firstMatch.tap()
         let fav = byID("favoriteTrack.\(track)")
-        XCTAssertTrue(fav.waitForExistence(timeout: 10), "the rated track is in Favorites")
+        XCTAssertTrue(fav.waitForExistence(timeout: 10), "the rated track is in Favourites › Rated 4★+")
         XCTAssertEqual(app.buttons["rowRating.\(track)"].value as? String, "4½ stars", "its stars show")
         XCTAssertTrue(app.buttons["Shuffle"].exists && app.buttons["Play"].exists)
         shot("rt1-favorites")
@@ -191,6 +192,77 @@ final class RatingsUITests: XCTestCase {
         while first.identifier != "songRow.\(track)", Date() < deadline { sleep(1) }
         XCTAssertEqual(first.identifier, "songRow.\(track)", "the rated track sorts first")
         shot("rt3-songs-my-rating")
+    }
+
+    /// The heart (USER-12): a movie hearted on its page shows in the Movies grid's Favourites
+    /// filter (and the server has it); a song hearted in Now Playing is a favourite too.
+    func testFavoriteFromPageAndNowPlaying() throws {
+        let user = try temporaryUser()
+        let libs = try api("GET", "/libraries") as? [[String: Any]] ?? []
+        let movies = try XCTUnwrap(libs.first { $0["type"] as? String == "movies" }?["id"] as? Int)
+        let firstPage = (try api("GET", "/libraries/\(movies)/items?limit=4", token: user.token) as? [String: Any])?["items"] as? [[String: Any]] ?? []
+        let movie = try XCTUnwrap(firstPage.last)
+        let movieID = try XCTUnwrap(movie["id"] as? Int), movieTitle = try XCTUnwrap(movie["title"] as? String)
+        let track = try trackID("Floating 1")
+        signIn(user.name, user.password)
+
+        func favorite(_ id: Int) throws -> Bool {
+            (try api("GET", "/items/\(id)", token: user.token) as? [String: Any])?["favorite"] as? Bool ?? false
+        }
+        func waitFavorite(_ id: Int) throws -> Bool {
+            let deadline = Date().addingTimeInterval(10)
+            while try !favorite(id), Date() < deadline { sleep(1) }
+            return try favorite(id)
+        }
+
+        // The movie's page: the heart fills and the server has it.
+        openLibrary("Movies")
+        let poster = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", movieTitle + ",")).firstMatch
+        XCTAssertTrue(poster.waitForExistence(timeout: 10))
+        poster.tap()
+        let heart = app.buttons["favoriteToggle"].firstMatch
+        for _ in 0..<3 where !(heart.exists && heart.isHittable) { app.swipeUp() }
+        XCTAssertTrue(heart.waitForExistence(timeout: 10), "the page has a heart")
+        XCTAssertEqual(heart.value as? String, "Off")
+        heart.tap()
+        XCTAssertEqual(heart.value as? String, "On", "the heart fills at once")
+        XCTAssertTrue(try waitFavorite(movieID), "the server has the favourite")
+        shot("fav1-movie-page")
+
+        // The grid's Favourites filter lists only it.
+        app.navigationBars.buttons.firstMatch.tap()
+        byID("sortMenu").tap()
+        app.buttons["Favourites"].firstMatch.tap()
+        if app.buttons["Favourites"].firstMatch.exists, app.buttons["Favourites"].firstMatch.isHittable {
+            app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).tap() // close the menu
+        }
+        let deadline = Date().addingTimeInterval(10)
+        let cards = byID("libraryGrid").buttons
+        while cards.count != 1, Date() < deadline { sleep(1) }
+        XCTAssertEqual(cards.count, 1, "only the favourite is listed")
+        XCTAssertTrue(poster.exists, "the hearted movie is in Favourites")
+        shot("fav2-favourites-filter")
+
+        // A song: play it, heart it in Now Playing.
+        openLibrary("Music")
+        openMusicRow("albums")
+        let album = app.scrollViews.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Floating'")).firstMatch
+        for _ in 0..<4 where !album.waitForExistence(timeout: 2) { app.swipeUp() }
+        album.tap()
+        let row = app.buttons["rowFavorite.\(track)"]
+        for _ in 0..<4 where !(row.exists && row.isHittable) { app.swipeUp() }
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "the track row has a heart")
+        app.buttons.matching(NSPredicate(format: "label CONTAINS 'Floating 1'")).firstMatch.tap()
+        let mini = byID("miniPlayer")
+        XCTAssertTrue(mini.waitForExistence(timeout: 15))
+        mini.tap()
+        let npHeart = app.buttons["np.favorite"]
+        XCTAssertTrue(npHeart.waitForExistence(timeout: 10), "Now Playing has a heart")
+        XCTAssertEqual(npHeart.value as? String, "Off")
+        npHeart.tap()
+        XCTAssertEqual(npHeart.value as? String, "On")
+        XCTAssertTrue(try waitFavorite(track), "the server has the song as a favourite")
+        shot("fav3-now-playing")
     }
 
     /// iPhone: a movie's header stacks the poster above the title (no mid-word breaks), and More

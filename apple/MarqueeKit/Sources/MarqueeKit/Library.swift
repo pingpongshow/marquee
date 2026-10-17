@@ -32,11 +32,13 @@ public extension AppSession {
 
     func items(library: Int64, sort: ItemSort = .title, offset: Int = 0, limit: Int = 100,
                watch: Operations.ListLibraryItems.Input.Query.WatchPayload? = nil, genre: String? = nil,
-               type: Schemas.ItemType? = nil, decade: Int? = nil, minMyRating: Int? = nil) async throws -> Schemas.ItemPage {
-        // minMyRating: only what this person rated at least that (0–10; 8 = 4 stars, favourites).
+               type: Schemas.ItemType? = nil, decade: Int? = nil, minMyRating: Int? = nil,
+               favorites: Bool = false) async throws -> Schemas.ItemPage {
+        // minMyRating: only what this person rated at least that (0–10; 8 = 4 stars).
+        // favorites: only this person's favourites (the heart, USER-12).
         try await api.listLibraryItems(path: .init(libraryId: library),
                                        query: .init(_type: type, sort: sort, offset: offset, limit: limit, watch: watch, genre: genre,
-                                                    decade: decade, minMyRating: minMyRating)).ok.body.json
+                                                    decade: decade, minMyRating: minMyRating, favorites: favorites ? true : nil)).ok.body.json
     }
 
     func filters(library: Int64, type: Schemas.ItemType? = nil) async throws -> LibraryFilters {
@@ -107,6 +109,13 @@ public extension AppSession {
     @discardableResult
     func setWatchlist(_ id: Int64, _ on: Bool) async throws -> Bool {
         try await OfflineSync.shared.submit(.watchlist(id, on))
+    }
+
+    /// Makes an item one of this person's favourites (the heart) or not (USER-12); kept to sync
+    /// later when offline (returns false then).
+    @discardableResult
+    func setItemFavorite(_ id: Int64, _ on: Bool) async throws -> Bool {
+        try await OfflineSync.shared.submit(.favorite(id, on))
     }
 
     func watchlist() async throws -> [Item] { try await api.getWatchlist().ok.body.json }

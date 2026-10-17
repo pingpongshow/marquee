@@ -27,7 +27,7 @@ struct ItemMenuItems: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
     let item: Item
-    /// Watchlist and Watched entries; off where the page shows its own live buttons for them.
+    /// Watchlist, Watched and favourite entries; off where the page shows its own live buttons for them.
     var showsLibraryState = true
 
     var body: some View {
@@ -50,6 +50,13 @@ struct ItemMenuItems: View {
         }
         if item._type == .track || item._type == .album, let artist = item._type == .track ? item.grandparentId : item.parentId {
             NavigationLink(value: Route.item(artist)) { Label("Go to Artist", systemImage: "music.mic") }
+        }
+        if showsLibraryState, FavoriteStore.canFavorite(item) {
+            // The heart (USER-12): this session's change counts (the tile's data may be older).
+            let fav = FavoriteStore.shared.isFavorite(item)
+            Button { FavoriteStore.shared.set(item, !fav, app: app) } label: {
+                Label(fav ? "Remove from favourites" : "Add to favourites", systemImage: fav ? "heart.slash" : "heart")
+            }
         }
         if showsLibraryState, [.movie, .show, .episode, .video].contains(item._type) {
             let listed = OfflineSync.shared.pendingWatchlist(item.id) ?? item.watchlisted ?? false

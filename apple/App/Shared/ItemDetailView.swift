@@ -345,6 +345,10 @@ struct ItemDetailView: View {
             .buttonStyle(.bordered)
             .accessibilityIdentifier("watchlistToggle")
         }
+        if FavoriteStore.canFavorite(d.base) {
+            // The heart (USER-12): shows at once, reverts if the server refuses it.
+            FavoriteButton(item: d.base)
+        }
         if d.base.isPlayableVideo || d.type == .show || d.type == .season {
             // Shows as made at once, as does a change waiting to sync (USER-18); the page reloads
             // once the server has it (a show's or season's episodes too).
@@ -361,7 +365,7 @@ struct ItemDetailView: View {
             PlayOnButton(target: { PlayOnTarget(itemIDs: [d.id]) }).buttonStyle(.bordered)
         }
         #endif
-        // Watchlist and Watched are buttons above (always current), so the menu leaves them out.
+        // Watchlist, Watched and the heart are buttons above (always current), so the menu leaves them out.
         Menu { ItemMenuItems(item: d.base, showsLibraryState: false) } label: { Label("More", systemImage: "ellipsis") }
             .buttonStyle(.bordered)
             .accessibilityLabel("More")
@@ -677,6 +681,7 @@ struct EpisodeRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
+            RowFavorite(item: episode)
         }
         .padding(.horizontal, sidePadding)
         .padding(.vertical, 6)
@@ -714,7 +719,8 @@ struct TrackRow: View {
             }
             .buttonStyle(.plain)
             .contextMenu { ItemMenuItems(item: track) }
-            RowRating(item: track)
+            RowFavorite(item: track)
+            RowRating(item: track, gap: isTV ? 8 : 4)
         }
         .padding(.trailing, sidePadding - 6)
     }

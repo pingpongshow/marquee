@@ -659,6 +659,93 @@ extension MarqueeTVUITests {
         XCTAssertTrue(app.buttons["Mark watched"].waitForExistence(timeout: 5))
     }
 
+    /// A linked item's page opens over the app: Close goes back.
+    private func closeLinkedPage() {
+        let close = app.buttons["Close"].firstMatch
+        guard close.waitForExistence(timeout: 3) else { return }
+        focus(close, direction: .up)
+        remote.press(.select)
+        XCTAssertTrue(close.waitForNonExistence(timeout: 5), "the linked page closed")
+    }
+
+    /// The heart (USER-12) on the TV: a movie hearted with its page's focusable button shows in
+    /// the Movies grid's Favourites filter; a song hearted in Now Playing is a favourite.
+    func testFavoritesTV() throws {
+        let token = try temporaryAccount()
+        let libs = try list("/libraries", token: token)
+        let movies = try XCTUnwrap(libs.first { $0["type"] as? String == "movies" }?["id"] as? Int)
+        let first = try XCTUnwrap((try api("GET", "/libraries/\(movies)/items?limit=1", token: token)["items"] as? [[String: Any]])?.first)
+        let movieID = try XCTUnwrap(first["id"] as? Int), movieTitle = try XCTUnwrap(first["title"] as? String)
+        let music = try XCTUnwrap(libs.first { $0["type"] as? String == "music" && $0["name"] as? String == "Music" }?["id"] as? Int)
+        let tracks = try api("GET", "/libraries/\(music)/items?type=track&limit=500", token: token)["items"] as? [[String: Any]] ?? []
+        let track = try XCTUnwrap(tracks.first { $0["title"] as? String == "Floating 1" }?["id"] as? Int)
+        func favorite(_ id: Int) throws -> Bool { try api("GET", "/items/\(id)", token: token)["favorite"] as? Bool ?? false }
+        try signIn(as: token)
+        app.launchArguments = [] // opening a link relaunches the app: keep the sign-in
+
+        // The movie's page: focus the heart beside Play and select it.
+        app.open(URL(string: "marquee://item/\(movieID)")!)
+        let heart = app.buttons["favoriteToggle"]
+        XCTAssertTrue(heart.waitForExistence(timeout: 15), "the page has a heart")
+        let play = app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume'}")).firstMatch
+        focus(play, direction: .down)
+        focus(heart, direction: .right, tries: 8)
+        XCTAssertEqual(heart.value as? String, "Off")
+        remote.press(.select)
+        try eventually(10, "a favourite on the server") { try favorite(movieID) }
+        XCTAssertEqual(heart.value as? String, "On", "the page shows it")
+        sleep(1)
+        shot("tv-fav1-movie-page")
+        closeLinkedPage()
+
+        // Movies › Sort and filter › Favourites: only the hearted movie.
+        app.openSection("Movies")
+        let grid = app.descendants(matching: .any)["libraryGrid"]
+        XCTAssertTrue(grid.waitForExistence(timeout: 10))
+        remote.press(.down)
+        for _ in 0..<6 { remote.press(.right) }
+        remote.press(.select)
+        let filter = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Favourites'")).firstMatch
+        XCTAssertTrue(filter.waitForExistence(timeout: 5), "the sort and filter menu opened")
+        // XCUITest doesn't report focus in the menu: up to its first row (Movies), then down past
+        // Collections, the eight sorts and Unwatched only to Favourites.
+        for _ in 0..<14 { remote.press(.up) }
+        for _ in 0..<11 { remote.press(.down) }
+        sleep(1)
+        shot("tv-fav2a-menu")
+        remote.press(.select)
+        sleep(1)
+        if filter.exists { remote.press(.menu) } // close the menu if it stayed open
+        try eventually(10, "only the favourite listed") { grid.buttons.count == 1 }
+        XCTAssertTrue(grid.buttons.element(boundBy: 0).label.hasPrefix(movieTitle), "the hearted movie is in Favourites")
+        shot("tv-fav2-favourites-filter")
+
+        // A song: play it from its page, then heart it in Now Playing.
+        app.open(URL(string: "marquee://item/\(track)")!)
+        XCTAssertTrue(play.waitForExistence(timeout: 15))
+        focus(play, direction: .down)
+        remote.press(.select)
+        closeLinkedPage()
+        XCTAssertTrue(app.buttons["Now Playing"].firstMatch.waitForExistence(timeout: 20))
+        app.openSection("Now Playing")
+        let npHeart = app.buttons["np.favorite"]
+        XCTAssertTrue(npHeart.waitForExistence(timeout: 10), "Now Playing has a heart")
+        for _ in 0..<25 where !npHeart.hasFocus {
+            let f = focused.frame, h = npHeart.frame
+            if f.maxY < 200 { remote.press(.down) } // still at the top
+            else if f.minX > app.frame.midX { remote.press(.left) } // in the queue
+            else if abs(f.midY - h.midY) < 15 { remote.press(f.midX > h.midX ? .left : .right) }
+            else { remote.press(f.midY < h.midY ? .down : .up) }
+        }
+        XCTAssertTrue(npHeart.hasFocus, "focus reached the heart")
+        XCTAssertEqual(npHeart.value as? String, "Off")
+        remote.press(.select)
+        try eventually(10, "the song a favourite on the server") { try favorite(track) }
+        XCTAssertEqual(npHeart.value as? String, "On")
+        sleep(1)
+        shot("tv-fav3-now-playing")
+    }
+
     /// Video playlists are on the Playlists tab; Play starts the first item.
     func testVideoPlaylistTV() throws {
         let token = try temporaryAccount()
