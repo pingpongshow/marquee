@@ -22,6 +22,7 @@ var (
 	errUserPaused  = errors.New("paused")
 	errQueuePaused = errors.New("queue paused")
 	errAutoPaused  = errors.New("paused while watching")
+	errYielded     = errors.New("connection given to a viewer")
 	errShutdown    = errors.New("server stopping")
 )
 
@@ -53,8 +54,17 @@ type job struct {
 	id       int64
 	sourceID string
 	cancel   context.CancelCauseFunc
+	seq      int64 // start order (the newest give connections back first)
+	// budget: the source's free connections decide how many this save uses (budget.go).
+	budget bool
+	wantCh chan struct{} // told when want changes
 
 	mu         sync.Mutex
+	want       int  // connections it may use (budget.go)
+	conns      int  // connections it has open
+	netDone    bool // the download is over (converting or verifying needs no connection)
+	yielding   bool // stopping to give its connection back
+	split      bool // a segmented download, which can use more connections
 	step       string
 	done       int64
 	total      int64
@@ -62,6 +72,78 @@ type job struct {
 	speed      float64
 	lastBytes  int64
 	lastSample time.Time
+}
+
+// held is the connections the save counts as using: what it may use while downloading.
+func (j *job) held() int {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if j.netDone || j.yielding {
+		return 0
+	}
+	return j.want
+}
+
+// open is the connections it has open now.
+func (j *job) open() int {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.conns
+}
+
+func (j *job) wantConns() int {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.want
+}
+
+func (j *job) setWant(n int) {
+	j.mu.Lock()
+	j.want = n
+	j.mu.Unlock()
+	select {
+	case j.wantCh <- struct{}{}:
+	default:
+	}
+}
+
+func (j *job) addConns(d int) {
+	j.mu.Lock()
+	j.conns += d
+	j.mu.Unlock()
+}
+
+func (j *job) setSplit(v bool) {
+	j.mu.Lock()
+	j.split = v
+	j.mu.Unlock()
+}
+
+func (j *job) splittable() bool {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.split && !j.netDone && !j.yielding
+}
+
+// yield stops the save to give its connections back; it goes back to the queue.
+func (j *job) yield() {
+	j.mu.Lock()
+	j.yielding = true
+	j.mu.Unlock()
+	j.cancel(errYielded)
+}
+
+func (j *job) isYielding() bool {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.yielding
+}
+
+// downloaded marks the download over: it holds no connection any more.
+func (j *job) downloaded() {
+	j.mu.Lock()
+	j.netDone, j.conns, j.split = true, 0, false
+	j.mu.Unlock()
 }
 
 func (j *job) setStep(step string) {
@@ -113,6 +195,7 @@ func (j *job) fill(v *Save) {
 	}
 	v.Progress = j.progress
 	if j.step == Downloading {
+		v.Connections = j.conns
 		v.SpeedBps = j.speed
 		if j.speed > 0 && v.BytesTotal > v.BytesDone {
 			v.ETASeconds = int64(float64(v.BytesTotal-v.BytesDone) / j.speed)
@@ -211,7 +294,21 @@ func (s *Service) step(ctx context.Context) {
 	}
 
 	sources := s.pendingSources(ctx)
-	s.autoPause(ctx, c, sources)
+	var playing []Playing
+	if c.PauseWhileWatching && s.Activity != nil && len(sources) > 0 {
+		playing = s.Activity(ctx)
+	}
+	// Sources whose provider's connection limit is known share its free connections.
+	budgets := map[string]Budget{}
+	if s.Connections != nil && s.VOD != nil && len(sources) > 0 {
+		live := s.Connections()
+		for _, src := range sources {
+			if b := ConnectionBudget(src, s.VOD.SourceHost(src), live, playing); budgeted(c, b) {
+				budgets[src] = b
+			}
+		}
+	}
+	s.autoPause(ctx, c, sources, playing, budgets)
 	queuePaused := s.QueuePaused(ctx)
 	// Outside the maintenance window (when downloads are limited to it), running saves stop
 	// and keep their partial files, like a paused queue.
@@ -221,8 +318,50 @@ func (s *Service) step(ctx context.Context) {
 	}
 	s.pruneHistory(ctx)
 
+	for _, src := range sources {
+		b, ok := budgets[src]
+		s.mu.Lock()
+		if !ok {
+			delete(s.waitReason, src)
+			delete(s.caps, src)
+			s.mu.Unlock()
+			continue
+		}
+		full := b.allowed(false)
+		cap := s.connCap(src, b.allowed(c.PauseWhileWatching), full)
+		spare, running := s.shrink(src, cap)
+		s.waitReason[src] = ""
+		if spare == 0 && running < maxConnections {
+			switch {
+			case cap < full:
+				s.waitReason[src] = "Waiting: connections in use by viewers"
+			case full < min(b.Limit, maxConnections):
+				s.waitReason[src] = "Waiting: connections in use by recordings"
+			}
+		}
+		down := time.Now().Before(s.down[src].until)
+		s.mu.Unlock()
+		if queuePaused || down {
+			continue
+		}
+		started := 0
+		if n := min(spare, maxConnections-running); n > 0 {
+			for _, v := range s.nextQueued(ctx, src, n) {
+				s.start(ctx, v, true)
+				started++
+			}
+		}
+		// Connections still free go to large downloads, as more segments.
+		s.mu.Lock()
+		s.grow(src, spare-started)
+		s.mu.Unlock()
+	}
+
 	if !queuePaused {
 		for _, src := range sources {
+			if _, ok := budgets[src]; ok {
+				continue
+			}
 			s.mu.Lock()
 			blocked := s.pauseReason[src] != "" || time.Now().Before(s.down[src].until)
 			running := 0
@@ -235,26 +374,30 @@ func (s *Service) step(ctx context.Context) {
 			if blocked || running >= c.ConcurrentPerSource {
 				continue
 			}
-			rows, err := s.DB.QueryContext(ctx, "SELECT "+saveCols+` FROM vod_saves WHERE state=? AND source_id=?
-				AND (next_attempt_at IS NULL OR next_attempt_at<=?) ORDER BY queue_pos, id LIMIT ?`,
-				Queued, src, now(), c.ConcurrentPerSource-running)
-			if err != nil {
-				continue
-			}
-			var next []Save
-			for rows.Next() {
-				if v, err := scanSave(rows); err == nil {
-					next = append(next, v)
-				}
-			}
-			rows.Close()
-			for _, v := range next {
-				s.start(ctx, v)
+			for _, v := range s.nextQueued(ctx, src, c.ConcurrentPerSource-running) {
+				s.start(ctx, v, false)
 			}
 		}
 	}
 	s.checkDrained(ctx)
 	s.scanPending(ctx)
+}
+
+// nextQueued are the next n saves of a source waiting to run.
+func (s *Service) nextQueued(ctx context.Context, src string, n int) []Save {
+	rows, err := s.DB.QueryContext(ctx, "SELECT "+saveCols+` FROM vod_saves WHERE state=? AND source_id=?
+		AND (next_attempt_at IS NULL OR next_attempt_at<=?) ORDER BY queue_pos, id LIMIT ?`, Queued, src, now(), n)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var next []Save
+	for rows.Next() {
+		if v, err := scanSave(rows); err == nil {
+			next = append(next, v)
+		}
+	}
+	return next
 }
 
 // pendingSources are the sources with saves waiting or running.
@@ -276,14 +419,18 @@ func (s *Service) pendingSources(ctx context.Context) []string {
 
 // autoPause pauses the saves of sources something is being watched from (or of every
 // source, with scope "any"), and resumes them once nothing has been for the grace period.
-func (s *Service) autoPause(ctx context.Context, c settings.VODSave, sources []string) {
-	var playing []Playing
-	if c.PauseWhileWatching && s.Activity != nil && len(sources) > 0 {
-		playing = s.Activity(ctx)
-	}
+// Sources with a connection budget don't pause: they give back connections instead.
+func (s *Service) autoPause(ctx context.Context, c settings.VODSave, sources []string, playing []Playing, budgets map[string]Budget) {
 	t := time.Now()
 	var stop []string
 	for _, src := range sources {
+		if _, ok := budgets[src]; ok {
+			s.mu.Lock()
+			delete(s.pauseReason, src)
+			delete(s.lastActive, src)
+			s.mu.Unlock()
+			continue
+		}
 		host := ""
 		if s.VOD != nil {
 			host = s.VOD.SourceHost(src)
@@ -352,10 +499,13 @@ func HostOf(link string) string {
 	return u.Hostname()
 }
 
-func (s *Service) start(ctx context.Context, v Save) {
+func (s *Service) start(ctx context.Context, v Save, budget bool) {
 	jctx, cancel := context.WithCancelCause(ctx)
-	j := &job{id: v.ID, sourceID: v.SourceID, cancel: cancel, step: Downloading, done: v.BytesDone, total: v.BytesTotal}
+	j := &job{id: v.ID, sourceID: v.SourceID, cancel: cancel, step: Downloading, done: v.BytesDone, total: v.BytesTotal,
+		budget: budget, want: 1, wantCh: make(chan struct{}, 1)}
 	s.mu.Lock()
+	s.seq++
+	j.seq = s.seq
 	s.jobs[v.ID] = j
 	s.mu.Unlock()
 	if _, err := s.DB.ExecContext(ctx, "UPDATE vod_saves SET state=?, started_at=COALESCE(started_at, ?), next_attempt_at=NULL WHERE id=?",
@@ -416,7 +566,7 @@ func (s *Service) finish(ctx context.Context, jctx context.Context, j *job, v Sa
 	case errors.Is(cause, errUserPaused):
 		s.DB.ExecContext(ctx, "UPDATE vod_saves SET bytes_done=? WHERE id=?", done, v.ID)
 		return
-	case errors.Is(cause, errQueuePaused), errors.Is(cause, errAutoPaused), errors.Is(cause, errShutdown):
+	case errors.Is(cause, errQueuePaused), errors.Is(cause, errAutoPaused), errors.Is(cause, errYielded), errors.Is(cause, errShutdown):
 		s.DB.ExecContext(ctx, "UPDATE vod_saves SET bytes_done=? WHERE id=?", done, v.ID)
 		s.setState(ctx, v.ID, Queued)
 		return
@@ -586,10 +736,12 @@ func (s *Service) scanPending(ctx context.Context) {
 	}
 }
 
-// removeParts deletes a save's partial files.
+// removeParts deletes a save's partial files (and a segmented download's state).
 func removeParts(target string) {
-	os.Remove(target + ".part")
-	os.Remove(target + ".source.part")
+	for _, p := range []string{target + ".part", target + ".source.part"} {
+		os.Remove(p)
+		os.Remove(segsPath(p))
+	}
 }
 
 // mkdirs makes a folder and any missing parents, group-writable (the server runs as 99:100).

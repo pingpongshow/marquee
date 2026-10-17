@@ -57,6 +57,7 @@ func (s *Service) run(ctx context.Context, j *job, v Save) (outcome, error) {
 		return outcome{}, permError{err, false}
 	}
 	sum, total, err := s.download(ctx, j, v, link, ua, dl, processed)
+	j.downloaded() // converting and verifying need no connection
 	if err != nil {
 		return outcome{}, err
 	}
@@ -184,6 +185,27 @@ func (s *Service) download(ctx context.Context, j *job, v Save, link, ua, part s
 	if err != nil {
 		return "", 0, err
 	}
+	// A segmented download left off: continued over the free connections, else on one.
+	segOK := j.budget
+	if seg, ok := loadSegs(part); ok {
+		if segOK {
+			err := s.segmented(ctx, j, v, link, ua, f, part, seg, nil, processed)
+			if err == nil {
+				sum, err := fileSHA256(ctx, part)
+				return sum, seg.Total, err
+			}
+			if !errors.Is(err, errSegFallback) {
+				return "", 0, err
+			}
+			segOK = false
+		}
+		if err := collapse(f, part, seg); err != nil {
+			return "", 0, permError{err, true}
+		}
+		if st, err = f.Stat(); err != nil {
+			return "", 0, err
+		}
+	}
 	have := st.Size()
 	h := sha256.New()
 	// Already complete (stopped while converting or verifying).
@@ -195,9 +217,40 @@ func (s *Service) download(ctx context.Context, j *job, v Save, link, ua, part s
 		return hex.EncodeToString(h.Sum(nil)), have, nil
 	}
 	for attempt := 0; ; attempt++ {
-		resp, err := s.get(ctx, link, ua, have)
+		var resp *http.Response
+		var err error
+		if segOK {
+			// Asked as a range even from the start: a 206 says the server can split it.
+			resp, err = s.getRange(ctx, link, ua, have, -1)
+		} else {
+			resp, err = s.get(ctx, link, ua, have)
+		}
 		if err != nil {
 			return "", 0, err
+		}
+		if seg := s.segmentable(resp, have, segOK); seg != nil {
+			err := s.segmented(ctx, j, v, link, ua, f, part, seg, resp, processed)
+			if err == nil {
+				sum, err := fileSHA256(ctx, part)
+				return sum, seg.Total, err
+			}
+			if !errors.Is(err, errSegFallback) {
+				return "", 0, err
+			}
+			// Fall back to one connection from what's complete from the start.
+			segOK = false
+			if seg2, ok := loadSegs(part); ok {
+				seg = seg2
+			}
+			if err := collapse(f, part, seg); err != nil {
+				return "", 0, permError{err, true}
+			}
+			st, err := f.Stat()
+			if err != nil {
+				return "", 0, err
+			}
+			have = st.Size()
+			continue
 		}
 		total := int64(0)
 		switch {
@@ -251,7 +304,9 @@ func (s *Service) download(ctx context.Context, j *job, v Save, link, ua, part s
 			return "", 0, permError{fmt.Errorf("the source answered %s", resp.Status), resp.StatusCode == http.StatusTooManyRequests}
 		}
 		s.sourceUp(v.SourceID)
+		j.addConns(1)
 		err = s.receive(ctx, j, v, resp, f, h, have, total, processed)
+		j.addConns(-1)
 		resp.Body.Close()
 		if err != nil {
 			return "", 0, err
@@ -269,7 +324,47 @@ func restart(f *os.File, h hash.Hash) error {
 	return err
 }
 
+// segmentable is the segmented download to start with an answer (to a Range request from
+// have): a known size of at least SegmentMin and the range asked for. nil = one
+// connection.
+func (s *Service) segmentable(resp *http.Response, have int64, ok bool) *segFile {
+	if !ok || resp.StatusCode != http.StatusPartialContent {
+		return nil
+	}
+	m := contentRange.FindStringSubmatch(resp.Header.Get("Content-Range"))
+	if m == nil || m[3] == "*" {
+		return nil
+	}
+	start, _ := strconv.ParseInt(m[1], 10, 64)
+	total, _ := strconv.ParseInt(m[3], 10, 64)
+	if start != have || total < s.segmentMin() || total <= have {
+		return nil
+	}
+	seg := &segFile{Total: total}
+	if have > 0 {
+		seg.Segments = append(seg.Segments, &segment{Start: 0, End: have, Done: have})
+	}
+	seg.Segments = append(seg.Segments, &segment{Start: have, End: total})
+	return seg
+}
+
 func (s *Service) get(ctx context.Context, link, ua string, from int64) (*http.Response, error) {
+	if from > 0 {
+		return s.getRange(ctx, link, ua, from, -1)
+	}
+	return s.request(ctx, link, ua, "")
+}
+
+// getRange asks for the bytes from–to (to < 0: to the end).
+func (s *Service) getRange(ctx context.Context, link, ua string, from, to int64) (*http.Response, error) {
+	rg := fmt.Sprintf("bytes=%d-", from)
+	if to >= 0 {
+		rg += strconv.FormatInt(to, 10)
+	}
+	return s.request(ctx, link, ua, rg)
+}
+
+func (s *Service) request(ctx context.Context, link, ua, rg string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
 	if err != nil {
 		return nil, permError{errors.New("the source's link isn't valid"), false}
@@ -277,8 +372,8 @@ func (s *Service) get(ctx context.Context, link, ua string, from int64) (*http.R
 	if ua != "" {
 		req.Header.Set("User-Agent", ua)
 	}
-	if from > 0 {
-		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", from))
+	if rg != "" {
+		req.Header.Set("Range", rg)
 	}
 	resp, err := s.client().Do(req)
 	if err != nil {

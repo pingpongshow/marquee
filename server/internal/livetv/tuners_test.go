@@ -212,6 +212,15 @@ func TestConnectionLimit(t *testing.T) {
 	rec := &Recorder{Live: s, FFmpeg: ff, Dir: filepath.Join(dir, "rec")}
 	s.DVR = rec
 	o := Options{VideoCodecs: []string{"h264"}, AudioCodecs: []string{"aac"}}
+	// VOD downloads hear of each connection about to open, already counted, before the
+	// source is asked.
+	var hookMu sync.Mutex
+	var heard []string
+	s.BeforeConnect = func(sourceID string) {
+		hookMu.Lock()
+		defer hookMu.Unlock()
+		heard = append(heard, sourceID+" "+strconv.Itoa(s.InUse(sourceID))+" gold "+strconv.Itoa(src.count("/gold"))+" news "+strconv.Itoa(src.count("/news")))
+	}
 
 	// Nothing in use: everything is available.
 	avail := s.Availability()
@@ -290,4 +299,11 @@ func TestConnectionLimit(t *testing.T) {
 		t.Errorf("in use after pre-empting: %d", n)
 	}
 	rec.Stop(ctx, id, false)
+	hookMu.Lock()
+	defer hookMu.Unlock()
+	// The first recording, the live stream on News, the second recording: each counted in
+	// use, and heard of before it connected.
+	if strings.Join(heard, ", ") != "d 1 gold 0 news 0, d 1 gold 1 news 0, d 1 gold 1 news "+strconv.Itoa(src.count("/news")) {
+		t.Errorf("before connect: %q", heard)
+	}
 }

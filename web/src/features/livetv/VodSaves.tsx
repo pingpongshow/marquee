@@ -460,7 +460,11 @@ function SaveRow({ v }: { v: VodSave }) {
               </span>
             )}
             <Badge tone={v.state === "failed" ? "danger" : running || v.state === "done" ? "accent" : "muted"}>
-              {v.state === "done" && v.replacedPath ? "Upgraded" : stateText[v.state]}
+              {v.state === "done" && v.replacedPath
+                ? "Upgraded"
+                : v.state === "downloading" && (v.connections ?? 0) > 1
+                  ? `Downloading (${v.connections} connections)`
+                  : stateText[v.state]}
             </Badge>
             {v.upgrade && v.state !== "done" && (
               <span

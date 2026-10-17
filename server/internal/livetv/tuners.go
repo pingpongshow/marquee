@@ -127,6 +127,20 @@ func (s *Service) use(sourceID string) sourceUse {
 // InUse is how many connections a source has in use now.
 func (s *Service) InUse(sourceID string) int { return s.use(sourceID).n() }
 
+// Use is how many connections a source has in use now, and how many of them recordings
+// hold.
+func (s *Service) Use(sourceID string) (inUse, recordings int) {
+	u := s.use(sourceID)
+	return u.n(), len(u.recordings)
+}
+
+// beforeConnect lets VOD downloads give back a connection about to be opened.
+func (s *Service) beforeConnect(sourceID string) {
+	if s.BeforeConnect != nil && sourceID != "" {
+		s.BeforeConnect(sourceID)
+	}
+}
+
 // Availability returns a function telling whether a channel can be tuned now, and why
 // not. Usage is read once, so call it once per listing.
 func (s *Service) Availability() func(c Channel) (bool, string) {
@@ -180,6 +194,7 @@ func (s *Service) Tune(ctx context.Context, c Channel, userID int64, o Options) 
 	s.Sessions.addPending(c.SourceID, 1) // holds the connection while it tunes
 	s.tuneMu.Unlock()
 	defer s.Sessions.addPending(c.SourceID, -1)
+	s.beforeConnect(c.SourceID)
 	return s.Sessions.Start(ctx, c.ID, userID, c.StreamURL, o)
 }
 

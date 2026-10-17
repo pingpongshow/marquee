@@ -92,6 +92,7 @@ type fakeSource struct {
 	// behaviours
 	dropAfter       int64         // the next response ends after this many bytes (once)
 	ignoreRange     bool          // always the whole file
+	failBounded     bool          // a Range with an end ("bytes=a-b") answers 500
 	fileStatus      int           // file requests answer this (0 = normal)
 	statusAfterDrop int           // fileStatus becomes this once a response was dropped
 	down            atomic.Bool   // everything answers 503
@@ -165,6 +166,7 @@ func (f *fakeSource) serve(w http.ResponseWriter, r *http.Request) {
 		f.fileStatus = f.statusAfterDrop
 	}
 	ignore := f.ignoreRange
+	failBounded := f.failBounded
 	f.inFlight++
 	f.maxIn = max(f.maxIn, f.inFlight)
 	delay := f.delay
@@ -182,21 +184,30 @@ func (f *fakeSource) serve(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	start := int64(0)
+	start, end := int64(0), int64(len(data))
 	if rg := r.Header.Get("Range"); rg != "" && !ignore {
-		start, _ = strconv.ParseInt(strings.TrimSuffix(strings.TrimPrefix(rg, "bytes="), "-"), 10, 64)
+		from, to, bounded := strings.Cut(strings.TrimPrefix(rg, "bytes="), "-")
+		start, _ = strconv.ParseInt(from, 10, 64)
+		if bounded && to != "" {
+			if failBounded {
+				http.Error(w, "nope", http.StatusInternalServerError)
+				return
+			}
+			e, _ := strconv.ParseInt(to, 10, 64)
+			end = min(e+1, end)
+		}
 		if start >= int64(len(data)) {
 			w.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
 			return
 		}
-		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, len(data)-1, len(data)))
-		w.Header().Set("Content-Length", strconv.Itoa(len(data)-int(start)))
+		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end-1, len(data)))
+		w.Header().Set("Content-Length", strconv.Itoa(int(end-start)))
 		w.WriteHeader(http.StatusPartialContent)
 	} else {
 		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 		w.WriteHeader(http.StatusOK)
 	}
-	body := data[start:]
+	body := data[start:end]
 	sent := int64(0)
 	for len(body) > 0 {
 		n := min(len(body), 64<<10)

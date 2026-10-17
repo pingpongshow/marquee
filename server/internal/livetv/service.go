@@ -36,6 +36,10 @@ type Service struct {
 	// DVR, when set, is the recorder, whose recordings in progress hold connections
 	// (tuners.go).
 	DVR *Recorder
+	// BeforeConnect, when set, is called just before a live stream or a recording opens a
+	// connection to a source, already counted in InUse: VOD downloads from the same
+	// provider give back the connections it needs (it may block a moment).
+	BeforeConnect func(sourceID string)
 
 	refreshing sync.Mutex
 	tuneMu     sync.Mutex

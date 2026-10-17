@@ -551,6 +551,9 @@ func (h *Handlers) vodSaveActivity(ctx context.Context) []ActivityTask {
 		switch v.State {
 		case vodsave.Downloading:
 			t.Title = "Downloading " + v.Title
+			if v.Connections > 1 {
+				t.Title += fmt.Sprintf(" (%d connections)", v.Connections)
+			}
 			detail := fmt.Sprintf("%.1f of %.1f GB", float64(v.BytesDone)/(1<<30), float64(v.BytesTotal)/(1<<30))
 			if v.SpeedBps > 0 {
 				detail += fmt.Sprintf(" · %.1f MB/s", v.SpeedBps/mb)

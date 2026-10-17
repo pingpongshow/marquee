@@ -84,8 +84,12 @@ type Service struct {
 	// library scan.
 	Libraries func(ctx context.Context) ([]library.Library, error)
 	Scan      func(libID int64)
-	// Activity is what's being watched now (nil: nothing pauses saves).
+	// Activity is what's being watched now (nil: nothing pauses saves). Each film or
+	// episode playing is listed once per stream (each holds a provider connection).
 	Activity func(ctx context.Context) []Playing
+	// Connections lists the Live TV sources' connection limits and use (nil: no limit is
+	// known, so ConcurrentPerSource decides; budget.go).
+	Connections func() []LiveUse
 	// OnFailed hears a save that failed; OnDrained hears the queue empty after saving
 	// (admin alerts).
 	OnFailed  func(s Save)
@@ -106,6 +110,9 @@ type Service struct {
 	RetryFailedEvery time.Duration   // failed saves are queued again this often (4 h)
 	ScanEvery        time.Duration   // while a library keeps getting files, scans at most this often (15 min)
 	ProbeGap         time.Duration   // the least time between two probes of files on demand (2 s)
+	// SegmentMin is the least size of a download split over several connections (200 MB);
+	// SplitMin the least a segment is split into (32 MB).
+	SegmentMin, SplitMin int64
 
 	once        sync.Once
 	mu          sync.Mutex
@@ -113,6 +120,9 @@ type Service struct {
 	jobs        map[int64]*job
 	lastActive  map[string]time.Time // source -> last time something was watched from it
 	pauseReason map[string]string    // source -> why it is paused automatically
+	waitReason  map[string]string    // source -> why queued saves wait for connections
+	caps        map[string]*capState // source -> connections its downloads may hold
+	seq         int64
 	down        map[string]sourceDown
 	lastScan    map[int64]time.Time
 	pendingScan map[int64]bool
@@ -146,6 +156,8 @@ func (s *Service) init() {
 		s.jobs = map[int64]*job{}
 		s.lastActive = map[string]time.Time{}
 		s.pauseReason = map[string]string{}
+		s.waitReason = map[string]string{}
+		s.caps = map[string]*capState{}
 		s.down = map[string]sourceDown{}
 		s.lastScan = map[int64]time.Time{}
 		s.pendingScan = map[int64]bool{}
@@ -210,6 +222,7 @@ type Save struct {
 	SpeedBps    float64
 	ETASeconds  int64
 	PauseReason string // why a queued save isn't running (paused queue, watching, source down)
+	Connections int    // connections it downloads over now
 }
 
 const saveCols = `id, source_id, kind, vod_id, COALESCE(series_id,0), source_key, file, title, COALESCE(tmdb_id,0), expected_ms,
@@ -301,6 +314,8 @@ func (s *Service) List(ctx context.Context) ([]Save, error) {
 				v.PauseReason = "Waiting for the maintenance window"
 			case s.pauseReason[v.SourceID] != "":
 				v.PauseReason = s.pauseReason[v.SourceID]
+			case s.waitReason[v.SourceID] != "":
+				v.PauseReason = s.waitReason[v.SourceID]
 			case s.down[v.SourceID].err != "":
 				d := s.down[v.SourceID]
 				v.PauseReason = "Source unreachable (" + d.err + "); trying again at " + d.until.Local().Format("15:04")

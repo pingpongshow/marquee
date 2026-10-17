@@ -182,7 +182,7 @@ func toAPIVodSave(v vodsave.Save) VodSave {
 		BytesTotal: v.BytesTotal, Progress: float32(v.Progress), Attempts: v.Attempts, Verified: v.Verified,
 		VerifyNote: nz(v.VerifyNote), Sha256: nz(v.SHA256), Error: nz(v.Error), PauseReason: nz(v.PauseReason),
 		CreatedAt: v.CreatedAt, StartedAt: v.StartedAt, FinishedAt: v.FinishedAt, NextAttemptAt: v.NextAttemptAt,
-		EtaSeconds: nz(v.ETASeconds), ReplacedPath: nz(v.ReplacedPath), DestinationName: nz(v.DestinationName),
+		EtaSeconds: nz(v.ETASeconds), Connections: nz(v.Connections), ReplacedPath: nz(v.ReplacedPath), DestinationName: nz(v.DestinationName),
 		DestinationFolder: nz(v.DestinationFolder)}
 	if v.NoLibrary {
 		out.NoLibrary = ptr(true)
