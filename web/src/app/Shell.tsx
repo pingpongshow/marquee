@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { liveStatusQuery } from "@/features/livetv/api";
 import { vodStatusQuery } from "@/features/livetv/vodApi";
 import { requestsStatusQuery } from "@/features/requests/api";
@@ -137,6 +137,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const libraries = useQuery(librariesQuery);
   const [navOpen, setNavOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const navigate = useNavigate();
   const music = useMusicState();
 
   // "/" jumps to search from anywhere, unless you're typing in a field.
@@ -176,6 +177,23 @@ export function Shell({ children }: { children: ReactNode }) {
   const onVod = !onVodShows && (location.pathname === "/vod" || location.pathname.startsWith("/vod/"));
   const sidebar = (
     <nav aria-label="Libraries" className="flex h-full flex-col gap-1 overflow-y-auto p-3">
+      {/* Who's watching, above Home: one click opens the profile picker (friends, who have
+          no household profiles, go to their account instead). */}
+      {me.data && (
+        <button
+          onClick={() => {
+            setNavOpen(false);
+            if (me.data?.restrictions.friend) void navigate({ to: "/account" });
+            else setSwitching(true);
+          }}
+          className={clsx(navItem, "mb-2")}
+          title={me.data.restrictions.friend ? "Account" : "Switch profile"}
+        >
+          <Avatar name={me.data.displayName} url={me.data.avatarUrl} className="size-7 shrink-0 !bg-accent text-xs text-black" />
+          <span className="min-w-0 flex-1 truncate text-left">{me.data.displayName}</span>
+          {!me.data.restrictions.friend && <Users className="size-4 shrink-0 text-faint" aria-hidden />}
+        </button>
+      )}
       <Link
         to="/"
         className={navItem}
