@@ -197,7 +197,6 @@ func TestEstimate(t *testing.T) {
 	}
 }
 
-
 // The full-GPU path is used for NVENC when nothing needs the CPU: not for tone mapping,
 // sources NVDEC can't decode or unusual pixel formats, and never for other encoders.
 func TestFullGPU(t *testing.T) {
