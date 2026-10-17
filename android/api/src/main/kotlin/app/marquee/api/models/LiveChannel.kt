@@ -41,6 +41,8 @@ import kotlinx.serialization.Contextual
  * @param hidden The caller hid it (listed only with hidden=true).
  * @param now 
  * @param next 
+ * @param available False while every connection its source allows is in use (recordings and viewers) and this channel isn't one of those being received; tuning it would answer 409 no_tuner. Absent = available (older servers). Channel up/down should skip unavailable channels.
+ * @param unavailableReason Why it isn't available, e.g. \"All connections are in use: recording Gold Rush\".
  */
 @Serializable
 
@@ -74,7 +76,15 @@ data class LiveChannel (
     val now: LiveProgramme? = null,
 
     @SerialName(value = "next")
-    val next: LiveProgramme? = null
+    val next: LiveProgramme? = null,
+
+    /* False while every connection its source allows is in use (recordings and viewers) and this channel isn't one of those being received; tuning it would answer 409 no_tuner. Absent = available (older servers). Channel up/down should skip unavailable channels. */
+    @SerialName(value = "available")
+    val available: kotlin.Boolean? = null,
+
+    /* Why it isn't available, e.g. \"All connections are in use: recording Gold Rush\". */
+    @SerialName(value = "unavailableReason")
+    val unavailableReason: kotlin.String? = null
 
 ) {
 

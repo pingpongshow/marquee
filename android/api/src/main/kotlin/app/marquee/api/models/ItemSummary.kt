@@ -63,6 +63,7 @@ import kotlinx.serialization.Contextual
  * @param watchedLeafCount Shows, seasons, artists, albums: how many episodes/tracks the user has watched.
  * @param userRating The user's rating, 0–10 (10 = loved).
  * @param watchlisted On the user's watchlist (USER-8).
+ * @param favorite One of the user's favourites (the heart). Absent or false when it isn't.
  * @param extraType Set for extras (LIB-8).
  * @param releaseType Albums: the kind of release, from MusicBrainz (META-3). Absent when unknown.
  * @param audioFormat 
@@ -163,6 +164,10 @@ data class ItemSummary (
     /* On the user's watchlist (USER-8). */
     @SerialName(value = "watchlisted")
     val watchlisted: kotlin.Boolean? = null,
+
+    /* One of the user's favourites (the heart). Absent or false when it isn't. */
+    @SerialName(value = "favorite")
+    val favorite: kotlin.Boolean? = null,
 
     /* Set for extras (LIB-8). */
     @SerialName(value = "extraType")

@@ -41,9 +41,10 @@ import kotlinx.serialization.Contextual
  * @param fromName 
  * @param mailConfigured Host, port and from address are set.
  * @param linkUrl Address links in mail start with (e.g. reset links). Empty = the Remote Access URL.
- * @param alerts Alert types that are on. All are off by default.
+ * @param alerts Alert types that are on. All are off by default except vod_save_failed.
  * @param dvrQuotaAlert The dvr_quota alert is on: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Off by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.)
  * @param plexSyncAlert The plex_sync alert is on: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Off by default. (Not in AlertType; notifications carry type plex_sync.)
+ * @param optimizeFailedAlert The optimize_failed alert is on: a Library Health → Large files conversion failed (not one skipped for saving too little). On by default. (Not in AlertType; notifications carry type optimize_failed.)
  * @param recipientsAllAdmins Mail alerts to every administrator with an email address.
  * @param recipients Administrators (user ids) who get alert mail when recipientsAllAdmins is off.
  * @param diskThresholdPercent Alert when a volume has less free space than this.
@@ -82,7 +83,7 @@ data class NotificationSettings (
     @SerialName(value = "linkUrl")
     val linkUrl: kotlin.String? = null,
 
-    /* Alert types that are on. All are off by default. */
+    /* Alert types that are on. All are off by default except vod_save_failed. */
     @SerialName(value = "alerts")
     val alerts: kotlin.collections.List<@Contextual AlertType>? = null,
 
@@ -93,6 +94,10 @@ data class NotificationSettings (
     /* The plex_sync alert is on: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Off by default. (Not in AlertType; notifications carry type plex_sync.) */
     @SerialName(value = "plexSyncAlert")
     val plexSyncAlert: kotlin.Boolean? = null,
+
+    /* The optimize_failed alert is on: a Library Health → Large files conversion failed (not one skipped for saving too little). On by default. (Not in AlertType; notifications carry type optimize_failed.) */
+    @SerialName(value = "optimizeFailedAlert")
+    val optimizeFailedAlert: kotlin.Boolean? = null,
 
     /* Mail alerts to every administrator with an email address. */
     @SerialName(value = "recipientsAllAdmins")

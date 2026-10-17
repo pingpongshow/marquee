@@ -57,6 +57,7 @@ import kotlinx.serialization.Contextual
  * @param viewOffsetMs Finished recordings: where the caller stopped watching (0 = not started or finished), to resume from the Recordings list.
  * @param durationMs Finished recordings: the recorded item's length.
  * @param watched Finished recordings: the caller has watched it to the end.
+ * @param stoppedEarly Someone stopped it before the programme ended (Stop and keep): what was recorded until then was kept as a playable file.
  */
 @Serializable
 
@@ -146,7 +147,11 @@ data class Recording (
 
     /* Finished recordings: the caller has watched it to the end. */
     @SerialName(value = "watched")
-    val watched: kotlin.Boolean? = null
+    val watched: kotlin.Boolean? = null,
+
+    /* Someone stopped it before the programme ended (Stop and keep): what was recorded until then was kept as a playable file. */
+    @SerialName(value = "stoppedEarly")
+    val stoppedEarly: kotlin.Boolean? = null
 
 ) {
 

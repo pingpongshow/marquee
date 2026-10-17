@@ -62,6 +62,7 @@ open class SearchApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * 
      * @param q 
      * @param limit Maximum results per type. (optional, default to 10)
+     * @param favorites Only the user&#39;s favourites (the heart). (optional)
      * @return SearchResults
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -71,8 +72,8 @@ open class SearchApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun search(q: kotlin.String, limit: kotlin.Int? = 10) : SearchResults {
-        val localVarResponse = searchWithHttpInfo(q = q, limit = limit)
+    fun search(q: kotlin.String, limit: kotlin.Int? = 10, favorites: kotlin.Boolean? = null) : SearchResults {
+        val localVarResponse = searchWithHttpInfo(q = q, limit = limit, favorites = favorites)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as SearchResults
@@ -95,14 +96,15 @@ open class SearchApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * 
      * @param q 
      * @param limit Maximum results per type. (optional, default to 10)
+     * @param favorites Only the user&#39;s favourites (the heart). (optional)
      * @return ApiResponse<SearchResults?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun searchWithHttpInfo(q: kotlin.String, limit: kotlin.Int?) : ApiResponse<SearchResults?> {
-        val localVariableConfig = searchRequestConfig(q = q, limit = limit)
+    fun searchWithHttpInfo(q: kotlin.String, limit: kotlin.Int?, favorites: kotlin.Boolean?) : ApiResponse<SearchResults?> {
+        val localVariableConfig = searchRequestConfig(q = q, limit = limit, favorites = favorites)
 
         return request<Unit, SearchResults>(
             localVariableConfig
@@ -114,15 +116,19 @@ open class SearchApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      *
      * @param q 
      * @param limit Maximum results per type. (optional, default to 10)
+     * @param favorites Only the user&#39;s favourites (the heart). (optional)
      * @return RequestConfig
      */
-    fun searchRequestConfig(q: kotlin.String, limit: kotlin.Int?) : RequestConfig<Unit> {
+    fun searchRequestConfig(q: kotlin.String, limit: kotlin.Int?, favorites: kotlin.Boolean?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
                 put("q", listOf(q.toString()))
                 if (limit != null) {
                     put("limit", listOf(limit.toString()))
+                }
+                if (favorites != null) {
+                    put("favorites", listOf(favorites.toString()))
                 }
             }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()

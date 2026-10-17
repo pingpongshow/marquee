@@ -39,9 +39,9 @@ import kotlinx.serialization.Contextual
  * @param canRecord Deprecated: the same as canRecordDVR (kept for older clients). Read only when canRecordDVR isn't sent.
  * @param canRecordDVR May schedule Live TV recordings (LIVE-5). Default true; admins always may. A user who may not has their series paused.
  * @param canViewDVR May see and play the household's Live TV recordings (the DVR list and the recordings libraries). Default true; admins always may.
- * @param dvrQuotaGb This user's DVR quota in GB (10^9 bytes). Null or absent = the server default (integrations.dvrDefaultQuotaGb); 0 = unlimited.
+ * @param dvrQuotaGb This user's DVR quota in GB (10^9 bytes). Null or absent = the server default (integrations.dvrDefaultQuotaGb) for everyone but admins, who then have no limit; 0 = unlimited. An admin's own quota applies to them like anyone's. Admins may set it for anyone, admins and themselves included.
  * @param liveTv May watch Live TV (LIVE-4). Default true.
- * @param liveTvGroups Channel groups this user may watch. Null or absent = all.
+ * @param liveTvGroups Deprecated and ignored: channel groups no longer limit anyone (everyone who may watch Live TV sees every group). The server ignores it when written and never returns it.
  * @param seerrUserId The Seerr user requests are made as. Null = Seerr's API key owner.
  * @param friend Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker.
  */
@@ -81,7 +81,7 @@ data class UserRestrictions (
     @SerialName(value = "canViewDVR")
     val canViewDVR: kotlin.Boolean? = null,
 
-    /* This user's DVR quota in GB (10^9 bytes). Null or absent = the server default (integrations.dvrDefaultQuotaGb); 0 = unlimited. */
+    /* This user's DVR quota in GB (10^9 bytes). Null or absent = the server default (integrations.dvrDefaultQuotaGb) for everyone but admins, who then have no limit; 0 = unlimited. An admin's own quota applies to them like anyone's. Admins may set it for anyone, admins and themselves included. */
     @SerialName(value = "dvrQuotaGb")
     val dvrQuotaGb: kotlin.Int? = null,
 
@@ -89,8 +89,9 @@ data class UserRestrictions (
     @SerialName(value = "liveTv")
     val liveTv: kotlin.Boolean? = null,
 
-    /* Channel groups this user may watch. Null or absent = all. */
+    /* Deprecated and ignored: channel groups no longer limit anyone (everyone who may watch Live TV sees every group). The server ignores it when written and never returns it. */
     @SerialName(value = "liveTvGroups")
+    @Deprecated(message = "This property is deprecated.")
     val liveTvGroups: kotlin.collections.List<kotlin.String>? = null,
 
     /* The Seerr user requests are made as. Null = Seerr's API key owner. */

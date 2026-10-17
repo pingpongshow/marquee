@@ -427,7 +427,7 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
     /**
      * DELETE /files/{fileId}
      * Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
-     * The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item&#39;s last file the item goes too, along with a season or show left empty.
+     * The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good when the daily Empty media trash task runs. When it was the item&#39;s last file the item goes too, along with a season or show left empty.
      * @param fileId 
      * @return void
      * @throws IllegalStateException If the request is not correctly configured
@@ -458,7 +458,7 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
     /**
      * DELETE /files/{fileId}
      * Delete a media file from Library Health (ADM-11, admin only, when allowMediaDeletion is on).
-     * The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good after 30 days. When it was the item&#39;s last file the item goes too, along with a season or show left empty.
+     * The file, and the subtitles and artwork beside it that belong only to it, move to a .marquee-trash folder in its library folder and are removed for good when the daily Empty media trash task runs. When it was the item&#39;s last file the item goes too, along with a season or show left empty.
      * @param fileId 
      * @return ApiResponse<Unit?>
      * @throws IllegalStateException If the request is not correctly configured

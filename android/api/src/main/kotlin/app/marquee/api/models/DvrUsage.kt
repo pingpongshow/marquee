@@ -35,7 +35,7 @@ import kotlinx.serialization.Contextual
  * @param usedBytes Space the user's recordings take now: finished ones' files and in-progress ones' parts, wherever they are.
  * @param recordings Recordings counted.
  * @param quotaBytes The quota in bytes; 0 = unlimited.
- * @param quotaSource default = the server default applies; user = the user's own quota (which may be 0, unlimited).
+ * @param quotaSource default = the server default applies (for an admin without a quota of their own: no limit, so quotaBytes is 0); user = the user's own quota (which may be 0, unlimited).
  * @param overQuota At or over the quota.
  * @param displayName 
  * @param quotaGb The quota in GB; 0 = unlimited.
@@ -62,7 +62,7 @@ data class DvrUsage (
     @SerialName(value = "quotaBytes")
     val quotaBytes: kotlin.Long,
 
-    /* default = the server default applies; user = the user's own quota (which may be 0, unlimited). */
+    /* default = the server default applies (for an admin without a quota of their own: no limit, so quotaBytes is 0); user = the user's own quota (which may be 0, unlimited). */
     @SerialName(value = "quotaSource")
     val quotaSource: DvrUsage.QuotaSource,
 
@@ -90,7 +90,7 @@ data class DvrUsage (
 ) {
 
     /**
-     * default = the server default applies; user = the user's own quota (which may be 0, unlimited).
+     * default = the server default applies (for an admin without a quota of their own: no limit, so quotaBytes is 0); user = the user's own quota (which may be 0, unlimited).
      *
      * Values: DEFAULT,USER
      */

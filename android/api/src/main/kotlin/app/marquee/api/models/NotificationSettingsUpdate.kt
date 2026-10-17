@@ -40,9 +40,10 @@ import kotlinx.serialization.Contextual
  * @param fromAddress 
  * @param fromName 
  * @param linkUrl 
- * @param alerts Replaces the list; the dvr_quota and plex_sync alerts are kept as they were unless dvrQuotaAlert or plexSyncAlert is sent.
+ * @param alerts Replaces the list; the dvr_quota, plex_sync and optimize_failed alerts are kept as they were unless dvrQuotaAlert, plexSyncAlert or optimizeFailedAlert is sent.
  * @param dvrQuotaAlert 
  * @param plexSyncAlert 
+ * @param optimizeFailedAlert 
  * @param recipientsAllAdmins 
  * @param recipients 
  * @param diskThresholdPercent 
@@ -75,7 +76,7 @@ data class NotificationSettingsUpdate (
     @SerialName(value = "linkUrl")
     val linkUrl: kotlin.String? = null,
 
-    /* Replaces the list; the dvr_quota and plex_sync alerts are kept as they were unless dvrQuotaAlert or plexSyncAlert is sent. */
+    /* Replaces the list; the dvr_quota, plex_sync and optimize_failed alerts are kept as they were unless dvrQuotaAlert, plexSyncAlert or optimizeFailedAlert is sent. */
     @SerialName(value = "alerts")
     val alerts: kotlin.collections.List<@Contextual AlertType>? = null,
 
@@ -84,6 +85,9 @@ data class NotificationSettingsUpdate (
 
     @SerialName(value = "plexSyncAlert")
     val plexSyncAlert: kotlin.Boolean? = null,
+
+    @SerialName(value = "optimizeFailedAlert")
+    val optimizeFailedAlert: kotlin.Boolean? = null,
 
     @SerialName(value = "recipientsAllAdmins")
     val recipientsAllAdmins: kotlin.Boolean? = null,

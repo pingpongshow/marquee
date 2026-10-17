@@ -31,7 +31,7 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param seed 
+ * @param seed favourites: from your favourite songs, albums and artists (the heart) and what you play and rate highly.
  * @param itemId With seed item: a track, album or artist.
  * @param `value` With genre: the genre; decade: e.g. 1990; mood: a word or phrase.
  * @param libraryId 
@@ -42,6 +42,7 @@ import kotlinx.serialization.Contextual
 
 data class RadioRequest (
 
+    /* favourites: from your favourite songs, albums and artists (the heart) and what you play and rate highly. */
     @SerialName(value = "seed")
     val seed: RadioRequest.Seed,
 
@@ -66,7 +67,7 @@ data class RadioRequest (
 ) {
 
     /**
-     * 
+     * favourites: from your favourite songs, albums and artists (the heart) and what you play and rate highly.
      *
      * Values: ITEM,GENRE,DECADE,MOOD,FAVOURITES,LIBRARY
      */

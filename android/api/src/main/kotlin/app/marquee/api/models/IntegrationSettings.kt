@@ -49,6 +49,8 @@ import kotlinx.serialization.Contextual
  * @param comskipAvailable This server's build includes Comskip, so commercials can be found.
  * @param liveTvSources 
  * @param vodEnabled Movies on demand appear under Live TV (LIVE-6).
+ * @param vodAutoRefresh The movie sources' lists reload every vodRefreshHours after the last successful refresh (default on). Off: they reload only when an admin presses Refresh (and at start for a source that has never loaded).
+ * @param vodRefreshHours Hours between automatic syncs of the movie sources (default 6).
  * @param vodSources 
  */
 @Serializable
@@ -115,6 +117,14 @@ data class IntegrationSettings (
     /* Movies on demand appear under Live TV (LIVE-6). */
     @SerialName(value = "vodEnabled")
     val vodEnabled: kotlin.Boolean? = null,
+
+    /* The movie sources' lists reload every vodRefreshHours after the last successful refresh (default on). Off: they reload only when an admin presses Refresh (and at start for a source that has never loaded). */
+    @SerialName(value = "vodAutoRefresh")
+    val vodAutoRefresh: kotlin.Boolean? = null,
+
+    /* Hours between automatic syncs of the movie sources (default 6). */
+    @SerialName(value = "vodRefreshHours")
+    val vodRefreshHours: kotlin.Int? = null,
 
     @SerialName(value = "vodSources")
     val vodSources: kotlin.collections.List<VodSource>? = null

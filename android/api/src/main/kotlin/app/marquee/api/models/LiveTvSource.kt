@@ -38,6 +38,7 @@ import kotlinx.serialization.Contextual
  * @param epgUrl XMLTV guide (m3u sources; optional, else the playlist's url-tvg).
  * @param userAgent 
  * @param enabled 
+ * @param maxStreams Connections the provider allows at once (0 or absent = unlimited). At the limit other channels of this source are unavailable, a channel being recorded is watched from the recording's own connection, and a recording that needs a connection stops live streams on other channels of the source.
  */
 @Serializable
 
@@ -65,7 +66,11 @@ data class LiveTvSource (
     val userAgent: kotlin.String? = null,
 
     @SerialName(value = "enabled")
-    val enabled: kotlin.Boolean? = null
+    val enabled: kotlin.Boolean? = null,
+
+    /* Connections the provider allows at once (0 or absent = unlimited). At the limit other channels of this source are unavailable, a channel being recorded is watched from the recording's own connection, and a recording that needs a connection stops live streams on other channels of the source. */
+    @SerialName(value = "maxStreams")
+    val maxStreams: kotlin.Int? = null
 
 ) {
 
