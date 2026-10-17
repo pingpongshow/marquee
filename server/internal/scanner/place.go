@@ -258,27 +258,68 @@ func (w *writer) placeEpisode(ctx context.Context, c candidate, parts []string, 
 }
 
 func (w *writer) placeTrack(ctx context.Context, c candidate, res *probe.Result) (placement, error) {
-	t := readTrackTags(res.Tags, c.Rel)
+	// An admin may have moved this file's track to another album (see PlaceTrack).
+	o, err := w.placementOverride(ctx, c.Path)
+	if err != nil {
+		return placement{}, err
+	}
+	t := o.apply(readTrackTags(res.Tags, c.Rel))
+	artistID, albumID, err := w.trackParents(ctx, c, res, t, o.AlbumID)
+	if err != nil {
+		return placement{}, err
+	}
+	trackID, _, err := w.item(ctx, "track", "f:"+c.Rel, albumID, artistID,
+		itemFields{Idx: t.Track, Disc: t.Disc, Title: t.Title, ArtistCredit: t.Artist, MatchState: "local"})
+	if err != nil {
+		return placement{}, err
+	}
+	if t.MBTrackID != "" {
+		w.externalID(ctx, trackID, "musicbrainz", t.MBTrackID)
+	}
+	return placement{ItemID: trackID}, nil
+}
+
+// trackParents finds or creates a track's artist and album from its tags (or uses albumID,
+// an album in the library chosen by an admin, when it still exists).
+func (w *writer) trackParents(ctx context.Context, c candidate, res *probe.Result, t trackTags, albumID int64) (artistID, album int64, err error) {
+	if albumID > 0 {
+		err := w.tx.QueryRowContext(ctx, `SELECT parent_id FROM items WHERE id = ? AND library_id = ? AND type = 'album' AND parent_id IS NOT NULL`,
+			albumID, w.lib.ID).Scan(&artistID)
+		if err == nil {
+			return artistID, albumID, nil
+		}
+		if err != sql.ErrNoRows {
+			return 0, 0, err
+		}
+	}
 	artists := splitArtists(t.AlbumArtist)
 	primary := artists[0]
 
-	artistID, created, err := w.item(ctx, "artist", "a:"+naming.Normalize(primary), 0, 0,
+	artistKey := "a:" + naming.Normalize(primary)
+	artistID, created, err := w.item(ctx, "artist", artistKey, 0, 0,
 		itemFields{Title: primary, MatchState: "local"})
 	if err != nil {
-		return placement{}, err
+		return 0, 0, err
 	}
-	if created && t.MBArtistID != "" && len(artists) == 1 {
-		w.externalID(ctx, artistID, "musicbrainz", t.MBArtistID)
+	if created {
+		// An admin's MusicBrainz match for this artist wins over the tags.
+		if mbid := w.manualMBID(ctx, "artist", artistKey); mbid != "" {
+			w.externalID(ctx, artistID, "musicbrainz", mbid)
+		} else if t.MBArtistID != "" && len(artists) == 1 {
+			w.externalID(ctx, artistID, "musicbrainz", t.MBArtistID)
+		}
 	}
 
 	albumKey := "al:" + naming.Normalize(primary) + ":" + naming.Normalize(t.Album)
-	albumID, created, err := w.item(ctx, "album", albumKey, artistID, 0,
+	albumID, created, err = w.item(ctx, "album", albumKey, artistID, 0,
 		itemFields{Title: t.Album, Year: t.Year, ArtistCredit: t.AlbumArtist, MatchState: "local"})
 	if err != nil {
-		return placement{}, err
+		return 0, 0, err
 	}
 	if created {
-		if t.MBAlbumID != "" {
+		// A manual match (a release group) is used by the MusicBrainz lookup; the tags' release
+		// id would name another album.
+		if t.MBAlbumID != "" && w.manualMBID(ctx, "album", albumKey) == "" {
 			w.externalID(ctx, albumID, "musicbrainz", t.MBAlbumID)
 		}
 		dir := filepath.Dir(c.Path)
@@ -300,16 +341,7 @@ func (w *writer) placeTrack(ctx context.Context, c candidate, res *probe.Result)
 			}
 		}
 	}
-
-	trackID, _, err := w.item(ctx, "track", "f:"+c.Rel, albumID, artistID,
-		itemFields{Idx: t.Track, Disc: t.Disc, Title: t.Title, ArtistCredit: t.Artist, MatchState: "local"})
-	if err != nil {
-		return placement{}, err
-	}
-	if t.MBTrackID != "" {
-		w.externalID(ctx, trackID, "musicbrainz", t.MBTrackID)
-	}
-	return placement{ItemID: trackID}, nil
+	return artistID, albumID, nil
 }
 
 func (w *writer) placeVideo(ctx context.Context, c candidate, base string, res *probe.Result) (placement, error) {

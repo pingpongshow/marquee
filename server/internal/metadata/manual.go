@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"marquee/internal/metadata/tmdb"
 )
@@ -13,6 +15,12 @@ var (
 	ErrNotMatchable = errors.New("only movies and shows can be matched")
 	ErrNotMatched   = errors.New("item is not matched to TMDB")
 )
+
+// MatchRefError is a TMDB or IMDb id that can't be used for this item (a show's link pasted
+// into a movie's Fix Match); its text is shown to the admin.
+type MatchRefError string
+
+func (e MatchRefError) Error() string { return string(e) }
 
 type Candidate struct {
 	Provider, ID, Title, Original, Overview, PosterURL string
@@ -48,6 +56,13 @@ func (s *Service) Candidates(ctx context.Context, itemID int64, title string, ye
 	if err != nil {
 		return nil, err
 	}
+	if ref, ok := parseMatchRef(title); ok {
+		r, err := lookupRef(ctx, c, typ, ref)
+		if err != nil || r == nil {
+			return []Candidate{}, err
+		}
+		return []Candidate{candidate(*r, current)}, nil
+	}
 	var res []tmdb.SearchResult
 	if typ == "movie" {
 		res, err = c.SearchMovie(ctx, title, year)
@@ -65,17 +80,119 @@ func (s *Service) Candidates(ctx context.Context, itemID int64, title string, ye
 	}
 	out := make([]Candidate, 0, len(res))
 	for _, r := range res {
-		cand := Candidate{Provider: "tmdb", ID: strconv.Itoa(r.ID), Title: r.DisplayTitle(), Year: r.Year(),
-			Overview: r.Overview, Current: r.ID == current}
-		if o := r.Original(); o != cand.Title {
-			cand.Original = o
-		}
-		if r.PosterPath != "" {
-			cand.PosterURL = "https://image.tmdb.org/t/p/w154" + r.PosterPath
-		}
-		out = append(out, cand)
+		out = append(out, candidate(r, current))
 	}
 	return out, nil
+}
+
+func candidate(r tmdb.SearchResult, current int) Candidate {
+	cand := Candidate{Provider: "tmdb", ID: strconv.Itoa(r.ID), Title: r.DisplayTitle(), Year: r.Year(),
+		Overview: r.Overview, Current: r.ID == current}
+	if o := r.Original(); o != cand.Title {
+		cand.Original = o
+	}
+	if r.PosterPath != "" {
+		cand.PosterURL = "https://image.tmdb.org/t/p/w154" + r.PosterPath
+	}
+	return cand
+}
+
+// matchRef is a TMDB or IMDb id typed into Fix Match's search box instead of a title.
+type matchRef struct {
+	tmdb int
+	kind string // movie or tv when a TMDB link says which
+	imdb string
+}
+
+var (
+	tmdbLinkRe = regexp.MustCompile(`(?i)themoviedb\.org/(?:[a-z]{2}(?:-[a-z]{2})?/)?(movie|tv)/(\d+)`)
+	tmdbIDRe   = regexp.MustCompile(`(?i)^tmdb\s*[:#-]?\s*(\d+)$`)
+	imdbLinkRe = regexp.MustCompile(`(?i)imdb\.com/(?:[a-z]{2}/)?title/(tt\d+)`)
+	imdbIDRe   = regexp.MustCompile(`(?i)^(?:imdb\s*[:#-]?\s*)?(tt\d{6,})$`)
+)
+
+// parseMatchRef recognises a TMDB link (themoviedb.org/movie/603-the-matrix), "tmdb:603",
+// an IMDb id (tt0133093) or an IMDb link. Plain numbers stay a title search: films are
+// called "1917" and "2012".
+func parseMatchRef(q string) (matchRef, bool) {
+	q = strings.TrimSpace(q)
+	if m := tmdbLinkRe.FindStringSubmatch(q); m != nil {
+		id, _ := strconv.Atoi(m[2])
+		return matchRef{tmdb: id, kind: strings.ToLower(m[1])}, id > 0
+	}
+	if m := tmdbIDRe.FindStringSubmatch(q); m != nil {
+		id, _ := strconv.Atoi(m[1])
+		return matchRef{tmdb: id}, id > 0
+	}
+	if m := imdbLinkRe.FindStringSubmatch(q); m != nil {
+		return matchRef{imdb: strings.ToLower(m[1])}, true
+	}
+	if m := imdbIDRe.FindStringSubmatch(q); m != nil {
+		return matchRef{imdb: strings.ToLower(m[1])}, true
+	}
+	return matchRef{}, false
+}
+
+// lookupRef fetches the entry a matchRef names, as a search result for an item of type typ
+// (movie or show). nil when TMDB has no such entry.
+func lookupRef(ctx context.Context, c *tmdb.Client, typ string, ref matchRef) (*tmdb.SearchResult, error) {
+	want := "movie"
+	if typ == "show" {
+		want = "tv"
+	}
+	wrongKind := func(what string) error {
+		if want == "movie" {
+			return MatchRefError("that " + what + " is for a TV show, but this is a movie")
+		}
+		return MatchRefError("that " + what + " is for a movie, but this is a TV show")
+	}
+	if ref.imdb != "" {
+		movies, tv, err := c.Find(ctx, ref.imdb, "imdb_id")
+		if errors.Is(err, tmdb.ErrNotFound) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		mine, other := movies, tv
+		if want == "tv" {
+			mine, other = tv, movies
+		}
+		if len(mine) > 0 {
+			return &mine[0], nil
+		}
+		if len(other) > 0 {
+			return nil, wrongKind("IMDb id")
+		}
+		return nil, nil
+	}
+	if ref.kind != "" && ref.kind != want {
+		return nil, wrongKind("TMDB link")
+	}
+	var r tmdb.SearchResult
+	if want == "movie" {
+		m, err := c.MovieBasic(ctx, ref.tmdb)
+		if errors.Is(err, tmdb.ErrNotFound) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		r = tmdb.SearchResult{ID: m.ID, Title: m.Title, OriginalTitle: m.OriginalTitle, ReleaseDate: m.ReleaseDate, Overview: m.Overview, PosterPath: m.PosterPath}
+	} else {
+		t, err := c.TVBasic(ctx, ref.tmdb)
+		if errors.Is(err, tmdb.ErrNotFound) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		r = tmdb.SearchResult{ID: t.ID, Name: t.Name, OriginalName: t.OriginalName, FirstAirDate: t.FirstAirDate, Overview: t.Overview, PosterPath: t.PosterPath}
+	}
+	if r.ID == 0 {
+		return nil, nil
+	}
+	return &r, nil
 }
 
 // MatchTo matches an item to a specific TMDB entry and applies its metadata.

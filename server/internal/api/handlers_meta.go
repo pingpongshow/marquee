@@ -9,6 +9,7 @@ import (
 	"marquee/internal/items"
 	"marquee/internal/metadata"
 	"marquee/internal/metadata/tmdb"
+	"marquee/internal/scanner"
 )
 
 func (h *Handlers) EditItem(ctx context.Context, req EditItemRequestObject) (EditItemResponseObject, error) {
@@ -64,7 +65,12 @@ func (h *Handlers) EditItem(ctx context.Context, req EditItemRequestObject) (Edi
 
 // metaError maps metadata errors to a user-facing message; ok=false means internal error.
 func metaError(err error) (string, bool) {
+	var ref metadata.MatchRefError
 	switch {
+	case errors.As(err, &ref):
+		return ref.Error(), true
+	case errors.Is(err, metadata.ErrNotMusicMatchable):
+		return err.Error(), true
 	case errors.Is(err, metadata.ErrNotMatchable), errors.Is(err, metadata.ErrNotMatched):
 		return err.Error(), true
 	case errors.Is(err, tmdb.ErrNoKey):
@@ -130,6 +136,123 @@ func (h *Handlers) ApplyMatch(ctx context.Context, req ApplyMatchRequestObject) 
 		return nil, internal(ctx, "applyMatch", err)
 	}
 	return ApplyMatch200JSONResponse(out), nil
+}
+
+func (h *Handlers) SearchMusicMatches(ctx context.Context, req SearchMusicMatchesRequestObject) (SearchMusicMatchesResponseObject, error) {
+	switch authed, admin := isAdmin(ctx); {
+	case !authed:
+		return SearchMusicMatches401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !admin:
+		return SearchMusicMatches403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	q, artist := "", ""
+	set(&q, req.Params.Q)
+	set(&artist, req.Params.Artist)
+	cands, err := h.Metadata.MusicCandidates(ctx, req.ItemId, q, artist)
+	if err != nil {
+		if items.IsNotFound(err) {
+			return SearchMusicMatches404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
+		}
+		if msg, ok := metaError(err); ok {
+			return SearchMusicMatches400JSONResponse{BadRequestJSONResponse(apiErr("metadata", msg))}, nil
+		}
+		return nil, internal(ctx, "searchMusicMatches", err)
+	}
+	out := make(SearchMusicMatches200JSONResponse, len(cands))
+	for i, c := range cands {
+		out[i] = MusicMatchCandidate{Mbid: c.MBID, Name: c.Name, Disambiguation: nz(c.Disambiguation), Type: nz(c.Type), Country: nz(c.Country),
+			Year: nz(c.Year), BeginYear: nz(c.BeginYear), EndYear: nz(c.EndYear), Artist: nz(c.Artist), TrackCount: nz(c.TrackCount),
+			Score: nz(c.Score), Current: ptr(c.Current)}
+	}
+	return out, nil
+}
+
+func (h *Handlers) ApplyMusicMatch(ctx context.Context, req ApplyMusicMatchRequestObject) (ApplyMusicMatchResponseObject, error) {
+	switch authed, admin := isAdmin(ctx); {
+	case !authed:
+		return ApplyMusicMatch401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !admin:
+		return ApplyMusicMatch403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	if req.Body == nil || strings.TrimSpace(req.Body.Mbid) == "" {
+		return ApplyMusicMatch400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "a MusicBrainz id is required"))}, nil
+	}
+	if err := h.Metadata.MusicMatchTo(ctx, req.ItemId, req.Body.Mbid); err != nil {
+		if items.IsNotFound(err) {
+			return ApplyMusicMatch404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
+		}
+		if msg, ok := metaError(err); ok {
+			return ApplyMusicMatch400JSONResponse{BadRequestJSONResponse(apiErr("metadata", msg))}, nil
+		}
+		return nil, internal(ctx, "applyMusicMatch", err)
+	}
+	out, err := h.detail(ctx, req.ItemId)
+	if err != nil {
+		return nil, internal(ctx, "applyMusicMatch", err)
+	}
+	return ApplyMusicMatch200JSONResponse(out), nil
+}
+
+// placementError is the message for a track that can't be moved there.
+func placementError(err error) (string, bool) {
+	switch {
+	case errors.Is(err, scanner.ErrNotTrack), errors.Is(err, scanner.ErrAlbumNotInLibrary), errors.Is(err, scanner.ErrNoAlbum):
+		return err.Error(), true
+	}
+	return "", false
+}
+
+func (h *Handlers) SetTrackPlacement(ctx context.Context, req SetTrackPlacementRequestObject) (SetTrackPlacementResponseObject, error) {
+	switch authed, admin := isAdmin(ctx); {
+	case !authed:
+		return SetTrackPlacement401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !admin:
+		return SetTrackPlacement403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	var p scanner.Placement
+	if req.Body != nil {
+		set(&p.AlbumID, req.Body.AlbumId)
+		set(&p.AlbumArtist, req.Body.AlbumArtist)
+		set(&p.Album, req.Body.Album)
+		set(&p.Artist, req.Body.Artist)
+	}
+	if err := scanner.PlaceTrack(ctx, h.DB, req.ItemId, p); err != nil {
+		if items.IsNotFound(err) {
+			return SetTrackPlacement404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
+		}
+		if msg, ok := placementError(err); ok {
+			return SetTrackPlacement400JSONResponse{BadRequestJSONResponse(apiErr("invalid", msg))}, nil
+		}
+		return nil, internal(ctx, "setTrackPlacement", err)
+	}
+	out, err := h.detail(ctx, req.ItemId)
+	if err != nil {
+		return nil, internal(ctx, "setTrackPlacement", err)
+	}
+	return SetTrackPlacement200JSONResponse(out), nil
+}
+
+func (h *Handlers) ClearTrackPlacement(ctx context.Context, req ClearTrackPlacementRequestObject) (ClearTrackPlacementResponseObject, error) {
+	switch authed, admin := isAdmin(ctx); {
+	case !authed:
+		return ClearTrackPlacement401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !admin:
+		return ClearTrackPlacement403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	if err := scanner.UnplaceTrack(ctx, h.DB, req.ItemId); err != nil {
+		if items.IsNotFound(err) {
+			return ClearTrackPlacement404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
+		}
+		if msg, ok := placementError(err); ok {
+			return ClearTrackPlacement400JSONResponse{BadRequestJSONResponse(apiErr("invalid", msg))}, nil
+		}
+		return nil, internal(ctx, "clearTrackPlacement", err)
+	}
+	out, err := h.detail(ctx, req.ItemId)
+	if err != nil {
+		return nil, internal(ctx, "clearTrackPlacement", err)
+	}
+	return ClearTrackPlacement200JSONResponse(out), nil
 }
 
 func (h *Handlers) RefreshItem(ctx context.Context, req RefreshItemRequestObject) (RefreshItemResponseObject, error) {

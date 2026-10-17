@@ -222,8 +222,8 @@ func (c *Client) SearchTV(ctx context.Context, query string, year int) ([]Search
 	return r.Results, err
 }
 
-// FindByExternalID resolves an IMDb or TVDB id to TMDB ids. source: imdb_id, tvdb_id.
-func (c *Client) FindByExternalID(ctx context.Context, id, source string) (movieIDs, tvIDs []int, err error) {
+// Find resolves an IMDb or TVDB id to TMDB movies and shows. source: imdb_id, tvdb_id.
+func (c *Client) Find(ctx context.Context, id, source string) (movies, tv []SearchResult, err error) {
 	var r struct {
 		Movies []SearchResult `json:"movie_results"`
 		TV     []SearchResult `json:"tv_results"`
@@ -231,10 +231,19 @@ func (c *Client) FindByExternalID(ctx context.Context, id, source string) (movie
 	if err := c.get(ctx, "/find/"+url.PathEscape(id), url.Values{"external_source": {source}}, &r); err != nil {
 		return nil, nil, err
 	}
-	for _, m := range r.Movies {
+	return r.Movies, r.TV, nil
+}
+
+// FindByExternalID resolves an IMDb or TVDB id to TMDB ids. source: imdb_id, tvdb_id.
+func (c *Client) FindByExternalID(ctx context.Context, id, source string) (movieIDs, tvIDs []int, err error) {
+	movies, tv, err := c.Find(ctx, id, source)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, m := range movies {
 		movieIDs = append(movieIDs, m.ID)
 	}
-	for _, t := range r.TV {
+	for _, t := range tv {
 		tvIDs = append(tvIDs, t.ID)
 	}
 	return movieIDs, tvIDs, nil
@@ -515,6 +524,13 @@ func (t *TVShow) Certification(country string) string {
 		}
 	}
 	return ""
+}
+
+// TVBasic fetches a show without credits, images or seasons' details.
+func (c *Client) TVBasic(ctx context.Context, id int) (*TVShow, error) {
+	var t TVShow
+	err := c.get(ctx, "/tv/"+strconv.Itoa(id), nil, &t)
+	return &t, err
 }
 
 func (c *Client) TV(ctx context.Context, id int) (*TVShow, error) {

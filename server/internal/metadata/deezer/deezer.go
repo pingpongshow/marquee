@@ -72,6 +72,15 @@ func (c *Client) SearchArtists(ctx context.Context, name string) ([]Artist, erro
 	return r.Data, nil
 }
 
+// Artist looks an artist up by Deezer id.
+func (c *Client) Artist(ctx context.Context, id string) (Artist, error) {
+	var a Artist
+	if err := c.get(ctx, "/artist/"+url.PathEscape(id), url.Values{}, &a); err != nil {
+		return Artist{}, err
+	}
+	return a, nil
+}
+
 func (c *Client) SearchAlbums(ctx context.Context, artist, album string) ([]Album, error) {
 	var r struct {
 		Data []Album `json:"data"`

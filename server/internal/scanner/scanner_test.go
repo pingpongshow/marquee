@@ -3,6 +3,7 @@ package scanner
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,9 +25,11 @@ type fakeProber struct{ video *probe.Result }
 func (f fakeProber) Probe(_ context.Context, p string) (*probe.Result, error) {
 	if ext(p) == "flac" {
 		parts := strings.Split(strings.TrimSuffix(filepath.Base(p), ".flac"), "|")
-		return &probe.Result{Container: "flac", DurationMS: 200_000, Tags: map[string]string{
-			"album_artist": parts[0], "artist": parts[0], "album": parts[1], "track": parts[2], "title": parts[3],
-		}, Streams: []probe.Stream{{Kind: "audio", Codec: "flac"}}}, nil
+		tags := map[string]string{"album_artist": parts[0], "artist": parts[0], "album": parts[1], "track": parts[2], "title": parts[3]}
+		// As ffprobe reports it, so the tags are kept with the file (probe_json).
+		raw, _ := json.Marshal(map[string]any{"format": map[string]any{"format_name": "flac", "duration": "200", "tags": tags},
+			"streams": []map[string]any{{"index": 0, "codec_type": "audio", "codec_name": "flac"}}})
+		return probe.Parse(raw)
 	}
 	return f.video, nil
 }

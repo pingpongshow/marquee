@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Check, History, Lock, Pencil, RefreshCw, Scissors, Search, Trash2, Unlock } from "lucide-react";
+import { Check, Disc3, History, Lock, Pencil, RefreshCw, Scissors, Search, Trash2, Unlock } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, unwrap } from "@/api/client";
 import type { components } from "@/api/schema.gen";
 import type { ItemDetail } from "@/api/types";
 import { Alert, Button, Dialog, Field, Input, Spinner } from "@/components/ui";
 import { ItemFiles } from "./FileNames";
+import { MoveTrackDialog, MusicMatchDialog } from "./MusicFixes";
 import {
   canRemove,
   commercialsText,
@@ -53,12 +54,13 @@ export function FixMatchDialog({ item, onClose }: { item: ItemDetail; onClose: (
     <Dialog open wide onClose={onClose} title="Fix match">
       <ItemFiles item={item} />
       <form onSubmit={search} className="mb-4 flex gap-2">
-        <Input aria-label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <Input aria-label="Title" placeholder="Title, or a TMDB or IMDb link or ID" value={title} onChange={(e) => setTitle(e.target.value)} />
         <Input aria-label="Year" placeholder="Year" inputMode="numeric" className="w-24" value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, "").slice(0, 4))} />
         <Button type="submit" variant="secondary">
           <Search className="size-4" /> Search
         </Button>
       </form>
+      <p className="-mt-2 mb-4 text-xs text-faint">Title, or a TMDB or IMDb link or ID (themoviedb.org/movie/603, tt0133093).</p>
       {(cands.isError || apply.isError) && <Alert tone="error">{(cands.error ?? apply.error)?.message}</Alert>}
       {cands.isFetching && <Spinner label="Searching TMDB" />}
       {cands.data?.length === 0 && <p className="py-6 text-center text-sm text-muted">No matches. Try a different title or remove the year.</p>}
@@ -204,9 +206,10 @@ function EditDialog({ item, onClose }: { item: ItemDetail; onClose: () => void }
 export function ItemActions({ item }: { item: ItemDetail }) {
   const updated = useItemUpdated();
   const [open, setOpen] = useState(false);
-  const [dialog, setDialog] = useState<"edit" | "match" | null>(null);
+  const [dialog, setDialog] = useState<"edit" | "match" | "musicMatch" | "move" | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const matchable = item.type === "movie" || item.type === "show";
+  const musicMatchable = item.type === "artist" || item.type === "album";
   const navigate = useNavigate();
   const removeCollection = useMutation({
     mutationFn: () => unwrap(api.DELETE("/collections/{collectionId}", { params: { path: { collectionId: item.id } } })),
@@ -244,6 +247,16 @@ export function ItemActions({ item }: { item: ItemDetail }) {
                 <Search className="size-4" /> Fix match…
               </button>
             )}
+            {musicMatchable && (
+              <button className={itemCls} onClick={() => setDialog("musicMatch")}>
+                <Search className="size-4" /> Fix match…
+              </button>
+            )}
+            {item.type === "track" && (
+              <button className={itemCls} onClick={() => setDialog("move")}>
+                <Disc3 className="size-4" /> Move to album…
+              </button>
+            )}
             {matchable && item.matchState === "matched" && (
               <button className={itemCls} onClick={() => refresh.mutate()}>
                 <RefreshCw className="size-4" /> Refresh metadata
@@ -278,6 +291,8 @@ export function ItemActions({ item }: { item: ItemDetail }) {
       {refresh.isError && <span className="text-sm text-danger">{refresh.error.message}</span>}
       {adError && <span className="text-sm text-danger">{adError.message}</span>}
       {dialog === "match" && <FixMatchDialog item={item} onClose={() => setDialog(null)} />}
+      {dialog === "musicMatch" && <MusicMatchDialog item={item} onClose={() => setDialog(null)} />}
+      {dialog === "move" && <MoveTrackDialog track={item} onClose={() => setDialog(null)} />}
       {dialog === "edit" && <EditDialog item={item} onClose={() => setDialog(null)} />}
     </>
   );

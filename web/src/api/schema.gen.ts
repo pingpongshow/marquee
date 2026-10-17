@@ -782,6 +782,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/items/{itemId}/music-match": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        /** MusicBrainz candidates for Fix match of a music artist or album (admin only; 400 for anything else). */
+        get: operations["searchMusicMatches"];
+        /** Match a music artist or album to a MusicBrainz artist or release group and look its details up again (admin only). The choice outlasts rescans and wins over MBIDs in tags; locked fields are kept. */
+        put: operations["applyMusicMatch"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{itemId}/music-placement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Move a track to another album without editing its file (admin only, tracks only). Kept through rescans; albums and artists left empty are removed. */
+        put: operations["setTrackPlacement"];
+        post?: never;
+        /** Put a moved track back where its file's tags say it belongs (admin only, tracks only). */
+        delete: operations["clearTrackPlacement"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/items/{itemId}/refresh": {
         parameters: {
             query?: never;
@@ -7032,6 +7072,45 @@ export interface components {
             provider: "tmdb";
             id: string;
         };
+        /** @description A MusicBrainz artist or release group offered by Fix match for music. */
+        MusicMatchCandidate: {
+            /** @description Artist MBID or release group MBID. */
+            mbid: string;
+            /** @description Artist name or album title. */
+            name: string;
+            /** @description MusicBrainz's note telling same-named entries apart ("US singer"). */
+            disambiguation?: string;
+            /** @description Artists: person, group, orchestra, choir… Albums: album, ep, single, live, compilation, soundtrack, remix, demo, other. */
+            type?: string;
+            /** @description Artists; ISO 3166-1 code. */
+            country?: string;
+            /** @description Albums; year first released. */
+            year?: number;
+            /** @description Artists. */
+            beginYear?: number;
+            /** @description Artists. */
+            endYear?: number;
+            /** @description Albums; the artist credit. */
+            artist?: string;
+            trackCount?: number;
+            /** @description MusicBrainz search score, 0–100. */
+            score?: number;
+            /** @description The item is currently matched to this entry. */
+            current?: boolean;
+        };
+        MusicMatchRequest: {
+            /** @description Artist MBID for an artist; release group (or release) MBID for an album. A musicbrainz.org link works too. */
+            mbid: string;
+        };
+        /** @description Either albumId (an album in the track's library) or albumArtist and album (found or created in the track's library). */
+        TrackPlacementRequest: {
+            /** Format: int64 */
+            albumId?: number;
+            albumArtist?: string;
+            album?: string;
+            /** @description The track's own artist, when it should change too. */
+            artist?: string;
+        };
         /** @description External ratings (OMDb). Absent values are unknown. */
         Ratings: {
             /** @description 0–10 */
@@ -7061,6 +7140,8 @@ export interface components {
         ItemDetail: components["schemas"]["ItemSummary"] & {
             /** @description Fields edited by an administrator; agents never overwrite them. */
             lockedFields: string[];
+            /** @description Tracks, for admins; moved to another album by hand (see /items/{itemId}/music-placement). */
+            placementOverride?: boolean;
             /** @description Collections the item belongs to (META-7). */
             collections?: components["schemas"]["ItemSummary"][];
             smartRules?: components["schemas"]["SmartCollectionRules"];
@@ -8921,7 +9002,7 @@ export interface operations {
     searchMatches: {
         parameters: {
             query?: {
-                /** @description Defaults to the item's title. */
+                /** @description Defaults to the item's title. A TMDB link (themoviedb.org/movie/603, /tv/1399), tmdb:603, an IMDb id (tt0133093) or an IMDb link is looked up directly and returns that one entry (none when TMDB doesn't have it; 400 when it is a show for a movie or a movie for a show). Plain numbers are titles (1917). */
                 title?: string;
                 year?: number;
             };
@@ -8964,6 +9045,123 @@ export interface operations {
         };
         responses: {
             /** @description Matched. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    searchMusicMatches: {
+        parameters: {
+            query?: {
+                /** @description Artist name or album title; defaults to the item's. A MusicBrainz id or musicbrainz.org link (artist, release group or release) is looked up directly. */
+                q?: string;
+                /** @description Albums only; defaults to the album's artist. */
+                artist?: string;
+            };
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MusicMatchCandidate"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    applyMusicMatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MusicMatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Matched. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setTrackPlacement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrackPlacementRequest"];
+            };
+        };
+        responses: {
+            /** @description Moved; the track. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    clearTrackPlacement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Back as tagged; the track. */
             200: {
                 headers: {
                     [name: string]: unknown;

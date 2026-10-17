@@ -142,11 +142,13 @@ type ReleaseGroup struct {
 	PrimaryType      string   `json:"primary-type"`
 	SecondaryTypes   []string `json:"secondary-types"`
 	FirstReleaseDate string   `json:"first-release-date"`
+	Disambiguation   string   `json:"disambiguation"`
 	Genres           []Genre  `json:"genres"`
 	Tags             []Genre  `json:"tags"`
 	ArtistCredit     []struct {
-		Name   string `json:"name"`
-		Artist struct {
+		Name       string `json:"name"`
+		JoinPhrase string `json:"joinphrase"`
+		Artist     struct {
 			ID   string `json:"id"`
 			Name string `json:"name"`
 		} `json:"artist"`
@@ -263,21 +265,85 @@ func (c *Client) ReleaseGroupOf(ctx context.Context, releaseID string) (string, 
 	return out.ReleaseGroup.ID, label, nil
 }
 
-// ReleaseGroup looks a release group up, with genres.
+// ReleaseGroup looks a release group up, with genres and its artist credit.
 func (c *Client) ReleaseGroup(ctx context.Context, id string) (ReleaseGroup, error) {
 	var g ReleaseGroup
-	err := c.get(ctx, "/release-group/"+url.PathEscape(id), url.Values{"inc": {"genres tags"}}, &g)
+	err := c.get(ctx, "/release-group/"+url.PathEscape(id), url.Values{"inc": {"genres tags artist-credits"}}, &g)
 	return g, err
 }
 
-// SearchReleaseGroups finds an artist's release groups by title.
+// SearchReleaseGroups finds an artist's release groups by title (any artist's when artist
+// is empty).
 func (c *Client) SearchReleaseGroups(ctx context.Context, artist, title string) ([]ReleaseGroup, error) {
 	var out struct {
 		ReleaseGroups []ReleaseGroup `json:"release-groups"`
 	}
-	q := "releasegroup:" + quote(title) + " AND artist:" + quote(artist)
+	q := "releasegroup:" + quote(title)
+	if artist != "" {
+		q += " AND artist:" + quote(artist)
+	}
 	err := c.get(ctx, "/release-group", url.Values{"query": {q}, "limit": {"10"}}, &out)
 	return out.ReleaseGroups, err
+}
+
+// ReleaseGroupLabel is the first label of a release group's earliest release ("" when none).
+func (c *Client) ReleaseGroupLabel(ctx context.Context, id string) (string, error) {
+	var out struct {
+		Releases []struct {
+			Date      string `json:"date"`
+			LabelInfo []struct {
+				Label *struct {
+					Name string `json:"name"`
+				} `json:"label"`
+			} `json:"label-info"`
+		} `json:"releases"`
+	}
+	if err := c.get(ctx, "/release", url.Values{"release-group": {id}, "inc": {"labels"}, "limit": {"25"}}, &out); err != nil {
+		return "", err
+	}
+	sort.SliceStable(out.Releases, func(i, j int) bool {
+		a, b := out.Releases[i].Date, out.Releases[j].Date
+		return a != "" && (b == "" || a < b)
+	})
+	for _, r := range out.Releases {
+		for _, l := range r.LabelInfo {
+			if l.Label != nil && l.Label.Name != "" && !strings.EqualFold(l.Label.Name, "[no label]") {
+				return l.Label.Name, nil
+			}
+		}
+	}
+	return "", nil
+}
+
+// Credit is the release group's artist credit as printed ("Simon & Garfunkel").
+func (g ReleaseGroup) Credit() string {
+	var b strings.Builder
+	for _, c := range g.ArtistCredit {
+		b.WriteString(c.Name)
+		b.WriteString(c.JoinPhrase)
+	}
+	return strings.TrimSpace(b.String())
+}
+
+// DeezerID is the artist's Deezer id, from its links ("" when MusicBrainz has none).
+func (a Artist) DeezerID() string {
+	for _, r := range a.Rels {
+		u := r.URL.Resource
+		if i := strings.Index(u, "deezer.com/"); i >= 0 {
+			rest := u[i+len("deezer.com/"):]
+			// deezer.com/artist/27 or deezer.com/en/artist/27
+			if j := strings.Index(rest, "artist/"); j >= 0 && j <= 3 {
+				id := rest[j+len("artist/"):]
+				if k := strings.IndexAny(id, "/?#"); k >= 0 {
+					id = id[:k]
+				}
+				if id != "" && strings.Trim(id, "0123456789") == "" {
+					return id
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // ReleaseType maps MusicBrainz's primary and secondary types to Marquee's release types.

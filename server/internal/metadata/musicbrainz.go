@@ -39,10 +39,14 @@ const (
 type mbTodo struct {
 	id                  int64
 	typ, title, artist  string
-	mbid                string
+	mbid                string // artist MBID; an album's release MBID (from tags)
+	rgid                string // an album's release group MBID, when known
 	locked              string
 	sortTitle, released string
 	year                int
+	// manual: mbid (artists) or rgid (albums) was chosen by an admin (Fix match); the details
+	// it brings replace the old ones.
+	manual bool
 }
 
 // mbInfo is what's stored in music_info for a found item.
@@ -85,11 +89,13 @@ func (s *Service) EnrichMusic(ctx context.Context) (string, error) {
 	s.mu.Unlock()
 	retry := time.Now().UTC().Add(-180 * 24 * time.Hour).Format(time.RFC3339)
 	rows, err := s.DB.QueryContext(ctx, `SELECT i.id, i.type, i.title, COALESCE(a.title, ''), COALESCE(x.value, ''), i.locked_fields, i.sort_title,
-			COALESCE(i.originally_available_at, ''), COALESCE(i.year, 0)
+			COALESCE(i.originally_available_at, ''), COALESCE(i.year, 0), COALESCE(rg.value, ''), COALESCE(mm.mbid, '')
 		FROM items i
 		JOIN libraries l ON l.id = i.library_id AND l.type = 'music'
 		LEFT JOIN items a ON a.id = i.parent_id
 		LEFT JOIN external_ids x ON x.item_id = i.id AND x.provider = 'musicbrainz'
+		LEFT JOIN external_ids rg ON rg.item_id = i.id AND rg.provider = 'musicbrainz_releasegroup'
+		LEFT JOIN music_matches mm ON mm.library_id = i.library_id AND mm.kind = i.type AND mm.scan_key = i.scan_key
 		LEFT JOIN musicbrainz_lookups m ON m.item_id = i.id
 		LEFT JOIN music_info mi ON mi.item_id = i.id
 		WHERE i.type IN ('artist', 'album')
@@ -103,11 +109,19 @@ func (s *Service) EnrichMusic(ctx context.Context) (string, error) {
 	var list []mbTodo
 	for rows.Next() {
 		var t mbTodo
-		if err := rows.Scan(&t.id, &t.typ, &t.title, &t.artist, &t.mbid, &t.locked, &t.sortTitle, &t.released, &t.year); err != nil {
+		var manual string
+		if err := rows.Scan(&t.id, &t.typ, &t.title, &t.artist, &t.mbid, &t.locked, &t.sortTitle, &t.released, &t.year, &t.rgid, &manual); err != nil {
 			rows.Close()
 			return "", err
 		}
 		t.mbid = firstMBID(t.mbid)
+		// An admin's match wins over tags and earlier lookups.
+		switch {
+		case manual != "" && t.typ == "artist":
+			t.mbid, t.manual = manual, true
+		case manual != "":
+			t.mbid, t.rgid, t.manual = "", manual, true
+		}
 		list = append(list, t)
 	}
 	rows.Close()
@@ -211,9 +225,14 @@ func (s *Service) enrichArtist(ctx context.Context, mb *musicbrainz.Client, t mb
 			return false, err
 		}
 	}
+	return true, s.applyArtist(ctx, t, a)
+}
+
+// applyArtist stores what MusicBrainz knows about the artist, then fetches the extras.
+func (s *Service) applyArtist(ctx context.Context, t mbTodo, a musicbrainz.Artist) error {
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
-		return false, err
+		return err
 	}
 	defer tx.Rollback()
 	tx.ExecContext(ctx, `INSERT OR IGNORE INTO external_ids(item_id, provider, value) VALUES (?, 'musicbrainz', ?)`, t.id, a.ID)
@@ -221,7 +240,7 @@ func (s *Service) enrichArtist(ctx context.Context, mb *musicbrainz.Client, t mb
 		tx.ExecContext(ctx, `UPDATE items SET sort_title = ? WHERE id = ?`, sortName, t.id)
 	}
 	if err := addGenres(ctx, tx, t.id, a.Genres, t.locked); err != nil {
-		return false, err
+		return err
 	}
 	info := mbInfo{artistType: strings.ToLower(a.Type), gender: strings.ToLower(a.Gender), country: a.CountryCode()}
 	if a.Area != nil {
@@ -232,13 +251,13 @@ func (s *Service) enrichArtist(ctx context.Context, mb *musicbrainz.Client, t mb
 	}
 	info.beginYear, info.endYear = a.Years()
 	if err := saveInfo(ctx, tx, t, info, musicbrainz.Styles(a.Genres, a.Tags, mbStylesPerItem)); err != nil {
-		return false, err
+		return err
 	}
 	if err := tx.Commit(); err != nil {
-		return false, err
+		return err
 	}
 	s.artistExtras(ctx, t, a)
-	return true, nil
+	return nil
 }
 
 // artistExtras adds a Wikipedia bio when the artist has none, and the artist's most-listened
@@ -250,6 +269,9 @@ func (s *Service) artistExtras(ctx context.Context, t mbTodo, a musicbrainz.Arti
 	}
 	web := s.web
 	s.mu.Unlock()
+	if t.manual {
+		s.artistPicture(ctx, t, a)
+	}
 	if q := a.Wikidata(); q != "" && !lockedIn(t.locked, "summary") {
 		// Only when the artist has no summary (tags, Plex import or an earlier lookup may have one).
 		var cur sql.NullString
@@ -332,7 +354,15 @@ func (s *Service) setPopular(ctx context.Context, artistID int64, top []musicbra
 func (s *Service) enrichAlbum(ctx context.Context, mb *musicbrainz.Client, t mbTodo) (bool, error) {
 	var g musicbrainz.ReleaseGroup
 	var label string
-	if t.mbid != "" {
+	if t.mbid == "" && t.rgid != "" {
+		var err error
+		if g, err = mb.ReleaseGroup(ctx, t.rgid); err != nil {
+			return false, err
+		}
+		if label, err = mb.ReleaseGroupLabel(ctx, g.ID); err != nil && !errors.Is(err, musicbrainz.ErrNotFound) {
+			return false, err
+		}
+	} else if t.mbid != "" {
 		id, l, err := mb.ReleaseGroupOf(ctx, t.mbid)
 		if err != nil {
 			return false, err
@@ -369,30 +399,36 @@ func (s *Service) enrichAlbum(ctx context.Context, mb *musicbrainz.Client, t mbT
 			return false, err
 		}
 	}
+	return true, s.applyAlbum(ctx, t, g, label)
+}
+
+// applyAlbum stores what MusicBrainz knows about the album (its release group).
+func (s *Service) applyAlbum(ctx context.Context, t mbTodo, g musicbrainz.ReleaseGroup, label string) error {
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
-		return false, err
+		return err
 	}
 	defer tx.Rollback()
 	tx.ExecContext(ctx, `INSERT OR IGNORE INTO external_ids(item_id, provider, value) VALUES (?, 'musicbrainz_releasegroup', ?)`, t.id, g.ID)
 	if rt := g.ReleaseType(); rt != "" {
 		tx.ExecContext(ctx, `UPDATE items SET release_type = ? WHERE id = ?`, rt, t.id)
 	}
-	// The original release date, when the files only gave a year (or nothing).
-	if d := g.FirstReleaseDate; len(d) == 10 && len(t.released) < 10 && !lockedIn(t.locked, "originallyAvailableAt", "originally_available_at") {
+	// The original release date, when the files only gave a year (or nothing), or the album
+	// an admin picked.
+	if d := g.FirstReleaseDate; len(d) == 10 && (len(t.released) < 10 || t.manual) && !lockedIn(t.locked, "originallyAvailableAt", "originally_available_at") {
 		tx.ExecContext(ctx, `UPDATE items SET originally_available_at = ? WHERE id = ?`, d, t.id)
 	}
-	if y := year(g.FirstReleaseDate); y > 0 && t.year == 0 && !lockedIn(t.locked, "year") {
+	if y := year(g.FirstReleaseDate); y > 0 && (t.year == 0 || t.manual) && !lockedIn(t.locked, "year") {
 		tx.ExecContext(ctx, `UPDATE items SET year = ? WHERE id = ?`, y, t.id)
 	}
 	if err := addGenres(ctx, tx, t.id, g.Genres, t.locked); err != nil {
-		return false, err
+		return err
 	}
 	info := mbInfo{primaryType: strings.ToLower(g.PrimaryType), label: label}
 	if err := saveInfo(ctx, tx, t, info, musicbrainz.Styles(g.Genres, g.Tags, mbStylesPerItem)); err != nil {
-		return false, err
+		return err
 	}
-	return true, tx.Commit()
+	return tx.Commit()
 }
 
 func lockedIn(lockedJSON string, fields ...string) bool {

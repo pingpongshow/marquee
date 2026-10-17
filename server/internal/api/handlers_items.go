@@ -15,6 +15,7 @@ import (
 	"marquee/internal/images"
 	"marquee/internal/items"
 	"marquee/internal/library"
+	"marquee/internal/scanner"
 	"marquee/internal/vodsave"
 )
 
@@ -287,6 +288,9 @@ func (h *Handlers) detail(ctx context.Context, id int64) (ItemDetail, error) {
 			list[i] = toAPISummary(c)
 		}
 		out.Collections = &list
+	}
+	if d.Type == "track" && s.User.IsAdmin {
+		out.PlacementOverride = ptr(scanner.HasPlacement(ctx, h.DB, id))
 	}
 	if d.Type == "collection" {
 		if sc, ok := h.Items.Smart(ctx, id); ok {

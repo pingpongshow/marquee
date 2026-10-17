@@ -1084,7 +1084,7 @@ paths:
       parameters:
         - name: title
           in: query
-          description: Defaults to the item's title.
+          description: "Defaults to the item's title. A TMDB link (themoviedb.org/movie/603, /tv/1399), tmdb:603, an IMDb id (tt0133093) or an IMDb link is looked up directly and returns that one entry (none when TMDB doesn't have it; 400 when it is a show for a movie or a movie for a show). Plain numbers are titles (1917)."
           schema: { type: string }
         - name: year
           in: query
@@ -1113,6 +1113,91 @@ paths:
       responses:
         "200":
           description: Matched.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/music-match:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [items]
+      operationId: searchMusicMatches
+      summary: MusicBrainz candidates for Fix match of a music artist or album (admin only; 400 for anything else).
+      parameters:
+        - name: q
+          in: query
+          description: "Artist name or album title; defaults to the item's. A MusicBrainz id or musicbrainz.org link (artist, release group or release) is looked up directly."
+          schema: { type: string }
+        - name: artist
+          in: query
+          description: Albums only; defaults to the album's artist.
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MusicMatchCandidate" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [items]
+      operationId: applyMusicMatch
+      summary: "Match a music artist or album to a MusicBrainz artist or release group and look its details up again (admin only). The choice outlasts rescans and wins over MBIDs in tags; locked fields are kept."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MusicMatchRequest" }
+      responses:
+        "200":
+          description: Matched.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /items/{itemId}/music-placement:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    put:
+      tags: [items]
+      operationId: setTrackPlacement
+      summary: "Move a track to another album without editing its file (admin only, tracks only). Kept through rescans; albums and artists left empty are removed."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TrackPlacementRequest" }
+      responses:
+        "200":
+          description: Moved; the track.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [items]
+      operationId: clearTrackPlacement
+      summary: Put a moved track back where its file's tags say it belongs (admin only, tracks only).
+      responses:
+        "200":
+          description: Back as tagged; the track.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ItemDetail" }
@@ -7873,6 +7958,39 @@ components:
         provider: { type: string, enum: [tmdb] }
         id: { type: string }
 
+    MusicMatchCandidate:
+      type: object
+      description: A MusicBrainz artist or release group offered by Fix match for music.
+      required: [mbid, name]
+      properties:
+        mbid: { type: string, description: Artist MBID or release group MBID. }
+        name: { type: string, description: Artist name or album title. }
+        disambiguation: { type: string, description: "MusicBrainz's note telling same-named entries apart (\"US singer\")." }
+        type: { type: string, description: "Artists: person, group, orchestra, choir… Albums: album, ep, single, live, compilation, soundtrack, remix, demo, other." }
+        country: { type: string, description: Artists; ISO 3166-1 code. }
+        year: { type: integer, description: Albums; year first released. }
+        beginYear: { type: integer, description: Artists. }
+        endYear: { type: integer, description: Artists. }
+        artist: { type: string, description: Albums; the artist credit. }
+        trackCount: { type: integer }
+        score: { type: integer, description: "MusicBrainz search score, 0–100." }
+        current: { type: boolean, description: The item is currently matched to this entry. }
+
+    MusicMatchRequest:
+      type: object
+      required: [mbid]
+      properties:
+        mbid: { type: string, description: "Artist MBID for an artist; release group (or release) MBID for an album. A musicbrainz.org link works too." }
+
+    TrackPlacementRequest:
+      type: object
+      description: "Either albumId (an album in the track's library) or albumArtist and album (found or created in the track's library)."
+      properties:
+        albumId: { type: integer, format: int64 }
+        albumArtist: { type: string }
+        album: { type: string }
+        artist: { type: string, description: "The track's own artist, when it should change too." }
+
     Ratings:
       type: object
       description: External ratings (OMDb). Absent values are unknown.
@@ -7913,6 +8031,9 @@ components:
               type: array
               description: Fields edited by an administrator; agents never overwrite them.
               items: { type: string }
+            placementOverride:
+              type: boolean
+              description: Tracks, for admins; moved to another album by hand (see /items/{itemId}/music-placement).
             collections:
               type: array
               description: Collections the item belongs to (META-7).

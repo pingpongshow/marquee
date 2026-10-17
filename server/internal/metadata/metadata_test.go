@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -341,5 +343,100 @@ func TestRematchReplacesSeasonArt(t *testing.T) {
 	}
 	if u := selected(5, "poster"); u != "my-poster" {
 		t.Errorf("local poster replaced: %q", u)
+	}
+}
+
+func TestParseMatchRef(t *testing.T) {
+	for q, want := range map[string]matchRef{
+		"https://www.themoviedb.org/movie/603-the-matrix":   {tmdb: 603, kind: "movie"},
+		"themoviedb.org/tv/1399":                            {tmdb: 1399, kind: "tv"},
+		"https://www.themoviedb.org/de/tv/1399?language=de": {tmdb: 1399, kind: "tv"},
+		"tmdb:603":       {tmdb: 603},
+		"TMDB 603":       {tmdb: 603},
+		"tt0133093":      {imdb: "tt0133093"},
+		" TT0133093 ":    {imdb: "tt0133093"},
+		"imdb:tt0133093": {imdb: "tt0133093"},
+		"https://www.imdb.com/title/tt0133093/?ref_=nv": {imdb: "tt0133093"},
+		"https://m.imdb.com/title/tt0944947/":           {imdb: "tt0944947"},
+	} {
+		if got, ok := parseMatchRef(q); !ok || got != want {
+			t.Errorf("%q → %+v %v, want %+v", q, got, ok, want)
+		}
+	}
+	for _, q := range []string{"1917", "2012", "The Matrix", "tt", "tt12", "Matrix tt0133093 cut", ""} {
+		if got, ok := parseMatchRef(q); ok {
+			t.Errorf("%q should stay a title search, got %+v", q, got)
+		}
+	}
+}
+
+func TestCandidatesByID(t *testing.T) {
+	dir := t.TempDir()
+	ctx := context.Background()
+	d, err := db.Open(ctx, filepath.Join(dir, "t.db"), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	store, _ := settings.Open(ctx, d)
+	store.Update(ctx, func(s *settings.Settings) error { s.Metadata.TMDBAPIKey = "k"; return nil })
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/movie/603":
+			io.WriteString(w, `{"id":603,"title":"The Matrix","release_date":"1999-03-30","poster_path":"/p.jpg"}`)
+		case "/tv/1399":
+			io.WriteString(w, `{"id":1399,"name":"Game of Thrones","first_air_date":"2011-04-17"}`)
+		case "/find/tt0133093":
+			if r.URL.Query().Get("external_source") != "imdb_id" {
+				t.Errorf("find source: %s", r.URL.RawQuery)
+			}
+			io.WriteString(w, `{"movie_results":[{"id":603,"title":"The Matrix","release_date":"1999-03-30"}],"tv_results":[]}`)
+		case "/find/tt0944947":
+			io.WriteString(w, `{"movie_results":[],"tv_results":[{"id":1399,"name":"Game of Thrones","first_air_date":"2011-04-17"}]}`)
+		case "/find/tt0000001":
+			io.WriteString(w, `{"movie_results":[],"tv_results":[]}`)
+		case "/search/movie":
+			t.Errorf("searched by title: %s", r.URL.RawQuery)
+			io.WriteString(w, `{"results":[]}`)
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	defer srv.Close()
+	mustExec(t, d, `INSERT INTO libraries(id, name, type) VALUES (1, 'Movies', 'movies'), (2, 'Shows', 'shows')`)
+	mustExec(t, d, `INSERT INTO items(id, library_id, type, title, sort_title) VALUES (10, 1, 'movie', 'Matrix', 'Matrix'), (20, 2, 'show', 'GoT', 'GoT')`)
+	mustExec(t, d, `INSERT INTO external_ids(item_id, provider, value) VALUES (10, 'tmdb', '603')`)
+	svc := &Service{DB: d, Settings: store}
+	c, _ := svc.tmdb("en-US")
+	c.BaseURL = srv.URL
+
+	for _, q := range []string{"https://www.themoviedb.org/movie/603-the-matrix", "tmdb:603", "tt0133093", "https://www.imdb.com/title/tt0133093/"} {
+		cands, err := svc.Candidates(ctx, 10, q, 0)
+		if err != nil || len(cands) != 1 || cands[0].ID != "603" || cands[0].Year != 1999 || !cands[0].Current {
+			t.Errorf("%s: %v %+v", q, err, cands)
+		}
+	}
+	if cands, err := svc.Candidates(ctx, 20, "tt0944947", 0); err != nil || len(cands) != 1 || cands[0].Title != "Game of Thrones" || cands[0].Current {
+		t.Errorf("show by imdb: %v %+v", err, cands)
+	}
+	if cands, err := svc.Candidates(ctx, 20, "themoviedb.org/tv/1399", 0); err != nil || len(cands) != 1 || cands[0].ID != "1399" {
+		t.Errorf("show by link: %v %+v", err, cands)
+	}
+	// Not on TMDB: no candidates.
+	for _, q := range []string{"tt0000001", "tmdb:999"} {
+		if cands, err := svc.Candidates(ctx, 10, q, 0); err != nil || len(cands) != 0 {
+			t.Errorf("%s: %v %+v", q, err, cands)
+		}
+	}
+	// The wrong kind says so.
+	var ref MatchRefError
+	if _, err := svc.Candidates(ctx, 10, "https://www.themoviedb.org/tv/1399", 0); !errors.As(err, &ref) || !strings.Contains(err.Error(), "TV show") {
+		t.Errorf("show link on a movie: %v", err)
+	}
+	if _, err := svc.Candidates(ctx, 10, "tt0944947", 0); !errors.As(err, &ref) {
+		t.Errorf("show imdb id on a movie: %v", err)
+	}
+	if _, err := svc.Candidates(ctx, 20, "tt0133093", 0); !errors.As(err, &ref) || !strings.Contains(err.Error(), "movie") {
+		t.Errorf("movie imdb id on a show: %v", err)
 	}
 }

@@ -13,6 +13,7 @@ import { useRadio } from "../music/useRadio";
 import { AddToPlaylistDialog } from "../playlists/AddToPlaylist";
 import { useMusicActions } from "../player/MusicPlayer";
 import { AddToCollectionDialog } from "./AddToCollection";
+import { MoveTrackDialog } from "./MusicFixes";
 import { favoriteTypes, useSetFavorite } from "./Favorite";
 import { isWatched, markableTypes, useMarkWatched, useRemoveFromContinueWatching } from "./watched";
 
@@ -44,6 +45,7 @@ export function ItemMenu({
   const [adding, setAdding] = useState(false);
   const [journey, setJourney] = useState(false);
   const [collecting, setCollecting] = useState(false);
+  const [moving, setMoving] = useState(false);
   const radio = useRadio();
   const qc = useQueryClient();
   const admin = !!useQuery(meQuery).data?.isAdmin;
@@ -116,6 +118,11 @@ export function ItemMenu({
             Add to collection…
           </MenuItem>
         )}
+        {admin && item.type === "track" && (
+          <MenuItem icon={<Disc3 />} onClick={() => setMoving(true)}>
+            Move to album…
+          </MenuItem>
+        )}
         {item.type === "track" && (item.parentId || item.grandparentId) && <MenuDivider />}
         {item.type === "track" && item.parentId && (
           <MenuItem icon={<Disc3 />} onClick={() => navigate({ to: "/item/$itemId", params: { itemId: String(item.parentId) } })}>
@@ -130,6 +137,7 @@ export function ItemMenu({
       </Menu>
       {adding && <AddToPlaylistDialog item={item} onClose={() => setAdding(false)} />}
       {collecting && <AddToCollectionDialog item={item} onClose={() => setCollecting(false)} />}
+      {moving && <MoveTrackDialog track={item} onClose={() => setMoving(false)} />}
       {journey && <JourneyDialog from={item} onClose={() => setJourney(false)} />}
     </>
   );

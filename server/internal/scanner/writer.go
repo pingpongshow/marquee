@@ -97,6 +97,10 @@ func (w *writer) upsert(ctx context.Context, c candidate, res *probe.Result) (ou
 	// A file that disappeared from one place and appeared elsewhere with the same name
 	// and size was moved or its folder renamed: keep the record (and the watch history).
 	if id, ok := w.findMoved(c); ok {
+		// A track moved to another album by hand stays there.
+		if _, err := w.tx.ExecContext(ctx, `UPDATE track_placements SET path = ? WHERE path = (SELECT path FROM media_files WHERE id = ?)`, c.Path, id); err != nil {
+			return moved, err
+		}
 		if err := w.updateFile(ctx, id, c, res); err != nil {
 			return moved, err
 		}
