@@ -64,9 +64,17 @@ type VideoStream struct {
 type AudioStream struct {
 	Index       int
 	Codec       string
+	Profile     string // e.g. "LC", "HE-AAC", "HE-AACv2" (from the probe)
 	Channels    int
 	BitrateKbps int
 	Language    string
+}
+
+// heAAC reports HE-AAC (v1 or v2). Copied into HLS it is labelled and decoded
+// inconsistently (browsers reject it with bufferAddCodecError; broadcast recordings often
+// use it), so repackaged streams convert it to AAC-LC, which costs next to nothing.
+func heAAC(a *AudioStream) bool {
+	return a != nil && a.Codec == "aac" && strings.HasPrefix(strings.ToUpper(a.Profile), "HE")
 }
 
 type SubtitleStream struct {
@@ -231,7 +239,7 @@ func Decide(m Media, p DeviceProfile, l Limits) Decision {
 	if (videoOK || d.retag) && bitrateOK && !d.BurnSubtitle && p.HLS && has(p.HLSVideoCodecs, v.Codec) && !l.NoVideoCopy {
 		d.Method = DirectStream
 		d.VideoCopy = true
-		d.AudioCopy = a == nil || (has(p.HLSAudioCodecs, a.Codec) && (p.MaxAudioChannels == 0 || a.Channels <= p.MaxAudioChannels))
+		d.AudioCopy = a == nil || (has(p.HLSAudioCodecs, a.Codec) && (p.MaxAudioChannels == 0 || a.Channels <= p.MaxAudioChannels) && !heAAC(a))
 		if !d.AudioCopy {
 			d.AudioCodec, d.AudioChannels = audioTarget(a, p)
 			d.AudioKbps = audioKbps(d.AudioChannels)
@@ -256,7 +264,7 @@ func Decide(m Media, p DeviceProfile, l Limits) Decision {
 			d.Height = h
 		}
 	}
-	d.AudioCopy = a == nil || (has(p.HLSAudioCodecs, a.Codec) && (p.MaxAudioChannels == 0 || a.Channels <= p.MaxAudioChannels) && l.MaxKbps == 0)
+	d.AudioCopy = a == nil || (has(p.HLSAudioCodecs, a.Codec) && (p.MaxAudioChannels == 0 || a.Channels <= p.MaxAudioChannels) && l.MaxKbps == 0 && !heAAC(a))
 	if !d.AudioCopy {
 		d.AudioCodec, d.AudioChannels = audioTarget(a, p)
 		d.AudioKbps = audioKbps(d.AudioChannels)

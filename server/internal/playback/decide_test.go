@@ -128,3 +128,23 @@ func TestMusicAudioKbps(t *testing.T) {
 		t.Errorf("direct play: %+v", d)
 	}
 }
+
+// A broadcast recording (H.264 1080p in MKV, HE-AAC stereo) in a browser: the video is
+// repackaged as it is and the HE-AAC audio becomes AAC-LC (copied, Safari rejected it with
+// bufferAddCodecError). AAC-LC is still copied.
+func TestHEAACIsConvertedWhenRepackaged(t *testing.T) {
+	m := Media{Container: "mkv", BitrateKbps: 3600, Video: &VideoStream{Codec: "h264", Height: 1080, BitDepth: 8},
+		Audio: &AudioStream{Codec: "aac", Profile: "HE-AAC", Channels: 2}}
+	d := Decide(m, chrome, Limits{})
+	if d.Method != DirectStream || !d.VideoCopy || d.AudioCopy || d.AudioCodec != "aac" || d.AudioChannels != 2 {
+		t.Fatalf("HE-AAC: %+v", d)
+	}
+	m.Audio.Profile = "HE-AACv2"
+	if d := Decide(m, appleTV, Limits{}); d.AudioCopy {
+		t.Fatalf("HE-AACv2 copied: %+v", d)
+	}
+	m.Audio.Profile = "LC"
+	if d := Decide(m, chrome, Limits{}); d.Method != DirectStream || !d.AudioCopy {
+		t.Fatalf("AAC-LC should be copied: %+v", d)
+	}
+}

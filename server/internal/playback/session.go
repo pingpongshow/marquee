@@ -556,7 +556,7 @@ func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 		audio = &auds[0]
 	}
 	if audio != nil {
-		s.Media.Audio = &AudioStream{Index: audio.index, Codec: audio.codec, Channels: audio.channels, BitrateKbps: audio.kbps, Language: audio.lang}
+		s.Media.Audio = &AudioStream{Index: audio.index, Codec: audio.codec, Profile: streamProfile(probeJSON, audio.index), Channels: audio.channels, BitrateKbps: audio.kbps, Language: audio.lang}
 		s.AudioStreamID = audio.id
 	}
 
@@ -889,6 +889,25 @@ func (d Decision) String() string {
 }
 
 // codecTag reads a stream's container codec tag (hvc1, hev1, avc1…) from the stored ffprobe output.
+// streamProfile is a stream's codec profile from the stored probe (e.g. "HE-AAC").
+func streamProfile(probeJSON string, index int) string {
+	var out struct {
+		Streams []struct {
+			Index   int    `json:"index"`
+			Profile string `json:"profile"`
+		} `json:"streams"`
+	}
+	if json.Unmarshal([]byte(probeJSON), &out) != nil {
+		return ""
+	}
+	for _, st := range out.Streams {
+		if st.Index == index {
+			return st.Profile
+		}
+	}
+	return ""
+}
+
 func codecTag(probeJSON string, index int) string {
 	var out struct {
 		Streams []struct {
