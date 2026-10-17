@@ -6,6 +6,7 @@ public typealias BazarrCandidate = Components.Schemas.BazarrCandidate
 public typealias HealthCheck = Components.Schemas.HealthCheck
 public typealias HealthIssue = Components.Schemas.HealthIssue
 public typealias MatchCandidate = Components.Schemas.MatchCandidate
+public typealias MusicMatchCandidate = Components.Schemas.MusicMatchCandidate
 public typealias IntegrationSettings = Components.Schemas.IntegrationSettings
 public typealias IssueFile = Components.Schemas.IssueFile
 public typealias MediaFile = Components.Schemas.MediaFile
@@ -149,6 +150,76 @@ public extension AppSession {
         case .ok: return
         case .badRequest(let r): throw MarqueeError((try? r.body.json.message) ?? "Couldn't use that match.")
         default: throw MarqueeError("Couldn't fix the match.")
+        }
+    }
+
+    // MARK: - Music fixes (META-3)
+
+    /// MusicBrainz candidates for Fix match of a music artist or album (admin). `artist` is for albums.
+    func musicMatchCandidates(_ itemID: Int64, query: String? = nil, artist: String? = nil) async throws -> [MusicMatchCandidate] {
+        let q = query?.trimmingCharacters(in: .whitespaces)
+        let a = artist?.trimmingCharacters(in: .whitespaces)
+        switch try await adminAPI.searchMusicMatches(path: .init(itemId: itemID), query: .init(q: q?.isEmpty == false ? q : nil, artist: a?.isEmpty == false ? a : nil)) {
+        case .ok(let ok): return try ok.body.json
+        case .badRequest(let r): throw MarqueeError((try? r.body.json.message) ?? "This can't be matched.")
+        case .forbidden: throw MarqueeError("Only admins can fix matches.")
+        case .notFound: throw MarqueeError("That item isn't here any more.")
+        default: throw MarqueeError("Couldn't search MusicBrainz.")
+        }
+    }
+
+    /// Matches a music artist or album to a MusicBrainz artist or release group (admin).
+    @discardableResult
+    func applyMusicMatch(_ itemID: Int64, mbid: String) async throws -> ItemDetail {
+        switch try await adminAPI.applyMusicMatch(path: .init(itemId: itemID), body: .json(.init(mbid: mbid))) {
+        case .ok(let ok): return try ok.body.json
+        case .badRequest(let r): throw MarqueeError((try? r.body.json.message) ?? "Couldn't use that match.")
+        case .forbidden: throw MarqueeError("Only admins can fix matches.")
+        case .notFound: throw MarqueeError("That item isn't here any more.")
+        default: throw MarqueeError("Couldn't fix the match.")
+        }
+    }
+
+    /// Moves a track to an album in its library (admin); the file isn't changed.
+    @discardableResult
+    func moveTrack(_ trackID: Int64, toAlbum albumID: Int64) async throws -> ItemDetail {
+        try await placeTrack(trackID, .init(albumId: albumID))
+    }
+
+    /// Moves a track to the album with this artist and title, made when there isn't one (admin).
+    @discardableResult
+    func moveTrack(_ trackID: Int64, albumArtist: String, album: String) async throws -> ItemDetail {
+        try await placeTrack(trackID, .init(albumArtist: albumArtist, album: album))
+    }
+
+    private func placeTrack(_ trackID: Int64, _ body: Components.Schemas.TrackPlacementRequest) async throws -> ItemDetail {
+        switch try await adminAPI.setTrackPlacement(path: .init(itemId: trackID), body: .json(body)) {
+        case .ok(let ok): return try ok.body.json
+        case .badRequest(let r): throw MarqueeError((try? r.body.json.message) ?? "Couldn't move the track there.")
+        case .forbidden: throw MarqueeError("Only admins can move tracks.")
+        case .notFound: throw MarqueeError("That track or album isn't here any more.")
+        default: throw MarqueeError("Couldn't move the track.")
+        }
+    }
+
+    /// Puts a moved track back where its file's tags say it belongs (admin).
+    @discardableResult
+    func clearTrackPlacement(_ trackID: Int64) async throws -> ItemDetail {
+        switch try await adminAPI.clearTrackPlacement(path: .init(itemId: trackID)) {
+        case .ok(let ok): return try ok.body.json
+        case .badRequest(let r): throw MarqueeError((try? r.body.json.message) ?? "Couldn't put the track back.")
+        case .forbidden: throw MarqueeError("Only admins can move tracks.")
+        case .notFound: throw MarqueeError("That track isn't here any more.")
+        default: throw MarqueeError("Couldn't put the track back.")
+        }
+    }
+
+    /// The item, or nil when it's gone (an album emptied by a move); other failures throw.
+    func itemIfPresent(_ id: Int64) async throws -> ItemDetail? {
+        switch try await adminAPI.getItem(path: .init(itemId: id)) {
+        case .ok(let ok): return try ok.body.json
+        case .notFound: return nil
+        default: throw MarqueeError("Couldn't load this page.")
         }
     }
 

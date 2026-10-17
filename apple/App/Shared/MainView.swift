@@ -25,14 +25,47 @@ struct MainView: View {
     /// Bumped when another person signs in (a profile switch stays signed in): the tabs and
     /// their pages start again, so nothing of the last person's stays on screen.
     var generation = 0
+    /// The tab showing; Home to begin with (the profile entry is listed above it).
+    @State private var selection = "home"
+    /// The signed-in profile's picture for the sidebar's profile entry (iPad, Apple TV).
+    @State private var profileIcon = ProfileIcon()
+    #if os(iOS)
+    /// iPhone: the profiles, opened from the avatar on Home.
+    @State private var showProfiles = false
+    #endif
 
     var body: some View {
-        TabView {
-            Tab("Home", systemImage: "house") { stack { HomeView() } }
+        TabView(selection: $selection) {
+            if !compact {
+                // Like Plex: who's signed in, above Home; it lists the household's profiles to
+                // switch to, with Account Settings and Sign Out.
+                Tab(value: "profile") {
+                    stack { profilesPage.navigationTitle(app.me?.displayName ?? "Profile") }
+                } label: {
+                    Label {
+                        Text(app.me?.displayName ?? "Profile")
+                    } icon: {
+                        if let icon = profileIcon.image { Image(uiImage: icon) } else { Image(systemName: "person.crop.circle") }
+                    }
+                }
+                .accessibilityIdentifier("profileTab")
+            }
+            Tab("Home", systemImage: "house", value: "home") {
+                stack {
+                    HomeView()
+                        #if os(iOS)
+                        .toolbar {
+                            if compact {
+                                ToolbarItem(placement: .topBarLeading) { ProfileToolbarButton { showProfiles = true } }
+                            }
+                        }
+                        #endif
+                }
+            }
             if compact {
                 // iPhone: one Libraries tab so the tab bar doesn't overflow into "More". Live TV
                 // is listed there with the libraries.
-                Tab("Libraries", systemImage: "square.stack") {
+                Tab("Libraries", systemImage: "square.stack", value: "libraries") {
                     stack { LibrariesList(libraries: libraries, liveTV: hasLiveTV, vodMovies: hasVodMovies, vodShows: hasVodShows, error: librariesError, icon: icon, reload: { await loadAll() }) }
                 }
             } else {
@@ -42,18 +75,18 @@ struct MainView: View {
                     ForEach(LibraryEntry.list(libraries, liveTV: hasLiveTV, vodMovies: hasVodMovies, vodShows: hasVodShows)) { entry in
                         switch entry {
                         case .library(let lib):
-                            Tab(lib.name, systemImage: icon(lib._type)) { stack { LibraryView(libraryID: lib.id) } }
+                            Tab(lib.name, systemImage: icon(lib._type), value: "library-\(lib.id)") { stack { LibraryView(libraryID: lib.id) } }
                         case .liveTV:
-                            Tab("Live TV", systemImage: "antenna.radiowaves.left.and.right") { stack { LiveTVView() } }
+                            Tab("Live TV", systemImage: "antenna.radiowaves.left.and.right", value: "livetv") { stack { LiveTVView() } }
                         case .vodMovies:
-                            Tab("VOD Movies", systemImage: "film.stack") { stack { VodPage() } }
+                            Tab("VOD Movies", systemImage: "film.stack", value: "vodMovies") { stack { VodPage() } }
                         case .vodShows:
-                            Tab("VOD Shows", systemImage: "play.tv") { stack { VodPage(shows: true) } }
+                            Tab("VOD Shows", systemImage: "play.tv", value: "vodShows") { stack { VodPage(shows: true) } }
                         }
                     }
                     if libraries.isEmpty, librariesError != nil {
                         // The server wasn't reachable: a way back instead of an empty section.
-                        Tab("Libraries", systemImage: "exclamationmark.triangle") {
+                        Tab("Libraries", systemImage: "exclamationmark.triangle", value: "librariesError") {
                             stack { LibrariesList(libraries: [], liveTV: false, error: librariesError, icon: icon, reload: { await loadAll() }) }
                         }
                     }
@@ -71,6 +104,10 @@ struct MainView: View {
         .onChange(of: generation) {
             video.request = nil
             linkedItem = nil
+            selection = "home"
+        }
+        .task(id: "\(app.me?.id ?? 0)|\(app.me?.avatarUrl ?? "")|\(app.me?.displayName ?? "")") {
+            if !compact { await profileIcon.load(app: app, size: isTV ? 48 : 28) }
         }
         // iPad and Apple TV: a sidebar (Home, the Libraries section, then the rest). On the TV a
         // top bar fits only about six tabs; the sidebar lists them all, and Back from the top of
@@ -139,34 +176,50 @@ struct MainView: View {
                 .environment(video)
         }
         #if os(iOS)
+        .sheet(isPresented: $showProfiles) {
+            NavigationStack {
+                ProfilesPage(onAccountSettings: {
+                    showProfiles = false
+                    selection = "settings"
+                }, showsSignOut: true, onSwitched: { showProfiles = false })
+                .navigationTitle(app.me?.displayName ?? "Profiles")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { showProfiles = false } } }
+            }
+        }
         .sheet(isPresented: $showNowPlaying) { NowPlayingView() }
         .environment(\.openNowPlaying, OpenNowPlayingAction { showNowPlaying = true })
         #endif
     }
 
     /// Playlists, Discover, Downloads (iPad), Now Playing (TV), Settings and Search.
-    @TabContentBuilder<Never>
-    private var otherTabs: some TabContent<Never> {
-        Tab("Playlists", systemImage: "music.note.list") { stack { PlaylistsView() } }
+    @TabContentBuilder<String>
+    private var otherTabs: some TabContent<String> {
+        Tab("Playlists", systemImage: "music.note.list", value: "playlists") { stack { PlaylistsView() } }
         if !compact && canDiscover {
-            Tab("Discover", systemImage: "safari") { stack { DiscoverView() } }
+            Tab("Discover", systemImage: "safari", value: "discover") { stack { DiscoverView() } }
         }
         #if os(iOS)
         if !compact {
             // iPhone lists Downloads under Libraries (a sixth tab would spill into "More").
-            Tab("Downloads", systemImage: "arrow.down.circle") { stack { DownloadsView() } }
+            Tab("Downloads", systemImage: "arrow.down.circle", value: "downloads") { stack { DownloadsView() } }
         }
         #endif
         #if os(tvOS)
         if music.current != nil {
-            Tab("Now Playing", systemImage: "waveform") { NowPlayingView() }
+            Tab("Now Playing", systemImage: "waveform", value: "nowPlaying") { NowPlayingView() }
         }
         #endif
-        Tab("Settings", systemImage: "gearshape") { stack { SettingsView() } }
-        Tab(role: .search) {
+        Tab("Settings", systemImage: "gearshape", value: "settings") { stack { SettingsView() } }
+        Tab(value: "search", role: .search) {
             stack(rootTitle: true) { SearchView() }
 
         }
+    }
+
+    /// The profile entry's page: switch profiles, Account Settings (the Settings tab), Sign Out.
+    private var profilesPage: some View {
+        ProfilesPage(onAccountSettings: { selection = "settings" }, showsSignOut: true)
     }
 
     private var compact: Bool {

@@ -35,6 +35,13 @@ struct ItemDetailView: View {
     @State private var startedHere = false
     /// The movie's or show's trailer (PLAY-22); the button shows once it's known to exist.
     @State private var trailer: ItemTrailer?
+    #if os(iOS)
+    @Environment(\.dismiss) private var dismiss
+    /// Admin music fixes (META-3): the artist or album being matched, the track being moved.
+    @State private var matching: Item?
+    @State private var moving: Item?
+    #endif
+    private var isAdmin: Bool { app.me?.isAdmin == true }
 
     var body: some View {
         ScrollView {
@@ -75,6 +82,8 @@ struct ItemDetailView: View {
         .background(alignment: .top) { backdrop }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $matching) { MusicMatchSheet(item: $0) { afterMusicFix() } }
+        .sheet(item: $moving) { MoveTrackSheet(track: $0) { afterMusicFix() } }
         #endif
         .navigationTitle(detail?.title ?? "")
         .task(id: id) {
@@ -135,6 +144,22 @@ struct ItemDetailView: View {
             if detail == nil { self.error = error.localizedDescription }
         }
     }
+
+    #if os(iOS)
+    /// After a music fix the page loads again; tracks may have moved, and an album or artist
+    /// left empty is gone (back to the page before).
+    private func afterMusicFix() {
+        Task {
+            do {
+                guard try await app.itemIfPresent(id) != nil else {
+                    dismiss()
+                    return
+                }
+            } catch {}
+            await load()
+        }
+    }
+    #endif
 
     /// The item and its children again (progress, watched state), without the shelves.
     private func refresh() async {
@@ -377,7 +402,17 @@ struct ItemDetailView: View {
         }
         #endif
         // Watchlist, Watched and the heart are buttons above (always current), so the menu leaves them out.
-        Menu { ItemMenuItems(item: d.base, showsLibraryState: false) } label: { Label("More", systemImage: "ellipsis") }
+        Menu {
+            ItemMenuItems(item: d.base, showsLibraryState: false)
+            #if os(iOS)
+            if isAdmin, d.type == .artist || d.type == .album {
+                Button { matching = d.base } label: { Label("Fix Match…", systemImage: "wand.and.stars") }
+            }
+            if isAdmin, d.type == .track {
+                Button { moving = d.base } label: { Label("Move to Album…", systemImage: "square.stack") }
+            }
+            #endif
+        } label: { Label("More", systemImage: "ellipsis") }
             .buttonStyle(.bordered)
             .accessibilityLabel("More")
             .accessibilityIdentifier("itemMore")
@@ -591,7 +626,7 @@ struct ItemDetailView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Tracks").font(.title3.bold()).padding(.horizontal, sidePadding).padding(.bottom, 6)
                     ForEach(children, id: \.id) { t in
-                        TrackRow(track: t, album: d.base) {
+                        TrackRow(track: t, album: d.base, onMove: moveAction) {
                             // From this track's place among the tracks (not among all children).
                             let tracks = children.filter { $0._type == .track }
                             music.play(tracks, start: tracks.firstIndex { $0.id == t.id } ?? 0, source: d.title)
@@ -602,6 +637,15 @@ struct ItemDetailView: View {
                 EmptyView()
             }
         }
+    }
+
+    /// "Move to Album…" in track menus, for admins on iPhone and iPad (META-3).
+    private var moveAction: ((Item) -> Void)? {
+        #if os(iOS)
+        isAdmin ? { moving = $0 } : nil
+        #else
+        nil
+        #endif
     }
 
     /// The artist's most-listened tracks (ListenBrainz, MUSIC-15): five, or all ten.
@@ -718,6 +762,8 @@ struct TrackRow: View {
     @Environment(MusicPlayer.self) private var music
     let track: Item
     var album: Item?
+    /// Admins: "Move to Album…" in the track's menu.
+    var onMove: ((Item) -> Void)?
     let play: () -> Void
 
     var body: some View {
@@ -743,7 +789,12 @@ struct TrackRow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .contextMenu { ItemMenuItems(item: track) }
+            .contextMenu {
+                ItemMenuItems(item: track)
+                if let onMove {
+                    Button { onMove(track) } label: { Label("Move to Album…", systemImage: "square.stack") }
+                }
+            }
             RowFavorite(item: track)
             RowRating(item: track, gap: isTV ? 8 : 4)
         }

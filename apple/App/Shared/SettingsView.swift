@@ -151,53 +151,13 @@ struct SettingsView: View {
 
 /// Switch to another profile on this device.
 struct ProfileSwitcher: View {
-    @Environment(AppSession.self) private var app
     @Environment(\.dismiss) private var dismiss
-    @State private var profiles: [Schemas.Profile] = []
-    @State private var target: Schemas.Profile?
-    @State private var error: String?
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
-                if let error { ErrorBanner(message: error) }
-                if let target {
-                    AvatarView(name: target.displayName, url: target.avatarUrl, size: 80)
-                    Text("Enter \(target.displayName)'s PIN").font(.headline)
-                    PinPad { pin in switchTo(target, pin: pin) }
-                } else {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 20)], spacing: 20) {
-                        ForEach(profiles, id: \.id) { p in
-                            Button {
-                                if p.requires == .pin && app.me?.isAdmin != true { target = p } else { switchTo(p, pin: nil) }
-                            } label: {
-                                VStack {
-                                    AvatarView(name: p.displayName, url: p.avatarUrl, size: 72)
-                                    Text(p.displayName).lineLimit(1)
-                                    if p.id == app.me?.id { Text("Current").font(.caption2).foregroundStyle(Color.marqueeGold) }
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-                Spacer()
-            }
-            .padding()
-            .navigationTitle("Switch Profile")
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
-            .task { profiles = (try? await app.switchableProfiles()) ?? [] }
-        }
-    }
-
-    private func switchTo(_ p: Schemas.Profile, pin: String?) {
-        Task {
-            do {
-                try await app.switchProfile(to: p.id, pin: pin, password: nil)
-                dismiss()
-            } catch {
-                self.error = error.localizedDescription
-            }
+            ProfilesPage(onSwitched: { dismiss() })
+                .navigationTitle("Switch Profile")
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
         }
     }
 }

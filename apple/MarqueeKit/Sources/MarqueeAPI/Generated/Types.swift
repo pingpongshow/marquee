@@ -307,6 +307,26 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `PUT /items/{itemId}/match`.
     /// - Remark: Generated from `#/paths//items/{itemId}/match/put(applyMatch)`.
     func applyMatch(_ input: Operations.ApplyMatch.Input) async throws -> Operations.ApplyMatch.Output
+    /// MusicBrainz candidates for Fix match of a music artist or album (admin only; 400 for anything else).
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/music-match`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/music-match/get(searchMusicMatches)`.
+    func searchMusicMatches(_ input: Operations.SearchMusicMatches.Input) async throws -> Operations.SearchMusicMatches.Output
+    /// Match a music artist or album to a MusicBrainz artist or release group and look its details up again (admin only). The choice outlasts rescans and wins over MBIDs in tags; locked fields are kept.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/music-match`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/music-match/put(applyMusicMatch)`.
+    func applyMusicMatch(_ input: Operations.ApplyMusicMatch.Input) async throws -> Operations.ApplyMusicMatch.Output
+    /// Move a track to another album without editing its file (admin only, tracks only). Kept through rescans; albums and artists left empty are removed.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/music-placement`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/music-placement/put(setTrackPlacement)`.
+    func setTrackPlacement(_ input: Operations.SetTrackPlacement.Input) async throws -> Operations.SetTrackPlacement.Output
+    /// Put a moved track back where its file's tags say it belongs (admin only, tracks only).
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/music-placement`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/music-placement/delete(clearTrackPlacement)`.
+    func clearTrackPlacement(_ input: Operations.ClearTrackPlacement.Input) async throws -> Operations.ClearTrackPlacement.Output
     /// Re-download metadata for a matched movie or show, keeping locked fields (admin only).
     ///
     /// - Remark: HTTP `POST /items/{itemId}/refresh`.
@@ -610,7 +630,7 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /optimize/jobs`.
     /// - Remark: Generated from `#/paths//optimize/jobs/get(listOptimizeJobs)`.
     func listOptimizeJobs(_ input: Operations.ListOptimizeJobs.Input) async throws -> Operations.ListOptimizeJobs.Output
-    /// Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren't available movies or episodes, are skipped.
+    /// Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren't available movies or episodes, are skipped. Files optimized before can be queued again (re-optimized).
     ///
     /// - Remark: HTTP `POST /optimize/jobs`.
     /// - Remark: Generated from `#/paths//optimize/jobs/post(queueOptimizeJobs)`.
@@ -890,6 +910,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /livetv/vod/suggestions`.
     /// - Remark: Generated from `#/paths//livetv/vod/suggestions/get(vodSuggestions)`.
     func vodSuggestions(_ input: Operations.VodSuggestions.Input) async throws -> Operations.VodSuggestions.Output
+    /// The recommendations page: rows of films or series on demand for the caller, each with its own angle (top picks, Because you love …, more of a favourite genre, critically acclaimed, popular on VOD), all from the caller's own taste: other people's viewing is never used. A title shows in one row only; rows that can't be filled aren't sent. The same exclusions as suggestions apply.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/recommendations`.
+    /// - Remark: Generated from `#/paths//livetv/vod/recommendations/get(vodRecommendations)`.
+    func vodRecommendations(_ input: Operations.VodRecommendations.Input) async throws -> Operations.VodRecommendations.Output
     /// Not interested: stops suggesting this film or series to the caller (anywhere suggestions show).
     ///
     /// - Remark: HTTP `DELETE /livetv/vod/suggestions/{kind}/{vodId}`.
@@ -1035,7 +1060,7 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /livetv/vod/saves`.
     /// - Remark: Generated from `#/paths//livetv/vod/saves/get(listVodSaves)`.
     func listVodSaves(_ input: Operations.ListVodSaves.Input) async throws -> Operations.ListVodSaves.Output
-    /// Remove finished saves (done, failed, cancelled, skipped) from the list (admin only). Failed saves' partial files are deleted.
+    /// Remove finished saves (done, cancelled, skipped) from the list, or with failed=true the failed ones (their partial files are deleted). Admin only. Failed saves are never removed automatically.
     ///
     /// - Remark: HTTP `POST /livetv/vod/saves/clear`.
     /// - Remark: Generated from `#/paths//livetv/vod/saves/clear/post(clearVodSaves)`.
@@ -2047,6 +2072,64 @@ extension APIProtocol {
             body: body
         ))
     }
+    /// MusicBrainz candidates for Fix match of a music artist or album (admin only; 400 for anything else).
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/music-match`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/music-match/get(searchMusicMatches)`.
+    public func searchMusicMatches(
+        path: Operations.SearchMusicMatches.Input.Path,
+        query: Operations.SearchMusicMatches.Input.Query = .init(),
+        headers: Operations.SearchMusicMatches.Input.Headers = .init()
+    ) async throws -> Operations.SearchMusicMatches.Output {
+        try await searchMusicMatches(Operations.SearchMusicMatches.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Match a music artist or album to a MusicBrainz artist or release group and look its details up again (admin only). The choice outlasts rescans and wins over MBIDs in tags; locked fields are kept.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/music-match`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/music-match/put(applyMusicMatch)`.
+    public func applyMusicMatch(
+        path: Operations.ApplyMusicMatch.Input.Path,
+        headers: Operations.ApplyMusicMatch.Input.Headers = .init(),
+        body: Operations.ApplyMusicMatch.Input.Body
+    ) async throws -> Operations.ApplyMusicMatch.Output {
+        try await applyMusicMatch(Operations.ApplyMusicMatch.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Move a track to another album without editing its file (admin only, tracks only). Kept through rescans; albums and artists left empty are removed.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/music-placement`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/music-placement/put(setTrackPlacement)`.
+    public func setTrackPlacement(
+        path: Operations.SetTrackPlacement.Input.Path,
+        headers: Operations.SetTrackPlacement.Input.Headers = .init(),
+        body: Operations.SetTrackPlacement.Input.Body
+    ) async throws -> Operations.SetTrackPlacement.Output {
+        try await setTrackPlacement(Operations.SetTrackPlacement.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Put a moved track back where its file's tags say it belongs (admin only, tracks only).
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/music-placement`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/music-placement/delete(clearTrackPlacement)`.
+    public func clearTrackPlacement(
+        path: Operations.ClearTrackPlacement.Input.Path,
+        headers: Operations.ClearTrackPlacement.Input.Headers = .init()
+    ) async throws -> Operations.ClearTrackPlacement.Output {
+        try await clearTrackPlacement(Operations.ClearTrackPlacement.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// Re-download metadata for a matched movie or show, keeping locked fields (admin only).
     ///
     /// - Remark: HTTP `POST /items/{itemId}/refresh`.
@@ -2816,7 +2899,7 @@ extension APIProtocol {
             headers: headers
         ))
     }
-    /// Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren't available movies or episodes, are skipped.
+    /// Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren't available movies or episodes, are skipped. Files optimized before can be queued again (re-optimized).
     ///
     /// - Remark: HTTP `POST /optimize/jobs`.
     /// - Remark: Generated from `#/paths//optimize/jobs/post(queueOptimizeJobs)`.
@@ -3466,6 +3549,19 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// The recommendations page: rows of films or series on demand for the caller, each with its own angle (top picks, Because you love …, more of a favourite genre, critically acclaimed, popular on VOD), all from the caller's own taste: other people's viewing is never used. A title shows in one row only; rows that can't be filled aren't sent. The same exclusions as suggestions apply.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/recommendations`.
+    /// - Remark: Generated from `#/paths//livetv/vod/recommendations/get(vodRecommendations)`.
+    public func vodRecommendations(
+        query: Operations.VodRecommendations.Input.Query = .init(),
+        headers: Operations.VodRecommendations.Input.Headers = .init()
+    ) async throws -> Operations.VodRecommendations.Output {
+        try await vodRecommendations(Operations.VodRecommendations.Input(
+            query: query,
+            headers: headers
+        ))
+    }
     /// Not interested: stops suggesting this film or series to the caller (anywhere suggestions show).
     ///
     /// - Remark: HTTP `DELETE /livetv/vod/suggestions/{kind}/{vodId}`.
@@ -3823,12 +3919,18 @@ extension APIProtocol {
     public func listVodSaves(headers: Operations.ListVodSaves.Input.Headers = .init()) async throws -> Operations.ListVodSaves.Output {
         try await listVodSaves(Operations.ListVodSaves.Input(headers: headers))
     }
-    /// Remove finished saves (done, failed, cancelled, skipped) from the list (admin only). Failed saves' partial files are deleted.
+    /// Remove finished saves (done, cancelled, skipped) from the list, or with failed=true the failed ones (their partial files are deleted). Admin only. Failed saves are never removed automatically.
     ///
     /// - Remark: HTTP `POST /livetv/vod/saves/clear`.
     /// - Remark: Generated from `#/paths//livetv/vod/saves/clear/post(clearVodSaves)`.
-    public func clearVodSaves(headers: Operations.ClearVodSaves.Input.Headers = .init()) async throws -> Operations.ClearVodSaves.Output {
-        try await clearVodSaves(Operations.ClearVodSaves.Input(headers: headers))
+    public func clearVodSaves(
+        query: Operations.ClearVodSaves.Input.Query = .init(),
+        headers: Operations.ClearVodSaves.Input.Headers = .init()
+    ) async throws -> Operations.ClearVodSaves.Output {
+        try await clearVodSaves(Operations.ClearVodSaves.Input(
+            query: query,
+            headers: headers
+        ))
     }
     /// Pause the whole queue (admin only). Running saves stop and keep their partial files; resuming continues them with Range requests.
     ///

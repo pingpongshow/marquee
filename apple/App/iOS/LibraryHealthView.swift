@@ -247,7 +247,7 @@ struct FixMatchSheet: View {
                     }
                 }
                 Section {
-                    TextField("Title", text: $title).autocorrectionDisabled()
+                    TextField("Title, or a TMDB or IMDb link or ID", text: $title).autocorrectionDisabled()
                     TextField("Year", text: $year).keyboardType(.numberPad)
                     Button("Search") { Task { await search() } }.disabled(busy || title.trimmingCharacters(in: .whitespaces).isEmpty)
                 }

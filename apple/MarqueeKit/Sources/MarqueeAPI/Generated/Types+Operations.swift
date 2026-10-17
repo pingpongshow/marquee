@@ -9559,6 +9559,10 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/libraries/{libraryId}/items/GET/query/favorites`.
                 public var favorites: Swift.Bool?
+                /// With sort=random: the same seed gives the same shuffle on every page (send one per shuffle). Without it each page is shuffled on its own.
+                ///
+                /// - Remark: Generated from `#/paths/libraries/{libraryId}/items/GET/query/seed`.
+                public var seed: Swift.Int64?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
@@ -9575,6 +9579,7 @@ public enum Operations {
                 ///   - letter: Only titles starting with this letter ("#" for anything else).
                 ///   - minMyRating: Only what the person rated at least this (0–10, e.g. 8 = 4 stars: favourites).
                 ///   - favorites: Only the person's favourites (the heart). Combines with the other filters and sorts; sort -favorited lists the newest favourites first.
+                ///   - seed: With sort=random: the same seed gives the same shuffle on every page (send one per shuffle). Without it each page is shuffled on its own.
                 public init(
                     _type: Components.Schemas.ItemType? = nil,
                     sort: Components.Parameters.Sort? = nil,
@@ -9588,7 +9593,8 @@ public enum Operations {
                     hdr: Swift.Bool? = nil,
                     letter: Swift.String? = nil,
                     minMyRating: Swift.Int? = nil,
-                    favorites: Swift.Bool? = nil
+                    favorites: Swift.Bool? = nil,
+                    seed: Swift.Int64? = nil
                 ) {
                     self._type = _type
                     self.sort = sort
@@ -9603,6 +9609,7 @@ public enum Operations {
                     self.letter = letter
                     self.minMyRating = minMyRating
                     self.favorites = favorites
+                    self.seed = seed
                 }
             }
             public var query: Operations.ListLibraryItems.Input.Query
@@ -10186,7 +10193,7 @@ public enum Operations {
             public var path: Operations.SearchMatches.Input.Path
             /// - Remark: Generated from `#/paths/items/{itemId}/match/GET/query`.
             public struct Query: Sendable, Hashable {
-                /// Defaults to the item's title.
+                /// Defaults to the item's title. A TMDB link (themoviedb.org/movie/603, /tv/1399), tmdb:603, an IMDb id (tt0133093) or an IMDb link is looked up directly and returns that one entry (none when TMDB doesn't have it; 400 when it is a show for a movie or a movie for a show). Plain numbers are titles (1917).
                 ///
                 /// - Remark: Generated from `#/paths/items/{itemId}/match/GET/query/title`.
                 public var title: Swift.String?
@@ -10195,7 +10202,7 @@ public enum Operations {
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
-                ///   - title: Defaults to the item's title.
+                ///   - title: Defaults to the item's title. A TMDB link (themoviedb.org/movie/603, /tv/1399), tmdb:603, an IMDb id (tt0133093) or an IMDb link is looked up directly and returns that one entry (none when TMDB doesn't have it; 400 when it is a show for a movie or a movie for a show). Plain numbers are titles (1917).
                 ///   - year:
                 public init(
                     title: Swift.String? = nil,
@@ -10587,6 +10594,931 @@ public enum Operations {
             /// Not found.
             ///
             /// - Remark: Generated from `#/paths//items/{itemId}/match/put(applyMatch)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// MusicBrainz candidates for Fix match of a music artist or album (admin only; 400 for anything else).
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/music-match`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/music-match/get(searchMusicMatches)`.
+    public enum SearchMusicMatches {
+        public static let id: Swift.String = "searchMusicMatches"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/items/{itemId}/music-match/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/music-match/GET/path/itemId`.
+                public var itemId: Components.Parameters.ItemId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - itemId:
+                public init(itemId: Components.Parameters.ItemId) {
+                    self.itemId = itemId
+                }
+            }
+            public var path: Operations.SearchMusicMatches.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/music-match/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// Artist name or album title; defaults to the item's. A MusicBrainz id or musicbrainz.org link (artist, release group or release) is looked up directly.
+                ///
+                /// - Remark: Generated from `#/paths/items/{itemId}/music-match/GET/query/q`.
+                public var q: Swift.String?
+                /// Albums only; defaults to the album's artist.
+                ///
+                /// - Remark: Generated from `#/paths/items/{itemId}/music-match/GET/query/artist`.
+                public var artist: Swift.String?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - q: Artist name or album title; defaults to the item's. A MusicBrainz id or musicbrainz.org link (artist, release group or release) is looked up directly.
+                ///   - artist: Albums only; defaults to the album's artist.
+                public init(
+                    q: Swift.String? = nil,
+                    artist: Swift.String? = nil
+                ) {
+                    self.q = q
+                    self.artist = artist
+                }
+            }
+            public var query: Operations.SearchMusicMatches.Input.Query
+            /// - Remark: Generated from `#/paths/items/{itemId}/music-match/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SearchMusicMatches.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SearchMusicMatches.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.SearchMusicMatches.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - query:
+            ///   - headers:
+            public init(
+                path: Operations.SearchMusicMatches.Input.Path,
+                query: Operations.SearchMusicMatches.Input.Query = .init(),
+                headers: Operations.SearchMusicMatches.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/music-match/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{itemId}/music-match/GET/responses/200/content/application\/json`.
+                    case json([Components.Schemas.MusicMatchCandidate])
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: [Components.Schemas.MusicMatchCandidate] {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.SearchMusicMatches.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.SearchMusicMatches.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-match/get(searchMusicMatches)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.SearchMusicMatches.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.SearchMusicMatches.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-match/get(searchMusicMatches)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-match/get(searchMusicMatches)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-match/get(searchMusicMatches)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-match/get(searchMusicMatches)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Match a music artist or album to a MusicBrainz artist or release group and look its details up again (admin only). The choice outlasts rescans and wins over MBIDs in tags; locked fields are kept.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/music-match`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/music-match/put(applyMusicMatch)`.
+    public enum ApplyMusicMatch {
+        public static let id: Swift.String = "applyMusicMatch"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/items/{itemId}/music-match/PUT/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/music-match/PUT/path/itemId`.
+                public var itemId: Components.Parameters.ItemId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - itemId:
+                public init(itemId: Components.Parameters.ItemId) {
+                    self.itemId = itemId
+                }
+            }
+            public var path: Operations.ApplyMusicMatch.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/music-match/PUT/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ApplyMusicMatch.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ApplyMusicMatch.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ApplyMusicMatch.Input.Headers
+            /// - Remark: Generated from `#/paths/items/{itemId}/music-match/PUT/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/music-match/PUT/requestBody/content/application\/json`.
+                case json(Components.Schemas.MusicMatchRequest)
+            }
+            public var body: Operations.ApplyMusicMatch.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.ApplyMusicMatch.Input.Path,
+                headers: Operations.ApplyMusicMatch.Input.Headers = .init(),
+                body: Operations.ApplyMusicMatch.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/music-match/PUT/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{itemId}/music-match/PUT/responses/200/content/application\/json`.
+                    case json(Components.Schemas.ItemDetail)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ItemDetail {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ApplyMusicMatch.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ApplyMusicMatch.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Matched.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-match/put(applyMusicMatch)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ApplyMusicMatch.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ApplyMusicMatch.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-match/put(applyMusicMatch)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-match/put(applyMusicMatch)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-match/put(applyMusicMatch)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-match/put(applyMusicMatch)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Move a track to another album without editing its file (admin only, tracks only). Kept through rescans; albums and artists left empty are removed.
+    ///
+    /// - Remark: HTTP `PUT /items/{itemId}/music-placement`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/music-placement/put(setTrackPlacement)`.
+    public enum SetTrackPlacement {
+        public static let id: Swift.String = "setTrackPlacement"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/items/{itemId}/music-placement/PUT/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/music-placement/PUT/path/itemId`.
+                public var itemId: Components.Parameters.ItemId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - itemId:
+                public init(itemId: Components.Parameters.ItemId) {
+                    self.itemId = itemId
+                }
+            }
+            public var path: Operations.SetTrackPlacement.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/music-placement/PUT/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SetTrackPlacement.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SetTrackPlacement.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.SetTrackPlacement.Input.Headers
+            /// - Remark: Generated from `#/paths/items/{itemId}/music-placement/PUT/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/music-placement/PUT/requestBody/content/application\/json`.
+                case json(Components.Schemas.TrackPlacementRequest)
+            }
+            public var body: Operations.SetTrackPlacement.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.SetTrackPlacement.Input.Path,
+                headers: Operations.SetTrackPlacement.Input.Headers = .init(),
+                body: Operations.SetTrackPlacement.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/music-placement/PUT/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{itemId}/music-placement/PUT/responses/200/content/application\/json`.
+                    case json(Components.Schemas.ItemDetail)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ItemDetail {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.SetTrackPlacement.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.SetTrackPlacement.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Moved; the track.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-placement/put(setTrackPlacement)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.SetTrackPlacement.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.SetTrackPlacement.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-placement/put(setTrackPlacement)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-placement/put(setTrackPlacement)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-placement/put(setTrackPlacement)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-placement/put(setTrackPlacement)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Put a moved track back where its file's tags say it belongs (admin only, tracks only).
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}/music-placement`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/music-placement/delete(clearTrackPlacement)`.
+    public enum ClearTrackPlacement {
+        public static let id: Swift.String = "clearTrackPlacement"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/items/{itemId}/music-placement/DELETE/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/music-placement/DELETE/path/itemId`.
+                public var itemId: Components.Parameters.ItemId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - itemId:
+                public init(itemId: Components.Parameters.ItemId) {
+                    self.itemId = itemId
+                }
+            }
+            public var path: Operations.ClearTrackPlacement.Input.Path
+            /// - Remark: Generated from `#/paths/items/{itemId}/music-placement/DELETE/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ClearTrackPlacement.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ClearTrackPlacement.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ClearTrackPlacement.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.ClearTrackPlacement.Input.Path,
+                headers: Operations.ClearTrackPlacement.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{itemId}/music-placement/DELETE/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{itemId}/music-placement/DELETE/responses/200/content/application\/json`.
+                    case json(Components.Schemas.ItemDetail)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ItemDetail {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ClearTrackPlacement.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ClearTrackPlacement.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Back as tagged; the track.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-placement/delete(clearTrackPlacement)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ClearTrackPlacement.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ClearTrackPlacement.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Invalid request.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-placement/delete(clearTrackPlacement)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Components.Responses.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Components.Responses.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-placement/delete(clearTrackPlacement)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-placement/delete(clearTrackPlacement)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//items/{itemId}/music-placement/delete(clearTrackPlacement)/responses/404`.
             ///
             /// HTTP response code: `404 notFound`.
             case notFound(Components.Responses.NotFound)
@@ -21910,6 +22842,15 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/optimize/files/GET/query/hdr`.
                 public var hdr: Operations.ListLargeFiles.Input.Query.HdrPayload?
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/optimized`.
+                @frozen public enum OptimizedPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case yes = "yes"
+                    case no = "no"
+                }
+                /// Only files the optimizer has already replaced (yes, to optimize them again) or only ones it hasn't (no).
+                ///
+                /// - Remark: Generated from `#/paths/optimize/files/GET/query/optimized`.
+                public var optimized: Operations.ListLargeFiles.Input.Query.OptimizedPayload?
                 /// The preset the estimates are for (default: the default preset).
                 ///
                 /// - Remark: Generated from `#/paths/optimize/files/GET/query/presetId`.
@@ -21937,6 +22878,7 @@ public enum Operations {
                 ///   - resolution: Only this resolution class (by width or height, so letterboxed films count): 2160 = 4K, 480 = SD.
                 ///   - codecs: Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9).
                 ///   - hdr: Only HDR (yes) or only SDR (no) files.
+                ///   - optimized: Only files the optimizer has already replaced (yes, to optimize them again) or only ones it hasn't (no).
                 ///   - presetId: The preset the estimates are for (default: the default preset).
                 ///   - sort:
                 ///   - offset:
@@ -21949,6 +22891,7 @@ public enum Operations {
                     resolution: Operations.ListLargeFiles.Input.Query.ResolutionPayload? = nil,
                     codecs: Swift.String? = nil,
                     hdr: Operations.ListLargeFiles.Input.Query.HdrPayload? = nil,
+                    optimized: Operations.ListLargeFiles.Input.Query.OptimizedPayload? = nil,
                     presetId: Swift.String? = nil,
                     sort: Operations.ListLargeFiles.Input.Query.SortPayload? = nil,
                     offset: Components.Parameters.Offset? = nil,
@@ -21961,6 +22904,7 @@ public enum Operations {
                     self.resolution = resolution
                     self.codecs = codecs
                     self.hdr = hdr
+                    self.optimized = optimized
                     self.presetId = presetId
                     self.sort = sort
                     self.offset = offset
@@ -22336,7 +23280,7 @@ public enum Operations {
             }
         }
     }
-    /// Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren't available movies or episodes, are skipped.
+    /// Queue files to be optimized with a preset: the files listed, or every file matching a filter (admin only). Files already queued, and ones that aren't available movies or episodes, are skipped. Files optimized before can be queued again (re-optimized).
     ///
     /// - Remark: HTTP `POST /optimize/jobs`.
     /// - Remark: Generated from `#/paths//optimize/jobs/post(queueOptimizeJobs)`.
@@ -32600,6 +33544,196 @@ public enum Operations {
             }
         }
     }
+    /// The recommendations page: rows of films or series on demand for the caller, each with its own angle (top picks, Because you love …, more of a favourite genre, critically acclaimed, popular on VOD), all from the caller's own taste: other people's viewing is never used. A title shows in one row only; rows that can't be filled aren't sent. The same exclusions as suggestions apply.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/recommendations`.
+    /// - Remark: Generated from `#/paths//livetv/vod/recommendations/get(vodRecommendations)`.
+    public enum VodRecommendations {
+        public static let id: Swift.String = "vodRecommendations"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/vod/recommendations/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/recommendations/GET/query/kind`.
+                @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case movie = "movie"
+                    case series = "series"
+                }
+                /// Only films or only series (omitted = both).
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/recommendations/GET/query/kind`.
+                public var kind: Operations.VodRecommendations.Input.Query.KindPayload?
+                /// Titles per row at most.
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/recommendations/GET/query/perRow`.
+                public var perRow: Swift.Int?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - kind: Only films or only series (omitted = both).
+                ///   - perRow: Titles per row at most.
+                public init(
+                    kind: Operations.VodRecommendations.Input.Query.KindPayload? = nil,
+                    perRow: Swift.Int? = nil
+                ) {
+                    self.kind = kind
+                    self.perRow = perRow
+                }
+            }
+            public var query: Operations.VodRecommendations.Input.Query
+            /// - Remark: Generated from `#/paths/livetv/vod/recommendations/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.VodRecommendations.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.VodRecommendations.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.VodRecommendations.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - query:
+            ///   - headers:
+            public init(
+                query: Operations.VodRecommendations.Input.Query = .init(),
+                headers: Operations.VodRecommendations.Input.Headers = .init()
+            ) {
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/livetv/vod/recommendations/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/livetv/vod/recommendations/GET/responses/200/content/application\/json`.
+                    case json([Components.Schemas.VodRecommendationRow])
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: [Components.Schemas.VodRecommendationRow] {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.VodRecommendations.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.VodRecommendations.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Rows (empty when suggestions aren't set up).
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/recommendations/get(vodRecommendations)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.VodRecommendations.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.VodRecommendations.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/recommendations/get(vodRecommendations)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//livetv/vod/recommendations/get(vodRecommendations)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
     /// Not interested: stops suggesting this film or series to the caller (anywhere suggestions show).
     ///
     /// - Remark: HTTP `DELETE /livetv/vod/suggestions/{kind}/{vodId}`.
@@ -38495,13 +39629,28 @@ public enum Operations {
             }
         }
     }
-    /// Remove finished saves (done, failed, cancelled, skipped) from the list (admin only). Failed saves' partial files are deleted.
+    /// Remove finished saves (done, cancelled, skipped) from the list, or with failed=true the failed ones (their partial files are deleted). Admin only. Failed saves are never removed automatically.
     ///
     /// - Remark: HTTP `POST /livetv/vod/saves/clear`.
     /// - Remark: Generated from `#/paths//livetv/vod/saves/clear/post(clearVodSaves)`.
     public enum ClearVodSaves {
         public static let id: Swift.String = "clearVodSaves"
         public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/livetv/vod/saves/clear/POST/query`.
+            public struct Query: Sendable, Hashable {
+                /// Clear the failed saves instead of the finished ones.
+                ///
+                /// - Remark: Generated from `#/paths/livetv/vod/saves/clear/POST/query/failed`.
+                public var failed: Swift.Bool?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - failed: Clear the failed saves instead of the finished ones.
+                public init(failed: Swift.Bool? = nil) {
+                    self.failed = failed
+                }
+            }
+            public var query: Operations.ClearVodSaves.Input.Query
             /// - Remark: Generated from `#/paths/livetv/vod/saves/clear/POST/header`.
             public struct Headers: Sendable, Hashable {
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ClearVodSaves.AcceptableContentType>]
@@ -38517,8 +39666,13 @@ public enum Operations {
             /// Creates a new `Input`.
             ///
             /// - Parameters:
+            ///   - query:
             ///   - headers:
-            public init(headers: Operations.ClearVodSaves.Input.Headers = .init()) {
+            public init(
+                query: Operations.ClearVodSaves.Input.Query = .init(),
+                headers: Operations.ClearVodSaves.Input.Headers = .init()
+            ) {
+                self.query = query
                 self.headers = headers
             }
         }

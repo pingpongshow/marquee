@@ -4108,6 +4108,39 @@ extension Components {
                 case nextEpisode
             }
         }
+        /// - Remark: Generated from `#/components/schemas/VodRecommendationRow`.
+        public struct VodRecommendationRow: Codable, Hashable, Sendable {
+            /// top, because:<n>, genre:<name>, acclaimed or popular (new kinds may be added).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodRecommendationRow/id`.
+            public var id: Swift.String
+            /// e.g. Because you love Heat.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodRecommendationRow/title`.
+            public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/VodRecommendationRow/entries`.
+            public var entries: [Components.Schemas.VodSuggestion]
+            /// Creates a new `VodRecommendationRow`.
+            ///
+            /// - Parameters:
+            ///   - id: top, because:<n>, genre:<name>, acclaimed or popular (new kinds may be added).
+            ///   - title: e.g. Because you love Heat.
+            ///   - entries:
+            public init(
+                id: Swift.String,
+                title: Swift.String,
+                entries: [Components.Schemas.VodSuggestion]
+            ) {
+                self.id = id
+                self.title = title
+                self.entries = entries
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case title
+                case entries
+            }
+        }
         /// A film or series on demand suggested for the caller from their taste (Watch on VOD, Also on VOD, Muse, the on-demand pages' Recommended for you).
         ///
         /// - Remark: Generated from `#/components/schemas/VodSuggestion`.
@@ -5107,7 +5140,11 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/VodSave/etaSeconds`.
             public var etaSeconds: Swift.Int64?
-            /// Why a queued save isn't running: the queue is paused, something is being watched, or the source is unreachable.
+            /// Connections the download uses now (while downloading; more than 1 when a large file is fetched over the free connections of the source's Maximum streams).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSave/connections`.
+            public var connections: Swift.Int?
+            /// Why a queued save isn't running: the queue is paused, something is being watched, connections are in use by viewers, or the source is unreachable.
             ///
             /// - Remark: Generated from `#/components/schemas/VodSave/pauseReason`.
             public var pauseReason: Swift.String?
@@ -5176,7 +5213,8 @@ extension Components {
             ///   - progress: 0–1 of the current step: download, or conversion while processing.
             ///   - speedBps: Download speed in bytes a second (while downloading).
             ///   - etaSeconds: Time left for the download.
-            ///   - pauseReason: Why a queued save isn't running: the queue is paused, something is being watched, or the source is unreachable.
+            ///   - connections: Connections the download uses now (while downloading; more than 1 when a large file is fetched over the free connections of the source's Maximum streams).
+            ///   - pauseReason: Why a queued save isn't running: the queue is paused, something is being watched, connections are in use by viewers, or the source is unreachable.
             ///   - attempts: Network failures in a row.
             ///   - nextAttemptAt: When a save waiting after a network error tries again.
             ///   - error:
@@ -5208,6 +5246,7 @@ extension Components {
                 progress: Swift.Double,
                 speedBps: Swift.Double? = nil,
                 etaSeconds: Swift.Int64? = nil,
+                connections: Swift.Int? = nil,
                 pauseReason: Swift.String? = nil,
                 attempts: Swift.Int,
                 nextAttemptAt: Foundation.Date? = nil,
@@ -5240,6 +5279,7 @@ extension Components {
                 self.progress = progress
                 self.speedBps = speedBps
                 self.etaSeconds = etaSeconds
+                self.connections = connections
                 self.pauseReason = pauseReason
                 self.attempts = attempts
                 self.nextAttemptAt = nextAttemptAt
@@ -5273,6 +5313,7 @@ extension Components {
                 case progress
                 case speedBps
                 case etaSeconds
+                case connections
                 case pauseReason
                 case attempts
                 case nextAttemptAt
@@ -12835,6 +12876,169 @@ extension Components {
                 case id
             }
         }
+        /// A MusicBrainz artist or release group offered by Fix match for music.
+        ///
+        /// - Remark: Generated from `#/components/schemas/MusicMatchCandidate`.
+        public struct MusicMatchCandidate: Codable, Hashable, Sendable {
+            /// Artist MBID or release group MBID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicMatchCandidate/mbid`.
+            public var mbid: Swift.String
+            /// Artist name or album title.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicMatchCandidate/name`.
+            public var name: Swift.String
+            /// MusicBrainz's note telling same-named entries apart ("US singer").
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicMatchCandidate/disambiguation`.
+            public var disambiguation: Swift.String?
+            /// Artists: person, group, orchestra, choir… Albums: album, ep, single, live, compilation, soundtrack, remix, demo, other.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicMatchCandidate/type`.
+            public var _type: Swift.String?
+            /// Artists; ISO 3166-1 code.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicMatchCandidate/country`.
+            public var country: Swift.String?
+            /// Albums; year first released.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicMatchCandidate/year`.
+            public var year: Swift.Int?
+            /// Artists.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicMatchCandidate/beginYear`.
+            public var beginYear: Swift.Int?
+            /// Artists.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicMatchCandidate/endYear`.
+            public var endYear: Swift.Int?
+            /// Albums; the artist credit.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicMatchCandidate/artist`.
+            public var artist: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/MusicMatchCandidate/trackCount`.
+            public var trackCount: Swift.Int?
+            /// MusicBrainz search score, 0–100.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicMatchCandidate/score`.
+            public var score: Swift.Int?
+            /// The item is currently matched to this entry.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicMatchCandidate/current`.
+            public var current: Swift.Bool?
+            /// Creates a new `MusicMatchCandidate`.
+            ///
+            /// - Parameters:
+            ///   - mbid: Artist MBID or release group MBID.
+            ///   - name: Artist name or album title.
+            ///   - disambiguation: MusicBrainz's note telling same-named entries apart ("US singer").
+            ///   - _type: Artists: person, group, orchestra, choir… Albums: album, ep, single, live, compilation, soundtrack, remix, demo, other.
+            ///   - country: Artists; ISO 3166-1 code.
+            ///   - year: Albums; year first released.
+            ///   - beginYear: Artists.
+            ///   - endYear: Artists.
+            ///   - artist: Albums; the artist credit.
+            ///   - trackCount:
+            ///   - score: MusicBrainz search score, 0–100.
+            ///   - current: The item is currently matched to this entry.
+            public init(
+                mbid: Swift.String,
+                name: Swift.String,
+                disambiguation: Swift.String? = nil,
+                _type: Swift.String? = nil,
+                country: Swift.String? = nil,
+                year: Swift.Int? = nil,
+                beginYear: Swift.Int? = nil,
+                endYear: Swift.Int? = nil,
+                artist: Swift.String? = nil,
+                trackCount: Swift.Int? = nil,
+                score: Swift.Int? = nil,
+                current: Swift.Bool? = nil
+            ) {
+                self.mbid = mbid
+                self.name = name
+                self.disambiguation = disambiguation
+                self._type = _type
+                self.country = country
+                self.year = year
+                self.beginYear = beginYear
+                self.endYear = endYear
+                self.artist = artist
+                self.trackCount = trackCount
+                self.score = score
+                self.current = current
+            }
+            public enum CodingKeys: String, CodingKey {
+                case mbid
+                case name
+                case disambiguation
+                case _type = "type"
+                case country
+                case year
+                case beginYear
+                case endYear
+                case artist
+                case trackCount
+                case score
+                case current
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/MusicMatchRequest`.
+        public struct MusicMatchRequest: Codable, Hashable, Sendable {
+            /// Artist MBID for an artist; release group (or release) MBID for an album. A musicbrainz.org link works too.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MusicMatchRequest/mbid`.
+            public var mbid: Swift.String
+            /// Creates a new `MusicMatchRequest`.
+            ///
+            /// - Parameters:
+            ///   - mbid: Artist MBID for an artist; release group (or release) MBID for an album. A musicbrainz.org link works too.
+            public init(mbid: Swift.String) {
+                self.mbid = mbid
+            }
+            public enum CodingKeys: String, CodingKey {
+                case mbid
+            }
+        }
+        /// Either albumId (an album in the track's library) or albumArtist and album (found or created in the track's library).
+        ///
+        /// - Remark: Generated from `#/components/schemas/TrackPlacementRequest`.
+        public struct TrackPlacementRequest: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/TrackPlacementRequest/albumId`.
+            public var albumId: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/TrackPlacementRequest/albumArtist`.
+            public var albumArtist: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/TrackPlacementRequest/album`.
+            public var album: Swift.String?
+            /// The track's own artist, when it should change too.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TrackPlacementRequest/artist`.
+            public var artist: Swift.String?
+            /// Creates a new `TrackPlacementRequest`.
+            ///
+            /// - Parameters:
+            ///   - albumId:
+            ///   - albumArtist:
+            ///   - album:
+            ///   - artist: The track's own artist, when it should change too.
+            public init(
+                albumId: Swift.Int64? = nil,
+                albumArtist: Swift.String? = nil,
+                album: Swift.String? = nil,
+                artist: Swift.String? = nil
+            ) {
+                self.albumId = albumId
+                self.albumArtist = albumArtist
+                self.album = album
+                self.artist = artist
+            }
+            public enum CodingKeys: String, CodingKey {
+                case albumId
+                case albumArtist
+                case album
+                case artist
+            }
+        }
         /// External ratings (OMDb). Absent values are unknown.
         ///
         /// - Remark: Generated from `#/components/schemas/Ratings`.
@@ -12975,6 +13179,10 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/lockedFields`.
                 public var lockedFields: [Swift.String]
+                /// Tracks, for admins; moved to another album by hand (see /items/{itemId}/music-placement).
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/placementOverride`.
+                public var placementOverride: Swift.Bool?
                 /// Collections the item belongs to (META-7).
                 ///
                 /// - Remark: Generated from `#/components/schemas/ItemDetail/value2/collections`.
@@ -13035,6 +13243,7 @@ extension Components {
                 ///
                 /// - Parameters:
                 ///   - lockedFields: Fields edited by an administrator; agents never overwrite them.
+                ///   - placementOverride: Tracks, for admins; moved to another album by hand (see /items/{itemId}/music-placement).
                 ///   - collections: Collections the item belongs to (META-7).
                 ///   - smartRules:
                 ///   - extras: Trailers, featurettes and other extras (LIB-8), trailers first.
@@ -13051,6 +13260,7 @@ extension Components {
                 ///   - chapters:
                 public init(
                     lockedFields: [Swift.String],
+                    placementOverride: Swift.Bool? = nil,
                     collections: [Components.Schemas.ItemSummary]? = nil,
                     smartRules: Components.Schemas.SmartCollectionRules? = nil,
                     extras: [Components.Schemas.ItemSummary]? = nil,
@@ -13067,6 +13277,7 @@ extension Components {
                     chapters: [Components.Schemas.Chapter]
                 ) {
                     self.lockedFields = lockedFields
+                    self.placementOverride = placementOverride
                     self.collections = collections
                     self.smartRules = smartRules
                     self.extras = extras
@@ -13084,6 +13295,7 @@ extension Components {
                 }
                 public enum CodingKeys: String, CodingKey {
                     case lockedFields
+                    case placementOverride
                     case collections
                     case smartRules
                     case extras
@@ -13913,6 +14125,17 @@ extension Components {
             }
             /// - Remark: Generated from `#/components/schemas/OptimizeFilter/hdr`.
             public var hdr: Components.Schemas.OptimizeFilter.HdrPayload?
+            /// Only files already optimized (yes) or not yet (no).
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeFilter/optimized`.
+            @frozen public enum OptimizedPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case yes = "yes"
+                case no = "no"
+            }
+            /// Only files already optimized (yes) or not yet (no).
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizeFilter/optimized`.
+            public var optimized: Components.Schemas.OptimizeFilter.OptimizedPayload?
             /// Creates a new `OptimizeFilter`.
             ///
             /// - Parameters:
@@ -13923,6 +14146,7 @@ extension Components {
             ///   - resolution:
             ///   - codecs:
             ///   - hdr:
+            ///   - optimized: Only files already optimized (yes) or not yet (no).
             public init(
                 libraryId: Swift.Int64? = nil,
                 _type: Components.Schemas.OptimizeFilter._TypePayload? = nil,
@@ -13930,7 +14154,8 @@ extension Components {
                 minBitrateMbps: Swift.Double? = nil,
                 resolution: Components.Schemas.OptimizeFilter.ResolutionPayload? = nil,
                 codecs: [Swift.String]? = nil,
-                hdr: Components.Schemas.OptimizeFilter.HdrPayload? = nil
+                hdr: Components.Schemas.OptimizeFilter.HdrPayload? = nil,
+                optimized: Components.Schemas.OptimizeFilter.OptimizedPayload? = nil
             ) {
                 self.libraryId = libraryId
                 self._type = _type
@@ -13939,6 +14164,7 @@ extension Components {
                 self.resolution = resolution
                 self.codecs = codecs
                 self.hdr = hdr
+                self.optimized = optimized
             }
             public enum CodingKeys: String, CodingKey {
                 case libraryId
@@ -13948,6 +14174,7 @@ extension Components {
                 case resolution
                 case codecs
                 case hdr
+                case optimized
             }
         }
         /// - Remark: Generated from `#/components/schemas/OptimizeQueueRequest`.
@@ -14056,6 +14283,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OptimizePreset/videoKbps`.
             public var videoKbps: Swift.Int?
+            /// The largest a result may be per hour of running time, in GB (10^9 bytes): 5 = a 2-hour film at most 10 GB. Each file's video bitrate is capped so that, with its audio and subtitles, it fits (files that need less stay smaller). 0 or omitted = no limit.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OptimizePreset/maxGbPerHour`.
+            public var maxGbPerHour: Swift.Double?
             /// copy = every track as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1). Every audio track (all languages, commentary) and every subtitle is always kept; an MP4 with picture subtitles becomes MKV.
             ///
             /// - Remark: Generated from `#/components/schemas/OptimizePreset/audio`.
@@ -14089,6 +14320,7 @@ extension Components {
             ///   - codec: AV1 only when the server has an AV1 encoder (av1Available).
             ///   - quality: Constant-quality level, unless videoKbps is set.
             ///   - videoKbps: A target video bitrate instead of a quality; 0 = use the quality.
+            ///   - maxGbPerHour: The largest a result may be per hour of running time, in GB (10^9 bytes): 5 = a 2-hour film at most 10 GB. Each file's video bitrate is capped so that, with its audio and subtitles, it fits (files that need less stay smaller). 0 or omitted = no limit.
             ///   - audio: copy = every track as it is; aac_stereo / aac_51 = every track as AAC (at most 5.1). Every audio track (all languages, commentary) and every subtitle is always kept; an MP4 with picture subtitles becomes MKV.
             ///   - hdr: keep = HDR stays HDR (10-bit HEVC or AV1; H.264 always tone-maps); tonemap = converted to SDR.
             public init(
@@ -14099,6 +14331,7 @@ extension Components {
                 codec: Components.Schemas.OptimizePreset.CodecPayload,
                 quality: Components.Schemas.OptimizePreset.QualityPayload,
                 videoKbps: Swift.Int? = nil,
+                maxGbPerHour: Swift.Double? = nil,
                 audio: Components.Schemas.OptimizePreset.AudioPayload,
                 hdr: Components.Schemas.OptimizePreset.HdrPayload
             ) {
@@ -14109,6 +14342,7 @@ extension Components {
                 self.codec = codec
                 self.quality = quality
                 self.videoKbps = videoKbps
+                self.maxGbPerHour = maxGbPerHour
                 self.audio = audio
                 self.hdr = hdr
             }
@@ -14120,6 +14354,7 @@ extension Components {
                 case codec
                 case quality
                 case videoKbps
+                case maxGbPerHour
                 case audio
                 case hdr
             }
