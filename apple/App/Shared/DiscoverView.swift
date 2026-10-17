@@ -10,6 +10,8 @@ struct DiscoverView: View {
     @State private var items: [DiscoverItem] = []
     @State private var error: String?
     @State private var picked: DiscoverItem?
+    /// The same title on demand, opened from a title's sheet (Watch now on VOD).
+    @State private var vodOpen: VodRef?
     @State private var browse = DiscoverBrowse()
     @State private var filters: DiscoverFilters?
     @State private var page = 1
@@ -27,7 +29,10 @@ struct DiscoverView: View {
                 filters = try? await app.discoverFilters()
             }
             .task(id: "\(category.rawValue)|\(query)|\(browse.hashValue)") { await load() }
-            .sheet(item: $picked, onDismiss: { Task { await load() } }) { RequestSheet(item: $0) }
+            .sheet(item: $picked, onDismiss: { Task { await load() } }) { RequestSheet(item: $0, onWatchVod: { vodOpen = $0 }) }
+            .navigationDestination(item: $vodOpen) { ref in
+                if ref.kind == .movie { VodMovieView(id: ref.id) } else { VodSeriesView(id: ref.id) }
+            }
     }
 
     @ViewBuilder private var content: some View {
@@ -84,9 +89,13 @@ struct DiscoverView: View {
         if let id = it.itemId {
             NavigationLink(value: Route.item(id)) { label }.buttonStyle(cardStyle)
         } else {
-            Button { picked = it } label: { label } // its details, with Request when it can be
-                .buttonStyle(cardStyle)
-                .accessibilityLabel(requestable(it) ? "Request \(it.title)" : "\(it.title), \(it.availability.label)")
+            VStack(alignment: .leading, spacing: 6) {
+                Button { picked = it } label: { label } // its details, with Request when it can be
+                    .buttonStyle(cardStyle)
+                    .accessibilityLabel(requestable(it) ? "Request \(it.title)" : "\(it.title), \(it.availability.label)")
+                // On demand already: watch it there now rather than wait for a request.
+                if let v = it.vod?.value1 { WatchOnVodLink(ref: v, compact: true) }
+            }
         }
     }
 
@@ -222,6 +231,8 @@ struct RequestSheet: View {
     @Environment(AppSession.self) private var app
     @Environment(\.dismiss) private var dismiss
     let item: DiscoverItem
+    /// Opens the same title on demand (the sheet closes first).
+    var onWatchVod: ((VodRef) -> Void)?
     @State private var show: RequestableShow?
     @State private var ratings: TitleRatings?
     @State private var seasons: Set<Int> = []
@@ -233,6 +244,19 @@ struct RequestSheet: View {
         NavigationStack {
             Form {
                 header
+                if item.itemId == nil, let v = item.vod?.value1, let onWatchVod {
+                    Section {
+                        Button {
+                            dismiss()
+                            onWatchVod(v)
+                        } label: {
+                            Label("Watch now on VOD", systemImage: "play.fill")
+                        }
+                        .accessibilityIdentifier("request.watchOnVod")
+                    } footer: {
+                        Text("It's on demand already, so you can watch it now.")
+                    }
+                }
                 if canRequest && item.mediaType == .tv { seasonsSection }
                 if let error { Text(error).foregroundStyle(.red) }
                 if done { Label("Requested", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }

@@ -54,7 +54,11 @@ struct HomeView: View {
                 }
                 ForEach(hubs, id: \.id) { hub in
                     let wide = hub.id == "continue-watching"
-                    if wide, let entries = hub.entries {
+                    if hub.id == Self.vodRow {
+                        // Watch on VOD (LIVE-6, USER-16): films and series on demand picked
+                        // for this viewer.
+                        VodSuggestionRow(title: hub.title, list: hub.vodEntries ?? [], identifier: "home.vodSuggestions")
+                    } else if wide, let entries = hub.entries {
                         // Library titles and films and episodes on demand together, in the
                         // server's order; View more when there are more than the row holds.
                         let more = (hub.total ?? 0) > entries.count
@@ -167,6 +171,9 @@ struct HomeView: View {
         }
     }
 
+    /// Home's Watch on VOD row.
+    private static let vodRow = "vod-suggestions"
+
     /// Continue Watching with nothing in it (the server may send the row with no library items
     /// but films on demand, or nothing left after a removal).
     private static func isEmptyContinue(_ hub: Hub) -> Bool {
@@ -214,7 +221,7 @@ struct HomeView: View {
     private func load() async {
         loadedVersion = HomeChanges.shared.version
         do {
-            hubs = try await app.hubs().filter { !Self.isEmptyContinue($0) }
+            hubs = try await app.hubs(vod: true).filter { !Self.isEmptyContinue($0) && !($0.id == Self.vodRow && ($0.vodEntries ?? []).isEmpty) }
             error = nil
             #if os(tvOS)
             if let lists = try? await app.playlists(kind: .video) { videoPlaylists = lists }

@@ -34,6 +34,8 @@ struct VodBrowseView: View {
     @State private var genres: [VodCategory] = []
     @State private var resume: [VodMovie] = []
     @State private var resumeShows: [VodSeries] = []
+    /// Recommended for you (USER-16): titles on demand picked from the viewer's taste.
+    @State private var suggestions: [VodSuggestion] = []
     @State private var movies: [VodMovie] = []
     @State private var series: [VodSeries] = []
     @State private var total: Int?
@@ -100,6 +102,7 @@ struct VodBrowseView: View {
             controls.padding(.horizontal, sidePadding)
             if filters.isActive { activeFilters.padding(.horizontal, sidePadding) }
             if category.isEmpty, query.isEmpty, !filters.isActive {
+                VodSuggestionRow(title: "Recommended for you", list: suggestions, identifier: "vod.recommended")
                 if shows, !resumeShows.isEmpty {
                     ShelfRow(title: "Continue Watching") {
                         ForEach(resumeShows, id: \.id) { s in
@@ -331,6 +334,9 @@ struct VodBrowseView: View {
         async let gens = try? (shows ? app.vodSeriesGenres() : app.vodGenres())
         async let st = try? app.vodStatus()
         await reloadResume()
+        if category.isEmpty, query.isEmpty, !filters.isActive, let r = try? await app.vodSuggestions(series: shows) {
+            suggestions = r
+        }
         do {
             try await fetch(offset: 0, replace: true)
         } catch is CancellationError {

@@ -33,9 +33,11 @@ public extension AppSession {
         }
     }
 
-    /// Movies and shows matching a description, best first.
-    func museVideo(_ prompt: String, library: Int64? = nil, limit: Int = 40) async throws -> MuseVideoResult {
-        switch try await recapAPI.museVideo(body: .json(.init(prompt: prompt, libraryId: library, limit: limit))) {
+    /// Movies and shows matching a description, best first; with `includeVod`, films and series
+    /// on demand that fit too (in `vod`).
+    func museVideo(_ prompt: String, library: Int64? = nil, limit: Int = 40, includeVod: Bool = false) async throws -> MuseVideoResult {
+        switch try await recapAPI.museVideo(body: .json(.init(prompt: prompt, libraryId: library, limit: limit,
+                                                              includeVod: includeVod ? true : nil))) {
         case .ok(let ok): return try ok.body.json
         case .badRequest(let r): throw MarqueeError((try? r.body.json.message) ?? "Muse didn't understand that.")
         case .serviceUnavailable(let r): throw MarqueeError((try? r.body.json.message) ?? "Muse isn't available right now.")
