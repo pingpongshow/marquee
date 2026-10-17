@@ -19,6 +19,7 @@ type Filter struct {
 	Resolution     int      // 2160, 1080, 720 or 480 (SD): only this class
 	Codecs         []string // only these video codecs (ffprobe names: h264, mpeg2video, vc1, …)
 	HDR            *bool    // only HDR (true) or only SDR (false)
+	Optimized      *bool    // only files the optimizer replaced (true, to re-optimize) or only ones it hasn't (false)
 	Sort           string   // size (default), bitrate, title
 }
 
@@ -100,6 +101,13 @@ func (flt Filter) where() (string, []any) {
 			conds = append(conds, "COALESCE(f.hdr_format, '') = ''")
 		}
 	}
+	if flt.Optimized != nil {
+		c := "EXISTS (SELECT 1 FROM optimize_jobs oj WHERE oj.file_id = f.id AND oj.state = 'done')"
+		if !*flt.Optimized {
+			c = "NOT " + c
+		}
+		conds = append(conds, c)
+	}
 	return strings.Join(conds, " AND "), args
 }
 
@@ -175,6 +183,7 @@ func (s *Service) List(ctx context.Context, flt Filter, p settings.OptimizePrese
 		var title string
 		if arows.Scan(&id, &a.Codec, &a.Channels, &a.Kbps, &a.Default, &title) == nil {
 			a.Commentary = strings.Contains(strings.ToLower(title), "commentary")
+			a.Profile = title // e.g. "DTS-HD MA 5.1", for the lossless DTS guess
 			if i, ok := byID[id]; ok {
 				all[i].info.Audio = append(all[i].info.Audio, a)
 			}

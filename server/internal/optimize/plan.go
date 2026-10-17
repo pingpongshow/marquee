@@ -41,7 +41,9 @@ type Stream struct {
 	Channels int
 	Title    string
 	Default  bool
-	Comment  bool // commentary (disposition or title)
+	Comment  bool   // commentary (disposition or title)
+	Profile  string // e.g. "DTS-HD MA"
+	Kbps     int    // the stream's bitrate, 0 = unknown
 }
 
 // textSubtitles are subtitle formats kept as they are in MKV; mov_text (MP4's) becomes SRT.
@@ -75,15 +77,17 @@ type Plan struct {
 	Format string // matroska or mp4
 	// Final is the path the result goes to: the original's, or with .mkv when the
 	// original's container can't hold the result.
-	Final        string
-	ScaleW       int // 0 = no scaling
-	ScaleH       int
-	ToneMap      bool
-	TenBit       bool
-	HDRTransfer  string // kept HDR's transfer, "" = SDR
-	Codec        string
-	Quality      string
-	VideoKbps    int
+	Final       string
+	ScaleW      int // 0 = no scaling
+	ScaleH      int
+	ToneMap     bool
+	TenBit      bool
+	HDRTransfer string // kept HDR's transfer, "" = SDR
+	Codec       string
+	Quality     string
+	VideoKbps   int
+	// MaxKbps caps the video bitrate so the file fits the preset's maximum size (0 = none).
+	MaxKbps      int
 	Audio        []AudioOut
 	Subtitles    []SubOut
 	Attachments  bool
@@ -171,7 +175,48 @@ func NewPlan(src Source, p settings.OptimizePreset) (Plan, error) {
 		}
 	}
 	pl.Attachments = pl.Format == "matroska" && src.Attachments > 0 && ext == ".mkv"
+
+	// A maximum size caps the video bitrate: what's left of the size, spread over the
+	// running time, once the audio and subtitles are counted.
+	if p.MaxSizeGB > 0 && src.DurationMS > 0 {
+		var audio, subs float64
+		for _, a := range pl.Audio {
+			if a.Codec == "copy" {
+				audio += float64(audioKbps(AudioInfo{Codec: a.Stream.Codec, Profile: a.Profile, Channels: a.Stream.Channels, Kbps: a.Stream.Kbps}))
+			} else {
+				audio += float64(a.Kbps)
+			}
+		}
+		for _, st := range pl.Subtitles {
+			subs += subtitleKbps(st.Stream.Codec)
+		}
+		pl.MaxKbps = sizeCapKbps(p.MaxSizeGB, float64(src.DurationMS)/1000, audio+subs)
+		if pl.VideoKbps > pl.MaxKbps {
+			pl.VideoKbps = pl.MaxKbps
+		}
+	}
 	return pl, nil
+}
+
+// minCapKbps is the lowest video bitrate a maximum size brings a file down to: a file whose
+// audio alone nearly fills the size comes out bigger rather than unwatchable.
+const minCapKbps = 1000
+
+// sizeCapKbps is the video bitrate that fits a file of secs into maxGB along with
+// otherKbps of audio and subtitles, leaving 3% for the container and the encoder's
+// overshoot.
+func sizeCapKbps(maxGB, secs, otherKbps float64) int {
+	total := maxGB * 1e9 * 8 / 1000 / secs * 0.97
+	return max(int(total-otherKbps), minCapKbps)
+}
+
+// subtitleKbps is about what a subtitle track adds: picture subtitles tens of kb/s, text
+// next to nothing.
+func subtitleKbps(codec string) float64 {
+	if imageSubtitles[codec] {
+		return 40
+	}
+	return 1
 }
 
 // Args is the FFmpeg command line that re-encodes src into out with an encoder (nvenc,
@@ -239,7 +284,7 @@ func (pl Plan) Args(src Source, encoder, encPreset, qsvDevice, out string) []str
 	}
 	a = append(a, "-vf", strings.Join(chain, ","))
 	a = append(a, encode.Video{Encoder: encoder, Codec: pl.Codec, Preset: encPreset, Quality: pl.Quality, Kbps: pl.VideoKbps,
-		TenBit: pl.TenBit, HDRTransfer: pl.HDRTransfer}.Args()...)
+		MaxKbps: pl.MaxKbps, TenBit: pl.TenBit, HDRTransfer: pl.HDRTransfer}.Args()...)
 	if pl.Format == "mp4" && pl.Codec == "hevc" {
 		a = append(a, "-tag:v", "hvc1") // so Apple devices play it
 	}
@@ -274,6 +319,7 @@ type FileInfo struct {
 // AudioInfo is an audio stream as the library knows it.
 type AudioInfo struct {
 	Codec      string
+	Profile    string // e.g. "DTS-HD MA" (lossless DTS is much bigger than core DTS)
 	Channels   int
 	Kbps       int // 0 = unknown
 	Default    bool
@@ -306,6 +352,8 @@ func audioKbps(a AudioInfo) int {
 	switch {
 	case a.Codec == "truehd":
 		return 3500
+	case a.Codec == "dts" && strings.Contains(a.Profile, "MA"):
+		return 600 * ch
 	case a.Codec == "dts":
 		return 1536
 	case a.Codec == "eac3":
@@ -365,6 +413,9 @@ func Estimate(f FileInfo, p settings.OptimizePreset) int64 {
 	srcVideo := float64(f.Size)*8/1000/secs - srcAudio
 	if srcVideo > 0 && v > srcVideo {
 		v = srcVideo
+	}
+	if p.MaxSizeGB > 0 {
+		v = min(v, float64(sizeCapKbps(p.MaxSizeGB, secs, outAudio)))
 	}
 	est := int64((v + outAudio) * 1000 / 8 * secs * 1.01) // ~1% container overhead
 	return min(est, f.Size)
