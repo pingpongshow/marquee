@@ -53,8 +53,9 @@ func TestArgsHDRKeep(t *testing.T) {
 	if !has(nv, "-map", "0:6") || has(nv, "-c:a:0") {
 		t.Errorf("captions dropped or audio converted: %v", nv)
 	}
-	if f := vf(nv); f != "scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2,format=p010le" {
-		t.Errorf("nvenc filters: %s", f)
+	// The whole conversion stays on the GPU: CUDA frames, scale_cuda to P010.
+	if f := vf(nv); f != "scale_cuda=w=1920:h=1080:force_original_aspect_ratio=decrease:force_divisible_by=2:format=p010le" || !has(nv, "-hwaccel_output_format", "cuda") {
+		t.Errorf("nvenc filters: %s %v", f, nv)
 	}
 	qsv := pl.Args(hdr4K, "qsv", "slow", "/dev/dri/renderD128", "/m/out.part")
 	for _, want := range [][]string{{"-init_hw_device", "qsv=qs:/dev/dri/renderD128"}, {"-c:v", "hevc_qsv"}, {"-global_quality", "24"}} {
@@ -193,5 +194,36 @@ func TestEstimate(t *testing.T) {
 	}
 	if Class(1920, 800) != 1080 || Class(3840, 1600) != 2160 || Class(1280, 536) != 720 || Class(720, 480) != 480 {
 		t.Error("classes")
+	}
+}
+
+
+// The full-GPU path is used for NVENC when nothing needs the CPU: not for tone mapping,
+// sources NVDEC can't decode or unusual pixel formats, and never for other encoders.
+func TestFullGPU(t *testing.T) {
+	p := preset("1080p-hevc-balanced")
+	sdr := Source{Path: "/m/a.mkv", DurationMS: 1000, Width: 1920, Height: 1080, VideoCodec: "h264", PixFmt: "yuv420p",
+		Audio: []Stream{{Index: 1, Codec: "aac", Channels: 2}}}
+	pl, _ := NewPlan(sdr, p)
+	a := pl.Args(sdr, "nvenc", "p6", "", "out")
+	if !pl.FullGPU(sdr, "nvenc") || vf(a) != "scale_cuda=format=nv12" || !has(a, "-hwaccel_output_format", "cuda") {
+		t.Errorf("8-bit 1080p on NVENC: %s %v", vf(a), a)
+	}
+	if pl.FullGPU(sdr, "qsv") || pl.FullGPU(sdr, "software") {
+		t.Error("full GPU for another encoder")
+	}
+	odd := sdr
+	odd.VideoCodec = "mpeg4"
+	if pl2, _ := NewPlan(odd, p); pl2.FullGPU(odd, "nvenc") || has(pl2.Args(odd, "nvenc", "p6", "", "out"), "-hwaccel_output_format", "cuda") {
+		t.Error("full GPU for a codec NVDEC can't decode")
+	}
+	yuv422 := sdr
+	yuv422.PixFmt = "yuv422p10le"
+	if pl3, _ := NewPlan(yuv422, p); pl3.FullGPU(yuv422, "nvenc") {
+		t.Error("full GPU for 4:2:2")
+	}
+	tm := preset("720p-hevc") // tone-maps HDR
+	if pl4, _ := NewPlan(hdr4K, tm); pl4.FullGPU(hdr4K, "nvenc") || !strings.HasPrefix(vf(pl4.Args(hdr4K, "nvenc", "p6", "", "out")), "tonemapx=") {
+		t.Error("tone mapping must use the CPU path")
 	}
 }

@@ -176,10 +176,32 @@ func NewPlan(src Source, p settings.OptimizePreset) (Plan, error) {
 
 // Args is the FFmpeg command line that re-encodes src into out with an encoder (nvenc,
 // qsv, software) at its preset name.
+// nvdecCodecs are the source codecs NVIDIA's decoder handles (4:2:0, 8 or 10 bit).
+var nvdecCodecs = map[string]bool{"h264": true, "hevc": true, "av1": true, "vp9": true, "mpeg2video": true, "vc1": true}
+
+// FullGPU reports whether the whole conversion can stay on an NVIDIA GPU: decode, resize and
+// colour conversion (scale_cuda) and encode, with no frames copied back to the CPU. Tone
+// mapping runs on the CPU, so it needs the other path; so do sources NVDEC can't decode.
+func (pl Plan) FullGPU(src Source, encoder string) bool {
+	if encoder != "nvenc" || pl.ToneMap || !nvdecCodecs[src.VideoCodec] {
+		return false
+	}
+	switch src.PixFmt {
+	case "yuv420p", "yuvj420p", "yuv420p10le", "nv12", "p010le":
+		return true
+	}
+	return false
+}
+
 func (pl Plan) Args(src Source, encoder, encPreset, qsvDevice, out string) []string {
 	a := []string{"-hide_banner", "-v", "error", "-nostdin", "-y"}
+	gpu := pl.FullGPU(src, encoder)
 	if encoder == "nvenc" {
-		a = append(a, "-hwaccel", "cuda") // decode on the GPU where it can (frames come back for the filters)
+		a = append(a, "-hwaccel", "cuda") // decode on the GPU
+		if gpu {
+			// …and keep the frames there for scale_cuda and the encoder.
+			a = append(a, "-hwaccel_output_format", "cuda")
+		}
 	}
 	a = append(a, encode.HWInit(encoder, qsvDevice)...)
 	a = append(a, "-i", src.Path, "-map", fmt.Sprintf("0:%d", src.VideoIndex))
@@ -195,13 +217,26 @@ func (pl Plan) Args(src Source, encoder, encPreset, qsvDevice, out string) []str
 	a = append(a, "-map_metadata", "0", "-map_chapters", "0", "-c", "copy")
 
 	var chain []string
-	if pl.ToneMap {
-		chain = append(chain, encode.ToneMap)
+	if gpu {
+		// Resize and convert on the GPU: P010 for 10-bit output, NV12 for 8-bit.
+		f := "nv12"
+		if pl.TenBit {
+			f = "p010le"
+		}
+		if pl.ScaleW > 0 {
+			chain = append(chain, fmt.Sprintf("scale_cuda=w=%d:h=%d:force_original_aspect_ratio=decrease:force_divisible_by=2:format=%s", pl.ScaleW, pl.ScaleH, f))
+		} else {
+			chain = append(chain, "scale_cuda=format="+f)
+		}
+	} else {
+		if pl.ToneMap {
+			chain = append(chain, encode.ToneMap)
+		}
+		if pl.ScaleW > 0 {
+			chain = append(chain, fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=decrease:force_divisible_by=2", pl.ScaleW, pl.ScaleH))
+		}
+		chain = append(chain, encode.PixelFormat(encoder, pl.TenBit)...)
 	}
-	if pl.ScaleW > 0 {
-		chain = append(chain, fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=decrease:force_divisible_by=2", pl.ScaleW, pl.ScaleH))
-	}
-	chain = append(chain, encode.PixelFormat(encoder, pl.TenBit)...)
 	a = append(a, "-vf", strings.Join(chain, ","))
 	a = append(a, encode.Video{Encoder: encoder, Codec: pl.Codec, Preset: encPreset, Quality: pl.Quality, Kbps: pl.VideoKbps,
 		TenBit: pl.TenBit, HDRTransfer: pl.HDRTransfer}.Args()...)
