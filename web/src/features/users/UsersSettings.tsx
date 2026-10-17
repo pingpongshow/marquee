@@ -181,6 +181,9 @@ function DvrQuotaField({
   const quota = value.dvrQuotaGb;
   const mode = quota == null ? "default" : quota === 0 ? "unlimited" : "own";
   const def = settings.data?.integrations?.dvrDefaultQuotaGb ?? 0;
+  // The number is typed freely and applied as it's typed when valid; clearing the box
+  // doesn't snap it back to 1 (it used to, so typing a new amount made "150" of "50").
+  const [text, setText] = useState<string | null>(null);
   return (
       <Field
         label="Recording quota"
@@ -216,13 +219,13 @@ function DvrQuotaField({
                   inputMode="numeric"
                   aria-label="Quota in GB"
                   className="w-28"
-                  value={quota ?? ""}
-                  onChange={(e) =>
-                    onChange({
-                      ...value,
-                      dvrQuotaGb: Math.max(1, Math.floor(Number(e.target.value) || 1)),
-                    })
-                  }
+                  value={text ?? String(quota ?? "")}
+                  onChange={(e) => {
+                    setText(e.target.value);
+                    const n = Math.floor(Number(e.target.value));
+                    if (n >= 1) onChange({ ...value, dvrQuotaGb: n });
+                  }}
+                  onBlur={() => setText(null)}
                 />
                 <span className="text-sm text-muted">GB</span>
               </>
