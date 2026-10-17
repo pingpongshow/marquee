@@ -80,7 +80,11 @@ func (h *Handlers) liveStatus(ctx context.Context) LiveTvStatus {
 	}, len(sources))
 	for i, s := range sources {
 		out.Sources[i].Id, out.Sources[i].Name, out.Sources[i].Channels, out.Sources[i].Programmes = s.ID, s.Name, s.Channels, s.Programmes
-		out.Sources[i].RefreshedAt, out.Sources[i].Error = s.RefreshedAt, nz(s.Error)
+		out.Sources[i].RefreshedAt = s.RefreshedAt
+		// A source's error can carry its URL (IPTV URLs often hold a login): admins only.
+		if sess, ok := session(ctx); ok && sess.User.IsAdmin {
+			out.Sources[i].Error = nz(s.Error)
+		}
 		// Connections in use against the source's limit (LIVE-3).
 		out.Sources[i].MaxStreams, out.Sources[i].InUse = ptr(h.LiveTV.MaxStreams(s.ID)), ptr(h.LiveTV.InUse(s.ID))
 	}
