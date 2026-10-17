@@ -547,8 +547,11 @@ export function VodDownloadsPanel() {
   if (q.isPending) return <Spinner />;
   if (q.isError) return <Alert tone="error">{q.error.message}</Alert>;
   const d = q.data;
-  const finished = d.saves.filter((v) => ["done", "failed", "cancelled", "skipped"].includes(v.state));
-  const waiting = d.saves.filter((v) => !finished.includes(v));
+  // Failed saves have their own list and stay until retried or cleared; finished ones are
+  // the done, cancelled and skipped history.
+  const failed = d.saves.filter((v) => v.state === "failed");
+  const finished = d.saves.filter((v) => ["done", "cancelled", "skipped"].includes(v.state));
+  const waiting = d.saves.filter((v) => v.state !== "failed" && !finished.includes(v));
   return (
     <section id="downloads" className="scroll-mt-4 space-y-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -572,6 +575,22 @@ export function VodDownloadsPanel() {
             <SaveRow key={v.id} v={v} />
           ))}
         </ul>
+      )}
+      {failed.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <h3 className="text-sm font-semibold text-danger">Failed ({failed.length})</h3>
+            <Button size="sm" variant="ghost" className="ml-auto" onClick={() => act.mutate({ action: "clearFailed" })}>
+              Clear failed
+            </Button>
+          </div>
+          <p className="text-xs text-muted">Failed downloads stay here until you retry or clear them; they keep what they downloaded, so Retry continues from there.</p>
+          <ul className="divide-y divide-border rounded-lg bg-surface px-4">
+            {failed.map((v) => (
+              <SaveRow key={v.id} v={v} />
+            ))}
+          </ul>
+        </div>
       )}
       {finished.length > 0 && (
         <details>

@@ -3768,7 +3768,12 @@ paths:
     post:
       tags: [livetv]
       operationId: clearVodSaves
-      summary: "Remove finished saves (done, failed, cancelled, skipped) from the list (admin only). Failed saves' partial files are deleted."
+      summary: "Remove finished saves (done, cancelled, skipped) from the list, or with failed=true the failed ones (their partial files are deleted). Admin only. Failed saves are never removed automatically."
+      parameters:
+        - name: failed
+          in: query
+          description: "Clear the failed saves instead of the finished ones."
+          schema: { type: boolean }
       responses:
         "204": { description: Cleared. }
         "401": { $ref: "#/components/responses/Unauthorized" }

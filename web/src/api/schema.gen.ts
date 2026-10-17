@@ -3062,7 +3062,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Remove finished saves (done, failed, cancelled, skipped) from the list (admin only). Failed saves' partial files are deleted. */
+        /** Remove finished saves (done, cancelled, skipped) from the list, or with failed=true the failed ones (their partial files are deleted). Admin only. Failed saves are never removed automatically. */
         post: operations["clearVodSaves"];
         delete?: never;
         options?: never;
@@ -12842,7 +12842,10 @@ export interface operations {
     };
     clearVodSaves: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Clear the failed saves instead of the finished ones. */
+                failed?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;

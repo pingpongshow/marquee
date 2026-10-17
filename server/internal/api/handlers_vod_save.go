@@ -365,7 +365,7 @@ func (h *Handlers) ListVodSaves(ctx context.Context, _ ListVodSavesRequestObject
 	return ListVodSaves200JSONResponse(out), nil
 }
 
-func (h *Handlers) ClearVodSaves(ctx context.Context, _ ClearVodSavesRequestObject) (ClearVodSavesResponseObject, error) {
+func (h *Handlers) ClearVodSaves(ctx context.Context, req ClearVodSavesRequestObject) (ClearVodSavesResponseObject, error) {
 	switch authed, admin, ok := h.vodSaveAdmin(ctx); {
 	case !authed:
 		return ClearVodSaves401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
@@ -374,7 +374,11 @@ func (h *Handlers) ClearVodSaves(ctx context.Context, _ ClearVodSavesRequestObje
 	case !ok:
 		return ClearVodSaves503JSONResponse{ServiceUnavailableJSONResponse(errVodSaveUnavailable)}, nil
 	}
-	if err := h.VODSaves.ClearFinished(ctx); err != nil {
+	clear := h.VODSaves.ClearFinished
+	if req.Params.Failed != nil && *req.Params.Failed {
+		clear = h.VODSaves.ClearFailed
+	}
+	if err := clear(ctx); err != nil {
 		return nil, internal(ctx, "clearVodSaves", err)
 	}
 	return ClearVodSaves204Response{}, nil

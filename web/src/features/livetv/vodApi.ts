@@ -262,9 +262,10 @@ type SaveAction = "cancel" | "retry" | "top" | "pause" | "resume";
 export function useSaveAction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, action }: { id?: number; action: SaveAction | "clear" }) => {
+    mutationFn: ({ id, action }: { id?: number; action: SaveAction | "clear" | "clearFailed" }) => {
       if (id == null) {
         if (action === "clear") return unwrap(api.POST("/livetv/vod/saves/clear"));
+        if (action === "clearFailed") return unwrap(api.POST("/livetv/vod/saves/clear", { params: { query: { failed: true } } }));
         if (action === "pause") return unwrap(api.POST("/livetv/vod/saves/pause"));
         return unwrap(api.POST("/livetv/vod/saves/resume"));
       }
