@@ -11,6 +11,9 @@ final class VideoMuse {
     private(set) var error: String?
     private(set) var saved: String?
 
+    /// Also ask for films and series on demand (the page's Include VOD, when the viewer may watch on demand).
+    var includeVod = false
+
     func run(_ app: AppSession, library: Int64?) {
         let p = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard p.count >= 2, !busy else { return }
@@ -20,7 +23,7 @@ final class VideoMuse {
         Task {
             defer { busy = false }
             do {
-                result = try await app.museVideo(p, library: library)
+                result = try await app.museVideo(p, library: library, includeVod: includeVod && library == nil)
                 asked = p
             } catch {
                 self.error = error.localizedDescription
@@ -48,17 +51,38 @@ struct VideoMuseView: View {
     @Environment(AppSession.self) private var app
     var libraryID: Int64?
     @State private var muse = VideoMuse()
+    /// Include VOD, remembered on this device.
+    @AppStorage("marquee.muse.includeVod") private var includeVod = false
+    /// Whether films and series on demand can be offered (on, allowed for this profile, and not
+    /// Muse within one library).
+    @State private var canVod = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 promptField
                 VideoMuseChips(muse: muse, libraryID: libraryID)
+                if canVod {
+                    Toggle(isOn: $includeVod) { Label("Include VOD", systemImage: "play.tv") }
+                        #if os(iOS)
+                        .toggleStyle(.switch)
+                        .tint(Color.marqueeGold)
+                        .fixedSize()
+                        #endif
+                        .padding(.horizontal, sidePadding)
+                        .accessibilityIdentifier("muse.includeVod")
+                }
                 VideoMuseResults(muse: muse)
             }
             .padding(.vertical)
         }
         .navigationTitle("Muse")
+        .task {
+            guard libraryID == nil else { return }
+            canVod = (try? await app.vodStatus())?.enabled == true
+            muse.includeVod = canVod && includeVod
+        }
+        .onChange(of: includeVod) { muse.includeVod = canVod && includeVod }
     }
 
     private var promptField: some View {
@@ -127,8 +151,10 @@ struct VideoMuseResults: View {
                     }
                 }
                 .padding(.horizontal, sidePadding)
+                let onVod = VodSuggestionHides.shared.visible(r.vod ?? [])
                 if r.items.isEmpty {
-                    ContentUnavailableView("Nothing matched", systemImage: "sparkles", description: Text("Try describing it another way."))
+                    ContentUnavailableView("Nothing matched", systemImage: "sparkles",
+                                           description: Text(onVod.isEmpty ? "Try describing it another way." : "Nothing in your libraries matches that."))
                 } else {
                     HStack {
                         Text("\(r.items.count) \(r.items.count == 1 ? "match" : "matches")").font(.headline)
@@ -147,6 +173,16 @@ struct VideoMuseResults: View {
                         ForEach(r.items, id: \.id) { PosterCard(item: $0, width: width) }
                     }
                     .padding(.horizontal, sidePadding)
+                }
+                if !onVod.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("On VOD").font(.headline).padding(.horizontal, sidePadding)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: width, maximum: width * 1.4), spacing: gap, alignment: .top)], spacing: gap) {
+                            ForEach(onVod, id: \.key) { VodSuggestionTile(suggestion: $0, width: width) }
+                        }
+                        .padding(.horizontal, sidePadding)
+                    }
+                    .accessibilityIdentifier("muse.onVod")
                 }
             }
         }

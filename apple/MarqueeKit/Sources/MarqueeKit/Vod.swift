@@ -10,6 +10,8 @@ public typealias VodSeries = Components.Schemas.VodSeries
 public typealias VodSeriesDetail = Components.Schemas.VodSeriesDetail
 public typealias VodSeason = Components.Schemas.VodSeason
 public typealias VodEpisode = Components.Schemas.VodEpisode
+public typealias VodSuggestion = Components.Schemas.VodSuggestion
+public typealias VodRef = Components.Schemas.VodRef
 
 /// Movies on demand under Live TV (LIVE-6): films from M3U sources (e.g. Pluto TV), played by
 /// passing the source's HLS through the server, with per-viewer resume and watched state.
@@ -197,6 +199,29 @@ public extension AppSession {
         }
     }
 
+    // MARK: Suggestions (LIVE-6, USER-16)
+
+    /// Films (or series) on demand picked for the viewer from their taste: the VOD pages'
+    /// Recommended for you.
+    func vodSuggestions(series: Bool, limit: Int = 20) async throws -> [VodSuggestion] {
+        try await vodAPI.vodSuggestions(query: .init(kind: series ? .series : .movie, limit: limit)).ok.body.json
+    }
+
+    /// Also on VOD: films or series on demand like a library movie or show (empty when the
+    /// viewer can't watch on demand).
+    func itemVodSimilar(_ itemId: Int64, limit: Int = 20) async throws -> [VodSuggestion] {
+        try await vodAPI.itemVodSimilar(path: .init(itemId: itemId), query: .init(limit: limit)).ok.body.json
+    }
+
+    /// Not interested: the title isn't suggested to this viewer again.
+    func hideVodSuggestion(_ s: VodSuggestion) async throws {
+        guard let id = s.vodId else { return }
+        switch try await vodAPI.hideVodSuggestion(path: .init(kind: s.kind == .series ? .series : .movie, vodId: id)) {
+        case .noContent, .notFound: return
+        default: throw MarqueeError("Couldn't hide that suggestion")
+        }
+    }
+
     /// The episode after this one in viewing order, if any (for Up Next).
     func vodNextEpisode(_ id: Int64) async throws -> VodEpisode? {
         try await vodAPI.vodNextEpisode(path: .init(episodeId: id)).ok.body.json.episode
@@ -280,4 +305,11 @@ public extension VodMovieDetail {
     var info: Value2Payload { value2 }
     var id: Int64 { value1.id }
     var title: String { value1.title }
+}
+
+public extension VodSuggestion {
+    /// The film's or series' id.
+    var vodId: Int64? { movie?.id ?? series?.id }
+    var title: String { movie?.title ?? series?.title ?? "" }
+    var posterUrl: String? { movie?.posterUrl ?? series?.posterUrl }
 }

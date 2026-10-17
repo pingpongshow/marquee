@@ -885,6 +885,16 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /livetv/vod/movies`.
     /// - Remark: Generated from `#/paths//livetv/vod/movies/get(listVodMovies)`.
     func listVodMovies(_ input: Operations.ListVodMovies.Input) async throws -> Operations.ListVodMovies.Output
+    /// Recommended for you: films and series on demand picked for the caller from their taste (favourites, ratings and what they watched), best first, leaving out titles their libraries have, ones they've started or watched and ones they said they're not interested in.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/suggestions`.
+    /// - Remark: Generated from `#/paths//livetv/vod/suggestions/get(vodSuggestions)`.
+    func vodSuggestions(_ input: Operations.VodSuggestions.Input) async throws -> Operations.VodSuggestions.Output
+    /// Not interested: stops suggesting this film or series to the caller (anywhere suggestions show).
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/suggestions/{kind}/{vodId}`.
+    /// - Remark: Generated from `#/paths//livetv/vod/suggestions/{kind}/{vodId}/delete(hideVodSuggestion)`.
+    func hideVodSuggestion(_ input: Operations.HideVodSuggestion.Input) async throws -> Operations.HideVodSuggestion.Output
     /// Films the caller stopped part-way through, most recent first.
     ///
     /// - Remark: HTTP `GET /livetv/vod/continue`.
@@ -1160,6 +1170,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /items/{itemId}/related`.
     /// - Remark: Generated from `#/paths//items/{itemId}/related/get(relatedItems)`.
     func relatedItems(_ input: Operations.RelatedItems.Input) async throws -> Operations.RelatedItems.Output
+    /// Also on VOD: films (for a movie) or series (for a show) on demand like this one that the caller's libraries don't have, best first by TMDB's recommendations and the caller's taste. Empty for other types, or when on demand is off or not the caller's to watch.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/vod-similar`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/vod-similar/get(itemVodSimilar)`.
+    func itemVodSimilar(_ input: Operations.ItemVodSimilar.Input) async throws -> Operations.ItemVodSimilar.Output
     /// Playable items under a show, season, artist, album or collection, in play order (for Play all / Shuffle). At most 2,000.
     ///
     /// - Remark: HTTP `GET /items/{itemId}/leaves`.
@@ -2965,8 +2980,14 @@ extension APIProtocol {
     ///
     /// - Remark: HTTP `GET /hubs/home`.
     /// - Remark: Generated from `#/paths//hubs/home/get(homeHubs)`.
-    public func homeHubs(headers: Operations.HomeHubs.Input.Headers = .init()) async throws -> Operations.HomeHubs.Output {
-        try await homeHubs(Operations.HomeHubs.Input(headers: headers))
+    public func homeHubs(
+        query: Operations.HomeHubs.Input.Query = .init(),
+        headers: Operations.HomeHubs.Input.Headers = .init()
+    ) async throws -> Operations.HomeHubs.Output {
+        try await homeHubs(Operations.HomeHubs.Input(
+            query: query,
+            headers: headers
+        ))
     }
     /// Recent plays, newest first (admin only).
     ///
@@ -3429,6 +3450,32 @@ extension APIProtocol {
     ) async throws -> Operations.ListVodMovies.Output {
         try await listVodMovies(Operations.ListVodMovies.Input(
             query: query,
+            headers: headers
+        ))
+    }
+    /// Recommended for you: films and series on demand picked for the caller from their taste (favourites, ratings and what they watched), best first, leaving out titles their libraries have, ones they've started or watched and ones they said they're not interested in.
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/suggestions`.
+    /// - Remark: Generated from `#/paths//livetv/vod/suggestions/get(vodSuggestions)`.
+    public func vodSuggestions(
+        query: Operations.VodSuggestions.Input.Query = .init(),
+        headers: Operations.VodSuggestions.Input.Headers = .init()
+    ) async throws -> Operations.VodSuggestions.Output {
+        try await vodSuggestions(Operations.VodSuggestions.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Not interested: stops suggesting this film or series to the caller (anywhere suggestions show).
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/suggestions/{kind}/{vodId}`.
+    /// - Remark: Generated from `#/paths//livetv/vod/suggestions/{kind}/{vodId}/delete(hideVodSuggestion)`.
+    public func hideVodSuggestion(
+        path: Operations.HideVodSuggestion.Input.Path,
+        headers: Operations.HideVodSuggestion.Input.Headers = .init()
+    ) async throws -> Operations.HideVodSuggestion.Output {
+        try await hideVodSuggestion(Operations.HideVodSuggestion.Input(
+            path: path,
             headers: headers
         ))
     }
@@ -4080,6 +4127,21 @@ extension APIProtocol {
     ) async throws -> Operations.RelatedItems.Output {
         try await relatedItems(Operations.RelatedItems.Input(
             path: path,
+            headers: headers
+        ))
+    }
+    /// Also on VOD: films (for a movie) or series (for a show) on demand like this one that the caller's libraries don't have, best first by TMDB's recommendations and the caller's taste. Empty for other types, or when on demand is off or not the caller's to watch.
+    ///
+    /// - Remark: HTTP `GET /items/{itemId}/vod-similar`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/vod-similar/get(itemVodSimilar)`.
+    public func itemVodSimilar(
+        path: Operations.ItemVodSimilar.Input.Path,
+        query: Operations.ItemVodSimilar.Input.Query = .init(),
+        headers: Operations.ItemVodSimilar.Input.Headers = .init()
+    ) async throws -> Operations.ItemVodSimilar.Output {
+        try await itemVodSimilar(Operations.ItemVodSimilar.Input(
+            path: path,
+            query: query,
             headers: headers
         ))
     }

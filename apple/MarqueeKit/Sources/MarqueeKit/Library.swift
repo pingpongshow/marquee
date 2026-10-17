@@ -28,7 +28,10 @@ public extension AppSession {
 
     func libraries() async throws -> [Library] { try await api.listLibraries().ok.body.json }
 
-    func hubs() async throws -> [Hub] { try await api.homeHubs().ok.body.json }
+    /// Home's rows. `vod` adds Watch on VOD (id vod-suggestions, its titles in vodEntries).
+    func hubs(vod: Bool = false) async throws -> [Hub] {
+        try await api.homeHubs(query: .init(vod: vod ? true : nil)).ok.body.json
+    }
 
     func items(library: Int64, sort: ItemSort = .title, offset: Int = 0, limit: Int = 100,
                watch: Operations.ListLibraryItems.Input.Query.WatchPayload? = nil, genre: String? = nil,

@@ -4108,6 +4108,98 @@ extension Components {
                 case nextEpisode
             }
         }
+        /// A film or series on demand suggested for the caller from their taste (Watch on VOD, Also on VOD, Muse, the on-demand pages' Recommended for you).
+        ///
+        /// - Remark: Generated from `#/components/schemas/VodSuggestion`.
+        public struct VodSuggestion: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodSuggestion/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case movie = "movie"
+                case series = "series"
+            }
+            /// - Remark: Generated from `#/components/schemas/VodSuggestion/kind`.
+            public var kind: Components.Schemas.VodSuggestion.KindPayload
+            /// Unique within a list, e.g. movie:5, series:7.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSuggestion/key`.
+            public var key: Swift.String
+            /// - Remark: Generated from `#/components/schemas/VodSuggestion/movie`.
+            public var movie: Components.Schemas.VodMovie?
+            /// - Remark: Generated from `#/components/schemas/VodSuggestion/series`.
+            public var series: Components.Schemas.VodSeries?
+            /// Why it's suggested, e.g. "Because you love Heat" or "Similar to Arrival".
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSuggestion/reason`.
+            public var reason: Swift.String?
+            /// How well it fits, higher is better (for ordering only; not comparable between requests).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSuggestion/score`.
+            public var score: Swift.Double?
+            /// Creates a new `VodSuggestion`.
+            ///
+            /// - Parameters:
+            ///   - kind:
+            ///   - key: Unique within a list, e.g. movie:5, series:7.
+            ///   - movie:
+            ///   - series:
+            ///   - reason: Why it's suggested, e.g. "Because you love Heat" or "Similar to Arrival".
+            ///   - score: How well it fits, higher is better (for ordering only; not comparable between requests).
+            public init(
+                kind: Components.Schemas.VodSuggestion.KindPayload,
+                key: Swift.String,
+                movie: Components.Schemas.VodMovie? = nil,
+                series: Components.Schemas.VodSeries? = nil,
+                reason: Swift.String? = nil,
+                score: Swift.Double? = nil
+            ) {
+                self.kind = kind
+                self.key = key
+                self.movie = movie
+                self.series = series
+                self.reason = reason
+                self.score = score
+            }
+            public enum CodingKeys: String, CodingKey {
+                case kind
+                case key
+                case movie
+                case series
+                case reason
+                case score
+            }
+        }
+        /// A film or series on demand.
+        ///
+        /// - Remark: Generated from `#/components/schemas/VodRef`.
+        public struct VodRef: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodRef/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case movie = "movie"
+                case series = "series"
+            }
+            /// - Remark: Generated from `#/components/schemas/VodRef/kind`.
+            public var kind: Components.Schemas.VodRef.KindPayload
+            /// The film's or series' id (GET /livetv/vod/movies/{id} or /livetv/vod/series/{id}).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodRef/id`.
+            public var id: Swift.Int64
+            /// Creates a new `VodRef`.
+            ///
+            /// - Parameters:
+            ///   - kind:
+            ///   - id: The film's or series' id (GET /livetv/vod/movies/{id} or /livetv/vod/series/{id}).
+            public init(
+                kind: Components.Schemas.VodRef.KindPayload,
+                id: Swift.Int64
+            ) {
+                self.kind = kind
+                self.id = id
+            }
+            public enum CodingKeys: String, CodingKey {
+                case kind
+                case id
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/VodSeriesDetail`.
         public struct VodSeriesDetail: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value1`.
@@ -5411,6 +5503,30 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/DiscoverItem/requestId`.
             public var requestId: Swift.Int64?
+            /// The same title (TMDB id and type) on demand, when the caller may watch it there: show Watch now on VOD.
+            ///
+            /// - Remark: Generated from `#/components/schemas/DiscoverItem/vod`.
+            public struct VodPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/DiscoverItem/vod/value1`.
+                public var value1: Components.Schemas.VodRef
+                /// Creates a new `VodPayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                public init(value1: Components.Schemas.VodRef) {
+                    self.value1 = value1
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try self.value1.encode(to: encoder)
+                }
+            }
+            /// The same title (TMDB id and type) on demand, when the caller may watch it there: show Watch now on VOD.
+            ///
+            /// - Remark: Generated from `#/components/schemas/DiscoverItem/vod`.
+            public var vod: Components.Schemas.DiscoverItem.VodPayload?
             /// Creates a new `DiscoverItem`.
             ///
             /// - Parameters:
@@ -5425,6 +5541,7 @@ extension Components {
             ///   - availability:
             ///   - itemId: The title in this library, when it's here.
             ///   - requestId: The caller's open Marquee request for it.
+            ///   - vod: The same title (TMDB id and type) on demand, when the caller may watch it there: show Watch now on VOD.
             public init(
                 tmdbId: Swift.Int64,
                 mediaType: Components.Schemas.DiscoverItem.MediaTypePayload,
@@ -5436,7 +5553,8 @@ extension Components {
                 tmdbRating: Swift.Double? = nil,
                 availability: Components.Schemas.Availability,
                 itemId: Swift.Int64? = nil,
-                requestId: Swift.Int64? = nil
+                requestId: Swift.Int64? = nil,
+                vod: Components.Schemas.DiscoverItem.VodPayload? = nil
             ) {
                 self.tmdbId = tmdbId
                 self.mediaType = mediaType
@@ -5449,6 +5567,7 @@ extension Components {
                 self.availability = availability
                 self.itemId = itemId
                 self.requestId = requestId
+                self.vod = vod
             }
             public enum CodingKeys: String, CodingKey {
                 case tmdbId
@@ -5462,6 +5581,7 @@ extension Components {
                 case availability
                 case itemId
                 case requestId
+                case vod
             }
         }
         /// - Remark: Generated from `#/components/schemas/ScrobbleStatus`.
@@ -9797,6 +9917,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MuseVideoRequest/limit`.
             public var limit: Swift.Int?
+            /// Also suggest films and series on demand that fit (in vod; the caller must be allowed on demand).
+            ///
+            /// - Remark: Generated from `#/components/schemas/MuseVideoRequest/includeVod`.
+            public var includeVod: Swift.Bool?
             /// Creates a new `MuseVideoRequest`.
             ///
             /// - Parameters:
@@ -9804,22 +9928,26 @@ extension Components {
             ///   - libraryId: Only this library.
             ///   - types: Default movies and shows.
             ///   - limit: Default 40.
+            ///   - includeVod: Also suggest films and series on demand that fit (in vod; the caller must be allowed on demand).
             public init(
                 prompt: Swift.String,
                 libraryId: Swift.Int64? = nil,
                 types: Components.Schemas.MuseVideoRequest.TypesPayload? = nil,
-                limit: Swift.Int? = nil
+                limit: Swift.Int? = nil,
+                includeVod: Swift.Bool? = nil
             ) {
                 self.prompt = prompt
                 self.libraryId = libraryId
                 self.types = types
                 self.limit = limit
+                self.includeVod = includeVod
             }
             public enum CodingKeys: String, CodingKey {
                 case prompt
                 case libraryId
                 case types
                 case limit
+                case includeVod
             }
         }
         /// - Remark: Generated from `#/components/schemas/MuseVideoResult`.
@@ -9842,6 +9970,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MuseVideoResult/reasons`.
             public var reasons: [Components.Schemas.RecommendationReason]?
+            /// With includeVod: films and series on demand that fit, best first (not in the caller's libraries).
+            ///
+            /// - Remark: Generated from `#/components/schemas/MuseVideoResult/vod`.
+            public var vod: [Components.Schemas.VodSuggestion]?
             /// Creates a new `MuseVideoResult`.
             ///
             /// - Parameters:
@@ -9850,18 +9982,21 @@ extension Components {
             ///   - analysed: Share of the library ready for Muse (0–1); below 1 while it's still being indexed.
             ///   - title: A short title for the results (AI), or the prompt.
             ///   - reasons: One-line reasons for the top results, when AI re-ranked them.
+            ///   - vod: With includeVod: films and series on demand that fit, best first (not in the caller's libraries).
             public init(
                 items: [Components.Schemas.ItemSummary],
                 understood: Swift.String,
                 analysed: Swift.Double? = nil,
                 title: Swift.String? = nil,
-                reasons: [Components.Schemas.RecommendationReason]? = nil
+                reasons: [Components.Schemas.RecommendationReason]? = nil,
+                vod: [Components.Schemas.VodSuggestion]? = nil
             ) {
                 self.items = items
                 self.understood = understood
                 self.analysed = analysed
                 self.title = title
                 self.reasons = reasons
+                self.vod = vod
             }
             public enum CodingKeys: String, CodingKey {
                 case items
@@ -9869,6 +10004,7 @@ extension Components {
                 case analysed
                 case title
                 case reasons
+                case vod
             }
         }
         /// - Remark: Generated from `#/components/schemas/HealthCheck`.
@@ -10481,6 +10617,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Hub/total`.
             public var total: Swift.Int?
+            /// Watch on VOD (id vod-suggestions) only, sent when the request asks with vod=true: films and series on demand picked for the caller, best first (items is empty).
+            ///
+            /// - Remark: Generated from `#/components/schemas/Hub/vodEntries`.
+            public var vodEntries: [Components.Schemas.VodSuggestion]?
             /// Creates a new `Hub`.
             ///
             /// - Parameters:
@@ -10490,13 +10630,15 @@ extension Components {
             ///   - items:
             ///   - entries: Continue Watching only: the row's entries, library items and films and episodes on demand together, newest first (up to 20; items stays library-only for older apps). When it's present show it instead of items. The row is sent when either has something.
             ///   - total: Continue Watching only: how many entries there are in all (GET /hubs/continue-watching); more than entries holds means a View more link.
+            ///   - vodEntries: Watch on VOD (id vod-suggestions) only, sent when the request asks with vod=true: films and series on demand picked for the caller, best first (items is empty).
             public init(
                 id: Swift.String,
                 title: Swift.String,
                 libraryId: Swift.Int64? = nil,
                 items: [Components.Schemas.ItemSummary],
                 entries: [Components.Schemas.ContinueEntry]? = nil,
-                total: Swift.Int? = nil
+                total: Swift.Int? = nil,
+                vodEntries: [Components.Schemas.VodSuggestion]? = nil
             ) {
                 self.id = id
                 self.title = title
@@ -10504,6 +10646,7 @@ extension Components {
                 self.items = items
                 self.entries = entries
                 self.total = total
+                self.vodEntries = vodEntries
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -10512,6 +10655,7 @@ extension Components {
                 case items
                 case entries
                 case total
+                case vodEntries
             }
         }
         /// A Continue Watching entry: a library item (an in-progress movie, episode or video, or a show's next episode) or a film or episode on demand stopped part-way through.
