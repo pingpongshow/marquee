@@ -657,12 +657,14 @@ func (s *Service) applySeasons(ctx context.Context, c *tmdb.Client, showID int64
 			// the TMDB season that aired that year.
 			n, ok := byYear[se.idx]
 			if !ok {
+				s.dropTMDBArt(ctx, se.id)
 				continue
 			}
 			tmdbSeason = n
 		}
 		data, err := c.Season(ctx, t.ID, tmdbSeason)
 		if errors.Is(err, tmdb.ErrNotFound) {
+			s.dropTMDBArt(ctx, se.id)
 			continue
 		}
 		if err != nil {
@@ -682,6 +684,13 @@ func (s *Service) applySeasons(ctx context.Context, c *tmdb.Client, showID int64
 		}
 	}
 	return nil
+}
+
+// dropTMDBArt removes TMDB artwork from a season TMDB doesn't have (in the show it's now
+// matched to) and from its episodes, so a previous match's posters and stills don't linger.
+func (s *Service) dropTMDBArt(ctx context.Context, seasonID int64) {
+	s.DB.ExecContext(ctx, `DELETE FROM artwork WHERE source = 'tmdb' AND kind IN ('poster', 'thumb')
+		AND (item_id = ? OR item_id IN (SELECT id FROM items WHERE parent_id = ? AND type = 'episode'))`, seasonID, seasonID)
 }
 
 // absoluteEpisodes returns season 1 with episodes from all regular TMDB seasons numbered
@@ -755,6 +764,12 @@ func (s *Service) applySeason(ctx context.Context, seasonID int64, data *tmdb.Se
 	if _, err := tx.ExecContext(ctx, `UPDATE items SET match_state = 'matched' WHERE id = ?`, seasonID); err != nil {
 		return err
 	}
+	// TMDB artwork is replaced, not added to: after a re-match (e.g. a show first matched to
+	// the wrong series) the old series' season posters and stills would otherwise stay
+	// selected. Local and uploaded artwork are kept.
+	if _, err := tx.ExecContext(ctx, `DELETE FROM artwork WHERE item_id = ? AND kind = 'poster' AND source = 'tmdb'`, seasonID); err != nil {
+		return err
+	}
 	if data.PosterPath != "" {
 		if err := addArt(ctx, tx, seasonID, "poster", data.PosterPath, 0, 0, ""); err != nil {
 			return err
@@ -782,6 +797,10 @@ func (s *Service) applySeason(ctx context.Context, seasonID int64, data *tmdb.Se
 	for _, e := range eps {
 		m, ok := byNum[e.idx]
 		if !ok {
+			// Not in this series on TMDB: no TMDB still (a previous match's would be wrong).
+			if _, err := tx.ExecContext(ctx, `DELETE FROM artwork WHERE item_id = ? AND kind = 'thumb' AND source = 'tmdb'`, e.id); err != nil {
+				return err
+			}
 			continue
 		}
 		if err := update(ctx, tx, e.id, fields{"title": m.Name, "summary": m.Overview, "originally_available_at": m.AirDate,
@@ -789,6 +808,9 @@ func (s *Service) applySeason(ctx context.Context, seasonID int64, data *tmdb.Se
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE items SET match_state = 'matched' WHERE id = ?`, e.id); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM artwork WHERE item_id = ? AND kind = 'thumb' AND source = 'tmdb'`, e.id); err != nil {
 			return err
 		}
 		if m.StillPath != "" {

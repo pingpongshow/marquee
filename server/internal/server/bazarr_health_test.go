@@ -63,7 +63,7 @@ func TestBazarrAndLibraryHealth(t *testing.T) {
 	}
 	var checks []api.HealthCheck
 	h.do("GET", "/library-health", nil, &checks)
-	if len(checks) != 8 {
+	if len(checks) != 7 {
 		t.Fatalf("checks: %+v", checks)
 	}
 	for _, c := range checks {

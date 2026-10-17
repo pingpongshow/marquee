@@ -300,3 +300,46 @@ func TestSameTitleShowsPickedBySeasonFit(t *testing.T) {
 		t.Fatalf("matched %s, want the 2-season show 111110", tmdbID)
 	}
 }
+
+// Re-matching a show replaces its seasons' TMDB posters and episodes' TMDB stills (a show
+// first matched to the wrong series kept that series' season art); local artwork stays.
+func TestRematchReplacesSeasonArt(t *testing.T) {
+	dir := t.TempDir()
+	ctx := context.Background()
+	d, _ := db.Open(ctx, filepath.Join(dir, "t.db"), dir)
+	defer d.Close()
+	store, _ := settings.Open(ctx, d)
+	mustExec(t, d, `INSERT INTO libraries(id, name, type) VALUES (1, 'Shows', 'shows')`)
+	mustExec(t, d, `INSERT INTO items(id, library_id, type, title, sort_title) VALUES (1, 1, 'show', 'S', 'S')`)
+	mustExec(t, d, `INSERT INTO items(id, library_id, type, title, sort_title, parent_id, idx) VALUES (2, 1, 'season', 'Season 1', '1', 1, 1)`)
+	mustExec(t, d, `INSERT INTO items(id, library_id, type, title, sort_title, parent_id, grandparent_id, idx) VALUES (3, 1, 'episode', 'E1', '1', 2, 1, 1)`)
+	mustExec(t, d, `INSERT INTO items(id, library_id, type, title, sort_title, parent_id, grandparent_id, idx) VALUES (4, 1, 'episode', 'E9', '9', 2, 1, 9)`)
+	mustExec(t, d, `INSERT INTO items(id, library_id, type, title, sort_title, parent_id, idx) VALUES (5, 1, 'season', 'Season 2', '2', 1, 2)`)
+	mustExec(t, d, `INSERT INTO artwork(item_id, kind, source, remote_url, selected) VALUES
+		(2, 'poster', 'tmdb', 'old-season', 1), (3, 'thumb', 'tmdb', 'old-still', 1), (4, 'thumb', 'tmdb', 'old-still-9', 1),
+		(5, 'poster', 'local', 'my-poster', 1)`)
+	svc := &Service{DB: d, Settings: store}
+	if err := svc.applySeason(ctx, 2, &tmdb.Season{PosterPath: "/new-season.jpg", Episodes: []tmdb.Episode{{EpisodeNumber: 1, StillPath: "/new-still.jpg"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.applySeason(ctx, 5, &tmdb.Season{PosterPath: "/tmdb-s2.jpg"}); err != nil {
+		t.Fatal(err)
+	}
+	selected := func(item int64, kind string) string {
+		var u string
+		d.QueryRow(`SELECT remote_url FROM artwork WHERE item_id = ? AND kind = ? AND selected = 1`, item, kind).Scan(&u)
+		return u
+	}
+	if u := selected(2, "poster"); !strings.HasSuffix(u, "/new-season.jpg") {
+		t.Errorf("season poster: %q", u)
+	}
+	if u := selected(3, "thumb"); !strings.HasSuffix(u, "/new-still.jpg") {
+		t.Errorf("episode still: %q", u)
+	}
+	if u := selected(4, "thumb"); u != "" {
+		t.Errorf("episode not in the new series kept its old still: %q", u)
+	}
+	if u := selected(5, "poster"); u != "my-poster" {
+		t.Errorf("local poster replaced: %q", u)
+	}
+}
