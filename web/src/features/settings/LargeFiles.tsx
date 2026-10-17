@@ -730,9 +730,9 @@ function SettingsTab({ config }: { config: OptimizeConfig }) {
           label="Only during the maintenance window"
           help={
             <>
-              Set the window in{" "}
-              <Link to="/settings/$section" params={{ section: "tasks" }} className="underline">
-                Tasks
+              Queued files only convert inside the maintenance window, set in{" "}
+              <Link to="/settings/$section" params={{ section: "scheduled-tasks" }} className="underline">
+                Scheduled Tasks
               </Link>
               .
             </>
