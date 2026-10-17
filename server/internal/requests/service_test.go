@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"marquee/internal/db"
 	"marquee/internal/settings"
@@ -195,5 +196,43 @@ func TestNotConfigured(t *testing.T) {
 	s.Settings.Update(ctx, func(x *settings.Settings) error { x.Integrations.SeerrURL = ""; return nil })
 	if _, _, _, err := s.Search(ctx, kid, "x", 1); !errors.Is(err, ErrNotConfigured) {
 		t.Errorf("unconfigured: %v", err)
+	}
+}
+
+// Finished requests (declined, failed, available) are dropped 10 days after they were
+// decided; pending and approved ones stay however old.
+func TestOldFinishedRequestsArePruned(t *testing.T) {
+	s, _, _, kid := setup(t)
+	ctx := context.Background()
+	add := func(status, decided string) {
+		t.Helper()
+		if _, err := s.DB.Exec(`INSERT INTO media_requests (user_id, tmdb_id, media_type, title, status, decided_at, created_at)
+			VALUES (?, 1, 'movie', ?, ?, ?, '2020-01-01T00:00:00.000Z')`, kid, status+" "+decided, status, decided); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := time.Now().UTC().AddDate(0, 0, -11).Format("2006-01-02T15:04:05.000Z")
+	recent := time.Now().UTC().AddDate(0, 0, -2).Format("2006-01-02T15:04:05.000Z")
+	for _, st := range []string{"declined", "failed", "available"} {
+		add(st, old)
+		add(st, recent)
+	}
+	add("approved", old)
+	add("pending", old)
+	list, err := s.List(ctx, 0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, r := range list {
+		got[r.Title] = true
+	}
+	for _, st := range []string{"declined", "failed", "available"} {
+		if got[st+" "+old] || !got[st+" "+recent] {
+			t.Errorf("%s: old kept %v, recent kept %v", st, got[st+" "+old], got[st+" "+recent])
+		}
+	}
+	if !got["approved "+old] || !got["pending "+old] {
+		t.Errorf("waiting requests pruned: %v", got)
 	}
 }

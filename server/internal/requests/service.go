@@ -348,6 +348,7 @@ func (s *Service) Get(ctx context.Context, id int64) (Request, error) {
 // List returns requests, newest first: one user's (userID > 0) or everyone's.
 func (s *Service) List(ctx context.Context, userID int64, status string) ([]Request, error) {
 	s.refresh(ctx)
+	s.prune(ctx)
 	q := `SELECT ` + cols + from + ` WHERE 1 = 1`
 	var args []any
 	if userID > 0 {
@@ -381,6 +382,16 @@ func (s *Service) PendingCount(ctx context.Context) int {
 	return n
 }
 
+// HistoryDays is how long finished requests (declined, failed, available) are kept; approved
+// ones waiting for Seerr stay until they finish.
+const HistoryDays = 10
+
+// prune deletes finished requests decided more than HistoryDays ago.
+func (s *Service) prune(ctx context.Context) {
+	s.DB.ExecContext(ctx, `DELETE FROM media_requests WHERE status IN ('declined', 'failed', 'available')
+		AND COALESCE(decided_at, created_at) < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ?)`, fmt.Sprintf("-%d days", HistoryDays))
+}
+
 // refresh updates approved requests from Seerr: arrived, or declined/failed there.
 func (s *Service) refresh(ctx context.Context) {
 	if !s.Enabled() {
@@ -407,11 +418,11 @@ func (s *Service) refresh(ctx context.Context) {
 		}
 		switch {
 		case media == mediaAvailable:
-			s.DB.ExecContext(ctx, `UPDATE media_requests SET status = 'available' WHERE id = ?`, p.id)
+			s.DB.ExecContext(ctx, `UPDATE media_requests SET status = 'available', decided_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`, p.id)
 		case st == requestDeclined:
-			s.DB.ExecContext(ctx, `UPDATE media_requests SET status = 'declined', reason = 'Declined in Seerr' WHERE id = ?`, p.id)
+			s.DB.ExecContext(ctx, `UPDATE media_requests SET status = 'declined', reason = 'Declined in Seerr', decided_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`, p.id)
 		case st == requestFailed:
-			s.DB.ExecContext(ctx, `UPDATE media_requests SET status = 'failed', reason = 'Seerr couldn''t add it' WHERE id = ?`, p.id)
+			s.DB.ExecContext(ctx, `UPDATE media_requests SET status = 'failed', reason = 'Seerr couldn''t add it', decided_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`, p.id)
 		}
 	}
 }
