@@ -117,6 +117,13 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
         // A reload that fails keeps the page already shown.
         if (fresh.isSuccess || value?.isSuccess != true) pageState.value = fresh
     }
+    // Also on VOD: films (for a movie) or series (for a show) on demand like this one (LIVE-6, USER-16).
+    val vodOn by marquee.vod.collectAsState()
+    val itemType = page?.getOrNull()?.detail?.type
+    val alsoOnVod by cachedLoad<List<app.marquee.api.models.VodSuggestion>>("item-$itemId:vod-similar", vodOn, itemType) {
+        if (!vodOn || marquee.isOffline || itemType !in listOf(ItemType.MOVIE, ItemType.SHOW)) null
+        else withContext(Dispatchers.IO) { runCatching { marquee.items.itemVodSimilar(itemId, 20) }.getOrNull() }
+    }
     val p = page
     if (p == null) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }; return }
     val pg = p.getOrElse { Text("Couldn't load: ${it.message}", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.error); return }
@@ -367,6 +374,9 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
             Shelf("More like this", pg.related, sidePadding) { _, it ->
                 PosterCard(it, marquee.imageUrl(it.images?.poster, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) })
             }
+        }
+        if (vodOn && d.type in listOf(ItemType.MOVIE, ItemType.SHOW) && !alsoOnVod.isNullOrEmpty()) item(key = "alsoOnVod") {
+            VodSuggestionRow(nav, "Also on VOD", alsoOnVod)
         }
         // Last, so the Community rating can scroll here.
         if (reviewable(d.type)) item { ReviewsSection(d, reviews, me?.isAdmin == true) { reviewsVersion++ } }

@@ -25,6 +25,7 @@ package app.marquee.api.models
 
 import app.marquee.api.models.ItemSummary
 import app.marquee.api.models.RecommendationReason
+import app.marquee.api.models.VodSuggestion
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -38,6 +39,7 @@ import kotlinx.serialization.Contextual
  * @param analysed Share of the library ready for Muse (0–1); below 1 while it's still being indexed.
  * @param title A short title for the results (AI), or the prompt.
  * @param reasons One-line reasons for the top results, when AI re-ranked them.
+ * @param vod With includeVod: films and series on demand that fit, best first (not in the caller's libraries).
  */
 @Serializable
 
@@ -60,7 +62,11 @@ data class MuseVideoResult (
 
     /* One-line reasons for the top results, when AI re-ranked them. */
     @SerialName(value = "reasons")
-    val reasons: kotlin.collections.List<RecommendationReason>? = null
+    val reasons: kotlin.collections.List<RecommendationReason>? = null,
+
+    /* With includeVod: films and series on demand that fit, best first (not in the caller's libraries). */
+    @SerialName(value = "vod")
+    val vod: kotlin.collections.List<VodSuggestion>? = null
 
 ) {
 

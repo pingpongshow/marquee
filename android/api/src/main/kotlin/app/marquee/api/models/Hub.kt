@@ -25,6 +25,7 @@ package app.marquee.api.models
 
 import app.marquee.api.models.ContinueEntry
 import app.marquee.api.models.ItemSummary
+import app.marquee.api.models.VodSuggestion
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -39,6 +40,7 @@ import kotlinx.serialization.Contextual
  * @param libraryId 
  * @param propertyEntries Continue Watching only: the row's entries, library items and films and episodes on demand together, newest first (up to 20; items stays library-only for older apps). When it's present show it instead of items. The row is sent when either has something.
  * @param total Continue Watching only: how many entries there are in all (GET /hubs/continue-watching); more than entries holds means a View more link.
+ * @param vodEntries Watch on VOD (id vod-suggestions) only, sent when the request asks with vod=true: films and series on demand picked for the caller, best first (items is empty).
  */
 @Serializable
 
@@ -62,7 +64,11 @@ data class Hub (
 
     /* Continue Watching only: how many entries there are in all (GET /hubs/continue-watching); more than entries holds means a View more link. */
     @SerialName(value = "total")
-    val total: kotlin.Int? = null
+    val total: kotlin.Int? = null,
+
+    /* Watch on VOD (id vod-suggestions) only, sent when the request asks with vod=true: films and series on demand picked for the caller, best first (items is empty). */
+    @SerialName(value = "vodEntries")
+    val vodEntries: kotlin.collections.List<VodSuggestion>? = null
 
 ) {
 

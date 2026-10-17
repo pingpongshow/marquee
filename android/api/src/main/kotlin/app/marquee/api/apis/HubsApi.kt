@@ -216,6 +216,7 @@ open class HubsApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
      * GET /hubs/home
      * Rows for the Home screen (Continue Watching, Recently Added…).
      * 
+     * @param vod Include the Watch on VOD row (id vod-suggestions; films and series on demand picked for the caller, in vodEntries, with items empty). Only apps that show vodEntries should ask for it; without it the row is left out. (optional, default to false)
      * @return kotlin.collections.List<Hub>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -225,8 +226,8 @@ open class HubsApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    fun homeHubs() : kotlin.collections.List<Hub> {
-        val localVarResponse = homeHubsWithHttpInfo()
+    fun homeHubs(vod: kotlin.Boolean? = false) : kotlin.collections.List<Hub> {
+        val localVarResponse = homeHubsWithHttpInfo(vod = vod)
 
         return when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<Hub>
@@ -247,14 +248,15 @@ open class HubsApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
      * GET /hubs/home
      * Rows for the Home screen (Continue Watching, Recently Added…).
      * 
+     * @param vod Include the Watch on VOD row (id vod-suggestions; films and series on demand picked for the caller, in vodEntries, with items empty). Only apps that show vodEntries should ask for it; without it the row is left out. (optional, default to false)
      * @return ApiResponse<kotlin.collections.List<Hub>?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    fun homeHubsWithHttpInfo() : ApiResponse<kotlin.collections.List<Hub>?> {
-        val localVariableConfig = homeHubsRequestConfig()
+    fun homeHubsWithHttpInfo(vod: kotlin.Boolean?) : ApiResponse<kotlin.collections.List<Hub>?> {
+        val localVariableConfig = homeHubsRequestConfig(vod = vod)
 
         return request<Unit, kotlin.collections.List<Hub>>(
             localVariableConfig
@@ -264,11 +266,17 @@ open class HubsApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
     /**
      * To obtain the request config of the operation homeHubs
      *
+     * @param vod Include the Watch on VOD row (id vod-suggestions; films and series on demand picked for the caller, in vodEntries, with items empty). Only apps that show vodEntries should ask for it; without it the row is left out. (optional, default to false)
      * @return RequestConfig
      */
-    fun homeHubsRequestConfig() : RequestConfig<Unit> {
+    fun homeHubsRequestConfig(vod: kotlin.Boolean?) : RequestConfig<Unit> {
         val localVariableBody = null
-        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (vod != null) {
+                    put("vod", listOf(vod.toString()))
+                }
+            }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
         localVariableHeaders["Accept"] = "application/json"
 

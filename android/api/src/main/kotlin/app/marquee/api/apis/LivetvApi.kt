@@ -56,6 +56,7 @@ import app.marquee.api.models.VodSeriesPage
 import app.marquee.api.models.VodSession
 import app.marquee.api.models.VodSource
 import app.marquee.api.models.VodStatus
+import app.marquee.api.models.VodSuggestion
 import app.marquee.api.models.VodUpNext
 
 import kotlinx.serialization.SerialName
@@ -732,6 +733,97 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.PUT,
             path = "/livetv/channels/{channelId}/hidden".replace("{"+"channelId"+"}", encodeURIComponent(channelId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * enum for parameter kind
+     */
+     enum class KindHideVodSuggestion(val value: kotlin.String) {
+         @SerialName(value = "movie") MOVIE("movie"),
+         @SerialName(value = "series") SERIES("series");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * DELETE /livetv/vod/suggestions/{kind}/{vodId}
+     * Not interested: stops suggesting this film or series to the caller (anywhere suggestions show).
+     * 
+     * @param kind 
+     * @param vodId The film&#39;s or series&#39; id.
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun hideVodSuggestion(kind: KindHideVodSuggestion, vodId: kotlin.Long) : Unit {
+        val localVarResponse = hideVodSuggestionWithHttpInfo(kind = kind, vodId = vodId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /livetv/vod/suggestions/{kind}/{vodId}
+     * Not interested: stops suggesting this film or series to the caller (anywhere suggestions show).
+     * 
+     * @param kind 
+     * @param vodId The film&#39;s or series&#39; id.
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun hideVodSuggestionWithHttpInfo(kind: KindHideVodSuggestion, vodId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = hideVodSuggestionRequestConfig(kind = kind, vodId = vodId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation hideVodSuggestion
+     *
+     * @param kind 
+     * @param vodId The film&#39;s or series&#39; id.
+     * @return RequestConfig
+     */
+    fun hideVodSuggestionRequestConfig(kind: KindHideVodSuggestion, vodId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/livetv/vod/suggestions/{kind}/{vodId}".replace("{"+"kind"+"}", encodeURIComponent(kind.value.toString())).replace("{"+"vodId"+"}", encodeURIComponent(vodId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -4751,6 +4843,107 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/livetv/vod/status",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * enum for parameter kind
+     */
+     enum class KindVodSuggestions(val value: kotlin.String) {
+         @SerialName(value = "movie") MOVIE("movie"),
+         @SerialName(value = "series") SERIES("series");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * GET /livetv/vod/suggestions
+     * Recommended for you: films and series on demand picked for the caller from their taste (favourites, ratings and what they watched), best first, leaving out titles their libraries have, ones they&#39;ve started or watched and ones they said they&#39;re not interested in.
+     * 
+     * @param kind Only films or only series (omitted &#x3D; both). (optional)
+     * @param limit  (optional, default to 20)
+     * @return kotlin.collections.List<VodSuggestion>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun vodSuggestions(kind: KindVodSuggestions? = null, limit: kotlin.Int? = 20) : kotlin.collections.List<VodSuggestion> {
+        val localVarResponse = vodSuggestionsWithHttpInfo(kind = kind, limit = limit)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<VodSuggestion>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /livetv/vod/suggestions
+     * Recommended for you: films and series on demand picked for the caller from their taste (favourites, ratings and what they watched), best first, leaving out titles their libraries have, ones they&#39;ve started or watched and ones they said they&#39;re not interested in.
+     * 
+     * @param kind Only films or only series (omitted &#x3D; both). (optional)
+     * @param limit  (optional, default to 20)
+     * @return ApiResponse<kotlin.collections.List<VodSuggestion>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun vodSuggestionsWithHttpInfo(kind: KindVodSuggestions?, limit: kotlin.Int?) : ApiResponse<kotlin.collections.List<VodSuggestion>?> {
+        val localVariableConfig = vodSuggestionsRequestConfig(kind = kind, limit = limit)
+
+        return request<Unit, kotlin.collections.List<VodSuggestion>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation vodSuggestions
+     *
+     * @param kind Only films or only series (omitted &#x3D; both). (optional)
+     * @param limit  (optional, default to 20)
+     * @return RequestConfig
+     */
+    fun vodSuggestionsRequestConfig(kind: KindVodSuggestions?, limit: kotlin.Int?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (kind != null) {
+                    put("kind", listOf(kind.value))
+                }
+                if (limit != null) {
+                    put("limit", listOf(limit.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/livetv/vod/suggestions",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
