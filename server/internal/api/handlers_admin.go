@@ -75,6 +75,7 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			MaintenanceWindowStart: ptr(s.Tasks.MaintenanceWindowStart),
 			MaintenanceWindowHours: ptr(s.Tasks.MaintenanceWindowHours),
 			BackupRetention:        ptr(s.Tasks.BackupRetention),
+			Disabled:               ptr(append([]string{}, s.Tasks.Disabled...)),
 		},
 		Music: &MusicSettings{
 			SoundprintAnalysis: ptr(s.Music.SoundprintAnalysis),
@@ -199,6 +200,9 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		set(&s.Tasks.MaintenanceWindowStart, t.MaintenanceWindowStart)
 		set(&s.Tasks.MaintenanceWindowHours, t.MaintenanceWindowHours)
 		set(&s.Tasks.BackupRetention, t.BackupRetention)
+		if t.Disabled != nil {
+			s.Tasks.Disabled = append([]string{}, *t.Disabled...)
+		}
 	}
 	if m := u.Music; m != nil {
 		set(&s.Music.SoundprintAnalysis, m.SoundprintAnalysis)
@@ -350,6 +354,9 @@ func (h *Handlers) UpdateSettings(ctx context.Context, req UpdateSettingsRequest
 		before := s.VODSave
 		beforeDVR := s.Integrations.DVRFolder
 		applySettingsUpdate(s, *req.Body)
+		if req.Body.Tasks != nil && req.Body.Tasks.Disabled != nil && h.Tasks != nil {
+			s.Tasks.Disabled = h.Tasks.Known(s.Tasks.Disabled) // unknown task ids are dropped
+		}
 		// The recordings folder must be there and writable; checked when it changes.
 		folderChanged = s.Integrations.DVRFolder != beforeDVR
 		if f := s.Integrations.DVRFolder; folderChanged && f != "" && filepath.IsAbs(f) {

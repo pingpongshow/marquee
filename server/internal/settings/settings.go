@@ -419,6 +419,9 @@ type Tasks struct {
 	MaintenanceWindowStart string `json:"maintenanceWindowStart"`
 	MaintenanceWindowHours int    `json:"maintenanceWindowHours"`
 	BackupRetention        int    `json:"backupRetention"` // days to keep nightly backups
+	// Disabled are the ids of the scheduled tasks turned off: they don't run on their
+	// schedule or automatically (Run now still works). Empty = all on.
+	Disabled []string `json:"disabled,omitempty"`
 }
 
 // Defaults are applied first; stored JSON is unmarshalled over them, so new settings

@@ -1725,7 +1725,7 @@ export interface paths {
             header?: never;
             path: {
                 jobId: number;
-                /** @description cancel = stop a queued or running job (the original stays as it is); retry = queue a failed, cancelled or skipped job again; restore = put an optimized file's original back from the media trash (the optimized file goes there instead). */
+                /** @description cancel = stop a queued or running job (the original stays as it is); retry = queue a failed, cancelled or skipped job again; restore = put an optimized file's original back from the media trash (the optimized file goes there instead; only when the original was kept). */
                 action: "cancel" | "retry" | "restore";
             };
             cookie?: never;
@@ -3537,6 +3537,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{taskId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Turn a task on or off (admin only). Off: it never runs on its schedule or automatically; Run now still works. */
+        patch: operations["updateTask"];
+        trace?: never;
+    };
     "/tasks/{taskId}/run": {
         parameters: {
             query?: never;
@@ -4808,6 +4825,8 @@ export interface components {
              */
             positionMs?: number;
             watched: boolean;
+            /** @description The library already has this film (matched by TMDB id, else by title and year) in a library the caller can see. */
+            inLibrary?: boolean;
         };
         VodMovieDetail: components["schemas"]["VodMovie"] & {
             overview?: string;
@@ -4877,6 +4896,8 @@ export interface components {
             watchedCount: number;
             /** @description The caller has watched every known episode. */
             watched: boolean;
+            /** @description The library already has this show (any of its episodes; matched by TMDB id, else by title and year) in a library the caller can see. */
+            inLibrary?: boolean;
             /** @description The episode the caller would watch next (Continue Watching and the series detail). */
             nextEpisode?: components["schemas"]["VodEpisode"];
         };
@@ -5394,6 +5415,8 @@ export interface components {
             maintenanceWindowHours?: number;
             /** @description Days to keep nightly backups before they're deleted (the newest is always kept). */
             backupRetention?: number;
+            /** @description Ids of the tasks turned off (they don't run on their schedule or automatically; Run now still works). Unknown ids are ignored. */
+            disabled?: string[];
         };
         /** @enum {string} */
         LibraryType: "movies" | "shows" | "anime" | "music" | "videos" | "photos";
@@ -6430,6 +6453,8 @@ export interface components {
             schedule: string;
             running: boolean;
             lastRun?: components["schemas"]["TaskRun"];
+            /** @description Off: the task never runs on its schedule or automatically (after scans, recordings and the like); Run now still works. Default on. */
+            enabled?: boolean;
         };
         TaskRun: {
             /** @enum {string} */
@@ -6958,7 +6983,7 @@ export interface components {
             estimatedSize: number;
         };
         /**
-         * @description verifying = the new file is being checked (or waits for nobody to be watching before it's swapped in); done = optimized, the original is in the media trash; skipped = not worth it (see error); restored = the original was put back.
+         * @description verifying = the new file is being checked (or waits for nobody to be watching before it's swapped in); done = optimized (the original was deleted, or kept in the media trash when keepOriginals is on: see originalDeleted); skipped = not worth it (see error); restored = the original was put back.
          * @enum {string}
          */
         OptimizeJobState: "queued" | "running" | "verifying" | "done" | "failed" | "cancelled" | "skipped" | "restored";
@@ -6996,6 +7021,8 @@ export interface components {
             paused?: string;
             /** @description The original is still in the media trash. */
             canRestore: boolean;
+            /** @description The original was deleted once the new file was verified and swapped in (keepOriginals off), so it can't be restored. */
+            originalDeleted?: boolean;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -7087,6 +7114,8 @@ export interface components {
             windowOnly: boolean;
             /** @description The queue is paused by an admin. */
             paused: boolean;
+            /** @description On: originals go to the media trash (restorable for about 30 days). Off (default): once the new file is verified and swapped in the original is deleted, freeing the space at once. Omitted on update = unchanged. */
+            keepOriginals?: boolean;
         };
         OptimizeConfig: {
             settings: components["schemas"]["OptimizeSettings"];
@@ -10313,7 +10342,7 @@ export interface operations {
             header?: never;
             path: {
                 jobId: number;
-                /** @description cancel = stop a queued or running job (the original stays as it is); retry = queue a failed, cancelled or skipped job again; restore = put an optimized file's original back from the media trash (the optimized file goes there instead). */
+                /** @description cancel = stop a queued or running job (the original stays as it is); retry = queue a failed, cancelled or skipped job again; restore = put an optimized file's original back from the media trash (the optimized file goes there instead; only when the original was kept). */
                 action: "cancel" | "retry" | "restore";
             };
             cookie?: never;
@@ -11611,6 +11640,8 @@ export interface operations {
                 watched?: "unwatched" | "inProgress" | "watched";
                 /** @description Only this source's (VodStatus.sources[].id). */
                 sourceId?: string;
+                /** @description true = only titles the library already has (in a library the caller can see); false = only those it doesn't. Omitted = any. */
+                inLibrary?: boolean;
                 offset?: number;
             };
             header?: never;
@@ -11861,6 +11892,8 @@ export interface operations {
                 watched?: "unwatched" | "inProgress" | "watched";
                 /** @description Only this source's (VodStatus.sources[].id). */
                 sourceId?: string;
+                /** @description true = only titles the library already has (in a library the caller can see); false = only those it doesn't. Omitted = any. */
+                inLibrary?: boolean;
                 offset?: number;
             };
             header?: never;
@@ -13380,6 +13413,38 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    updateTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The task. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskInfo"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     runTask: {

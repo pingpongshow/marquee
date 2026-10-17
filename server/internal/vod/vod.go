@@ -450,6 +450,11 @@ type Filter struct {
 	Watched string
 	// SourceID limits to one source.
 	SourceID string
+	// InLibrary, when set, keeps only the titles the library has (true) or doesn't (false);
+	// LibraryIDs are the ids of those it has (worked out by vodsave's index, for the
+	// libraries the user can see).
+	InLibrary  *bool
+	LibraryIDs []int64
 }
 
 // where builds the filter's conditions on m (vod_movies or vod_series).
@@ -482,6 +487,19 @@ func (f Filter) where(series bool) (string, []any) {
 	if f.SourceID != "" {
 		where += " AND m.source_id=?"
 		args = append(args, f.SourceID)
+	}
+	if f.InLibrary != nil {
+		ids := f.LibraryIDs
+		if ids == nil {
+			ids = []int64{}
+		}
+		b, _ := json.Marshal(ids)
+		not := ""
+		if !*f.InLibrary {
+			not = "NOT "
+		}
+		where += " AND m.id " + not + "IN (SELECT value FROM json_each(?))"
+		args = append(args, string(b))
 	}
 	if !series {
 		const p = "SELECT 1 FROM vod_progress w WHERE w.movie_id=m.id AND w.user_id=?"

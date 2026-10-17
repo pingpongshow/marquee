@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Play, RotateCcw, Save, Trash2 } from "lucide-react";
+import { clsx } from "clsx";
 import { useState } from "react";
 import { api, session, unwrap } from "@/api/client";
 import { settingsQuery, useUpdateSettings } from "@/api/queries";
@@ -64,30 +65,55 @@ function Tasks() {
       qc.invalidateQueries({ queryKey: ["backups"] });
     },
   });
+  const toggle = useMutation({
+    mutationFn: ({ taskId, enabled }: { taskId: string; enabled: boolean }) =>
+      unwrap(api.PATCH("/tasks/{taskId}", { params: { path: { taskId } }, body: { enabled } })),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      qc.invalidateQueries({ queryKey: settingsQuery.queryKey });
+    },
+  });
   return (
-    <Card title="Tasks" description="Maintenance jobs and when they last ran.">
+    <Card title="Tasks" description="Maintenance jobs and when they last ran. A task that's off never runs by itself (on its schedule, or after scans and recordings); Run now still works.">
       {tasks.isPending && <Spinner />}
       {run.isError && <Alert tone="error">{run.error.message}</Alert>}
+      {toggle.isError && <Alert tone="error">{toggle.error.message}</Alert>}
       <ul className="-my-2 divide-y divide-border">
-        {tasks.data?.map((t) => (
-          <li key={t.id} className="flex flex-wrap items-center gap-4 py-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 font-medium">
-                {t.name}
-                {t.running && <Badge tone="accent">Running</Badge>}
-                {!t.running && t.lastRun?.status === "failed" && <Badge tone="danger">Failed</Badge>}
+        {tasks.data?.map((t) => {
+          // While a switch is being flipped it shows where it's going.
+          const enabled = toggle.isPending && toggle.variables.taskId === t.id ? toggle.variables.enabled : t.enabled !== false;
+          return (
+            <li key={t.id} className="flex flex-wrap items-center gap-4 py-3">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={enabled}
+                aria-label={`${t.name}: ${enabled ? "on" : "off"}`}
+                title={enabled ? "On: runs by itself. Turn off to stop that." : "Off: never runs by itself. Run now still works."}
+                onClick={() => toggle.mutate({ taskId: t.id, enabled: !enabled })}
+                className={clsx("relative h-6 w-11 shrink-0 rounded-full transition-colors", enabled ? "bg-accent" : "bg-surface-3")}
+              >
+                <span className={clsx("absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition-transform", enabled && "translate-x-5")} />
+              </button>
+              <div className={clsx("min-w-0 flex-1", !enabled && "opacity-70")}>
+                <div className="flex items-center gap-2 font-medium">
+                  {t.name}
+                  {!enabled && <Badge>Off</Badge>}
+                  {t.running && <Badge tone="accent">Running</Badge>}
+                  {!t.running && t.lastRun?.status === "failed" && <Badge tone="danger">Failed</Badge>}
+                </div>
+                <div className="text-sm text-muted">{t.description}</div>
+                <div className="mt-0.5 text-xs text-faint">
+                  {enabled ? t.schedule : "Off"} · Last run {timeAgo(t.lastRun?.finishedAt ?? t.lastRun?.startedAt)}
+                  {t.lastRun?.message ? ` · ${t.lastRun.message}` : ""}
+                </div>
               </div>
-              <div className="text-sm text-muted">{t.description}</div>
-              <div className="mt-0.5 text-xs text-faint">
-                {t.schedule} · Last run {timeAgo(t.lastRun?.finishedAt ?? t.lastRun?.startedAt)}
-                {t.lastRun?.message ? ` · ${t.lastRun.message}` : ""}
-              </div>
-            </div>
-            <Button size="sm" disabled={t.running} loading={run.isPending && run.variables === t.id} onClick={() => run.mutate(t.id)}>
-              <Play className="size-4" /> Run now
-            </Button>
-          </li>
-        ))}
+              <Button size="sm" disabled={t.running} loading={run.isPending && run.variables === t.id} onClick={() => run.mutate(t.id)}>
+                <Play className="size-4" /> Run now
+              </Button>
+            </li>
+          );
+        })}
       </ul>
     </Card>
   );

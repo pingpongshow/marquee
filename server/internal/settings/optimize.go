@@ -23,6 +23,10 @@ type Optimize struct {
 	WindowOnly bool `json:"windowOnly"`
 	// Paused holds the whole queue (an admin's pause).
 	Paused bool `json:"paused"`
+	// KeepOriginals moves originals to the media trash (restorable until it's emptied).
+	// Off (the default), an original is deleted once its new file is verified and swapped
+	// in, freeing the space at once.
+	KeepOriginals bool `json:"keepOriginals"`
 }
 
 // OptimizePreset is how files are re-encoded.

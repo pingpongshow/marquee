@@ -76,14 +76,25 @@ export function showPosterItem(m: VodSeries) {
   };
 }
 
+/** A tile's poster: a green ring when the library already has the title (with a tooltip
+ * and a label for screen readers), else the accent ring on hover. */
+function TilePoster({ item, src, inLibrary }: { item: Parameters<typeof Poster>[0]["item"]; src?: string; inLibrary?: boolean }) {
+  return (
+    <div title={inLibrary ? "In your library" : undefined}>
+      <Poster
+        item={item}
+        src={src}
+        className={clsx("transition-transform group-hover:scale-[1.03]", inLibrary ? "ring-2 ring-success" : "group-hover:ring-2 group-hover:ring-accent")}
+      />
+      {inLibrary && <span className="sr-only">In your library</span>}
+    </div>
+  );
+}
+
 function VodTile({ movie: m }: { movie: VodMovie }) {
   return (
     <Link to="/vod/$movieId" params={{ movieId: String(m.id) }} className="group block">
-      <Poster
-        item={posterItem(m)}
-        src={m.posterUrl}
-        className="transition-transform group-hover:scale-[1.03] group-hover:ring-2 group-hover:ring-accent"
-      />
+      <TilePoster item={posterItem(m)} src={m.posterUrl} inLibrary={m.inLibrary} />
       <div className="mt-2 truncate text-sm font-medium" title={m.title}>
         {m.title}
       </div>
@@ -103,11 +114,7 @@ function ShowTile({ show: m }: { show: VodSeries }) {
         .join(" · ");
   return (
     <Link to="/vod/shows/$seriesId" params={{ seriesId: String(m.id) }} className="group block">
-      <Poster
-        item={showPosterItem(m)}
-        src={m.posterUrl}
-        className="transition-transform group-hover:scale-[1.03] group-hover:ring-2 group-hover:ring-accent"
-      />
+      <TilePoster item={showPosterItem(m)} src={m.posterUrl} inLibrary={m.inLibrary} />
       <div className="mt-2 truncate text-sm font-medium" title={m.title}>
         {m.title}
       </div>
@@ -237,7 +244,7 @@ export function VodBrowse({ kind }: { kind: "movies" | "shows" }) {
   const total = shows ? series.data?.pages[0]?.total : movies.data?.pages[0]?.total;
   const all = categories.data?.reduce((n, c) => n + c.count, 0);
   const noun = shows ? "shows" : "movies";
-  const filtered = !!(filters.genre || filters.decade || filters.minRating || filters.watched || filters.sourceId);
+  const filtered = !!(filters.genre || filters.decade || filters.minRating || filters.watched || filters.sourceId || filters.inLibrary);
   const sourceName = sources.find((s) => s.id === filters.sourceId)?.name ?? filters.sourceId;
 
   // Load the next page as the end of the grid comes into view.
@@ -306,7 +313,7 @@ export function VodBrowse({ kind }: { kind: "movies" | "shows" }) {
         </div>
         {filtersOpen && (
           <div className="rounded-lg border border-border bg-surface p-4">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className={clsx("grid gap-3 sm:grid-cols-2", sources.length > 1 ? "lg:grid-cols-6" : "lg:grid-cols-5")}>
               <Select
                 aria-label="Watched state"
                 value={filters.watched ?? ""}
@@ -349,6 +356,15 @@ export function VodBrowse({ kind }: { kind: "movies" | "shows" }) {
                   </option>
                 ))}
               </Select>
+              <Select
+                aria-label="In my library"
+                value={filters.inLibrary ?? ""}
+                onChange={(e) => set({ inLibrary: (e.target.value || undefined) as VodFilters["inLibrary"] })}
+              >
+                <option value="">In my library: any</option>
+                <option value="yes">In my library: yes</option>
+                <option value="no">In my library: no</option>
+              </Select>
               {sources.length > 1 && (
                 <Select aria-label="Source" value={filters.sourceId ?? ""} onChange={(e) => set({ sourceId: e.target.value || undefined })}>
                   <option value="">All sources</option>
@@ -371,6 +387,9 @@ export function VodBrowse({ kind }: { kind: "movies" | "shows" }) {
             {filters.decade && <Chip label={`${filters.decade}s`} onClear={() => set({ decade: undefined })} />}
             {filters.minRating && <Chip label={`Rated ${filters.minRating}+`} onClear={() => set({ minRating: undefined })} />}
             {filters.sourceId && <Chip label={sourceName ?? "Source"} onClear={() => set({ sourceId: undefined })} />}
+            {filters.inLibrary && (
+              <Chip label={filters.inLibrary === "yes" ? "In my library" : "Not in my library"} onClear={() => set({ inLibrary: undefined })} />
+            )}
             <button onClick={() => setFilters({})} className="text-xs text-muted hover:text-text">
               Clear all
             </button>

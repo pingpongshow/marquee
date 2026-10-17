@@ -24,6 +24,8 @@ export interface VodFilters {
   minRating?: number;
   watched?: "unwatched" | "inProgress" | "watched";
   sourceId?: string;
+  /** Only titles the library already has ("yes") or doesn't ("no"). */
+  inLibrary?: "yes" | "no";
 }
 
 function filterQuery(f: VodFilters) {
@@ -34,6 +36,7 @@ function filterQuery(f: VodFilters) {
     minRating: f.minRating || undefined,
     watched: f.watched || undefined,
     sourceId: f.sourceId || undefined,
+    inLibrary: f.inLibrary ? f.inLibrary === "yes" : undefined,
   };
 }
 

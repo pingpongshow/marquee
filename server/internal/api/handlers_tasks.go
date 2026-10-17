@@ -27,12 +27,46 @@ func (h *Handlers) ListTasks(ctx context.Context, _ ListTasksRequestObject) (Lis
 	}
 	out := make(ListTasks200JSONResponse, len(list))
 	for i, t := range list {
-		out[i] = TaskInfo{Id: t.ID, Name: t.Name, Description: t.Description, Schedule: t.Schedule(), Running: t.Running}
-		if t.Last != nil {
-			out[i].LastRun = &TaskRun{Status: TaskRunStatus(t.Last.Status), StartedAt: t.Last.StartedAt, FinishedAt: t.Last.FinishedAt, Message: nz(t.Last.Message)}
-		}
+		out[i] = toAPITask(t)
 	}
 	return out, nil
+}
+
+func toAPITask(t tasks.TaskInfo) TaskInfo {
+	out := TaskInfo{Id: t.ID, Name: t.Name, Description: t.Description, Schedule: t.Schedule(), Running: t.Running, Enabled: ptr(t.Enabled)}
+	if t.Last != nil {
+		out.LastRun = &TaskRun{Status: TaskRunStatus(t.Last.Status), StartedAt: t.Last.StartedAt, FinishedAt: t.Last.FinishedAt, Message: nz(t.Last.Message)}
+	}
+	return out
+}
+
+// UpdateTask turns a task on or off.
+func (h *Handlers) UpdateTask(ctx context.Context, req UpdateTaskRequestObject) (UpdateTaskResponseObject, error) {
+	switch authed, admin := isAdmin(ctx); {
+	case !authed:
+		return UpdateTask401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !admin:
+		return UpdateTask403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	if req.Body == nil {
+		return UpdateTask400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "enabled is needed"))}, nil
+	}
+	switch err := h.Tasks.SetEnabled(ctx, req.TaskId, req.Body.Enabled); {
+	case errors.Is(err, tasks.ErrUnknownTask):
+		return UpdateTask404JSONResponse{NotFoundJSONResponse(apiErr("not_found", err.Error()))}, nil
+	case err != nil:
+		return nil, internal(ctx, "updateTask", err)
+	}
+	list, err := h.Tasks.List(ctx)
+	if err != nil {
+		return nil, internal(ctx, "updateTask", err)
+	}
+	for _, t := range list {
+		if t.ID == req.TaskId {
+			return UpdateTask200JSONResponse(toAPITask(t)), nil
+		}
+	}
+	return UpdateTask404JSONResponse{NotFoundJSONResponse(apiErr("not_found", tasks.ErrUnknownTask.Error()))}, nil
 }
 
 func (h *Handlers) RunTask(ctx context.Context, req RunTaskRequestObject) (RunTaskResponseObject, error) {

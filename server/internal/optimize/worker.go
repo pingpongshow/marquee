@@ -390,7 +390,9 @@ func (s *Service) verify(ctx context.Context, path string, src Source, plan Plan
 // swap puts the new file in the original's place, keeping the library's record (so the
 // item keeps its id, watch history and metadata): the original moves to the media trash,
 // the record is pointed at the new file (same name, or .mkv when the container changed)
-// to be read again by the next scan, and the library is rescanned.
+// to be read again by the next scan, and the library is rescanned. Unless keepOriginals
+// is on, the original is then deleted, only once the new file is in place (it was verified
+// before swap was called); anything failing before that leaves the original as it was.
 func (s *Service) swap(ctx context.Context, jobID, fileID, libID int64, path, part, final string, after int64) error {
 	if s.Trash == nil {
 		return errors.New("the media trash isn't available")
@@ -406,8 +408,16 @@ func (s *Service) swap(ctx context.Context, jobID, fileID, libID int64, path, pa
 	if _, err := s.DB.ExecContext(ctx, `UPDATE media_files SET path = ?, size = -1, mtime = 0 WHERE id = ?`, final, fileID); err != nil {
 		slog.Warn("optimize: couldn't point the library at the new file; the scan will", "path", final, "err", err)
 	}
-	s.DB.ExecContext(ctx, `UPDATE optimize_jobs SET state = 'done', progress = 1, after_size = ?, final_path = ?, original = ?, error = '', finished_at = ?
-		WHERE id = ?`, after, final, original, s.stamp(), jobID)
+	deleted := false
+	if !s.cfg().KeepOriginals {
+		if err := os.Remove(original); err != nil && !os.IsNotExist(err) {
+			slog.Warn("optimize: couldn't delete the original; it stays in the media trash", "path", original, "err", err)
+		} else {
+			deleted, original = true, ""
+		}
+	}
+	s.DB.ExecContext(ctx, `UPDATE optimize_jobs SET state = 'done', progress = 1, after_size = ?, final_path = ?, original = ?, original_deleted = ?,
+		error = '', finished_at = ? WHERE id = ?`, after, final, original, deleted, s.stamp(), jobID)
 	if s.Rescan != nil {
 		s.Rescan(libID)
 	}
@@ -480,10 +490,12 @@ type Job struct {
 	Error          string
 	Paused         string
 	CanRestore     bool
-	CreatedAt      time.Time
-	StartedAt      *time.Time
-	FinishedAt     *time.Time
-	durationMS     int64
+	// OriginalDeleted: the original was deleted after the swap (keepOriginals off).
+	OriginalDeleted bool
+	CreatedAt       time.Time
+	StartedAt       *time.Time
+	FinishedAt      *time.Time
+	durationMS      int64
 }
 
 // JobPage is a page of jobs with the totals saved.
@@ -511,7 +523,7 @@ func (s *Service) Jobs(ctx context.Context, history bool, offset, limit int) (Jo
 	}
 	s.DB.QueryRowContext(ctx, `SELECT COALESCE(SUM(before_size - after_size), 0), COUNT(*) FROM optimize_jobs WHERE state = 'done'`).Scan(&out.SavedBytes, &out.Optimized)
 	rows, err := s.DB.QueryContext(ctx, `SELECT j.id, COALESCE(j.file_id, 0), COALESCE(j.item_id, 0), j.title, CASE WHEN j.final_path <> '' THEN j.final_path ELSE j.path END,
-			j.preset_id, j.preset_name, j.state, j.progress, j.encoder, j.before_size, j.after_size, j.error, j.original, j.created_at, j.started_at, j.finished_at,
+			j.preset_id, j.preset_name, j.state, j.progress, j.encoder, j.before_size, j.after_size, j.error, j.original, j.original_deleted, j.created_at, j.started_at, j.finished_at,
 			COALESCE(f.duration_ms, 0)
 		FROM optimize_jobs j LEFT JOIN media_files f ON f.id = j.file_id WHERE `+where+` ORDER BY `+order+` LIMIT ? OFFSET ?`, limit, max(offset, 0))
 	if err != nil {
@@ -524,7 +536,7 @@ func (s *Service) Jobs(ctx context.Context, history bool, offset, limit int) (Jo
 		var original, created string
 		var started, finished sql.NullString
 		if err := rows.Scan(&jb.ID, &jb.FileID, &jb.ItemID, &jb.Title, &jb.Path, &jb.PresetID, &jb.PresetName, &jb.State, &jb.Progress, &jb.Encoder,
-			&jb.BeforeSize, &jb.AfterSize, &jb.Error, &original, &created, &started, &finished, &jb.durationMS); err != nil {
+			&jb.BeforeSize, &jb.AfterSize, &jb.Error, &original, &jb.OriginalDeleted, &created, &started, &finished, &jb.durationMS); err != nil {
 			return out, err
 		}
 		jb.CreatedAt = parseTime(created)

@@ -279,6 +279,7 @@ func TestQueueEncodeSwapRestore(t *testing.T) {
 		Tick: 20 * time.Millisecond, Grace: 100 * time.Millisecond, BusyRetry: 20 * time.Millisecond}
 	e.set(func(c *settings.Settings) {
 		c.Optimize.MinSavingsPercent = 20
+		c.Optimize.KeepOriginals = true // originals go to the trash, so they can be restored
 		c.Optimize.Presets = []settings.OptimizePreset{{ID: "tiny", Name: "Tiny", Codec: "hevc", Quality: "small", Audio: "aac_stereo", HDR: "keep"}}
 	})
 	if _, _, err := s.Enqueue(ctx, files, "nope"); !errors.Is(err, ErrNoPreset) {
@@ -425,8 +426,8 @@ func TestQueueEncodeSwapRestore(t *testing.T) {
 	}
 }
 
-// A result that isn't enough smaller is thrown away (skipped); a truncated result fails
-// verification.
+// A result that isn't enough smaller is thrown away (skipped), leaving the original alone
+// even with keepOriginals off (the default); a truncated result fails verification.
 func TestThresholdAndVerify(t *testing.T) {
 	e := newEnv(t)
 	ctx, cancel := context.WithCancel(context.Background())

@@ -615,7 +615,9 @@ function JobRow({ job: j, busy, onAction }: { job: Job; busy: boolean; onAction:
         {(j.state === "done" || j.state === "restored") && saved > 0 && (
           <span className={clsx("ml-1", j.state === "done" ? "text-success" : "text-faint line-through")}>Optimized: saved {size(saved)}</span>
         )}
-        {j.state === "done" && !j.canRestore && <span className="ml-1 text-faint">· the original has left the media trash</span>}
+        {j.state === "done" && !j.canRestore && (
+          <span className="ml-1 text-faint">{j.originalDeleted ? "· Original deleted" : "· the original has left the media trash"}</span>
+        )}
       </div>
       {j.error && <div className={clsx("text-xs", j.state === "failed" ? "text-danger" : "text-muted")}>{j.error}</div>}
     </li>
@@ -715,6 +717,12 @@ function SettingsTab({ config }: { config: OptimizeConfig }) {
           checked={draft.windowOnly}
           onChange={(v) => setDraft({ ...draft, windowOnly: v })}
         />
+        <Toggle
+          label="Keep originals in the media trash"
+          help="On: each original goes to the media trash once its new file is in place, and can be restored for 30 days. Off frees the space at once; originals can't be restored. Either way the original is only touched after the new file has been checked."
+          checked={!!draft.keepOriginals}
+          onChange={(v) => setDraft({ ...draft, keepOriginals: v })}
+        />
       </section>
 
       <section className="space-y-3 rounded-lg border border-border bg-surface p-5">
@@ -725,7 +733,7 @@ function SettingsTab({ config }: { config: OptimizeConfig }) {
           </Button>
         </div>
         <p className="text-sm text-muted">
-          Files are encoded on the NVIDIA GPU when there is one, then Quick Sync, then the CPU. The original goes to the media trash, where it can be restored from for 30 days.
+          Files are encoded on the NVIDIA GPU when there is one, then Quick Sync, then the CPU.
         </p>
         <ul className="divide-y divide-border rounded-md border border-border" aria-label="Presets">
           {all.map((p) => (

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 var (
 	ErrUnknownTask = errors.New("no such task")
 	ErrTaskRunning = errors.New("the task is already running")
+	// ErrTaskDisabled: the task is turned off, so it isn't started automatically.
+	ErrTaskDisabled = errors.New("the task is turned off")
 )
 
 // Task is a maintenance job (ADM-2). Window tasks run once a day inside the maintenance
@@ -66,6 +69,7 @@ type LastRun struct {
 type TaskInfo struct {
 	Task
 	Running bool
+	Enabled bool
 	Last    *LastRun
 }
 
@@ -113,7 +117,7 @@ func (s *Scheduler) List(ctx context.Context) ([]TaskInfo, error) {
 	s.mu.Unlock()
 	out := make([]TaskInfo, len(tasks))
 	for i, t := range tasks {
-		out[i] = TaskInfo{Task: t, Running: s.isRunning(t.ID)}
+		out[i] = TaskInfo{Task: t, Running: s.isRunning(t.ID), Enabled: s.Enabled(t.ID)}
 		var status string
 		var msg, started, finished sql.NullString
 		err := s.DB.QueryRowContext(ctx, `SELECT status, message, started_at, finished_at FROM task_runs WHERE task = ? ORDER BY id DESC LIMIT 1`, t.ID).
@@ -155,8 +159,56 @@ func (s *Scheduler) isRunning(id string) bool {
 	return s.running[id]
 }
 
-// RunNow starts a task in the background.
+// Enabled reports whether a task is on (settings tasks.disabled doesn't list it).
+func (s *Scheduler) Enabled(id string) bool {
+	if s.Settings == nil {
+		return true
+	}
+	return !slices.Contains(s.Settings.Get().Tasks.Disabled, id)
+}
+
+// SetEnabled turns a task on or off.
+func (s *Scheduler) SetEnabled(ctx context.Context, id string, on bool) error {
+	if _, ok := s.find(id); !ok {
+		return ErrUnknownTask
+	}
+	if s.Settings == nil {
+		return errors.New("no settings store")
+	}
+	_, err := s.Settings.Update(ctx, func(st *settings.Settings) error {
+		st.Tasks.Disabled = slices.DeleteFunc(slices.Clone(st.Tasks.Disabled), func(d string) bool { return d == id })
+		if !on {
+			st.Tasks.Disabled = append(st.Tasks.Disabled, id)
+		}
+		return nil
+	})
+	return err
+}
+
+// Known keeps the ids of registered tasks, each once, in order (for tasks.disabled: unknown
+// ids are dropped).
+func (s *Scheduler) Known(ids []string) []string {
+	out := []string{}
+	for _, id := range ids {
+		if _, ok := s.find(id); ok && !slices.Contains(out, id) {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// RunNow starts a task in the background, whether or not it's turned off (an admin's Run
+// now, or an action the admin asked for).
 func (s *Scheduler) RunNow(ctx context.Context, id string) error {
+	return s.start(ctx, id, time.Time{})
+}
+
+// Trigger starts a task automatically (after a scan, a recording, new details…): not when
+// it's turned off (ErrTaskDisabled).
+func (s *Scheduler) Trigger(ctx context.Context, id string) error {
+	if !s.Enabled(id) {
+		return ErrTaskDisabled
+	}
 	return s.start(ctx, id, time.Time{})
 }
 
@@ -280,7 +332,7 @@ func (s *Scheduler) Run(ctx context.Context) {
 		s.mu.Unlock()
 		now := s.now()
 		for _, t := range tasks {
-			if !s.isRunning(t.ID) && s.due(ctx, t, now) {
+			if s.Enabled(t.ID) && !s.isRunning(t.ID) && s.due(ctx, t, now) {
 				var deadline time.Time
 				if t.Window && t.Bounded {
 					cfg := s.Settings.Get().Tasks

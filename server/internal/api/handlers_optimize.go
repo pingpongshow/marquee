@@ -177,7 +177,7 @@ func (h *Handlers) ListOptimizeJobs(ctx context.Context, req ListOptimizeJobsReq
 		out.Items[i] = OptimizeJob{Id: j.ID, FileId: nz(j.FileID), ItemId: nz(j.ItemID), Title: j.Title, Path: j.Path, PresetId: j.PresetID,
 			PresetName: j.PresetName, State: OptimizeJobState(j.State), Progress: float32(j.Progress), Fps: nz(float32(j.FPS)), Speed: nz(float32(j.Speed)),
 			EtaSeconds: nz(j.ETASeconds), Encoder: nz(j.Encoder), BeforeSize: j.BeforeSize, AfterSize: j.AfterSize, Error: nz(j.Error),
-			Paused: nz(j.Paused), CanRestore: j.CanRestore, CreatedAt: j.CreatedAt, StartedAt: j.StartedAt, FinishedAt: j.FinishedAt}
+			Paused: nz(j.Paused), CanRestore: j.CanRestore, OriginalDeleted: ptr(j.OriginalDeleted), CreatedAt: j.CreatedAt, StartedAt: j.StartedAt, FinishedAt: j.FinishedAt}
 	}
 	return ListOptimizeJobs200JSONResponse(out), nil
 }
@@ -251,7 +251,7 @@ func fromAPIOptimizePreset(p OptimizePreset) settings.OptimizePreset {
 
 func (h *Handlers) optimizeConfig(o settings.Optimize) OptimizeConfig {
 	out := OptimizeConfig{Settings: OptimizeSettings{Presets: []OptimizePreset{}, DefaultPreset: o.DefaultPreset, Concurrency: o.Concurrency,
-		MinSavingsPercent: o.MinSavingsPercent, PauseWhileWatching: o.PauseWhileWatching, WindowOnly: o.WindowOnly, Paused: o.Paused},
+		MinSavingsPercent: o.MinSavingsPercent, PauseWhileWatching: o.PauseWhileWatching, WindowOnly: o.WindowOnly, Paused: o.Paused, KeepOriginals: ptr(o.KeepOriginals)},
 		Presets: []OptimizePreset{}, Av1Available: h.optimizer().AV1Available()}
 	for _, p := range o.Presets {
 		out.Settings.Presets = append(out.Settings.Presets, toAPIOptimizePreset(p))
@@ -286,7 +286,9 @@ func (h *Handlers) UpdateOptimizeSettings(ctx context.Context, req UpdateOptimiz
 	av1 := h.optimizer().AV1Available()
 	next, err := h.Settings.Update(ctx, func(s *settings.Settings) error {
 		o := settings.Optimize{DefaultPreset: b.DefaultPreset, Concurrency: b.Concurrency, MinSavingsPercent: b.MinSavingsPercent,
-			PauseWhileWatching: b.PauseWhileWatching, WindowOnly: b.WindowOnly, Paused: b.Paused, Presets: []settings.OptimizePreset{}}
+			PauseWhileWatching: b.PauseWhileWatching, WindowOnly: b.WindowOnly, Paused: b.Paused, Presets: []settings.OptimizePreset{},
+			KeepOriginals: s.Optimize.KeepOriginals}
+		set(&o.KeepOriginals, b.KeepOriginals) // omitted = unchanged
 		for _, p := range b.Presets {
 			if p.BuiltIn != nil && *p.BuiltIn {
 				continue

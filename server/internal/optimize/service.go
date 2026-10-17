@@ -1,9 +1,9 @@
 // Package optimize is the library optimizer (Library Health → Large files, admins only):
 // oversized movie and episode files are listed from what the library knows, queued with a
 // preset, re-encoded (NVENC, then Quick Sync, then the CPU, at the lowest priority) next to
-// the original, checked, and swapped in when they're enough smaller. The original goes to
-// the media trash, where it can be restored from; the library item keeps its id, watch
-// history and metadata. Playback comes first: jobs pause while anyone watches (a setting),
+// the original, checked, and swapped in when they're enough smaller. The original is then
+// deleted, or, with keepOriginals on, goes to the media trash, where it can be restored
+// from; the library item keeps its id, watch history and metadata. Playback comes first: jobs pause while anyone watches (a setting),
 // keep a free NVENC session for playback and give theirs up when playback needs it.
 package optimize
 
