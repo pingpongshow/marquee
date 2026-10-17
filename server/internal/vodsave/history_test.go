@@ -23,8 +23,8 @@ func (e *env) addRow(t *testing.T, state, finished string, path string) {
 	}
 }
 
-// Finished saves are kept 5 days and at most 10 (the newest); failed ones' partial files
-// go with them; queued ones stay.
+// Finished saves are kept 5 days and at most 10 (the newest); failed ones are never pruned
+// (they keep their partial files until retried or cleared); queued ones stay.
 func TestHistoryPruned(t *testing.T) {
 	e := newEnv(t, "", nil)
 	ctx := context.Background()
@@ -39,19 +39,31 @@ func TestHistoryPruned(t *testing.T) {
 	e.addRow(t, Queued, "", filepath.Join(e.movies, "q.mkv"))
 
 	e.s.pruneHistory(ctx)
-	var finished, queued int
-	e.s.DB.QueryRow(`SELECT COUNT(*) FROM vod_saves WHERE state IN ('done','failed','cancelled','skipped')`).Scan(&finished)
+	var finished, failed, queued int
+	e.s.DB.QueryRow(`SELECT COUNT(*) FROM vod_saves WHERE state IN ('done','cancelled','skipped')`).Scan(&finished)
+	e.s.DB.QueryRow(`SELECT COUNT(*) FROM vod_saves WHERE state = 'failed'`).Scan(&failed)
 	e.s.DB.QueryRow(`SELECT COUNT(*) FROM vod_saves WHERE state = 'queued'`).Scan(&queued)
-	if finished != HistoryMax || queued != 1 {
-		t.Fatalf("finished %d (want %d), queued %d", finished, HistoryMax, queued)
+	if finished != HistoryMax || failed != 1 || queued != 1 {
+		t.Fatalf("finished %d (want %d), failed %d (want 1), queued %d", finished, HistoryMax, failed, queued)
 	}
 	var oldest string
 	e.s.DB.QueryRow(`SELECT MIN(finished_at) FROM vod_saves WHERE state = 'done'`).Scan(&oldest)
 	if oldest < at(10*time.Hour) {
 		t.Errorf("an older save was kept over a newer one: %s", oldest)
 	}
-	if _, err := os.Stat(part + ".part"); !os.IsNotExist(err) {
-		t.Errorf("the failed save's partial file is still there: %v", err)
+	if _, err := os.Stat(part + ".part"); err != nil {
+		t.Errorf("the failed save's partial file went: %v", err)
+	}
+	// Clear finished leaves failed saves; Clear failed removes them and their partial files.
+	e.s.ClearFinished(ctx)
+	e.s.DB.QueryRow(`SELECT COUNT(*) FROM vod_saves WHERE state = 'failed'`).Scan(&failed)
+	if failed != 1 {
+		t.Fatalf("clear finished removed a failed save")
+	}
+	e.s.ClearFailed(ctx)
+	e.s.DB.QueryRow(`SELECT COUNT(*) FROM vod_saves WHERE state = 'failed'`).Scan(&failed)
+	if _, err := os.Stat(part + ".part"); failed != 0 || !os.IsNotExist(err) {
+		t.Errorf("clear failed: %d left, part file: %v", failed, err)
 	}
 }
 

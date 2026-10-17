@@ -457,8 +457,12 @@ const (
 	HistoryMax  = 10
 )
 
-// pruneHistory drops finished saves older than HistoryDays and beyond the newest HistoryMax
-// (failed ones' partial files go too). It runs at most once a minute.
+// historyStates are the finished saves kept as history (and pruned). Failed saves aren't
+// history: they stay in their own list until retried or cleared.
+var historyStates = []any{Done, Cancelled, Skipped}
+
+// pruneHistory drops done, cancelled and skipped saves older than HistoryDays and beyond the
+// newest HistoryMax. Failed saves are never pruned. It runs at most once a minute.
 func (s *Service) pruneHistory(ctx context.Context) {
 	s.mu.Lock()
 	due := time.Since(s.lastPrune) >= time.Minute
@@ -470,8 +474,8 @@ func (s *Service) pruneHistory(ctx context.Context) {
 		return
 	}
 	cutoff := time.Now().UTC().AddDate(0, 0, -HistoryDays).Format(time.RFC3339)
-	rows, err := s.DB.QueryContext(ctx, `SELECT id, state, target_path FROM vod_saves WHERE state IN (`+in(len(finishedStates))+`)
-		ORDER BY COALESCE(finished_at, created_at) DESC, id DESC`, finishedStates...)
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, state, target_path FROM vod_saves WHERE state IN (`+in(len(historyStates))+`)
+		ORDER BY COALESCE(finished_at, created_at) DESC, id DESC`, historyStates...)
 	if err != nil {
 		return
 	}
@@ -492,8 +496,8 @@ func (s *Service) pruneHistory(ctx context.Context) {
 		}
 	}
 	rows.Close()
-	old, err := s.DB.QueryContext(ctx, `SELECT id, state, target_path FROM vod_saves WHERE state IN (`+in(len(finishedStates))+`)
-		AND COALESCE(finished_at, created_at) < ?`, append(append([]any{}, finishedStates...), cutoff)...)
+	old, err := s.DB.QueryContext(ctx, `SELECT id, state, target_path FROM vod_saves WHERE state IN (`+in(len(historyStates))+`)
+		AND COALESCE(finished_at, created_at) < ?`, append(append([]any{}, historyStates...), cutoff)...)
 	if err == nil {
 		for old.Next() {
 			var r row
@@ -514,6 +518,12 @@ func (s *Service) pruneHistory(ctx context.Context) {
 // ClearFinished removes done, failed, cancelled and skipped saves from the list (failed
 // ones' partial files go too).
 func (s *Service) ClearFinished(ctx context.Context) error {
+	_, err := s.DB.ExecContext(ctx, "DELETE FROM vod_saves WHERE state IN ("+in(len(historyStates))+")", historyStates...)
+	return err
+}
+
+// ClearFailed removes failed saves from their list, with their partial files.
+func (s *Service) ClearFailed(ctx context.Context) error {
 	rows, err := s.DB.QueryContext(ctx, "SELECT target_path FROM vod_saves WHERE state=?", Failed)
 	if err != nil {
 		return err
@@ -528,7 +538,7 @@ func (s *Service) ClearFinished(ctx context.Context) error {
 	for _, p := range paths {
 		removeParts(p)
 	}
-	_, err = s.DB.ExecContext(ctx, "DELETE FROM vod_saves WHERE state IN ("+in(len(finishedStates))+")", finishedStates...)
+	_, err = s.DB.ExecContext(ctx, "DELETE FROM vod_saves WHERE state=?", Failed)
 	return err
 }
 
