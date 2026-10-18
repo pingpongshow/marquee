@@ -123,6 +123,19 @@ func (s *Session) Snapshot() Snapshot {
 	return snap
 }
 
+// position is the last reported playback position.
+func (s *Session) position() int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.positionMS
+}
+
+// playhead returns the Transcoder.Playhead for this session: the plan segment at the
+// reported position.
+func (s *Session) playhead(plan []float64) func() int {
+	return func() int { return segmentFor(plan, float64(s.position())/1000) }
+}
+
 func (s *Session) touch() {
 	s.mu.Lock()
 	s.lastActive = time.Now()
@@ -366,7 +379,7 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 			job.SubForceStyle = burnStyle(sub, r.SubtitleStyle)
 		}
 		s.transcoder = &Transcoder{FFmpeg: m.FFmpeg, Job: job, Encoders: m.encodersFor(cfg.Transcoder.EncoderOrder),
-			TotalSegments: len(plan), ThrottleAhead: cfg.Transcoder.ThrottleSegmentsAhead}
+			TotalSegments: len(plan), ThrottleAhead: cfg.Transcoder.ThrottleSegmentsAhead, Playhead: s.playhead(plan)}
 		if s.Decision.VideoCopy {
 			s.transcoder.Encoders = []string{"software"} // copying video needs no encoder
 		}

@@ -174,7 +174,8 @@ func (m *Manager) StartExternal(ctx context.Context, r ExternalRequest) (*Sessio
 		job.AudioIndex, job.AudioCodec = a.Index, a.Codec
 	}
 	s.transcoder = &Transcoder{FFmpeg: m.FFmpeg, Job: job, Encoders: m.encodersFor(cfg.Transcoder.EncoderOrder),
-		TotalSegments: len(plan), ThrottleAhead: cfg.Transcoder.ThrottleSegmentsAhead, Redact: r.Redact}
+		TotalSegments: len(plan), ThrottleAhead: cfg.Transcoder.ThrottleSegmentsAhead, Redact: r.Redact,
+		Playhead: s.playhead(plan)}
 	if s.Decision.VideoCopy {
 		s.transcoder.Encoders = []string{"software"} // copying video needs no encoder
 	}

@@ -28,6 +28,11 @@ type Transcoder struct {
 	// Redact, when set, cleans FFmpeg's messages before they are logged or returned: a
 	// remote input's link may hold a password (movies on demand).
 	Redact func(string) string
+	// Playhead, when set, is the segment the viewer is watching (from progress reports), or
+	// -1 if unknown. Old segments are pruned behind it rather than behind the last request:
+	// players buffer far ahead (hls.js several minutes), so the last request can be dozens
+	// of segments past what is on screen. It's called without t.mu held.
+	Playhead func() int
 
 	mu          sync.Mutex
 	encIdx      int
@@ -305,6 +310,10 @@ func (t *Transcoder) throttleLoop() {
 			return
 		case <-tick.C:
 		}
+		viewer := -1
+		if t.Playhead != nil {
+			viewer = t.Playhead() // before locking: it reads the session
+		}
 		t.mu.Lock()
 		if t.cmd != nil && !isClosed(t.exited) {
 			t.refreshProduced()
@@ -318,13 +327,38 @@ func (t *Transcoder) throttleLoop() {
 				t.paused = false
 			}
 		}
-		// Keep a minute of segments behind the viewer for small rewinds.
-		for k := t.lastRequest - 10 - 20; k < t.lastRequest-10; k++ {
-			if k >= 0 {
-				os.Remove(t.segPath(k))
-			}
-		}
+		t.pruneLocked(viewer)
 		t.mu.Unlock()
+	}
+}
+
+// Pruning keeps pruneBehind segments behind the viewer for small rewinds, deleting up to
+// pruneWindow older ones per pass. maxPlayheadLag bounds how far the reported playhead may
+// trail the last request before it's taken as stale (a client that stopped reporting
+// progress would otherwise keep a whole film's segments).
+const (
+	pruneBehind    = 10
+	pruneWindow    = 20
+	maxPlayheadLag = 150
+)
+
+// pruneLocked deletes old segments behind the viewer (the playhead segment, or -1 for
+// unknown, when the last request stands in for it). Caller holds t.mu.
+//
+// Pruning behind the last request alone deleted segments the viewer hadn't reached yet:
+// with copied video FFmpeg finishes a whole episode in a second, hls.js fetches minutes
+// ahead, and then the segments at and just after the playhead were gone. Anything that
+// asks for them again (Safari evicting buffered media, hls.js reloading a fragment it
+// couldn't fully append) restarted FFmpeg mid-playback: stalls, skips and audio glitches.
+func (t *Transcoder) pruneLocked(viewer int) {
+	ref := t.lastRequest
+	if viewer >= 0 && viewer < ref {
+		ref = max(viewer, ref-maxPlayheadLag)
+	}
+	for k := ref - pruneBehind - pruneWindow; k < ref-pruneBehind; k++ {
+		if k >= 0 {
+			os.Remove(t.segPath(k))
+		}
 	}
 }
 
