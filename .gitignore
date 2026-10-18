@@ -37,3 +37,6 @@ deploy/empty-plex/
 
 # Agent worktrees (local only)
 .claude/worktrees/
+
+# A server binary built in place (go build in server/)
+/server/marquee
