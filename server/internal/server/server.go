@@ -100,9 +100,12 @@ func withIdentity(d Deps, next http.Handler) http.Handler {
 		}
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "same-origin")
-		// The web app must not be framed by other sites (clickjacking).
+		// The web app must not be framed by other sites (clickjacking), and runs only its own
+		// scripts (see contentSecurityPolicy).
 		w.Header().Set("X-Frame-Options", "DENY")
-		w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
+		if w.Header().Get("Content-Security-Policy") == "" {
+			w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
+		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -153,3 +156,24 @@ func writeError(w http.ResponseWriter, status int, code, msg string) {
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(api.Error{Code: code, Message: msg})
 }
+
+// contentSecurityPolicy limits what the web app's pages may load and run, so that even if
+// something slipped injected markup into a page (a crafted title, a subtitle), the browser
+// would refuse to run it:
+//   - scripts and workers only from Marquee itself (the bundle has no inline scripts), plus
+//     WebAssembly for styled subtitles (JASSUB) and blob: workers (hls.js);
+//   - images from anywhere (posters in Fix match, Discover and Requests come straight from
+//     TMDB and other providers; images can't run code);
+//   - video and audio from Marquee and blob: (hls.js feeds the player through Media Source);
+//   - frames only for trailers on YouTube; no plugins; forms and <base> only to Marquee;
+//   - and no framing by other sites.
+const contentSecurityPolicy = "default-src 'self'; " +
+	"script-src 'self' 'wasm-unsafe-eval'; " +
+	"worker-src 'self' blob:; " +
+	"style-src 'self' 'unsafe-inline'; " +
+	"img-src 'self' data: blob: https: http:; " +
+	"media-src 'self' blob: data:; " +
+	"font-src 'self' data: blob:; " +
+	"connect-src 'self'; " +
+	"frame-src https://www.youtube-nocookie.com https://www.youtube.com; " +
+	"object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
