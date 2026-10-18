@@ -352,7 +352,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                     }
                 }
                 else -> Shelf(when (d.type) { ItemType.SHOW -> "Seasons"; ItemType.ARTIST -> "Albums"; else -> "In this collection" }, pg.children, sidePadding) { _, it ->
-                    PosterCard(it, marquee.imageUrl(it.images?.poster, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) }, actions = tileActions(it))
+                    PosterCard(it, marquee.imageUrl(it.images?.poster, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) }, actions = tileActions(it, nav = nav))
                 }
             }
         }
@@ -416,7 +416,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
 private fun EpisodeRow(nav: NavHostController, ep: ItemSummary) {
     val marquee = LocalMarquee.current
     val watched = isWatched(ep)
-    val actions = tileActions(ep)
+    val actions = tileActions(ep, nav = nav)
     var menu by remember { mutableStateOf(false) }
     Box {
         ListItem(

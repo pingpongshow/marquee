@@ -8,7 +8,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.NavHostController
 import app.marquee.api.models.ItemSummary
+import app.marquee.api.models.ItemType
 import app.marquee.core.Marquee
 import app.marquee.core.PendingChange
 import app.marquee.core.WatchChoices
@@ -44,10 +46,11 @@ fun watchChoices(item: ItemSummary): WatchChoices {
 
 /**
  * A tile's context menu (USER-6): Mark as watched and/or unwatched for videos, shows and seasons (both while part-way through),
- * Add to / Remove from favourites (USER-12), and Remove from Continue Watching on that row's tiles.
+ * Add to / Remove from favourites (USER-12), Remove from Continue Watching on that row's tiles, and Go to show for an
+ * episode when there's a [nav] to open it with.
  */
 @Composable
-fun tileActions(item: ItemSummary, continueWatching: Boolean = false, onRemoved: (Long) -> Unit = {}): List<TileAction> {
+fun tileActions(item: ItemSummary, continueWatching: Boolean = false, nav: NavHostController? = null, onRemoved: (Long) -> Unit = {}): List<TileAction> {
     val marquee = LocalMarquee.current
     val context = LocalContext.current
     // The app's scope: the tile may leave the screen (its row reloads) before the request ends.
@@ -62,6 +65,8 @@ fun tileActions(item: ItemSummary, continueWatching: Boolean = false, onRemoved:
             if (choices.markUnwatched) add(TileAction("Mark as unwatched") { setWatched(false) })
         }
         favorite?.let(::add)
+        val show = item.grandparentId
+        if (nav != null && item.type == ItemType.EPISODE && show != null) add(TileAction("Go to show") { nav.navigate("item/$show") })
         if (continueWatching && !marquee.isOffline) add(TileAction("Remove from Continue Watching") {
             scope.launch {
                 withContext(Dispatchers.IO) { runCatching { marquee.hubs.removeFromContinueWatching(item.id) } }

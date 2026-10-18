@@ -170,7 +170,7 @@ fun ContinueTile(nav: NavHostController, e: ContinueEntry, width: Dp, autoFocus:
     val item = e.item
     if (item != null) {
         PosterCard(item, marquee.imageUrl(item.images?.thumb ?: item.images?.backdrop, 300), width, { onOpen(); openItem(nav, item, play = true) },
-            shape = Shape.Wide, autoFocus = autoFocus, actions = tileActions(item, continueWatching = true) { id -> onRemoved("item:$id") })
+            shape = Shape.Wide, autoFocus = autoFocus, actions = tileActions(item, continueWatching = true, nav = nav) { id -> onRemoved("item:$id") })
         return
     }
     VodContinueTile(nav, e, width, autoFocus, onOpen, onRemoved)

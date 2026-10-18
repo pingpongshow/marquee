@@ -182,7 +182,7 @@ fun HomeScreen(nav: NavHostController) {
                 Shelf(hub.title, hub.items, sidePadding, onTitle = HomeRows.route(hub.id)?.let { r -> { nav.navigate(r) } }) { i, it ->
                     PosterCard(it, marquee.imageUrl(it.images?.poster, 300), cardWidth, { opened = it.id; openedKey = null; openItem(nav, it) },
                         shape = shapeFor(it), autoFocus = marquee.isTv && (if (opened != null) it.id == opened else first && i == 0),
-                        actions = tileActions(it))
+                        actions = tileActions(it, nav = nav))
                 }
             }
         }
@@ -366,7 +366,7 @@ fun LibraryScreen(nav: NavHostController, libraryId: Long) {
                 if (i >= items.size - 30) LaunchedEffect(i) { loadMore() }
                 PosterCard(it, marquee.imageUrl(it.images?.poster, 240), min, { opened = it.id; openItem(nav, it) },
                     autoFocus = marquee.isTv && (if (opened != null) it.id == opened else i == 0),
-                    showRating = byMyRating || fav, actions = tileActions(it))
+                    showRating = byMyRating || fav, actions = tileActions(it, nav = nav))
             }
         }
     }
@@ -505,7 +505,7 @@ fun SearchScreen(nav: NavHostController) {
             items(results?.groups ?: emptyList()) { g ->
                 Shelf(g.type.value.replaceFirstChar { it.uppercase() } + "s", g.items, sidePadding) { _, it ->
                     PosterCard(it, marquee.imageUrl(it.images?.poster ?: it.images?.thumb, 240), if (marquee.isTv) 130.dp else 110.dp, { openItem(nav, it) },
-                        actions = tileActions(it))
+                        actions = tileActions(it, nav = nav))
                 }
             }
         }

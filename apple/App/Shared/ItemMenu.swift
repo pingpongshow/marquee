@@ -45,6 +45,10 @@ struct ItemMenuItems: View {
                 Button { ActionError.run { music.play(try await leaves(), shuffle: true, source: item.title) } } label: { Label("Shuffle", systemImage: "shuffle") }
             }
         }
+        if item._type == .episode, let show = item.grandparentId {
+            // Continue Watching, On Deck and episode tiles: the show's page.
+            NavigationLink(value: Route.item(show)) { Label("Go to Show", systemImage: "tv") }
+        }
         Button { PlaylistPicker.shared.item = item } label: { Label("Add to Playlist…", systemImage: "text.badge.plus") }
         if item._type == .track, let album = item.parentId {
             NavigationLink(value: Route.item(album)) { Label("Go to Album", systemImage: "square.stack") }
