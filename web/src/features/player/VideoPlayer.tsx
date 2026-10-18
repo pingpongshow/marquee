@@ -915,7 +915,7 @@ export function VideoPlayer({
 
       {/* Cinema trailers: what's playing, and ways past it (PLAY-18) */}
       {preroll && (
-        <div className="absolute right-8 bottom-28 flex items-center gap-2">
+        <div className="absolute right-8 bottom-28 z-10 flex items-center gap-2">
           <span className="rounded-md bg-black/60 px-3 py-2 text-sm text-white/90 backdrop-blur">
             {preroll.label}
           </span>
@@ -941,15 +941,15 @@ export function VideoPlayer({
             videoRef.current &&
             (videoRef.current.currentTime = marker.endMs / 1000)
           }
-          className="absolute right-8 bottom-28 rounded-md border border-white/40 bg-black/60 px-5 py-2.5 font-semibold text-white backdrop-blur hover:bg-white hover:text-black"
+          className="absolute right-8 bottom-28 z-10 rounded-md border border-white/40 bg-black/60 px-5 py-2.5 font-semibold text-white backdrop-blur hover:bg-white hover:text-black"
         >
           Skip {marker.kind === "intro" ? "Intro" : "Credits"}
         </button>
       )}
 
-      {/* Up Next */}
+      {/* Up Next (above the bottom controls, whose gradient reaches up behind it and would take its clicks) */}
       {showUpNext && next && (
-        <div className="absolute right-8 bottom-28 flex w-80 flex-col gap-2">
+        <div className="absolute right-8 bottom-28 z-10 flex w-80 flex-col gap-2">
           {showRatingInline && d && (
             <RatingPromptCard
               item={d}

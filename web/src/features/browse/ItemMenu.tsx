@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/Toast";
 import { useNavigate } from "@tanstack/react-router";
-import { Bookmark, BookmarkMinus, CircleCheck, CircleSlash, Compass, Disc3, EyeOff, Heart, HeartOff, Layers, ListEnd, ListPlus, ListStart, MoreHorizontal, Radio, Shuffle, UserRound } from "lucide-react";
+import { Bookmark, BookmarkMinus, CircleCheck, CircleSlash, Compass, Disc3, EyeOff, Heart, HeartOff, Layers, ListEnd, ListPlus, ListStart, MoreHorizontal, Radio, Shuffle, Tv, UserRound } from "lucide-react";
 import { clsx } from "clsx";
 import { useState, type MouseEvent } from "react";
 import { api, unwrap } from "@/api/client";
@@ -79,6 +79,11 @@ export function ItemMenu({
         {continueWatching && (
           <MenuItem icon={<EyeOff />} onClick={() => removeCw.mutate(item.id)}>
             Remove from Continue Watching
+          </MenuItem>
+        )}
+        {item.type === "episode" && item.grandparentId && (
+          <MenuItem icon={<Tv />} onClick={() => navigate({ to: "/item/$itemId", params: { itemId: String(item.grandparentId) } })}>
+            Go to show
           </MenuItem>
         )}
         {isMusic && (
