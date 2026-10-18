@@ -58,6 +58,8 @@ import app.marquee.api.models.ContinueEntry
 import app.marquee.api.models.Hub
 import app.marquee.api.models.ItemSummary
 import app.marquee.core.Marquee
+import app.marquee.core.WatchChoices
+import app.marquee.core.WatchState
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -101,6 +103,38 @@ fun removeVodContinue(marquee: Marquee, context: Context, kind: HubsApi.KindRemo
             .onSuccess { withContext(Dispatchers.Main) { onRemoved() }; marquee.watch.changed(); VodChanges.bump() }
             .onFailure { withContext(Dispatchers.Main) { onFailed(); toast(context, "Couldn't remove “$title”: ${it.message ?: ""}") } }
     }
+}
+
+/** What a VOD entry's menu offers (PLAY-5): watched unless it is, unwatched whenever it's played or part-way through. */
+fun vodWatchChoices(e: ContinueEntry): WatchChoices =
+    WatchState.choices(e.vodMovie?.watched ?: e.vodEpisode?.watched ?: false, e.positionMs > 0)
+
+/**
+ * Marks a film or episode on demand watched or unwatched (unwatched forgets where it stopped,
+ * PLAY-5): [onDone] once saved, then Home's row, the Continue Watching page and the VOD pages
+ * refresh; a toast if it fails.
+ */
+fun setVodWatched(marquee: Marquee, context: Context, kind: HubsApi.KindRemoveVodFromContinueWatching, id: Long, on: Boolean, title: String,
+    onDone: () -> Unit = {}) {
+    marquee.scope.launch {
+        withContext(Dispatchers.IO) {
+            runCatching {
+                when (kind) {
+                    HubsApi.KindRemoveVodFromContinueWatching.MOVIE -> if (on) marquee.livetv.markVodWatched(id) else marquee.livetv.markVodUnwatched(id)
+                    HubsApi.KindRemoveVodFromContinueWatching.EPISODE -> if (on) marquee.livetv.markVodEpisodeWatched(id) else marquee.livetv.markVodEpisodeUnwatched(id)
+                }
+            }
+        }
+            .onSuccess { withContext(Dispatchers.Main) { onDone() }; marquee.watch.changed(); VodChanges.bump() }
+            .onFailure { withContext(Dispatchers.Main) { toast(context, "Couldn't update “$title”: ${it.message ?: ""}") } }
+    }
+}
+
+/** Mark as watched and/or unwatched for a film or episode on demand, as [choices] say; [onDone] once saved. */
+fun vodWatchActions(marquee: Marquee, context: Context, kind: HubsApi.KindRemoveVodFromContinueWatching, id: Long, choices: WatchChoices, title: String,
+    onDone: () -> Unit = {}): List<TileAction> = if (marquee.isOffline) emptyList() else buildList {
+    if (choices.markWatched) add(TileAction("Mark as watched") { setVodWatched(marquee, context, kind, id, true, title, onDone) })
+    if (choices.markUnwatched) add(TileAction("Mark as unwatched") { setVodWatched(marquee, context, kind, id, false, title, onDone) })
 }
 
 /** Where opening an entry goes: library videos play (as Home always did), films and episodes on demand resume in their player. */
@@ -154,6 +188,8 @@ private fun VodContinueTile(nav: NavHostController, e: ContinueEntry, width: Dp,
     val under = marquee.absolute(m?.posterUrl ?: e.seriesPosterUrl)
     val over = marquee.absolute(if (m != null) "/api/v1/livetv/vod/movies/${m.id}/image?kind=backdrop" else ep?.stillUrl)
     val actions = buildList {
+        // Watched or unwatched: either way it leaves Continue Watching.
+        vodRemoval(e)?.let { (kind, id) -> addAll(vodWatchActions(marquee, context, kind, id, vodWatchChoices(e), title) { onRemoved(e.key) }) }
         if (!marquee.isOffline) add(TileAction("Remove from Continue Watching") {
             val (kind, id) = vodRemoval(e) ?: return@TileAction
             removeVodContinue(marquee, context, kind, id, title, onRemoved = { onRemoved(e.key) })
@@ -203,14 +239,14 @@ fun ViewMoreTile(total: Int, width: Dp, height: Dp, onClick: () -> Unit) {
 
 /**
  * Home's Continue Watching row: [hub]'s entries less those removed here ([removed], keys) or just
- * marked watched, ending in View more (and with a title that opens the page) when there are more.
+ * marked watched or unwatched, ending in View more (and with a title that opens the page) when there are more.
  */
 @Composable
 fun ContinueRow(nav: NavHostController, hub: Hub, removed: List<String>, width: Dp, focusFirst: Boolean, openedKey: String?,
     onOpen: (String) -> Unit, onRemoved: (String) -> Unit) {
     val marquee = LocalMarquee.current
     val marks by marquee.watch.marks.collectAsState()
-    val shown = continueEntries(hub).filter { e -> e.key !in removed && e.item?.let { marquee.watch.markFor(it, marks)?.on == true } != true }
+    val shown = continueEntries(hub).filter { e -> e.key !in removed && e.item?.let { marquee.watch.markFor(it, marks) } == null }
     if (shown.isEmpty()) return
     val more = continueHasMore(hub)
     val openPage = { nav.navigate(CONTINUE_ROUTE) }
@@ -274,7 +310,7 @@ fun ContinueWatchingScreen(nav: NavHostController) {
         if (gen == page.generation) page.loading = false
     }
     val width = if (marquee.isTv) 240.dp else 168.dp
-    val shown = page.entries.filter { e -> e.key !in removed && e.item?.let { marquee.watch.markFor(it, marks)?.on == true } != true }
+    val shown = page.entries.filter { e -> e.key !in removed && e.item?.let { marquee.watch.markFor(it, marks) } == null }
     val full: androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan = { GridItemSpan(maxLineSpan) }
     LazyVerticalGrid(GridCells.Adaptive(width), Modifier.fillMaxSize().semantics { contentDescription = "Continue Watching" },
         contentPadding = PaddingValues(start = sidePadding, end = sidePadding, top = 16.dp, bottom = 24.dp),

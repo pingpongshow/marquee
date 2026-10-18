@@ -4,6 +4,7 @@ import app.marquee.api.apis.HubsApi
 import app.marquee.api.infrastructure.Serializer
 import app.marquee.api.models.ContinueEntry
 import app.marquee.api.models.Hub
+import app.marquee.core.WatchChoices
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -50,5 +51,13 @@ class ContinueWatchingTest {
         // Unknown duration: the episode's runtime.
         assertEquals(0.25f, continueProgress(ep)!!, 0.001f)
         assertEquals(0.25f, continueProgress(film)!!, 0.001f)
+    }
+
+    @Test fun vodEntriesOfferBothWhilePartWay() {
+        val (ep, _, film) = continueEntries(json.decodeFromString(Hub.serializer(), hub))
+        val both = WatchChoices(markWatched = true, markUnwatched = true)
+        assertEquals(both, vodWatchChoices(ep))
+        assertEquals(both, vodWatchChoices(film))
+        assertEquals(WatchChoices(markWatched = true, markUnwatched = false), vodWatchChoices(film.copy(positionMs = 0)))
     }
 }

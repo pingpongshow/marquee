@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Forward30
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.RemoveDone
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Search
@@ -114,6 +115,7 @@ import app.marquee.api.models.PlayVodMovieRequest
 import app.marquee.api.models.VodEpisode
 import app.marquee.api.models.VodSeries
 import app.marquee.core.AndroidProfile
+import app.marquee.core.WatchState
 import app.marquee.api.models.ReportVodPlaybackRequest
 import app.marquee.api.models.VodCategory
 import app.marquee.api.models.VodMovie
@@ -396,13 +398,19 @@ fun VodBrowse(nav: NavHostController, shows: Boolean, header: @Composable () -> 
                 LazyRow(Modifier.semantics { contentDescription = "Continue Watching" }, contentPadding = PaddingValues(vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     if (shows) items(rs?.filter { "s${it.id}" !in removed } ?: emptyList(), key = { it.id }) { s ->
-                        VodNextEpisodeTile(s, if (marquee.isTv) 260.dp else 200.dp, continueActions(s.nextEpisode?.let { HubsApi.KindRemoveVodFromContinueWatching.EPISODE to it.id },
+                        val ep = s.nextEpisode
+                        // Watched or unwatched (PLAY-5): the next episode, and the tile leaves the row at once.
+                        val watch = ep?.let { vodWatchActions(marquee, context, HubsApi.KindRemoveVodFromContinueWatching.EPISODE, it.id,
+                            WatchState.choices(it.watched, (it.positionMs ?: 0) > 0), s.title) { removed.add("s${s.id}") } } ?: emptyList()
+                        VodNextEpisodeTile(s, if (marquee.isTv) 260.dp else 200.dp, watch + continueActions(ep?.let { HubsApi.KindRemoveVodFromContinueWatching.EPISODE to it.id },
                             "s${s.id}", s.title, listOf(TileAction("Go to show") { openShow(s) }))) {
                             val e = s.nextEpisode
                             if (e != null) nav.navigate("vodepplay/${s.id}/${e.id}") else openShow(s)
                         }
                     } else items(rm?.filter { "m${it.id}" !in removed } ?: emptyList(), key = { it.id }) { m ->
-                        VodTile(m, if (marquee.isTv) 150.dp else 112.dp, continueActions(HubsApi.KindRemoveVodFromContinueWatching.MOVIE to m.id, "m${m.id}", m.title,
+                        val watch = vodWatchActions(marquee, context, HubsApi.KindRemoveVodFromContinueWatching.MOVIE, m.id,
+                            WatchState.choices(m.watched, (m.positionMs ?: 0) > 0), m.title) { removed.add("m${m.id}") }
+                        VodTile(m, if (marquee.isTv) 150.dp else 112.dp, watch + continueActions(HubsApi.KindRemoveVodFromContinueWatching.MOVIE to m.id, "m${m.id}", m.title,
                             listOf(TileAction("Go to film") { openMovie(m) }))) { openMovie(m) }
                     }
                 }
@@ -471,7 +479,8 @@ fun VodMovieScreen(nav: NavHostController, movieId: Long) {
         return
     }
     val watched = watchedOverride ?: m.watched
-    val position = m.positionMs ?: 0
+    // Marked here (watched, or unwatched, which forgets where it stopped): no resume point until the reload.
+    val position = if (watchedOverride != null) 0 else m.positionMs ?: 0
     val resume = position > 0 && !watched
     fun play(from: Long?) = nav.navigate("vodplay/${m.id}" + (from?.let { "?start=$it" } ?: ""))
     fun setWatched(on: Boolean) {
@@ -524,6 +533,11 @@ fun VodMovieScreen(nav: NavHostController, movieId: Long) {
                         }) {
                             Icon(Icons.Filled.Check, null, tint = if (watched) Gold else MaterialTheme.colorScheme.onSurface)
                             Text(if (watched) "Watched" else "Mark watched", Modifier.padding(start = 6.dp))
+                        }
+                        // Part-way through: unwatched too, which forgets where it stopped (PLAY-5).
+                        if (!watched && position > 0) OutlinedButton({ setWatched(false) }, Modifier.focusRing().semantics { contentDescription = "Mark as unwatched" }) {
+                            Icon(Icons.Filled.RemoveDone, null)
+                            Text("Mark unwatched", Modifier.padding(start = 6.dp))
                         }
                     }
                 }

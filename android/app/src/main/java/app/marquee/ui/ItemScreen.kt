@@ -8,6 +8,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.RemoveDone
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Album
@@ -164,6 +165,11 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
             // The app's scope: leaving the page doesn't cancel the change.
             marquee.scope.launch { if (!marquee.sync.setWatched(id, on)) toast(context, "Couldn't update “${d.title}”") }
         }) { Icon(if (watched) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked, null); Text(if (watched) "Watched" else "Mark watched") }
+        // Part-way through (or a show or season partly watched): unwatched too, which forgets the resume point (PLAY-5).
+        if (d.type in app.marquee.core.WatchState.videoTypes && !watched && watchChoices(d.summary()).markUnwatched) OutlinedButton(modifier = Modifier.focusRing(), onClick = {
+            val id = d.id
+            marquee.scope.launch { if (!marquee.sync.setWatched(id, false)) toast(context, "Couldn't update “${d.title}”") }
+        }) { Icon(Icons.Filled.RemoveDone, null); Text("Mark unwatched") }
         if (d.type in listOf(ItemType.MOVIE, ItemType.SHOW, ItemType.SEASON, ItemType.EPISODE, ItemType.VIDEO, ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK))
             AddToPlaylistButton(d.id, music = d.type in listOf(ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK))
     }
@@ -225,7 +231,9 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
     @Composable fun Actions() {
             when (d.type) {
                 ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO -> {
-                    val resume = (d.viewOffsetMs ?: 0) > 0
+                    // Marked watched or unwatched on this device: the resume point is gone (PLAY-5), as on its tile.
+                    val marks by marquee.watch.marks.collectAsState()
+                    val resume = (d.viewOffsetMs ?: 0) > 0 && marquee.watch.markFor(d.summary(), marks) == null
                     Button(onClick = { nav.navigate("player/${d.id}") }, modifier = Modifier.focusRing().initialFocus(marquee.isTv)) {
                         Icon(Icons.Filled.PlayArrow, null)
                         Text(if (resume) "Resume" else "Play")

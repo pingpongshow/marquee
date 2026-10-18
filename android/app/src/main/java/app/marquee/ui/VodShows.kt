@@ -1,6 +1,8 @@
 package app.marquee.ui
 
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import app.marquee.core.WatchChoices
+import app.marquee.core.WatchState
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -230,7 +232,7 @@ fun VodShowScreen(nav: NavHostController, seriesId: Long) {
                         FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (next != null) {
                                 val pos = next.positionMs ?: 0
-                                val resume = pos > 0 && !watched(next)
+                                val resume = pos > 0 && !watched(next) && (episodeOverride[next.id] ?: showOverride) == null
                                 Button({ play(next) }, Modifier.focusRing().initialFocus(marquee.isTv)) {
                                     Icon(Icons.Filled.PlayArrow, null)
                                     Text(if (resume) "Resume ${next.label()} from ${formatTime(pos)}" else "Play ${next.label()}", Modifier.padding(start = 6.dp))
@@ -285,7 +287,12 @@ fun VodShowScreen(nav: NavHostController, seriesId: Long) {
                     }
                 }
             }
-            items(episodes, key = { it.id }) { e -> VodEpisodeRow(e, watched(e), wide, onPlay = { play(e) }, onWatched = { setEpisode(e, !watched(e)) }) }
+            items(episodes, key = { it.id }) { e ->
+                // Marked here: what the mark leaves (PLAY-5), and no progress until the reload.
+                val marked = episodeOverride[e.id] ?: showOverride
+                VodEpisodeRow(e, watched(e), marked?.let(WatchState::choicesAfterMark) ?: WatchState.choices(e.watched, (e.positionMs ?: 0) > 0),
+                    showProgress = marked == null, wide = wide, onPlay = { play(e) }, onWatched = { setEpisode(e, it) })
+            }
             if (s.episodes.isEmpty() && s.episodesError == null) item(key = "none") {
                 Text("No episodes listed yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -307,30 +314,43 @@ fun VodShowScreen(nav: NavHostController, seriesId: Long) {
     }
 }
 
-/** An episode: its still (with how far it was watched), number, title, runtime and overview; opening it plays it. The tick marks it watched. */
+/**
+ * An episode: its still (with how far it was watched), number, title, runtime and overview; opening it plays it. The tick marks it
+ * watched or unwatched; a long press (TV: hold OK, or the menu key) offers Mark as watched and/or unwatched, both while part-way through (PLAY-5).
+ */
 @Composable
-private fun VodEpisodeRow(e: VodEpisode, watched: Boolean, wide: Boolean, onPlay: () -> Unit, onWatched: () -> Unit) {
+private fun VodEpisodeRow(e: VodEpisode, watched: Boolean, choices: WatchChoices, showProgress: Boolean, wide: Boolean, onPlay: () -> Unit, onWatched: (Boolean) -> Unit) {
     val marquee = LocalMarquee.current
+    val progress = if (watched || !showProgress) null else e.progress()
+    val actions = buildList {
+        if (choices.markWatched) add(TileAction("Mark as watched") { onWatched(true) })
+        if (choices.markUnwatched) add(TileAction("Mark as unwatched") { onWatched(false) })
+    }
+    var menu by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        Row(Modifier.weight(1f).focusCard(onPlay).semantics(mergeDescendants = true) {
-            contentDescription = "${e.label()}, ${e.title}"
-            stateDescription = if (watched) "Watched" else e.progress()?.let { "${(it * 100).toInt()}% watched" } ?: "Not watched"
-        }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(Modifier.width(if (wide) 200.dp else 140.dp)) {
-                Artwork(marquee.absolute(e.stillUrl), "E${e.episode}", Shape.Wide, Modifier.fillMaxWidth())
-                if (!watched) e.progress()?.let {
-                    LinearProgressIndicator(progress = { it }, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(6.dp).height(3.dp),
-                        color = Gold, trackColor = Color.White.copy(alpha = 0.3f), drawStopIndicator = {})
+        Box(Modifier.weight(1f)) {
+            Row(Modifier.fillMaxWidth().focusCard(onPlay, onLongClick = { menu = true }).semantics(mergeDescendants = true) {
+                contentDescription = "${e.label()}, ${e.title}"
+                stateDescription = if (watched) "Watched" else progress?.let { "${(it * 100).toInt()}% watched" } ?: "Not watched"
+                customActions = actions.map { a -> CustomAccessibilityAction(a.label) { a.run(); true } }
+            }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Box(Modifier.width(if (wide) 200.dp else 140.dp)) {
+                    Artwork(marquee.absolute(e.stillUrl), "E${e.episode}", Shape.Wide, Modifier.fillMaxWidth())
+                    progress?.let {
+                        LinearProgressIndicator(progress = { it }, Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(6.dp).height(3.dp),
+                            color = Gold, trackColor = Color.White.copy(alpha = 0.3f), drawStopIndicator = {})
+                    }
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("${e.episode}. ${e.title}", fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    val meta = listOfNotNull(e.runtimeMs?.let(::formatRuntime), e.airDate)
+                    if (meta.isNotEmpty()) Text(meta.joinToString(" · "), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    if (wide) e.overview?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                 }
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("${e.episode}. ${e.title}", fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                val meta = listOfNotNull(e.runtimeMs?.let(::formatRuntime), e.airDate)
-                if (meta.isNotEmpty()) Text(meta.joinToString(" · "), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                if (wide) e.overview?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis) }
-            }
+            TileMenu(actions, menu) { menu = false }
         }
-        IconButton(onWatched, Modifier.focusRing().semantics {
+        IconButton({ onWatched(!watched) }, Modifier.focusRing().semantics {
             contentDescription = if (watched) "Mark ${e.label()} unwatched" else "Mark ${e.label()} watched"
             stateDescription = if (watched) "Watched" else "Not watched"
         }) {
