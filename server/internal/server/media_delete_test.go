@@ -68,12 +68,15 @@ func TestDeleteDuplicateFile(t *testing.T) {
 		t.Fatalf("setting: %+v", set.Library)
 	}
 
-	// A read-only folder can't give up its file.
-	os.Chmod(filepath.Dir(heatPath), 0o555)
-	if code := h.do("DELETE", fmt.Sprintf("/files/%d", heatFile), nil, nil); code != 409 && os.Geteuid() != 0 {
-		t.Errorf("read-only: %d", code)
+	// A read-only folder can't give up its file. (Root ignores folder permissions, so the
+	// check would delete the file instead: skipped when the tests run as root, as in a container.)
+	if os.Geteuid() != 0 {
+		os.Chmod(filepath.Dir(heatPath), 0o555)
+		if code := h.do("DELETE", fmt.Sprintf("/files/%d", heatFile), nil, nil); code != 409 {
+			t.Errorf("read-only: %d", code)
+		}
+		os.Chmod(filepath.Dir(heatPath), 0o755)
 	}
-	os.Chmod(filepath.Dir(heatPath), 0o755)
 
 	if code := h.do("DELETE", fmt.Sprintf("/files/%d", copyFile), nil, nil); code != 204 {
 		t.Fatalf("delete: %d", code)
