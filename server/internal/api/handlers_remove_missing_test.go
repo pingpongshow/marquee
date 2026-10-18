@@ -91,4 +91,18 @@ func TestRemoveMissingTitles(t *testing.T) {
 	} else if _, ok := res.(RemoveMissingTitles409JSONResponse); !ok {
 		t.Errorf("offline library: %#v", res)
 	}
+	// Settings → Libraries warns about the folder that can't be read.
+	if r, err = h.ListLibraries(adm, ListLibrariesRequestObject{Params: ListLibrariesParams{Manage: ptr(true)}}); err != nil {
+		t.Fatal(err)
+	}
+	if ls := r.(ListLibraries200JSONResponse); len(ls) != 1 || ls[0].UnreadablePaths == nil || len(*ls[0].UnreadablePaths) != 1 || (*ls[0].UnreadablePaths)[0] != root {
+		t.Errorf("unreadable folder not reported: %#v", ls)
+	}
+	os.Rename(root+"-offline", root)
+	if r, err = h.ListLibraries(adm, ListLibrariesRequestObject{Params: ListLibrariesParams{Manage: ptr(true)}}); err != nil {
+		t.Fatal(err)
+	}
+	if ls := r.(ListLibraries200JSONResponse); ls[0].UnreadablePaths != nil {
+		t.Errorf("readable folder reported: %v", *ls[0].UnreadablePaths)
+	}
 }

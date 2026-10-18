@@ -158,21 +158,21 @@ func TestScanShows(t *testing.T) {
 		t.Errorf("watch state lost after rename")
 	}
 
-	// Deleting a file marks it unavailable rather than removing the item.
+	// Deleting a file removes it, and the show it was the last episode of.
 	os.Remove(filepath.Join(e.root, "tv/Show/Season 02/Show - S02E05.mkv"))
-	if st := e.scan(l); st.Missing != 1 {
+	if st := e.scan(l); st.Missing != 1 || st.Removed != 2 { // the episode, and the show's extra with the show
 		t.Fatalf("after delete: %s", st)
 	}
-	if n := e.count(`SELECT available FROM items WHERE type = 'show' AND title = 'Show'`); n != 0 {
-		t.Error("show with only missing files should be unavailable")
+	if n := e.count(`SELECT COUNT(*) FROM items WHERE type = 'show' AND title = 'Show'`); n != 0 {
+		t.Error("show without files should be gone")
 	}
-	// It comes back when the file returns.
+	// A file put back is found again as new.
 	e.touch("tv/Show/Season 02/Show - S02E05.mkv")
-	if st := e.scan(l); st.Updated+st.Restored+st.Moved == 0 {
-		t.Fatalf("after restore: %s", st)
+	if st := e.scan(l); st.Added != 2 { // with the extra
+		t.Fatalf("after putting it back: %s", st)
 	}
 	if n := e.count(`SELECT available FROM items WHERE type = 'show' AND title = 'Show'`); n != 1 {
-		t.Error("show should be available again")
+		t.Error("show should be back")
 	}
 }
 

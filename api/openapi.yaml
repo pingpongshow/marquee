@@ -5526,6 +5526,7 @@ components:
         dvrQuotaAlert: { type: boolean, description: "The dvr_quota alert is on: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Off by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.)" }
         plexSyncAlert: { type: boolean, description: "The plex_sync alert is on: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Off by default. (Not in AlertType; notifications carry type plex_sync.)" }
         optimizeFailedAlert: { type: boolean, description: "The optimize_failed alert is on: a Library Health → Large files conversion failed (not one skipped for saving too little). On by default. (Not in AlertType; notifications carry type optimize_failed.)" }
+        libraryUnreadableAlert: { type: boolean, description: "The library_unreadable alert is on: a scan couldn't read one of a library's folders (offline drive, permissions), so its titles were kept as they were. On by default. (Not in AlertType; notifications carry type library_unreadable.)" }
         recipientsAllAdmins: { type: boolean, description: Mail alerts to every administrator with an email address. }
         recipients:
           type: array
@@ -5552,6 +5553,7 @@ components:
         dvrQuotaAlert: { type: boolean }
         plexSyncAlert: { type: boolean }
         optimizeFailedAlert: { type: boolean }
+        libraryUnreadableAlert: { type: boolean }
         recipientsAllAdmins: { type: boolean }
         recipients:
           type: array
@@ -5789,7 +5791,6 @@ components:
         detectIntros: { type: boolean, description: "Find intros and end credits in TV episodes by comparing their audio, for Skip Intro and Skip Credits (PLAY-12). Markers from Plex or the files take precedence." }
         trickplay: { type: boolean, description: "Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie." }
         allowMediaDeletion: { type: boolean, default: false, description: "Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good by the daily Empty media trash task." }
-        removeMissingAfterDays: { type: integer, minimum: 0, maximum: 3650, default: 7, description: "Scans remove titles whose files have been missing for longer than this many days, with their watch history. Only files in library folders the scan could read count as missing, so an offline drive never loses its titles. 0 = never." }
 
     WatchGroup:
       type: object
@@ -6629,6 +6630,7 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         missingCount: { type: integer, description: "Admins listing with manage=true: how many titles have no available file and would be removed by POST /libraries/{libraryId}/remove-missing (only files in folders that can be reached count)." }
+        unreadablePaths: { type: array, items: { type: string }, description: "Admins listing with manage=true: the library's folders that can't be read right now (offline drive, permissions). Their titles are kept until they can be read again." }
         recordings: { type: boolean, description: "A Live TV recordings library (Recorded TV / Recorded Movies). Only listed to admins with manage=true; its items are shown only under Live TV → Recordings, and browsing it returns 404." }
 
     LibraryCreate:

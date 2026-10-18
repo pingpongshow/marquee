@@ -36,8 +36,6 @@ type writer struct {
 	// now is when the scan started; liveRoots are the library folders it could read.
 	now       time.Time
 	liveRoots []string
-	// removeAfterDays: files missing longer than this are removed at the end; 0 = never.
-	removeAfterDays int
 }
 
 // maxHold is how long a write transaction stays open: the database has one writer, and
@@ -242,9 +240,9 @@ func (w *writer) writeStreams(ctx context.Context, fileID int64, c candidate, re
 	return nil
 }
 
-// finish marks missing files unavailable (noting when they went missing), removes files
-// missing for longer than removeAfterDays from the folders this scan could read, tidies
-// the library (see Tidy) and commits. It returns how many titles were removed.
+// finish removes the files this scan found gone (in the folders it could read), tidies the
+// library (see Tidy: titles left without files go, with their watch history) and commits.
+// It returns how many titles were removed.
 func (w *writer) finish(ctx context.Context) (int, error) {
 	if err := w.ensure(ctx); err != nil {
 		return 0, err
@@ -259,12 +257,7 @@ func (w *writer) finish(ctx context.Context) (int, error) {
 			return 0, err
 		}
 	}
-	var roots []string
-	if w.removeAfterDays > 0 {
-		roots = removableRoots(w.liveRoots)
-	}
-	cutoff := sqlTime(now.Add(-time.Duration(w.removeAfterDays) * 24 * time.Hour))
-	removed, err := removeMissing(ctx, w.tx, w.lib.ID, roots, cutoff) // just tidies without roots
+	removed, err := removeMissing(ctx, w.tx, w.lib.ID, w.liveRoots, "")
 	if err != nil {
 		return 0, err
 	}

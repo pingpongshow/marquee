@@ -188,11 +188,31 @@ func run() error {
 		Libraries: libraries,
 		Settings:  store,
 		Scanner: &scanner.Scanner{
-			DB:                 database,
-			Prober:             probe.New(cfg.FFprobePath, 8),
-			Workers:            8,
-			RemoveMissingAfter: func() int { return store.Get().Library.RemoveMissingAfterDays },
+			DB:      database,
+			Prober:  probe.New(cfg.FFprobePath, 8),
+			Workers: 8,
 		},
+	}
+	// A library folder a scan can't read keeps its titles; the admins are told, and told
+	// again when it's readable (de-duplicated: the watcher rescans often).
+	scans.OnUnreadable = func(ctx context.Context, lib library.Library, paths []string) {
+		subject := "library:" + strconv.FormatInt(lib.ID, 10)
+		if len(paths) == 0 {
+			// Only when the last word about it was that it couldn't be read.
+			var last string
+			database.QueryRowContext(ctx, `SELECT title FROM notifications WHERE type = ? AND subject = ? ORDER BY id DESC LIMIT 1`,
+				settings.AlertLibraryUnreadable, subject).Scan(&last)
+			if strings.HasPrefix(last, "Library folder can't be read") {
+				alerts.Raise(ctx, notify.Alert{Type: settings.AlertLibraryUnreadable, Subject: subject, Resolved: true,
+					Title:   "Library folder readable again: " + lib.Name,
+					Message: "Every folder of the " + lib.Name + " library can be read again."})
+			}
+			return
+		}
+		alerts.Raise(ctx, notify.Alert{Type: settings.AlertLibraryUnreadable, Subject: subject,
+			Title: "Library folder can't be read: " + lib.Name,
+			Message: "Marquee couldn't read " + strings.Join(paths, ", ") + " (the " + lib.Name + " library) during a scan. " +
+				"Its titles are kept as they were until it can be read again. Check that the drive is mounted and that Marquee's user may read it."})
 	}
 	meta := &metadata.Service{DB: database, Settings: store, CacheDir: filepath.Join(cfg.ConfigDir, "cache")}
 	var afterMusicScan atomic.Pointer[func()] // set once the scheduler exists

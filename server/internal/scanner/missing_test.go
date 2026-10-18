@@ -2,75 +2,25 @@ package scanner
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"marquee/internal/library"
 )
 
-// clock is a settable scan clock.
-type clock struct{ t time.Time }
-
-func (c *clock) now() time.Time { return c.t }
-
-func (e *env) missingSince(rel string) sql.NullString {
-	var s sql.NullString
-	if err := e.db.QueryRow(`SELECT missing_since FROM media_files WHERE path = ?`, filepath.Join(e.root, rel)).Scan(&s); err != nil {
-		e.t.Fatal(err)
-	}
-	return s
-}
-
-// A file found gone notes when; finding it again clears it.
-func TestMissingSince(t *testing.T) {
+// A scan that finds files gone removes them at once, with the titles left without files,
+// their watch state and the show left empty; the rest of the library stays.
+func TestScanRemovesMissingAtOnce(t *testing.T) {
 	e := newEnv(t)
-	c := &clock{time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)}
-	e.sc.Now = c.now
-	e.touch("tv/Show/Show - S01E01.mkv")
-	e.touch("tv/Show/Show - S01E02.mkv")
-	l := e.lib("TV", library.Shows, "tv")
-	e.scan(l)
-	const ep = "tv/Show/Show - S01E02.mkv"
-	if s := e.missingSince(ep); s.Valid {
-		t.Fatalf("missing_since set on a file that's there: %v", s.String)
-	}
-	os.Remove(filepath.Join(e.root, ep))
-	e.scan(l)
-	if s := e.missingSince(ep); s.String != "2026-10-01T12:00:00.000Z" {
-		t.Fatalf("missing_since = %q", s.String)
-	}
-	// Still missing on a later scan: the first time is kept.
-	c.t = c.t.Add(48 * time.Hour)
-	e.scan(l)
-	if s := e.missingSince(ep); s.String != "2026-10-01T12:00:00.000Z" {
-		t.Fatalf("missing_since moved to %q", s.String)
-	}
-	e.touch(ep)
-	if st := e.scan(l); st.Updated+st.Restored == 0 {
-		t.Fatalf("not restored: %s", st)
-	}
-	if s := e.missingSince(ep); s.Valid {
-		t.Errorf("missing_since kept after the file came back: %v", s.String)
-	}
-}
-
-// Scans remove titles missing longer than the setting, with watch state and the show left
-// empty; not before, and never with the setting at 0.
-func TestScanRemovesMissingAfterGrace(t *testing.T) {
-	e := newEnv(t)
-	c := &clock{time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)}
-	days := 7
-	e.sc.Now, e.sc.RemoveMissingAfter = c.now, func() int { return days }
 	e.touch("tv/Kept/Kept - S01E01.mkv")
 	e.touch("tv/Gone/Gone - S01E01.mkv")
+	e.touch("tv/Gone/Gone - S01E02.mkv")
 	l := e.lib("TV", library.Shows, "tv")
 	e.scan(l)
 	var epID int64
-	if err := e.db.QueryRow(`SELECT id FROM items WHERE type = 'episode' AND grandparent_id = (SELECT id FROM items WHERE title = 'Gone')`).Scan(&epID); err != nil {
+	if err := e.db.QueryRow(`SELECT id FROM items WHERE type = 'episode' AND grandparent_id = (SELECT id FROM items WHERE title = 'Gone') LIMIT 1`).Scan(&epID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := e.db.Exec(`INSERT INTO users(id, username, display_name) VALUES (1, 'u', 'u')`); err != nil {
@@ -80,26 +30,11 @@ func TestScanRemovesMissingAfterGrace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The Gone folder moves to another library.
+	// The Gone folder moves to another library: the next scan removes it.
 	os.RemoveAll(filepath.Join(e.root, "tv/Gone"))
-	e.scan(l)
-	c.t = c.t.Add(6 * 24 * time.Hour)
-	if st := e.scan(l); st.Removed != 0 {
-		t.Fatalf("removed before the grace period: %s", st)
-	}
-	if n := e.count(`SELECT COUNT(*) FROM items WHERE type = 'show' AND title = 'Gone'`); n != 1 {
-		t.Fatal("show removed before the grace period")
-	}
-	// Turned off: kept however long.
-	days = 0
-	c.t = c.t.Add(30 * 24 * time.Hour)
-	if st := e.scan(l); st.Removed != 0 {
-		t.Fatalf("removed with the setting off: %s", st)
-	}
-	days = 7
 	st := e.scan(l)
-	if st.Removed != 1 {
-		t.Fatalf("after the grace period: %s", st)
+	if st.Removed != 2 {
+		t.Fatalf("removed: %s", st)
 	}
 	if n := e.count(`SELECT COUNT(*) FROM items WHERE title = 'Gone'`); n != 0 {
 		t.Errorf("show left behind: %d", n)
@@ -110,17 +45,15 @@ func TestScanRemovesMissingAfterGrace(t *testing.T) {
 	if n := e.count(`SELECT COUNT(*) FROM user_item_state WHERE item_id = ?`, epID); n != 0 {
 		t.Error("watch state left behind")
 	}
-	if n := e.count(`SELECT COUNT(*) FROM items WHERE type = 'episode'`); n != 1 {
-		t.Errorf("episodes = %d, want the kept one", n)
+	if n := e.count(`SELECT COUNT(*) FROM media_files`); n != 1 {
+		t.Errorf("files = %d, want the kept one", n)
 	}
 }
 
-// Files in a library folder that's offline, or empty like an unmounted disk's mount point,
-// are never removed.
-func TestScanNeverRemovesFromOfflineFolder(t *testing.T) {
+// A library folder that can't be read (a drive that's gone) isn't scanned, so nothing in it
+// counts as missing; a folder that can be read but is empty has lost its files.
+func TestScanOfflineFolder(t *testing.T) {
 	e := newEnv(t)
-	c := &clock{time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)}
-	e.sc.Now, e.sc.RemoveMissingAfter = c.now, func() int { return 1 }
 	e.touch("a/Heat (1995)/Heat (1995).mkv")
 	e.touch("b/Alien (1979)/Alien (1979).mkv")
 	e.touch("c/Ran (1985)/Ran (1985).mkv")
@@ -131,27 +64,27 @@ func TestScanNeverRemovesFromOfflineFolder(t *testing.T) {
 	}
 	e.scan(l)
 	os.Rename(b, b+"-offline")                    // drive gone
-	os.RemoveAll(filepath.Join(cc, "Ran (1985)")) // folder left empty
-	for range 3 {
-		c.t = c.t.Add(10 * 24 * time.Hour)
-		if st := e.scan(l); st.Removed != 0 {
-			t.Fatalf("removed from an offline folder: %s", st)
-		}
+	os.RemoveAll(filepath.Join(cc, "Ran (1985)")) // folder emptied
+	st := e.scan(l)
+	if st.Removed != 1 {
+		t.Fatalf("removed: %s", st)
 	}
-	if n := e.count(`SELECT COUNT(*) FROM items WHERE type = 'movie'`); n != 3 {
-		t.Fatalf("movies = %d, want 3", n)
+	if len(st.Unreadable) != 1 || st.Unreadable[0] != b {
+		t.Errorf("unreadable folders reported: %v", st.Unreadable)
+	}
+	if u := UnreadableRoots([]string{a, b, cc}); len(u) != 1 || u[0] != b {
+		t.Errorf("UnreadableRoots: %v", u)
+	}
+	if n := e.count(`SELECT COUNT(*) FROM items WHERE type = 'movie'`); n != 2 {
+		t.Fatalf("movies = %d, want Heat and Alien", n)
 	}
 	if n := e.count(`SELECT available FROM media_files WHERE path LIKE ?`, b+"%"); n != 1 {
 		t.Error("offline drive's file marked missing")
 	}
-	// Removing by hand skips them too.
-	if n, err := RemoveMissing(context.Background(), e.db, l); err != nil || n != 0 {
-		t.Fatalf("remove missing = %d, %v", n, err)
-	}
 }
 
-// Remove missing titles now: counts and removes the gone titles, refuses when no folder
-// can be reached.
+// Remove missing titles now (for files an older version left greyed out): counts and removes
+// the gone titles, refuses when no folder can be reached.
 func TestRemoveMissingNow(t *testing.T) {
 	e := newEnv(t)
 	e.touch("movies/Heat (1995)/Heat (1995).mkv")
@@ -160,9 +93,15 @@ func TestRemoveMissingNow(t *testing.T) {
 	e.touch("movies/Ran (1985)/Ran (1985) {edition-Director's Cut}.mkv")
 	l := e.lib("Movies", library.Movies, "movies")
 	e.scan(l)
+	// Files an older version left greyed out (unavailable) instead of removing.
 	os.RemoveAll(filepath.Join(e.root, "movies/Alien (1979)"))
 	os.Remove(filepath.Join(e.root, "movies/Ran (1985)/Ran (1985) {edition-Director's Cut}.mkv")) // one of two versions
-	e.scan(l)
+	if _, err := e.db.Exec(`UPDATE media_files SET available = 0 WHERE path LIKE '%Alien%' OR path LIKE '%Director%'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.db.Exec(`UPDATE items SET available = 0 WHERE title LIKE 'Alien%'`); err != nil {
+		t.Fatal(err)
+	}
 	ctx := context.Background()
 	if n, err := MissingCount(ctx, e.db, l); err != nil || n != 1 {
 		t.Fatalf("missing count = %d, %v", n, err)

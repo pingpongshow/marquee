@@ -61,7 +61,6 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			Trickplay:               ptr(s.Library.Trickplay),
 			DetectIntros:            ptr(s.Library.DetectIntros),
 			AllowMediaDeletion:      ptr(s.Library.AllowMediaDeletion),
-			RemoveMissingAfterDays:  ptr(s.Library.RemoveMissingAfterDays),
 		},
 		Metadata: MetadataSettings{
 			TmdbApiKeySet:            ptr(s.Metadata.TMDBAPIKey != ""),
@@ -187,7 +186,6 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		set(&s.Library.Trickplay, l.Trickplay)
 		set(&s.Library.DetectIntros, l.DetectIntros)
 		set(&s.Library.AllowMediaDeletion, l.AllowMediaDeletion)
-		set(&s.Library.RemoveMissingAfterDays, l.RemoveMissingAfterDays)
 	}
 	if m := u.Metadata; m != nil {
 		set(&s.Metadata.TMDBAPIKey, m.TmdbApiKey)
@@ -471,6 +469,10 @@ func (h *Handlers) ListLibraries(ctx context.Context, req ListLibrariesRequestOb
 					slog.Warn("count missing titles", "library", l.Name, "err", err)
 				} else {
 					a.MissingCount = &n
+				}
+				// …and warns about folders it can't read (their titles are kept).
+				if u := scanner.UnreadableRoots(l.Paths); len(u) > 0 {
+					a.UnreadablePaths = &u
 				}
 			}
 			out = append(out, a)

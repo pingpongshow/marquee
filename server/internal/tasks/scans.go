@@ -43,6 +43,9 @@ type Scans struct {
 	// AfterScan, if set, runs after each successful scan as part of the same task, e.g.
 	// metadata matching. Its progress is reported through report.
 	AfterScan func(ctx context.Context, lib library.Library, report func(scanner.Progress)) error
+	// OnUnreadable, if set, is told after every scan which of the library's folders it
+	// couldn't read (none = all fine), e.g. to raise or clear an admin alert.
+	OnUnreadable func(ctx context.Context, lib library.Library, paths []string)
 
 	mu     sync.Mutex
 	status map[int64]*ScanStatus
@@ -227,6 +230,9 @@ func (s *Scans) runOne(parent context.Context, libID int64) {
 		s.mu.Unlock()
 	})
 	result := st.String()
+	if s.OnUnreadable != nil {
+		s.OnUnreadable(parent, lib, st.Unreadable)
+	}
 	if err != nil {
 		slog.Warn("scan failed", "library", lib.Name, "err", err, "partial", result)
 	} else {

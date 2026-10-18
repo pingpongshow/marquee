@@ -17,7 +17,7 @@ import (
 
 // hiddenAlerts are alert types the API exposes as their own booleans, not as AlertType
 // values (shipped apps decode the enum strictly).
-var hiddenAlerts = []string{settings.AlertDVRQuota, settings.AlertPlexSync, settings.AlertOptimizeFailed}
+var hiddenAlerts = []string{settings.AlertDVRQuota, settings.AlertPlexSync, settings.AlertOptimizeFailed, settings.AlertLibraryUnreadable}
 
 func hiddenAlert(kind string) bool {
 	for _, a := range hiddenAlerts {
@@ -43,8 +43,9 @@ func toAPINotifications(n settings.Notifications) *NotificationSettings {
 		FromAddress: ptr(n.FromAddress), FromName: ptr(n.FromName), MailConfigured: ptr(n.MailConfigured()),
 		LinkUrl: ptr(n.LinkURL), Alerts: &alerts, DvrQuotaAlert: ptr(n.AlertOn(settings.AlertDVRQuota)),
 		PlexSyncAlert: ptr(n.AlertOn(settings.AlertPlexSync)), OptimizeFailedAlert: ptr(n.AlertOn(settings.AlertOptimizeFailed)),
-		RecipientsAllAdmins: ptr(n.RecipientsAllAdmins),
-		Recipients:          ptr(append([]int64{}, n.Recipients...)), DiskThresholdPercent: ptr(n.DiskThresholdPercent),
+		LibraryUnreadableAlert: ptr(n.AlertOn(settings.AlertLibraryUnreadable)),
+		RecipientsAllAdmins:    ptr(n.RecipientsAllAdmins),
+		Recipients:             ptr(append([]int64{}, n.Recipients...)), DiskThresholdPercent: ptr(n.DiskThresholdPercent),
 	}
 }
 
@@ -72,7 +73,7 @@ func applyNotifications(n *settings.Notifications, u NotificationSettingsUpdate)
 		flags[a] = n.AlertOn(a)
 	}
 	sent := map[string]*bool{settings.AlertDVRQuota: u.DvrQuotaAlert, settings.AlertPlexSync: u.PlexSyncAlert,
-		settings.AlertOptimizeFailed: u.OptimizeFailedAlert}
+		settings.AlertOptimizeFailed: u.OptimizeFailedAlert, settings.AlertLibraryUnreadable: u.LibraryUnreadableAlert}
 	changed := u.Alerts != nil
 	for a, v := range sent {
 		if v != nil {

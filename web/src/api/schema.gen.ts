@@ -4465,6 +4465,8 @@ export interface components {
             plexSyncAlert?: boolean;
             /** @description The optimize_failed alert is on: a Library Health → Large files conversion failed (not one skipped for saving too little). On by default. (Not in AlertType; notifications carry type optimize_failed.) */
             optimizeFailedAlert?: boolean;
+            /** @description The library_unreadable alert is on: a scan couldn't read one of a library's folders (offline drive, permissions), so its titles were kept as they were. On by default. (Not in AlertType; notifications carry type library_unreadable.) */
+            libraryUnreadableAlert?: boolean;
             /** @description Mail alerts to every administrator with an email address. */
             recipientsAllAdmins?: boolean;
             /** @description Administrators (user ids) who get alert mail when recipientsAllAdmins is off. */
@@ -4488,6 +4490,7 @@ export interface components {
             dvrQuotaAlert?: boolean;
             plexSyncAlert?: boolean;
             optimizeFailedAlert?: boolean;
+            libraryUnreadableAlert?: boolean;
             recipientsAllAdmins?: boolean;
             recipients?: number[];
             diskThresholdPercent?: number;
@@ -4716,11 +4719,6 @@ export interface components {
              * @default false
              */
             allowMediaDeletion: boolean;
-            /**
-             * @description Scans remove titles whose files have been missing for longer than this many days, with their watch history. Only files in library folders the scan could read count as missing, so an offline drive never loses its titles. 0 = never.
-             * @default 7
-             */
-            removeMissingAfterDays: number;
         };
         WatchGroup: {
             id: string;
@@ -5725,6 +5723,8 @@ export interface components {
             updatedAt: string;
             /** @description Admins listing with manage=true: how many titles have no available file and would be removed by POST /libraries/{libraryId}/remove-missing (only files in folders that can be reached count). */
             missingCount?: number;
+            /** @description Admins listing with manage=true: the library's folders that can't be read right now (offline drive, permissions). Their titles are kept until they can be read again. */
+            unreadablePaths?: string[];
             /** @description A Live TV recordings library (Recorded TV / Recorded Movies). Only listed to admins with manage=true; its items are shown only under Live TV → Recordings, and browsing it returns 404. */
             recordings?: boolean;
         };

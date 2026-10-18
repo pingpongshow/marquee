@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Folder, Pencil, Plus, RefreshCw, Square, Trash2 } from "lucide-react";
+import { Folder, Pencil, Plus, RefreshCw, Square, Trash2, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { manageLibrariesQuery, useCancelScan, useDeleteLibrary, useRemoveMissingTitles, useScanAll, useScanLibrary } from "@/api/queries";
 import type { Library } from "@/api/types";
@@ -103,6 +103,15 @@ export function LibrariesSettings() {
                     ))}
                   </ul>
                   <ScanStatus lib={lib} />
+                  {!!lib.unreadablePaths?.length && (
+                    <div role="alert" className="mt-1 flex items-start gap-1.5 text-xs text-danger">
+                      <TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden />
+                      <span>
+                        Can&apos;t be read: <span className="font-mono">{lib.unreadablePaths.join(", ")}</span>. Its titles are kept until the folder can be read again. Check that
+                        the drive is mounted and that Marquee may read it.
+                      </span>
+                    </div>
+                  )}
                   {!!lib.missingCount && lib.scanStatus === "idle" && (
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted">
                       <span>{titles(lib.missingCount)} with files gone</span>
@@ -170,12 +179,6 @@ export function LibrariesSettings() {
             </Field>
           </Card>
           <Card title="Media files">
-            <Field
-              label="Remove missing titles after (days)"
-              help="When a title's files are gone from its library folder (deleted, or moved to another library), it stays greyed out for this long in case they come back, then the next scan removes it along with its watch history. Files on a drive that's offline or a folder that's empty are never removed. 0 keeps missing titles until you remove them."
-            >
-              {(id) => <Input id={id} type="number" min={0} max={3650} value={scanning.draft!.removeMissingAfterDays ?? 7} onChange={(e) => scanning.update({ removeMissingAfterDays: Number(e.target.value) })} />}
-            </Field>
             <Toggle
               label="Allow deleting media files"
               help="Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good by the nightly Empty media trash task."

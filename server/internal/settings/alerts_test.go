@@ -29,7 +29,7 @@ func TestDefaultAlertsOnNewServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	n := s.Get().Notifications
-	if !n.AlertOn(AlertVODSaveFailed) || !n.AlertOn(AlertOptimizeFailed) || n.AlertsVersion != AlertsVersion {
+	if !n.AlertOn(AlertVODSaveFailed) || !n.AlertOn(AlertOptimizeFailed) || !n.AlertOn(AlertLibraryUnreadable) || n.AlertsVersion != AlertsVersion {
 		t.Errorf("new server alerts: %v (version %d)", n.Alerts, n.AlertsVersion)
 	}
 	if i := s.Get().Integrations; !i.VODAutoRefresh || i.VODRefreshHours != 6 {
@@ -53,7 +53,7 @@ func TestAlertsUpgradeOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	n := s.Get().Notifications
-	if !slices.Equal(n.Alerts, []string{AlertTaskFailed, AlertVODSaveFailed, AlertOptimizeFailed}) || n.AlertsVersion != 2 {
+	if !slices.Equal(n.Alerts, []string{AlertTaskFailed, AlertVODSaveFailed, AlertOptimizeFailed, AlertLibraryUnreadable}) || n.AlertsVersion != AlertsVersion {
 		t.Fatalf("upgraded: %v (version %d)", n.Alerts, n.AlertsVersion)
 	}
 	// Persisted: the stored settings carry the version.
@@ -61,7 +61,7 @@ func TestAlertsUpgradeOnce(t *testing.T) {
 	d.QueryRow(`SELECT value FROM settings WHERE key = ?`, keyServer).Scan(&stored)
 	var back Settings
 	json.Unmarshal([]byte(stored), &back)
-	if back.Notifications.AlertsVersion != 2 || !back.Notifications.AlertOn(AlertOptimizeFailed) {
+	if back.Notifications.AlertsVersion != AlertsVersion || !back.Notifications.AlertOn(AlertOptimizeFailed) {
 		t.Errorf("not persisted: %s", stored)
 	}
 
@@ -71,6 +71,18 @@ func TestAlertsUpgradeOnce(t *testing.T) {
 		return nil
 	}); err != nil {
 		t.Fatal(err)
+	}
+	// A server already at version 2 gets only the version 3 alert (unreadable folders).
+	v2 := map[string]any{"notifications": map[string]any{"alerts": []string{AlertTaskFailed}, "alertsVersion": 2, "diskThresholdPercent": 10, "smtpPort": 587}}
+	d2 := openDB(t)
+	raw2, _ := json.Marshal(v2)
+	if _, err := d2.Exec(`INSERT INTO settings(key, value) VALUES (?, ?)`, keyServer, string(raw2)); err != nil {
+		t.Fatal(err)
+	}
+	if s3, err := Open(ctx, d2); err != nil {
+		t.Fatal(err)
+	} else if n := s3.Get().Notifications; !slices.Equal(n.Alerts, []string{AlertTaskFailed, AlertLibraryUnreadable}) {
+		t.Errorf("version 2 upgrade: %v", n.Alerts)
 	}
 	s2, err := Open(ctx, d)
 	if err != nil {

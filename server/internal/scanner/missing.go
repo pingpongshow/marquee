@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +15,7 @@ import (
 )
 
 // ErrNoReachableFolder is returned by RemoveMissing when none of the library's folders can
-// be read: their files might only be offline, so nothing is removed.
+// be read: nothing can be told missing there, so nothing is removed.
 var ErrNoReachableFolder = errors.New("none of the library's folders can be reached, so nothing was removed")
 
 // timeLayout matches the timestamps SQLite writes (strftime('%Y-%m-%dT%H:%M:%fZ')), so
@@ -23,19 +24,38 @@ const timeLayout = "2006-01-02T15:04:05.000Z"
 
 func sqlTime(t time.Time) string { return t.UTC().Format(timeLayout) }
 
-// removableRoots are the library folders whose missing files may be removed: ones that can
-// be read and aren't empty. An unmounted disk often leaves an empty mount point behind, so
-// an empty folder is treated like an offline one.
+// removableRoots are the library folders whose missing files may be removed: the ones that
+// can be read (a folder that can't be opened can't show what's gone).
 func removableRoots(roots []string) []string {
 	var out []string
 	for _, r := range roots {
-		f, err := os.Open(r)
-		if err != nil {
-			continue
+		if fi, err := os.Stat(r); err == nil && fi.IsDir() {
+			out = append(out, r)
 		}
-		names, _ := f.Readdirnames(1)
-		f.Close()
-		if len(names) > 0 {
+	}
+	return out
+}
+
+// UnreadableRoots are the library folders that can't be read right now: missing, not a
+// folder, or not openable (an offline drive, permissions).
+func UnreadableRoots(roots []string) []string {
+	var out []string
+	for _, r := range roots {
+		f, err := os.Open(r)
+		if err == nil {
+			var fi os.FileInfo
+			if fi, err = f.Stat(); err == nil && !fi.IsDir() {
+				err = errors.New("not a folder")
+			}
+			if err == nil {
+				_, err = f.Readdirnames(1)
+				if errors.Is(err, io.EOF) { // empty, but readable
+					err = nil
+				}
+			}
+			f.Close()
+		}
+		if err != nil {
 			out = append(out, r)
 		}
 	}

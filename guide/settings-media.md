@@ -24,7 +24,8 @@ Everything here is under **Settings** in the web app and needs an administrator 
 - **Scan all** scans every library now.
 - The arrows button next to a library scans just that one.
 - The pencil edits it; the bin deletes it. Deleting a library removes its metadata, artwork and watch history from Marquee. Your media files are not touched.
-- When a library has titles whose files are gone, it says how many under its last scan, with **Remove missing titles**. Confirming removes them now, with their watch history, instead of waiting for **Remove missing titles after (days)** (below). Only folders that can be reached count: if every folder of the library is offline, nothing is removed.
+- When a library folder can't be read (a drive that's offline, permissions), the library shows a red **Can't be read** warning naming the folder. Its titles are kept until it can be read again. See [Missing files](#missing-files).
+- If titles were left greyed out by an older version of Marquee, the library says how many have files gone, with **Remove missing titles** to remove them now.
 
 ### Adding a library
 
@@ -74,16 +75,15 @@ These apply to all libraries.
 
 | Setting | Default | What it does |
 |---|---|---|
-| Remove missing titles after (days) | `7` | How long a title whose files are gone stays greyed out before a scan removes it, with its watch history. 0 = never: missing titles stay until you use **Remove missing titles**. See [Missing files](#missing-files). |
 | Allow deleting media files | Off | Lets administrators delete media files from Library Health. Deleted files move to a `.marquee-trash` folder in their library folder and are removed for good by the nightly **Empty media trash** task. |
 
 Deleting needs write access: the video folder is mounted read-only unless you set `VIDEO_MODE=` (empty) in `.env`. See [Install](install.md).
 
 ### Missing files
 
-When a scan can't find a file that used to be there, for example because you deleted it or moved a show folder from your TV library to your Anime library, the title stays in the library greyed out as unavailable. If the file comes back (or turns up in another folder of the same library), the title is available again with its watch history.
+When a scan finds that a file is gone, for example because you deleted it or moved a show folder from your TV library to your Anime library, the title is removed straight away, with its watch history and any season or show left empty. A file renamed or moved within the same library is recognised and keeps its history.
 
-After **Remove missing titles after (days)** the next scan removes the title for good, along with its watch history, and any season or show left empty. Titles are only removed from library folders that can be read and aren't empty, so a drive that's offline or not mounted (which often leaves an empty folder behind) never loses its titles.
+The exception is a library folder Marquee **can't read** at all (a drive that's offline, a network share that's down, a permissions problem): nothing in it can be told missing, so its titles are kept as they were. Settings → Libraries shows a **Can't be read** warning on the library, and the **Library folder can't be read** alert (in the bell, and by email if you choose) says which folder; another notice follows when it can be read again.
 
 ## Metadata
 

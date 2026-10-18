@@ -44,6 +44,7 @@ export function NotificationsSettings() {
       dvrQuotaAlert: x.dvrQuotaAlert,
       plexSyncAlert: x.plexSyncAlert,
       optimizeFailedAlert: x.optimizeFailedAlert,
+      libraryUnreadableAlert: x.libraryUnreadableAlert,
       recipientsAllAdmins: x.recipientsAllAdmins,
       recipients: x.recipients,
       diskThresholdPercent: x.diskThresholdPercent,
@@ -140,6 +141,12 @@ export function NotificationsSettings() {
               help="A conversion in Library Health → Large files failed (not one skipped for saving too little); the original is unchanged. On by default."
               checked={!!d.optimizeFailedAlert}
               onChange={(v) => update({ optimizeFailedAlert: v })}
+            />
+            <Toggle
+              label="Library folder can't be read"
+              help="A scan couldn't read one of a library's folders (a drive that's offline, permissions). Its titles are kept until it can be read again; another notice says when it can. On by default."
+              checked={!!d.libraryUnreadableAlert}
+              onChange={(v) => update({ libraryUnreadableAlert: v })}
             />
           </div>
           {alerts.includes("disk_low") && (

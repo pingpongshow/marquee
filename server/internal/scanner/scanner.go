@@ -32,10 +32,12 @@ type Progress struct {
 // Stats summarises a scan.
 type Stats struct {
 	Found, Added, Updated, Unchanged, Moved, Missing, Restored, Skipped, Failed int
-	// Removed is how many titles went because their files had been missing longer than
-	// the "Remove missing titles after" setting.
-	Removed  int
-	Duration time.Duration
+	// Removed is how many titles went because the scan found their files gone.
+	Removed int
+	// Unreadable are the library folders the scan couldn't read: their titles are kept
+	// (nothing in them can be told missing), and an admin alert says so.
+	Unreadable []string
+	Duration   time.Duration
 }
 
 func (s Stats) String() string {
@@ -57,9 +59,6 @@ type Scanner struct {
 	Prober Prober
 	// Workers is the number of files probed concurrently.
 	Workers int
-	// RemoveMissingAfter is how many days a file may stay missing before a scan removes
-	// it (and the titles left without files); 0 or nil = never.
-	RemoveMissingAfter func() int
 	// Now is the clock; nil = time.Now. Tests set it.
 	Now func() time.Time
 }
@@ -96,18 +95,20 @@ func (s *Scanner) Scan(ctx context.Context, lib library.Library, ignore []string
 	}
 	wantAudio := lib.Type == library.Music
 
-	// 1. Walk. Roots that can't be read (offline drive) are excluded from missing-file
-	// detection so a disconnected disk never marks its items as gone.
+	// 1. Walk. Roots that can't be read (offline drive, permissions) are excluded from
+	// missing-file detection, so their titles stay; the scan reports them (Stats.Unreadable).
 	report(Progress{Phase: "walking"})
 	wr := walkResult{Dirs: map[string][]string{}}
 	var liveRoots []string
 	for _, root := range lib.Paths {
 		if fi, err := os.Stat(root); err != nil || !fi.IsDir() {
 			slog.Warn("library folder unavailable; skipping", "library", lib.Name, "path", root, "err", err)
+			st.Unreadable = append(st.Unreadable, root)
 			continue
 		}
 		if err := walk(root, wantAudio, ignore, &wr); err != nil {
 			slog.Warn("library folder unreadable; skipping", "library", lib.Name, "path", root, "err", err)
+			st.Unreadable = append(st.Unreadable, root)
 			continue
 		}
 		liveRoots = append(liveRoots, root)
@@ -165,9 +166,6 @@ func (s *Scanner) Scan(ctx context.Context, lib library.Library, ignore []string
 	// 3. Probe changed/new files in parallel; write results from this goroutine.
 	w := &writer{db: s.DB, lib: lib, dirs: wr.Dirs, existing: existing, missing: missing, keyCache: map[string]int64{},
 		now: s.now(), liveRoots: liveRoots}
-	if s.RemoveMissingAfter != nil {
-		w.removeAfterDays = s.RemoveMissingAfter()
-	}
 	defer w.rollback()
 	if len(restore) > 0 {
 		if err := w.begin(ctx); err != nil {
@@ -273,8 +271,9 @@ func (s *Scanner) Scan(ctx context.Context, lib library.Library, ignore []string
 		return st, err
 	}
 
-	// 4. Whatever is still missing goes unavailable (not deleted: see LIB-9) until it has
-	// been missing longer than RemoveMissingAfter.
+	// 4. Whatever is still missing is gone: removed now, with its title when nothing else
+	// is left of it. (Folders that couldn't be read aren't scanned, so nothing in them counts
+	// as missing.)
 	report(Progress{Phase: "cleanup", Done: len(work), Total: len(work)})
 	for _, e := range w.missing {
 		if e.Available {
