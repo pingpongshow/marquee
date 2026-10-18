@@ -175,17 +175,17 @@ Look up your provider's "SMTP settings" page and copy them across. Most use port
 
 Many providers only accept a **From address** that belongs to the account you sign in with.
 
-### Alerts
+### Email alerts
 
-Alerts tell administrators when something goes wrong. They appear under the bell in the top bar for administrators, are emailed to the recipients below when email is set up, and go to any webhook subscribed to **Alerts**. The same alert is sent at most once an hour.
+Alerts tell administrators when something goes wrong. **Every alert appears under the bell** in the top bar for administrators, and goes to any webhook subscribed to **Alerts**. The switches here choose which alerts are **also emailed** to the recipients below, once email is set up. The same alert is raised at most once an hour.
 
-Two alerts are on by default (VOD download failed and Large files conversion failed). The rest are off until you turn them on.
+Three are emailed by default (VOD download failed, Large files conversion failed and Library folder can't be read).
 
-| Setting | Default | What it does |
+| Emailed | Default | What it's about |
 |---|---|---|
 | A scheduled task failed | Off | Any scheduled task, including the nightly database backup. |
 | Disk space is low | Off | The config, transcode or recordings folder, or a library folder. Checked every 15 minutes. |
-| Low disk space threshold | 10 % | Shown when the alert above is on. Alert when a volume has less free space than this (1–50 %). |
+| Low disk space threshold | 10 % | Alert when a volume has less free space than this (1–50 %). |
 | A recording failed | Off | Live TV DVR recordings. |
 | A Live TV or movie source couldn't be loaded | Off | Checked whenever the channel and film lists refresh. |
 | A connected service isn't answering | Off | Seerr, Bazarr, Ollama (AI) and Soundprint, if set up. Reported after two checks in a row fail. |
@@ -197,8 +197,9 @@ Two alerts are on by default (VOD download failed and Large files conversion fai
 | Someone is over their recording quota | Off | A recording wasn't made, or their oldest watched recordings went to the media trash to make room. |
 | Plex sync is failing | Off | Plex rejects the token, or hasn't been reachable for three sync runs in a row. |
 | Large files conversion failed | **On** | A conversion in Library Health → Large files failed (not one skipped for saving too little). The original is unchanged. |
+| Library folder can't be read | **On** | A scan couldn't read one of a library's folders (a drive that's offline, permissions). Its titles are kept until it can be read again; another notice says when it can. |
 
-**Recommended:** also turn on *A scheduled task failed* (so you hear if backups stop), *Disk space is low* and *Repeated failed sign-ins* if the server is reachable from outside your home.
+**Recommended:** also email *A scheduled task failed* (so you hear if backups stop), *Disk space is low* and *Repeated failed sign-ins* if the server is reachable from outside your home.
 
 ### Alert email recipients
 

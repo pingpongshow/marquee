@@ -39,8 +39,8 @@ type Notification struct {
 	Read                          bool
 }
 
-// Alerts raises alerts: it stores them for the bell, mails the chosen administrators and
-// tells webhooks subscribed to "alert". Alert types that are off are dropped.
+// Alerts raises alerts: every alert goes to the bell and to webhooks subscribed to "alert";
+// the alert types chosen in Settings → Notifications are also mailed to the administrators.
 type Alerts struct {
 	DB       *sql.DB
 	Settings *settings.Store
@@ -61,16 +61,14 @@ func (a *Alerts) now() time.Time {
 	return time.Now()
 }
 
-// Raise records and delivers an alert, reporting whether it was raised (false when its type
-// is off or the same alert was raised within DedupWindow).
+// Raise records and delivers an alert, reporting whether it was raised (false when the
+// same alert was raised within DedupWindow). It always reaches the bell; it's mailed when
+// its type is chosen for email.
 func (a *Alerts) Raise(ctx context.Context, al Alert) bool {
 	if a == nil || a.Settings == nil {
 		return false
 	}
 	cfg := a.Settings.Get()
-	if !cfg.Notifications.AlertOn(al.Type) {
-		return false
-	}
 	key := al.Type + "\x00" + al.Subject + "\x00" + fmt.Sprint(al.Resolved)
 	now := a.now()
 	a.mu.Lock()
@@ -97,7 +95,7 @@ func (a *Alerts) Raise(ctx context.Context, al Alert) bool {
 	slog.Info("alert", "type", al.Type, "subject", al.Subject, "title", al.Title)
 	a.Webhooks.Publish(webhooks.Event{Event: webhooks.AlertRaised, Alert: &webhooks.Alert{
 		Type: al.Type, Subject: al.Subject, Title: al.Title, Message: al.Message, Resolved: al.Resolved}})
-	if a.Mail.Configured() {
+	if a.Mail.Configured() && cfg.Notifications.AlertOn(al.Type) {
 		deliver := func() {
 			to, err := a.Recipients(ctx)
 			if err != nil || len(to) == 0 {
@@ -270,12 +268,11 @@ func (w *Watcher) Run(ctx context.Context) {
 func (w *Watcher) Check(ctx context.Context) {
 	w.Alerts.Prune(ctx)
 	n := w.Alerts.Settings.Get().Notifications
-	if n.AlertOn(settings.AlertDiskLow) && w.Volumes != nil {
+	// Every alert reaches the bell, so the checks always run (email follows the settings).
+	if w.Volumes != nil {
 		w.checkDisks(ctx, w.Volumes(ctx), float64(n.DiskThresholdPercent))
 	}
-	if n.AlertOn(settings.AlertIntegrationDown) {
-		w.checkProbes(ctx)
-	}
+	w.checkProbes(ctx)
 }
 
 func (w *Watcher) checkDisks(ctx context.Context, vols []Volume, threshold float64) {

@@ -22,7 +22,7 @@ export const alertTypes: { id: AlertType; label: string; help: string }[] = [
   { id: "failed_signins", label: "Repeated failed sign-ins", help: "Five wrong passwords for one account within 15 minutes." },
   { id: "new_admin_device", label: "An administrator signed in from a new device", help: "A browser or app that account hasn't used before." },
   { id: "playback_failed", label: "Playback failed", help: "The transcoder couldn't produce video for a stream." },
-  { id: "vod_save_failed", label: "VOD download failed", help: "Saving a movie or episode on demand into the library failed after its retries; see Settings → VOD → Downloads. On by default." },
+  { id: "vod_save_failed", label: "VOD download failed", help: "Saving a movie or episode on demand into the library failed after its retries; see Settings → VOD → Downloads. Emailed by default." },
   { id: "vod_save_done", label: "Saving to the library finished", help: "One summary when the save queue empties, not one per episode." },
 ];
 
@@ -119,7 +119,10 @@ export function NotificationsSettings() {
           <TestEmail disabled={s.dirty} configured={!!d.mailConfigured} />
         </Card>
 
-        <Card title="Alerts" description="VOD download and Large files conversion failures are on by default; the others are off until you turn them on. Alerts appear under the bell in the top bar for administrators, are mailed to the recipients below when email is set up, and go to webhooks subscribed to “Alerts”. The same alert is sent at most once an hour.">
+        <Card
+          title="Email alerts"
+          description="Every alert appears under the bell in the top bar for administrators, and goes to webhooks subscribed to “Alerts”. Choose which are also emailed to the recipients below (when email is set up); VOD download failures, Large files conversion failures and unreadable library folders are chosen by default. The same alert is raised at most once an hour."
+        >
           <div className="space-y-3">
             {alertTypes.map((a) => (
               <Toggle key={a.id} label={a.label} help={a.help} checked={alerts.includes(a.id)} onChange={(v) => toggleAlert(a.id, v)} />
@@ -138,27 +141,25 @@ export function NotificationsSettings() {
             />
             <Toggle
               label="Large files conversion failed"
-              help="A conversion in Library Health → Large files failed (not one skipped for saving too little); the original is unchanged. On by default."
+              help="A conversion in Library Health → Large files failed (not one skipped for saving too little); the original is unchanged. Emailed by default."
               checked={!!d.optimizeFailedAlert}
               onChange={(v) => update({ optimizeFailedAlert: v })}
             />
             <Toggle
               label="Library folder can't be read"
-              help="A scan couldn't read one of a library's folders (a drive that's offline, permissions). Its titles are kept until it can be read again; another notice says when it can. On by default."
+              help="A scan couldn't read one of a library's folders (a drive that's offline, permissions). Its titles are kept until it can be read again; another notice says when it can. Emailed by default."
               checked={!!d.libraryUnreadableAlert}
               onChange={(v) => update({ libraryUnreadableAlert: v })}
             />
           </div>
-          {alerts.includes("disk_low") && (
-            <Field label="Low disk space threshold" help="Alert when a volume has less free space than this.">
-              {(id) => (
-                <div className="relative w-32">
-                  <Input id={id} type="number" min={1} max={50} value={d.diskThresholdPercent ?? 10} onChange={(e) => update({ diskThresholdPercent: Number(e.target.value) })} className="pr-8" />
-                  <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-faint">%</span>
-                </div>
-              )}
-            </Field>
-          )}
+          <Field label="Low disk space threshold" help="Alert when a volume has less free space than this.">
+            {(id) => (
+              <div className="relative w-32">
+                <Input id={id} type="number" min={1} max={50} value={d.diskThresholdPercent ?? 10} onChange={(e) => update({ diskThresholdPercent: Number(e.target.value) })} className="pr-8" />
+                <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-faint">%</span>
+              </div>
+            )}
+          </Field>
         </Card>
 
         <Recipients draft={d} update={update} />

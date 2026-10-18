@@ -148,7 +148,8 @@ const (
 	VODSaveTranscode = "transcode"
 )
 
-// Alert types an administrator can turn on (off by default, except DefaultAlerts).
+// Alert types. Every alert appears in the bell; an administrator chooses which are also
+// emailed (none by default, except DefaultAlerts).
 const (
 	AlertTaskFailed      = "task_failed"
 	AlertDiskLow         = "disk_low"
@@ -201,7 +202,7 @@ type Notifications struct {
 	FromName     string `json:"fromName"`
 	// LinkURL is the address used in links in mail (reset links); empty = the remote URL.
 	LinkURL string `json:"linkUrl"`
-	// Alerts are the alert types that are on.
+	// Alerts are the alert types that are emailed (every alert appears in the bell).
 	Alerts []string `json:"alerts"`
 	// RecipientsAllAdmins mails every administrator with an email address; otherwise
 	// Recipients lists the administrators (user ids) who get alert mail.

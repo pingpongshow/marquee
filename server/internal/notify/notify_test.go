@@ -119,7 +119,9 @@ func countNotifications(t *testing.T, database *sql.DB) int {
 	return n
 }
 
-func TestAlertsTypeOffDedupAndMail(t *testing.T) {
+// Every alert reaches the bell; the types chosen for email are also mailed. Duplicates within
+// the hour are dropped.
+func TestAlertsBellEmailDedup(t *testing.T) {
 	database, store := openStore(t)
 	srv := fakesmtp.Start(t)
 	useSMTP(t, store, srv, nil)
@@ -132,9 +134,9 @@ func TestAlertsTypeOffDedupAndMail(t *testing.T) {
 	ctx := context.Background()
 	al := Alert{Type: settings.AlertTaskFailed, Subject: "backup", Title: "Task failed: Backup", Message: "disk full"}
 
-	// Off by default: nothing is stored or sent.
-	if a.Raise(ctx, al) || countNotifications(t, database) != 0 || len(srv.Received()) != 0 {
-		t.Fatal("an alert that is off was raised")
+	// Not chosen for email (the default): it reaches the bell, but no mail goes out.
+	if !a.Raise(ctx, Alert{Type: settings.AlertTaskFailed, Subject: "scan", Title: "Task failed: Scan"}) || countNotifications(t, database) != 1 || len(srv.Received()) != 0 {
+		t.Fatal("an alert not chosen for email should reach the bell only")
 	}
 	store.Update(ctx, func(s *settings.Settings) error {
 		s.Notifications.Alerts = []string{settings.AlertTaskFailed}
@@ -162,7 +164,7 @@ func TestAlertsTypeOffDedupAndMail(t *testing.T) {
 	if !a.Raise(ctx, al) {
 		t.Fatal("not raised again after an hour")
 	}
-	if n := countNotifications(t, database); n != 3 {
+	if n := countNotifications(t, database); n != 4 {
 		t.Fatalf("stored %d", n)
 	}
 	// Only the chosen admins get mail.
@@ -176,13 +178,13 @@ func TestAlertsTypeOffDedupAndMail(t *testing.T) {
 
 	// The list: unread count, mark read, mark all, dismiss, prune.
 	list, unread, err := a.List(ctx, 10)
-	if err != nil || len(list) != 3 || unread != 3 || list[0].Subject != "backup" {
+	if err != nil || len(list) != 4 || unread != 4 || list[0].Subject != "backup" {
 		t.Fatalf("list: %v %d %+v", err, unread, list)
 	}
 	if err := a.MarkRead(ctx, list[0].ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, unread, _ = a.List(ctx, 10); unread != 2 {
+	if _, unread, _ = a.List(ctx, 10); unread != 3 {
 		t.Fatalf("unread after one read: %d", unread)
 	}
 	if err := a.Dismiss(ctx, list[1].ID); err != nil {
