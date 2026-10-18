@@ -318,6 +318,19 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     }
     return graph.current;
   }, []);
+  // A running Web Audio context keeps the computer's audio output in its low-latency mode
+  // even when it's silent, and other sound on the page (a video started after some music)
+  // can then underrun and pop. Suspend it a few seconds after music stops; playing again
+  // resumes it (onPlay → resumeCtx).
+  useEffect(() => {
+    if (playing) return;
+    const t = window.setTimeout(() => {
+      const g = graph.current;
+      const busy = audios.current.some((a) => a && !a.paused);
+      if (g && g.ctx.state === "running" && !busy) g.ctx.suspend().catch(() => {});
+    }, 3000);
+    return () => window.clearTimeout(t);
+  }, [playing]);
   const levellingRef = useRef(levelling);
   const volumeRef = useRef(volume);
   useEffect(() => {
