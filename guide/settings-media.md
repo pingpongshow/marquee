@@ -492,7 +492,7 @@ Say you want 1080p films to end up around 5 GB, without touching ones that are a
 
 What you get: 2.5 GB per hour is about 5.4 Mb/s for the whole file. A 5.1 AAC track takes about 0.4 Mb/s, so the picture gets up to about 5 Mb/s, which is typical for 1080p HEVC at Balanced quality anyway. A 2-hour film comes out at no more than 5 GB, a 90-minute one at no more than about 3.75 GB, and an easy-to-compress film comes out smaller still. Each extra audio language takes another 0.4 Mb/s from the picture.
 
-Files that wouldn't shrink by at least the smallest saving (20 % by default) are skipped and left alone. Later, if you want them smaller still, filter **Optimized before** to *Already optimized (re-optimize)* and queue them with a smaller preset, or use **Re-optimize** in History.
+Files that wouldn't shrink by at least the smallest saving (20 % by default) are skipped and left alone. They stay in the Files list under *Not optimized or queued yet* (marked Skipped), so you can queue them again with a smaller preset. Files that were optimized and that you want smaller still: filter **Optimized before** to *Already optimized (re-optimize)*, or use **Re-optimize** in History.
 
 ---
 
