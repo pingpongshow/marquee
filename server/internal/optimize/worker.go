@@ -356,7 +356,8 @@ func (s *Service) encode(ctx context.Context, j *job, src Source, plan Plan, out
 		return fmt.Errorf("this server has no %s encoder", strings.ToUpper(plan.Codec))
 	}
 	var err error
-	for _, enc := range encs {
+	for i := 0; i < len(encs); i++ {
+		enc := encs[i]
 		s.mu.Lock()
 		j.encoder, j.prog = enc, encode.Progress{}
 		s.mu.Unlock()
@@ -374,8 +375,18 @@ func (s *Service) encode(ctx context.Context, j *job, src Source, plan Plan, out
 		if err == nil || ctx.Err() != nil {
 			return err
 		}
-		slog.Info("optimize: encoder failed; trying the next", "encoder", enc, "path", src.Path, "err", err)
 		os.Remove(out)
+		// The all-GPU route can fail on a file the GPU otherwise handles, e.g. when the
+		// decoder hands back a frame it decoded on the CPU, which scale_cuda can't take
+		// ("Function not implemented"). Try NVENC again with the filters on the CPU before
+		// giving the job to a slower encoder.
+		if plan.FullGPU(src, enc) {
+			slog.Info("optimize: all-GPU conversion failed; trying NVENC with the filters on the CPU", "path", src.Path, "err", err)
+			plan.CPUFilters = true
+			i--
+			continue
+		}
+		slog.Info("optimize: encoder failed; trying the next", "encoder", enc, "path", src.Path, "err", err)
 	}
 	return err
 }

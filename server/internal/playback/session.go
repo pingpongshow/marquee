@@ -168,6 +168,8 @@ func (s *Session) BitrateKbps() int {
 }
 
 type Manager struct {
+	subMu        sync.Mutex
+	subJobs      map[string]*subtitleJob // subtitle conversions in progress, by output file
 	DB           *sql.DB
 	Settings     *settings.Store
 	FFmpeg       string

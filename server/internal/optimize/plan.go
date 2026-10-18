@@ -93,6 +93,9 @@ type Plan struct {
 	Attachments  bool
 	Preset       settings.OptimizePreset
 	SourceVideoW int
+	// CPUFilters keeps the resize and colour conversion on the CPU (decoding and encoding
+	// still on the GPU): the fallback when the all-GPU route fails on a file.
+	CPUFilters bool
 }
 
 // boxes are the frame each resolution cap fits the picture in (so a letterboxed 3840×1600
@@ -228,7 +231,7 @@ var nvdecCodecs = map[string]bool{"h264": true, "hevc": true, "av1": true, "vp9"
 // colour conversion (scale_cuda) and encode, with no frames copied back to the CPU. Tone
 // mapping runs on the CPU, so it needs the other path; so do sources NVDEC can't decode.
 func (pl Plan) FullGPU(src Source, encoder string) bool {
-	if encoder != "nvenc" || pl.ToneMap || !nvdecCodecs[src.VideoCodec] {
+	if encoder != "nvenc" || pl.ToneMap || pl.CPUFilters || !nvdecCodecs[src.VideoCodec] {
 		return false
 	}
 	switch src.PixFmt {

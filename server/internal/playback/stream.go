@@ -322,28 +322,30 @@ func (m *Manager) serveSubtitle(w http.ResponseWriter, r *http.Request, s *Sessi
 	// Convert again when the source changed since: stream ids are reused (a downloaded
 	// subtitle removed and another added, a file rescanned), and files get replaced.
 	if cached, err := os.Stat(out); err != nil || newerThan(src, cached.ModTime()) {
-		os.MkdirAll(cacheDir, 0o755)
-		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
-		defer cancel()
 		args := []string{"-hide_banner", "-v", "error", "-y"}
 		if external != "" {
 			args = append(args, "-i", external, "-map", "0:s:0")
 		} else {
 			args = append(args, "-i", s.Path, "-map", fmt.Sprintf("0:%d", index))
 		}
-		tmp := out + "." + newID()[:8] + ".tmp" // unique: players fetch the same track at once
+		codec := "webvtt"
 		if format == "ass" {
-			args = append(args, "-c:s", "ass", "-f", "ass", tmp)
-		} else {
-			args = append(args, "-c:s", "webvtt", "-f", "webvtt", tmp)
+			codec = "ass"
 		}
-		if msg, err := exec.CommandContext(ctx, m.FFmpeg, args...).CombinedOutput(); err != nil {
-			os.Remove(tmp)
-			slog.Warn("subtitle conversion failed", "file", s.Path, "stream", streamID, "err", err, "ffmpeg", strings.TrimSpace(string(msg)))
-			http.Error(w, "subtitle conversion failed", http.StatusUnprocessableEntity)
+		args = append(args, "-c:s", codec, "-f", codec)
+		done := m.convertSubtitle(out, cacheDir, args)
+		select {
+		case err := <-done:
+			if err != nil {
+				slog.Warn("subtitle conversion failed", "file", s.Path, "stream", streamID, "err", err)
+				http.Error(w, "subtitle conversion failed", http.StatusUnprocessableEntity)
+				return
+			}
+		case <-r.Context().Done():
+			// The player gave up waiting; the conversion carries on, so its next request
+			// (or the next viewer's) finds the track ready.
 			return
 		}
-		os.Rename(tmp, out)
 	}
 	if format == "ass" {
 		w.Header().Set("Content-Type", "text/x-ssa; charset=utf-8")
@@ -542,4 +544,51 @@ func (m *Manager) serveIFrames(w http.ResponseWriter, r *http.Request, s *Sessio
 	}
 	w.Header().Set("Content-Type", "video/mp4")
 	http.ServeContent(w, r, "iframes.mp4", st.ModTime(), f)
+}
+
+// subtitleJob is a subtitle conversion in progress: everyone asking for the same track waits
+// on it.
+type subtitleJob struct {
+	done chan struct{}
+	err  error
+}
+
+// convertSubtitle converts a subtitle track to out (args are FFmpeg's, without the output
+// file) once, however many requests ask for it at the same time, and independently of
+// them: reading a subtitle track means reading the whole file, which for a big film takes
+// longer than a player waits, and a conversion tied to the request was killed with it and
+// never finished. The channel gets the result.
+func (m *Manager) convertSubtitle(out, cacheDir string, args []string) <-chan error {
+	m.subMu.Lock()
+	if m.subJobs == nil {
+		m.subJobs = map[string]*subtitleJob{}
+	}
+	j := m.subJobs[out]
+	if j == nil {
+		j = &subtitleJob{done: make(chan struct{})}
+		m.subJobs[out] = j
+		go func() {
+			os.MkdirAll(cacheDir, 0o755)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+			tmp := out + "." + newID()[:8] + ".tmp"
+			if msg, err := exec.CommandContext(ctx, m.FFmpeg, append(args, tmp)...).CombinedOutput(); err != nil {
+				os.Remove(tmp)
+				j.err = fmt.Errorf("%w: %s", err, strings.TrimSpace(string(msg)))
+			} else {
+				j.err = os.Rename(tmp, out)
+			}
+			m.subMu.Lock()
+			delete(m.subJobs, out)
+			m.subMu.Unlock()
+			close(j.done)
+		}()
+	}
+	m.subMu.Unlock()
+	res := make(chan error, 1)
+	go func() {
+		<-j.done
+		res <- j.err
+	}()
+	return res
 }
