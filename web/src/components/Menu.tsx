@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 
 /** A dropdown menu anchored to its trigger button. Items close the menu when clicked. */
 export function Menu({
@@ -30,6 +31,9 @@ export function Menu({
   /** Position the list against the viewport, so a scrolling row (overflow) can't clip it. */
   floating?: boolean;
 }) {
+  // A floating list is drawn at the top of the page, so neighbouring tiles (raised by their
+  // hover zoom, for one) can't paint over it.
+  const portal = (el: ReactNode) => (floating ? createPortal(el, document.body) : el);
   const [own, setOwn] = useState(false);
   const open = controlled ?? own;
   const changeRef = useRef(onOpenChange);
@@ -80,7 +84,9 @@ export function Menu({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) =>
-      !ref.current?.contains(e.target as Node) && setOpen(false);
+      !ref.current?.contains(e.target as Node) &&
+      !menu.current?.contains(e.target as Node) &&
+      setOpen(false);
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     // A floating list would drift from its trigger when the page or row scrolls.
     const onMove = () => floating && setOpen(false);
@@ -111,7 +117,8 @@ export function Menu({
       >
         {trigger}
       </button>
-      {open && (
+      {open &&
+        portal(
         <div
           role="menu"
           ref={menu}
@@ -133,8 +140,8 @@ export function Menu({
           }}
         >
           {children}
-        </div>
-      )}
+        </div>,
+        )}
     </div>
   );
 }
