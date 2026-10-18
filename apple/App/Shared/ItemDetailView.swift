@@ -401,7 +401,8 @@ struct ItemDetailView: View {
             PlayOnButton(target: { PlayOnTarget(itemIDs: [d.id]) }).buttonStyle(.bordered)
         }
         #endif
-        // Watchlist, Watched and the heart are buttons above (always current), so the menu leaves them out.
+        // Watchlist, Watched and the heart are buttons above (always current), so the menu leaves them
+        // out, except the other watched mark (Mark Unwatched for something part-way through).
         Menu {
             ItemMenuItems(item: d.base, showsLibraryState: false)
             #if os(iOS)

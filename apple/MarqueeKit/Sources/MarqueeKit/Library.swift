@@ -197,6 +197,22 @@ public extension Components.Schemas.ItemSummary {
         default: (viewCount ?? 0) > 0
         }
     }
+    /// Watched with nothing left to finish: a played video not part-way through a rewatch, or a
+    /// show or season with every episode played. Mark Watched is offered when this is false.
+    var isFullyWatched: Bool {
+        switch _type {
+        case .show, .season: watched
+        default: watched && (viewOffsetMs ?? 0) == 0
+        }
+    }
+    /// Whether there's anything to mark unwatched: a video played or part-way through (as in
+    /// Continue Watching), or a show or season with an episode played.
+    var hasWatchState: Bool {
+        switch _type {
+        case .show, .season: (watchedLeafCount ?? 0) > 0
+        default: (viewCount ?? 0) > 0 || (viewOffsetMs ?? 0) > 0
+        }
+    }
     var unwatchedCount: Int {
         (_type == .show || _type == .season) ? max(0, leafCount - (watchedLeafCount ?? 0)) : 0
     }

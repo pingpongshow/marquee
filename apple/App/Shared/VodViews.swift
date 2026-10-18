@@ -106,13 +106,17 @@ struct VodBrowseView: View {
                 if shows, !resumeShows.isEmpty {
                     ShelfRow(title: "Continue Watching") {
                         ForEach(resumeShows, id: \.id) { s in
-                            VodSeriesTile(series: s, width: tileWidth, onRemove: s.next.map { e in { removeShow(s, episodeId: e.id) } })
+                            VodSeriesTile(series: s, width: tileWidth, onRemove: s.next.map { e in { removeShow(s, episodeId: e.id) } },
+                                          onMark: s.next.map { e in { try await markShow(episodeId: e.id, $0) } })
                         }
                     }
                     .accessibilityIdentifier("vod.continue")
                 } else if !shows, !resume.isEmpty {
                     ShelfRow(title: "Continue Watching") {
-                        ForEach(resume, id: \.id) { m in VodTile(movie: m, width: tileWidth, onRemove: { removeMovie(m) }) }
+                        ForEach(resume, id: \.id) { m in
+                            VodTile(movie: m, width: tileWidth, onRemove: { removeMovie(m) },
+                                    onMark: { try await markMovie(m, $0) })
+                        }
                     }
                     .accessibilityIdentifier("vod.continue")
                 }
@@ -384,6 +388,26 @@ struct VodBrowseView: View {
         }
     }
 
+    /// A film in Continue Watching marked watched or unwatched: its grid tile shows it at once
+    /// (tick, no resume bar), then this row and Home's come from the server again (it's left them).
+    private func markMovie(_ m: VodMovie, _ watched: Bool) async throws {
+        try await app.setVodWatched(m.id, watched)
+        if let i = movies.firstIndex(where: { $0.id == m.id }) {
+            movies[i].watched = watched
+            movies[i].positionMs = nil
+        }
+        HomeChanges.shared.version += 1
+        await reloadResume()
+    }
+
+    /// A show's next episode in Continue Watching marked watched or unwatched, as for a film
+    /// (the show's own counts come with the grid's next load).
+    private func markShow(episodeId: Int64, _ watched: Bool) async throws {
+        try await app.setVodEpisodeWatched(episodeId, watched)
+        HomeChanges.shared.version += 1
+        await reloadResume()
+    }
+
     /// Takes a film off Continue Watching: gone from the row at once, back if the server says no;
     /// then this row and Home's come from the server again.
     private func removeMovie(_ m: VodMovie) {
@@ -441,6 +465,8 @@ struct VodTile: View {
     var width: CGFloat = 130
     /// Takes it off Continue Watching (its context menu, in the Continue Watching row).
     var onRemove: (() -> Void)?
+    /// Marks it watched or unwatched (its context menu, in the Continue Watching row).
+    var onMark: (@MainActor (Bool) async throws -> Void)?
 
     var body: some View {
         #if os(tvOS)
@@ -450,7 +476,7 @@ struct VodTile: View {
                 .accessibilityLabel(movie.title)
                 .accessibilityValue(movie.inLibrary == true ? VodInLibraryBadge.text : "")
                 .accessibilityIdentifier("vod.tile")
-                .modifier(RemoveFromContinueMenu(action: onRemove))
+                .modifier(RemoveFromContinueMenu(action: onRemove, mark: onMark))
             titles
         }
         .frame(width: width)
@@ -468,7 +494,7 @@ struct VodTile: View {
         .accessibilityValue(movie.inLibrary == true ? VodInLibraryBadge.text : "")
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("vod.tile")
-        .modifier(RemoveFromContinueMenu(action: onRemove))
+        .modifier(RemoveFromContinueMenu(action: onRemove, mark: onMark))
         #endif
     }
 
@@ -691,6 +717,12 @@ struct VodMovieView: View {
             }
             .buttonStyle(.bordered)
             .accessibilityIdentifier("vod.watched")
+            if resume && !isWatched {
+                // Part-way through: forget the resume point (it leaves Continue Watching).
+                Button { toggleWatched(m, now: false) } label: { Label("Mark unwatched", systemImage: "circle") }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("vod.unwatched")
+            }
         }
         #if os(iOS)
         .fixedSize(horizontal: false, vertical: true)
@@ -724,6 +756,7 @@ struct VodMovieView: View {
         Task {
             do {
                 try await app.setVodWatched(m.id, now)
+                HomeChanges.shared.version += 1 // Continue Watching changes either way
                 await load()
             } catch {
                 self.error = error.localizedDescription

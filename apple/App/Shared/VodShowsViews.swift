@@ -12,6 +12,9 @@ struct VodSeriesTile: View {
     var width: CGFloat = 130
     /// Takes the show off Continue Watching (its context menu, in the Continue Watching row).
     var onRemove: (() -> Void)?
+    /// Marks its next episode (the one part-way through) watched or unwatched (its context
+    /// menu, in the Continue Watching row).
+    var onMark: (@MainActor (Bool) async throws -> Void)?
 
     var body: some View {
         #if os(tvOS)
@@ -21,7 +24,7 @@ struct VodSeriesTile: View {
                 .accessibilityLabel(series.title)
                 .accessibilityValue(series.inLibrary == true ? VodInLibraryBadge.text : "")
                 .accessibilityIdentifier("vod.showTile")
-                .modifier(RemoveFromContinueMenu(action: onRemove))
+                .modifier(RemoveFromContinueMenu(action: onRemove, mark: onMark))
             titles
         }
         .frame(width: width)
@@ -39,7 +42,7 @@ struct VodSeriesTile: View {
         .accessibilityValue(series.inLibrary == true ? VodInLibraryBadge.text : "")
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("vod.showTile")
-        .modifier(RemoveFromContinueMenu(action: onRemove))
+        .modifier(RemoveFromContinueMenu(action: onRemove, mark: onMark))
         #endif
     }
 
@@ -321,6 +324,7 @@ struct VodSeriesView: View {
             .buttonStyle(.card)
             .accessibilityLabel("\(e.label) \(e.title)")
             .accessibilityIdentifier("vod.episode")
+            .contextMenu { episodeMarks(e, watched: watched) }
             toggle
         }
         #else
@@ -338,10 +342,23 @@ struct VodSeriesView: View {
                 if (e.positionMs ?? 0) > 0 {
                     Button("Play from Start", systemImage: "arrow.counterclockwise") { playing = VodPlayTarget(episode: e, startMs: 0) }
                 }
+                episodeMarks(e, watched: watched)
             }
             toggle.buttonStyle(.plain)
         }
         #endif
+    }
+
+    /// An episode's Mark Watched (unless watched with nothing part-way through) and Mark
+    /// Unwatched (when watched or part-way through) for its menu: both when it's in progress.
+    @ViewBuilder private func episodeMarks(_ e: VodEpisode, watched: Bool) -> some View {
+        let started = pending[e.id] == nil && (e.positionMs ?? 0) > 0
+        if !watched || started {
+            Button("Mark Watched", systemImage: "checkmark.circle") { setWatched(key: e.id, now: true) { try await app.setVodEpisodeWatched(e.id, true) } }
+        }
+        if watched || started {
+            Button("Mark Unwatched", systemImage: "circle") { setWatched(key: e.id, now: false) { try await app.setVodEpisodeWatched(e.id, false) } }
+        }
     }
 
     private func pick(_ s: Int) {
@@ -355,6 +372,7 @@ struct VodSeriesView: View {
         Task {
             do {
                 try await save()
+                HomeChanges.shared.version += 1 // Continue Watching changes either way
                 await load()
             } catch {
                 ActionError.shared.message = error.localizedDescription

@@ -52,6 +52,12 @@ struct VodContinueCard: View {
         .accessibilityLabel("\(entry.title), \(entry.vodSubtitle)")
         .accessibilityIdentifier("continue.\(entry.key)")
         .contextMenu {
+            // Part-way through: watched or unwatched (the resume point forgotten), either way
+            // it leaves Continue Watching (Home and the Continue Watching page reload).
+            VodMarkWatchedButtons { watched in
+                try await app.setVodWatched(entry, watched)
+                HomeChanges.shared.version += 1
+            }
             if let onRemove { RemoveFromContinueButton(action: onRemove) }
             if let m = entry.vodMovie {
                 NavigationLink(value: Route.vodMovie(m.id)) { Label("Go to Film", systemImage: "film") }
@@ -59,6 +65,17 @@ struct VodContinueCard: View {
                 NavigationLink(value: Route.vodSeries(e.seriesId)) { Label("Go to Show", systemImage: "tv") }
             }
         }
+    }
+}
+
+/// Mark Watched and Mark Unwatched for a film or episode on demand part-way through (Continue
+/// Watching's menus): `save` marks it on the server; a failure shows as an alert.
+struct VodMarkWatchedButtons: View {
+    let save: @MainActor (Bool) async throws -> Void
+
+    var body: some View {
+        Button { ActionError.run { try await save(true) } } label: { Label("Mark Watched", systemImage: "checkmark.circle") }
+        Button { ActionError.run { try await save(false) } } label: { Label("Mark Unwatched", systemImage: "circle") }
     }
 }
 
@@ -169,6 +186,8 @@ struct ContinueWatchingView: View {
         .task { if total == nil { await reload() } }
         // Back from a library title's player, or an on demand one's: where they are changed.
         .onChange(of: video.request) { if video.request == nil { Task { await reload() } } }
+        // Marked watched or unwatched (or removed) from a tile's menu: it's left the list.
+        .onChange(of: HomeChanges.shared.version) { Task { await reload() } }
         .modifier(VodContinuePlayback(target: $playing, onDismiss: { Task { await reload() } }))
     }
 

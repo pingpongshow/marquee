@@ -27,7 +27,8 @@ struct ItemMenuItems: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
     let item: Item
-    /// Watchlist, Watched and favourite entries; off where the page shows its own live buttons for them.
+    /// Watchlist and favourite entries; off where the page shows its own live buttons for them
+    /// (Watched then keeps only the mark the page's button doesn't make).
     var showsLibraryState = true
 
     var body: some View {
@@ -64,11 +65,21 @@ struct ItemMenuItems: View {
                 Label(listed ? "Remove from Watchlist" : "Add to Watchlist", systemImage: listed ? "bookmark.slash" : "bookmark")
             }
         }
-        if showsLibraryState, item.isPlayableVideo || item._type == .show || item._type == .season {
-            // This session's marks count (the tile's own data may be older).
-            let watched = WatchStore.shared.watched(item)
-            Button { WatchStore.shared.mark(item, watched: !watched, app: app) } label: {
-                Label(watched ? "Mark Unwatched" : "Mark Watched", systemImage: watched ? "circle" : "checkmark.circle")
+        if item.isPlayableVideo || item._type == .show || item._type == .season {
+            // This session's marks count (the tile's own data may be older). Something part-way
+            // through (Continue Watching) offers both. A page with its own Watched button leaves
+            // out the one that button does.
+            let store = WatchStore.shared
+            let pageButtonWatches: Bool? = showsLibraryState ? nil : !store.watched(item)
+            if !store.fullyWatched(item), pageButtonWatches != true {
+                Button { store.mark(item, watched: true, app: app) } label: {
+                    Label("Mark Watched", systemImage: "checkmark.circle")
+                }
+            }
+            if store.hasWatchState(item), pageButtonWatches != false {
+                Button { store.mark(item, watched: false, app: app) } label: {
+                    Label("Mark Unwatched", systemImage: "circle")
+                }
             }
         }
     }

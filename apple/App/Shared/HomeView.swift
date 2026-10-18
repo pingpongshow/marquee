@@ -292,13 +292,18 @@ struct ContinueCard: View {
     }
 }
 
-/// A context menu with just "Remove from Continue Watching" when there's an action (the VOD
-/// pages' Continue Watching rows, LIVE-6); nothing otherwise.
+/// The VOD pages' Continue Watching rows' context menu (LIVE-6): Mark Watched and Mark
+/// Unwatched when `mark` is given, and "Remove from Continue Watching" when there's an action;
+/// no menu outside the row.
 struct RemoveFromContinueMenu: ViewModifier {
     let action: (() -> Void)?
+    var mark: (@MainActor (Bool) async throws -> Void)?
     func body(content: Content) -> some View {
-        if let action {
-            content.contextMenu { RemoveFromContinueButton(action: action) }
+        if action != nil || mark != nil {
+            content.contextMenu {
+                if let mark { VodMarkWatchedButtons(save: mark) }
+                if let action { RemoveFromContinueButton(action: action) }
+            }
         } else {
             content
         }

@@ -253,6 +253,19 @@ final class WatchStore {
         return item.unwatchedCount
     }
 
+    /// Watched with nothing part-way through (Mark Watched is offered otherwise).
+    func fullyWatched(_ item: Item) -> Bool {
+        if let w = mark(item)?.watched ?? OfflineSync.shared.pendingWatched(item.id) { return w }
+        return item.isFullyWatched
+    }
+
+    /// Played or part-way through, or a show or season with an episode played (Mark Unwatched
+    /// is offered then, Continue Watching's titles included).
+    func hasWatchState(_ item: Item) -> Bool {
+        if let w = mark(item)?.watched ?? OfflineSync.shared.pendingWatched(item.id) { return w }
+        return item.hasWatchState
+    }
+
     /// The resume position's share; marking either way clears it on the server.
     func progress(_ item: Item) -> Double? { canResume(item) ? item.progress : nil }
 

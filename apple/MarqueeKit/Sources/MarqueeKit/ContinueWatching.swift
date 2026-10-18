@@ -29,6 +29,16 @@ public extension AppSession {
         }
     }
 
+    /// Marks a film or episode on demand watched or unwatched (unwatched forgets the resume
+    /// point); either way it leaves Continue Watching.
+    func setVodWatched(_ entry: ContinueEntry, _ watched: Bool) async throws {
+        if let m = entry.vodMovie {
+            try await setVodWatched(m.id, watched)
+        } else if let e = entry.vodEpisode {
+            try await setVodEpisodeWatched(e.id, watched)
+        }
+    }
+
     /// Takes a film on demand off Continue Watching (VOD Movies' row as well as Home's).
     func removeVodMovieFromContinueWatching(_ movieId: Int64) async throws {
         try await removeVod(.init(kind: .movie, vodId: movieId))
