@@ -41,7 +41,7 @@ import { Spinner } from "@/components/ui";
 import { languageName, versionLabel } from "../browse/format";
 import { ignoreShortcut } from "@/lib/keys";
 import { cueCss, placeCues, resolveSubtitleStyle } from "@/lib/subtitleStyle";
-import { deviceProfile } from "./deviceProfile";
+import { deviceProfile, prefersNativeHLS } from "./deviceProfile";
 import { SubtitleSearchDialog } from "./SubtitleSearch";
 import { remoteStateChanged, setVideoTarget, type RemoteTarget } from "../remote/bus";
 import { PlayOnButton } from "../remote/PlayOn";
@@ -487,7 +487,7 @@ export function VideoPlayer({
     hlsRef.current?.destroy();
     hlsRef.current = null;
     let removeSeek: (() => void) | undefined;
-    if (sess.protocol === "hls" && Hls.isSupported()) {
+    if (sess.protocol === "hls" && Hls.isSupported() && !prefersNativeHLS()) {
       const hls = new Hls({
         startPosition: start,
         maxBufferLength: 30,

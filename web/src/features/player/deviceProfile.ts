@@ -80,3 +80,15 @@ export function deviceProfile(): DeviceProfile {
   };
   return cached;
 }
+
+/**
+ * Safari (macOS, iPhone, iPad) plays HLS itself, with the same media engine as the Apple TV.
+ * There it's preferred over hls.js, whose path through Safari's Media Source Extensions
+ * glitches on copied audio (pops and stutters at fragment joins). Other browsers that
+ * answer canPlayType for HLS (Chrome on Android, newer desktop Chrome) keep hls.js.
+ */
+export function prefersNativeHLS(): boolean {
+  const ua = navigator.userAgent;
+  const safari = /safari/i.test(ua) && !/chrome|chromium|crios|fxios|edg|opr|android/i.test(ua);
+  return safari && document.createElement("video").canPlayType("application/vnd.apple.mpegurl") !== "";
+}
