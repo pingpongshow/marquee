@@ -16,6 +16,7 @@ import (
 	"marquee/internal/items"
 	"marquee/internal/library"
 	"marquee/internal/scanner"
+	"marquee/internal/tasks"
 	"marquee/internal/vodsave"
 )
 
@@ -37,6 +38,39 @@ func (h *Handlers) ScanLibrary(ctx context.Context, req ScanLibraryRequestObject
 	}
 	h.Scans.Queue(l.ID)
 	return ScanLibrary202JSONResponse(h.toAPILibrary(l)), nil
+}
+
+// RemoveMissingTitles removes the library's missing files (in folders that can be reached)
+// and the titles left without files.
+func (h *Handlers) RemoveMissingTitles(ctx context.Context, req RemoveMissingTitlesRequestObject) (RemoveMissingTitlesResponseObject, error) {
+	switch authed, admin := isAdmin(ctx); {
+	case !authed:
+		return RemoveMissingTitles401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !admin:
+		return RemoveMissingTitles403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	l, err := h.Libraries.Get(ctx, req.LibraryId)
+	if errors.Is(err, library.ErrNotFound) {
+		return RemoveMissingTitles404JSONResponse{NotFoundJSONResponse(apiErr("not_found", err.Error()))}, nil
+	}
+	if err != nil {
+		return nil, internal(ctx, "removeMissingTitles", err)
+	}
+	// A running scan holds its own picture of the library's files.
+	if h.Scans != nil && h.Scans.Status(l.ID).State != tasks.Idle {
+		return RemoveMissingTitles409JSONResponse{ConflictJSONResponse(apiErr("scanning", "The library is being scanned; try again when the scan has finished."))}, nil
+	}
+	n, err := scanner.RemoveMissing(ctx, h.DB, l)
+	if errors.Is(err, scanner.ErrNoReachableFolder) {
+		return RemoveMissingTitles409JSONResponse{ConflictJSONResponse(apiErr("unreachable", "None of the library's folders can be reached, so nothing was removed: the files might only be offline."))}, nil
+	}
+	if err != nil {
+		return nil, internal(ctx, "removeMissingTitles", err)
+	}
+	if n > 0 {
+		slog.Info("removed missing titles", "library", l.Name, "titles", n)
+	}
+	return RemoveMissingTitles200JSONResponse{Removed: n}, nil
 }
 
 func (h *Handlers) CancelLibraryScan(ctx context.Context, req CancelLibraryScanRequestObject) (CancelLibraryScanResponseObject, error) {

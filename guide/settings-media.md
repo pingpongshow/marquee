@@ -24,6 +24,7 @@ Everything here is under **Settings** in the web app and needs an administrator 
 - **Scan all** scans every library now.
 - The arrows button next to a library scans just that one.
 - The pencil edits it; the bin deletes it. Deleting a library removes its metadata, artwork and watch history from Marquee. Your media files are not touched.
+- When a library has titles whose files are gone, it says how many under its last scan, with **Remove missing titles**. Confirming removes them now, with their watch history, instead of waiting for **Remove missing titles after (days)** (below). Only folders that can be reached count: if every folder of the library is offline, nothing is removed.
 
 ### Adding a library
 
@@ -73,9 +74,16 @@ These apply to all libraries.
 
 | Setting | Default | What it does |
 |---|---|---|
+| Remove missing titles after (days) | `7` | How long a title whose files are gone stays greyed out before a scan removes it, with its watch history. 0 = never: missing titles stay until you use **Remove missing titles**. See [Missing files](#missing-files). |
 | Allow deleting media files | Off | Lets administrators delete media files from Library Health. Deleted files move to a `.marquee-trash` folder in their library folder and are removed for good by the nightly **Empty media trash** task. |
 
 Deleting needs write access: the video folder is mounted read-only unless you set `VIDEO_MODE=` (empty) in `.env`. See [Install](install.md).
+
+### Missing files
+
+When a scan can't find a file that used to be there, for example because you deleted it or moved a show folder from your TV library to your Anime library, the title stays in the library greyed out as unavailable. If the file comes back (or turns up in another folder of the same library), the title is available again with its watch history.
+
+After **Remove missing titles after (days)** the next scan removes the title for good, along with its watch history, and any season or show left empty. Titles are only removed from library folders that can be read and aren't empty, so a drive that's offline or not mounted (which often leaves an empty folder behind) never loses its titles.
 
 ## Metadata
 

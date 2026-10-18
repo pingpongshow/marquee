@@ -33,6 +33,11 @@ type writer struct {
 	pending  int
 	began    time.Time
 	keyCache map[string]int64 // type|scan_key → item id
+	// now is when the scan started; liveRoots are the library folders it could read.
+	now       time.Time
+	liveRoots []string
+	// removeAfterDays: files missing longer than this are removed at the end; 0 = never.
+	removeAfterDays int
 }
 
 // maxHold is how long a write transaction stays open: the database has one writer, and
@@ -78,7 +83,7 @@ func (w *writer) maybeCommit(ctx context.Context) error {
 
 func (w *writer) restore(ctx context.Context, ids []int64) error {
 	for _, id := range ids {
-		if _, err := w.tx.ExecContext(ctx, `UPDATE media_files SET available = 1 WHERE id = ?`, id); err != nil {
+		if _, err := w.tx.ExecContext(ctx, `UPDATE media_files SET available = 1, missing_since = NULL WHERE id = ?`, id); err != nil {
 			return err
 		}
 	}
@@ -151,7 +156,7 @@ func (w *writer) updateFile(ctx context.Context, id int64, c candidate, res *pro
 	v, a := res.Video(), res.Audio()
 	_, err := w.tx.ExecContext(ctx, `UPDATE media_files SET path = ?, size = ?, mtime = ?, container = ?, duration_ms = ?,
 		bitrate_kbps = ?, width = ?, height = ?, video_codec = ?, audio_codec = ?, hdr_format = ?, dv_profile = ?,
-		available = 1, probed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), probe_json = ? WHERE id = ?`,
+		available = 1, missing_since = NULL, probed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), probe_json = ? WHERE id = ?`,
 		c.Path, c.Size, c.MTime, res.Container, res.DurationMS, res.BitrateKbps,
 		vint(v, func(s *probe.Stream) int { return s.Width }), vint(v, func(s *probe.Stream) int { return s.Height }),
 		vstr(v, func(s *probe.Stream) string { return s.Codec }), vstr(a, func(s *probe.Stream) string { return s.Codec }),
@@ -237,25 +242,38 @@ func (w *writer) writeStreams(ctx context.Context, fileID int64, c candidate, re
 	return nil
 }
 
-// finish marks missing files unavailable, tidies the library (see Tidy) and commits.
-func (w *writer) finish(ctx context.Context) error {
+// finish marks missing files unavailable (noting when they went missing), removes files
+// missing for longer than removeAfterDays from the folders this scan could read, tidies
+// the library (see Tidy) and commits. It returns how many titles were removed.
+func (w *writer) finish(ctx context.Context) (int, error) {
 	if err := w.ensure(ctx); err != nil {
-		return err
+		return 0, err
+	}
+	now := w.now
+	if now.IsZero() {
+		now = time.Now()
 	}
 	for _, e := range w.missing {
-		if _, err := w.tx.ExecContext(ctx, `UPDATE media_files SET available = 0 WHERE id = ?`, e.ID); err != nil {
-			return err
+		if _, err := w.tx.ExecContext(ctx, `UPDATE media_files SET available = 0, missing_since = COALESCE(missing_since, ?) WHERE id = ?`,
+			sqlTime(now), e.ID); err != nil {
+			return 0, err
 		}
 	}
-	if err := tidy(ctx, w.tx, w.lib.ID); err != nil {
-		return err
+	var roots []string
+	if w.removeAfterDays > 0 {
+		roots = removableRoots(w.liveRoots)
+	}
+	cutoff := sqlTime(now.Add(-time.Duration(w.removeAfterDays) * 24 * time.Hour))
+	removed, err := removeMissing(ctx, w.tx, w.lib.ID, roots, cutoff) // just tidies without roots
+	if err != nil {
+		return 0, err
 	}
 	if _, err := w.tx.ExecContext(ctx, `UPDATE libraries SET last_scanned_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`, w.lib.ID); err != nil {
-		return err
+		return 0, err
 	}
-	err := w.tx.Commit()
+	err = w.tx.Commit()
 	w.tx = nil
-	return err
+	return removed, err
 }
 
 // Tidy removes a library's versions and items left without files (and seasons, shows,

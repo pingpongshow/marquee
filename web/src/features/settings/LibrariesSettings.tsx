@@ -1,13 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { Folder, Pencil, Plus, RefreshCw, Square, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { manageLibrariesQuery, useCancelScan, useDeleteLibrary, useScanAll, useScanLibrary } from "@/api/queries";
+import { manageLibrariesQuery, useCancelScan, useDeleteLibrary, useRemoveMissingTitles, useScanAll, useScanLibrary } from "@/api/queries";
 import type { Library } from "@/api/types";
 import { libraryIcons } from "@/app/Shell";
+import { toast } from "@/components/Toast";
 import { Alert, Button, Card, Dialog, Field, Input, Spinner, StringListEditor, Toggle } from "@/components/ui";
 import { LibraryDialog } from "./LibraryDialog";
 import { SaveBar } from "./SaveBar";
 import { useSectionDraft } from "./useSectionDraft";
+
+const titles = (n: number) => `${n.toLocaleString()} title${n === 1 ? "" : "s"}`;
 
 const typeLabels: Record<Library["type"], string> = { movies: "Movies", shows: "TV Shows", anime: "Anime", music: "Music", videos: "Other Videos", photos: "Photos" };
 
@@ -54,6 +57,8 @@ export function LibrariesSettings() {
   const scanAll = useScanAll();
   const [dialog, setDialog] = useState<{ library?: Library; key: number } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Library | null>(null);
+  const removeMissing = useRemoveMissingTitles();
+  const [confirmRemove, setConfirmRemove] = useState<Library | null>(null);
   const scanning = useSectionDraft("library");
 
   return (
@@ -98,6 +103,21 @@ export function LibrariesSettings() {
                     ))}
                   </ul>
                   <ScanStatus lib={lib} />
+                  {!!lib.missingCount && lib.scanStatus === "idle" && (
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted">
+                      <span>{titles(lib.missingCount)} with files gone</span>
+                      <button
+                        type="button"
+                        className="text-accent hover:underline"
+                        onClick={() => {
+                          removeMissing.reset();
+                          setConfirmRemove(lib);
+                        }}
+                      >
+                        Remove missing titles
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex shrink-0 gap-1">
                   {lib.scanStatus === "idle" ? (
@@ -150,6 +170,12 @@ export function LibrariesSettings() {
             </Field>
           </Card>
           <Card title="Media files">
+            <Field
+              label="Remove missing titles after (days)"
+              help="When a title's files are gone from its library folder (deleted, or moved to another library), it stays greyed out for this long in case they come back, then the next scan removes it along with its watch history. Files on a drive that's offline or a folder that's empty are never removed. 0 keeps missing titles until you remove them."
+            >
+              {(id) => <Input id={id} type="number" min={0} max={3650} value={scanning.draft!.removeMissingAfterDays ?? 7} onChange={(e) => scanning.update({ removeMissingAfterDays: Number(e.target.value) })} />}
+            </Field>
             <Toggle
               label="Allow deleting media files"
               help="Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good by the nightly Empty media trash task."
@@ -162,6 +188,43 @@ export function LibrariesSettings() {
       )}
 
       {dialog && <LibraryDialog key={dialog.key} open library={dialog.library} onClose={() => setDialog(null)} />}
+
+      <Dialog
+        open={!!confirmRemove}
+        onClose={() => setConfirmRemove(null)}
+        title="Remove missing titles?"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmRemove(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              loading={removeMissing.isPending}
+              onClick={() =>
+                confirmRemove &&
+                removeMissing.mutate(confirmRemove.id, {
+                  onSuccess: (r) => {
+                    setConfirmRemove(null);
+                    toast(`Removed ${titles(r.removed)}.`);
+                  },
+                })
+              }
+            >
+              Remove
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted">
+          {titles(confirmRemove?.missingCount ?? 0)} in <strong className="text-text">{confirmRemove?.name}</strong> whose files are gone will be removed, with their watch history. Files on a drive that&apos;s offline are left alone.
+        </p>
+        {removeMissing.isError && (
+          <div className="mt-3">
+            <Alert tone="error">{removeMissing.error.message}</Alert>
+          </div>
+        )}
+      </Dialog>
 
       <Dialog
         open={!!confirmDelete}

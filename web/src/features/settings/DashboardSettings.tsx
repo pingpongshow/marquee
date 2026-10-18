@@ -4,6 +4,7 @@ import { Cpu, Globe, Home, Square, Tv } from "lucide-react";
 import { api, imageUrl, unwrap } from "@/api/client";
 import type { components } from "@/api/schema.gen";
 import { Card, Spinner } from "@/components/ui";
+import { ResourcesCard, WatchStatsCard } from "./ServerStats";
 
 type Session = components["schemas"]["PlaybackSessionInfo"];
 
@@ -194,7 +195,6 @@ export function BandwidthChart({ samples, uploadKbps }: { samples: Sample[]; upl
 export function DashboardSettings() {
   const sessions = useQuery({ queryKey: ["dashboard", "sessions"], queryFn: () => unwrap(api.GET("/playback/sessions")), refetchInterval: 3000 });
   const status = useQuery({ queryKey: ["dashboard", "status"], queryFn: () => unwrap(api.GET("/system/status")), refetchInterval: 5000 });
-  const history = useQuery({ queryKey: ["dashboard", "history"], queryFn: () => unwrap(api.GET("/activity/history", { params: { query: { limit: 40 } } })), refetchInterval: 30000 });
   const st = status.data;
   return (
     <div className="space-y-6">
@@ -224,32 +224,8 @@ export function DashboardSettings() {
           ))}
         </ul>
       </Card>
-      <Card title="Recent plays">
-        {history.isPending && <Spinner />}
-        <ul className="-my-2 divide-y divide-border text-sm">
-          {history.data?.map((h) => (
-            <li key={h.id} className="flex items-center gap-3 py-2">
-              <span className="w-32 shrink-0 text-xs text-faint tabular-nums">{new Date(h.startedAt).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}</span>
-              <span className="w-28 shrink-0 truncate text-muted">{h.userName}</span>
-              <span className="min-w-0 flex-1 truncate">{h.title}</span>
-              <span className="hidden shrink-0 text-xs text-faint sm:inline">
-                {h.source === "plex" ? "Plex (imported)" : [h.method && methodLabel[h.method as keyof typeof methodLabel], h.networkClass === "remote" ? "Remote" : h.networkClass ? "Local" : ""].filter(Boolean).join(" · ")}
-              </span>
-            </li>
-          ))}
-        </ul>
-        {st && (
-          <div className="flex flex-wrap gap-x-6 gap-y-1 border-t border-border pt-4 text-xs text-muted">
-            <span>Marquee {st.version}</span>
-            <span>Up since {new Date(st.startedAt).toLocaleString()}</span>
-            {st.libraries.map((l) => (
-              <span key={l.id}>
-                {l.name}: {l.items.toLocaleString()}
-              </span>
-            ))}
-          </div>
-        )}
-      </Card>
+      {st && <ResourcesCard status={st} />}
+      <WatchStatsCard />
     </div>
   );
 }

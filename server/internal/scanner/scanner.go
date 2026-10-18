@@ -32,12 +32,19 @@ type Progress struct {
 // Stats summarises a scan.
 type Stats struct {
 	Found, Added, Updated, Unchanged, Moved, Missing, Restored, Skipped, Failed int
-	Duration                                                                    time.Duration
+	// Removed is how many titles went because their files had been missing longer than
+	// the "Remove missing titles after" setting.
+	Removed  int
+	Duration time.Duration
 }
 
 func (s Stats) String() string {
-	return fmt.Sprintf("%d files: %d added, %d updated, %d unchanged, %d moved, %d missing, %d restored, %d skipped, %d failed in %s",
-		s.Found, s.Added, s.Updated, s.Unchanged, s.Moved, s.Missing, s.Restored, s.Skipped, s.Failed, s.Duration.Round(time.Second))
+	removed := ""
+	if s.Removed > 0 {
+		removed = fmt.Sprintf(", %d removed", s.Removed)
+	}
+	return fmt.Sprintf("%d files: %d added, %d updated, %d unchanged, %d moved, %d missing, %d restored%s, %d skipped, %d failed in %s",
+		s.Found, s.Added, s.Updated, s.Unchanged, s.Moved, s.Missing, s.Restored, removed, s.Skipped, s.Failed, s.Duration.Round(time.Second))
 }
 
 // Prober is satisfied by *probe.Prober; tests substitute a fake.
@@ -50,6 +57,18 @@ type Scanner struct {
 	Prober Prober
 	// Workers is the number of files probed concurrently.
 	Workers int
+	// RemoveMissingAfter is how many days a file may stay missing before a scan removes
+	// it (and the titles left without files); 0 or nil = never.
+	RemoveMissingAfter func() int
+	// Now is the clock; nil = time.Now. Tests set it.
+	Now func() time.Time
+}
+
+func (s *Scanner) now() time.Time {
+	if s.Now != nil {
+		return s.Now()
+	}
+	return time.Now()
 }
 
 type existingFile struct {
@@ -144,7 +163,11 @@ func (s *Scanner) Scan(ctx context.Context, lib library.Library, ignore []string
 	}
 
 	// 3. Probe changed/new files in parallel; write results from this goroutine.
-	w := &writer{db: s.DB, lib: lib, dirs: wr.Dirs, existing: existing, missing: missing, keyCache: map[string]int64{}}
+	w := &writer{db: s.DB, lib: lib, dirs: wr.Dirs, existing: existing, missing: missing, keyCache: map[string]int64{},
+		now: s.now(), liveRoots: liveRoots}
+	if s.RemoveMissingAfter != nil {
+		w.removeAfterDays = s.RemoveMissingAfter()
+	}
 	defer w.rollback()
 	if len(restore) > 0 {
 		if err := w.begin(ctx); err != nil {
@@ -250,14 +273,15 @@ func (s *Scanner) Scan(ctx context.Context, lib library.Library, ignore []string
 		return st, err
 	}
 
-	// 4. Whatever is still missing goes unavailable (not deleted: see LIB-9).
+	// 4. Whatever is still missing goes unavailable (not deleted: see LIB-9) until it has
+	// been missing longer than RemoveMissingAfter.
 	report(Progress{Phase: "cleanup", Done: len(work), Total: len(work)})
 	for _, e := range w.missing {
 		if e.Available {
 			st.Missing++
 		}
 	}
-	if err := w.finish(ctx); err != nil {
+	if st.Removed, err = w.finish(ctx); err != nil {
 		return st, err
 	}
 	// Subtitles saved or removed next to videos that didn't change (Bazarr, by hand).

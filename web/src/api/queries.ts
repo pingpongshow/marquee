@@ -116,6 +116,15 @@ export function useScanAll() {
   });
 }
 
+// Removes titles whose files are gone; everything showing them is refetched.
+export function useRemoveMissingTitles() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => unwrap(api.POST("/libraries/{libraryId}/remove-missing", { params: { path: { libraryId: id } } })),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
 export function useDeleteLibrary() {
   const qc = useQueryClient();
   return useMutation({

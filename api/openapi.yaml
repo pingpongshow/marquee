@@ -967,6 +967,28 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /libraries/{libraryId}/remove-missing:
+    parameters:
+      - $ref: "#/components/parameters/LibraryId"
+    post:
+      tags: [libraries]
+      operationId: removeMissingTitles
+      summary: "Remove the library's missing files now (admin only): files a scan found gone, in library folders that can be reached right now (an empty folder counts as unreachable, like an unmounted disk). Titles left without files are removed too, with their watch history."
+      responses:
+        "200":
+          description: Removed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [removed]
+                properties:
+                  removed: { type: integer, description: How many titles were removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
   /libraries/scan:
     post:
       tags: [libraries]
@@ -5767,6 +5789,7 @@ components:
         detectIntros: { type: boolean, description: "Find intros and end credits in TV episodes by comparing their audio, for Skip Intro and Skip Credits (PLAY-12). Markers from Plex or the files take precedence." }
         trickplay: { type: boolean, description: "Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie." }
         allowMediaDeletion: { type: boolean, default: false, description: "Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good by the daily Empty media trash task." }
+        removeMissingAfterDays: { type: integer, minimum: 0, maximum: 3650, default: 7, description: "Scans remove titles whose files have been missing for longer than this many days, with their watch history. Only files in library folders the scan could read count as missing, so an offline drive never loses its titles. 0 = never." }
 
     WatchGroup:
       type: object
@@ -6605,6 +6628,7 @@ components:
         lastScannedAt: { type: string, format: date-time, nullable: true }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        missingCount: { type: integer, description: "Admins listing with manage=true: how many titles have no available file and would be removed by POST /libraries/{libraryId}/remove-missing (only files in folders that can be reached count)." }
         recordings: { type: boolean, description: "A Live TV recordings library (Recorded TV / Recorded Movies). Only listed to admins with manage=true; its items are shown only under Live TV → Recordings, and browsing it returns 404." }
 
     LibraryCreate:
@@ -7088,6 +7112,11 @@ components:
           type: array
           description: The last hour, one sample a minute, oldest first.
           items: { $ref: "#/components/schemas/BandwidthSample" }
+        host: { $ref: "#/components/schemas/HostInfo" }
+        resources:
+          type: array
+          description: "The last hour of CPU, memory and GPU readings, one every 10 seconds, oldest first (empty after a restart or where the server can't read them)."
+          items: { $ref: "#/components/schemas/ResourceSample" }
         libraries:
           type: array
           items:
@@ -7098,6 +7127,28 @@ components:
               name: { type: string }
               type: { $ref: "#/components/schemas/LibraryType" }
               items: { type: integer }
+
+    HostInfo:
+      type: object
+      required: [cpuCores, memTotalBytes]
+      properties:
+        cpuCores: { type: integer }
+        memTotalBytes: { type: integer, format: int64 }
+        gpuName: { type: string, description: "NVIDIA GPU, when there is one." }
+        gpuMemTotalBytes: { type: integer, format: int64 }
+
+    ResourceSample:
+      type: object
+      required: [at, hostCpu, serverCpu, hostMemBytes, serverMemBytes]
+      properties:
+        at: { type: string, format: date-time }
+        hostCpu: { type: number, description: "The whole machine's CPU use, percent of all cores." }
+        serverCpu: { type: number, description: "Marquee's CPU use (the server and the FFmpeg processes it runs), percent of all cores." }
+        hostMemBytes: { type: integer, format: int64, description: The machine's memory in use. }
+        serverMemBytes: { type: integer, format: int64, description: "Marquee's memory (the server and its FFmpeg processes)." }
+        gpu: { type: number, description: "NVIDIA GPU use, percent; omitted when not known." }
+        gpuEncoder: { type: number }
+        gpuDecoder: { type: number }
 
     SpeedTestResult:
       type: object

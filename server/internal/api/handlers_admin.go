@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"marquee/internal/library"
+	"marquee/internal/scanner"
 	"marquee/internal/settings"
 )
 
@@ -60,6 +61,7 @@ func toAPISettings(s settings.Settings) ServerSettings {
 			Trickplay:               ptr(s.Library.Trickplay),
 			DetectIntros:            ptr(s.Library.DetectIntros),
 			AllowMediaDeletion:      ptr(s.Library.AllowMediaDeletion),
+			RemoveMissingAfterDays:  ptr(s.Library.RemoveMissingAfterDays),
 		},
 		Metadata: MetadataSettings{
 			TmdbApiKeySet:            ptr(s.Metadata.TMDBAPIKey != ""),
@@ -185,6 +187,7 @@ func applySettingsUpdate(s *settings.Settings, u ServerSettingsUpdate) {
 		set(&s.Library.Trickplay, l.Trickplay)
 		set(&s.Library.DetectIntros, l.DetectIntros)
 		set(&s.Library.AllowMediaDeletion, l.AllowMediaDeletion)
+		set(&s.Library.RemoveMissingAfterDays, l.RemoveMissingAfterDays)
 	}
 	if m := u.Metadata; m != nil {
 		set(&s.Metadata.TMDBAPIKey, m.TmdbApiKey)
@@ -461,7 +464,16 @@ func (h *Handlers) ListLibraries(ctx context.Context, req ListLibrariesRequestOb
 	out := ListLibraries200JSONResponse{}
 	for _, l := range libs {
 		if (manage && l.Recordings) || h.canSeeLibrary(ctx, l.ID) {
-			out = append(out, h.toAPILibrary(l))
+			a := h.toAPILibrary(l)
+			if manage {
+				// Settings → Libraries offers to remove the titles whose files are gone.
+				if n, err := scanner.MissingCount(ctx, h.DB, l); err != nil {
+					slog.Warn("count missing titles", "library", l.Name, "err", err)
+				} else {
+					a.MissingCount = &n
+				}
+			}
+			out = append(out, a)
 		}
 	}
 	return out, nil

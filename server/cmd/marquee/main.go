@@ -57,6 +57,7 @@ import (
 	"marquee/internal/soundprint"
 	"marquee/internal/subtitles"
 	"marquee/internal/syncplay"
+	"marquee/internal/sysstats"
 	"marquee/internal/tasks"
 	"marquee/internal/thumbs"
 	"marquee/internal/trickplay"
@@ -144,6 +145,8 @@ func run() error {
 		Encoders: playback.DetectEncoders(ctx, cfg.FFmpegPath)}
 	player.RemoteFFprobe = cfg.FFprobePath // movies on demand from Xtream Codes servers
 	go player.Run(ctx)
+	sysStats := &sysstats.Sampler{} // CPU, memory and GPU for the dashboard
+	go sysStats.Run(ctx)
 	// Webhooks (ADM-5).
 	hooks := &webhooks.Dispatcher{DB: database, Settings: store, Server: func() webhooks.Server {
 		return webhooks.Server{ID: store.ServerID(), Name: store.Get().General.ServerName, Version: config.Version}
@@ -185,9 +188,10 @@ func run() error {
 		Libraries: libraries,
 		Settings:  store,
 		Scanner: &scanner.Scanner{
-			DB:      database,
-			Prober:  probe.New(cfg.FFprobePath, 8),
-			Workers: 8,
+			DB:                 database,
+			Prober:             probe.New(cfg.FFprobePath, 8),
+			Workers:            8,
+			RemoveMissingAfter: func() int { return store.Get().Library.RemoveMissingAfterDays },
 		},
 	}
 	meta := &metadata.Service{DB: database, Settings: store, CacheDir: filepath.Join(cfg.ConfigDir, "cache")}
@@ -721,6 +725,7 @@ func run() error {
 		Logs:        logs,
 		Metadata:    meta,
 		Playback:    player,
+		SysStats:    sysStats,
 		Plex: &plex.Importer{DB: database, Auth: authSvc, Libraries: libraries, Matcher: meta,
 			PlexRoot: cfg.PlexDir, WorkDir: filepath.Join(cfg.ConfigDir, "plex-import"),
 			ArtDir: filepath.Join(cfg.ConfigDir, "cache", "plex-artwork"), OnMapped: plexSync.SaveImport},

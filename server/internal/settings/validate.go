@@ -140,6 +140,9 @@ func (s Settings) Validate() error {
 	if w := s.Library.WatchedThresholdPercent; w < 50 || w > 100 {
 		return invalid("watched threshold must be between 50 and 100")
 	}
+	if d := s.Library.RemoveMissingAfterDays; d < 0 || d > 3650 {
+		return invalid("remove missing titles after must be between 0 and 3650 days")
+	}
 	if s.Metadata.OMDbDailyLimit < 1 {
 		return invalid("OMDb daily limit must be at least 1")
 	}

@@ -314,6 +314,25 @@ func (h *Handlers) SystemStatus(ctx context.Context, _ SystemStatusRequestObject
 		hist = append(hist, BandwidthSample{At: x.At, LocalKbps: x.LocalKbps, RemoteKbps: x.RemoteKbps, Streams: x.Streams, Transcodes: x.Transcodes})
 	}
 	out.BandwidthHistory = &hist
+	if h.SysStats != nil {
+		host, samples := h.SysStats.Snapshot()
+		if host.CPUCores > 0 {
+			hi := HostInfo{CpuCores: host.CPUCores, MemTotalBytes: host.MemTotal}
+			if host.GPUName != "" {
+				hi.GpuName, hi.GpuMemTotalBytes = ptr(host.GPUName), ptr(host.GPUMemTotal)
+			}
+			out.Host = &hi
+		}
+		res := make([]ResourceSample, 0, len(samples))
+		for _, x := range samples {
+			r := ResourceSample{At: x.At, HostCpu: float32(x.HostCPU), ServerCpu: float32(x.ServerCPU), HostMemBytes: x.HostMemUsed, ServerMemBytes: x.ServerMem}
+			if x.GPU >= 0 {
+				r.Gpu, r.GpuEncoder, r.GpuDecoder = ptr(float32(x.GPU)), ptr(float32(x.GPUEncoder)), ptr(float32(x.GPUDecoder))
+			}
+			res = append(res, r)
+		}
+		out.Resources = &res
+	}
 	libs, err := h.Libraries.List(ctx)
 	if err != nil {
 		return nil, internal(ctx, "status", err)

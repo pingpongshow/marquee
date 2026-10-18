@@ -261,8 +261,8 @@ export const settingsGroups: { label: string; sections: SettingsSection[] }[] =
           label: "Dashboard",
           icon: Activity,
           component: DashboardSettings,
-          keywords: "now playing streams bandwidth graph history stop",
-          description: "Now playing, bandwidth, transcodes and recent plays.",
+          keywords: "now playing streams bandwidth graph cpu memory gpu server stats watch statistics top users stop",
+          description: "Now playing, bandwidth, the server's CPU, memory and GPU, and watch stats.",
         },
         {
           id: "statistics",

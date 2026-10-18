@@ -96,7 +96,7 @@ func (s *Service) repoint(ctx context.Context, ids []int64, path string, libs ma
 	forget := ids[1:]
 	if found > 0 {
 		forget = ids
-	} else if _, err := tx.ExecContext(ctx, `UPDATE media_files SET path=?, size=-1, mtime=0, available=1 WHERE id=?`, path, ids[0]); err != nil {
+	} else if _, err := tx.ExecContext(ctx, `UPDATE media_files SET path=?, size=-1, mtime=0, available=1, missing_since=NULL WHERE id=?`, path, ids[0]); err != nil {
 		return err
 	}
 	for _, id := range forget {

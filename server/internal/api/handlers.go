@@ -37,6 +37,7 @@ import (
 	"marquee/internal/soundprint"
 	"marquee/internal/subtitles"
 	"marquee/internal/syncplay"
+	"marquee/internal/sysstats"
 	"marquee/internal/tasks"
 	"marquee/internal/trickplay"
 	"marquee/internal/vod"
@@ -59,6 +60,8 @@ type Handlers struct {
 	Plex      *plex.Importer
 	PlexSync  *plexsync.Service
 	Playback  *playback.Manager
+	// SysStats samples CPU, memory and GPU use for the dashboard; may be nil.
+	SysStats *sysstats.Sampler
 	// LibrariesChanged is called after a library is created, edited or deleted.
 	LibrariesChanged func()
 	Scans            *tasks.Scans

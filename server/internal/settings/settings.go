@@ -426,6 +426,9 @@ type Library struct {
 	// AllowMediaDeletion lets admins delete media files from Library Health; they move to
 	// a .marquee-trash folder in the library folder and are removed after 30 days.
 	AllowMediaDeletion bool `json:"allowMediaDeletion"`
+	// RemoveMissingAfterDays: scans remove titles whose files have been missing (from a
+	// library folder that could be read) for longer than this. 0 = never.
+	RemoveMissingAfterDays int `json:"removeMissingAfterDays"`
 }
 
 type Metadata struct {
@@ -486,6 +489,7 @@ func Defaults() Settings {
 			WatchedThresholdPercent: 90,
 			Trickplay:               true,
 			DetectIntros:            true,
+			RemoveMissingAfterDays:  7,
 		},
 		Metadata: Metadata{AnimeEpisodeOrdering: "seasonal", OMDbDailyLimit: 950},
 		Tasks:    Tasks{MaintenanceWindowStart: "03:00", MaintenanceWindowHours: 4, BackupRetention: 7},

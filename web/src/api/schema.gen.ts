@@ -689,6 +689,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/libraries/{libraryId}/remove-missing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                libraryId: components["parameters"]["LibraryId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove the library's missing files now (admin only): files a scan found gone, in library folders that can be reached right now (an empty folder counts as unreachable, like an unmounted disk). Titles left without files are removed too, with their watch history. */
+        post: operations["removeMissingTitles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/libraries/scan": {
         parameters: {
             query?: never;
@@ -4697,6 +4716,11 @@ export interface components {
              * @default false
              */
             allowMediaDeletion: boolean;
+            /**
+             * @description Scans remove titles whose files have been missing for longer than this many days, with their watch history. Only files in library folders the scan could read count as missing, so an offline drive never loses its titles. 0 = never.
+             * @default 7
+             */
+            removeMissingAfterDays: number;
         };
         WatchGroup: {
             id: string;
@@ -5699,6 +5723,8 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            /** @description Admins listing with manage=true: how many titles have no available file and would be removed by POST /libraries/{libraryId}/remove-missing (only files in folders that can be reached count). */
+            missingCount?: number;
             /** @description A Live TV recordings library (Recorded TV / Recorded Movies). Only listed to admins with manage=true; its items are shown only under Live TV → Recordings, and browsing it returns 404. */
             recordings?: boolean;
         };
@@ -6218,6 +6244,9 @@ export interface components {
             uploadSpeedKbps?: number;
             /** @description The last hour, one sample a minute, oldest first. */
             bandwidthHistory?: components["schemas"]["BandwidthSample"][];
+            host?: components["schemas"]["HostInfo"];
+            /** @description The last hour of CPU, memory and GPU readings, one every 10 seconds, oldest first (empty after a restart or where the server can't read them). */
+            resources?: components["schemas"]["ResourceSample"][];
             libraries: {
                 /** Format: int64 */
                 id: number;
@@ -6225,6 +6254,37 @@ export interface components {
                 type: components["schemas"]["LibraryType"];
                 items: number;
             }[];
+        };
+        HostInfo: {
+            cpuCores: number;
+            /** Format: int64 */
+            memTotalBytes: number;
+            /** @description NVIDIA GPU, when there is one. */
+            gpuName?: string;
+            /** Format: int64 */
+            gpuMemTotalBytes?: number;
+        };
+        ResourceSample: {
+            /** Format: date-time */
+            at: string;
+            /** @description The whole machine's CPU use, percent of all cores. */
+            hostCpu: number;
+            /** @description Marquee's CPU use (the server and the FFmpeg processes it runs), percent of all cores. */
+            serverCpu: number;
+            /**
+             * Format: int64
+             * @description The machine's memory in use.
+             */
+            hostMemBytes: number;
+            /**
+             * Format: int64
+             * @description Marquee's memory (the server and its FFmpeg processes).
+             */
+            serverMemBytes: number;
+            /** @description NVIDIA GPU use, percent; omitted when not known. */
+            gpu?: number;
+            gpuEncoder?: number;
+            gpuDecoder?: number;
         };
         SpeedTestResult: {
             downloadMbps: number;
@@ -8877,6 +8937,35 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    removeMissingTitles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                libraryId: components["parameters"]["LibraryId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description How many titles were removed. */
+                        removed: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     scanAllLibraries: {
