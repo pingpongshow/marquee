@@ -18,6 +18,15 @@ export function isWatched(item: Watchable) {
   return (item.viewCount ?? 0) > 0 && !item.viewOffsetMs;
 }
 
+/**
+ * Whether there's anything to mark unwatched: a leaf played or started (part-way through, as in
+ * Continue Watching), or a show or season with an episode played.
+ */
+export function hasWatchState(item: Watchable) {
+  if (parentTypes.has(item.type)) return (item.watchedLeafCount ?? 0) > 0;
+  return (item.viewCount ?? 0) > 0 || (item.viewOffsetMs ?? 0) > 0;
+}
+
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null;
 // An item summary or detail: has an id, a video type and an availability flag (libraries and playlists don't).
@@ -108,7 +117,8 @@ export function useMarkWatched() {
         const next = applyWatched(q.state.data, item.id, watched);
         if (next !== q.state.data) qc.setQueryData(q.queryKey, next);
       }
-      if (watched) qc.setQueryData<Hub[]>(hubsKey, (old) => withoutContinueWatching(old, item.id));
+      // Watched, or unwatched (its resume point forgotten): either way it leaves Continue Watching.
+      qc.setQueryData<Hub[]>(hubsKey, (old) => withoutContinueWatching(old, item.id));
       return { snapshot };
     },
     onError: (_e, _v, ctx) => {

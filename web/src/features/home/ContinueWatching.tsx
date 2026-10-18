@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ChevronRight, EyeOff, Film, MoreHorizontal, Tv } from "lucide-react";
+import { ChevronRight, CircleCheck, CircleSlash, EyeOff, Film, MoreHorizontal, Tv } from "lucide-react";
 import { clsx } from "clsx";
 import { useState } from "react";
 import { api, unwrap } from "@/api/client";
@@ -104,9 +104,41 @@ export function useRemoveVodFromContinue() {
   });
 }
 
+/** Marks a film or episode on demand in Continue Watching watched or unwatched (either way it leaves the row). */
+function useMarkVod() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ e, watched }: { e: ContinueEntry; watched: boolean }) => {
+      if (e.vodMovie) {
+        const params = { path: { movieId: e.vodMovie.id } };
+        return unwrap(watched ? api.PUT("/livetv/vod/movies/{movieId}/watched", { params }) : api.DELETE("/livetv/vod/movies/{movieId}/watched", { params }));
+      }
+      const params = { path: { episodeId: e.vodEpisode?.id ?? 0 } };
+      return unwrap(watched ? api.PUT("/livetv/vod/episodes/{episodeId}/watched", { params }) : api.DELETE("/livetv/vod/episodes/{episodeId}/watched", { params }));
+    },
+    onMutate: ({ e }) => {
+      const old = qc.getQueryData<Hub[]>(hubsKey);
+      qc.setQueryData<Hub[]>(hubsKey, (h) =>
+        h?.map((x) => (x.id === "continue-watching" ? { ...x, entries: x.entries?.filter((y) => y.key !== e.key), total: x.total ? x.total - 1 : x.total } : x)),
+      );
+      return { old };
+    },
+    onError: (err, _v, ctx) => {
+      qc.setQueryData(hubsKey, ctx?.old);
+      toast(err.message, { tone: "error" });
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: hubsKey });
+      qc.invalidateQueries({ queryKey: ["continue-watching"] });
+      qc.invalidateQueries({ queryKey: ["vod"] });
+    },
+  });
+}
+
 /** A film or episode on demand in Continue Watching: opens the player where it stopped. */
 function VodTile({ e, className }: { e: ContinueEntry; className?: string }) {
   const remove = useRemoveVodFromContinue();
+  const mark = useMarkVod();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const m = e.vodMovie;
@@ -160,6 +192,12 @@ function VodTile({ e, className }: { e: ContinueEntry; className?: string }) {
         )}
       >
         <Menu label={`More actions for ${title}`} trigger={<MoreHorizontal className="size-4" />} open={open} onOpenChange={setOpen} floating>
+          <MenuItem icon={<CircleCheck />} onClick={() => mark.mutate({ e, watched: true })}>
+            Mark as watched
+          </MenuItem>
+          <MenuItem icon={<CircleSlash />} onClick={() => mark.mutate({ e, watched: false })}>
+            Mark as unwatched
+          </MenuItem>
           <MenuItem icon={<EyeOff />} onClick={() => remove.mutate(e)}>
             Remove from Continue Watching
           </MenuItem>

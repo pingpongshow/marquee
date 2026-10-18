@@ -15,7 +15,7 @@ import { useMusicActions } from "../player/MusicPlayer";
 import { AddToCollectionDialog } from "./AddToCollection";
 import { MoveTrackDialog } from "./MusicFixes";
 import { favoriteTypes, useSetFavorite } from "./Favorite";
-import { isWatched, markableTypes, useMarkWatched, useRemoveFromContinueWatching } from "./watched";
+import { hasWatchState, isWatched, markableTypes, useMarkWatched, useRemoveFromContinueWatching } from "./watched";
 
 const music = new Set(["track", "album", "artist"]);
 const watchable = new Set(["movie", "show", "episode", "video"]);
@@ -65,9 +65,15 @@ export function ItemMenu({
   return (
     <>
       <Menu label={`More actions for ${item.title}`} trigger={<MoreHorizontal className="size-4" />} className={className} open={open} onOpenChange={onOpenChange} floating={floating}>
-        {markableTypes.has(item.type) && (
-          <MenuItem icon={watched ? <CircleSlash /> : <CircleCheck />} onClick={() => markWatched.mutate({ item, watched: !watched })}>
-            {watched ? "Mark as unwatched" : "Mark as watched"}
+        {/* Part-way through (Continue Watching), both: finish it, or start over as unwatched. */}
+        {markableTypes.has(item.type) && !watched && (
+          <MenuItem icon={<CircleCheck />} onClick={() => markWatched.mutate({ item, watched: true })}>
+            Mark as watched
+          </MenuItem>
+        )}
+        {markableTypes.has(item.type) && hasWatchState(item) && (
+          <MenuItem icon={<CircleSlash />} onClick={() => markWatched.mutate({ item, watched: false })}>
+            Mark as unwatched
           </MenuItem>
         )}
         {continueWatching && (

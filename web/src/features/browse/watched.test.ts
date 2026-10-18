@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyWatched, isWatched, withoutContinueWatching } from "./watched";
+import { applyWatched, hasWatchState, isWatched, withoutContinueWatching } from "./watched";
 
 const movie = { id: 5, type: "movie", title: "M", available: true, viewCount: 0, viewOffsetMs: 60000 };
 const season = { id: 20, type: "season", parentId: 10, title: "S1", available: true, leafCount: 3, watchedLeafCount: 1 };
@@ -43,5 +43,15 @@ describe("withoutContinueWatching", () => {
     expect(out[0]!.items).toEqual([movie]);
     expect(out[1]!.items).toEqual([movie]);
     expect(withoutContinueWatching(hubs, 5)![0]!.items).toHaveLength(1);
+  });
+});
+
+describe("hasWatchState", () => {
+  it("offers Mark as unwatched for anything played or part-way through", () => {
+    expect(hasWatchState({ id: 1, type: "movie" })).toBe(false);
+    expect(hasWatchState({ id: 1, type: "movie", viewCount: 1 })).toBe(true);
+    expect(hasWatchState({ id: 1, type: "episode", viewOffsetMs: 60_000 })).toBe(true); // Continue Watching
+    expect(hasWatchState({ id: 1, type: "show", leafCount: 10, watchedLeafCount: 0 })).toBe(false);
+    expect(hasWatchState({ id: 1, type: "season", leafCount: 10, watchedLeafCount: 3 })).toBe(true);
   });
 });
