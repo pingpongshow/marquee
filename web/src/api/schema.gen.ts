@@ -7368,7 +7368,7 @@ export interface components {
             /** @enum {string} */
             hdr?: "yes" | "no";
             /**
-             * @description Only files already optimized (yes) or not yet (no).
+             * @description Only files already optimized (yes) or still to do (no: not optimized, not queued).
              * @enum {string}
              */
             optimized?: "yes" | "no";
@@ -10731,7 +10731,7 @@ export interface operations {
                 codecs?: string;
                 /** @description Only HDR (yes) or only SDR (no) files. */
                 hdr?: "yes" | "no";
-                /** @description Only files the optimizer has already replaced (yes, to optimize them again) or only ones it hasn't (no). */
+                /** @description Only files the optimizer has already replaced (yes, to optimize them again) or only ones still to do (no): not optimized and not already queued or being converted. */
                 optimized?: "yes" | "no";
                 /** @description The preset the estimates are for (default: the default preset). */
                 presetId?: string;

@@ -326,11 +326,11 @@ function FilesTab({ config, onQueued }: { config: OptimizeConfig; onQueued: () =
             </Select>
           )}
         </Field>
-        <Field label="Optimized before" help="Optimized files can be queued again, e.g. with a smaller preset.">
+        <Field label="Optimized before" help="Not optimized or queued yet: what's still to do. Optimized files can be queued again, e.g. with a smaller preset.">
           {(id) => (
             <Select id={id} value={filters.optimized ?? ""} onChange={(e) => update({ optimized: (e.target.value || undefined) as Filters["optimized"] })}>
               <option value="">Any</option>
-              <option value="no">Not yet optimized</option>
+              <option value="no">Not optimized or queued yet</option>
               <option value="yes">Already optimized (re-optimize)</option>
             </Select>
           )}

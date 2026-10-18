@@ -2290,7 +2290,7 @@ paths:
         - { name: resolution, in: query, description: "Only this resolution class (by width or height, so letterboxed films count): 2160 = 4K, 480 = SD.", schema: { type: integer, enum: [2160, 1080, 720, 480] } }
         - { name: codecs, in: query, description: "Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9).", schema: { type: string } }
         - { name: hdr, in: query, description: "Only HDR (yes) or only SDR (no) files.", schema: { type: string, enum: ["yes", "no"] } }
-        - { name: optimized, in: query, description: "Only files the optimizer has already replaced (yes, to optimize them again) or only ones it hasn't (no).", schema: { type: string, enum: ["yes", "no"] } }
+        - { name: optimized, in: query, description: "Only files the optimizer has already replaced (yes, to optimize them again) or only ones still to do (no): not optimized and not already queued or being converted.", schema: { type: string, enum: ["yes", "no"] } }
         - { name: presetId, in: query, description: "The preset the estimates are for (default: the default preset).", schema: { type: string } }
         - { name: sort, in: query, schema: { type: string, enum: [size, bitrate, title, savings], default: size } }
         - $ref: "#/components/parameters/Offset"
@@ -8238,7 +8238,7 @@ components:
         resolution: { type: integer, enum: [2160, 1080, 720, 480] }
         codecs: { type: array, items: { type: string } }
         hdr: { type: string, enum: ["yes", "no"] }
-        optimized: { type: string, enum: ["yes", "no"], description: "Only files already optimized (yes) or not yet (no)." }
+        optimized: { type: string, enum: ["yes", "no"], description: "Only files already optimized (yes) or still to do (no: not optimized, not queued)." }
 
     OptimizeQueueRequest:
       type: object

@@ -397,7 +397,7 @@ Find files to convert, see the estimate, and queue them.
 | Bitrate at least (Mb/s) | (empty) | Only files at or above this bitrate. |
 | Resolution | Any | 4K (2160p), 1080p, 720p or SD. |
 | HDR | HDR and SDR | Or **Only HDR** or **Only SDR**. |
-| Optimized before | Any | **Not yet optimized**, or **Already optimized (re-optimize)** to queue optimized files again, for example with a smaller preset. |
+| Optimized before | Any | **Not optimized or queued yet** (what's still to do: leaves out optimized files and files already in the queue), or **Already optimized (re-optimize)** to queue optimized files again, for example with a smaller preset. |
 | Preset | The default preset | Used for the size estimates and for queueing. |
 | Sort | Biggest first | Or **Most to save first**, **Highest bitrate first** or **Title**. |
 | Codecs | None (all) | Tap codecs (H.264, HEVC, MPEG-2, VC-1, MPEG-4, AV1, VP9) to show only those. Older codecs (MPEG-2, VC-1, H.264) shrink the most. |

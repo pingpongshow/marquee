@@ -19,7 +19,7 @@ type Filter struct {
 	Resolution     int      // 2160, 1080, 720 or 480 (SD): only this class
 	Codecs         []string // only these video codecs (ffprobe names: h264, mpeg2video, vc1, …)
 	HDR            *bool    // only HDR (true) or only SDR (false)
-	Optimized      *bool    // only files the optimizer replaced (true, to re-optimize) or only ones it hasn't (false)
+	Optimized      *bool    // only files the optimizer replaced (true, to re-optimize) or only ones still to do: not optimized and not in the queue (false)
 	Sort           string   // size (default), bitrate, title
 }
 
@@ -101,12 +101,13 @@ func (flt Filter) where() (string, []any) {
 			conds = append(conds, "COALESCE(f.hdr_format, '') = ''")
 		}
 	}
-	if flt.Optimized != nil {
-		c := "EXISTS (SELECT 1 FROM optimize_jobs oj WHERE oj.file_id = f.id AND oj.state = 'done')"
-		if !*flt.Optimized {
-			c = "NOT " + c
-		}
-		conds = append(conds, c)
+	switch {
+	case flt.Optimized == nil:
+	case *flt.Optimized:
+		conds = append(conds, "EXISTS (SELECT 1 FROM optimize_jobs oj WHERE oj.file_id = f.id AND oj.state = 'done')")
+	default:
+		// Still to do: neither optimized nor already on its way (queued, converting, checking).
+		conds = append(conds, "NOT EXISTS (SELECT 1 FROM optimize_jobs oj WHERE oj.file_id = f.id AND oj.state IN ('done', 'queued', 'running', 'verifying'))")
 	}
 	return strings.Join(conds, " AND "), args
 }

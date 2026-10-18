@@ -134,6 +134,13 @@ func TestReoptimize(t *testing.T) {
 	if got, want := ids(Filter{Optimized: ptrBool(false)}), strconv.FormatInt(fresh, 10)+" "+strconv.FormatInt(restored, 10)+" "; got != want {
 		t.Errorf("not optimized: %q, want %q", got, want)
 	}
+	// A file already in the queue isn't "still to do".
+	if _, _, err := s.Enqueue(ctx, []int64{restored}, "1080p-hevc-small"); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := ids(Filter{Optimized: ptrBool(false)}), strconv.FormatInt(fresh, 10)+" "; got != want {
+		t.Errorf("still to do (one queued): %q, want %q", got, want)
+	}
 	queued, skipped, err := s.Enqueue(ctx, []int64{done}, "1080p-hevc-small")
 	if err != nil || queued != 1 || skipped != 0 {
 		t.Fatalf("re-queue: %d %d %v", queued, skipped, err)
