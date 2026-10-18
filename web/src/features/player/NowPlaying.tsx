@@ -216,7 +216,11 @@ export function MiniPlayer() {
   const [queueOpen, setQueueOpen] = useState(false);
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur">
-      <Scrubber className="-mt-2 block h-2" />
+      {/* Its own row, as tall as the slider's handle (Safari's is ~20 px), so the handle
+          never sits on the artwork below. */}
+      <div className="px-3 pt-1 sm:px-4">
+        <Scrubber className="block h-5" />
+      </div>
       <div className="flex items-center gap-3 px-3 pb-2 sm:gap-4 sm:px-4">
         <button
           onClick={() => m.setExpanded(true)}

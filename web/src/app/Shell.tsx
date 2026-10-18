@@ -287,7 +287,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </Link>
       )}
       {/* Keep the last entries clear of the player bar while something plays. */}
-      {music.current && <div className="h-20 shrink-0" aria-hidden />}
+      {music.current && <div className="h-24 shrink-0" aria-hidden />}
     </nav>
   );
 
@@ -359,7 +359,7 @@ export function Shell({ children }: { children: ReactNode }) {
         )}
         <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto">
           {children}
-          {music.current && <div className="h-20" aria-hidden />}
+          {music.current && <div className="h-24" aria-hidden />}
         </main>
       </div>
       {switching && <ProfileSwitcher onClose={() => setSwitching(false)} />}
