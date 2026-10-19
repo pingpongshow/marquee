@@ -171,7 +171,7 @@ func (m *Manager) StartExternal(ctx context.Context, r ExternalRequest) (*Sessio
 		VideoCodec: s.Media.Video.Codec, AudioIndex: -1, SubIndex: -1, SubRelIndex: -1, Dir: filepath.Join(m.TranscodeDir, s.ID),
 		Preset: cfg.Transcoder.Preset, QSVDevice: m.Encoders.QSVDevice, Plan: plan}
 	if a := s.Media.Audio; a != nil {
-		job.AudioIndex, job.AudioCodec = a.Index, a.Codec
+		job.AudioIndex, job.AudioCodec, job.AudioChannels = a.Index, a.Codec, a.Channels
 	}
 	s.transcoder = &Transcoder{FFmpeg: m.FFmpeg, Job: job, Encoders: m.encodersFor(cfg.Transcoder.EncoderOrder),
 		TotalSegments: len(plan), ThrottleAhead: cfg.Transcoder.ThrottleSegmentsAhead, Redact: r.Redact,

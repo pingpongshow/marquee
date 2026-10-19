@@ -122,18 +122,7 @@ func wireAlerts(ctx context.Context, d alertDeps) *notify.Watcher {
 
 	cfg := d.cfg
 	return &notify.Watcher{Alerts: d.alerts, Every: 15 * time.Minute,
-		Volumes: func(ctx context.Context) []notify.Volume {
-			vols := []notify.Volume{{Name: "Config", Path: cfg.ConfigDir}, {Name: "Transcode", Path: cfg.TranscodeDir},
-				{Name: "Recordings", Path: cfg.RecordingsDir}}
-			if libs, err := d.libraries.List(ctx); err == nil {
-				for _, l := range libs {
-					for _, p := range l.Paths {
-						vols = append(vols, notify.Volume{Name: "Library " + l.Name, Path: p})
-					}
-				}
-			}
-			return vols
-		},
+		Volumes: func(ctx context.Context) []notify.Volume { return alertVolumes(ctx, cfg, d.libraries) },
 		Probes: []notify.Probe{
 			{Name: "Seerr", Enabled: func() bool { i := d.store.Get().Integrations; return i.SeerrURL != "" && i.SeerrAPIKey != "" },
 				Check: func(ctx context.Context) error {

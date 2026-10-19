@@ -30,6 +30,7 @@ import (
 	"marquee/internal/discovery"
 	"marquee/internal/downloads"
 	"marquee/internal/encode"
+	"marquee/internal/filecheck"
 	"marquee/internal/images"
 	"marquee/internal/introdetect"
 	"marquee/internal/items"
@@ -55,6 +56,7 @@ import (
 	"marquee/internal/server"
 	"marquee/internal/settings"
 	"marquee/internal/soundprint"
+	"marquee/internal/storage"
 	"marquee/internal/subtitles"
 	"marquee/internal/syncplay"
 	"marquee/internal/sysstats"
@@ -370,9 +372,28 @@ func run() error {
 	scheduler.Register(tasks.Task{ID: "embeddings", Name: "Index movies and shows", Window: true, Bounded: true,
 		Description: "Reads the descriptions of new and changed movies and shows so Muse, recommendations and related items include them.",
 		Run:         embedder.Run, Progress: embedder.Progress})
+	// New video files get a playback check (damaged files go to Library Health → Unplayable
+	// files), straight after the scan that added them.
+	fileCheck := &filecheck.Service{DB: database, FFmpeg: cfg.FFmpegPath,
+		OnDamaged: func(ctx context.Context, files []filecheck.Damaged) {
+			title := "New file is damaged: " + filepath.Base(files[0].Path)
+			if len(files) > 1 {
+				title = strconv.Itoa(len(files)) + " new files are damaged"
+			}
+			var lines []string
+			for _, f := range files {
+				lines = append(lines, filepath.Base(f.Path)+": "+f.Reason)
+			}
+			alerts.Raise(ctx, notify.Alert{Type: settings.AlertFileDamaged, Subject: "file:" + strconv.FormatInt(files[0].FileID, 10),
+				Title: title, Message: strings.Join(lines, "\n") + "\n\nDamaged files won't play properly; see Settings → Library Health → Unplayable files."})
+		}}
+	scheduler.Register(fileCheck.Task())
 	runEmbed := func() {
 		scheduler.Trigger(ctx, "embeddings")
 		scheduler.Trigger(ctx, "thumbnails") // thumbnails for new episodes TMDB has no still for
+		if fileCheck.Pending(ctx) {
+			scheduler.Trigger(ctx, filecheck.TaskID)
+		}
 	}
 	afterVideoScan.Store(&runEmbed)
 	loud := &loudness.Service{DB: database, FFmpeg: cfg.FFmpegPath, Workers: 4, Analyse: func() bool { return true }} // volume levelling is always on, so every track is measured
@@ -689,6 +710,9 @@ func run() error {
 	alertWatcher := wireAlerts(ctx, alertDeps{cfg: &cfg, store: store, alerts: alerts, auth: authSvc, scheduler: scheduler,
 		live: live, dvr: dvr, vod: vodSvc, saves: vodSaves, optimizer: optimizer, player: player, libraries: libraries, ai: aiClient, soundprint: soundprintSvc})
 	go alertWatcher.Run(ctx)
+	// The storage overview (Dashboard → Storage) and its daily sample of library sizes.
+	storageSvc := &storage.Service{DB: database, Folders: func(ctx context.Context) []storage.Folder { return storageFolders(ctx, &cfg, libraries) }}
+	go storageSvc.Run(ctx)
 	go optimizer.Run(ctx)
 	go live.Run(ctx, liveWake)
 	// Two-way Plex sync (watch state, plays, ratings): off until the admin turns it on.
@@ -746,6 +770,7 @@ func run() error {
 		Metadata:    meta,
 		Playback:    player,
 		SysStats:    sysStats,
+		Storage:     storageSvc,
 		Plex: &plex.Importer{DB: database, Auth: authSvc, Libraries: libraries, Matcher: meta,
 			PlexRoot: cfg.PlexDir, WorkDir: filepath.Join(cfg.ConfigDir, "plex-import"),
 			ArtDir: filepath.Join(cfg.ConfigDir, "cache", "plex-artwork"), OnMapped: plexSync.SaveImport},

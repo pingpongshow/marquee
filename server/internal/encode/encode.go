@@ -229,6 +229,19 @@ func Run(ctx context.Context, name string, args []string, durationMS int64, prog
 // DecodeCheck decodes seconds of the first video stream (and the audio, when withAudio)
 // from at (seconds), failing on any error or when no frame comes out.
 func DecodeCheck(ctx context.Context, ffmpeg, path string, at, seconds float64, withAudio bool) error {
+	return decodeCheck(ctx, nil, ffmpeg, path, at, seconds, withAudio)
+}
+
+// DecodeCheckLow is DecodeCheck at low priority (LowPriority, with lookPath), for
+// background checks. It returns context.DeadlineExceeded when the decode took too long.
+func DecodeCheckLow(ctx context.Context, lookPath func(string) (string, error), ffmpeg, path string, at, seconds float64, withAudio bool) error {
+	if lookPath == nil {
+		lookPath = exec.LookPath
+	}
+	return decodeCheck(ctx, lookPath, ffmpeg, path, at, seconds, withAudio)
+}
+
+func decodeCheck(ctx context.Context, lookPath func(string) (string, error), ffmpeg, path string, at, seconds float64, withAudio bool) error {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	args := []string{"-hide_banner", "-v", "error", "-nostdin"}
@@ -240,11 +253,18 @@ func DecodeCheck(ctx context.Context, ffmpeg, path string, at, seconds float64, 
 		args = append(args, "-map", "0:a?")
 	}
 	args = append(args, "-f", "null", "-progress", "pipe:1", "-nostats", "-")
-	cmd := exec.CommandContext(ctx, ffmpeg, args...)
+	name := ffmpeg
+	if lookPath != nil {
+		name, args = LowPriority(lookPath, ffmpeg, args...)
+	}
+	cmd := exec.CommandContext(ctx, name, args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &LimitWriter{W: &stderr, N: 4096}
 	out, err := cmd.Output()
 	if err != nil {
+		if lookPath != nil && ctx.Err() != nil {
+			return ctx.Err()
+		}
 		return errors.New(LastLine(stderr.String(), err))
 	}
 	if msg := decodeErrors(stderr.String()); msg != "" {

@@ -52,6 +52,8 @@ type Request struct {
 	SubtitleOffsetMS, AudioOffsetMS *int
 	// SubtitleStyle is how this person wants text subtitles to look (PLAY-20), for burn-in.
 	SubtitleStyle SubtitleStyle
+	// NightMode converts the audio with a dialogue boost and compression (video only).
+	NightMode bool
 }
 
 // Session is an active playback.
@@ -339,7 +341,7 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 	s.LimitKbps, s.LimitReason = MaxKbps(q, cfg.RemoteAccess)
 	m.offsets(ctx, s, r)
 	limits := Limits{MaxKbps: s.LimitKbps, Remote: r.Remote, PreferHEVC: r.Remote && cfg.Transcoder.PreferHEVCRemote,
-		Resync: s.AudioOffsetMS != 0 && s.Media.Video != nil && s.Media.Audio != nil}
+		Resync: s.AudioOffsetMS != 0 && s.Media.Video != nil && s.Media.Audio != nil, NightMode: r.NightMode}
 	s.Decision = Decide(s.Media, r.Profile, limits)
 	// Copied video is cut on its own keyframes; without an index of them, transcode instead.
 	var plan []float64
@@ -373,7 +375,7 @@ func (m *Manager) Start(ctx context.Context, r Request) (*Session, error) {
 			job.VideoIndex, job.VideoCodec = v.Index, v.Codec
 		}
 		if a := s.Media.Audio; a != nil {
-			job.AudioIndex, job.AudioCodec = a.Index, a.Codec
+			job.AudioIndex, job.AudioCodec, job.AudioChannels = a.Index, a.Codec, a.Channels
 		}
 		if sub := s.Media.Subtitle; sub != nil && s.Decision.BurnSubtitle {
 			job.SubIndex, job.SubExternal, job.SubImage = sub.Index, sub.External, sub.IsImage()

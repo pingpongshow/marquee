@@ -132,6 +132,8 @@ type Selection = {
   /** Timing offsets (PLAY-17); unset lets the server use what this user last chose for the file. */
   subOffset?: number;
   audioOffset?: number;
+  /** Night mode (dialogue boost); unset lets the server use this person's default. */
+  nightMode?: boolean;
 };
 
 /** Playback speeds (PLAY-19). Each new video starts at 1×. */
@@ -354,6 +356,7 @@ export function VideoPlayer({
               measuredKbps,
               subtitleOffsetMs: sel.subOffset,
               audioOffsetMs: sel.audioOffset,
+              nightMode: sel.nightMode,
             },
           }),
         );
@@ -1194,6 +1197,14 @@ export function VideoPlayer({
                   onChange={changeAudioOffset}
                 />
               )}
+              {sess && !!file?.videoCodec && (
+                <MenuSwitch
+                  label="Night mode"
+                  help="Quieter loud scenes, clearer dialogue"
+                  checked={!!sess.nightMode}
+                  onChange={(on) => restart({ nightMode: on }, true)}
+                />
+              )}
               <MenuHeading>Subtitles</MenuHeading>
               <MenuItem
                 active={!sess?.subtitleStreamId}
@@ -1329,6 +1340,11 @@ export function VideoPlayer({
                   ? ` · limited to ${(sess.limitKbps / 1000).toFixed(1)} Mbps by ${sess.limitReason}`
                   : ""}
               </div>
+              {sess.nightMode && (
+                <div className="text-white/70">
+                  Night mode: dialogue lifted, loud scenes quieter
+                </div>
+              )}
               {file && (
                 <div className="text-white/50">
                   Source: {file.container?.toUpperCase()} ·{" "}
@@ -1403,6 +1419,46 @@ function OffsetStepper({
         </button>
       </div>
     </div>
+  );
+}
+
+/** An on/off row with a short explanation underneath. */
+function MenuSwitch({
+  label,
+  help,
+  checked,
+  onChange,
+}: {
+  label: string;
+  help: string;
+  checked: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  return (
+    <button
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="flex w-full items-center gap-3 rounded px-3 py-2 text-left hover:bg-white/10"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block">{label}</span>
+        <span className="block text-xs text-white/50">{help}</span>
+      </span>
+      <span
+        className={clsx(
+          "relative h-5 w-9 shrink-0 rounded-full transition-colors",
+          checked ? "bg-accent" : "bg-white/25",
+        )}
+      >
+        <span
+          className={clsx(
+            "absolute top-0.5 left-0.5 size-4 rounded-full bg-white transition-transform",
+            checked && "translate-x-4",
+          )}
+        />
+      </span>
+    </button>
   );
 }
 

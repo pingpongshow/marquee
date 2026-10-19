@@ -177,12 +177,17 @@ const (
 	// permissions); its titles are kept. Like dvr_quota it isn't in the API's AlertType enum;
 	// the API exposes it as NotificationSettings.libraryUnreadableAlert.
 	AlertLibraryUnreadable = "library_unreadable"
+	// AlertFileDamaged ("New file is damaged"): the Check new files task found a new video
+	// file whose start or end doesn't decode, or whose length is wrong. Like dvr_quota it
+	// isn't in the API's AlertType enum, and it has no API flag yet, so it isn't emailed (it
+	// shows in the bell and goes to webhooks).
+	AlertFileDamaged = "file_damaged"
 )
 
 // AlertTypes lists every alert type.
 var AlertTypes = []string{AlertTaskFailed, AlertDiskLow, AlertRecordingFailed, AlertSourceFailed,
 	AlertIntegrationDown, AlertFailedSignIns, AlertNewAdminDevice, AlertPlaybackFailed, AlertVODSaveFailed, AlertVODSaveDone, AlertDVRQuota, AlertPlexSync,
-	AlertOptimizeFailed, AlertLibraryUnreadable}
+	AlertOptimizeFailed, AlertLibraryUnreadable, AlertFileDamaged}
 
 // DefaultAlerts are on for new servers, and were turned on once for existing ones by the
 // alerts version 2 upgrade (an admin can turn them off; they stay off).

@@ -64,22 +64,24 @@ func (e Encoders) Available(order []string) []string {
 
 // Job describes one FFmpeg run producing HLS for a session.
 type Job struct {
-	Input        string
-	Decision     Decision
-	VideoIndex   int // container stream index (-1 = none)
-	AudioIndex   int
-	SubIndex     int    // container stream index of a subtitle to burn (-1 = none)
-	SubRelIndex  int    // index among the file's subtitle streams (for the subtitles filter)
-	SubExternal  string // external subtitle file to burn
-	SubImage     bool   // the subtitle to burn is a bitmap format (overlay) rather than text (libass)
-	VideoCodec   string // source video codec (for stream-copy tagging)
-	AudioCodec   string // source audio codec (for stream-copy fixes)
-	StartSegment int
-	Plan         []float64 // segment start times (seconds); nil = every SegmentSeconds
-	Dir          string
-	Encoder      string // nvenc, qsv, software
-	QSVDevice    string
-	Preset       string // speed, balanced, quality
+	Input       string
+	Decision    Decision
+	VideoIndex  int // container stream index (-1 = none)
+	AudioIndex  int
+	SubIndex    int    // container stream index of a subtitle to burn (-1 = none)
+	SubRelIndex int    // index among the file's subtitle streams (for the subtitles filter)
+	SubExternal string // external subtitle file to burn
+	SubImage    bool   // the subtitle to burn is a bitmap format (overlay) rather than text (libass)
+	VideoCodec  string // source video codec (for stream-copy tagging)
+	AudioCodec  string // source audio codec (for stream-copy fixes)
+	// AudioChannels is the source audio's channel count (night mode's downmix needs it).
+	AudioChannels int
+	StartSegment  int
+	Plan          []float64 // segment start times (seconds); nil = every SegmentSeconds
+	Dir           string
+	Encoder       string // nvenc, qsv, software
+	QSVDevice     string
+	Preset        string // speed, balanced, quality
 	// Timing offsets (PLAY-17), in ms: positive plays the audio / shows burned-in subtitles later.
 	AudioOffsetMS, SubOffsetMS int
 	// OutputFile, when set, writes one fast-start MP4 there (offline downloads) instead of
@@ -285,6 +287,9 @@ func (j Job) Args() []string {
 				a = append(a, "-bsf:a", "aac_adtstoasc") // AAC from MPEG-TS has ADTS headers MP4 can't hold
 			}
 		} else {
+			if d.NightMode {
+				a = append(a, "-filter:a", NightModeFilter(j.AudioChannels))
+			}
 			a = append(a, "-c:a", "aac", "-ac", strconv.Itoa(d.AudioChannels), "-b:a", fmt.Sprintf("%dk", audioKbps(d.AudioChannels)))
 		}
 	}
@@ -307,6 +312,23 @@ func (j Job) Args() []string {
 		"-avoid_negative_ts", "disabled", "-max_muxing_queue_size", "4096",
 		"-f", "mp4", "-movflags", movflags, "pipe:1")
 	return a
+}
+
+// nightModeDynamics quietens loud passages and lifts quiet ones (dynamic-range compression),
+// then keeps the peaks below full scale.
+const nightModeDynamics = "acompressor=threshold=-24dB:ratio=4:attack=10:release=250:makeup=6dB,alimiter=limit=0.95"
+
+// NightModeFilter is the audio filter for night mode (dialogue boost): surround sources are
+// downmixed to stereo with the centre (dialogue) channel lifted, then everything is
+// compressed and limited. The source is first normalised to 5.1 (FFmpeg remixes any other
+// layout, e.g. 7.1, 5.1(side), 4.0 or an unlabelled one), so the downmix never names a
+// channel the source lacks. Stereo and mono sources are only compressed.
+func NightModeFilter(sourceChannels int) string {
+	if sourceChannels <= 2 {
+		return nightModeDynamics
+	}
+	return "aformat=channel_layouts=5.1," +
+		"pan=stereo|FL=0.5*FC+0.35*FL+0.25*BL|FR=0.5*FC+0.35*FR+0.25*BR," + nightModeDynamics
 }
 
 func isImageFile(p string) bool {

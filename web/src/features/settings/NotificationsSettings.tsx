@@ -45,6 +45,7 @@ export function NotificationsSettings() {
       plexSyncAlert: x.plexSyncAlert,
       optimizeFailedAlert: x.optimizeFailedAlert,
       libraryUnreadableAlert: x.libraryUnreadableAlert,
+      fileDamagedAlert: x.fileDamagedAlert,
       recipientsAllAdmins: x.recipientsAllAdmins,
       recipients: x.recipients,
       diskThresholdPercent: x.diskThresholdPercent,
@@ -150,6 +151,12 @@ export function NotificationsSettings() {
               help="A scan couldn't read one of a library's folders (a drive that's offline, permissions). Its titles are kept until it can be read again; another notice says when it can. Emailed by default."
               checked={!!d.libraryUnreadableAlert}
               onChange={(v) => update({ libraryUnreadableAlert: v })}
+            />
+            <Toggle
+              label="New file is damaged"
+              help="A newly added file failed its playback check (its start or end doesn't decode); it's listed in Library Health → Unplayable files."
+              checked={!!d.fileDamagedAlert}
+              onChange={(v) => update({ fileDamagedAlert: v })}
             />
           </div>
           <Field label="Low disk space threshold" help="Alert when a volume has less free space than this.">

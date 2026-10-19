@@ -5,6 +5,7 @@ import { api, imageUrl, unwrap } from "@/api/client";
 import type { components } from "@/api/schema.gen";
 import { Card, Spinner } from "@/components/ui";
 import { ResourcesCard, WatchStatsCard } from "./ServerStats";
+import { StorageCard } from "./StorageCard";
 
 type Session = components["schemas"]["PlaybackSessionInfo"];
 
@@ -226,6 +227,7 @@ export function DashboardSettings() {
       </Card>
       {st && <ResourcesCard status={st} />}
       <WatchStatsCard />
+      <StorageCard />
     </div>
   );
 }

@@ -330,13 +330,15 @@ Running the import again updates everything without duplicating it. New users cr
 
 | Check | Severity | What it finds |
 |---|---|---|
-| Unplayable files | Problem | Files that couldn't be read: no audio or video, no duration, or ffprobe failed. |
+| Unplayable files | Problem | Files that couldn't be read (no audio or video, no duration, or ffprobe failed), and new video files that are damaged: the **Check new files** task found that their start or end doesn't decode, or that their length is wrong. The reason is shown with each file. |
 | Playback errors | Problem | Titles that failed to play in the last 30 days. |
 | Duplicates | Warning | The same film or show more than once in a library, or a title with two files of the same resolution and edition. |
 | Unmatched | Warning | Movies, shows, artists and albums without online metadata. |
 | Missing subtitles | Warning | Movies and episodes still missing subtitles their Bazarr language profile asks for. Needs Bazarr; otherwise shown as unavailable. |
 | Upgrade candidates | Info | Movies and episodes whose best file is SD or 720p, or has a low bitrate for its resolution (under 10 Mb/s for 4K or 3 Mb/s for 1080p in H.264, half that for HEVC, AV1 and VP9). |
 | Missing artwork | Info | Movies, shows and albums without a poster. |
+
+Damaged files are found only among movies, episodes and personal videos added (or replaced) since the check arrived; files that were already in the library aren't checked. Replacing a damaged file with a good copy clears it after the next scan and check. Live TV recordings are left to the DVR.
 
 Each title in a check has **Open**, **Refresh metadata** and **Ignore** (which hides it from that check; **Undo** brings it back). Movies and shows also have **Fix match**, and **Missing subtitles** has **Download with Bazarr**.
 

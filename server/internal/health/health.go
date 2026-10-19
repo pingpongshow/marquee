@@ -76,15 +76,16 @@ const lowBitrate = `kbps > 0 AND kbps < (CASE res WHEN '4K' THEN 10000 ELSE 3000
 
 var checks = []check{
 	{id: "unplayable", title: "Unplayable files", severity: "error",
-		description: "Files that couldn't be read: no audio or video, no duration, or ffprobe failed.",
+		description: "Files that couldn't be read (no audio or video, no duration, or ffprobe failed), and new video files that are damaged: their start or end doesn't decode, or their length is wrong.",
 		query: `SELECT i.id AS item_id, f.id AS file_id, f.path AS path, CASE
 			WHEN pf.error IS NOT NULL THEN 'Couldn''t be read: ' || pf.error
+			WHEN f.check_error IS NOT NULL THEN f.check_error
 			WHEN NOT EXISTS (SELECT 1 FROM streams s WHERE s.file_id = f.id AND s.kind IN ('video', 'audio')) THEN 'No audio or video streams'
 			ELSE 'Zero duration' END AS detail, 0 AS rank
 		FROM media_files f CROSS JOIN media_versions v ON v.id = f.version_id CROSS JOIN items i ON i.id = v.item_id
 		LEFT JOIN probe_failures pf ON pf.path = f.path
 		WHERE f.available = 1 AND i.extra_type IS NULL AND i.type NOT IN ('photo')
-			AND (pf.path IS NOT NULL OR COALESCE(f.duration_ms, 0) <= 0
+			AND (pf.path IS NOT NULL OR f.check_error IS NOT NULL OR COALESCE(f.duration_ms, 0) <= 0
 				OR NOT EXISTS (SELECT 1 FROM streams s WHERE s.file_id = f.id AND s.kind IN ('video', 'audio')))`},
 	{id: "playbackErrors", title: "Playback errors", severity: "error",
 		description: "Titles that failed to play in the last 30 days.",

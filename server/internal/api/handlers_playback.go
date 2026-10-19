@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"time"
 
+	"marquee/internal/auth"
 	"marquee/internal/items"
 	"marquee/internal/netclass"
 	"marquee/internal/playback"
@@ -71,6 +72,7 @@ func (h *Handlers) StartPlayback(ctx context.Context, req StartPlaybackRequestOb
 	set(&r.SubtitleStreamID, b.SubtitleStreamId)
 	set(&r.StartMS, b.StartMs)
 	set(&r.Preload, b.Preload)
+	r.NightMode = nightMode(b.NightMode, u.Preferences)
 	r.SubtitleOffsetMS, r.AudioOffsetMS = b.SubtitleOffsetMs, b.AudioOffsetMs
 	set(&r.Quality.RequestedKbps, b.MaxBitrateKbps)
 	set(&r.Quality.MeasuredKbps, b.MeasuredKbps)
@@ -98,7 +100,8 @@ func (h *Handlers) StartPlayback(ctx context.Context, req StartPlaybackRequestOb
 		Decision: toAPIDecision(s.Decision), LimitKbps: nz(s.LimitKbps), LimitReason: nz(s.LimitReason),
 		NetworkClass: NetworkClass(ri.Class), AudioStreamId: nz(s.AudioStreamID), SubtitleStreamId: nz(s.SubtitleStreamID),
 		TrackGainDb: f32(s.TrackGainDB), AlbumGainDb: f32(s.AlbumGainDB), Peak: f32(s.Peak),
-		SubtitleOffsetMs: ptr(s.SubtitleOffsetMS), AudioOffsetMs: ptr(s.AudioOffsetMS), Markers: []Marker{}}
+		SubtitleOffsetMs: ptr(s.SubtitleOffsetMS), AudioOffsetMs: ptr(s.AudioOffsetMS), Markers: []Marker{},
+		NightMode: ptr(s.Decision.NightMode)}
 	switch {
 	case s.Decision.Method == playback.DirectPlay:
 		out.Url, out.Protocol, out.ContentType = base+"file", File, ptr(playback.FileContentType(s))
@@ -131,6 +134,15 @@ func (h *Handlers) StartPlayback(ctx context.Context, req StartPlaybackRequestOb
 		rows.Close()
 	}
 	return StartPlayback200JSONResponse(out), nil
+}
+
+// nightMode settles a session's night mode: what the player asked for, else this person's
+// default.
+func nightMode(requested *bool, p auth.Preferences) bool {
+	if requested != nil {
+		return *requested
+	}
+	return p.NightMode
 }
 
 func must[T any](v T, _ error) T { return v }

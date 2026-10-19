@@ -35,6 +35,7 @@ import (
 	"marquee/internal/scrobble"
 	"marquee/internal/settings"
 	"marquee/internal/soundprint"
+	"marquee/internal/storage"
 	"marquee/internal/subtitles"
 	"marquee/internal/syncplay"
 	"marquee/internal/sysstats"
@@ -115,6 +116,9 @@ type Handlers struct {
 	// VODSuggest suggests films and series on demand from each person's taste; may be nil
 	// (no suggestions).
 	VODSuggest *vodsuggest.Service
+	// Storage is the storage overview (Dashboard → Storage, admins only); made on demand
+	// (without volumes) when nil.
+	Storage *storage.Service
 	// Optimize is the library optimizer (Library Health → Large files, admins only); may be nil.
 	Optimize *optimize.Service
 }

@@ -198,6 +198,9 @@ Three are emailed by default (VOD download failed, Large files conversion failed
 | Plex sync is failing | Off | Plex rejects the token, or hasn't been reachable for three sync runs in a row. |
 | Large files conversion failed | **On** | A conversion in Library Health → Large files failed (not one skipped for saving too little). The original is unchanged. |
 | Library folder can't be read | **On** | A scan couldn't read one of a library's folders (a drive that's offline, permissions). Its titles are kept until it can be read again; another notice says when it can. |
+| New file is damaged | Off | A newly added file failed its playback check (its start or end doesn't decode). It's listed in Library Health → Unplayable files. |
+
+
 
 **Recommended:** also email *A scheduled task failed* (so you hear if backups stop), *Disk space is low* and *Repeated failed sign-ins* if the server is reachable from outside your home.
 
@@ -280,6 +283,7 @@ Each task shows its schedule, when it last ran, its last result, and a **Running
 | Generate missing thumbnails | Daily in the maintenance window | Takes a frame from episodes and personal videos that have no thumbnail. A real still found later replaces it. |
 | Find intros and credits | Daily in the maintenance window | Compares the audio of episodes in each season to find intros and end credits for Skip Intro and Skip Credits. |
 | Commercials in recordings | Daily in the maintenance window | Finds the commercials in Live TV recordings and, when Settings → Live TV says so, cuts them out (the original goes to the media trash). |
+| Check new files | Every hour | Checks each movie, episode and personal video added to the library (or replaced) for damage: a few seconds at its start and near its end must decode, and its length must be right where it's known. Damaged files are listed in Library Health → Unplayable files. Also runs after a scan adds files; low priority, one file at a time. Files already in the library before this check arrived aren't checked. |
 | Optimize large files | Shows the queue's state | Converts the files queued in Library Health → Large files, giving way to playback. Off, the queue waits (running conversions are suspended); **Run now** wakes it. |
 | Fetch lyrics | Every day | With online lyrics on, looks up lyrics on LRCLIB for tracks not looked up yet, about one a second. |
 | Index lyric themes | Every 6 hours | With AI on, reads track lyrics with the embedding model so Muse can find songs about a theme. |
@@ -325,6 +329,11 @@ Each backup in the list has:
 - **Now playing:** each session's title, person, device, local or remote, how it's delivered (Direct Play, Direct Stream or Transcode, with the reasons), the encoder, bitrate and progress. The square button stops a stream.
 - **Recent plays:** the last 40 plays, with who played them and how. Plays imported from Plex are marked.
 - The footer shows the Marquee version, when the server started and how many items each library holds.
+- **Storage:** where the space goes.
+  - **Disks:** each disk Marquee uses (the config, transcode and recordings folders and every library folder) as a bar of used space, with the free space and the percentage free. Folders on the same disk share one bar, named for everything on it. The bar turns red under 10% free. The disk space alert in Notifications watches the same disks.
+  - **Libraries:** each library's size, file count and how much it grew or shrank over the period you pick (the last 30 or 90 days, or the last year). Only files that are there count. Libraries Live TV recordings go into are listed too.
+  - **Growth:** the libraries' sizes stacked over the period. Marquee records each library's size once a day and keeps a year of readings, so the chart starts the day you upgrade and fills in from there.
+  - **Biggest titles:** the largest movies, shows (all their episodes together) and home videos, biggest first. Click one to open it. A movie or show whose files average 20 GB or more has an **Optimize** link to Library Health → Large files, which can make a smaller copy.
 
 ## Statistics
 

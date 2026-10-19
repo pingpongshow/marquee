@@ -4484,6 +4484,8 @@ export interface components {
             plexSyncAlert?: boolean;
             /** @description The optimize_failed alert is emailed: a Library Health → Large files conversion failed (not one skipped for saving too little). Emailed by default. (Not in AlertType; notifications carry type optimize_failed.) */
             optimizeFailedAlert?: boolean;
+            /** @description The file_damaged alert is emailed: a newly added file failed its playback check (see Library Health → Unplayable files). Not emailed by default. (Not in AlertType; notifications carry type file_damaged.) */
+            fileDamagedAlert?: boolean;
             /** @description The library_unreadable alert is emailed: a scan couldn't read one of a library's folders (offline drive, permissions), so its titles were kept as they were. Emailed by default. (Not in AlertType; notifications carry type library_unreadable.) */
             libraryUnreadableAlert?: boolean;
             /** @description Mail alerts to every administrator with an email address. */
@@ -4510,6 +4512,7 @@ export interface components {
             plexSyncAlert?: boolean;
             optimizeFailedAlert?: boolean;
             libraryUnreadableAlert?: boolean;
+            fileDamagedAlert?: boolean;
             recipientsAllAdmins?: boolean;
             recipients?: number[];
             diskThresholdPercent?: number;

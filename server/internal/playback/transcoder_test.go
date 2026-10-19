@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -119,6 +120,47 @@ func TestDelayMoovOnlyForDolbyCopy(t *testing.T) {
 		got := strings.Contains(strings.Join(j.Args(), " "), "delay_moov")
 		if got != c.want {
 			t.Errorf("%s copy=%v: delay_moov %v, want %v", c.codec, c.copy, got, c.want)
+		}
+	}
+}
+
+// TestNightModeRealFFmpeg runs night mode's command lines on short surround and stereo
+// clips: the filter chain must be accepted and give stereo AAC with the video copied.
+func TestNightModeRealFFmpeg(t *testing.T) {
+	ff := ffmpegPath(t)
+	dir := t.TempDir()
+	for _, tc := range []struct {
+		layout string
+		ch     int
+		offset int
+	}{{"5.1(side)", 6, 0}, {"7.1", 8, 0}, {"5.1", 6, 250}, {"stereo", 2, 0}, {"mono", 1, 0}} {
+		in := filepath.Join(dir, "in"+strconv.Itoa(tc.ch)+".mkv")
+		out, err := exec.Command(ff, "-hide_banner", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=24:duration=3",
+			"-f", "lavfi", "-i", "sine=frequency=440:duration=3,aformat=channel_layouts=mono,pan="+tc.layout+"|c0=c0",
+			"-c:v", "libx264", "-preset", "ultrafast", "-g", "24", "-c:a", "ac3", in).CombinedOutput()
+		if err != nil {
+			t.Skipf("can't build sample: %v %s", err, out)
+		}
+		m := Media{Container: "mkv", DurationMS: 3000, BitrateKbps: 500,
+			Video: &VideoStream{Index: 0, Codec: "h264", Width: 320, Height: 180, BitDepth: 8}, Audio: &AudioStream{Index: 1, Codec: "ac3", Channels: tc.ch}}
+		d := Decide(m, appleTV, Limits{NightMode: true, Resync: tc.offset != 0})
+		j := Job{Input: in, Decision: d, VideoIndex: 0, AudioIndex: 1, AudioChannels: tc.ch, SubIndex: -1, Dir: dir, Encoder: "software", AudioOffsetMS: tc.offset}
+		dst := filepath.Join(dir, "out.mp4")
+		f, _ := os.Create(dst)
+		cmd := exec.Command(ff, j.Args()...)
+		var msg strings.Builder
+		cmd.Stdout, cmd.Stderr = f, &msg
+		err = cmd.Run()
+		f.Close()
+		if err != nil {
+			t.Fatalf("%s: ffmpeg failed: %v %s\n%s", tc.layout, err, msg.String(), strings.Join(j.Args(), " "))
+		}
+		if msg.Len() > 0 {
+			t.Logf("%s: %s", tc.layout, msg.String())
+		}
+		probe, _ := exec.Command("ffprobe", "-v", "error", "-show_entries", "stream=codec_name,channels", "-of", "csv=p=0", dst).Output()
+		if got := strings.Fields(string(probe)); !slices.Equal(got, []string{"h264", "aac,2"}) {
+			t.Errorf("%s: output streams %q", tc.layout, probe)
 		}
 	}
 }

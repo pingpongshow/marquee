@@ -104,6 +104,9 @@ type Limits struct {
 	// Resync rules out direct play: the audio is shifted (an audio sync offset, PLAY-17),
 	// which needs the file repackaged.
 	Resync bool
+	// NightMode converts the audio with a dialogue boost and dynamic-range compression
+	// (see NightModeFilter): it rules out direct play and copying the audio.
+	NightMode bool
 }
 
 // Decision is the plan for a session.
@@ -122,8 +125,11 @@ type Decision struct {
 	SubtitleASS   bool // deliver it as the original ASS (client renders styling and fonts)
 	SubtitleHLS   bool // deliver it as a WebVTT rendition in the HLS master playlist
 	ToneMap       bool
-	Reasons       []string
-	retag         bool // video is fine apart from its codec tag; direct stream fixes it
+	// NightMode: the audio is converted to stereo with the dialogue lifted and loud scenes
+	// compressed (NightModeFilter). Only for video played over HLS.
+	NightMode bool
+	Reasons   []string
+	retag     bool // video is fine apart from its codec tag; direct stream fixes it
 }
 
 func has(list []string, v string) bool { return slices.Contains(list, strings.ToLower(v)) }
@@ -226,7 +232,13 @@ func Decide(m Media, p DeviceProfile, l Limits) Decision {
 	if l.Resync && p.HLS {
 		reason("audio sync offset needs repackaging")
 	}
-	if videoOK && audioOK && containerOK && bitrateOK && !d.BurnSubtitle && !d.SubtitleHLS && !(l.Resync && p.HLS) {
+	// Night mode needs the audio converted, so the file can't be played as-is; clients that
+	// can't play HLS keep the original audio.
+	d.NightMode = l.NightMode && a != nil && p.HLS
+	if d.NightMode {
+		reason("night mode converts the audio")
+	}
+	if videoOK && audioOK && containerOK && bitrateOK && !d.BurnSubtitle && !d.SubtitleHLS && !(l.Resync && p.HLS) && !d.NightMode {
 		d.Method = DirectPlay
 		d.VideoCopy, d.AudioCopy = true, true
 		return d
@@ -240,10 +252,7 @@ func Decide(m Media, p DeviceProfile, l Limits) Decision {
 		d.Method = DirectStream
 		d.VideoCopy = true
 		d.AudioCopy = a == nil || (has(p.HLSAudioCodecs, a.Codec) && (p.MaxAudioChannels == 0 || a.Channels <= p.MaxAudioChannels) && !heAAC(a))
-		if !d.AudioCopy {
-			d.AudioCodec, d.AudioChannels = audioTarget(a, p)
-			d.AudioKbps = audioKbps(d.AudioChannels)
-		}
+		d.setAudioTarget(a, p)
 		return d
 	}
 
@@ -265,11 +274,23 @@ func Decide(m Media, p DeviceProfile, l Limits) Decision {
 		}
 	}
 	d.AudioCopy = a == nil || (has(p.HLSAudioCodecs, a.Codec) && (p.MaxAudioChannels == 0 || a.Channels <= p.MaxAudioChannels) && l.MaxKbps == 0 && !heAAC(a))
+	d.setAudioTarget(a, p)
+	return d
+}
+
+// setAudioTarget picks the converted audio's format when the audio isn't copied. Night
+// mode always converts, to stereo AAC.
+func (d *Decision) setAudioTarget(a *AudioStream, p DeviceProfile) {
+	if d.NightMode {
+		d.AudioCopy = false
+		d.AudioCodec, d.AudioChannels = "aac", 2
+		d.AudioKbps = audioKbps(2)
+		return
+	}
 	if !d.AudioCopy {
 		d.AudioCodec, d.AudioChannels = audioTarget(a, p)
 		d.AudioKbps = audioKbps(d.AudioChannels)
 	}
-	return d
 }
 
 func audioTarget(a *AudioStream, p DeviceProfile) (string, int) {

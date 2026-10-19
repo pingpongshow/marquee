@@ -207,9 +207,12 @@ Each person sets their own preferences in the web app under avatar → **Account
 | **Quality at home** | Original (no transcoding) | Original, or 1080p · 12 Mbps down to 360p · 1 Mbps |
 | **Quality away from home** | Automatic | Automatic (adapts to your connection), or a fixed step |
 | **Play trailers before movies** | On | When the server has cinema trailers on and a film starts from the beginning. |
+| **Night mode by default** | Off | Starts videos with night mode on (see below). |
 | **Ask me to rate after watching** | On | Shown when the server asks people to rate (**Settings → General**). |
 
 Choose **Save preferences** when you're done.
+
+**Night mode** makes loud scenes quieter and dialogue clearer: the server lifts the centre (dialogue) channel, mixes the sound down to stereo and evens out the volume. Switch it for the video you're watching in the player's **Audio and subtitles** menu (playback carries on where it was), or turn on **Night mode by default** above. The picture is still sent as it is when it can be; only the sound is converted, so **Playback info** shows *night mode converts the audio*. Downloads for offline viewing keep the original sound.
 
 **Subtitle appearance** changes how text subtitles look in every app, with a live preview. Styled (ASS) subtitles keep their own look.
 

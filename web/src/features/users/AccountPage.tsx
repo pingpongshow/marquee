@@ -344,6 +344,12 @@ export function AccountPage() {
           checked={p.cinemaTrailers !== false}
           onChange={(v) => setPrefs({ ...prefs, cinemaTrailers: v })}
         />
+        <Toggle
+          label="Night mode by default"
+          help="Quieter loud scenes, clearer dialogue. Switch it per video in the player's Audio and subtitles menu."
+          checked={!!p.nightMode}
+          onChange={(v) => setPrefs({ ...prefs, nightMode: v })}
+        />
         {info.data?.ratingPrompt && (
           <Toggle
             label="Ask me to rate after watching"

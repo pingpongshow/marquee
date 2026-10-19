@@ -59,3 +59,37 @@ func TestJobOffsets(t *testing.T) {
 		t.Errorf("resync direct played: %+v", d)
 	}
 }
+
+func TestJobNightMode(t *testing.T) {
+	m := archer()
+	m.Audio = &AudioStream{Codec: "eac3", Channels: 6}
+	surround := "-filter:a aformat=channel_layouts=5.1,pan=stereo|FL=0.5*FC+0.35*FL+0.25*BL|FR=0.5*FC+0.35*FR+0.25*BR," +
+		"acompressor=threshold=-24dB:ratio=4:attack=10:release=250:makeup=6dB,alimiter=limit=0.95 -c:a aac -ac 2 -b:a 192k"
+	// 5.1 source, direct stream: video copied, audio downmixed with the dialogue lifted.
+	j := Job{Input: "/m/a.mkv", Decision: Decide(m, appleTV, Limits{NightMode: true}), VideoIndex: 0, AudioIndex: 1, AudioChannels: 6,
+		SubIndex: -1, Dir: "/t", Encoder: "software"}
+	cmd := strings.Join(j.Args(), " ")
+	if !strings.Contains(cmd, "-c:v copy") || !strings.Contains(cmd, surround) || strings.Contains(cmd, "-c:a copy") {
+		t.Errorf("5.1 night mode:\n%s", cmd)
+	}
+	// Stereo source: only compression and the limiter.
+	m.Audio = &AudioStream{Codec: "aac", Channels: 2}
+	j.Decision, j.AudioChannels = Decide(m, appleTV, Limits{NightMode: true}), 2
+	cmd = strings.Join(j.Args(), " ")
+	if !strings.Contains(cmd, "-filter:a acompressor=threshold=-24dB:ratio=4:attack=10:release=250:makeup=6dB,alimiter=limit=0.95 -c:a aac -ac 2") ||
+		strings.Contains(cmd, "pan=") {
+		t.Errorf("stereo night mode:\n%s", cmd)
+	}
+	// Alongside a video transcode and an audio offset (PLAY-17): the shifted second input is filtered.
+	j = Job{Input: "/m/a.mkv", Decision: Decide(archer(), chrome, Limits{NightMode: true, Resync: true}), VideoIndex: 0, AudioIndex: 1, AudioChannels: 6,
+		SubIndex: -1, Dir: "/t", Encoder: "software", AudioOffsetMS: 300}
+	cmd = strings.Join(j.Args(), " ")
+	if !strings.Contains(cmd, "-itsoffset 0.300") || !strings.Contains(cmd, "-map 1:1 "+surround) || !strings.Contains(cmd, "filter_complex") {
+		t.Errorf("transcode + offset night mode:\n%s", cmd)
+	}
+	// Off: no audio filter.
+	j.Decision = Decide(archer(), chrome, Limits{})
+	if cmd = strings.Join(j.Args(), " "); strings.Contains(cmd, "-filter:a") {
+		t.Errorf("filter without night mode:\n%s", cmd)
+	}
+}

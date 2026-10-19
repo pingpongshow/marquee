@@ -1,6 +1,9 @@
 package playback
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 var chrome = DeviceProfile{
 	Containers: []string{"mp4", "webm"}, VideoCodecs: []string{"h264", "vp9", "av1"}, AudioCodecs: []string{"aac", "mp3", "opus", "flac"},
@@ -146,5 +149,37 @@ func TestHEAACIsConvertedWhenRepackaged(t *testing.T) {
 	m.Audio.Profile = "LC"
 	if d := Decide(m, chrome, Limits{}); d.Method != DirectStream || !d.AudioCopy {
 		t.Fatalf("AAC-LC should be copied: %+v", d)
+	}
+}
+
+func TestNightModeConvertsAudioAndKeepsVideo(t *testing.T) {
+	// A file that would direct play becomes a direct stream: video copied, audio converted.
+	m := Media{Container: "mp4", BitrateKbps: 5000, Video: &VideoStream{Codec: "h264", Height: 1080, BitDepth: 8}, Audio: &AudioStream{Codec: "aac", Channels: 2}}
+	d := Decide(m, chrome, Limits{NightMode: true})
+	if d.Method != DirectStream || !d.VideoCopy || d.AudioCopy || !d.NightMode || d.AudioCodec != "aac" || d.AudioChannels != 2 || d.AudioKbps != 192 {
+		t.Fatalf("direct play with night mode: %+v", d)
+	}
+	if !slices.Contains(d.Reasons, "night mode converts the audio") {
+		t.Errorf("no night mode reason: %v", d.Reasons)
+	}
+	// Copied surround audio is converted to stereo.
+	m6 := archer()
+	m6.Audio = &AudioStream{Codec: "eac3", Channels: 6}
+	if d := Decide(m6, appleTV, Limits{NightMode: true}); d.Method != DirectStream || !d.VideoCopy || d.AudioCopy || d.AudioChannels != 2 {
+		t.Fatalf("direct stream with night mode: %+v", d)
+	}
+	// A transcode keeps transcoding, with the audio converted.
+	if d := Decide(archer(), chrome, Limits{NightMode: true}); d.Method != Transcode || d.AudioCopy || !d.NightMode || d.AudioChannels != 2 {
+		t.Fatalf("transcode with night mode: %+v", d)
+	}
+	// Without HLS there is nothing to convert into; the file plays as it is.
+	noHLS := chrome
+	noHLS.HLS = false
+	if d := Decide(m, noHLS, Limits{NightMode: true}); d.Method != DirectPlay || d.NightMode {
+		t.Fatalf("no HLS: %+v", d)
+	}
+	// Off: unchanged.
+	if d := Decide(m, chrome, Limits{}); d.Method != DirectPlay || d.NightMode {
+		t.Fatalf("off: %+v", d)
 	}
 }
