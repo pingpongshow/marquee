@@ -48,6 +48,8 @@ class Marquee(context: Context) {
     /** Watched marks shown at once, and a signal for rows and pages to reload (USER-6). */
     val watch = WatchState()
     val favorites = FavoriteState()
+    /** Kids' time limits: why video stopped, and the last status for playing downloads offline. */
+    val timeLimits: TimeLimits by lazy { TimeLimits(appContext, this) }
     /**
      * Videos playing in order (a video playlist, USER-7): the player moves on to the next of
      * these when one ends. Cleared when a video outside it is played.

@@ -31,7 +31,8 @@ fun MarqueeRoot(marquee: Marquee, music: app.marquee.music.MusicController, down
     val switches by marquee.profileSwitches.collectAsState()
     LaunchedEffect(Unit) { if (marquee.server != null) marquee.reconnect() }
     // Signed in (even offline): resume downloads and send plays made offline.
-    LaunchedEffect(state) { if (state == Marquee.State.SignedIn) downloads.attach() }
+    // Smart downloads' background runs follow its settings (phones and tablets).
+    LaunchedEffect(state) { if (state == Marquee.State.SignedIn) { downloads.attach(); if (!marquee.isTv) downloads.smart.schedule() } }
     CompositionLocalProvider(LocalMarquee provides marquee, LocalMusic provides music, LocalDownloads provides downloads, LocalRemote provides remote) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             when (state) {

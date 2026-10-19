@@ -38,6 +38,7 @@ import kotlinx.serialization.Contextual
  * @param episodeCount Episodes known (0 until the series is first opened).
  * @param watchedCount Episodes the caller has watched.
  * @param watched The caller has watched every known episode.
+ * @param following The caller follows this series (new episodes are saved automatically).
  * @param year 
  * @param category 
  * @param contentRating e.g. TV-14 (TMDB's, when matched).
@@ -71,6 +72,10 @@ data class VodSeries (
     /* The caller has watched every known episode. */
     @SerialName(value = "watched")
     val watched: kotlin.Boolean,
+
+    /* The caller follows this series (new episodes are saved automatically). */
+    @SerialName(value = "following")
+    val following: kotlin.Boolean? = null,
 
     @SerialName(value = "year")
     val year: kotlin.Int? = null,

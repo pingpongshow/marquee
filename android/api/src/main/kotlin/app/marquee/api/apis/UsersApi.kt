@@ -40,6 +40,7 @@ import app.marquee.api.models.Profile
 import app.marquee.api.models.ResetInfoRequest
 import app.marquee.api.models.ScrobbleStatus
 import app.marquee.api.models.SwitchProfileRequest
+import app.marquee.api.models.TimeLimitStatus
 import app.marquee.api.models.User
 import app.marquee.api.models.UserCreate
 import app.marquee.api.models.UserUpdate
@@ -1285,6 +1286,76 @@ open class UsersApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/me/scrobbling/listenbrainz",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /me/time-limit
+     * The caller&#39;s time limit today (kids&#39; profiles): whether video may play now and how much is left. Starting playback past the limit or outside the viewing hours is refused with 403 and error code time_limit, and a session running when the time runs out ends (its progress reports answer 403 time_limit).
+     * 
+     * @return TimeLimitStatus
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun myTimeLimit() : TimeLimitStatus {
+        val localVarResponse = myTimeLimitWithHttpInfo()
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as TimeLimitStatus
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /me/time-limit
+     * The caller&#39;s time limit today (kids&#39; profiles): whether video may play now and how much is left. Starting playback past the limit or outside the viewing hours is refused with 403 and error code time_limit, and a session running when the time runs out ends (its progress reports answer 403 time_limit).
+     * 
+     * @return ApiResponse<TimeLimitStatus?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun myTimeLimitWithHttpInfo() : ApiResponse<TimeLimitStatus?> {
+        val localVariableConfig = myTimeLimitRequestConfig()
+
+        return request<Unit, TimeLimitStatus>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation myTimeLimit
+     *
+     * @return RequestConfig
+     */
+    fun myTimeLimitRequestConfig() : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/me/time-limit",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

@@ -249,6 +249,8 @@ fun VodShowScreen(nav: NavHostController, seriesId: Long) {
                                 Icon(Icons.Filled.Check, null, tint = if (showWatched) Gold else MaterialTheme.colorScheme.onSurface)
                                 Text(if (showWatched) "Watched" else "Mark watched", Modifier.padding(start = 6.dp))
                             }
+                            // Follow: new episodes saved to the library as they appear.
+                            VodFollowButton(s)
                         }
                     }
                 }

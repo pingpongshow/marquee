@@ -106,6 +106,7 @@ fun MainScreen() {
                 RatingPromptHost(!fullScreen, Modifier.align(Alignment.BottomCenter))
             }
         }
+        TimeLimitHost()
         return
     }
     Scaffold(
@@ -126,6 +127,7 @@ fun MainScreen() {
             RatingPromptHost(!fullScreen, Modifier.align(Alignment.BottomCenter))
         }
     }
+    TimeLimitHost()
 }
 
 @Composable
@@ -150,6 +152,8 @@ private fun Routes(nav: NavHostController) {
             ),
         ) { PlayerScreen(nav, it.arguments!!.getLong("id"), it.arguments!!.getLong("start").takeIf { s -> s >= 0 }, it.arguments!!.getString("group")) }
         composable("downloads") { DownloadsScreen(nav) }
+        composable("smartdownloads") { SmartDownloadsScreen(nav) }
+        composable("vodfollows") { VodFollowsScreen(nav) }
         composable("discover") { DiscoverScreen(nav) }
         // Opened from Libraries (and by deep links); not a tab.
         composable("livetv") { LiveTvScreen(nav) }

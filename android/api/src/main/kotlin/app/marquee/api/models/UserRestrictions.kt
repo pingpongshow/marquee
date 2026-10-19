@@ -44,6 +44,10 @@ import kotlinx.serialization.Contextual
  * @param liveTvGroups Deprecated and ignored: channel groups no longer limit anyone (everyone who may watch Live TV sees every group). The server ignores it when written and never returns it.
  * @param seerrUserId The Seerr user requests are made as. Null = Seerr's API key owner.
  * @param friend Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker.
+ * @param dailyLimitMinutes Time limit: minutes of video (movies, episodes, on demand, Live TV; not music) a day, counted on the server's clock and reset at midnight. Null or 0 = no limit. Not for admins.
+ * @param weekendLimitMinutes Time limit on Saturdays and Sundays instead of dailyLimitMinutes. Null = the same as dailyLimitMinutes; 0 = no limit at weekends.
+ * @param allowedFrom Viewing hours: video may only play from this time (HH:MM, server time) until allowedUntil; a window may cross midnight. Both null = any time.
+ * @param allowedUntil End of the viewing hours (HH:MM).
  */
 @Serializable
 
@@ -100,7 +104,23 @@ data class UserRestrictions (
 
     /* Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker. */
     @SerialName(value = "friend")
-    val friend: kotlin.Boolean? = null
+    val friend: kotlin.Boolean? = null,
+
+    /* Time limit: minutes of video (movies, episodes, on demand, Live TV; not music) a day, counted on the server's clock and reset at midnight. Null or 0 = no limit. Not for admins. */
+    @SerialName(value = "dailyLimitMinutes")
+    val dailyLimitMinutes: kotlin.Int? = null,
+
+    /* Time limit on Saturdays and Sundays instead of dailyLimitMinutes. Null = the same as dailyLimitMinutes; 0 = no limit at weekends. */
+    @SerialName(value = "weekendLimitMinutes")
+    val weekendLimitMinutes: kotlin.Int? = null,
+
+    /* Viewing hours: video may only play from this time (HH:MM, server time) until allowedUntil; a window may cross midnight. Both null = any time. */
+    @SerialName(value = "allowedFrom")
+    val allowedFrom: kotlin.String? = null,
+
+    /* End of the viewing hours (HH:MM). */
+    @SerialName(value = "allowedUntil")
+    val allowedUntil: kotlin.String? = null
 
 ) {
 

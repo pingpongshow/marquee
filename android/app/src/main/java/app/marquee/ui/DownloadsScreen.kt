@@ -63,14 +63,20 @@ fun DownloadsScreen(nav: NavHostController) {
     val context = LocalContext.current
     val all = downloads.entries.collectAsState().value.values.sortedByDescending { it.addedMs }
     val busy = all.filter { it.state != Downloads.State.Done }
-    val videos = all.filter { it.state == Downloads.State.Done && it.item.type != ItemType.TRACK }
-    val tracks = all.filter { it.state == Downloads.State.Done && it.item.type == ItemType.TRACK }
+    val byAlbum = compareBy<Downloads.Entry>({ it.item.grandparentTitle }, { it.item.parentTitle }, { it.item.index ?: 0 })
+    val allTracks = all.filter { it.state == Downloads.State.Done && it.item.type == ItemType.TRACK }.sortedWith(byAlbum)
+    val videos = all.filter { it.state == Downloads.State.Done && it.item.type != ItemType.TRACK && it.smart == null }
+    val tracks = allTracks.filter { it.smart == null }
+    // What smart downloads holds (shown on its own, with the space it takes and Remove).
+    val smartShows = all.filter { it.state == Downloads.State.Done && it.smart == Downloads.SmartKind.Shows }
         .sortedWith(compareBy({ it.item.grandparentTitle }, { it.item.parentTitle }, { it.item.index ?: 0 }))
+    val smartTracks = allTracks.filter { it.smart == Downloads.SmartKind.Music }
+    val smartSettings by downloads.smart.settings.collectAsState()
 
     fun open(e: Downloads.Entry) {
         if (e.state != Downloads.State.Done) return
         if (e.item.type == ItemType.TRACK) {
-            val album = tracks.filter { it.item.parentId == e.item.parentId }.map { it.item }
+            val album = allTracks.filter { it.item.parentId == e.item.parentId }.map { it.item }
             music.play(album, album.indexOfFirst { it.id == e.item.id }.coerceAtLeast(0), source = e.item.parentTitle)
         } else nav.navigate("player/${e.item.id}")
     }
@@ -109,6 +115,36 @@ fun DownloadsScreen(nav: NavHostController) {
                 }
             }
             items(tracks, key = { "t${it.item.id}" }) { Row(it, downloads, ::open) }
+        }
+        if (smartShows.isNotEmpty() || smartTracks.isNotEmpty()) {
+            item {
+                Column(Modifier.fillMaxWidth().padding(end = sidePadding)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Section("Smart downloads", Modifier.weight(1f))
+                        TextButton({ downloads.removeSmart() }, Modifier.focusRing()) { Text("Remove smart downloads") }
+                    }
+                    Text("${Formatter.formatShortFileSize(context, downloads.smartBytes())} · removed again once watched or no longer wanted",
+                        Modifier.padding(start = sidePadding), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (smartShows.isNotEmpty()) items(smartShows, key = { "ss${it.item.id}" }) { Row(it, downloads, ::open) }
+            if (smartTracks.isNotEmpty()) {
+                item {
+                    Row(Modifier.fillMaxWidth().padding(start = sidePadding, end = sidePadding), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Music", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton({ music.play(smartTracks.map { it.item }.shuffled(), 0, source = "Smart downloads") }) { Text("Shuffle") }
+                    }
+                }
+                items(smartTracks, key = { "st${it.item.id}" }) { Row(it, downloads, ::open) }
+            }
+        }
+        // Smart downloads' settings (phones and tablets).
+        if (!marquee.isTv) item {
+            Row(Modifier.fillMaxWidth().padding(horizontal = sidePadding, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(if (smartSettings.on) "Smart downloads are on" else "Smart downloads keep the next episodes and your favourite music here.",
+                    Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton({ nav.navigate("smartdownloads") }, Modifier.focusRing()) { Text(if (smartSettings.on) "Settings" else "Set up") }
+            }
         }
         if (all.isNotEmpty()) item {
             Text("${Formatter.formatShortFileSize(context, downloads.totalBytes)} on this device",
@@ -177,7 +213,11 @@ fun DownloadButton(item: ItemSummary) {
             single && e != null -> OutlinedButton({ menu = true }, Modifier.focusRing()) {
                 Icon(when (e.state) { Downloads.State.Done -> Icons.Filled.DownloadDone; Downloads.State.Failed -> Icons.Filled.ErrorOutline; else -> Icons.Filled.Download }, null)
                 Spacer(Modifier.width(6.dp))
-                Text(when (e.state) { Downloads.State.Done -> "Downloaded"; Downloads.State.Failed -> "Failed"; else -> "${(e.progress * 100).toInt()}%" })
+                Text(when (e.state) {
+                    Downloads.State.Done -> if (e.smart != null) "Smart download" else "Downloaded"
+                    Downloads.State.Failed -> "Failed"
+                    else -> "${(e.progress * 100).toInt()}%"
+                })
             }
             item.type == ItemType.TRACK || musicContainer -> OutlinedButton({ start(Downloads.Quality.Original) }, Modifier.focusRing()) {
                 Icon(Icons.Filled.Download, null); Spacer(Modifier.width(6.dp)); Text("Download")
@@ -188,6 +228,8 @@ fun DownloadButton(item: ItemSummary) {
             }
         }
         DropdownMenu(menu, { menu = false }) {
+            // A smart download can be kept, so smart downloads won't remove it.
+            if (single && e?.smart != null) DropdownMenuItem({ Text("Keep Download") }, { menu = false; downloads.keep(item.id) })
             if (single && e != null) DropdownMenuItem({ Text("Delete Download") }, { menu = false; downloads.remove(item.id) })
             else Downloads.Quality.entries.forEach { q -> DropdownMenuItem({ Text(q.label) }, { start(q) }) }
         }

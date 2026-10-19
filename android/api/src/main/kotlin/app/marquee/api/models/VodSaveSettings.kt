@@ -32,6 +32,8 @@ import kotlinx.serialization.Contextual
 /**
  * Saving films and episodes on demand (Xtream Codes sources) into the library (admins only). Partial sends keep the other fields.
  *
+ * @param followEnabled Let people follow series on demand (new episodes saved automatically, counted in their DVR quota). Default false.
+ * @param followDefaultMaxGb Size limit a new follow starts with, in GB (10^9 bytes); 0 = none (only the DVR quota limits it). Default 0.
  * @param moviesFolder Where films are saved, as the server sees it (must exist and be writable). Empty turns saving films off.
  * @param showsFolder Where episodes are saved. Empty turns saving episodes off.
  * @param quality original: the file as it is (MPEG-TS, FLV and other unusual containers are remuxed to MKV). remux: to MKV, every stream copied. transcode: the settings below.
@@ -52,6 +54,14 @@ import kotlinx.serialization.Contextual
 @Serializable
 
 data class VodSaveSettings (
+
+    /* Let people follow series on demand (new episodes saved automatically, counted in their DVR quota). Default false. */
+    @SerialName(value = "followEnabled")
+    val followEnabled: kotlin.Boolean? = null,
+
+    /* Size limit a new follow starts with, in GB (10^9 bytes); 0 = none (only the DVR quota limits it). Default 0. */
+    @SerialName(value = "followDefaultMaxGb")
+    val followDefaultMaxGb: kotlin.Double? = null,
 
     /* Where films are saved, as the server sees it (must exist and be writable). Empty turns saving films off. */
     @SerialName(value = "moviesFolder")

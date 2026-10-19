@@ -218,10 +218,26 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
         downloads.recordProgress(itemId, pos, watched = ended || (dur > 0 && pos >= dur * 0.9))
     }
 
+    /**
+     * The time limit was reached (kids' profiles): the player closes and the reason shows full
+     * screen. The session has already ended on the server.
+     */
+    fun timeUp(reason: String) {
+        endHandled[0] = true
+        player.pause()
+        marquee.timeLimits.block(reason)
+        if (stillShowing()) nav.popBackStack()
+    }
+
     fun report(state: PlaybackProgress.State) {
         val s = session ?: return
         val pos = player.currentPosition
-        marquee.scope.launch { runCatching { marquee.playback.reportPlayback(s.id, PlaybackProgress(pos, state)) } }
+        marquee.scope.launch {
+            runCatching { marquee.playback.reportPlayback(s.id, PlaybackProgress(pos, state)) }.onFailure { e ->
+                // The time ran out while playing: the server ended the session.
+                app.marquee.core.TimeLimitRules.reason(e)?.let { r -> withContext(Dispatchers.Main) { if (session?.id == s.id) { session = null; timeUp(r) } } }
+            }
+        }
     }
 
     fun closeSession(s: PlaybackSession?, pos: Long) {
@@ -271,7 +287,10 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                 if (s.startMs > 0) player.seekTo(s.startMs)
                 player.playWhenReady = true
             }
-            .onFailure { error = it.message ?: "Couldn't start playback" }
+            .onFailure { e ->
+                val limit = app.marquee.core.TimeLimitRules.reason(e)
+                if (limit != null) timeUp(limit) else error = e.message ?: "Couldn't start playback"
+            }
     }
 
     // ExoPlayer is main-thread only; don't rely on the effect's dispatcher for that.
@@ -285,7 +304,11 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
         launch { thumbs = TrickplayThumbs.load(marquee, itemId) }
         // Already casting: the Cast hand-off below plays it there instead.
         if (local == null && marquee.cast.device.value != null) return@LaunchedEffect
-        if (local != null) withContext(Dispatchers.Main) {
+        // A download plays on the device, but a time limit still applies: the server's word when
+        // it can be reached, the last status it gave when it can't.
+        val refusal = if (local != null) marquee.timeLimits.refusalForLocal() else null
+        if (refusal != null) withContext(Dispatchers.Main) { timeUp(refusal) }
+        else if (local != null) withContext(Dispatchers.Main) {
             player.setMediaItem(MediaItem.fromUri(Uri.fromFile(local)))
             player.prepare()
             val begin = startMs ?: downloads.resumePosition(itemId)
@@ -303,6 +326,16 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                 roll = 0
                 start(0, choice, pre[0].id)
             } else start(startMs, choice)
+        }
+    }
+    // A download playing while the server can be reached: a limited profile's time is checked each minute.
+    LaunchedEffect(local) {
+        if (local == null) return@LaunchedEffect
+        while (true) {
+            delay(60_000)
+            if (marquee.timeLimits.cached()?.limited != true) continue
+            val st = marquee.timeLimits.refresh() ?: continue
+            if (!st.allowedNow) { timeUp(st.reason?.takeIf { it.isNotBlank() } ?: app.marquee.core.TimeLimitRules.DEFAULT_REASON); break }
         }
     }
     // Watching together keeps everyone at 1×.
@@ -414,6 +447,8 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                 marquee.requestRating(ratingRequestFor(marquee, d))
             }
             recordLocal()
+            // Smart downloads catch up (the next episode, removing a watched one) soon after.
+            downloads.smart.runSoon()
             together.leave()
             player.removeListener(listener)
             player.release()

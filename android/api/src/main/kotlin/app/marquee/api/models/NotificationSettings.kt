@@ -45,6 +45,7 @@ import kotlinx.serialization.Contextual
  * @param dvrQuotaAlert The dvr_quota alert is emailed: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Not emailed by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.)
  * @param plexSyncAlert The plex_sync alert is emailed: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Not emailed by default. (Not in AlertType; notifications carry type plex_sync.)
  * @param optimizeFailedAlert The optimize_failed alert is emailed: a Library Health → Large files conversion failed (not one skipped for saving too little). Emailed by default. (Not in AlertType; notifications carry type optimize_failed.)
+ * @param fileDamagedAlert The file_damaged alert is emailed: a newly added file failed its playback check (see Library Health → Unplayable files). Not emailed by default. (Not in AlertType; notifications carry type file_damaged.)
  * @param libraryUnreadableAlert The library_unreadable alert is emailed: a scan couldn't read one of a library's folders (offline drive, permissions), so its titles were kept as they were. Emailed by default. (Not in AlertType; notifications carry type library_unreadable.)
  * @param recipientsAllAdmins Mail alerts to every administrator with an email address.
  * @param recipients Administrators (user ids) who get alert mail when recipientsAllAdmins is off.
@@ -99,6 +100,10 @@ data class NotificationSettings (
     /* The optimize_failed alert is emailed: a Library Health → Large files conversion failed (not one skipped for saving too little). Emailed by default. (Not in AlertType; notifications carry type optimize_failed.) */
     @SerialName(value = "optimizeFailedAlert")
     val optimizeFailedAlert: kotlin.Boolean? = null,
+
+    /* The file_damaged alert is emailed: a newly added file failed its playback check (see Library Health → Unplayable files). Not emailed by default. (Not in AlertType; notifications carry type file_damaged.) */
+    @SerialName(value = "fileDamagedAlert")
+    val fileDamagedAlert: kotlin.Boolean? = null,
 
     /* The library_unreadable alert is emailed: a scan couldn't read one of a library's folders (offline drive, permissions), so its titles were kept as they were. Emailed by default. (Not in AlertType; notifications carry type library_unreadable.) */
     @SerialName(value = "libraryUnreadableAlert")

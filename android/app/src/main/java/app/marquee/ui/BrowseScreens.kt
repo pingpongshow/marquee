@@ -543,6 +543,8 @@ fun SettingsScreen(nav: NavHostController) {
         RatingPromptPreference()
         ShowAudioQualityPreference()
         EqualiserSetting()
+        // Smart downloads: phones and tablets (a TV doesn't download).
+        if (!marquee.isTv) SmartDownloadsRow(nav)
         // Buttons wrap onto more lines rather than running off a phone's edge.
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { nav.navigate("stats") }) { Text("Your Stats") }

@@ -47,6 +47,7 @@ import kotlinx.serialization.Contextual
  * @param matched The details are TMDB's.
  * @param seasons In viewing order (specials, season 0, last).
  * @param episodes Every episode in viewing order (seasons in turn, specials last); filter by season for a season's list.
+ * @param following The caller follows this series (new episodes are saved automatically).
  * @param year 
  * @param category 
  * @param contentRating e.g. TV-14 (TMDB's, when matched).
@@ -107,6 +108,10 @@ data class VodSeriesDetail (
     /* Every episode in viewing order (seasons in turn, specials last); filter by season for a season's list. */
     @SerialName(value = "episodes")
     val episodes: kotlin.collections.List<VodEpisode>,
+
+    /* The caller follows this series (new episodes are saved automatically). */
+    @SerialName(value = "following")
+    val following: kotlin.Boolean? = null,
 
     @SerialName(value = "year")
     val year: kotlin.Int? = null,

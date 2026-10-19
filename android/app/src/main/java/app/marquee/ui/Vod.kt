@@ -233,7 +233,11 @@ fun VodPage(nav: NavHostController) {
 @Composable
 fun VodShowsPage(nav: NavHostController) {
     VodBrowse(nav, shows = true) {
-        Text("VOD Shows", Modifier.padding(horizontal = sidePadding), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Row(Modifier.fillMaxWidth().padding(horizontal = sidePadding), verticalAlignment = Alignment.CenterVertically) {
+            Text("VOD Shows", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            // The series you follow (new episodes saved automatically).
+            VodFollowingButton(nav)
+        }
     }
 }
 
@@ -618,15 +622,26 @@ private fun VodVideo(nav: NavHostController, movieId: Long?, seriesId: Long?, ep
     fun stillShowing() = ownEntry != null && nav.currentBackStackEntry === ownEntry
     val what = if (episodeId != null) "episode" else "movie"
 
-    suspend fun send(id: String, pos: Long, dur: Long) {
-        if (pos <= 0) return
-        runCatching { marquee.livetv.reportVodPlayback(id, ReportVodPlaybackRequest(pos, dur.takeIf { it > 0 })) }
+    /** The time limit was reached (kids' profiles): the player closes and the reason shows full screen. */
+    fun timeUp(reason: String) {
+        player.pause()
+        marquee.timeLimits.block(reason)
+        if (stillShowing()) nav.popBackStack()
+    }
+    suspend fun send(id: String, pos: Long, dur: Long): Throwable? {
+        if (pos <= 0) return null
+        return runCatching { marquee.livetv.reportVodPlayback(id, ReportVodPlaybackRequest(pos, dur.takeIf { it > 0 })) }.exceptionOrNull()
     }
     fun report() {
         val id = session?.id ?: return
         val pos = player.currentPosition
         val dur = player.duration
-        marquee.scope.launch { send(id, pos, dur) }
+        marquee.scope.launch {
+            // The time ran out while playing: the server ended the session.
+            app.marquee.core.TimeLimitRules.reason(send(id, pos, dur))?.let { r ->
+                withContext(Dispatchers.Main) { if (session?.id == id) { session = null; timeUp(r) } }
+            }
+        }
     }
     fun playNext() {
         val n = next ?: return
@@ -662,7 +677,10 @@ private fun VodVideo(nav: NavHostController, movieId: Long?, seriesId: Long?, ep
                 val at = startMs ?: s.startMs ?: 0
                 if (at > 0) player.seekTo(at)
                 player.playWhenReady = true
-            }.onFailure { error = vodStartError(it, what); buffering = false }
+            }.onFailure { e ->
+                val limit = app.marquee.core.TimeLimitRules.reason(e)
+                if (limit != null) timeUp(limit) else { error = vodStartError(e, what); buffering = false }
+            }
         }
     }
     LaunchedEffect(Unit) {

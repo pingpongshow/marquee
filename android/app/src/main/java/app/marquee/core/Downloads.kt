@@ -40,6 +40,9 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
 
     enum class State { Preparing, Downloading, Done, Failed }
 
+    /** Why smart downloads fetched something (it's removed again when no longer wanted). */
+    enum class SmartKind { Shows, Music }
+
     @Serializable
     data class Entry(
         val item: ItemSummary,
@@ -57,6 +60,10 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
         val resumeMs: Long? = null,
         /** Downloaded because a synced playlist has it (removed when no synced playlist does). */
         val viaPlaylist: Boolean = false,
+        /** Downloaded by smart downloads, not by hand: removed again once watched or no longer wanted. */
+        val smart: SmartKind? = null,
+        /** Only fetched over Wi-Fi (an unmetered network). */
+        val wifiOnly: Boolean = false,
     )
 
     private val dir = File(context.getExternalFilesDir(null) ?: context.filesDir, "downloads").apply { mkdirs() }
@@ -66,6 +73,9 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
     private val dm = context.getSystemService(DownloadManager::class.java)
     /** For starting downloads from screens that may go away; Main, for Toasts. */
     val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.Main)
+
+    /** Smart downloads (phones and tablets): episodes ahead and favourite music, kept up to date in the background. */
+    val smart: SmartDownloads by lazy { SmartDownloads(context, marquee, this) }
 
     private val _entries = MutableStateFlow(load())
     val entries: StateFlow<Map<Long, Entry>> = _entries
@@ -138,6 +148,9 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
         for (it in items) if (_entries.value[it.id] == null) {
             runCatching { download(it, if (it.type == ItemType.TRACK) Quality.Original else Quality.Medium) }
             set(it.id) { e -> e.copy(viaPlaylist = true) }
+        } else if (_entries.value[it.id]?.smart != null) {
+            // A smart download the playlist now keeps: smart downloads no longer remove it.
+            set(it.id) { e -> e.copy(viaPlaylist = true, smart = null) }
         }
         dropOrphans(before - now)
     }
@@ -160,12 +173,15 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
 
     // Starting and removing
 
-    /** Downloads a movie, episode, video or track. Tracks are always the original file. */
-    suspend fun download(item: ItemSummary, quality: Quality) {
+    /**
+     * Downloads a movie, episode, video or track. Tracks are always the original file. [smart]
+     * marks a smart download; [wifiOnly] fetches it only over an unmetered network.
+     */
+    suspend fun download(item: ItemSummary, quality: Quality, smart: SmartKind? = null, wifiOnly: Boolean = false) {
         val q = if (item.type == ItemType.TRACK) Quality.Original else quality
         val info = kotlinx.coroutines.withContext(Dispatchers.IO) { marquee.downloads.createDownload(CreateDownloadRequest(item.id, q.api)) }
         val entry = Entry(item, q, State.Preparing, info.progress, size = info.propertySize ?: 0,
-            jobId = info.id.takeUnless { it.startsWith("original-") }, url = info.url)
+            jobId = info.id.takeUnless { it.startsWith("original-") }, url = info.url, smart = smart, wifiOnly = wifiOnly)
         _entries.update { it + (item.id to entry) }
         save()
         if (info.status == Download.Status.READY && info.url != null) fetch(item.id, info.url!!, info.fileName)
@@ -178,8 +194,26 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
     /** Everything playable under a season, show, album or artist. */
     suspend fun downloadAll(container: ItemSummary, quality: Quality) {
         val leaves = kotlinx.coroutines.withContext(Dispatchers.IO) { marquee.items.itemLeaves(container.id) }
-        for (it in leaves) if (_entries.value[it.id] == null) runCatching { download(it, quality) }
+        for (it in leaves) {
+            val e = _entries.value[it.id]
+            if (e == null) runCatching { download(it, quality) } else if (e.smart != null) keep(it.id)
+        }
     }
+
+    /** Keeps a smart download as one made by hand: smart downloads won't remove it. */
+    fun keep(id: Long) = set(id) { it.copy(smart = null) }
+
+    /** Removes what smart downloads fetched (one kind, or all of it). Downloads made by hand stay. */
+    fun removeSmart(kind: SmartKind? = null) {
+        _entries.value.values.filter { it.smart != null && (kind == null || it.smart == kind) }.forEach { remove(it.item.id) }
+    }
+
+    /** The space smart downloads take (one kind, or all), finished or not. */
+    fun smartBytes(kind: SmartKind? = null): Long =
+        _entries.value.values.filter { it.smart != null && (kind == null || it.smart == kind) }.sumOf { it.size }
+
+    /** Picks up conversions and transfers left running (after the app was closed). */
+    fun resume() = watch()
 
     fun remove(id: Long) {
         val e = _entries.value[id] ?: return
@@ -228,7 +262,7 @@ class Downloads(private val context: Context, private val marquee: Marquee) {
             .setDescription("Marquee download")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
             .setDestinationUri(Uri.fromFile(File(dir, name)))
-            .setAllowedOverMetered(true)
+            .setAllowedOverMetered(!e.wifiOnly)
         val transfer = dm.enqueue(req)
         set(id) { it.copy(state = State.Downloading, progress = 0.0, file = name, transfer = transfer, url = path) }
     }

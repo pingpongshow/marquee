@@ -45,6 +45,8 @@ import app.marquee.api.models.ScheduleRecordingRequest
 import app.marquee.api.models.StopRecordingRequest
 import app.marquee.api.models.TestVodSource200Response
 import app.marquee.api.models.VodCategory
+import app.marquee.api.models.VodFollow
+import app.marquee.api.models.VodFollowRequest
 import app.marquee.api.models.VodMovie
 import app.marquee.api.models.VodMovieDetail
 import app.marquee.api.models.VodMoviePage
@@ -447,6 +449,83 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.PUT,
             path = "/livetv/channels/{channelId}/favorite".replace("{"+"channelId"+"}", encodeURIComponent(channelId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /livetv/vod/series/{seriesId}/follow
+     * Follow a series on demand (or change a follow): its new episodes are saved to the library through the download queue as they appear, within the follow&#39;s size limit and the caller&#39;s DVR quota (saved episodes count towards it like recordings). Needs following turned on (VodSaveSettings.followEnabled), a shows folder, on-demand access and the may-record permission (admins always may). 409 when following is off.
+     * 
+     * @param seriesId 
+     * @param vodFollowRequest 
+     * @return VodFollow
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun followVodSeries(seriesId: kotlin.Long, vodFollowRequest: VodFollowRequest) : VodFollow {
+        val localVarResponse = followVodSeriesWithHttpInfo(seriesId = seriesId, vodFollowRequest = vodFollowRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as VodFollow
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /livetv/vod/series/{seriesId}/follow
+     * Follow a series on demand (or change a follow): its new episodes are saved to the library through the download queue as they appear, within the follow&#39;s size limit and the caller&#39;s DVR quota (saved episodes count towards it like recordings). Needs following turned on (VodSaveSettings.followEnabled), a shows folder, on-demand access and the may-record permission (admins always may). 409 when following is off.
+     * 
+     * @param seriesId 
+     * @param vodFollowRequest 
+     * @return ApiResponse<VodFollow?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun followVodSeriesWithHttpInfo(seriesId: kotlin.Long, vodFollowRequest: VodFollowRequest) : ApiResponse<VodFollow?> {
+        val localVariableConfig = followVodSeriesRequestConfig(seriesId = seriesId, vodFollowRequest = vodFollowRequest)
+
+        return request<VodFollowRequest, VodFollow>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation followVodSeries
+     *
+     * @param seriesId 
+     * @param vodFollowRequest 
+     * @return RequestConfig
+     */
+    fun followVodSeriesRequestConfig(seriesId: kotlin.Long, vodFollowRequest: VodFollowRequest) : RequestConfig<VodFollowRequest> {
+        val localVariableBody = vodFollowRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/livetv/vod/series/{seriesId}/follow".replace("{"+"seriesId"+"}", encodeURIComponent(seriesId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -1329,6 +1408,84 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/livetv/vod/categories",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /livetv/vod/follows
+     * Followed series on demand: new episodes are saved to the library automatically. The caller&#39;s own follows; admins see everyone&#39;s (all&#x3D;true).
+     * 
+     * @param all Admins: everyone&#39;s follows. (optional)
+     * @return kotlin.collections.List<VodFollow>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun listVodFollows(all: kotlin.Boolean? = null) : kotlin.collections.List<VodFollow> {
+        val localVarResponse = listVodFollowsWithHttpInfo(all = all)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as kotlin.collections.List<VodFollow>
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /livetv/vod/follows
+     * Followed series on demand: new episodes are saved to the library automatically. The caller&#39;s own follows; admins see everyone&#39;s (all&#x3D;true).
+     * 
+     * @param all Admins: everyone&#39;s follows. (optional)
+     * @return ApiResponse<kotlin.collections.List<VodFollow>?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun listVodFollowsWithHttpInfo(all: kotlin.Boolean?) : ApiResponse<kotlin.collections.List<VodFollow>?> {
+        val localVariableConfig = listVodFollowsRequestConfig(all = all)
+
+        return request<Unit, kotlin.collections.List<VodFollow>>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listVodFollows
+     *
+     * @param all Admins: everyone&#39;s follows. (optional)
+     * @return RequestConfig
+     */
+    fun listVodFollowsRequestConfig(all: kotlin.Boolean?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (all != null) {
+                    put("all", listOf(all.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/livetv/vod/follows",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,
@@ -4223,6 +4380,85 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.DELETE,
             path = "/livetv/channels/{channelId}/favorite".replace("{"+"channelId"+"}", encodeURIComponent(channelId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /livetv/vod/series/{seriesId}/follow
+     * Stop following (episodes already saved stay in the library). Admins may remove anyone&#39;s follow with userId.
+     * 
+     * @param seriesId 
+     * @param userId  (optional)
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun unfollowVodSeries(seriesId: kotlin.Long, userId: kotlin.Long? = null) : Unit {
+        val localVarResponse = unfollowVodSeriesWithHttpInfo(seriesId = seriesId, userId = userId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /livetv/vod/series/{seriesId}/follow
+     * Stop following (episodes already saved stay in the library). Admins may remove anyone&#39;s follow with userId.
+     * 
+     * @param seriesId 
+     * @param userId  (optional)
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun unfollowVodSeriesWithHttpInfo(seriesId: kotlin.Long, userId: kotlin.Long?) : ApiResponse<Unit?> {
+        val localVariableConfig = unfollowVodSeriesRequestConfig(seriesId = seriesId, userId = userId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation unfollowVodSeries
+     *
+     * @param seriesId 
+     * @param userId  (optional)
+     * @return RequestConfig
+     */
+    fun unfollowVodSeriesRequestConfig(seriesId: kotlin.Long, userId: kotlin.Long?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (userId != null) {
+                    put("userId", listOf(userId.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/livetv/vod/series/{seriesId}/follow".replace("{"+"seriesId"+"}", encodeURIComponent(seriesId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

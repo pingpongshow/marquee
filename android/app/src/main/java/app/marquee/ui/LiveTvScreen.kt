@@ -429,7 +429,11 @@ private fun LiveVideo(channelId: Long, muted: Boolean, modifier: Modifier, onSta
                 player.prepare()
                 player.playWhenReady = true
             }
-        }.onFailure { onState(serverMessage(it).ifBlank { "Couldn't tune the channel" }) } // 409 no_tuner carries its own message
+        }.onFailure {
+            // A time limit (kids' profiles) shows full screen, as the other players do.
+            if (!muted) app.marquee.core.TimeLimitRules.reason(it)?.let(marquee.timeLimits::block)
+            onState(serverMessage(it).ifBlank { "Couldn't tune the channel" }) // 409 no_tuner carries its own message
+        }
     }
     DisposableEffect(player) {
         val l = object : Player.Listener {

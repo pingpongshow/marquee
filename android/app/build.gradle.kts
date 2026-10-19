@@ -79,6 +79,8 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
     implementation("io.coil-kt.coil3:coil-svg:3.0.4")
     implementation("androidx.tv:tv-material:1.0.0")
+    // Smart downloads run in the background (periodically, Wi-Fi only when asked).
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation(composeBom)

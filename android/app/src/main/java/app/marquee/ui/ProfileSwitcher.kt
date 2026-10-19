@@ -126,6 +126,10 @@ fun ProfileSwitcher(nav: NavHostController, onDismiss: () -> Unit) {
         value = withContext(Dispatchers.IO) { runCatching { marquee.users.listProfiles() } }
     }
     val isAdmin = me?.isAdmin == true
+    // A profile with a time limit sees what's left today ("45 min left today").
+    val timeLeft by produceState<String?>(null, me?.id) {
+        value = app.marquee.core.TimeLimitRules.leftLabel(marquee.timeLimits.refresh())
+    }
 
     /** The switch itself; the previous profile's music doesn't carry over. */
     suspend fun switchTo(p: Profile, pin: String?, password: String?) =
@@ -147,6 +151,7 @@ fun ProfileSwitcher(nav: NavHostController, onDismiss: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text("Who's watching?", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                timeLeft?.let { Text(it, Modifier.padding(top = 4.dp), color = Gold, style = MaterialTheme.typography.bodyMedium) }
                 error?.let { Text(it, Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.error) }
                 val list = profiles
                 when {
