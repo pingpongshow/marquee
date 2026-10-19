@@ -4311,6 +4311,23 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "502": { $ref: "#/components/responses/BadGateway" }
 
+  /system/storage:
+    get:
+      tags: [system]
+      operationId: storageReport
+      summary: "Storage overview (admin only): space used per library, the biggest titles, how each library grew (one sample a day, up to a year) and the free space on the volumes Marquee uses."
+      parameters:
+        - { name: days, in: query, description: "How far back the growth history goes.", schema: { type: integer, minimum: 7, maximum: 365, default: 90 } }
+        - { name: top, in: query, description: "How many of the biggest titles.", schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StorageReport" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   /system/status:
     get:
       tags: [system]
@@ -5348,6 +5365,7 @@ components:
         cinemaTrailers: { type: boolean, description: "Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true." }
         ratingPrompt: { type: boolean, description: "Ask me to rate a movie or episode when I finish it, if the server has it on (USER-19). Default true." }
         subtitleStyle: { $ref: "#/components/schemas/SubtitleStyle" }
+        nightMode: { type: boolean, description: "Night mode (dialogue boost) on by default for this person's video playback; each player can switch it per session. Default false." }
 
     UserCreate:
       type: object
@@ -6951,6 +6969,7 @@ components:
         audioStreamId: { type: integer, format: int64 }
         subtitleStreamId: { type: integer, format: int64, description: "-1 turns subtitles off; omit for automatic (the user's subtitle preference)." }
         startMs: { type: integer, format: int64, description: Omit to resume where the user left off. }
+        nightMode: { type: boolean, description: "Night mode (dialogue boost): the server converts the audio with dynamic-range compression and lifts the centre (dialogue) channel, so loud scenes are quieter and speech clearer. The video is still copied when it can be (a direct play becomes a direct stream). Omitted = the user's nightMode preference." }
         maxBitrateKbps: { type: integer, description: "The app's quality setting; 0/omitted = original (home) or automatic (remote)." }
         measuredKbps: { type: integer, description: Measured download speed from /playback/bandwidth-test. }
         preload:
@@ -7019,6 +7038,7 @@ components:
       type: object
       required: [id, itemId, url, protocol, startMs, durationMs, decision, networkClass, markers]
       properties:
+        nightMode: { type: boolean, description: "Night mode is applied to this session's audio." }
         id: { type: string }
         itemId: { type: integer, format: int64 }
         fileId: { type: integer, format: int64 }
@@ -7129,6 +7149,53 @@ components:
               name: { type: string }
               type: { $ref: "#/components/schemas/LibraryType" }
               items: { type: integer }
+
+    StorageReport:
+      type: object
+      required: [libraries, largest, volumes]
+      properties:
+        libraries: { type: array, items: { $ref: "#/components/schemas/StorageLibrary" } }
+        largest: { type: array, description: "The biggest movies and shows (a show counts all its episodes), biggest first.", items: { $ref: "#/components/schemas/StorageTitle" } }
+        volumes: { type: array, items: { $ref: "#/components/schemas/StorageVolume" } }
+
+    StorageLibrary:
+      type: object
+      required: [id, name, type, bytes, files, history]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        type: { $ref: "#/components/schemas/LibraryType" }
+        bytes: { type: integer, format: int64, description: Size of the library's available files. }
+        files: { type: integer }
+        history: { type: array, description: "One sample a day, oldest first (starts the day the server first recorded one).", items: { $ref: "#/components/schemas/StorageSample" } }
+
+    StorageSample:
+      type: object
+      required: [date, bytes]
+      properties:
+        date: { type: string, format: date }
+        bytes: { type: integer, format: int64 }
+
+    StorageTitle:
+      type: object
+      required: [itemId, title, type, bytes, libraryId]
+      properties:
+        itemId: { type: integer, format: int64 }
+        title: { type: string }
+        type: { type: string, description: "movie or show (also video, for home videos)." }
+        year: { type: integer }
+        libraryId: { type: integer, format: int64 }
+        bytes: { type: integer, format: int64 }
+        files: { type: integer }
+
+    StorageVolume:
+      type: object
+      required: [path, totalBytes, freeBytes]
+      properties:
+        path: { type: string, description: "A folder on the volume: config, transcode, recordings or a library folder." }
+        label: { type: string, description: "What it holds, e.g. Config, Transcode, Movies." }
+        totalBytes: { type: integer, format: int64 }
+        freeBytes: { type: integer, format: int64 }
 
     HostInfo:
       type: object

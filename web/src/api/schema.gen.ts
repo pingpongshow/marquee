@@ -3525,6 +3525,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/storage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Storage overview (admin only): space used per library, the biggest titles, how each library grew (one sample a day, up to a year) and the free space on the volumes Marquee uses. */
+        get: operations["storageReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/system/status": {
         parameters: {
             query?: never;
@@ -4306,6 +4323,8 @@ export interface components {
             /** @description Ask me to rate a movie or episode when I finish it, if the server has it on (USER-19). Default true. */
             ratingPrompt?: boolean;
             subtitleStyle?: components["schemas"]["SubtitleStyle"];
+            /** @description Night mode (dialogue boost) on by default for this person's video playback; each player can switch it per session. Default false. */
+            nightMode?: boolean;
         };
         UserCreate: {
             username: string;
@@ -6055,6 +6074,8 @@ export interface components {
              * @description Omit to resume where the user left off.
              */
             startMs?: number;
+            /** @description Night mode (dialogue boost): the server converts the audio with dynamic-range compression and lifts the centre (dialogue) channel, so loud scenes are quieter and speech clearer. The video is still copied when it can be (a direct play becomes a direct stream). Omitted = the user's nightMode preference. */
+            nightMode?: boolean;
             /** @description The app's quality setting; 0/omitted = original (home) or automatic (remote). */
             maxBitrateKbps?: number;
             /** @description Measured download speed from /playback/bandwidth-test. */
@@ -6123,6 +6144,8 @@ export interface components {
             available?: boolean;
         };
         PlaybackSession: {
+            /** @description Night mode is applied to this session's audio. */
+            nightMode?: boolean;
             id: string;
             /** Format: int64 */
             itemId: number;
@@ -6254,6 +6277,55 @@ export interface components {
                 type: components["schemas"]["LibraryType"];
                 items: number;
             }[];
+        };
+        StorageReport: {
+            libraries: components["schemas"]["StorageLibrary"][];
+            /** @description The biggest movies and shows (a show counts all its episodes), biggest first. */
+            largest: components["schemas"]["StorageTitle"][];
+            volumes: components["schemas"]["StorageVolume"][];
+        };
+        StorageLibrary: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            type: components["schemas"]["LibraryType"];
+            /**
+             * Format: int64
+             * @description Size of the library's available files.
+             */
+            bytes: number;
+            files: number;
+            /** @description One sample a day, oldest first (starts the day the server first recorded one). */
+            history: components["schemas"]["StorageSample"][];
+        };
+        StorageSample: {
+            /** Format: date */
+            date: string;
+            /** Format: int64 */
+            bytes: number;
+        };
+        StorageTitle: {
+            /** Format: int64 */
+            itemId: number;
+            title: string;
+            /** @description movie or show (also video, for home videos). */
+            type: string;
+            year?: number;
+            /** Format: int64 */
+            libraryId: number;
+            /** Format: int64 */
+            bytes: number;
+            files?: number;
+        };
+        StorageVolume: {
+            /** @description A folder on the volume: config, transcode, recordings or a library folder. */
+            path: string;
+            /** @description What it holds, e.g. Config, Transcode, Movies. */
+            label?: string;
+            /** Format: int64 */
+            totalBytes: number;
+            /** Format: int64 */
+            freeBytes: number;
         };
         HostInfo: {
             cpuCores: number;
@@ -13785,6 +13857,33 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             502: components["responses"]["BadGateway"];
+        };
+    };
+    storageReport: {
+        parameters: {
+            query?: {
+                /** @description How far back the growth history goes. */
+                days?: number;
+                /** @description How many of the biggest titles. */
+                top?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     systemStatus: {
