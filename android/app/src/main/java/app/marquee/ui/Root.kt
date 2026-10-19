@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -27,6 +28,7 @@ val LocalRemote = staticCompositionLocalOf<app.marquee.core.RemoteReceiver> { er
 @Composable
 fun MarqueeRoot(marquee: Marquee, music: app.marquee.music.MusicController, downloads: app.marquee.core.Downloads, remote: app.marquee.core.RemoteReceiver) {
     val state by marquee.state.collectAsState()
+    val switches by marquee.profileSwitches.collectAsState()
     LaunchedEffect(Unit) { if (marquee.server != null) marquee.reconnect() }
     // Signed in (even offline): resume downloads and send plays made offline.
     LaunchedEffect(state) { if (state == Marquee.State.SignedIn) downloads.attach() }
@@ -41,7 +43,8 @@ fun MarqueeRoot(marquee: Marquee, music: app.marquee.music.MusicController, down
                     }
                 }
                 Marquee.State.SignedOut -> SignInScreen()
-                Marquee.State.SignedIn -> MainScreen()
+                // A profile switch starts the app's screens (and what they keep) afresh.
+                Marquee.State.SignedIn -> key(switches) { MainScreen() }
             }
         }
     }

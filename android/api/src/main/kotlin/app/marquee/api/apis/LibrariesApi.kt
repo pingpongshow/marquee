@@ -41,6 +41,7 @@ import app.marquee.api.models.OptimizeJobPage
 import app.marquee.api.models.OptimizeQueueRequest
 import app.marquee.api.models.OptimizeQueueResult
 import app.marquee.api.models.OptimizeSettings
+import app.marquee.api.models.RemoveMissingTitles200Response
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -969,7 +970,7 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      * @param resolution Only this resolution class (by width or height, so letterboxed films count): 2160 &#x3D; 4K, 480 &#x3D; SD. (optional)
      * @param codecs Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9). (optional)
      * @param hdr Only HDR (yes) or only SDR (no) files. (optional)
-     * @param optimized Only files the optimizer has already replaced (yes, to optimize them again) or only ones it hasn&#39;t (no). (optional)
+     * @param optimized Only files the optimizer has already replaced (yes, to optimize them again) or only ones still to do (no): not optimized and not already queued or being converted. (optional)
      * @param presetId The preset the estimates are for (default: the default preset). (optional)
      * @param sort  (optional, default to Sort.SIZE)
      * @param offset  (optional, default to 0)
@@ -1012,7 +1013,7 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      * @param resolution Only this resolution class (by width or height, so letterboxed films count): 2160 &#x3D; 4K, 480 &#x3D; SD. (optional)
      * @param codecs Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9). (optional)
      * @param hdr Only HDR (yes) or only SDR (no) files. (optional)
-     * @param optimized Only files the optimizer has already replaced (yes, to optimize them again) or only ones it hasn&#39;t (no). (optional)
+     * @param optimized Only files the optimizer has already replaced (yes, to optimize them again) or only ones still to do (no): not optimized and not already queued or being converted. (optional)
      * @param presetId The preset the estimates are for (default: the default preset). (optional)
      * @param sort  (optional, default to Sort.SIZE)
      * @param offset  (optional, default to 0)
@@ -1041,7 +1042,7 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
      * @param resolution Only this resolution class (by width or height, so letterboxed films count): 2160 &#x3D; 4K, 480 &#x3D; SD. (optional)
      * @param codecs Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9). (optional)
      * @param hdr Only HDR (yes) or only SDR (no) files. (optional)
-     * @param optimized Only files the optimizer has already replaced (yes, to optimize them again) or only ones it hasn&#39;t (no). (optional)
+     * @param optimized Only files the optimizer has already replaced (yes, to optimize them again) or only ones still to do (no): not optimized and not already queued or being converted. (optional)
      * @param presetId The preset the estimates are for (default: the default preset). (optional)
      * @param sort  (optional, default to Sort.SIZE)
      * @param offset  (optional, default to 0)
@@ -1446,6 +1447,79 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/optimize/jobs",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /libraries/{libraryId}/remove-missing
+     * Remove the library&#39;s missing files now (admin only): files a scan found gone, in library folders that can be reached right now (an empty folder counts as unreachable, like an unmounted disk). Titles left without files are removed too, with their watch history.
+     * 
+     * @param libraryId 
+     * @return RemoveMissingTitles200Response
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun removeMissingTitles(libraryId: kotlin.Long) : RemoveMissingTitles200Response {
+        val localVarResponse = removeMissingTitlesWithHttpInfo(libraryId = libraryId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as RemoveMissingTitles200Response
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /libraries/{libraryId}/remove-missing
+     * Remove the library&#39;s missing files now (admin only): files a scan found gone, in library folders that can be reached right now (an empty folder counts as unreachable, like an unmounted disk). Titles left without files are removed too, with their watch history.
+     * 
+     * @param libraryId 
+     * @return ApiResponse<RemoveMissingTitles200Response?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun removeMissingTitlesWithHttpInfo(libraryId: kotlin.Long) : ApiResponse<RemoveMissingTitles200Response?> {
+        val localVariableConfig = removeMissingTitlesRequestConfig(libraryId = libraryId)
+
+        return request<Unit, RemoveMissingTitles200Response>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation removeMissingTitles
+     *
+     * @param libraryId 
+     * @return RequestConfig
+     */
+    fun removeMissingTitlesRequestConfig(libraryId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/libraries/{libraryId}/remove-missing".replace("{"+"libraryId"+"}", encodeURIComponent(libraryId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

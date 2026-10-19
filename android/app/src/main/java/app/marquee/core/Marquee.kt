@@ -297,6 +297,23 @@ class Marquee(context: Context) {
         auth.pinLogin(PinLoginRequest(userId, device, pin = pin, password = password, totpCode = totpCode))
     })
 
+    private val _profileSwitches = MutableStateFlow(0)
+    /** Bumped when this device switched to another profile: the app's screens start afresh for it. */
+    val profileSwitches: StateFlow<Int> = _profileSwitches
+
+    /**
+     * Switches this device to another household profile (its PIN or password when it has one).
+     * [onSwitched] runs once the server agreed, before the new profile takes over.
+     */
+    suspend fun switchProfile(userId: Long, pin: String?, password: String?, onSwitched: () -> Unit = {}) {
+        val result = withContext(Dispatchers.IO) {
+            users.switchProfile(userId, app.marquee.api.models.SwitchProfileRequest(device = device, pin = pin, password = password))
+        }
+        onSwitched()
+        finish(result)
+        _profileSwitches.value++
+    }
+
     suspend fun finish(result: AuthResult) {
         token = result.token
         server?.let { store.setToken(it.id, result.token); store.setUserId(it.id, result.user.id) }

@@ -47,6 +47,8 @@ import kotlinx.serialization.Contextual
  * @param lastScanResult Summary of the last scan, e.g. 6596 files: 12 added…
  * @param lastScanError 
  * @param lastScannedAt 
+ * @param missingCount Admins listing with manage=true: how many titles have no available file and would be removed by POST /libraries/{libraryId}/remove-missing (only files in folders that can be reached count).
+ * @param unreadablePaths Admins listing with manage=true: the library's folders that can't be read right now (offline drive, permissions). Their titles are kept until they can be read again.
  * @param recordings A Live TV recordings library (Recorded TV / Recorded Movies). Only listed to admins with manage=true; its items are shown only under Live TV → Recordings, and browsing it returns 404.
  */
 @Serializable
@@ -92,6 +94,14 @@ data class Library (
 
     @Contextual @SerialName(value = "lastScannedAt")
     val lastScannedAt: java.time.OffsetDateTime? = null,
+
+    /* Admins listing with manage=true: how many titles have no available file and would be removed by POST /libraries/{libraryId}/remove-missing (only files in folders that can be reached count). */
+    @SerialName(value = "missingCount")
+    val missingCount: kotlin.Int? = null,
+
+    /* Admins listing with manage=true: the library's folders that can't be read right now (offline drive, permissions). Their titles are kept until they can be read again. */
+    @SerialName(value = "unreadablePaths")
+    val unreadablePaths: kotlin.collections.List<kotlin.String>? = null,
 
     /* A Live TV recordings library (Recorded TV / Recorded Movies). Only listed to admins with manage=true; its items are shown only under Live TV → Recordings, and browsing it returns 404. */
     @SerialName(value = "recordings")

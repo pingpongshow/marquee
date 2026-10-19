@@ -43,6 +43,7 @@ import kotlinx.serialization.Contextual
  * @param decision 
  * @param networkClass 
  * @param markers 
+ * @param nightMode Night mode is applied to this session's audio.
  * @param fileId 
  * @param contentType The media type url is served with (e.g. video/mp4, audio/flac, application/vnd.apple.mpegurl), for players such as Chromecast that need it.
  * @param limitKbps Bitrate ceiling applied; absent = none.
@@ -90,6 +91,10 @@ data class PlaybackSession (
 
     @SerialName(value = "markers")
     val markers: kotlin.collections.List<Marker>,
+
+    /* Night mode is applied to this session's audio. */
+    @SerialName(value = "nightMode")
+    val nightMode: kotlin.Boolean? = null,
 
     @SerialName(value = "fileId")
     val fileId: kotlin.Long? = null,

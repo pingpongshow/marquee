@@ -128,14 +128,18 @@ fun HomeScreen(nav: NavHostController) {
         null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         else -> LazyColumn(contentPadding = PaddingValues(vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(26.dp)) {
             item {
-                Row(Modifier.padding(horizontal = sidePadding).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Home", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                    // Muse: describe what to watch (USER-15).
-                    if (!marquee.isOffline) IconButton({ nav.navigate("muse") }, Modifier.focusRing()) { Icon(Icons.Filled.AutoAwesome, "Muse", tint = Gold) }
-                    // Rows: order, hide and pinned collections and playlists (USER-12).
-                    if (!marquee.isOffline) androidx.compose.material3.TextButton({ nav.navigate("edithome") }, Modifier.focusRing()) {
-                        Icon(Icons.Filled.Edit, null)
-                        Text("Edit Home", Modifier.padding(start = 6.dp))
+                Column {
+                    // Phones and tablets: who's watching, top left (TV has it at the top of the side menu).
+                    if (!marquee.isTv) ProfileButton(nav, modifier = Modifier.padding(start = sidePadding - 4.dp, bottom = 8.dp))
+                    Row(Modifier.padding(horizontal = sidePadding).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Home", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        // Muse: describe what to watch (USER-15).
+                        if (!marquee.isOffline) IconButton({ nav.navigate("muse") }, Modifier.focusRing()) { Icon(Icons.Filled.AutoAwesome, "Muse", tint = Gold) }
+                        // Rows: order, hide and pinned collections and playlists (USER-12).
+                        if (!marquee.isOffline) androidx.compose.material3.TextButton({ nav.navigate("edithome") }, Modifier.focusRing()) {
+                            Icon(Icons.Filled.Edit, null)
+                            Text("Edit Home", Modifier.padding(start = 6.dp))
+                        }
                     }
                 }
             }
@@ -520,6 +524,8 @@ fun SettingsScreen(nav: NavHostController) {
     val scope = rememberCoroutineScope()
     // The rating switch below shows only while the server asks for ratings (USER-19).
     LaunchedEffect(Unit) { marquee.refreshRatingPrompt() }
+    var switching by remember { mutableStateOf(false) }
+    if (switching) ProfileSwitcher(nav, onDismiss = { switching = false })
     Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(sidePadding), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -533,6 +539,7 @@ fun SettingsScreen(nav: NavHostController) {
         Text("Version ${marquee.info?.version ?: ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
         PendingSyncRow()
         TrailersPreference()
+        NightModePreference()
         RatingPromptPreference()
         ShowAudioQualityPreference()
         EqualiserSetting()
@@ -546,7 +553,9 @@ fun SettingsScreen(nav: NavHostController) {
             if (me?.isAdmin == true) OutlinedButton(onClick = { nav.navigate("approvals") }) { Text("Requests") }
             if (me?.isAdmin == true) OutlinedButton(onClick = { nav.navigate("users") }) { Text("Users & sharing") }
             if (me?.isAdmin == true) OutlinedButton(onClick = { nav.navigate("serversettings") }) { Text("Server settings") }
-            OutlinedButton(onClick = { scope.launch { marquee.signOut() } }) { Text("Switch profile") }
+            // Friends have no household profiles to switch to (USER-13).
+            if (me?.restrictions?.friend != true) OutlinedButton(onClick = { switching = true }) { Text("Switch profile") }
+            OutlinedButton(onClick = { scope.launch { marquee.signOut() } }) { Text("Sign out") }
             OutlinedButton(onClick = { marquee.forgetServer() }) { Text("Use a different server") }
         }
         Box(Modifier.width(1.dp))

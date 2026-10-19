@@ -388,7 +388,9 @@ fun VodBrowse(nav: NavHostController, shows: Boolean, header: @Composable () -> 
             }
         }
         if (!searched && !recommended.isNullOrEmpty()) item(span = full, key = "recommended") {
-            HeaderNoPadding { VodSuggestionRow(nav, "Recommended for you", recommended) }
+            HeaderNoPadding {
+                VodSuggestionRow(nav, "Recommended for you", recommended, onSeeAll = { nav.navigate(vodRecommendedRoute(shows)) })
+            }
         }
         val rm = resumeMovies
         val rs = resumeShows

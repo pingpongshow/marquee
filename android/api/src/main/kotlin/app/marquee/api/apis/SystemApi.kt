@@ -32,6 +32,7 @@ import app.marquee.api.models.Backup
 import app.marquee.api.models.Error
 import app.marquee.api.models.Health
 import app.marquee.api.models.SpeedTestResult
+import app.marquee.api.models.StorageReport
 import app.marquee.api.models.SystemInfo
 import app.marquee.api.models.SystemStatus
 import app.marquee.api.models.TaskInfo
@@ -1184,6 +1185,90 @@ open class SystemApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/tasks/{taskId}/run".replace("{"+"taskId"+"}", encodeURIComponent(taskId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /system/storage
+     * Storage overview (admin only): space used per library, the biggest titles, how each library grew (one sample a day, up to a year) and the free space on the volumes Marquee uses.
+     * 
+     * @param days How far back the growth history goes. (optional, default to 90)
+     * @param top How many of the biggest titles. (optional, default to 20)
+     * @return StorageReport
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun storageReport(days: kotlin.Int? = 90, top: kotlin.Int? = 20) : StorageReport {
+        val localVarResponse = storageReportWithHttpInfo(days = days, top = top)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as StorageReport
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /system/storage
+     * Storage overview (admin only): space used per library, the biggest titles, how each library grew (one sample a day, up to a year) and the free space on the volumes Marquee uses.
+     * 
+     * @param days How far back the growth history goes. (optional, default to 90)
+     * @param top How many of the biggest titles. (optional, default to 20)
+     * @return ApiResponse<StorageReport?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun storageReportWithHttpInfo(days: kotlin.Int?, top: kotlin.Int?) : ApiResponse<StorageReport?> {
+        val localVariableConfig = storageReportRequestConfig(days = days, top = top)
+
+        return request<Unit, StorageReport>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation storageReport
+     *
+     * @param days How far back the growth history goes. (optional, default to 90)
+     * @param top How many of the biggest titles. (optional, default to 20)
+     * @return RequestConfig
+     */
+    fun storageReportRequestConfig(days: kotlin.Int?, top: kotlin.Int?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (days != null) {
+                    put("days", listOf(days.toString()))
+                }
+                if (top != null) {
+                    put("top", listOf(top.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/system/storage",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

@@ -94,6 +94,8 @@ fun MainScreen() {
     if (marquee.isTv) {
         Row(Modifier.fillMaxSize()) {
             if (!fullScreen) Column(Modifier.fillMaxHeight().width(112.dp).padding(vertical = 24.dp, horizontal = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Who's watching, above Home: opens the profile picker.
+                ProfileButton(nav, tv = true, modifier = Modifier.padding(bottom = 8.dp))
                 tabs.forEach { t -> TvRailItem(t, tab == t.route) { go(t.route) } }
                 Spacer(Modifier.weight(1f))
                 TvNowPlaying { nav.navigate("nowplaying") }
@@ -154,6 +156,10 @@ private fun Routes(nav: NavHostController) {
         // VOD (LIVE-6): VOD Movies and VOD Shows, pages of their own listed after Live TV.
         composable("vod") { VodPage(nav) }
         composable("vodshows") { VodShowsPage(nav) }
+        // The VOD pages' Recommended for you, in full: rows of films or series picked for this person.
+        composable("vodrecommended?kind={kind}", listOf(navArgument("kind") { type = NavType.StringType; defaultValue = "movie" })) {
+            VodRecommendedScreen(nav, it.arguments!!.getString("kind") == "series")
+        }
         composable("musicbrowse/{lib}/{kind}?sort={sort}", listOf(navArgument("lib") { type = NavType.LongType }, navArgument("sort") { type = NavType.StringType; nullable = true; defaultValue = null })) {
             app.marquee.music.MusicBrowseScreen(nav, it.arguments!!.getLong("lib"), it.arguments!!.getString("kind")!!, it.arguments!!.getString("sort"))
         }

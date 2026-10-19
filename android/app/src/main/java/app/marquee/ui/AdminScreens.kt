@@ -97,6 +97,30 @@ fun TrailersPreference() {
     }
 }
 
+/** Night mode by default: every video starts with night mode on; each player can still switch it. */
+@Composable
+fun NightModePreference() {
+    val marquee = LocalMarquee.current
+    val me by marquee.me.collectAsState()
+    val scope = rememberCoroutineScope()
+    val u = me ?: return
+    val on = u.preferences.nightMode == true
+    var error by remember { mutableStateOf<String?>(null) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Night mode by default")
+            Text(NIGHT_MODE_HELP, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        }
+        Switch(on, { v ->
+            scope.launch {
+                withContext(Dispatchers.IO) { runCatching { marquee.auth.updateMe(MeUpdate(preferences = u.preferences.copy(nightMode = v))) } }
+                    .onSuccess { marquee.updated(it); error = null }.onFailure { error = it.message ?: "Couldn't save" }
+            }
+        }, Modifier.focusRing().semantics { contentDescription = "Night mode by default" })
+    }
+}
+
 /** "Ask me to rate after watching" (USER-19): the person's own switch, shown while the server asks at all. */
 @Composable
 fun RatingPromptPreference() {

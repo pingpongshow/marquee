@@ -121,7 +121,16 @@ import kotlinx.coroutines.withContext
  * remembers them for this file.
  */
 private data class Choice(val fileId: Long? = null, val audio: Long? = null, val subtitle: Long? = null, val maxKbps: Int? = null,
-    val subOffset: Int? = null, val audioOffset: Int? = null)
+    val subOffset: Int? = null, val audioOffset: Int? = null, val nightMode: Boolean? = null)
+
+/** What night mode (dialogue boost) does, under its switches. */
+const val NIGHT_MODE_HELP = "Quieter loud scenes, clearer dialogue"
+
+/**
+ * Whether the player's Night mode switch shows on: the viewer's choice in this player, else
+ * what the session has (the person's preference, when no choice was sent), else the preference.
+ */
+internal fun nightModeOn(chosen: Boolean?, session: Boolean?, preference: Boolean?): Boolean = chosen ?: session ?: preference ?: false
 
 /** Quality caps offered in the player (kbps; null = no cap). */
 private val qualities = listOf<Pair<String, Int?>>(
@@ -230,7 +239,9 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
         val old = session
         val req = if (playId != itemId) PlaybackRequest(playId, AndroidProfile.profile, startMs = at)
         else PlaybackRequest(itemId, AndroidProfile.profile, fileId = c.fileId, audioStreamId = c.audio, subtitleStreamId = c.subtitle,
-            startMs = at, maxBitrateKbps = c.maxKbps, subtitleOffsetMs = c.subOffset, audioOffsetMs = c.audioOffset)
+            startMs = at, maxBitrateKbps = c.maxKbps, subtitleOffsetMs = c.subOffset, audioOffsetMs = c.audioOffset,
+            // Only an explicit choice is sent; otherwise the server uses the person's preference.
+            nightMode = c.nightMode)
         // Started on the session's own scope: if the screen goes away while the server is
         // starting it, the session is stopped as soon as it arrives rather than left running.
         val pending = marquee.scope.async { runCatching { marquee.playback.startPlayback(req) } }
@@ -649,7 +660,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             dismissButton = { TextButton({ groupPanel = false }, Modifier.focusRing()) { Text("Close") } },
         )
         if (settings) PlayerSettings(
-            detail, session, choice,
+            detail, session, choice, nightPreference = me?.preferences?.nightMode,
             together = group != null, speed = speed,
             onSpeed = { s ->
                 settings = false
@@ -721,7 +732,7 @@ internal fun ScrubBar(pos: Long, dur: Long, thumbs: TrickplayThumbs?, scrubbing:
 /** Audio, subtitles, quality and version, applied by restarting the session where it is. */
 @Composable
 private fun PlayerSettings(
-    detail: ItemDetail?, session: PlaybackSession?, choice: Choice, together: Boolean, speed: Float,
+    detail: ItemDetail?, session: PlaybackSession?, choice: Choice, nightPreference: Boolean?, together: Boolean, speed: Float,
     onSpeed: (Float) -> Unit, onTiming: (sub: Int, audio: Int) -> Unit,
     onPick: (Choice) -> Unit, onClose: () -> Unit, onFind: () -> Unit = {},
 ) {
@@ -748,9 +759,12 @@ private fun PlayerSettings(
                     }
                 }
             }
-            if (audio.size > 1) {
-                item { Heading("Audio") }
-                items(audio) { a -> Option(streamLabel(a), a.id == curAudio) { onPick(choice.copy(audio = a.id)) } }
+            item { Heading("Audio") }
+            if (audio.size > 1) items(audio) { a -> Option(streamLabel(a), a.id == curAudio) { onPick(choice.copy(audio = a.id)) } }
+            // Night mode: switching restarts the session where it is with the new setting.
+            item {
+                val night = nightModeOn(choice.nightMode, session?.nightMode, nightPreference)
+                ToggleOption("Night mode", NIGHT_MODE_HELP, night) { onPick(choice.copy(nightMode = !night)) }
             }
             item { Heading("Subtitles") }
             item { Option("Off", curSub == null, first = true) { onPick(choice.copy(subtitle = -1)) } }
@@ -806,6 +820,24 @@ private fun Option(label: String, selected: Boolean, first: Boolean = false, onC
     ) {
         Text(label, Modifier.weight(1f), fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
         if (selected) Icon(Icons.Filled.Check, null, tint = Gold)
+    }
+}
+
+/** A switch row (the whole row toggles it, for the D-pad), with help under the label. */
+@Composable
+private fun ToggleOption(label: String, help: String, on: Boolean, onToggle: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().focusCard(onToggle).semantics(mergeDescendants = true) {
+            contentDescription = label
+            stateDescription = if (on) "On" else "Off"
+        }.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(label)
+            Text(help, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        androidx.compose.material3.Switch(on, null, colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = Gold))
     }
 }
 

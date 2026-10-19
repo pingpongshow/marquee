@@ -40,6 +40,7 @@ import kotlinx.serialization.Contextual
  * @param cinemaTrailers Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true.
  * @param ratingPrompt Ask me to rate a movie or episode when I finish it, if the server has it on (USER-19). Default true.
  * @param subtitleStyle 
+ * @param nightMode Night mode (dialogue boost) on by default for this person's video playback; each player can switch it per session. Default false.
  */
 @Serializable
 
@@ -72,7 +73,11 @@ data class UserPreferences (
     val ratingPrompt: kotlin.Boolean? = null,
 
     @SerialName(value = "subtitleStyle")
-    val subtitleStyle: SubtitleStyle? = null
+    val subtitleStyle: SubtitleStyle? = null,
+
+    /* Night mode (dialogue boost) on by default for this person's video playback; each player can switch it per session. Default false. */
+    @SerialName(value = "nightMode")
+    val nightMode: kotlin.Boolean? = null
 
 ) {
 

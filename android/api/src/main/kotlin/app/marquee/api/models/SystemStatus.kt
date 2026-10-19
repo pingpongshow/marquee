@@ -24,6 +24,8 @@
 package app.marquee.api.models
 
 import app.marquee.api.models.BandwidthSample
+import app.marquee.api.models.HostInfo
+import app.marquee.api.models.ResourceSample
 import app.marquee.api.models.SystemStatusLibrariesInner
 
 import kotlinx.serialization.Serializable
@@ -44,6 +46,8 @@ import kotlinx.serialization.Contextual
  * @param libraries 
  * @param uploadSpeedKbps 
  * @param bandwidthHistory The last hour, one sample a minute, oldest first.
+ * @param host 
+ * @param resources The last hour of CPU, memory and GPU readings, one every 10 seconds, oldest first (empty after a restart or where the server can't read them).
  */
 @Serializable
 
@@ -82,7 +86,14 @@ data class SystemStatus (
 
     /* The last hour, one sample a minute, oldest first. */
     @SerialName(value = "bandwidthHistory")
-    val bandwidthHistory: kotlin.collections.List<BandwidthSample>? = null
+    val bandwidthHistory: kotlin.collections.List<BandwidthSample>? = null,
+
+    @SerialName(value = "host")
+    val host: HostInfo? = null,
+
+    /* The last hour of CPU, memory and GPU readings, one every 10 seconds, oldest first (empty after a restart or where the server can't read them). */
+    @SerialName(value = "resources")
+    val resources: kotlin.collections.List<ResourceSample>? = null
 
 ) {
 

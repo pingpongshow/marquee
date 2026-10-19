@@ -2,6 +2,16 @@ package app.marquee.ui
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.saveable.rememberSaveable
+import app.marquee.api.models.VodRecommendationRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -128,16 +138,72 @@ fun VodSuggestionTile(nav: NavHostController, s: VodSuggestion, width: Dp?, auto
  */
 @Composable
 fun VodSuggestionRow(nav: NavHostController, title: String, list: List<VodSuggestion>?, padding: Dp = sidePadding, autoFocusKey: String? = null,
-    onTitle: (() -> Unit)? = null, onOpen: (String) -> Unit = {}) {
+    onTitle: (() -> Unit)? = null, onSeeAll: (() -> Unit)? = null, onOpen: (String) -> Unit = {}) {
     val marquee = LocalMarquee.current
     val context = LocalContext.current
     val hidden = remember { mutableStateListOf<String>() }
     val shown = list.orEmpty().filter { it.key !in hidden && vodRoute(it) != null }
     if (shown.isEmpty()) return
     Box(Modifier.semantics { contentDescription = title }) {
-        Shelf(title, shown, padding, onTitle = onTitle) { _, s ->
+        Shelf(title, shown, padding, onTitle = onTitle, onSeeAll = onSeeAll) { _, s ->
             VodSuggestionTile(nav, s, if (marquee.isTv) 140.dp else 116.dp, autoFocus = marquee.isTv && s.key == autoFocusKey, onOpen = { onOpen(s.key) }) {
                 hideVodSuggestion(marquee, context, s, onHidden = { hidden.add(s.key) }, onFailed = { hidden.remove(s.key) })
+            }
+        }
+    }
+}
+
+/** The VOD pages' Recommended for you in full: films ([shows] false) or series. */
+fun vodRecommendedRoute(shows: Boolean): String = "vodrecommended?kind=" + if (shows) "series" else "movie"
+
+/**
+ * Recommended on VOD: rows of films or series picked from this person's own taste (Top picks,
+ * Because you love …), with a Movies/Shows switch. Tiles open the title; Not interested is in
+ * each tile's long-press menu.
+ */
+@Composable
+fun VodRecommendedScreen(nav: NavHostController, initialShows: Boolean) {
+    val marquee = LocalMarquee.current
+    var shows by rememberSaveable { mutableStateOf(initialShows) }
+    // Switched by hand: the D-pad stays on the switch rather than jumping into the new rows.
+    var switched by rememberSaveable { mutableStateOf(false) }
+    val changed by VodChanges.version.collectAsState()
+    val error = remember(shows) { mutableStateOf<String?>(null) }
+    val rows by cachedLoad<List<VodRecommendationRow>>("vodrecommended:$shows", changed) {
+        withContext(Dispatchers.IO) {
+            runCatching { marquee.livetv.vodRecommendations(if (shows) LivetvApi.KindVodRecommendations.SERIES else LivetvApi.KindVodRecommendations.MOVIE, 30) }
+                .onFailure { error.value = it.message ?: "Couldn't load recommendations" }.getOrNull()
+        }
+    }
+    val list = rows
+    val chipShape = RoundedCornerShape(8.dp)
+    LazyColumn(Modifier.fillMaxSize().semantics { contentDescription = "Recommended on VOD" }, contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        item(key = "header") {
+            Column(Modifier.padding(horizontal = sidePadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Recommended ${if (shows) "shows" else "movies"} on VOD", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Row(Modifier.semantics { contentDescription = "Movies or shows" }, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(!shows, { if (shows) { shows = false; switched = true } }, { Text("Movies") }, Modifier.focusRing(chipShape))
+                    FilterChip(shows, { if (!shows) { shows = true; switched = true } }, { Text("Shows") }, Modifier.focusRing(chipShape))
+                }
+                Text("Picked from your favourites, ratings and what you watch. Nothing here comes from what other people watch.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        when {
+            list == null && error.value != null -> item(key = "error") {
+                Text(error.value ?: "", Modifier.padding(horizontal = sidePadding), color = MaterialTheme.colorScheme.error)
+            }
+            list == null -> item(key = "loading") { CircularProgressIndicator(Modifier.padding(horizontal = sidePadding)) }
+            list.none { r -> r.propertyEntries.any { vodRoute(it) != null } } -> item(key = "empty") {
+                Text("Nothing to recommend yet. Watch, rate or heart a few titles and come back.", Modifier.padding(horizontal = sidePadding),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            else -> {
+                val first = list.firstOrNull { r -> r.propertyEntries.any { vodRoute(it) != null } }?.propertyEntries?.firstOrNull { vodRoute(it) != null }?.key
+                items(list, key = { "${if (shows) "s" else "m"}:${it.id}" }) { r ->
+                    VodSuggestionRow(nav, r.title, r.propertyEntries, autoFocusKey = first.takeIf { !switched })
+                }
             }
         }
     }

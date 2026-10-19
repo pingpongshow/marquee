@@ -44,6 +44,7 @@ import kotlinx.serialization.Contextual
  * @param dvrQuotaAlert 
  * @param plexSyncAlert 
  * @param optimizeFailedAlert 
+ * @param libraryUnreadableAlert 
  * @param recipientsAllAdmins 
  * @param recipients 
  * @param diskThresholdPercent 
@@ -88,6 +89,9 @@ data class NotificationSettingsUpdate (
 
     @SerialName(value = "optimizeFailedAlert")
     val optimizeFailedAlert: kotlin.Boolean? = null,
+
+    @SerialName(value = "libraryUnreadableAlert")
+    val libraryUnreadableAlert: kotlin.Boolean? = null,
 
     @SerialName(value = "recipientsAllAdmins")
     val recipientsAllAdmins: kotlin.Boolean? = null,

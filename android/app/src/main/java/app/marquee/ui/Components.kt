@@ -226,12 +226,17 @@ fun PosterCard(item: ItemSummary, imageUrl: String?, width: Dp, onClick: () -> U
     }
 }
 
-/** A titled horizontal row of cards (Home hubs, cast, related). */
+/** A titled horizontal row of cards (Home hubs, cast, related); [onSeeAll] adds "See all" beside the title. */
 @Composable
-fun <T> Shelf(title: String, items: List<T>, sidePadding: Dp, onTitle: (() -> Unit)? = null, content: @Composable (index: Int, item: T) -> Unit) {
+fun <T> Shelf(title: String, items: List<T>, sidePadding: Dp, onTitle: (() -> Unit)? = null, onSeeAll: (() -> Unit)? = null,
+    content: @Composable (index: Int, item: T) -> Unit) {
     Column {
         // A title that opens the whole list (a pinned collection or playlist) reads "Title ›".
-        if (onTitle != null) Text("$title  ›", Modifier.padding(start = sidePadding - 4.dp, bottom = 4.dp).focusRing(RoundedCornerShape(6.dp))
+        if (onSeeAll != null) Row(Modifier.fillMaxWidth().padding(start = sidePadding, end = sidePadding - 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            androidx.compose.material3.TextButton(onSeeAll, Modifier.focusRing().semantics { contentDescription = "See all: $title" }) { Text("See all", maxLines = 1) }
+        }
+        else if (onTitle != null) Text("$title  ›", Modifier.padding(start = sidePadding - 4.dp, bottom = 4.dp).focusRing(RoundedCornerShape(6.dp))
             .clip(RoundedCornerShape(6.dp)).clickable(onClick = onTitle).padding(horizontal = 4.dp),
             style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         else Text(title, Modifier.padding(start = sidePadding, bottom = 4.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

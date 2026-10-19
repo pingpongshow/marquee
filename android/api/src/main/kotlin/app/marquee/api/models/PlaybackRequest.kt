@@ -38,6 +38,7 @@ import kotlinx.serialization.Contextual
  * @param audioStreamId 
  * @param subtitleStreamId -1 turns subtitles off; omit for automatic (the user's subtitle preference).
  * @param startMs Omit to resume where the user left off.
+ * @param nightMode Night mode (dialogue boost): the server converts the audio with dynamic-range compression and lifts the centre (dialogue) channel, so loud scenes are quieter and speech clearer. The video is still copied when it can be (a direct play becomes a direct stream). Omitted = the user's nightMode preference.
  * @param maxBitrateKbps The app's quality setting; 0/omitted = original (home) or automatic (remote).
  * @param measuredKbps Measured download speed from /playback/bandwidth-test.
  * @param preload Prepare the next item (gapless music) without ending this device's current session. It takes over when it first reports \"playing\".
@@ -68,6 +69,10 @@ data class PlaybackRequest (
     /* Omit to resume where the user left off. */
     @SerialName(value = "startMs")
     val startMs: kotlin.Long? = null,
+
+    /* Night mode (dialogue boost): the server converts the audio with dynamic-range compression and lifts the centre (dialogue) channel, so loud scenes are quieter and speech clearer. The video is still copied when it can be (a direct play becomes a direct stream). Omitted = the user's nightMode preference. */
+    @SerialName(value = "nightMode")
+    val nightMode: kotlin.Boolean? = null,
 
     /* The app's quality setting; 0/omitted = original (home) or automatic (remote). */
     @SerialName(value = "maxBitrateKbps")

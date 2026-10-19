@@ -136,7 +136,7 @@ private fun CodeField(code: String, onChange: (String) -> Unit) {
 
 /** Asks for a PIN or password (and an authenticator code when needed); submit returns an error message, or null when it worked. */
 @Composable
-private fun SecretDialog(title: String, label: String, numeric: Boolean, onDismiss: () -> Unit, submit: suspend (String, String?) -> String?) {
+internal fun SecretDialog(title: String, label: String, numeric: Boolean, onDismiss: () -> Unit, submit: suspend (String, String?) -> String?) {
     var value by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
     var needsCode by remember { mutableStateOf(false) }

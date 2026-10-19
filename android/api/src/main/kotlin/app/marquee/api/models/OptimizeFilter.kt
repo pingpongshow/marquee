@@ -38,7 +38,7 @@ import kotlinx.serialization.Contextual
  * @param resolution 
  * @param codecs 
  * @param hdr 
- * @param optimized Only files already optimized (yes) or not yet (no).
+ * @param optimized Only files already optimized (yes) or still to do (no: not optimized, not queued).
  */
 @Serializable
 
@@ -65,7 +65,7 @@ data class OptimizeFilter (
     @SerialName(value = "hdr")
     val hdr: OptimizeFilter.Hdr? = null,
 
-    /* Only files already optimized (yes) or not yet (no). */
+    /* Only files already optimized (yes) or still to do (no: not optimized, not queued). */
     @SerialName(value = "optimized")
     val optimized: OptimizeFilter.Optimized? = null
 
@@ -104,7 +104,7 @@ data class OptimizeFilter (
         @SerialName(value = "no") NO("no");
     }
     /**
-     * Only files already optimized (yes) or not yet (no).
+     * Only files already optimized (yes) or still to do (no: not optimized, not queued).
      *
      * Values: YES,NO
      */
