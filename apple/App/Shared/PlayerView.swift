@@ -332,7 +332,8 @@ struct PlayerView: View {
     }
 
     #if os(iOS)
-    /// Speed and subtitle/audio timing (PLAY-19, PLAY-17); hidden while watching together.
+    /// Speed, subtitle/audio timing and night mode (PLAY-19, PLAY-17); hidden while watching
+    /// together.
     private func optionsMenu(_ p: VideoPlayback) -> some View {
         Menu {
             Picker("Speed", selection: Binding(get: { p.speed }, set: { p.speed = $0 })) {
@@ -342,6 +343,14 @@ struct PlayerView: View {
             if p.offlineTitle == nil {
                 Button("Subtitle Timing (\(offsetLabel(p.subtitleOffsetMs)))", systemImage: "captions.bubble") { timing = .subtitle }
                 Button("Audio Timing (\(offsetLabel(p.audioOffsetMs)))", systemImage: "waveform") { timing = .audio }
+                Section {
+                    // Restarts the stream at the same position, like an audio track change.
+                    Toggle(isOn: Binding(get: { p.nightMode }, set: { on in Task { await p.setNightMode(on) } })) {
+                        Label("Night Mode", systemImage: "moon")
+                        Text("Quieter loud scenes, clearer dialogue")
+                    }
+                    .accessibilityIdentifier("nightMode")
+                }
             }
         } label: {
             PlayerBubble(systemImage: "gearshape")
@@ -691,6 +700,7 @@ struct PlayerController: UIViewControllerRepresentable {
         let group = together?.group.map { g in "\(g.id):" + g.members.map(\.name).joined(separator: ",") } ?? "-"
         return [trailer != nil ? "T" : "", "\(playback.speed)", "\(playback.subtitleOffsetMs)", "\(playback.audioOffsetMs)",
                 playback.offlineTitle == nil ? "" : "off", audio.joined(separator: ","), "\(playback.session?.audioStreamId ?? -1)",
+                playback.nightMode ? "night" : "",
                 together == nil ? "" : "t", group].joined(separator: "|")
     }
     #endif
@@ -731,16 +741,21 @@ struct PlayerController: UIViewControllerRepresentable {
                 menu("Audio Timing", "metronome", playback.audioOffsetMs) { playback.setOffsets(audio: $0) }]
     }
 
-    /// Audio tracks (switching restarts the stream at the same position).
+    /// Audio tracks and night mode (switching either restarts the stream at the same position).
     private func audioMenu() -> [UIMenuElement] {
+        guard playback.offlineTitle == nil else { return [] }
         let streams = playback.item?.info.versions.first?.files.first?.streams.filter { $0.kind == .audio } ?? []
-        guard streams.count > 1 else { return [] }
         let current = playback.session?.audioStreamId
-        let actions = streams.map { s in
+        let tracks: [UIMenuElement] = streams.count > 1 ? [UIMenu(options: .displayInline, children: streams.map { s in
             UIAction(title: [s.title ?? languageName(s.language), s.codec.uppercased()].joined(separator: " · "),
                      state: s.id == current ? .on : .off) { _ in Task { await playback.change(audio: s.id) } }
-        }
-        return [UIMenu(title: "Audio", image: UIImage(systemName: "speaker.wave.2"), children: actions)]
+        })] : []
+        let on = playback.nightMode
+        let night = UIAction(title: "Night Mode", subtitle: "Quieter loud scenes, clearer dialogue", image: UIImage(systemName: "moon"),
+                             state: on ? .on : .off) { _ in Task { await playback.setNightMode(!on) } }
+        night.accessibilityIdentifier = "nightMode"
+        return [UIMenu(title: "Audio", image: UIImage(systemName: "speaker.wave.2"),
+                       children: tracks + [UIMenu(options: .displayInline, children: [night])])]
     }
     #endif
 }

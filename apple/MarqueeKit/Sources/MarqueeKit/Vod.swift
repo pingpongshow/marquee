@@ -11,6 +11,7 @@ public typealias VodSeriesDetail = Components.Schemas.VodSeriesDetail
 public typealias VodSeason = Components.Schemas.VodSeason
 public typealias VodEpisode = Components.Schemas.VodEpisode
 public typealias VodSuggestion = Components.Schemas.VodSuggestion
+public typealias VodRecommendationRow = Components.Schemas.VodRecommendationRow
 public typealias VodRef = Components.Schemas.VodRef
 
 /// Movies on demand under Live TV (LIVE-6): films from M3U sources (e.g. Pluto TV), played by
@@ -205,6 +206,12 @@ public extension AppSession {
     /// Recommended for you.
     func vodSuggestions(series: Bool, limit: Int = 20) async throws -> [VodSuggestion] {
         try await vodAPI.vodSuggestions(query: .init(kind: series ? .series : .movie, limit: limit)).ok.body.json
+    }
+
+    /// The recommendations page (Recommended for you's See All): rows of films (or series) on
+    /// demand, each with its own angle, all from the viewer's own taste.
+    func vodRecommendations(series: Bool, perRow: Int = 40) async throws -> [VodRecommendationRow] {
+        try await vodAPI.vodRecommendations(query: .init(kind: series ? .series : .movie, perRow: perRow)).ok.body.json
     }
 
     /// Also on VOD: films or series on demand like a library movie or show (empty when the

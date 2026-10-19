@@ -102,7 +102,8 @@ struct VodBrowseView: View {
             controls.padding(.horizontal, sidePadding)
             if filters.isActive { activeFilters.padding(.horizontal, sidePadding) }
             if category.isEmpty, query.isEmpty, !filters.isActive {
-                VodSuggestionRow(title: "Recommended for you", list: suggestions, identifier: "vod.recommended")
+                VodSuggestionRow(title: "Recommended for you", list: suggestions, identifier: "vod.recommended",
+                                 seeAll: .vodRecommended(series: shows))
                 if shows, !resumeShows.isEmpty {
                     ShelfRow(title: "Continue Watching") {
                         ForEach(resumeShows, id: \.id) { s in

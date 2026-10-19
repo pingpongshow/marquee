@@ -42,14 +42,104 @@ struct VodSuggestionRow: View {
     let title: String
     let list: [VodSuggestion]
     var identifier = "vod.suggestions"
+    /// The recommendations page: See All in the header (a tile at the row's end on the TV).
+    var seeAll: Route?
 
     var body: some View {
         let shown = VodSuggestionHides.shared.visible(list)
         if !shown.isEmpty {
-            ShelfRow(title: title) {
+            ShelfRow(title: title, seeAll: seeAll) {
                 ForEach(shown, id: \.key) { VodSuggestionTile(suggestion: $0) }
+                #if os(tvOS)
+                if let seeAll { VodSeeAllTile(route: seeAll) }
+                #endif
             }
             .accessibilityIdentifier(identifier)
+        }
+    }
+}
+
+#if os(tvOS)
+/// The TV's See All: a poster-sized tile at the end of Recommended for you.
+struct VodSeeAllTile: View {
+    let route: Route
+
+    var body: some View {
+        NavigationLink(value: route) {
+            VStack(spacing: 10) {
+                Image(systemName: "square.grid.2x2").font(.title2)
+                Text("See All").font(.headline)
+            }
+            .frame(width: VodSuggestionTile.defaultWidth, height: VodSuggestionTile.defaultWidth * 1.5)
+            .background(Color.secondary.opacity(0.15), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.card)
+        .accessibilityLabel("See All")
+        .accessibilityIdentifier("shelf.seeAll")
+    }
+}
+#endif
+
+/// Recommended for you's See All (USER-16): rows of films or series on demand, each with its
+/// own angle, from the viewer's own taste; Movies and Shows switch between the two.
+struct VodRecommendedView: View {
+    @Environment(AppSession.self) private var app
+    @State private var series: Bool
+    @State private var rows: [VodRecommendationRow]?
+    @State private var error: String?
+
+    init(series: Bool) {
+        _series = State(initialValue: series)
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: isTV ? 30 : 24) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Picker("Movies or shows", selection: $series) {
+                        Text("Movies").tag(false)
+                        Text("Shows").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: isTV ? 500 : 320)
+                    .accessibilityIdentifier("vodRecommended.kind")
+                    Text("Picked from your favourites, ratings and what you watch. Nothing here comes from what other people watch.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, sidePadding)
+                if let error {
+                    ErrorBanner(message: error).padding(.horizontal, sidePadding)
+                } else if let rows {
+                    if rows.allSatisfy({ VodSuggestionHides.shared.visible($0.entries).isEmpty }) {
+                        Text("Nothing to recommend yet. Watch, rate or heart a few titles and come back.")
+                            .foregroundStyle(.secondary).padding(.horizontal, sidePadding)
+                            .accessibilityIdentifier("vodRecommended.empty")
+                    }
+                    ForEach(rows, id: \.id) { r in
+                        VodSuggestionRow(title: r.title, list: r.entries, identifier: "vodRecommended.row")
+                    }
+                } else {
+                    ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
+                }
+            }
+            .padding(.vertical)
+        }
+        .navigationTitle(series ? "Recommended Shows" : "Recommended Movies")
+        #if os(iOS)
+        .refreshable { await load() }
+        #endif
+        .task(id: series) {
+            rows = nil
+            await load()
+        }
+    }
+
+    private func load() async {
+        do {
+            rows = try await app.vodRecommendations(series: series)
+            error = nil
+        } catch {
+            self.error = (error as? MarqueeError)?.message ?? error.localizedDescription
         }
     }
 }

@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var linkCode = ""
     @State private var linkResult: String?
     @State private var trailersError: String?
+    @State private var nightError: String?
     @State private var ratingError: String?
 
     var body: some View {
@@ -76,6 +77,17 @@ struct SettingsView: View {
                 if let trailersError { Text(trailersError).font(.caption).foregroundStyle(.red) }
             } footer: {
                 Text("When the server has cinema trailers on, they play before a movie you start from the beginning.")
+            }
+            Section {
+                Toggle("Night mode by default", isOn: Binding(get: { app.nightModePreference }, set: { on in
+                    Task {
+                        do { try await app.setNightMode(on); nightError = nil } catch { nightError = error.localizedDescription }
+                    }
+                }))
+                .accessibilityIdentifier("nightModePreference")
+                if let nightError { Text(nightError).font(.caption).foregroundStyle(.red) }
+            } footer: {
+                Text("Quieter loud scenes, clearer dialogue. You can still switch it for one video in the player's audio options.")
             }
             // Rating requests when a movie or episode ends (USER-19): the server-wide switch
             // for admins, and everyone's own choice while the server has it on.

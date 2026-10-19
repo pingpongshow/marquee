@@ -36,12 +36,13 @@ public extension AppSession {
     func items(library: Int64, sort: ItemSort = .title, offset: Int = 0, limit: Int = 100,
                watch: Operations.ListLibraryItems.Input.Query.WatchPayload? = nil, genre: String? = nil,
                type: Schemas.ItemType? = nil, decade: Int? = nil, minMyRating: Int? = nil,
-               favorites: Bool = false) async throws -> Schemas.ItemPage {
+               favorites: Bool = false, seed: Int64? = nil) async throws -> Schemas.ItemPage {
         // minMyRating: only what this person rated at least that (0–10; 8 = 4 stars).
         // favorites: only this person's favourites (the heart, USER-12).
+        // seed: with the Random sort, the same shuffle on every page (BROWSE-2).
         try await api.listLibraryItems(path: .init(libraryId: library),
                                        query: .init(_type: type, sort: sort, offset: offset, limit: limit, watch: watch, genre: genre,
-                                                    decade: decade, minMyRating: minMyRating, favorites: favorites ? true : nil)).ok.body.json
+                                                    decade: decade, minMyRating: minMyRating, favorites: favorites ? true : nil, seed: seed)).ok.body.json
     }
 
     func filters(library: Int64, type: Schemas.ItemType? = nil) async throws -> LibraryFilters {

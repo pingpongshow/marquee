@@ -597,6 +597,10 @@ extension Components {
             public var ratingPrompt: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/UserPreferences/subtitleStyle`.
             public var subtitleStyle: Components.Schemas.SubtitleStyle?
+            /// Night mode (dialogue boost) on by default for this person's video playback; each player can switch it per session. Default false.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserPreferences/nightMode`.
+            public var nightMode: Swift.Bool?
             /// Creates a new `UserPreferences`.
             ///
             /// - Parameters:
@@ -608,6 +612,7 @@ extension Components {
             ///   - cinemaTrailers: Play trailers before movies when the server has cinema trailers on (PLAY-18). Default true.
             ///   - ratingPrompt: Ask me to rate a movie or episode when I finish it, if the server has it on (USER-19). Default true.
             ///   - subtitleStyle:
+            ///   - nightMode: Night mode (dialogue boost) on by default for this person's video playback; each player can switch it per session. Default false.
             public init(
                 audioLanguage: Swift.String? = nil,
                 subtitleLanguage: Swift.String? = nil,
@@ -616,7 +621,8 @@ extension Components {
                 remoteQualityKbps: Swift.Int? = nil,
                 cinemaTrailers: Swift.Bool? = nil,
                 ratingPrompt: Swift.Bool? = nil,
-                subtitleStyle: Components.Schemas.SubtitleStyle? = nil
+                subtitleStyle: Components.Schemas.SubtitleStyle? = nil,
+                nightMode: Swift.Bool? = nil
             ) {
                 self.audioLanguage = audioLanguage
                 self.subtitleLanguage = subtitleLanguage
@@ -626,6 +632,7 @@ extension Components {
                 self.cinemaTrailers = cinemaTrailers
                 self.ratingPrompt = ratingPrompt
                 self.subtitleStyle = subtitleStyle
+                self.nightMode = nightMode
             }
             public enum CodingKeys: String, CodingKey {
                 case audioLanguage
@@ -636,6 +643,7 @@ extension Components {
                 case cinemaTrailers
                 case ratingPrompt
                 case subtitleStyle
+                case nightMode
             }
         }
         /// - Remark: Generated from `#/components/schemas/UserCreate`.
@@ -1318,22 +1326,26 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/NotificationSettings/linkUrl`.
             public var linkUrl: Swift.String?
-            /// Alert types that are on. All are off by default except vod_save_failed.
+            /// Alert types that are emailed. Every alert appears in the bell (GET /notifications) whatever is chosen here; only vod_save_failed is emailed by default among these.
             ///
             /// - Remark: Generated from `#/components/schemas/NotificationSettings/alerts`.
             public var alerts: [Components.Schemas.AlertType]?
-            /// The dvr_quota alert is on: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Off by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.)
+            /// The dvr_quota alert is emailed: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Not emailed by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.)
             ///
             /// - Remark: Generated from `#/components/schemas/NotificationSettings/dvrQuotaAlert`.
             public var dvrQuotaAlert: Swift.Bool?
-            /// The plex_sync alert is on: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Off by default. (Not in AlertType; notifications carry type plex_sync.)
+            /// The plex_sync alert is emailed: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Not emailed by default. (Not in AlertType; notifications carry type plex_sync.)
             ///
             /// - Remark: Generated from `#/components/schemas/NotificationSettings/plexSyncAlert`.
             public var plexSyncAlert: Swift.Bool?
-            /// The optimize_failed alert is on: a Library Health → Large files conversion failed (not one skipped for saving too little). On by default. (Not in AlertType; notifications carry type optimize_failed.)
+            /// The optimize_failed alert is emailed: a Library Health → Large files conversion failed (not one skipped for saving too little). Emailed by default. (Not in AlertType; notifications carry type optimize_failed.)
             ///
             /// - Remark: Generated from `#/components/schemas/NotificationSettings/optimizeFailedAlert`.
             public var optimizeFailedAlert: Swift.Bool?
+            /// The library_unreadable alert is emailed: a scan couldn't read one of a library's folders (offline drive, permissions), so its titles were kept as they were. Emailed by default. (Not in AlertType; notifications carry type library_unreadable.)
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/libraryUnreadableAlert`.
+            public var libraryUnreadableAlert: Swift.Bool?
             /// Mail alerts to every administrator with an email address.
             ///
             /// - Remark: Generated from `#/components/schemas/NotificationSettings/recipientsAllAdmins`.
@@ -1358,10 +1370,11 @@ extension Components {
             ///   - fromName:
             ///   - mailConfigured: Host, port and from address are set.
             ///   - linkUrl: Address links in mail start with (e.g. reset links). Empty = the Remote Access URL.
-            ///   - alerts: Alert types that are on. All are off by default except vod_save_failed.
-            ///   - dvrQuotaAlert: The dvr_quota alert is on: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Off by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.)
-            ///   - plexSyncAlert: The plex_sync alert is on: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Off by default. (Not in AlertType; notifications carry type plex_sync.)
-            ///   - optimizeFailedAlert: The optimize_failed alert is on: a Library Health → Large files conversion failed (not one skipped for saving too little). On by default. (Not in AlertType; notifications carry type optimize_failed.)
+            ///   - alerts: Alert types that are emailed. Every alert appears in the bell (GET /notifications) whatever is chosen here; only vod_save_failed is emailed by default among these.
+            ///   - dvrQuotaAlert: The dvr_quota alert is emailed: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Not emailed by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.)
+            ///   - plexSyncAlert: The plex_sync alert is emailed: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Not emailed by default. (Not in AlertType; notifications carry type plex_sync.)
+            ///   - optimizeFailedAlert: The optimize_failed alert is emailed: a Library Health → Large files conversion failed (not one skipped for saving too little). Emailed by default. (Not in AlertType; notifications carry type optimize_failed.)
+            ///   - libraryUnreadableAlert: The library_unreadable alert is emailed: a scan couldn't read one of a library's folders (offline drive, permissions), so its titles were kept as they were. Emailed by default. (Not in AlertType; notifications carry type library_unreadable.)
             ///   - recipientsAllAdmins: Mail alerts to every administrator with an email address.
             ///   - recipients: Administrators (user ids) who get alert mail when recipientsAllAdmins is off.
             ///   - diskThresholdPercent: Alert when a volume has less free space than this.
@@ -1379,6 +1392,7 @@ extension Components {
                 dvrQuotaAlert: Swift.Bool? = nil,
                 plexSyncAlert: Swift.Bool? = nil,
                 optimizeFailedAlert: Swift.Bool? = nil,
+                libraryUnreadableAlert: Swift.Bool? = nil,
                 recipientsAllAdmins: Swift.Bool? = nil,
                 recipients: [Swift.Int64]? = nil,
                 diskThresholdPercent: Swift.Int? = nil
@@ -1396,6 +1410,7 @@ extension Components {
                 self.dvrQuotaAlert = dvrQuotaAlert
                 self.plexSyncAlert = plexSyncAlert
                 self.optimizeFailedAlert = optimizeFailedAlert
+                self.libraryUnreadableAlert = libraryUnreadableAlert
                 self.recipientsAllAdmins = recipientsAllAdmins
                 self.recipients = recipients
                 self.diskThresholdPercent = diskThresholdPercent
@@ -1414,6 +1429,7 @@ extension Components {
                 case dvrQuotaAlert
                 case plexSyncAlert
                 case optimizeFailedAlert
+                case libraryUnreadableAlert
                 case recipientsAllAdmins
                 case recipients
                 case diskThresholdPercent
@@ -1455,6 +1471,8 @@ extension Components {
             public var plexSyncAlert: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/optimizeFailedAlert`.
             public var optimizeFailedAlert: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/libraryUnreadableAlert`.
+            public var libraryUnreadableAlert: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/recipientsAllAdmins`.
             public var recipientsAllAdmins: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/recipients`.
@@ -1476,6 +1494,7 @@ extension Components {
             ///   - dvrQuotaAlert:
             ///   - plexSyncAlert:
             ///   - optimizeFailedAlert:
+            ///   - libraryUnreadableAlert:
             ///   - recipientsAllAdmins:
             ///   - recipients:
             ///   - diskThresholdPercent:
@@ -1492,6 +1511,7 @@ extension Components {
                 dvrQuotaAlert: Swift.Bool? = nil,
                 plexSyncAlert: Swift.Bool? = nil,
                 optimizeFailedAlert: Swift.Bool? = nil,
+                libraryUnreadableAlert: Swift.Bool? = nil,
                 recipientsAllAdmins: Swift.Bool? = nil,
                 recipients: [Swift.Int64]? = nil,
                 diskThresholdPercent: Swift.Int? = nil
@@ -1508,6 +1528,7 @@ extension Components {
                 self.dvrQuotaAlert = dvrQuotaAlert
                 self.plexSyncAlert = plexSyncAlert
                 self.optimizeFailedAlert = optimizeFailedAlert
+                self.libraryUnreadableAlert = libraryUnreadableAlert
                 self.recipientsAllAdmins = recipientsAllAdmins
                 self.recipients = recipients
                 self.diskThresholdPercent = diskThresholdPercent
@@ -1525,6 +1546,7 @@ extension Components {
                 case dvrQuotaAlert
                 case plexSyncAlert
                 case optimizeFailedAlert
+                case libraryUnreadableAlert
                 case recipientsAllAdmins
                 case recipients
                 case diskThresholdPercent
@@ -6620,6 +6642,14 @@ extension Components {
             public var createdAt: Foundation.Date
             /// - Remark: Generated from `#/components/schemas/Library/updatedAt`.
             public var updatedAt: Foundation.Date
+            /// Admins listing with manage=true: how many titles have no available file and would be removed by POST /libraries/{libraryId}/remove-missing (only files in folders that can be reached count).
+            ///
+            /// - Remark: Generated from `#/components/schemas/Library/missingCount`.
+            public var missingCount: Swift.Int?
+            /// Admins listing with manage=true: the library's folders that can't be read right now (offline drive, permissions). Their titles are kept until they can be read again.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Library/unreadablePaths`.
+            public var unreadablePaths: [Swift.String]?
             /// A Live TV recordings library (Recorded TV / Recorded Movies). Only listed to admins with manage=true; its items are shown only under Live TV → Recordings, and browsing it returns 404.
             ///
             /// - Remark: Generated from `#/components/schemas/Library/recordings`.
@@ -6640,6 +6670,8 @@ extension Components {
             ///   - lastScannedAt:
             ///   - createdAt:
             ///   - updatedAt:
+            ///   - missingCount: Admins listing with manage=true: how many titles have no available file and would be removed by POST /libraries/{libraryId}/remove-missing (only files in folders that can be reached count).
+            ///   - unreadablePaths: Admins listing with manage=true: the library's folders that can't be read right now (offline drive, permissions). Their titles are kept until they can be read again.
             ///   - recordings: A Live TV recordings library (Recorded TV / Recorded Movies). Only listed to admins with manage=true; its items are shown only under Live TV → Recordings, and browsing it returns 404.
             public init(
                 id: Swift.Int64,
@@ -6655,6 +6687,8 @@ extension Components {
                 lastScannedAt: Foundation.Date? = nil,
                 createdAt: Foundation.Date,
                 updatedAt: Foundation.Date,
+                missingCount: Swift.Int? = nil,
+                unreadablePaths: [Swift.String]? = nil,
                 recordings: Swift.Bool? = nil
             ) {
                 self.id = id
@@ -6670,6 +6704,8 @@ extension Components {
                 self.lastScannedAt = lastScannedAt
                 self.createdAt = createdAt
                 self.updatedAt = updatedAt
+                self.missingCount = missingCount
+                self.unreadablePaths = unreadablePaths
                 self.recordings = recordings
             }
             public enum CodingKeys: String, CodingKey {
@@ -6686,6 +6722,8 @@ extension Components {
                 case lastScannedAt
                 case createdAt
                 case updatedAt
+                case missingCount
+                case unreadablePaths
                 case recordings
             }
         }
@@ -8180,6 +8218,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/PlaybackRequest/startMs`.
             public var startMs: Swift.Int64?
+            /// Night mode (dialogue boost): the server converts the audio with dynamic-range compression and lifts the centre (dialogue) channel, so loud scenes are quieter and speech clearer. The video is still copied when it can be (a direct play becomes a direct stream). Omitted = the user's nightMode preference.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaybackRequest/nightMode`.
+            public var nightMode: Swift.Bool?
             /// The app's quality setting; 0/omitted = original (home) or automatic (remote).
             ///
             /// - Remark: Generated from `#/components/schemas/PlaybackRequest/maxBitrateKbps`.
@@ -8210,6 +8252,7 @@ extension Components {
             ///   - audioStreamId:
             ///   - subtitleStreamId:
             ///   - startMs: Omit to resume where the user left off.
+            ///   - nightMode: Night mode (dialogue boost): the server converts the audio with dynamic-range compression and lifts the centre (dialogue) channel, so loud scenes are quieter and speech clearer. The video is still copied when it can be (a direct play becomes a direct stream). Omitted = the user's nightMode preference.
             ///   - maxBitrateKbps: The app's quality setting; 0/omitted = original (home) or automatic (remote).
             ///   - measuredKbps: Measured download speed from /playback/bandwidth-test.
             ///   - preload: Prepare the next item (gapless music) without ending this device's current session. It takes over when it first reports "playing".
@@ -8222,6 +8265,7 @@ extension Components {
                 audioStreamId: Swift.Int64? = nil,
                 subtitleStreamId: Swift.Int64? = nil,
                 startMs: Swift.Int64? = nil,
+                nightMode: Swift.Bool? = nil,
                 maxBitrateKbps: Swift.Int? = nil,
                 measuredKbps: Swift.Int? = nil,
                 preload: Swift.Bool? = nil,
@@ -8234,6 +8278,7 @@ extension Components {
                 self.audioStreamId = audioStreamId
                 self.subtitleStreamId = subtitleStreamId
                 self.startMs = startMs
+                self.nightMode = nightMode
                 self.maxBitrateKbps = maxBitrateKbps
                 self.measuredKbps = measuredKbps
                 self.preload = preload
@@ -8247,6 +8292,7 @@ extension Components {
                 case audioStreamId
                 case subtitleStreamId
                 case startMs
+                case nightMode
                 case maxBitrateKbps
                 case measuredKbps
                 case preload
@@ -8489,6 +8535,10 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/PlaybackSession`.
         public struct PlaybackSession: Codable, Hashable, Sendable {
+            /// Night mode is applied to this session's audio.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaybackSession/nightMode`.
+            public var nightMode: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/PlaybackSession/id`.
             public var id: Swift.String
             /// - Remark: Generated from `#/components/schemas/PlaybackSession/itemId`.
@@ -8571,6 +8621,7 @@ extension Components {
             /// Creates a new `PlaybackSession`.
             ///
             /// - Parameters:
+            ///   - nightMode: Night mode is applied to this session's audio.
             ///   - id:
             ///   - itemId:
             ///   - fileId:
@@ -8595,6 +8646,7 @@ extension Components {
             ///   - subtitleOffsetMs: Subtitle offset applied (PLAY-17). subtitleUrl also takes ?offsetMs= to try another without restarting.
             ///   - audioOffsetMs: Audio offset applied (PLAY-17).
             public init(
+                nightMode: Swift.Bool? = nil,
                 id: Swift.String,
                 itemId: Swift.Int64,
                 fileId: Swift.Int64? = nil,
@@ -8619,6 +8671,7 @@ extension Components {
                 subtitleOffsetMs: Swift.Int? = nil,
                 audioOffsetMs: Swift.Int? = nil
             ) {
+                self.nightMode = nightMode
                 self.id = id
                 self.itemId = itemId
                 self.fileId = fileId
@@ -8644,6 +8697,7 @@ extension Components {
                 self.audioOffsetMs = audioOffsetMs
             }
             public enum CodingKeys: String, CodingKey {
+                case nightMode
                 case id
                 case itemId
                 case fileId
@@ -8968,6 +9022,12 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/SystemStatus/bandwidthHistory`.
             public var bandwidthHistory: [Components.Schemas.BandwidthSample]?
+            /// - Remark: Generated from `#/components/schemas/SystemStatus/host`.
+            public var host: Components.Schemas.HostInfo?
+            /// The last hour of CPU, memory and GPU readings, one every 10 seconds, oldest first (empty after a restart or where the server can't read them).
+            ///
+            /// - Remark: Generated from `#/components/schemas/SystemStatus/resources`.
+            public var resources: [Components.Schemas.ResourceSample]?
             /// - Remark: Generated from `#/components/schemas/SystemStatus/LibrariesPayload`.
             public struct LibrariesPayloadPayload: Codable, Hashable, Sendable {
                 /// - Remark: Generated from `#/components/schemas/SystemStatus/LibrariesPayload/id`.
@@ -9020,6 +9080,8 @@ extension Components {
             ///   - remoteKbps:
             ///   - uploadSpeedKbps:
             ///   - bandwidthHistory: The last hour, one sample a minute, oldest first.
+            ///   - host:
+            ///   - resources: The last hour of CPU, memory and GPU readings, one every 10 seconds, oldest first (empty after a restart or where the server can't read them).
             ///   - libraries:
             public init(
                 version: Swift.String,
@@ -9032,6 +9094,8 @@ extension Components {
                 remoteKbps: Swift.Int,
                 uploadSpeedKbps: Swift.Int? = nil,
                 bandwidthHistory: [Components.Schemas.BandwidthSample]? = nil,
+                host: Components.Schemas.HostInfo? = nil,
+                resources: [Components.Schemas.ResourceSample]? = nil,
                 libraries: Components.Schemas.SystemStatus.LibrariesPayload
             ) {
                 self.version = version
@@ -9044,6 +9108,8 @@ extension Components {
                 self.remoteKbps = remoteKbps
                 self.uploadSpeedKbps = uploadSpeedKbps
                 self.bandwidthHistory = bandwidthHistory
+                self.host = host
+                self.resources = resources
                 self.libraries = libraries
             }
             public enum CodingKeys: String, CodingKey {
@@ -9057,7 +9123,314 @@ extension Components {
                 case remoteKbps
                 case uploadSpeedKbps
                 case bandwidthHistory
+                case host
+                case resources
                 case libraries
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/StorageReport`.
+        public struct StorageReport: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/StorageReport/libraries`.
+            public var libraries: [Components.Schemas.StorageLibrary]
+            /// The biggest movies and shows (a show counts all its episodes), biggest first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StorageReport/largest`.
+            public var largest: [Components.Schemas.StorageTitle]
+            /// - Remark: Generated from `#/components/schemas/StorageReport/volumes`.
+            public var volumes: [Components.Schemas.StorageVolume]
+            /// Creates a new `StorageReport`.
+            ///
+            /// - Parameters:
+            ///   - libraries:
+            ///   - largest: The biggest movies and shows (a show counts all its episodes), biggest first.
+            ///   - volumes:
+            public init(
+                libraries: [Components.Schemas.StorageLibrary],
+                largest: [Components.Schemas.StorageTitle],
+                volumes: [Components.Schemas.StorageVolume]
+            ) {
+                self.libraries = libraries
+                self.largest = largest
+                self.volumes = volumes
+            }
+            public enum CodingKeys: String, CodingKey {
+                case libraries
+                case largest
+                case volumes
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/StorageLibrary`.
+        public struct StorageLibrary: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/StorageLibrary/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/StorageLibrary/name`.
+            public var name: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StorageLibrary/type`.
+            public var _type: Components.Schemas.LibraryType
+            /// Size of the library's available files.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StorageLibrary/bytes`.
+            public var bytes: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/StorageLibrary/files`.
+            public var files: Swift.Int
+            /// One sample a day, oldest first (starts the day the server first recorded one).
+            ///
+            /// - Remark: Generated from `#/components/schemas/StorageLibrary/history`.
+            public var history: [Components.Schemas.StorageSample]
+            /// Creates a new `StorageLibrary`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - name:
+            ///   - _type:
+            ///   - bytes: Size of the library's available files.
+            ///   - files:
+            ///   - history: One sample a day, oldest first (starts the day the server first recorded one).
+            public init(
+                id: Swift.Int64,
+                name: Swift.String,
+                _type: Components.Schemas.LibraryType,
+                bytes: Swift.Int64,
+                files: Swift.Int,
+                history: [Components.Schemas.StorageSample]
+            ) {
+                self.id = id
+                self.name = name
+                self._type = _type
+                self.bytes = bytes
+                self.files = files
+                self.history = history
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case name
+                case _type = "type"
+                case bytes
+                case files
+                case history
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/StorageSample`.
+        public struct StorageSample: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/StorageSample/date`.
+            public var date: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StorageSample/bytes`.
+            public var bytes: Swift.Int64
+            /// Creates a new `StorageSample`.
+            ///
+            /// - Parameters:
+            ///   - date:
+            ///   - bytes:
+            public init(
+                date: Swift.String,
+                bytes: Swift.Int64
+            ) {
+                self.date = date
+                self.bytes = bytes
+            }
+            public enum CodingKeys: String, CodingKey {
+                case date
+                case bytes
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/StorageTitle`.
+        public struct StorageTitle: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/StorageTitle/itemId`.
+            public var itemId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/StorageTitle/title`.
+            public var title: Swift.String
+            /// movie or show (also video, for home videos).
+            ///
+            /// - Remark: Generated from `#/components/schemas/StorageTitle/type`.
+            public var _type: Swift.String
+            /// - Remark: Generated from `#/components/schemas/StorageTitle/year`.
+            public var year: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/StorageTitle/libraryId`.
+            public var libraryId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/StorageTitle/bytes`.
+            public var bytes: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/StorageTitle/files`.
+            public var files: Swift.Int?
+            /// Creates a new `StorageTitle`.
+            ///
+            /// - Parameters:
+            ///   - itemId:
+            ///   - title:
+            ///   - _type: movie or show (also video, for home videos).
+            ///   - year:
+            ///   - libraryId:
+            ///   - bytes:
+            ///   - files:
+            public init(
+                itemId: Swift.Int64,
+                title: Swift.String,
+                _type: Swift.String,
+                year: Swift.Int? = nil,
+                libraryId: Swift.Int64,
+                bytes: Swift.Int64,
+                files: Swift.Int? = nil
+            ) {
+                self.itemId = itemId
+                self.title = title
+                self._type = _type
+                self.year = year
+                self.libraryId = libraryId
+                self.bytes = bytes
+                self.files = files
+            }
+            public enum CodingKeys: String, CodingKey {
+                case itemId
+                case title
+                case _type = "type"
+                case year
+                case libraryId
+                case bytes
+                case files
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/StorageVolume`.
+        public struct StorageVolume: Codable, Hashable, Sendable {
+            /// A folder on the volume: config, transcode, recordings or a library folder.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StorageVolume/path`.
+            public var path: Swift.String
+            /// What it holds, e.g. Config, Transcode, Movies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StorageVolume/label`.
+            public var label: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/StorageVolume/totalBytes`.
+            public var totalBytes: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/StorageVolume/freeBytes`.
+            public var freeBytes: Swift.Int64
+            /// Creates a new `StorageVolume`.
+            ///
+            /// - Parameters:
+            ///   - path: A folder on the volume: config, transcode, recordings or a library folder.
+            ///   - label: What it holds, e.g. Config, Transcode, Movies.
+            ///   - totalBytes:
+            ///   - freeBytes:
+            public init(
+                path: Swift.String,
+                label: Swift.String? = nil,
+                totalBytes: Swift.Int64,
+                freeBytes: Swift.Int64
+            ) {
+                self.path = path
+                self.label = label
+                self.totalBytes = totalBytes
+                self.freeBytes = freeBytes
+            }
+            public enum CodingKeys: String, CodingKey {
+                case path
+                case label
+                case totalBytes
+                case freeBytes
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/HostInfo`.
+        public struct HostInfo: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/HostInfo/cpuCores`.
+            public var cpuCores: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/HostInfo/memTotalBytes`.
+            public var memTotalBytes: Swift.Int64
+            /// NVIDIA GPU, when there is one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/HostInfo/gpuName`.
+            public var gpuName: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/HostInfo/gpuMemTotalBytes`.
+            public var gpuMemTotalBytes: Swift.Int64?
+            /// Creates a new `HostInfo`.
+            ///
+            /// - Parameters:
+            ///   - cpuCores:
+            ///   - memTotalBytes:
+            ///   - gpuName: NVIDIA GPU, when there is one.
+            ///   - gpuMemTotalBytes:
+            public init(
+                cpuCores: Swift.Int,
+                memTotalBytes: Swift.Int64,
+                gpuName: Swift.String? = nil,
+                gpuMemTotalBytes: Swift.Int64? = nil
+            ) {
+                self.cpuCores = cpuCores
+                self.memTotalBytes = memTotalBytes
+                self.gpuName = gpuName
+                self.gpuMemTotalBytes = gpuMemTotalBytes
+            }
+            public enum CodingKeys: String, CodingKey {
+                case cpuCores
+                case memTotalBytes
+                case gpuName
+                case gpuMemTotalBytes
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ResourceSample`.
+        public struct ResourceSample: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ResourceSample/at`.
+            public var at: Foundation.Date
+            /// The whole machine's CPU use, percent of all cores.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ResourceSample/hostCpu`.
+            public var hostCpu: Swift.Double
+            /// Marquee's CPU use (the server and the FFmpeg processes it runs), percent of all cores.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ResourceSample/serverCpu`.
+            public var serverCpu: Swift.Double
+            /// The machine's memory in use.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ResourceSample/hostMemBytes`.
+            public var hostMemBytes: Swift.Int64
+            /// Marquee's memory (the server and its FFmpeg processes).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ResourceSample/serverMemBytes`.
+            public var serverMemBytes: Swift.Int64
+            /// NVIDIA GPU use, percent; omitted when not known.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ResourceSample/gpu`.
+            public var gpu: Swift.Double?
+            /// - Remark: Generated from `#/components/schemas/ResourceSample/gpuEncoder`.
+            public var gpuEncoder: Swift.Double?
+            /// - Remark: Generated from `#/components/schemas/ResourceSample/gpuDecoder`.
+            public var gpuDecoder: Swift.Double?
+            /// Creates a new `ResourceSample`.
+            ///
+            /// - Parameters:
+            ///   - at:
+            ///   - hostCpu: The whole machine's CPU use, percent of all cores.
+            ///   - serverCpu: Marquee's CPU use (the server and the FFmpeg processes it runs), percent of all cores.
+            ///   - hostMemBytes: The machine's memory in use.
+            ///   - serverMemBytes: Marquee's memory (the server and its FFmpeg processes).
+            ///   - gpu: NVIDIA GPU use, percent; omitted when not known.
+            ///   - gpuEncoder:
+            ///   - gpuDecoder:
+            public init(
+                at: Foundation.Date,
+                hostCpu: Swift.Double,
+                serverCpu: Swift.Double,
+                hostMemBytes: Swift.Int64,
+                serverMemBytes: Swift.Int64,
+                gpu: Swift.Double? = nil,
+                gpuEncoder: Swift.Double? = nil,
+                gpuDecoder: Swift.Double? = nil
+            ) {
+                self.at = at
+                self.hostCpu = hostCpu
+                self.serverCpu = serverCpu
+                self.hostMemBytes = hostMemBytes
+                self.serverMemBytes = serverMemBytes
+                self.gpu = gpu
+                self.gpuEncoder = gpuEncoder
+                self.gpuDecoder = gpuDecoder
+            }
+            public enum CodingKeys: String, CodingKey {
+                case at
+                case hostCpu
+                case serverCpu
+                case hostMemBytes
+                case serverMemBytes
+                case gpu
+                case gpuEncoder
+                case gpuDecoder
             }
         }
         /// - Remark: Generated from `#/components/schemas/SpeedTestResult`.
@@ -14125,14 +14498,14 @@ extension Components {
             }
             /// - Remark: Generated from `#/components/schemas/OptimizeFilter/hdr`.
             public var hdr: Components.Schemas.OptimizeFilter.HdrPayload?
-            /// Only files already optimized (yes) or not yet (no).
+            /// Only files already optimized (yes) or still to do (no: not optimized, not queued).
             ///
             /// - Remark: Generated from `#/components/schemas/OptimizeFilter/optimized`.
             @frozen public enum OptimizedPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case yes = "yes"
                 case no = "no"
             }
-            /// Only files already optimized (yes) or not yet (no).
+            /// Only files already optimized (yes) or still to do (no: not optimized, not queued).
             ///
             /// - Remark: Generated from `#/components/schemas/OptimizeFilter/optimized`.
             public var optimized: Components.Schemas.OptimizeFilter.OptimizedPayload?
@@ -14146,7 +14519,7 @@ extension Components {
             ///   - resolution:
             ///   - codecs:
             ///   - hdr:
-            ///   - optimized: Only files already optimized (yes) or not yet (no).
+            ///   - optimized: Only files already optimized (yes) or still to do (no: not optimized, not queued).
             public init(
                 libraryId: Swift.Int64? = nil,
                 _type: Components.Schemas.OptimizeFilter._TypePayload? = nil,

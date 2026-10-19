@@ -279,6 +279,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /libraries/{libraryId}/scan`.
     /// - Remark: Generated from `#/paths//libraries/{libraryId}/scan/delete(cancelLibraryScan)`.
     func cancelLibraryScan(_ input: Operations.CancelLibraryScan.Input) async throws -> Operations.CancelLibraryScan.Output
+    /// Remove the library's missing files now (admin only): files a scan found gone, in library folders that can be reached right now (an empty folder counts as unreachable, like an unmounted disk). Titles left without files are removed too, with their watch history.
+    ///
+    /// - Remark: HTTP `POST /libraries/{libraryId}/remove-missing`.
+    /// - Remark: Generated from `#/paths//libraries/{libraryId}/remove-missing/post(removeMissingTitles)`.
+    func removeMissingTitles(_ input: Operations.RemoveMissingTitles.Input) async throws -> Operations.RemoveMissingTitles.Output
     /// Queue a scan of every library (admin only).
     ///
     /// - Remark: HTTP `POST /libraries/scan`.
@@ -1175,6 +1180,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /system/speedtest`.
     /// - Remark: Generated from `#/paths//system/speedtest/post(runSpeedTest)`.
     func runSpeedTest(_ input: Operations.RunSpeedTest.Input) async throws -> Operations.RunSpeedTest.Output
+    /// Storage overview (admin only): space used per library, the biggest titles, how each library grew (one sample a day, up to a year) and the free space on the volumes Marquee uses.
+    ///
+    /// - Remark: HTTP `GET /system/storage`.
+    /// - Remark: Generated from `#/paths//system/storage/get(storageReport)`.
+    func storageReport(_ input: Operations.StorageReport.Input) async throws -> Operations.StorageReport.Output
     /// Server health for the dashboard (admin only).
     ///
     /// - Remark: HTTP `GET /system/status`.
@@ -1990,6 +2000,19 @@ extension APIProtocol {
         headers: Operations.CancelLibraryScan.Input.Headers = .init()
     ) async throws -> Operations.CancelLibraryScan.Output {
         try await cancelLibraryScan(Operations.CancelLibraryScan.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Remove the library's missing files now (admin only): files a scan found gone, in library folders that can be reached right now (an empty folder counts as unreachable, like an unmounted disk). Titles left without files are removed too, with their watch history.
+    ///
+    /// - Remark: HTTP `POST /libraries/{libraryId}/remove-missing`.
+    /// - Remark: Generated from `#/paths//libraries/{libraryId}/remove-missing/post(removeMissingTitles)`.
+    public func removeMissingTitles(
+        path: Operations.RemoveMissingTitles.Input.Path,
+        headers: Operations.RemoveMissingTitles.Input.Headers = .init()
+    ) async throws -> Operations.RemoveMissingTitles.Output {
+        try await removeMissingTitles(Operations.RemoveMissingTitles.Input(
             path: path,
             headers: headers
         ))
@@ -4183,6 +4206,19 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//system/speedtest/post(runSpeedTest)`.
     public func runSpeedTest(headers: Operations.RunSpeedTest.Input.Headers = .init()) async throws -> Operations.RunSpeedTest.Output {
         try await runSpeedTest(Operations.RunSpeedTest.Input(headers: headers))
+    }
+    /// Storage overview (admin only): space used per library, the biggest titles, how each library grew (one sample a day, up to a year) and the free space on the volumes Marquee uses.
+    ///
+    /// - Remark: HTTP `GET /system/storage`.
+    /// - Remark: Generated from `#/paths//system/storage/get(storageReport)`.
+    public func storageReport(
+        query: Operations.StorageReport.Input.Query = .init(),
+        headers: Operations.StorageReport.Input.Headers = .init()
+    ) async throws -> Operations.StorageReport.Output {
+        try await storageReport(Operations.StorageReport.Input(
+            query: query,
+            headers: headers
+        ))
     }
     /// Server health for the dashboard (admin only).
     ///

@@ -74,6 +74,16 @@ public extension AppSession {
         try await updatePreferences { $0.cinemaTrailers = on }
     }
 
+    // MARK: - Night mode
+
+    /// The person's "Night mode by default" choice (default off): quieter loud scenes and
+    /// clearer dialogue in every video unless the player switches it.
+    var nightModePreference: Bool { me?.preferences.nightMode ?? false }
+
+    func setNightMode(_ on: Bool) async throws {
+        try await updatePreferences { $0.nightMode = on }
+    }
+
     /// Changes one of the person's preferences. They're replaced as a whole, so the others are
     /// sent back unchanged.
     private func updatePreferences(_ change: (inout Schemas.UserPreferences) -> Void) async throws {

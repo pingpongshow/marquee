@@ -9325,6 +9325,243 @@ public enum Operations {
             }
         }
     }
+    /// Remove the library's missing files now (admin only): files a scan found gone, in library folders that can be reached right now (an empty folder counts as unreachable, like an unmounted disk). Titles left without files are removed too, with their watch history.
+    ///
+    /// - Remark: HTTP `POST /libraries/{libraryId}/remove-missing`.
+    /// - Remark: Generated from `#/paths//libraries/{libraryId}/remove-missing/post(removeMissingTitles)`.
+    public enum RemoveMissingTitles {
+        public static let id: Swift.String = "removeMissingTitles"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/libraries/{libraryId}/remove-missing/POST/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/libraries/{libraryId}/remove-missing/POST/path/libraryId`.
+                public var libraryId: Components.Parameters.LibraryId
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - libraryId:
+                public init(libraryId: Components.Parameters.LibraryId) {
+                    self.libraryId = libraryId
+                }
+            }
+            public var path: Operations.RemoveMissingTitles.Input.Path
+            /// - Remark: Generated from `#/paths/libraries/{libraryId}/remove-missing/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RemoveMissingTitles.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RemoveMissingTitles.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.RemoveMissingTitles.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.RemoveMissingTitles.Input.Path,
+                headers: Operations.RemoveMissingTitles.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/libraries/{libraryId}/remove-missing/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/libraries/{libraryId}/remove-missing/POST/responses/200/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// How many titles were removed.
+                        ///
+                        /// - Remark: Generated from `#/paths/libraries/{libraryId}/remove-missing/POST/responses/200/content/json/removed`.
+                        public var removed: Swift.Int
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - removed: How many titles were removed.
+                        public init(removed: Swift.Int) {
+                            self.removed = removed
+                        }
+                        public enum CodingKeys: String, CodingKey {
+                            case removed
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/libraries/{libraryId}/remove-missing/POST/responses/200/content/application\/json`.
+                    case json(Operations.RemoveMissingTitles.Output.Ok.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.RemoveMissingTitles.Output.Ok.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RemoveMissingTitles.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.RemoveMissingTitles.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// Removed.
+            ///
+            /// - Remark: Generated from `#/paths//libraries/{libraryId}/remove-missing/post(removeMissingTitles)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.RemoveMissingTitles.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.RemoveMissingTitles.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//libraries/{libraryId}/remove-missing/post(removeMissingTitles)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//libraries/{libraryId}/remove-missing/post(removeMissingTitles)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//libraries/{libraryId}/remove-missing/post(removeMissingTitles)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Conflicts with current state.
+            ///
+            /// - Remark: Generated from `#/paths//libraries/{libraryId}/remove-missing/post(removeMissingTitles)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Components.Responses.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Components.Responses.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
     /// Queue a scan of every library (admin only).
     ///
     /// - Remark: HTTP `POST /libraries/scan`.
@@ -22847,7 +23084,7 @@ public enum Operations {
                     case yes = "yes"
                     case no = "no"
                 }
-                /// Only files the optimizer has already replaced (yes, to optimize them again) or only ones it hasn't (no).
+                /// Only files the optimizer has already replaced (yes, to optimize them again) or only ones still to do (no): not optimized and not already queued or being converted.
                 ///
                 /// - Remark: Generated from `#/paths/optimize/files/GET/query/optimized`.
                 public var optimized: Operations.ListLargeFiles.Input.Query.OptimizedPayload?
@@ -22878,7 +23115,7 @@ public enum Operations {
                 ///   - resolution: Only this resolution class (by width or height, so letterboxed films count): 2160 = 4K, 480 = SD.
                 ///   - codecs: Only these video codecs, comma-separated FFprobe names (h264, hevc, mpeg2video, vc1, mpeg4, av1, vp9).
                 ///   - hdr: Only HDR (yes) or only SDR (no) files.
-                ///   - optimized: Only files the optimizer has already replaced (yes, to optimize them again) or only ones it hasn't (no).
+                ///   - optimized: Only files the optimizer has already replaced (yes, to optimize them again) or only ones still to do (no): not optimized and not already queued or being converted.
                 ///   - presetId: The preset the estimates are for (default: the default preset).
                 ///   - sort:
                 ///   - offset:
@@ -44369,6 +44606,191 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "badGateway",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Storage overview (admin only): space used per library, the biggest titles, how each library grew (one sample a day, up to a year) and the free space on the volumes Marquee uses.
+    ///
+    /// - Remark: HTTP `GET /system/storage`.
+    /// - Remark: Generated from `#/paths//system/storage/get(storageReport)`.
+    public enum StorageReport {
+        public static let id: Swift.String = "storageReport"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/system/storage/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// How far back the growth history goes.
+                ///
+                /// - Remark: Generated from `#/paths/system/storage/GET/query/days`.
+                public var days: Swift.Int?
+                /// How many of the biggest titles.
+                ///
+                /// - Remark: Generated from `#/paths/system/storage/GET/query/top`.
+                public var top: Swift.Int?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - days: How far back the growth history goes.
+                ///   - top: How many of the biggest titles.
+                public init(
+                    days: Swift.Int? = nil,
+                    top: Swift.Int? = nil
+                ) {
+                    self.days = days
+                    self.top = top
+                }
+            }
+            public var query: Operations.StorageReport.Input.Query
+            /// - Remark: Generated from `#/paths/system/storage/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.StorageReport.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.StorageReport.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.StorageReport.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - query:
+            ///   - headers:
+            public init(
+                query: Operations.StorageReport.Input.Query = .init(),
+                headers: Operations.StorageReport.Input.Headers = .init()
+            ) {
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/system/storage/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/system/storage/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.StorageReport)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.StorageReport {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.StorageReport.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.StorageReport.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//system/storage/get(storageReport)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.StorageReport.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.StorageReport.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//system/storage/get(storageReport)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not allowed for this user.
+            ///
+            /// - Remark: Generated from `#/paths//system/storage/get(storageReport)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Components.Responses.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Components.Responses.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
                             response: self
                         )
                     }

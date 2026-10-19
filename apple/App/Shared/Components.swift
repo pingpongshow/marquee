@@ -554,11 +554,24 @@ struct ErrorBanner: View {
 struct ShelfRow<Content: View>: View {
     let title: String
     var destination: Route?
+    /// A See All link at the header's right (iPhone/iPad; the TV puts a tile at the row's end).
+    var seeAll: Route?
     @ViewBuilder let content: () -> Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if let destination, !isTV {
+            if let seeAll, !isTV {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title).font(.title3.bold())
+                    Spacer()
+                    NavigationLink("See All", value: seeAll)
+                        .font(.subheadline)
+                        .foregroundStyle(Color.marqueeGold)
+                        .accessibilityIdentifier("shelf.seeAll")
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, sidePadding)
+            } else if let destination, !isTV {
                 NavigationLink(value: destination) {
                     HStack(spacing: 4) { Text(title).font(.title3.bold()); Image(systemName: "chevron.right").font(.footnote.bold()).foregroundStyle(.secondary) }
                 }

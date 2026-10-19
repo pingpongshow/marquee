@@ -52,6 +52,8 @@ public final class VideoPlayback {
     public private(set) var subtitleOffsetMs = 0
     public private(set) var audioOffsetMs = 0
     public static let offsetLimit = 30000
+    /// Night mode (quieter loud scenes, clearer dialogue) is on for the current stream.
+    public var nightMode: Bool { session?.nightMode ?? false }
 
     private let app: AppSession
     private let playlistID: Int64?
@@ -76,6 +78,9 @@ public final class VideoPlayback {
     /// server's remembered ones).
     @ObservationIgnored private var chosenOffsets: (subtitle: Int, audio: Int)?
     @ObservationIgnored private var offsetRestart: Task<Void, Never>?
+    /// Night mode switched in the player; kept for the rest of this player (nil = the
+    /// person's preference, decided by the server).
+    @ObservationIgnored private var chosenNightMode: Bool?
     /// Set while playing a downloaded file (no server session; progress syncs later).
     @ObservationIgnored private var offline: (itemID: Int64, downloads: Downloads)?
     @ObservationIgnored private var offlineCounted = false
@@ -150,7 +155,7 @@ public final class VideoPlayback {
         let measured = app.isRemote && quality == 0 ? await measureKbps() : nil
         do {
             let s = try await client.startPlayback(body: .json(.init(
-                itemId: itemID, fileId: self.fileID, audioStreamId: audio, subtitleStreamId: subtitle, startMs: startMs,
+                itemId: itemID, fileId: self.fileID, audioStreamId: audio, subtitleStreamId: subtitle, startMs: startMs, nightMode: chosenNightMode,
                 maxBitrateKbps: quality == 0 ? nil : quality, measuredKbps: measured,
                 subtitleOffsetMs: chosenOffsets?.subtitle, audioOffsetMs: chosenOffsets?.audio, profile: profile()))).ok.body.json
             await stopSession()
@@ -184,6 +189,14 @@ public final class VideoPlayback {
         guard let id = session?.itemId else { return }
         let pos = Int64(max(0, player.currentTime().seconds) * 1000)
         await start(itemID: id, startMs: pos, audio: audio ?? selection.audio, subtitle: subtitle ?? selection.subtitle)
+    }
+
+    /// Switches night mode, restarting at the current position like an audio change.
+    public func setNightMode(_ on: Bool) async {
+        guard offline == nil, let id = session?.itemId else { return }
+        chosenNightMode = on
+        let pos = Int64(max(0, player.currentTime().seconds) * 1000)
+        await start(itemID: id, startMs: pos, audio: selection.audio, subtitle: selection.subtitle)
     }
 
     /// Changes the subtitle or audio timing. The stream restarts at the same position with the

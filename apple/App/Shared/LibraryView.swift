@@ -64,6 +64,8 @@ struct LibraryGrid: View {
     @State private var positions: [Int64: Int] = [:]
     /// Bumped by every reload, so a page that arrives for an older sort is dropped.
     @State private var generation = 0
+    /// The Random sort's shuffle, new on each reload, so every page continues the same one.
+    @State private var shuffleSeed: Int64 = 0
     /// The sort and filters the grid was last loaded for. Coming back from an item re-runs the
     /// task: the grid only reloads when they changed, so it keeps its place (and TV focus).
     @State private var loadedKey: String?
@@ -200,6 +202,7 @@ struct LibraryGrid: View {
 
     private func reload() async {
         generation += 1
+        shuffleSeed = Int64.random(in: 1...Int64(Int32.max))
         loading = false // a load for the old sort may still be running; it's dropped
         items = []
         positions = [:]
@@ -219,7 +222,7 @@ struct LibraryGrid: View {
                                            watch: unwatchedOnly && !showCollections ? .unwatched : nil,
                                            genre: showCollections ? nil : genre, type: showCollections ? .collection : type,
                                            decade: showCollections ? nil : decade, minMyRating: ratedOnly && !showCollections ? 8 : nil,
-                                           favorites: favoritesOnly && !showCollections)
+                                           favorites: favoritesOnly && !showCollections, seed: sort == .random ? shuffleSeed : nil)
             guard gen == generation else { return }
             var fresh: [Item] = []
             for item in page.items where positions[item.id] == nil {

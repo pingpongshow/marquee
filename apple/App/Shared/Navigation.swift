@@ -16,6 +16,8 @@ enum Route: Hashable {
     case liveTVMovies
     /// VOD Shows (LIVE-6): series on demand, listed after VOD Movies.
     case vodShows
+    /// Recommended for you's See All on VOD Movies or VOD Shows: rows of films or series.
+    case vodRecommended(series: Bool)
     /// A film on demand under Live TV (LIVE-6).
     case vodMovie(Int64)
     /// A show on demand (LIVE-6).
@@ -85,6 +87,7 @@ private func routeView(_ route: Route) -> some View {
     case .liveTV: LiveTVView()
     case .liveTVMovies: VodPage()
     case .vodShows: VodPage(shows: true)
+    case .vodRecommended(let series): VodRecommendedView(series: series)
     case .vodMovie(let id): VodMovieView(id: id)
     case .vodSeries(let id): VodSeriesView(id: id)
     case .continueWatching: ContinueWatchingView()
