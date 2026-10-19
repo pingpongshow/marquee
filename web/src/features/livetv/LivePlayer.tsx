@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, unwrap } from "@/api/client";
 import { deviceProfile } from "@/features/player/deviceProfile";
+import { checkTimeUp } from "@/features/player/TimeUp";
 
 /** Why a live stream ended: its playlist answers 410 with a reason (null when it didn't end). */
 async function endReason(url: string): Promise<string | null> {
@@ -89,7 +90,10 @@ export function LivePlayer({
               if (reason !== null) {
                 session = null; // already gone
                 if (!reason.startsWith("Stopped:") && attempt < 3) setAttempt((a) => a + 1);
-                else onError?.(reason || "The stream stopped.");
+                else {
+                  onError?.(reason || "The stream stopped.");
+                  if (reason.startsWith("Stopped:")) void checkTimeUp(); // a kid's time limit?
+                }
               } else if (!recovered) {
                 recovered = true;
                 h.startLoad();

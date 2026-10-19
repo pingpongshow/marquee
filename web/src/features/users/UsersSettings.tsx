@@ -11,7 +11,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { api, unwrap } from "@/api/client";
-import { allRecordingUsageQuery, liveStatusQuery, usageLabel } from "../livetv/api";
+import { allRecordingUsageQuery, formatSize, liveStatusQuery, usageLabel } from "../livetv/api";
+import { vodFollowsQuery } from "../livetv/vodApi";
 import { requestsStatusQuery } from "../requests/api";
 import {
   librariesQuery,
@@ -40,6 +41,8 @@ import { useSectionDraft } from "../settings/useSectionDraft";
 import { Avatar, AvatarPicker } from "./Avatar";
 import { ratingOptions, remoteQualityOptions } from "./constants";
 import { InviteDialog, InviteList } from "./Invites";
+import { TimeLimitsEditor } from "./TimeLimitsEditor";
+import { describeTimeLimits } from "./timeLimits";
 
 function describe(r: UserRestrictions, libraryNames: Map<number, string>) {
   const parts: string[] = [];
@@ -56,6 +59,8 @@ function describe(r: UserRestrictions, libraryNames: Map<number, string>) {
   if (r.liveTv === false) parts.push("No Live TV");
   if ((r.canRecordDVR ?? r.canRecord) === false) parts.push("No recording");
   if (r.canViewDVR === false) parts.push("Can't watch recordings");
+  const limits = describeTimeLimits(r);
+  if (limits) parts.push(limits);
   return parts.join(" · ");
 }
 
@@ -187,7 +192,7 @@ function DvrQuotaField({
   return (
       <Field
         label="Recording quota"
-        help="Space their recordings may take. Recordings in progress always finish."
+        help="Space their recordings may take, with the episodes saved for series they follow on demand. Recordings in progress always finish."
       >
         {(id) => (
           <div className="flex flex-wrap items-center gap-2">
@@ -337,6 +342,7 @@ function RestrictionsEditor({
           </Select>
         )}
       </Field>
+      <TimeLimitsEditor value={value} onChange={onChange} />
     </div>
   );
 }
@@ -774,6 +780,10 @@ export function UsersSettings() {
   const libraries = useQuery(librariesQuery);
   const dvrUsage = useQuery({ ...allRecordingUsageQuery, retry: false });
   const usageOf = new Map((dvrUsage.data ?? []).map((u) => [u.userId, u]));
+  // Episodes saved for followed series on demand count towards the recording quota too.
+  const follows = useQuery({ ...vodFollowsQuery(true), retry: false });
+  const followedOf = new Map<number, number>();
+  for (const f of follows.data ?? []) followedOf.set(f.userId, (followedOf.get(f.userId) ?? 0) + f.usedBytes);
   const del = useDeleteUser();
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
@@ -821,10 +831,12 @@ export function UsersSettings() {
         </div>
         {(() => {
           const du = usageOf.get(u.id);
-          if (!du || (du.recordings === 0 && du.quotaSource === "default" && du.quotaBytes === 0)) return null;
+          if (!du || (du.recordings === 0 && du.usedBytes === 0 && du.quotaSource === "default" && du.quotaBytes === 0)) return null;
+          const followed = followedOf.get(u.id) ?? 0;
           return (
             <div className={du.overQuota ? "text-xs text-danger" : "text-xs text-muted"}>
               Recordings: {usageLabel(du)}
+              {followed > 0 ? ` (with ${formatSize(followed)} saved for followed series)` : ""}
               {du.quotaSource === "user" ? " (own quota)" : ""}
               {du.overQuota ? " · over quota" : ""}
             </div>

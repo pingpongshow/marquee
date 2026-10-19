@@ -85,6 +85,9 @@ type Recorder struct {
 	// OnQuota hears a recording that wasn't made, or recordings removed to make room
 	// (admin alerts).
 	OnQuota func(userID int64, owner, title, msg string)
+	// FollowedBytes is, by user, the size of the episodes on demand their followed series
+	// saved that are still in the library: they count towards the DVR quota like recordings.
+	FollowedBytes func(ctx context.Context) map[int64]int64
 
 	mu     sync.Mutex
 	active map[int64]*activeRec

@@ -25,6 +25,16 @@ let token: string | null = storageGet(TOKEN_KEY);
 /** Image-only key from /me (D85); image URLs fall back to the token until it is known. */
 let imageKey: string | null = null;
 const unauthorizedListeners = new Set<() => void>();
+const timeLimitListeners = new Set<(reason: string) => void>();
+
+/** Hears every refusal with error code time_limit (a kid's time is up): starting video, or
+ * a progress report of a stream the server ended. */
+export function onTimeLimit(fn: (reason: string) => void) {
+  timeLimitListeners.add(fn);
+  return () => {
+    timeLimitListeners.delete(fn);
+  };
+}
 
 export const session = {
   get token() {
@@ -94,6 +104,13 @@ const authMiddleware: Middleware = {
     return request;
   },
   async onResponse({ response, request }) {
+    if (response.status === 403 && timeLimitListeners.size) {
+      const body = await response
+        .clone()
+        .json()
+        .catch(() => undefined) as { code?: string; message?: string } | undefined;
+      if (body?.code === "time_limit") timeLimitListeners.forEach((fn) => fn(body.message ?? ""));
+    }
     if (response.status === 401 && request.headers.has("Authorization")) {
       // A wrong PIN or password while signed in (switching profile) answers 401 too, but the
       // session is fine: only an expired or revoked one signs out.

@@ -72,6 +72,7 @@ type Session struct {
 	DeviceName       string
 	ItemID           int64
 	ItemType         string
+	Extra            string // the item's extra type (trailer, …); "" for a main title
 	Title            string
 	FileID           int64
 	Path             string
@@ -448,9 +449,9 @@ func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 	var title, typ string
 	var parent, grand sql.NullString
 	var grandID sql.NullInt64
-	err := m.DB.QueryRowContext(ctx, `SELECT i.title, i.type, p.title, g.title, i.grandparent_id FROM items i
+	err := m.DB.QueryRowContext(ctx, `SELECT i.title, i.type, p.title, g.title, i.grandparent_id, COALESCE(i.extra_type, '') FROM items i
 		LEFT JOIN items p ON p.id = i.parent_id LEFT JOIN items g ON g.id = i.grandparent_id WHERE i.id = ?`, r.ItemID).
-		Scan(&title, &typ, &parent, &grand, &grandID)
+		Scan(&title, &typ, &parent, &grand, &grandID, &s.Extra)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNoMedia
 	}

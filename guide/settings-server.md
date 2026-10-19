@@ -82,7 +82,21 @@ The server-wide recording quota (**Recording quota per person**, default 0 = no 
 
 Administrators have no quota by default. When you edit an administrator, only **Recording quota** is shown, so you can give an admin (yourself included) a quota too.
 
-**Recommended for a child's profile:** a managed profile with a PIN-free one-tap entry, **Maximum content rating** set to their age band, **Access to all libraries** off with only the family libraries ticked, and **Allow streaming away from home** off if they only watch at home.
+**Recommended for a child's profile:** a managed profile with a PIN-free one-tap entry, **Maximum content rating** set to their age band, **Access to all libraries** off with only the family libraries ticked, **Allow streaming away from home** off if they only watch at home, and a **Daily limit** or **Viewing hours** if you want them (see [Time limits](#time-limits)).
+
+### Time limits
+
+Also under **Access and limits**, for anyone who isn't an administrator: a **Time limits** box that limits how much video they watch, and when. Everything in it is off until you set it, and administrators are never limited.
+
+| Setting | Default | What it does |
+|---|---|---|
+| Daily limit | No limit | Minutes of video a day. Type minutes (`90`) or hours and minutes (`1:30`); empty means no limit. |
+| Different limit at weekends | Off | Turn on to give Saturdays and Sundays their own limit. Leave its box empty for no limit at weekends. |
+| Viewing hours | Off | Video only plays between **From** and **Until** (for example 07:00–20:00). The hours may cross midnight (20:00–01:00). |
+
+What counts: movies, episodes, home videos, recordings, films and shows on demand, and Live TV, for the time they actually play (pausing and skipping ahead don't use it up). Music and cinema trailers don't count and aren't limited. The day follows the server's clock and starts again at midnight.
+
+When time's up, or outside the viewing hours, starting a video shows a full-screen message with the reason, such as "Time's up for today — back at midnight" or "Viewing hours are 07:00–20:00". A video already playing when the time runs out stops within a few seconds with the same message, and downloading a video for offline viewing is refused too. Five minutes before the end, the player shows a gentle warning, and a person with a limit sees how much is left today ("45 min left today") at the top of their account menu. Videos already downloaded to a phone or tablet are checked by the app.
 
 ### Editing and deleting
 

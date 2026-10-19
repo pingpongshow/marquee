@@ -247,6 +247,7 @@ func (s *Service) Run(ctx context.Context) {
 		slog.Warn("vod saves", "err", err)
 	}
 	go s.runQuality(ctx)
+	go s.runFollows(ctx)
 	t := time.NewTicker(s.tick())
 	defer t.Stop()
 	for {
@@ -535,6 +536,7 @@ func (s *Service) finish(ctx context.Context, jctx context.Context, j *job, v Sa
 		delete(s.jobs, v.ID)
 		s.mu.Unlock()
 		s.Wake()
+		s.wakeFollows() // a followed series may queue its next episode
 	}()
 	j.mu.Lock()
 	done := j.done
@@ -550,6 +552,7 @@ func (s *Service) finish(ctx context.Context, jctx context.Context, j *job, v Sa
 			bytes_total=CASE WHEN bytes_total=0 THEN ? ELSE bytes_total END, error='', finished_at=?, replaced_path=? WHERE id=?`,
 			Done, res.path, res.note, res.sha, res.bytes, res.bytes, now(), res.replaced, v.ID)
 		slog.Info("vod save done", "title", v.Title, "path", res.path, "replaced", res.replaced)
+		s.followSaved(ctx, v.ID, res.path, res.bytes)
 		s.mu.Lock()
 		s.drain.done++
 		if len(s.drain.titles) < 20 {

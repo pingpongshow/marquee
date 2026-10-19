@@ -539,6 +539,9 @@ func (s *Service) LoadEpisodes(ctx context.Context, seriesID int64, force bool) 
 	if tv := s.tv(); tv != nil {
 		go s.episodesFromTMDB(context.WithoutCancel(ctx), tv, seriesID)
 	}
+	if s.OnUpdated != nil {
+		s.OnUpdated()
+	}
 	return nil
 }
 

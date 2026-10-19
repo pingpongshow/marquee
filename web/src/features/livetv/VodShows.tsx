@@ -8,6 +8,7 @@ import { formatDuration, formatTrackTime } from "@/features/browse/format";
 import { Poster } from "@/features/browse/Poster";
 import { deviceProfile } from "@/features/player/deviceProfile";
 import { VodVideo, showPosterItem, store, stored } from "./Vod";
+import { FollowControls } from "./VodFollow";
 import { SaveEpisodeIcon, SaveSeriesButton } from "./VodSaves";
 import {
   type VodEpisode,
@@ -139,6 +140,7 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
                 </Button>
               )}
               {s.canSave && <SaveSeriesButton seriesId={s.id} label="Save show" library={s.library} targets={s} />}
+              <FollowControls show={s} />
             </div>
             {s.overview && <p className="mt-5 max-w-3xl leading-relaxed text-text/90">{s.overview}</p>}
             {s.cast.length > 0 && (

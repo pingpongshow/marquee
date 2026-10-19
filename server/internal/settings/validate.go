@@ -278,6 +278,9 @@ func (v VODSave) validate() error {
 		}
 		ids[d.ID], names[name] = true, true
 	}
+	if v.FollowDefaultMaxGB < 0 || v.FollowDefaultMaxGB > 1_000_000 {
+		return invalid("the size limit for followed series must be 0 (none) to 1,000,000 GB")
+	}
 	switch v.Quality {
 	case VODSaveOriginal, VODSaveRemux, VODSaveTranscode:
 	default:

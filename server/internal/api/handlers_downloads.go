@@ -56,6 +56,11 @@ func (h *Handlers) CreateDownload(ctx context.Context, req CreateDownloadRequest
 	if requestInfo(ctx).Class == netclass.Remote && !sess.User.IsAdmin && !sess.User.Restrictions.RemoteAllowed() {
 		return CreateDownload403JSONResponse{ForbiddenJSONResponse(apiErr("remote_disabled", "downloading away from home isn't allowed for this account"))}, nil
 	}
+	if h.itemCountsAsVideo(ctx, b.ItemId) {
+		if e := h.timeLimitRefusal(ctx, sess.User); e != nil {
+			return CreateDownload403JSONResponse{ForbiddenJSONResponse(*e)}, nil
+		}
+	}
 	var fileID int64
 	if b.FileId != nil {
 		fileID = *b.FileId

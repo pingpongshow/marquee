@@ -78,6 +78,7 @@ func (h *Handlers) ListVodSeries(ctx context.Context, req ListVodSeriesRequestOb
 		out.Series[i] = toAPIVodSeries(m)
 	}
 	markVodSeries(out.Series, idx, vis)
+	h.markVodFollowing(ctx, s, out.Series)
 	return out, nil
 }
 
@@ -119,6 +120,7 @@ func (h *Handlers) VodSeriesContinueWatching(ctx context.Context, _ VodSeriesCon
 	}
 	idx, vis := h.vodInLibrary(ctx, s)
 	markVodSeries(out, idx, vis)
+	h.markVodFollowing(ctx, s, out)
 	return out, nil
 }
 
@@ -195,6 +197,7 @@ func (h *Handlers) GetVodSeries(ctx context.Context, req GetVodSeriesRequestObje
 		Seasons: make([]VodSeason, len(seasons)), Episodes: make([]VodEpisode, len(eps))}
 	idx, vis := h.vodInLibrary(ctx, s)
 	out.InLibrary = ptr(idx.Has(true, m.ID, vis))
+	out.Following = h.vodFollowing(ctx, s, m.ID, m.SourceID)
 	if out.Genres == nil {
 		out.Genres = []string{}
 	}
@@ -430,6 +433,9 @@ func (h *Handlers) PlayVodEpisode(ctx context.Context, req PlayVodEpisodeRequest
 	}
 	if requestInfo(ctx).Class == netclass.Remote && !(s.User.IsAdmin || s.User.Restrictions.RemoteAllowed()) {
 		return PlayVodEpisode403JSONResponse{ForbiddenJSONResponse(apiErr("remote_not_allowed", "Movies on demand are only available at home for this profile."))}, nil
+	}
+	if tl := h.timeLimitRefusal(ctx, s.User); tl != nil {
+		return PlayVodEpisode403JSONResponse{ForbiddenJSONResponse(*tl)}, nil
 	}
 	e, err := h.vodEpisode(ctx, s, maxRating, req.EpisodeId)
 	if err != nil {

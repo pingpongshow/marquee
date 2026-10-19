@@ -31,7 +31,8 @@ func toAPIVodSaveSettings(v settings.VODSave) *VodSaveSettings {
 		Audio: ptr(VodSaveSettingsAudio(v.Audio)), ConcurrentPerSource: ptr(v.ConcurrentPerSource),
 		ScanAfterSave: ptr(v.ScanAfterSave), SkipExisting: ptr(v.SkipExisting), PauseWhileWatching: ptr(v.PauseWhileWatching),
 		PauseScope: ptr(VodSaveSettingsPauseScope(v.PauseScope)), RetryFailed: ptr(v.RetryFailed), WindowOnly: ptr(v.WindowOnly),
-		Destinations: ptr(toAPIVodSaveDestinations(v.Destinations, nil)),
+		Destinations:  ptr(toAPIVodSaveDestinations(v.Destinations, nil)),
+		FollowEnabled: ptr(v.FollowEnabled), FollowDefaultMaxGb: ptr(float32(v.FollowDefaultMaxGB)),
 	}
 }
 
@@ -139,6 +140,10 @@ func applyVodSaveSettings(v *settings.VODSave, u VodSaveSettings) {
 	set(&v.PauseWhileWatching, u.PauseWhileWatching)
 	set(&v.RetryFailed, u.RetryFailed)
 	set(&v.WindowOnly, u.WindowOnly)
+	set(&v.FollowEnabled, u.FollowEnabled)
+	if u.FollowDefaultMaxGb != nil {
+		v.FollowDefaultMaxGB = roundGB(float64(*u.FollowDefaultMaxGb))
+	}
 	if u.Destinations != nil {
 		v.Destinations = fromAPIVodSaveDestinations(*u.Destinations)
 	}

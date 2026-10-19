@@ -254,6 +254,9 @@ func (h *Handlers) PlayLiveChannel(ctx context.Context, req PlayLiveChannelReque
 	if !liveOK(s) {
 		return PlayLiveChannel403JSONResponse{ForbiddenJSONResponse(apiErr("not_allowed", "Live TV isn't available for this profile."))}, nil
 	}
+	if e := h.timeLimitRefusal(ctx, u); e != nil {
+		return PlayLiveChannel403JSONResponse{ForbiddenJSONResponse(*e)}, nil
+	}
 	o := livetv.Options{VideoCodecs: req.Body.Profile.HlsVideoCodecs, AudioCodecs: req.Body.Profile.HlsAudioCodecs, Remote: remote, UserAgent: h.LiveTV.UserAgent(c.SourceID)}
 	if req.Body.MaxBitrateKbps != nil {
 		o.MaxKbps = *req.Body.MaxBitrateKbps

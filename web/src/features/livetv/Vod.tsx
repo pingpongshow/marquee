@@ -27,6 +27,7 @@ import {
   vodSeriesContinueQuery,
   vodSeriesGenresQuery,
   vodSeriesListQuery,
+  vodFollowsQuery,
   vodStatusQuery,
 } from "./vodApi";
 import { SaveMovieButton, SavesLink } from "./VodSaves";
@@ -404,6 +405,8 @@ export function VodBrowse({ kind }: { kind: "movies" | "shows" }) {
 
       {!category && !q && !filtered && <RecommendedRow kind={shows ? "series" : "movie"} />}
 
+      {shows && !category && !q && !filtered && <FollowingRow />}
+
       {showResumeRow && (
         <section>
           <h2 className="mb-3 text-lg font-semibold">Continue Watching</h2>
@@ -448,6 +451,34 @@ export function VodBrowse({ kind }: { kind: "movies" | "shows" }) {
         {isFetchingNextPage && <Spinner />}
       </section>
     </div>
+  );
+}
+
+/** VOD Shows: the shows the person follows (new episodes saved automatically), with what
+ * each saved and why it stopped, if it has. */
+function FollowingRow() {
+  const follows = useQuery(vodFollowsQuery());
+  const list = follows.data ?? [];
+  if (list.length === 0) return null;
+  return (
+    <section data-testid="vod-following">
+      <h2 className="mb-3 text-lg font-semibold">Following</h2>
+      <ul className="flex gap-4 overflow-x-auto pb-2">
+        {list.map((f) => (
+          <li key={f.seriesId} className="w-36 shrink-0">
+            <Link to="/vod/shows/$seriesId" params={{ seriesId: String(f.seriesId) }} className="group block">
+              <TilePoster item={{ title: f.title, type: "show" as const, available: true, images: {} }} src={f.posterUrl} />
+              <div className="mt-2 truncate text-sm font-medium" title={f.title}>
+                {f.title}
+              </div>
+              <div className={clsx("truncate text-xs", f.status === "following" ? "text-muted" : "text-amber-500")} title={f.statusText}>
+                {f.statusText || `${f.episodesSaved} saved${f.episodesQueued ? ` · ${f.episodesQueued} saving` : ""}`}
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

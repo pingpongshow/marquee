@@ -149,7 +149,7 @@ These only show once a Live TV source is set up and the recordings folder can be
 
 ### Quotas
 
-A quota caps the space a person's recordings take, counting finished recordings and those in progress. Set the household default with **Recording quota per person** (0 = no limit) and override it per person in **Settings → Users**. Admins aren't held to the default, but you can give anyone (yourself included) a set amount.
+A quota caps the space a person's recordings take, counting finished recordings and those in progress, plus the episodes saved for VOD shows they [follow](vod-and-dispatcharr.md#following-a-show) that are still in the library. Their usage under **Live TV → Recordings** and in **Settings → Users** includes those episodes, and a followed show stops saving while the quota is full. Set the household default with **Recording quota per person** (0 = no limit) and override it per person in **Settings → Users**. Admins aren't held to the default, but you can give anyone (yourself included) a set amount.
 
 **When someone is over quota** chooses what happens when one of their recordings is due:
 
@@ -184,7 +184,7 @@ Comskip's settings live in [`deploy/comskip.ini`](../deploy/comskip.ini), tuned 
 | Start early | 1 min | Starts every recording this much early: none, 1, 2, 5 or 10 minutes. |
 | End late | 3 min | Ends every recording this much late: none, 1, 3, 5, 10, 15, 30 or 60 minutes. |
 | Commercials | Leave recordings alone | **Leave recordings alone**, **Detect only**, or **Remove commercials from recordings**. |
-| Recording quota per person | `0` GB | Space each person's recordings may take. 0 = no limit. A person's own quota overrides it. |
+| Recording quota per person | `0` GB | Space each person's recordings (and followed VOD shows' episodes) may take. 0 = no limit. A person's own quota overrides it. |
 | When someone is over quota | Don't record anything new | Or **Remove their oldest watched recordings to make room**. |
 | Recordings folder | empty (`/recordings`) | Where new recordings go. Empty uses the server's folder. **Use default** goes back to it. |
 

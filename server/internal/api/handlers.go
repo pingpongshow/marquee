@@ -40,6 +40,7 @@ import (
 	"marquee/internal/syncplay"
 	"marquee/internal/sysstats"
 	"marquee/internal/tasks"
+	"marquee/internal/timelimit"
 	"marquee/internal/trickplay"
 	"marquee/internal/vod"
 	"marquee/internal/vodsave"
@@ -121,6 +122,8 @@ type Handlers struct {
 	Storage *storage.Service
 	// Optimize is the library optimizer (Library Health → Large files, admins only); may be nil.
 	Optimize *optimize.Service
+	// TimeLimits counts watching time for kids' time limits; made on first use when nil.
+	TimeLimits *timelimit.Tracker
 }
 
 var _ StrictServerInterface = (*Handlers)(nil)

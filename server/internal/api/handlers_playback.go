@@ -50,6 +50,11 @@ func (h *Handlers) StartPlayback(ctx context.Context, req StartPlaybackRequestOb
 	} else if err != nil {
 		return nil, internal(ctx, "startPlayback", err)
 	}
+	if h.itemCountsAsVideo(ctx, b.ItemId) {
+		if e := h.timeLimitRefusal(ctx, sess.User); e != nil {
+			return StartPlayback403JSONResponse{ForbiddenJSONResponse(*e)}, nil
+		}
+	}
 	ri := requestInfo(ctx)
 	u := sess.User
 	devName := ""
@@ -160,12 +165,23 @@ func (h *Handlers) ownSession(ctx context.Context, id string) (*playback.Session
 }
 
 func (h *Handlers) ReportPlayback(ctx context.Context, req ReportPlaybackRequestObject) (ReportPlaybackResponseObject, error) {
-	if _, ok := session(ctx); !ok {
+	me, ok := session(ctx)
+	if !ok {
 		return ReportPlayback401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
 	s, ok := h.ownSession(ctx, req.SessionId)
 	if !ok {
+		// Ended by a time limit: say so, so the player shows why.
+		if reason := h.timeLimits().StoppedReason(playbackKey(req.SessionId)); reason != "" {
+			return timeLimitResponse{apiErr(errCodeTimeLimit, reason)}, nil
+		}
 		return ReportPlayback404JSONResponse{NotFoundJSONResponse(apiErr("not_found", playback.ErrNoSession.Error()))}, nil
+	}
+	if s.UserID == me.User.ID && req.Body.State == PlaybackProgressStatePlaying {
+		video := s.Media.Video != nil && countsAsVideo(s.ItemType, s.Extra)
+		if e := h.timeLimitOnReport(ctx, me.User, playbackKey(s.ID), video, func() { h.Playback.Stop(ctx, s.ID) }); e != nil {
+			return timeLimitResponse{*e}, nil
+		}
 	}
 	if req.Body.State == PlaybackProgressStateError {
 		msg := ""

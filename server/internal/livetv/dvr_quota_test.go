@@ -286,3 +286,43 @@ func TestDVRRecordingOffPausesSeries(t *testing.T) {
 		t.Errorf("resumed: %+v", rules)
 	}
 }
+
+// Episodes saved for followed series count towards the quota with the recordings: in the
+// usage shown, when scheduling, and when a recording is due.
+func TestDVRQuotaCountsFollowedSaves(t *testing.T) {
+	f := newQuotaFixture(t)
+	ctx := context.Background()
+	followed := map[int64]int64{}
+	f.r.FollowedBytes = func(context.Context) map[int64]int64 { return followed }
+	f.finished(f.r.Dir, "Old", 1000, 3, false)
+	res, _ := f.s.DB.Exec(`INSERT INTO users (username, display_name) VALUES ('o', 'Other')`)
+	other, _ := res.LastInsertId()
+	followed[f.uid], followed[other] = 600, 250
+
+	u, err := f.r.UserUsage(ctx, f.uid)
+	if err != nil || u.Bytes != 1600 || u.FollowedBytes != 600 || u.Recordings != 1 {
+		t.Fatalf("usage: %+v %v", u, err)
+	}
+	// Someone with followed saves and no recordings is listed too.
+	all, _ := f.r.AllUsage(ctx)
+	if all[f.uid].Bytes != 1600 || all[other].Bytes != 250 || all[other].Recordings != 0 || all[other].FollowedBytes != 250 {
+		t.Errorf("all usage: %+v", all)
+	}
+	// Recordings alone are under the quota; with the followed saves they're over it.
+	f.quota = 1500
+	list, _ := f.s.Channels(ctx, f.uid, Filter{})
+	if _, _, err := f.r.Schedule(ctx, f.uid, list[0].ID, list[0].Next.Start, false, false); err != ErrQuotaExceeded {
+		t.Errorf("schedule: %v", err)
+	}
+	if msg := f.r.mayStart(ctx, f.due("Due")); msg != msgOverQuota {
+		t.Errorf("start: %q", msg)
+	}
+	if len(f.alerts) != 1 || !strings.Contains(f.alerts[0], "followed series") {
+		t.Errorf("alerts: %v", f.alerts)
+	}
+	// Room again once the saved episodes leave the library.
+	delete(followed, f.uid)
+	if msg := f.r.mayStart(ctx, f.due("Later")); msg != "" {
+		t.Errorf("after the saves went: %q", msg)
+	}
+}

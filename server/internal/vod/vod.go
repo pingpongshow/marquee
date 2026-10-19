@@ -49,6 +49,9 @@ type Service struct {
 	OnSourceFailed func(src settings.VODSource, err error)
 	// OnMatched, when set, hears that a refresh's TMDB matching finished (suggestion data).
 	OnMatched func(ctx context.Context)
+	// OnUpdated, when set, hears that the lists were reloaded or a series' episodes were
+	// fetched (followed series look for new episodes).
+	OnUpdated func()
 	// Now is the clock and Tick how often Run checks whether a sync is due (tests;
 	// defaults time.Now and a minute).
 	Now  func() time.Time
@@ -237,6 +240,9 @@ func (s *Service) Refresh(ctx context.Context, retryFailed bool) {
 	s.DB.ExecContext(ctx, "DELETE FROM vod_series WHERE source_id NOT IN ("+in+")", keep...)
 	s.DB.ExecContext(ctx, "DELETE FROM vod_sources WHERE id NOT IN ("+in+")", keep...)
 	s.refreshing.Unlock()
+	if s.OnUpdated != nil {
+		s.OnUpdated()
+	}
 	if len(sources) > 0 {
 		go func() {
 			ctx := context.WithoutCancel(ctx)

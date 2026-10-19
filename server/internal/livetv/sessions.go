@@ -463,6 +463,16 @@ func (m *Sessions) join(s *Session, userID int64) {
 	s.mu.Unlock()
 }
 
+// Viewers returns who holds the stream and when it was last fetched (time limits).
+func (s *Session) Viewers() (users []int64, lastFetch time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for id := range s.users {
+		users = append(users, id)
+	}
+	return users, s.last
+}
+
 // Ended reports whether a stream's FFmpeg has exited.
 func (s *Session) Ended() bool {
 	s.mu.Lock()

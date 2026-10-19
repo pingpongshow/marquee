@@ -177,12 +177,29 @@ With **Pause while someone is watching** off, downloads only give way to recordi
 
 Turn on **Only during the maintenance window** to download only inside the window set in **Settings → Scheduled Tasks** (03:00 for 4 hours by default). Outside it, downloads stop and keep what they've downloaded.
 
+### Following a show
+
+Turn on **Let people follow series** in **Saving to library** and VOD show pages get a **Follow** button. Following a show saves its new episodes to the library automatically as they appear on the source, through the same queue (with its connection sharing, maintenance window, checks and Failed list). Anyone with VOD access who may record Live TV can follow (admins always can); follows are each person's own.
+
+When following, you choose:
+
+- **Size limit (GB):** saving stops once the episodes this follow saved (those still in the library) reach it. It starts at **Size limit for a new follow**; 0 means no limit of its own.
+- **Also save episodes already there:** saves the whole show from the start, not only new episodes.
+- **Save to:** the shows folder or another save folder for shows (admins only).
+
+Episodes the library already has, or that were already saved or queued, are skipped. A follow keeps up to 3 episodes in the queue at a time and adds the next as they finish. Marquee looks for new episodes after each VOD sync, whenever a show's episodes are reloaded, and every 30 minutes.
+
+**Saved episodes count towards the follower's recording quota** with their recordings (see [Quotas](live-tv-and-dvr.md#quotas)). A follow stops saving while it's at its size limit (**Full**) or the follower's recording space is full, and it's paused while following is turned off or the person may no longer record. It carries on by itself once there's room again, for example after episodes are deleted. Its status shows on the show page (**Following · 3 episodes · 4.2 GB**, with the reason when it's stopped) and in the **Following** row on **VOD Shows**.
+
+**Unfollow** on the show page stops it. The episodes already saved stay in the library and no longer count towards the quota. Admins see everyone's follows under **Followed series** in **Settings → VOD**, and can unfollow any of them.
+
 ### Alerts
 
 In **Settings → Notifications**:
 
 - **VOD download failed** is on by default. It's sent when a save fails after its retries.
 - **Saving to the library finished** sends one summary when the queue empties. It's off by default.
+- **Someone is over their recording quota** is also sent when a followed show stops saving because its follower's recording space is full.
 
 ### Saving to library settings
 
@@ -204,6 +221,8 @@ In **Settings → Notifications**:
 | Pause for | Watching from the same source | **Watching from the same source (including its Live TV)**, or **Any playback on the server** (saves bandwidth and GPU). |
 | Retry failed saves | On | Every 4 hours, failed saves are tried again from where they stopped. |
 | Only during the maintenance window | Off | On: downloads run only inside the maintenance window. |
+| Let people follow series | Off | A **Follow** button on VOD show pages: new episodes are saved automatically. See [Following a show](#following-a-show). |
+| Size limit for a new follow (GB) | `0` | The size limit a new follow starts with. 0 = no limit (only the recording quota). |
 
 ## Suggestions from VOD
 

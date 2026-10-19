@@ -342,7 +342,7 @@ function RecordingSettings() {
         </Field>
         <Field
           label="Recording quota per person"
-          help="Space each person's recordings may take (finished and in progress). 0 = no limit. A person's own quota in Settings → Users overrides it."
+          help="Space each person's recordings may take (finished and in progress), with the episodes saved for series they follow on demand. 0 = no limit. A person's own quota in Settings → Users overrides it."
         >
           {(id) => (
             <QuotaInput

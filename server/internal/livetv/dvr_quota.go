@@ -13,11 +13,14 @@ import (
 // series' airings to the series' owner), and counts against their quota with its actual
 // size on disk, finished or in progress, wherever it is.
 
-// Usage is how much a user's recordings take.
+// Usage is how much a user's recordings take, with the episodes their followed series
+// saved (counted in Bytes too).
 type Usage struct {
 	UserID     int64
 	Bytes      int64
 	Recordings int
+	// FollowedBytes: of Bytes, the followed series' saved episodes.
+	FollowedBytes int64
 	// QuotaBytes is their quota (0 = unlimited).
 	QuotaBytes int64
 }
@@ -110,7 +113,7 @@ func (r *Recorder) owned(ctx context.Context, userID int64) ([]Recording, error)
 	return out, rows.Err()
 }
 
-// UserUsage is how much one user's recordings take, and their quota.
+// UserUsage is how much one user's recordings (and followed saves) take, and their quota.
 func (r *Recorder) UserUsage(ctx context.Context, userID int64) (Usage, error) {
 	list, err := r.owned(ctx, userID)
 	if err != nil {
@@ -121,10 +124,14 @@ func (r *Recorder) UserUsage(ctx context.Context, userID int64) (Usage, error) {
 		u.Bytes += r.sizeOf(x)
 		u.Recordings++
 	}
+	if r.FollowedBytes != nil {
+		u.FollowedBytes = r.FollowedBytes(ctx)[userID]
+		u.Bytes += u.FollowedBytes
+	}
 	return u, nil
 }
 
-// AllUsage is every user's usage who has recordings, by user id.
+// AllUsage is every user's usage who has recordings or followed saves, by user id.
 func (r *Recorder) AllUsage(ctx context.Context) (map[int64]Usage, error) {
 	list, err := r.owned(ctx, 0)
 	if err != nil {
@@ -139,6 +146,17 @@ func (r *Recorder) AllUsage(ctx context.Context) (map[int64]Usage, error) {
 		u.Bytes += r.sizeOf(x)
 		u.Recordings++
 		out[x.UserID] = u
+	}
+	if r.FollowedBytes != nil {
+		for id, b := range r.FollowedBytes(ctx) {
+			u, ok := out[id]
+			if !ok {
+				u = Usage{UserID: id, QuotaBytes: r.quota(ctx, id)}
+			}
+			u.FollowedBytes = b
+			u.Bytes += b
+			out[id] = u
+		}
 	}
 	return out, nil
 }
@@ -246,7 +264,11 @@ func (r *Recorder) mayStart(ctx context.Context, id int64) string {
 			}
 		}
 	}
-	r.quotaAlert(x, fmt.Sprintf("%q wasn't recorded: %s is using %s of their %s recording quota.", x.Title, x.OwnerName, gb(u.Bytes), gb(u.QuotaBytes)))
+	followed := ""
+	if u.FollowedBytes > 0 {
+		followed = fmt.Sprintf(" (%s of it episodes saved for followed series)", gb(u.FollowedBytes))
+	}
+	r.quotaAlert(x, fmt.Sprintf("%q wasn't recorded: %s is using %s%s of their %s recording quota.", x.Title, x.OwnerName, gb(u.Bytes), followed, gb(u.QuotaBytes)))
 	return msgOverQuota
 }
 

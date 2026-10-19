@@ -330,3 +330,41 @@ export function useHideVodSuggestion() {
     },
   });
 }
+
+// ---- following series (new episodes saved automatically)
+
+export type VodFollow = components["schemas"]["VodFollow"];
+
+/** The caller's follows, or (all, admins) everyone's. */
+export const vodFollowsQuery = (all = false) =>
+  queryOptions({
+    queryKey: ["vod", "follows", all ? "all" : "mine"],
+    queryFn: () => unwrap(api.GET("/livetv/vod/follows", { params: { query: { all: all || undefined } } })),
+    staleTime: 30_000,
+  });
+
+/** Follows a series, or changes a follow (maxGb: 0 = no limit; omitted = the default). */
+export function useFollowVodSeries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ seriesId, ...body }: { seriesId: number; maxGb?: number; includeExisting?: boolean; destination?: string }) =>
+      unwrap(api.PUT("/livetv/vod/series/{seriesId}/follow", { params: { path: { seriesId } }, body })),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["vod"] });
+      qc.invalidateQueries({ queryKey: ["livetv", "usage"] });
+    },
+  });
+}
+
+/** Stops following (saved episodes stay); admins may pass someone else's userId. */
+export function useUnfollowVodSeries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ seriesId, userId }: { seriesId: number; userId?: number }) =>
+      unwrap(api.DELETE("/livetv/vod/series/{seriesId}/follow", { params: { path: { seriesId }, query: { userId } } })),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["vod"] });
+      qc.invalidateQueries({ queryKey: ["livetv", "usage"] });
+    },
+  });
+}

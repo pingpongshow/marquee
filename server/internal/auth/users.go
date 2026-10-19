@@ -40,6 +40,13 @@ type Restrictions struct {
 	// Friend: joined through an invite (USER-13). Signs in with a password, isn't on the
 	// profile picker, and can't switch to household profiles.
 	Friend bool `json:"friend,omitempty"`
+	// Time limits (kids' profiles; never for admins): minutes of video a day (nil or 0 =
+	// none), at weekends instead (nil = the same, 0 = none), and viewing hours ("HH:MM",
+	// both empty = any time; the window may cross midnight). See package timelimit.
+	DailyLimitMinutes   *int   `json:"dailyLimitMinutes,omitempty"`
+	WeekendLimitMinutes *int   `json:"weekendLimitMinutes,omitempty"`
+	AllowedFrom         string `json:"allowedFrom,omitempty"`
+	AllowedUntil        string `json:"allowedUntil,omitempty"`
 }
 
 // LiveTVAllowed reports whether the user may watch Live TV at all.

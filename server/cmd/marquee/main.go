@@ -593,6 +593,20 @@ func run() error {
 		},
 		Scan: scans.Queue,
 	}
+	// Followed series on demand: saved episodes count towards the follower's DVR quota.
+	dvr.FollowedBytes = vodSaves.FollowedBytes
+	vodSaves.MayFollow = func(ctx context.Context, userID int64) bool {
+		u, err := authSvc.GetUser(ctx, userID)
+		return err == nil && api.MayFollowVOD(u)
+	}
+	vodSaves.DVRUsage = func(ctx context.Context, userID int64) (int64, int64) {
+		u, err := dvr.UserUsage(ctx, userID)
+		if err != nil {
+			return 0, 0
+		}
+		return u.Bytes, u.QuotaBytes
+	}
+	vodSvc.OnUpdated = vodSaves.WakeFollows
 	// Libraries made for recordings before they were flagged (migration 41) are found by
 	// their folders: TV or Movies in the recordings folder.
 	if libs, err := libraries.List(ctx); err == nil {
@@ -781,6 +795,7 @@ func run() error {
 			return i.BazarrURL, i.BazarrAPIKey
 		}},
 	}
+	go apiHandlers.RunTimeLimits(ctx) // kids' time limits: counts watching, ends streams past them
 	handler := server.New(server.Deps{
 		Handlers:   apiHandlers,
 		Downloads:  apiHandlers.DownloadFiles(),

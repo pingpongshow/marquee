@@ -108,6 +108,11 @@ type VODSave struct {
 	// Destinations are more folders to save to besides the two above (e.g. Anime), chosen
 	// when saving ("Save to Anime").
 	Destinations []VODSaveDestination `json:"destinations,omitempty"`
+	// FollowEnabled lets people follow series on demand: new episodes are saved
+	// automatically (counted in the follower's DVR quota). FollowDefaultMaxGB is the size
+	// limit a new follow starts with, in GB (10^9 bytes); 0 = none.
+	FollowEnabled      bool    `json:"followEnabled,omitempty"`
+	FollowDefaultMaxGB float64 `json:"followDefaultMaxGb,omitempty"`
 }
 
 // VODSaveDestination is a folder to save to besides the default Movies and Shows ones.

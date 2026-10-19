@@ -42,6 +42,7 @@ import {
   recordingProgress,
 } from "./api";
 import { LivePlayer } from "./LivePlayer";
+import { vodFollowsQuery } from "./vodApi";
 import {
   canRemove,
   commercialsText,
@@ -886,6 +887,9 @@ function Recordings({ canRecord }: { canRecord: boolean }) {
   const recordings = useQuery(ownRecordingsQuery(owner));
   const rules = useQuery(ownRecordingRulesQuery(owner));
   const usage = useQuery({ ...recordingUsageQuery, enabled: canRecord });
+  // Episodes saved for followed series on demand count towards the quota too.
+  const follows = useQuery({ ...vodFollowsQuery(), enabled: canRecord, retry: false });
+  const followedBytes = (follows.data ?? []).reduce((n, f) => n + f.usedBytes, 0);
   const cancel = useCancelRecording();
   const stop = useStopRecording();
   const stopSeries = useDeleteRule();
@@ -977,6 +981,7 @@ function Recordings({ canRecord }: { canRecord: boolean }) {
       label={usageLabel(usage.data)}
       over={usage.data.overQuota}
       action={usage.data.quotaAction}
+      followed={followedBytes}
     />
   );
   const ownerToggle = (
@@ -1229,18 +1234,21 @@ function UsageMeter({
   label,
   over,
   action,
+  followed = 0,
 }: {
   used: number;
   quota: number;
   label: string;
   over: boolean;
   action?: string;
+  /** Of used, episodes saved for followed series. */
+  followed?: number;
 }) {
   const pct = quota > 0 ? Math.min(100, (used / quota) * 100) : 0;
   return (
     <div className="max-w-md space-y-1.5">
       <div className="flex items-baseline justify-between gap-3 text-sm">
-        <span className="text-muted">Your recordings</span>
+        <span className="text-muted">{followed > 0 ? "Your recordings and followed series" : "Your recordings"}</span>
         <span className={clsx(over ? "text-danger" : "text-text")}>
           {label}
         </span>
@@ -1262,6 +1270,11 @@ function UsageMeter({
             style={{ width: `${pct}%` }}
           />
         </div>
+      )}
+      {followed > 0 && (
+        <p className="text-xs text-muted">
+          Includes {formatSize(followed)} of episodes saved for series you follow on demand.
+        </p>
       )}
       {over && (
         <p className="text-sm text-danger">

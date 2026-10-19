@@ -32,6 +32,7 @@ import { UpdateBanner } from "@/features/activity/UpdateBanner";
 import { SearchBox } from "@/features/search/SearchBox";
 import { Avatar } from "@/features/users/Avatar";
 import { ProfileSwitcher } from "@/features/users/ProfileSwitcher";
+import { TimeLeftNote, TimeUpHost } from "@/features/player/TimeUp";
 import { useMusicState } from "@/features/player/MusicPlayer";
 import { RemoteHost } from "@/features/remote/RemoteHost";
 import { RatingPromptHost } from "@/features/player/RatingPrompt";
@@ -107,6 +108,7 @@ function UserMenu({
           className="absolute right-0 z-40 mt-2 w-52 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-2xl"
           onClick={() => setOpen(false)}
         >
+          <TimeLeftNote className="border-b border-border px-4 pt-1 pb-2 text-xs text-muted" />
           <Link to="/account" className={item}>
             <UserRound className="size-4" aria-hidden /> Account
           </Link>
@@ -365,6 +367,7 @@ export function Shell({ children }: { children: ReactNode }) {
       {switching && <ProfileSwitcher onClose={() => setSwitching(false)} />}
       <RemoteHost />
       <RatingPromptHost />
+      <TimeUpHost />
       <Toaster />
     </div>
   );

@@ -395,6 +395,9 @@ func (h *Handlers) PlayVodMovie(ctx context.Context, req PlayVodMovieRequestObje
 	if requestInfo(ctx).Class == netclass.Remote && !(s.User.IsAdmin || s.User.Restrictions.RemoteAllowed()) {
 		return PlayVodMovie403JSONResponse{ForbiddenJSONResponse(apiErr("remote_not_allowed", "Movies on demand are only available at home for this profile."))}, nil
 	}
+	if e := h.timeLimitRefusal(ctx, s.User); e != nil {
+		return PlayVodMovie403JSONResponse{ForbiddenJSONResponse(*e)}, nil
+	}
 	m, err := h.vodMovie(ctx, s, maxRating, req.MovieId)
 	if err != nil {
 		return nil, internal(ctx, "playVodMovie", err)
@@ -494,7 +497,13 @@ func (h *Handlers) ReportVodPlayback(ctx context.Context, req ReportVodPlaybackR
 		st = h.VOD.Streams.Get(req.SessionId)
 	}
 	if st == nil || st.UserID != s.User.ID {
+		if reason := h.timeLimits().StoppedReason(vodKey(req.SessionId)); reason != "" {
+			return timeLimitResponse{apiErr(errCodeTimeLimit, reason)}, nil // ended by a time limit
+		}
 		return ReportVodPlayback404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "session not found"))}, nil
+	}
+	if e := h.timeLimitOnReport(ctx, s.User, vodKey(st.ID), true, func() { h.stopVodStream(ctx, st) }); e != nil {
+		return timeLimitResponse{*e}, nil
 	}
 	var dur int64
 	if req.Body.DurationMs != nil {

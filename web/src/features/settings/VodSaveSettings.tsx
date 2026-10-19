@@ -1,7 +1,11 @@
+import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import type { components } from "@/api/schema.gen";
-import { Button, Card, Field, Input, Select, Spinner, Toggle } from "@/components/ui";
+import { Alert, Button, Card, Field, Input, Select, Spinner, Toggle } from "@/components/ui";
+import { formatSize } from "@/features/livetv/api";
+import { useUnfollowVodSeries, vodFollowsQuery } from "@/features/livetv/vodApi";
 import { FolderBrowser } from "./FolderBrowser";
 import { SaveBar } from "./SaveBar";
 import { useSectionDraft } from "./useSectionDraft";
@@ -280,9 +284,78 @@ export function VodSaveSettings() {
             checked={!!d.windowOnly}
             onChange={(v) => update({ windowOnly: v })}
           />
+          <Toggle
+            label="Let people follow series"
+            help="A Follow button on VOD shows: new episodes are saved through this queue as they appear, into the shows folder (or a save folder). Anyone with on-demand access who may record can follow; saved episodes count towards their recording quota with their recordings."
+            checked={!!d.followEnabled}
+            onChange={(v) => update({ followEnabled: v })}
+          />
+          {d.followEnabled && (
+            <Field label="Size limit for a new follow (GB)" help="What a new follow starts with; each person can change theirs. 0 = no limit (only their recording quota).">
+              {(id) => (
+                <Input
+                  id={id}
+                  type="number"
+                  min={0}
+                  step="any"
+                  className="max-w-40"
+                  value={d.followDefaultMaxGb ?? 0}
+                  onChange={(e) => update({ followDefaultMaxGb: Math.max(0, Number(e.target.value) || 0) })}
+                />
+              )}
+            </Field>
+          )}
         </div>
       </Card>
+      <FollowedSeries />
       <SaveBar dirty={s.dirty} saving={s.saving} error={s.error} savedAt={s.savedAt} onSave={s.save} onReset={s.reset} />
     </>
+  );
+}
+
+/** Everyone's followed series, with what each saved and Unfollow (saved episodes stay). */
+function FollowedSeries() {
+  const follows = useQuery(vodFollowsQuery(true));
+  const unfollow = useUnfollowVodSeries();
+  const list = follows.data ?? [];
+  if (follows.isPending || (list.length === 0 && !follows.isError)) return null;
+  return (
+    <Card title="Followed series" description="Series people follow: their new episodes are saved automatically. Unfollowing keeps the episodes saved so far.">
+      {follows.isError ? (
+        <Alert tone="error">{follows.error.message}</Alert>
+      ) : (
+        <ul className="divide-y divide-border" data-testid="vod-follows-admin">
+          {list.map((f) => (
+            <li key={`${f.userId}-${f.seriesId}`} className="flex items-center gap-3 py-2">
+              <div className="min-w-0 flex-1">
+                <Link to="/vod/shows/$seriesId" params={{ seriesId: String(f.seriesId) }} className="font-medium hover:underline">
+                  {f.title}
+                </Link>
+                <div className="truncate text-xs text-muted">
+                  {[
+                    f.userName,
+                    `${f.episodesSaved} ${f.episodesSaved === 1 ? "episode" : "episodes"}`,
+                    f.usedBytes ? formatSize(f.usedBytes) : "",
+                    f.maxGb ? `limit ${f.maxGb} GB` : "",
+                    f.episodesQueued ? `${f.episodesQueued} saving` : "",
+                    f.statusText ?? "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={unfollow.isPending && unfollow.variables?.seriesId === f.seriesId && unfollow.variables?.userId === f.userId}
+                onClick={() => unfollow.mutate({ seriesId: f.seriesId, userId: f.userId })}
+              >
+                Unfollow
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }

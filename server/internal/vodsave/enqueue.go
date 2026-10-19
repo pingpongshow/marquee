@@ -20,6 +20,8 @@ type Result struct {
 	Skipped  int // already in the library (as well or better, or better without upgrades asked for)
 	Upgrades int // of Queued, upgrades replacing the library's copy
 	Saves    []Save
+	// QueuedIDs are the saves of Queued (new, or failed ones queued again).
+	QueuedIDs []int64
 }
 
 type item struct {
@@ -120,7 +122,7 @@ func (s *Service) SaveEpisodeTo(ctx context.Context, episodeID, userID int64, up
 	if err != nil {
 		return Result{}, err
 	}
-	return s.saveEpisodes(ctx, seriesID, nil, episodeID, userID, upgrade, dest)
+	return s.saveEpisodes(ctx, seriesID, nil, episodeID, nil, userID, upgrade, dest)
 }
 
 // SaveSeries queues a series' episodes, or one season's (season non-nil). The episodes are
@@ -142,10 +144,12 @@ func (s *Service) SaveSeriesTo(ctx context.Context, seriesID int64, season *int,
 		}
 		return Result{}, err
 	}
-	return s.saveEpisodes(ctx, seriesID, season, 0, userID, upgrades, dest)
+	return s.saveEpisodes(ctx, seriesID, season, 0, nil, userID, upgrades, dest)
 }
 
-func (s *Service) saveEpisodes(ctx context.Context, seriesID int64, season *int, episodeID, userID int64, upgrade bool, dest string) (Result, error) {
+// saveEpisodes queues a series' episodes: one season's (season non-nil), one episode
+// (episodeID), or those listed in only (followed series; non-nil only).
+func (s *Service) saveEpisodes(ctx context.Context, seriesID int64, season *int, episodeID int64, only []int64, userID int64, upgrade bool, dest string) (Result, error) {
 	s.init()
 	c := s.cfg()
 	root, d, err := s.destination(dest, "episode")
@@ -195,6 +199,15 @@ func (s *Service) saveEpisodes(ctx context.Context, seriesID int64, season *int,
 	if episodeID > 0 {
 		q += " AND id=?"
 		args = append(args, episodeID)
+	}
+	if only != nil {
+		if len(only) == 0 {
+			return Result{}, nil
+		}
+		q += " AND id IN (" + in(len(only)) + ")"
+		for _, id := range only {
+			args = append(args, id)
+		}
 	}
 	rows, err := s.DB.QueryContext(ctx, q+" ORDER BY season=0, season, episode, id", args...)
 	if err != nil {
@@ -303,6 +316,7 @@ func (s *Service) enqueue(ctx context.Context, items []item, userID int64) (Resu
 				res.Upgrades++
 			}
 			ids = append(ids, id)
+			res.QueuedIDs = append(res.QueuedIDs, id)
 			continue
 		case err == nil && state != Cancelled && state != Skipped:
 			res.Already++
@@ -350,6 +364,9 @@ func (s *Service) enqueue(ctx context.Context, items []item, userID int64) (Resu
 		}
 		id, _ = r.LastInsertId()
 		ids = append(ids, id)
+		if state != Skipped {
+			res.QueuedIDs = append(res.QueuedIDs, id)
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return res, err

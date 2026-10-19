@@ -102,6 +102,15 @@ type Service struct {
 	// ProbeRemote reads a remote file's video (tests replace it; default ffprobe).
 	ProbeRemote func(ctx context.Context, link, userAgent string) (vod.Quality, error)
 
+	// Followed series (follow.go). MayFollow reports whether a user may follow series now
+	// (on-demand access, and admin or may record; nil: everyone may). DVRUsage is a user's
+	// DVR usage (recordings plus followed saves) and quota in bytes (0 = unlimited; nil: no
+	// quota). OnFollowQuota hears a follow stopped by its owner's quota (admin alerts).
+	MayFollow     func(ctx context.Context, userID int64) bool
+	DVRUsage      func(ctx context.Context, userID int64) (used, quota int64)
+	OnFollowQuota func(userID int64, owner, title, msg string)
+	FollowEvery   time.Duration // how often follows are checked besides when woken (30 min)
+
 	// Timings; zero values are the defaults.
 	Tick             time.Duration   // how often the queue is looked at (2 s)
 	Backoff          []time.Duration // waits after network failures (1, 3, 8, 18 min: 5 tries in ~30 min)
@@ -137,6 +146,8 @@ type Service struct {
 	qualityQueue   []qualityKey
 	qualityWaiting map[qualityKey]bool
 	qualityWake    chan struct{}
+
+	followWake chan struct{}
 }
 
 type sourceDown struct {
@@ -164,6 +175,7 @@ func (s *Service) init() {
 		s.lastRetry = time.Now()
 		s.qualityWaiting = map[qualityKey]bool{}
 		s.qualityWake = make(chan struct{}, 1)
+		s.followWake = make(chan struct{}, 1)
 	})
 }
 
