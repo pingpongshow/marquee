@@ -2162,6 +2162,19 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /me/time-limit:
+    get:
+      tags: [users]
+      operationId: myTimeLimit
+      summary: "The caller's time limit today (kids' profiles): whether video may play now and how much is left. Starting playback past the limit or outside the viewing hours is refused with 403 and error code time_limit, and a session running when the time runs out ends (its progress reports answer 403 time_limit)."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TimeLimitStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
   /me/recap:
     get:
       tags: [music]
@@ -3615,6 +3628,55 @@ paths:
                 items: { $ref: "#/components/schemas/VodSeries" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+
+  /livetv/vod/follows:
+    get:
+      tags: [livetv]
+      operationId: listVodFollows
+      summary: "Followed series on demand: new episodes are saved to the library automatically. The caller's own follows; admins see everyone's (all=true)."
+      parameters:
+        - { name: all, in: query, description: "Admins: everyone's follows.", schema: { type: boolean } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/VodFollow" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /livetv/vod/series/{seriesId}/follow:
+    parameters:
+      - { name: seriesId, in: path, required: true, schema: { type: integer, format: int64 } }
+    put:
+      tags: [livetv]
+      operationId: followVodSeries
+      summary: "Follow a series on demand (or change a follow): its new episodes are saved to the library through the download queue as they appear, within the follow's size limit and the caller's DVR quota (saved episodes count towards it like recordings). Needs following turned on (VodSaveSettings.followEnabled), a shows folder, on-demand access and the may-record permission (admins always may). 409 when following is off."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VodFollowRequest" }
+      responses:
+        "200":
+          description: Following.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VodFollow" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      tags: [livetv]
+      operationId: unfollowVodSeries
+      summary: "Stop following (episodes already saved stay in the library). Admins may remove anyone's follow with userId."
+      parameters:
+        - { name: userId, in: query, schema: { type: integer, format: int64 } }
+      responses:
+        "204": { description: Not followed any more. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /livetv/vod/series/{seriesId}:
     parameters:
@@ -5353,6 +5415,10 @@ components:
           items: { type: string }
         seerrUserId: { type: integer, format: int64, nullable: true, description: The Seerr user requests are made as. Null = Seerr's API key owner. }
         friend: { type: boolean, description: "Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker." }
+        dailyLimitMinutes: { type: integer, minimum: 0, maximum: 1440, nullable: true, description: "Time limit: minutes of video (movies, episodes, on demand, Live TV; not music) a day, counted on the server's clock and reset at midnight. Null or 0 = no limit. Not for admins." }
+        weekendLimitMinutes: { type: integer, minimum: 0, maximum: 1440, nullable: true, description: "Time limit on Saturdays and Sundays instead of dailyLimitMinutes. Null = the same as dailyLimitMinutes; 0 = no limit at weekends." }
+        allowedFrom: { type: string, nullable: true, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", description: "Viewing hours: video may only play from this time (HH:MM, server time) until allowedUntil; a window may cross midnight. Both null = any time." }
+        allowedUntil: { type: string, nullable: true, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$", description: "End of the viewing hours (HH:MM)." }
 
     UserPreferences:
       type: object
@@ -6105,6 +6171,7 @@ components:
       type: object
       required: [id, title, watched, episodeCount, watchedCount, seasonCount]
       properties:
+        following: { type: boolean, description: "The caller follows this series (new episodes are saved automatically)." }
         id: { type: integer, format: int64 }
         title: { type: string }
         year: { type: integer }
@@ -6260,6 +6327,8 @@ components:
       type: object
       description: "Saving films and episodes on demand (Xtream Codes sources) into the library (admins only). Partial sends keep the other fields."
       properties:
+        followEnabled: { type: boolean, description: "Let people follow series on demand (new episodes saved automatically, counted in their DVR quota). Default false." }
+        followDefaultMaxGb: { type: number, minimum: 0, description: "Size limit a new follow starts with, in GB (10^9 bytes); 0 = none (only the DVR quota limits it). Default 0." }
         moviesFolder: { type: string, description: "Where films are saved, as the server sees it (must exist and be writable). Empty turns saving films off." }
         showsFolder: { type: string, description: "Where episodes are saved. Empty turns saving episodes off." }
         quality: { type: string, enum: [original, remux, transcode], description: "original: the file as it is (MPEG-TS, FLV and other unusual containers are remuxed to MKV). remux: to MKV, every stream copied. transcode: the settings below." }
@@ -7198,6 +7267,45 @@ components:
         label: { type: string, description: "What it holds, e.g. Config, Transcode, Movies." }
         totalBytes: { type: integer, format: int64 }
         freeBytes: { type: integer, format: int64 }
+
+    TimeLimitStatus:
+      type: object
+      required: [limited, allowedNow]
+      properties:
+        limited: { type: boolean, description: "The caller has a time limit or viewing hours." }
+        allowedNow: { type: boolean, description: "Video may play now." }
+        minutesLeft: { type: integer, description: "Minutes of video left today (only with a daily limit)." }
+        limitMinutes: { type: integer, description: "Today's limit." }
+        usedMinutes: { type: integer, description: "Minutes watched today." }
+        allowedFrom: { type: string, description: "Viewing hours (HH:MM), when set." }
+        allowedUntil: { type: string }
+        reason: { type: string, description: "Why video can't play now, to show as is (e.g. \"Time's up for today\", \"Viewing hours are 07:00–20:00\")." }
+        resetsAt: { type: string, format: date-time, description: "When video may play again, if not now." }
+
+    VodFollowRequest:
+      type: object
+      properties:
+        maxGb: { type: number, minimum: 0, description: "This follow's own size limit in GB (10^9 bytes): once its saved episodes reach it, new ones aren't saved. 0 = none (only the DVR quota). Omitted = the server's followDefaultMaxGb (on a new follow) or unchanged." }
+        includeExisting: { type: boolean, description: "Also save the episodes already there (from the start), not only new ones. Only on a new follow. Default false." }
+        destination: { type: string, description: "A save folder name (VodSaveSettings.destinations) instead of the shows folder." }
+
+    VodFollow:
+      type: object
+      required: [seriesId, title, userId, usedBytes, episodesSaved, status, createdAt]
+      properties:
+        seriesId: { type: integer, format: int64 }
+        title: { type: string }
+        posterUrl: { type: string }
+        userId: { type: integer, format: int64 }
+        userName: { type: string }
+        maxGb: { type: number, description: "0 = no own limit." }
+        usedBytes: { type: integer, format: int64, description: "Size of the episodes this follow saved that are still in the library." }
+        episodesSaved: { type: integer }
+        episodesQueued: { type: integer }
+        status: { type: string, description: "following, full (its size limit is reached), quota (the owner's DVR quota is full) or paused (following is off or the owner may not record). New statuses may be added." }
+        statusText: { type: string, description: "The status for people, e.g. \"Paused: your recording space is full\"." }
+        createdAt: { type: string, format: date-time }
+        lastNewAt: { type: string, format: date-time, description: "When it last queued a new episode." }
 
     HostInfo:
       type: object

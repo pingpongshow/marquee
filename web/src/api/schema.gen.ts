@@ -1621,6 +1621,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/time-limit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's time limit today (kids' profiles): whether video may play now and how much is left. Starting playback past the limit or outside the viewing hours is refused with 403 and error code time_limit, and a session running when the time runs out ends (its progress reports answer 403 time_limit). */
+        get: operations["myTimeLimit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/recap": {
         parameters: {
             query?: never;
@@ -2868,6 +2885,43 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/follows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Followed series on demand: new episodes are saved to the library automatically. The caller's own follows; admins see everyone's (all=true). */
+        get: operations["listVodFollows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/series/{seriesId}/follow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Follow a series on demand (or change a follow): its new episodes are saved to the library through the download queue as they appear, within the follow's size limit and the caller's DVR quota (saved episodes count towards it like recordings). Needs following turned on (VodSaveSettings.followEnabled), a shows folder, on-demand access and the may-record permission (admins always may). 409 when following is off. */
+        put: operations["followVodSeries"];
+        post?: never;
+        /** Stop following (episodes already saved stay in the library). Admins may remove anyone's follow with userId. */
+        delete: operations["unfollowVodSeries"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4307,6 +4361,14 @@ export interface components {
             seerrUserId?: number | null;
             /** @description Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker. */
             friend?: boolean;
+            /** @description Time limit: minutes of video (movies, episodes, on demand, Live TV; not music) a day, counted on the server's clock and reset at midnight. Null or 0 = no limit. Not for admins. */
+            dailyLimitMinutes?: number | null;
+            /** @description Time limit on Saturdays and Sundays instead of dailyLimitMinutes. Null = the same as dailyLimitMinutes; 0 = no limit at weekends. */
+            weekendLimitMinutes?: number | null;
+            /** @description Viewing hours: video may only play from this time (HH:MM, server time) until allowedUntil; a window may cross midnight. Both null = any time. */
+            allowedFrom?: string | null;
+            /** @description End of the viewing hours (HH:MM). */
+            allowedUntil?: string | null;
         };
         UserPreferences: {
             /** @description ISO 639-2, e.g. eng, jpn */
@@ -5124,6 +5186,8 @@ export interface components {
             startMs?: number;
         };
         VodSeries: {
+            /** @description The caller follows this series (new episodes are saved automatically). */
+            following?: boolean;
             /** Format: int64 */
             id: number;
             title: string;
@@ -5291,6 +5355,10 @@ export interface components {
         };
         /** @description Saving films and episodes on demand (Xtream Codes sources) into the library (admins only). Partial sends keep the other fields. */
         VodSaveSettings: {
+            /** @description Let people follow series on demand (new episodes saved automatically, counted in their DVR quota). Default false. */
+            followEnabled?: boolean;
+            /** @description Size limit a new follow starts with, in GB (10^9 bytes); 0 = none (only the DVR quota limits it). Default 0. */
+            followDefaultMaxGb?: number;
             /** @description Where films are saved, as the server sees it (must exist and be writable). Empty turns saving films off. */
             moviesFolder?: string;
             /** @description Where episodes are saved. Empty turns saving episodes off. */
@@ -6329,6 +6397,65 @@ export interface components {
             totalBytes: number;
             /** Format: int64 */
             freeBytes: number;
+        };
+        TimeLimitStatus: {
+            /** @description The caller has a time limit or viewing hours. */
+            limited: boolean;
+            /** @description Video may play now. */
+            allowedNow: boolean;
+            /** @description Minutes of video left today (only with a daily limit). */
+            minutesLeft?: number;
+            /** @description Today's limit. */
+            limitMinutes?: number;
+            /** @description Minutes watched today. */
+            usedMinutes?: number;
+            /** @description Viewing hours (HH:MM), when set. */
+            allowedFrom?: string;
+            allowedUntil?: string;
+            /** @description Why video can't play now, to show as is (e.g. "Time's up for today", "Viewing hours are 07:00–20:00"). */
+            reason?: string;
+            /**
+             * Format: date-time
+             * @description When video may play again, if not now.
+             */
+            resetsAt?: string;
+        };
+        VodFollowRequest: {
+            /** @description This follow's own size limit in GB (10^9 bytes): once its saved episodes reach it, new ones aren't saved. 0 = none (only the DVR quota). Omitted = the server's followDefaultMaxGb (on a new follow) or unchanged. */
+            maxGb?: number;
+            /** @description Also save the episodes already there (from the start), not only new ones. Only on a new follow. Default false. */
+            includeExisting?: boolean;
+            /** @description A save folder name (VodSaveSettings.destinations) instead of the shows folder. */
+            destination?: string;
+        };
+        VodFollow: {
+            /** Format: int64 */
+            seriesId: number;
+            title: string;
+            posterUrl?: string;
+            /** Format: int64 */
+            userId: number;
+            userName?: string;
+            /** @description 0 = no own limit. */
+            maxGb?: number;
+            /**
+             * Format: int64
+             * @description Size of the episodes this follow saved that are still in the library.
+             */
+            usedBytes: number;
+            episodesSaved: number;
+            episodesQueued?: number;
+            /** @description following, full (its size limit is reached), quota (the owner's DVR quota is full) or paused (following is off or the owner may not record). New statuses may be added. */
+            status: string;
+            /** @description The status for people, e.g. "Paused: your recording space is full". */
+            statusText?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description When it last queued a new episode.
+             */
+            lastNewAt?: string;
         };
         HostInfo: {
             cpuCores: number;
@@ -10686,6 +10813,27 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    myTimeLimit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeLimitStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     listeningRecap: {
         parameters: {
             query?: {
@@ -12829,6 +12977,85 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    listVodFollows: {
+        parameters: {
+            query?: {
+                /** @description Admins: everyone's follows. */
+                all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodFollow"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    followVodSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VodFollowRequest"];
+            };
+        };
+        responses: {
+            /** @description Following. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VodFollow"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    unfollowVodSeries: {
+        parameters: {
+            query?: {
+                userId?: number;
+            };
+            header?: never;
+            path: {
+                seriesId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Not followed any more. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     getVodSeries: {
