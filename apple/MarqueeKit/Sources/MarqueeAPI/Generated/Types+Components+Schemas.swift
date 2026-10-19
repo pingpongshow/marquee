@@ -501,6 +501,22 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/UserRestrictions/friend`.
             public var friend: Swift.Bool?
+            /// Time limit: minutes of video (movies, episodes, on demand, Live TV; not music) a day, counted on the server's clock and reset at midnight. Null or 0 = no limit. Not for admins.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserRestrictions/dailyLimitMinutes`.
+            public var dailyLimitMinutes: Swift.Int?
+            /// Time limit on Saturdays and Sundays instead of dailyLimitMinutes. Null = the same as dailyLimitMinutes; 0 = no limit at weekends.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserRestrictions/weekendLimitMinutes`.
+            public var weekendLimitMinutes: Swift.Int?
+            /// Viewing hours: video may only play from this time (HH:MM, server time) until allowedUntil; a window may cross midnight. Both null = any time.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserRestrictions/allowedFrom`.
+            public var allowedFrom: Swift.String?
+            /// End of the viewing hours (HH:MM).
+            ///
+            /// - Remark: Generated from `#/components/schemas/UserRestrictions/allowedUntil`.
+            public var allowedUntil: Swift.String?
             /// Creates a new `UserRestrictions`.
             ///
             /// - Parameters:
@@ -517,6 +533,10 @@ extension Components {
             ///   - liveTvGroups: Deprecated and ignored: channel groups no longer limit anyone (everyone who may watch Live TV sees every group). The server ignores it when written and never returns it.
             ///   - seerrUserId: The Seerr user requests are made as. Null = Seerr's API key owner.
             ///   - friend: Joined through an invite (USER-13): signs in with their own password, and isn't listed on this server's profile picker.
+            ///   - dailyLimitMinutes: Time limit: minutes of video (movies, episodes, on demand, Live TV; not music) a day, counted on the server's clock and reset at midnight. Null or 0 = no limit. Not for admins.
+            ///   - weekendLimitMinutes: Time limit on Saturdays and Sundays instead of dailyLimitMinutes. Null = the same as dailyLimitMinutes; 0 = no limit at weekends.
+            ///   - allowedFrom: Viewing hours: video may only play from this time (HH:MM, server time) until allowedUntil; a window may cross midnight. Both null = any time.
+            ///   - allowedUntil: End of the viewing hours (HH:MM).
             public init(
                 libraryIds: [Swift.Int64]? = nil,
                 maxContentRating: Components.Schemas.UserRestrictions.MaxContentRatingPayload? = nil,
@@ -530,7 +550,11 @@ extension Components {
                 liveTv: Swift.Bool? = nil,
                 liveTvGroups: [Swift.String]? = nil,
                 seerrUserId: Swift.Int64? = nil,
-                friend: Swift.Bool? = nil
+                friend: Swift.Bool? = nil,
+                dailyLimitMinutes: Swift.Int? = nil,
+                weekendLimitMinutes: Swift.Int? = nil,
+                allowedFrom: Swift.String? = nil,
+                allowedUntil: Swift.String? = nil
             ) {
                 self.libraryIds = libraryIds
                 self.maxContentRating = maxContentRating
@@ -545,6 +569,10 @@ extension Components {
                 self.liveTvGroups = liveTvGroups
                 self.seerrUserId = seerrUserId
                 self.friend = friend
+                self.dailyLimitMinutes = dailyLimitMinutes
+                self.weekendLimitMinutes = weekendLimitMinutes
+                self.allowedFrom = allowedFrom
+                self.allowedUntil = allowedUntil
             }
             public enum CodingKeys: String, CodingKey {
                 case libraryIds
@@ -560,6 +588,10 @@ extension Components {
                 case liveTvGroups
                 case seerrUserId
                 case friend
+                case dailyLimitMinutes
+                case weekendLimitMinutes
+                case allowedFrom
+                case allowedUntil
             }
         }
         /// - Remark: Generated from `#/components/schemas/UserPreferences`.
@@ -1342,6 +1374,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/NotificationSettings/optimizeFailedAlert`.
             public var optimizeFailedAlert: Swift.Bool?
+            /// The file_damaged alert is emailed: a newly added file failed its playback check (see Library Health → Unplayable files). Not emailed by default. (Not in AlertType; notifications carry type file_damaged.)
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotificationSettings/fileDamagedAlert`.
+            public var fileDamagedAlert: Swift.Bool?
             /// The library_unreadable alert is emailed: a scan couldn't read one of a library's folders (offline drive, permissions), so its titles were kept as they were. Emailed by default. (Not in AlertType; notifications carry type library_unreadable.)
             ///
             /// - Remark: Generated from `#/components/schemas/NotificationSettings/libraryUnreadableAlert`.
@@ -1374,6 +1410,7 @@ extension Components {
             ///   - dvrQuotaAlert: The dvr_quota alert is emailed: a recording wasn't made, or watched recordings went to the media trash, because its owner is over their DVR quota. Not emailed by default. (Not in AlertType, which shipped apps decode strictly; notifications carry type dvr_quota.)
             ///   - plexSyncAlert: The plex_sync alert is emailed: two-way Plex sync is failing (Plex rejects the token, or hasn't been reachable for several runs). Not emailed by default. (Not in AlertType; notifications carry type plex_sync.)
             ///   - optimizeFailedAlert: The optimize_failed alert is emailed: a Library Health → Large files conversion failed (not one skipped for saving too little). Emailed by default. (Not in AlertType; notifications carry type optimize_failed.)
+            ///   - fileDamagedAlert: The file_damaged alert is emailed: a newly added file failed its playback check (see Library Health → Unplayable files). Not emailed by default. (Not in AlertType; notifications carry type file_damaged.)
             ///   - libraryUnreadableAlert: The library_unreadable alert is emailed: a scan couldn't read one of a library's folders (offline drive, permissions), so its titles were kept as they were. Emailed by default. (Not in AlertType; notifications carry type library_unreadable.)
             ///   - recipientsAllAdmins: Mail alerts to every administrator with an email address.
             ///   - recipients: Administrators (user ids) who get alert mail when recipientsAllAdmins is off.
@@ -1392,6 +1429,7 @@ extension Components {
                 dvrQuotaAlert: Swift.Bool? = nil,
                 plexSyncAlert: Swift.Bool? = nil,
                 optimizeFailedAlert: Swift.Bool? = nil,
+                fileDamagedAlert: Swift.Bool? = nil,
                 libraryUnreadableAlert: Swift.Bool? = nil,
                 recipientsAllAdmins: Swift.Bool? = nil,
                 recipients: [Swift.Int64]? = nil,
@@ -1410,6 +1448,7 @@ extension Components {
                 self.dvrQuotaAlert = dvrQuotaAlert
                 self.plexSyncAlert = plexSyncAlert
                 self.optimizeFailedAlert = optimizeFailedAlert
+                self.fileDamagedAlert = fileDamagedAlert
                 self.libraryUnreadableAlert = libraryUnreadableAlert
                 self.recipientsAllAdmins = recipientsAllAdmins
                 self.recipients = recipients
@@ -1429,6 +1468,7 @@ extension Components {
                 case dvrQuotaAlert
                 case plexSyncAlert
                 case optimizeFailedAlert
+                case fileDamagedAlert
                 case libraryUnreadableAlert
                 case recipientsAllAdmins
                 case recipients
@@ -1473,6 +1513,8 @@ extension Components {
             public var optimizeFailedAlert: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/libraryUnreadableAlert`.
             public var libraryUnreadableAlert: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/fileDamagedAlert`.
+            public var fileDamagedAlert: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/recipientsAllAdmins`.
             public var recipientsAllAdmins: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/NotificationSettingsUpdate/recipients`.
@@ -1495,6 +1537,7 @@ extension Components {
             ///   - plexSyncAlert:
             ///   - optimizeFailedAlert:
             ///   - libraryUnreadableAlert:
+            ///   - fileDamagedAlert:
             ///   - recipientsAllAdmins:
             ///   - recipients:
             ///   - diskThresholdPercent:
@@ -1512,6 +1555,7 @@ extension Components {
                 plexSyncAlert: Swift.Bool? = nil,
                 optimizeFailedAlert: Swift.Bool? = nil,
                 libraryUnreadableAlert: Swift.Bool? = nil,
+                fileDamagedAlert: Swift.Bool? = nil,
                 recipientsAllAdmins: Swift.Bool? = nil,
                 recipients: [Swift.Int64]? = nil,
                 diskThresholdPercent: Swift.Int? = nil
@@ -1529,6 +1573,7 @@ extension Components {
                 self.plexSyncAlert = plexSyncAlert
                 self.optimizeFailedAlert = optimizeFailedAlert
                 self.libraryUnreadableAlert = libraryUnreadableAlert
+                self.fileDamagedAlert = fileDamagedAlert
                 self.recipientsAllAdmins = recipientsAllAdmins
                 self.recipients = recipients
                 self.diskThresholdPercent = diskThresholdPercent
@@ -1547,6 +1592,7 @@ extension Components {
                 case plexSyncAlert
                 case optimizeFailedAlert
                 case libraryUnreadableAlert
+                case fileDamagedAlert
                 case recipientsAllAdmins
                 case recipients
                 case diskThresholdPercent
@@ -4005,6 +4051,10 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/VodSeries`.
         public struct VodSeries: Codable, Hashable, Sendable {
+            /// The caller follows this series (new episodes are saved automatically).
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSeries/following`.
+            public var following: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/VodSeries/id`.
             public var id: Swift.Int64
             /// - Remark: Generated from `#/components/schemas/VodSeries/title`.
@@ -4072,6 +4122,7 @@ extension Components {
             /// Creates a new `VodSeries`.
             ///
             /// - Parameters:
+            ///   - following: The caller follows this series (new episodes are saved automatically).
             ///   - id:
             ///   - title:
             ///   - year:
@@ -4086,6 +4137,7 @@ extension Components {
             ///   - inLibrary: The library already has this show (any of its episodes; matched by TMDB id, else by title and year) in a library the caller can see.
             ///   - nextEpisode: The episode the caller would watch next (Continue Watching and the series detail).
             public init(
+                following: Swift.Bool? = nil,
                 id: Swift.Int64,
                 title: Swift.String,
                 year: Swift.Int? = nil,
@@ -4100,6 +4152,7 @@ extension Components {
                 inLibrary: Swift.Bool? = nil,
                 nextEpisode: Components.Schemas.VodSeries.NextEpisodePayload? = nil
             ) {
+                self.following = following
                 self.id = id
                 self.title = title
                 self.year = year
@@ -4115,6 +4168,7 @@ extension Components {
                 self.nextEpisode = nextEpisode
             }
             public enum CodingKeys: String, CodingKey {
+                case following
                 case id
                 case title
                 case year
@@ -4776,6 +4830,14 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/VodSaveSettings`.
         public struct VodSaveSettings: Codable, Hashable, Sendable {
+            /// Let people follow series on demand (new episodes saved automatically, counted in their DVR quota). Default false.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/followEnabled`.
+            public var followEnabled: Swift.Bool?
+            /// Size limit a new follow starts with, in GB (10^9 bytes); 0 = none (only the DVR quota limits it). Default 0.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodSaveSettings/followDefaultMaxGb`.
+            public var followDefaultMaxGb: Swift.Double?
             /// Where films are saved, as the server sees it (must exist and be writable). Empty turns saving films off.
             ///
             /// - Remark: Generated from `#/components/schemas/VodSaveSettings/moviesFolder`.
@@ -4886,6 +4948,8 @@ extension Components {
             /// Creates a new `VodSaveSettings`.
             ///
             /// - Parameters:
+            ///   - followEnabled: Let people follow series on demand (new episodes saved automatically, counted in their DVR quota). Default false.
+            ///   - followDefaultMaxGb: Size limit a new follow starts with, in GB (10^9 bytes); 0 = none (only the DVR quota limits it). Default 0.
             ///   - moviesFolder: Where films are saved, as the server sees it (must exist and be writable). Empty turns saving films off.
             ///   - showsFolder: Where episodes are saved. Empty turns saving episodes off.
             ///   - quality: original: the file as it is (MPEG-TS, FLV and other unusual containers are remuxed to MKV). remux: to MKV, every stream copied. transcode: the settings below.
@@ -4903,6 +4967,8 @@ extension Components {
             ///   - windowOnly: Download only during the maintenance window (Scheduled Tasks); outside it running saves stop and keep what they downloaded. Default off: any time.
             ///   - destinations: More save folders besides moviesFolder and showsFolder (e.g. Anime), offered as "Save to {name}". Sending the list replaces it; an item without an id is new.
             public init(
+                followEnabled: Swift.Bool? = nil,
+                followDefaultMaxGb: Swift.Double? = nil,
                 moviesFolder: Swift.String? = nil,
                 showsFolder: Swift.String? = nil,
                 quality: Components.Schemas.VodSaveSettings.QualityPayload? = nil,
@@ -4920,6 +4986,8 @@ extension Components {
                 windowOnly: Swift.Bool? = nil,
                 destinations: [Components.Schemas.VodSaveDestination]? = nil
             ) {
+                self.followEnabled = followEnabled
+                self.followDefaultMaxGb = followDefaultMaxGb
                 self.moviesFolder = moviesFolder
                 self.showsFolder = showsFolder
                 self.quality = quality
@@ -4938,6 +5006,8 @@ extension Components {
                 self.destinations = destinations
             }
             public enum CodingKeys: String, CodingKey {
+                case followEnabled
+                case followDefaultMaxGb
                 case moviesFolder
                 case showsFolder
                 case quality
@@ -9325,6 +9395,221 @@ extension Components {
                 case label
                 case totalBytes
                 case freeBytes
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/TimeLimitStatus`.
+        public struct TimeLimitStatus: Codable, Hashable, Sendable {
+            /// The caller has a time limit or viewing hours.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TimeLimitStatus/limited`.
+            public var limited: Swift.Bool
+            /// Video may play now.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TimeLimitStatus/allowedNow`.
+            public var allowedNow: Swift.Bool
+            /// Minutes of video left today (only with a daily limit).
+            ///
+            /// - Remark: Generated from `#/components/schemas/TimeLimitStatus/minutesLeft`.
+            public var minutesLeft: Swift.Int?
+            /// Today's limit.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TimeLimitStatus/limitMinutes`.
+            public var limitMinutes: Swift.Int?
+            /// Minutes watched today.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TimeLimitStatus/usedMinutes`.
+            public var usedMinutes: Swift.Int?
+            /// Viewing hours (HH:MM), when set.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TimeLimitStatus/allowedFrom`.
+            public var allowedFrom: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/TimeLimitStatus/allowedUntil`.
+            public var allowedUntil: Swift.String?
+            /// Why video can't play now, to show as is (e.g. "Time's up for today", "Viewing hours are 07:00–20:00").
+            ///
+            /// - Remark: Generated from `#/components/schemas/TimeLimitStatus/reason`.
+            public var reason: Swift.String?
+            /// When video may play again, if not now.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TimeLimitStatus/resetsAt`.
+            public var resetsAt: Foundation.Date?
+            /// Creates a new `TimeLimitStatus`.
+            ///
+            /// - Parameters:
+            ///   - limited: The caller has a time limit or viewing hours.
+            ///   - allowedNow: Video may play now.
+            ///   - minutesLeft: Minutes of video left today (only with a daily limit).
+            ///   - limitMinutes: Today's limit.
+            ///   - usedMinutes: Minutes watched today.
+            ///   - allowedFrom: Viewing hours (HH:MM), when set.
+            ///   - allowedUntil:
+            ///   - reason: Why video can't play now, to show as is (e.g. "Time's up for today", "Viewing hours are 07:00–20:00").
+            ///   - resetsAt: When video may play again, if not now.
+            public init(
+                limited: Swift.Bool,
+                allowedNow: Swift.Bool,
+                minutesLeft: Swift.Int? = nil,
+                limitMinutes: Swift.Int? = nil,
+                usedMinutes: Swift.Int? = nil,
+                allowedFrom: Swift.String? = nil,
+                allowedUntil: Swift.String? = nil,
+                reason: Swift.String? = nil,
+                resetsAt: Foundation.Date? = nil
+            ) {
+                self.limited = limited
+                self.allowedNow = allowedNow
+                self.minutesLeft = minutesLeft
+                self.limitMinutes = limitMinutes
+                self.usedMinutes = usedMinutes
+                self.allowedFrom = allowedFrom
+                self.allowedUntil = allowedUntil
+                self.reason = reason
+                self.resetsAt = resetsAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case limited
+                case allowedNow
+                case minutesLeft
+                case limitMinutes
+                case usedMinutes
+                case allowedFrom
+                case allowedUntil
+                case reason
+                case resetsAt
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/VodFollowRequest`.
+        public struct VodFollowRequest: Codable, Hashable, Sendable {
+            /// This follow's own size limit in GB (10^9 bytes): once its saved episodes reach it, new ones aren't saved. 0 = none (only the DVR quota). Omitted = the server's followDefaultMaxGb (on a new follow) or unchanged.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodFollowRequest/maxGb`.
+            public var maxGb: Swift.Double?
+            /// Also save the episodes already there (from the start), not only new ones. Only on a new follow. Default false.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodFollowRequest/includeExisting`.
+            public var includeExisting: Swift.Bool?
+            /// A save folder name (VodSaveSettings.destinations) instead of the shows folder.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodFollowRequest/destination`.
+            public var destination: Swift.String?
+            /// Creates a new `VodFollowRequest`.
+            ///
+            /// - Parameters:
+            ///   - maxGb: This follow's own size limit in GB (10^9 bytes): once its saved episodes reach it, new ones aren't saved. 0 = none (only the DVR quota). Omitted = the server's followDefaultMaxGb (on a new follow) or unchanged.
+            ///   - includeExisting: Also save the episodes already there (from the start), not only new ones. Only on a new follow. Default false.
+            ///   - destination: A save folder name (VodSaveSettings.destinations) instead of the shows folder.
+            public init(
+                maxGb: Swift.Double? = nil,
+                includeExisting: Swift.Bool? = nil,
+                destination: Swift.String? = nil
+            ) {
+                self.maxGb = maxGb
+                self.includeExisting = includeExisting
+                self.destination = destination
+            }
+            public enum CodingKeys: String, CodingKey {
+                case maxGb
+                case includeExisting
+                case destination
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/VodFollow`.
+        public struct VodFollow: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/VodFollow/seriesId`.
+            public var seriesId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/VodFollow/title`.
+            public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/VodFollow/posterUrl`.
+            public var posterUrl: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/VodFollow/userId`.
+            public var userId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/VodFollow/userName`.
+            public var userName: Swift.String?
+            /// 0 = no own limit.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodFollow/maxGb`.
+            public var maxGb: Swift.Double?
+            /// Size of the episodes this follow saved that are still in the library.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodFollow/usedBytes`.
+            public var usedBytes: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/VodFollow/episodesSaved`.
+            public var episodesSaved: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/VodFollow/episodesQueued`.
+            public var episodesQueued: Swift.Int?
+            /// following, full (its size limit is reached), quota (the owner's DVR quota is full) or paused (following is off or the owner may not record). New statuses may be added.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodFollow/status`.
+            public var status: Swift.String
+            /// The status for people, e.g. "Paused: your recording space is full".
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodFollow/statusText`.
+            public var statusText: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/VodFollow/createdAt`.
+            public var createdAt: Foundation.Date
+            /// When it last queued a new episode.
+            ///
+            /// - Remark: Generated from `#/components/schemas/VodFollow/lastNewAt`.
+            public var lastNewAt: Foundation.Date?
+            /// Creates a new `VodFollow`.
+            ///
+            /// - Parameters:
+            ///   - seriesId:
+            ///   - title:
+            ///   - posterUrl:
+            ///   - userId:
+            ///   - userName:
+            ///   - maxGb: 0 = no own limit.
+            ///   - usedBytes: Size of the episodes this follow saved that are still in the library.
+            ///   - episodesSaved:
+            ///   - episodesQueued:
+            ///   - status: following, full (its size limit is reached), quota (the owner's DVR quota is full) or paused (following is off or the owner may not record). New statuses may be added.
+            ///   - statusText: The status for people, e.g. "Paused: your recording space is full".
+            ///   - createdAt:
+            ///   - lastNewAt: When it last queued a new episode.
+            public init(
+                seriesId: Swift.Int64,
+                title: Swift.String,
+                posterUrl: Swift.String? = nil,
+                userId: Swift.Int64,
+                userName: Swift.String? = nil,
+                maxGb: Swift.Double? = nil,
+                usedBytes: Swift.Int64,
+                episodesSaved: Swift.Int,
+                episodesQueued: Swift.Int? = nil,
+                status: Swift.String,
+                statusText: Swift.String? = nil,
+                createdAt: Foundation.Date,
+                lastNewAt: Foundation.Date? = nil
+            ) {
+                self.seriesId = seriesId
+                self.title = title
+                self.posterUrl = posterUrl
+                self.userId = userId
+                self.userName = userName
+                self.maxGb = maxGb
+                self.usedBytes = usedBytes
+                self.episodesSaved = episodesSaved
+                self.episodesQueued = episodesQueued
+                self.status = status
+                self.statusText = statusText
+                self.createdAt = createdAt
+                self.lastNewAt = lastNewAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case seriesId
+                case title
+                case posterUrl
+                case userId
+                case userName
+                case maxGb
+                case usedBytes
+                case episodesSaved
+                case episodesQueued
+                case status
+                case statusText
+                case createdAt
+                case lastNewAt
             }
         }
         /// - Remark: Generated from `#/components/schemas/HostInfo`.

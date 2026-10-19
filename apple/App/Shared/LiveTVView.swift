@@ -555,6 +555,8 @@ struct LiveWatchView: View {
     @State private var player = AVPlayer()
     @State private var session: String?
     @State private var error: String?
+    /// The time limit refused the channel (kids' profiles): shown full screen.
+    @State private var timeLimit: String?
     #if os(iOS)
     /// The channel overlay shown briefly after a swipe changes channel.
     @State private var overlayChannel: LiveChannel?
@@ -597,6 +599,7 @@ struct LiveWatchView: View {
             if let c = overlayChannel { channelOverlay(c).frame(maxHeight: .infinity) }
             #endif
             if let error { Text(error).foregroundStyle(.red).padding(.top, 80) }
+            if let timeLimit { TimeLimitScreen(reason: timeLimit, close: { dismiss() }) }
         }
         .task(id: current) { await tune() }
         .onDisappear { stop() }
@@ -708,6 +711,12 @@ struct LiveWatchView: View {
                 player.replaceCurrentItem(with: nil)
                 if reason.hasPrefix("Stopped:") || retried { error = reason.isEmpty ? "The stream stopped." : reason; return }
                 retried = true
+            } catch let reached as TimeLimitReached {
+                if !Task.isCancelled {
+                    TimeLimits.shared.noteReached(reached, app: app)
+                    timeLimit = reached.reason
+                }
+                return
             } catch {
                 if !Task.isCancelled { self.error = error.localizedDescription }
                 return

@@ -100,6 +100,7 @@ struct VodBrowseView: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 20) {
             controls.padding(.horizontal, sidePadding)
+            if shows { VodFollowingLink().padding(.horizontal, sidePadding) }
             if filters.isActive { activeFilters.padding(.horizontal, sidePadding) }
             if category.isEmpty, query.isEmpty, !filters.isActive {
                 VodSuggestionRow(title: "Recommended for you", list: suggestions, identifier: "vod.recommended",
@@ -866,6 +867,8 @@ struct VodPlayerView: View {
     @State private var player = AVPlayer()
     @State private var session: String?
     @State private var error: String?
+    /// The time limit refused or ended playback (kids' profiles): shown full screen.
+    @State private var timeLimit: String?
     @State private var loading = true
     @State private var closing = false
     @State private var observers: [NSObjectProtocol] = []
@@ -919,6 +922,7 @@ struct VodPlayerView: View {
                     .padding(.trailing, 40).padding(.bottom, 60)
                 }
             }
+            if let timeLimit { TimeLimitScreen(reason: timeLimit, close: close) }
         }
         .task(id: current.key) { await start() }
         .onDisappear { finish() }
@@ -988,10 +992,26 @@ struct VodPlayerView: View {
                 if Task.isCancelled { break }
                 if player.timeControlStatus == .playing { await report() }
             }
+        } catch let reached as TimeLimitReached {
+            loading = false
+            if !Task.isCancelled { reachedTimeLimit(reached) }
         } catch {
             loading = false
             if !Task.isCancelled { self.error = error.localizedDescription }
         }
+    }
+
+    /// The time limit refused or ended playback: nothing plays (the server has ended any
+    /// session), and the reason shows full screen.
+    private func reachedTimeLimit(_ reached: TimeLimitReached) {
+        TimeLimits.shared.noteReached(reached, app: app)
+        countdown = nil
+        next = nil
+        session = nil
+        player.pause()
+        player.replaceCurrentItem(with: nil)
+        error = nil
+        timeLimit = reached.reason
     }
 
     /// Reports on pause; at the end, Up Next for an episode with one after it, else back to the page.
@@ -1046,7 +1066,9 @@ struct VodPlayerView: View {
 
     private func report() async {
         guard let session, position.isFinite, position > 0 else { return }
-        await app.reportVod(session, positionMs: Int64(position * 1000), durationMs: durationMs)
+        if let reached = await app.reportVod(session, positionMs: Int64(position * 1000), durationMs: durationMs), self.session == session {
+            reachedTimeLimit(reached)
+        }
     }
 
     private func close() {

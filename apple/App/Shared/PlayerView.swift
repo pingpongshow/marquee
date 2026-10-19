@@ -48,6 +48,9 @@ struct PlayerView: View {
                 #if os(iOS)
                 if casting { CastingPanel(title: p.item?.title ?? "", close: close) }
                 #endif
+                // The time limit refused or ended playback (kids' profiles): the reason, full
+                // screen, instead of an error; nothing plays behind it.
+                if let reason = p.timeLimitReason { TimeLimitScreen(reason: reason, close: close) }
             } else {
                 ProgressView()
             }
@@ -91,7 +94,7 @@ struct PlayerView: View {
             Task { await playback?.stop() }
         }
         .onChange(of: playback?.finished) { _, done in
-            guard done == true else { return }
+            guard done == true, playback?.timeLimitReason == nil else { return }
             if trailerIndex != nil { nextTrailer(); return }
             if playback?.nextUp != nil {
                 // The rating request sits beside the countdown; autoplay carries on unless

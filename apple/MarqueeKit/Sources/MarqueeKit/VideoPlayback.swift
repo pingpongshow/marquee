@@ -32,6 +32,9 @@ public final class VideoPlayback {
     public private(set) var nextUp: Item?
     public private(set) var activeMarker: Marker?
     public private(set) var errorMessage: String?
+    /// Set when the profile's time limit or viewing hours refused or ended playback (kids'
+    /// profiles): the player shows it full screen instead of an error, with nothing playing.
+    public private(set) var timeLimitReason: String?
     public private(set) var finished = false
     public private(set) var position: Double = 0
     /// True once less than `nearEndWindow` seconds of the current video remain (its duration
@@ -84,6 +87,8 @@ public final class VideoPlayback {
     /// Set while playing a downloaded file (no server session; progress syncs later).
     @ObservationIgnored private var offline: (itemID: Int64, downloads: Downloads)?
     @ObservationIgnored private var offlineCounted = false
+    /// When a downloaded video last checked the time limit with the server.
+    @ObservationIgnored private var lastLimitCheck = Date()
     public private(set) var offlineTitle: String?
     @ObservationIgnored private static var measured: (kbps: Int, at: Date)?
     /// Set by `stop()`: a start still under way (the player closed while it loaded) ends there
@@ -154,10 +159,15 @@ public final class VideoPlayback {
         let quality = app.isRemote ? QualityPreference.remote : QualityPreference.local
         let measured = app.isRemote && quality == 0 ? await measureKbps() : nil
         do {
-            let s = try await client.startPlayback(body: .json(.init(
+            let response = try await client.startPlayback(body: .json(.init(
                 itemId: itemID, fileId: self.fileID, audioStreamId: audio, subtitleStreamId: subtitle, startMs: startMs, nightMode: chosenNightMode,
                 maxBitrateKbps: quality == 0 ? nil : quality, measuredKbps: measured,
-                subtitleOffsetMs: chosenOffsets?.subtitle, audioOffsetMs: chosenOffsets?.audio, profile: profile()))).ok.body.json
+                subtitleOffsetMs: chosenOffsets?.subtitle, audioOffsetMs: chosenOffsets?.audio, profile: profile())))
+            if case let .forbidden(e) = response, let reached = TimeLimitReached.from(try? e.body.json) {
+                await reachedTimeLimit(reached)
+                return
+            }
+            let s = try response.ok.body.json
             await stopSession()
             if stopped {
                 _ = try? await client.stopPlayback(path: .init(sessionId: s.id))
@@ -227,6 +237,14 @@ public final class VideoPlayback {
         offline = (itemID, downloads)
         offlineTitle = downloads.entries[itemID]?.item.title
         if app.client != nil { item = try? await app.item(itemID) }
+        // The time limit applies to downloads too: asked when the server can be reached, else
+        // the last answer kept on the device.
+        await TimeLimits.shared.refresh(app)
+        lastLimitCheck = Date()
+        if let reason = TimeLimits.shared.offlineRefusal(app) {
+            timeLimitReason = reason
+            return
+        }
         guard !stopped else { return }
         let playerItem = AVPlayerItem(url: file)
         playerItem.textStyleRules = app.subtitleStyle.textStyleRules
@@ -300,6 +318,32 @@ public final class VideoPlayback {
 
     // MARK: - Internals
 
+    /// The time limit refused or ended playback: nothing plays, the server session ends, and
+    /// the player shows the reason.
+    private func reachedTimeLimit(_ reached: TimeLimitReached) async {
+        TimeLimits.shared.noteReached(reached, app: app)
+        timeLimitReason = reached.reason
+        errorMessage = nil
+        offsetRestart?.cancel()
+        player.pause()
+        player.replaceCurrentItem(with: nil)
+        await stopSession()
+    }
+
+    /// A downloaded video playing while the server can be reached checks the limit every few
+    /// minutes (the server doesn't see it play, so nothing else would stop it).
+    private func checkOfflineLimit() {
+        guard offline != nil, timeLimitReason == nil, app.client != nil, Date().timeIntervalSince(lastLimitCheck) >= 300 else { return }
+        lastLimitCheck = Date()
+        Task {
+            await TimeLimits.shared.refresh(app)
+            if let reason = TimeLimits.shared.offlineRefusal(app), timeLimitReason == nil {
+                report(.paused, force: true)
+                await reachedTimeLimit(TimeLimitReached(reason: reason))
+            }
+        }
+    }
+
     private func stopSession() async {
         guard let s = session, let client = app.client else { return }
         session = nil
@@ -371,6 +415,7 @@ public final class VideoPlayback {
         let ms = Int64(seconds * 1000)
         activeMarker = session?.markers.first { ms >= $0.startMs && ms < $0.endMs - 1000 }
         if Date().timeIntervalSince(lastReport) >= 10, player.timeControlStatus == .playing { report(.playing) }
+        if player.timeControlStatus == .playing { checkOfflineLimit() }
     }
 
     private func setNearEnd(_ value: Bool) {
@@ -397,6 +442,12 @@ public final class VideoPlayback {
         if !force, Date().timeIntervalSince(lastReport) < 1 { return nil }
         lastReport = Date()
         let pos = Int64(max(0, player.currentTime().seconds) * 1000)
-        return Task { _ = try? await client.reportPlayback(path: .init(sessionId: s.id), body: .json(.init(positionMs: pos, state: state))) }
+        return Task { [weak self] in
+            // A session running when the time runs out ends: its reports answer 403 time_limit.
+            guard case let .undocumented(code, payload)? = try? await client.reportPlayback(path: .init(sessionId: s.id), body: .json(.init(positionMs: pos, state: state))),
+                  let reached = await TimeLimitReached.from(statusCode: code, payload: payload),
+                  let self, self.session?.id == s.id else { return }
+            await self.reachedTimeLimit(reached)
+        }
     }
 }

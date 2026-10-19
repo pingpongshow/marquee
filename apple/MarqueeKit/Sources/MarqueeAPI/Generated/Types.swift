@@ -585,6 +585,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /remote/players/{deviceId}/commands`.
     /// - Remark: Generated from `#/paths//remote/players/{deviceId}/commands/post(sendRemoteCommand)`.
     func sendRemoteCommand(_ input: Operations.SendRemoteCommand.Input) async throws -> Operations.SendRemoteCommand.Output
+    /// The caller's time limit today (kids' profiles): whether video may play now and how much is left. Starting playback past the limit or outside the viewing hours is refused with 403 and error code time_limit, and a session running when the time runs out ends (its progress reports answer 403 time_limit).
+    ///
+    /// - Remark: HTTP `GET /me/time-limit`.
+    /// - Remark: Generated from `#/paths//me/time-limit/get(myTimeLimit)`.
+    func myTimeLimit(_ input: Operations.MyTimeLimit.Input) async throws -> Operations.MyTimeLimit.Output
     /// Your year in music (MUSIC-22).
     ///
     /// - Remark: HTTP `GET /me/recap`.
@@ -990,6 +995,21 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /livetv/vod/series/continue`.
     /// - Remark: Generated from `#/paths//livetv/vod/series/continue/get(vodSeriesContinueWatching)`.
     func vodSeriesContinueWatching(_ input: Operations.VodSeriesContinueWatching.Input) async throws -> Operations.VodSeriesContinueWatching.Output
+    /// Followed series on demand: new episodes are saved to the library automatically. The caller's own follows; admins see everyone's (all=true).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/follows`.
+    /// - Remark: Generated from `#/paths//livetv/vod/follows/get(listVodFollows)`.
+    func listVodFollows(_ input: Operations.ListVodFollows.Input) async throws -> Operations.ListVodFollows.Output
+    /// Follow a series on demand (or change a follow): its new episodes are saved to the library through the download queue as they appear, within the follow's size limit and the caller's DVR quota (saved episodes count towards it like recordings). Needs following turned on (VodSaveSettings.followEnabled), a shows folder, on-demand access and the may-record permission (admins always may). 409 when following is off.
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/series/{seriesId}/follow`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/follow/put(followVodSeries)`.
+    func followVodSeries(_ input: Operations.FollowVodSeries.Input) async throws -> Operations.FollowVodSeries.Output
+    /// Stop following (episodes already saved stay in the library). Admins may remove anyone's follow with userId.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/series/{seriesId}/follow`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/follow/delete(unfollowVodSeries)`.
+    func unfollowVodSeries(_ input: Operations.UnfollowVodSeries.Input) async throws -> Operations.UnfollowVodSeries.Output
     /// A series with its seasons and episodes (and the caller's progress in each). Episodes are fetched from the source the first time a series is opened and again once 12 hours old, so this can take a few seconds.
     ///
     /// - Remark: HTTP `GET /livetv/vod/series/{seriesId}`.
@@ -2802,6 +2822,13 @@ extension APIProtocol {
             body: body
         ))
     }
+    /// The caller's time limit today (kids' profiles): whether video may play now and how much is left. Starting playback past the limit or outside the viewing hours is refused with 403 and error code time_limit, and a session running when the time runs out ends (its progress reports answer 403 time_limit).
+    ///
+    /// - Remark: HTTP `GET /me/time-limit`.
+    /// - Remark: Generated from `#/paths//me/time-limit/get(myTimeLimit)`.
+    public func myTimeLimit(headers: Operations.MyTimeLimit.Input.Headers = .init()) async throws -> Operations.MyTimeLimit.Output {
+        try await myTimeLimit(Operations.MyTimeLimit.Input(headers: headers))
+    }
     /// Your year in music (MUSIC-22).
     ///
     /// - Remark: HTTP `GET /me/recap`.
@@ -3742,6 +3769,49 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//livetv/vod/series/continue/get(vodSeriesContinueWatching)`.
     public func vodSeriesContinueWatching(headers: Operations.VodSeriesContinueWatching.Input.Headers = .init()) async throws -> Operations.VodSeriesContinueWatching.Output {
         try await vodSeriesContinueWatching(Operations.VodSeriesContinueWatching.Input(headers: headers))
+    }
+    /// Followed series on demand: new episodes are saved to the library automatically. The caller's own follows; admins see everyone's (all=true).
+    ///
+    /// - Remark: HTTP `GET /livetv/vod/follows`.
+    /// - Remark: Generated from `#/paths//livetv/vod/follows/get(listVodFollows)`.
+    public func listVodFollows(
+        query: Operations.ListVodFollows.Input.Query = .init(),
+        headers: Operations.ListVodFollows.Input.Headers = .init()
+    ) async throws -> Operations.ListVodFollows.Output {
+        try await listVodFollows(Operations.ListVodFollows.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Follow a series on demand (or change a follow): its new episodes are saved to the library through the download queue as they appear, within the follow's size limit and the caller's DVR quota (saved episodes count towards it like recordings). Needs following turned on (VodSaveSettings.followEnabled), a shows folder, on-demand access and the may-record permission (admins always may). 409 when following is off.
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/series/{seriesId}/follow`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/follow/put(followVodSeries)`.
+    public func followVodSeries(
+        path: Operations.FollowVodSeries.Input.Path,
+        headers: Operations.FollowVodSeries.Input.Headers = .init(),
+        body: Operations.FollowVodSeries.Input.Body
+    ) async throws -> Operations.FollowVodSeries.Output {
+        try await followVodSeries(Operations.FollowVodSeries.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Stop following (episodes already saved stay in the library). Admins may remove anyone's follow with userId.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/series/{seriesId}/follow`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/follow/delete(unfollowVodSeries)`.
+    public func unfollowVodSeries(
+        path: Operations.UnfollowVodSeries.Input.Path,
+        query: Operations.UnfollowVodSeries.Input.Query = .init(),
+        headers: Operations.UnfollowVodSeries.Input.Headers = .init()
+    ) async throws -> Operations.UnfollowVodSeries.Output {
+        try await unfollowVodSeries(Operations.UnfollowVodSeries.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
     }
     /// A series with its seasons and episodes (and the caller's progress in each). Episodes are fetched from the source the first time a series is opened and again once 12 hours old, so this can take a few seconds.
     ///

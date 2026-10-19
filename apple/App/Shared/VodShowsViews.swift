@@ -197,6 +197,7 @@ struct VodSeriesView: View {
                 .accessibilityLabel("Rating \(String(format: "%.1f", r))")
             }
             actions(s).padding(.top, 6)
+            VodFollowControl(show: s) // new episodes saved automatically
         }
         return Group {
             if isTV {

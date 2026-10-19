@@ -22,6 +22,9 @@ struct MarqueeApp: App {
     #if os(iOS)
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var downloads: Downloads
+    /// Smart downloads: next episodes and favourite music kept on the device.
+    @State private var smart: SmartDownloads
+    @Environment(\.scenePhase) private var scenePhase
     #endif
 
     init() {
@@ -41,6 +44,7 @@ struct MarqueeApp: App {
         player.downloads = dl
         AppDelegate.downloads = dl
         _downloads = State(initialValue: dl)
+        _smart = State(initialValue: SmartDownloads(downloads: dl))
         Shared.app = session
         Shared.music = player
         Shared.downloads = dl
@@ -55,13 +59,24 @@ struct MarqueeApp: App {
                 .environment(music)
                 #if os(iOS)
                 .environment(downloads)
+                .environment(smart)
                 .tint(.accentColor) // tvOS keeps the system's white focus style
-                .onChange(of: app.state, initial: true) { if app.state == .signedIn { downloads.attach(app) } }
-                .onChange(of: app.client == nil) { if app.client != nil { downloads.attach(app) } }
+                .onChange(of: app.state, initial: true) { if app.state == .signedIn { downloads.attach(app); runSmart() } }
+                .onChange(of: app.client == nil) { if app.client != nil { downloads.attach(app); runSmart() } }
+                // No background refresh: smart downloads catch up whenever the app comes back.
+                .onChange(of: scenePhase) { old, new in if old != new, new == .active { runSmart() } }
+                .onChange(of: app.me?.id) { runSmart() }
                 #endif
                 .preferredColorScheme(.dark)
         }
     }
+
+    #if os(iOS)
+    private func runSmart() {
+        guard app.state == .signedIn, app.client != nil, app.me != nil else { return }
+        Task { await smart.run(app) }
+    }
+    #endif
 }
 
 /// Server → sign-in → app.

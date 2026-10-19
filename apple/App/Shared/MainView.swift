@@ -32,6 +32,7 @@ struct MainView: View {
     #if os(iOS)
     /// iPhone: the profiles, opened from the avatar on Home.
     @State private var showProfiles = false
+    @Environment(SmartDownloads.self) private var smart
     #endif
 
     var body: some View {
@@ -137,6 +138,10 @@ struct MainView: View {
         // A video played: its watched state is the server's again.
         .onChange(of: video.request) { old, new in
             if new == nil, let old { WatchStore.shared.played(old.itemID) }
+            #if os(iOS)
+            // A video ended: a watched episode smart downloads fetched goes, the next one comes.
+            if new == nil, old != nil { Task { try? await Task.sleep(for: .seconds(3)); await smart.run(app) } }
+            #endif
         }
         .onDisappear { RemoteReceiver.shared.stop() }
         // Again whenever the connection changes (another address, reconnected, signed in).

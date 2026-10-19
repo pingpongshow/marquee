@@ -91,7 +91,9 @@ public extension AppSession {
             let s = try ok.body.json
             guard let url = absolute(s.url) else { throw MarqueeError("Not connected") }
             return (s.id, url, s.startMs ?? 0)
-        case let .forbidden(e): throw MarqueeError((try? e.body.json.message) ?? "This movie isn't available on this profile")
+        case let .forbidden(e):
+            if let reached = TimeLimitReached.from(try? e.body.json) { throw reached }
+            throw MarqueeError((try? e.body.json.message) ?? "This movie isn't available on this profile")
         case .notFound: throw MarqueeError("That movie isn't available any more")
         case let .badGateway(e): throw MarqueeError(Self.vodFailed((try? e.body.json.message), what: "movie"))
         case .serviceUnavailable: throw MarqueeError(Self.vodBusy)
@@ -109,7 +111,9 @@ public extension AppSession {
             let s = try ok.body.json
             guard let url = absolute(s.url) else { throw MarqueeError("Not connected") }
             return (s.id, url, s.startMs ?? 0)
-        case let .forbidden(e): throw MarqueeError((try? e.body.json.message) ?? "This show isn't available on this profile")
+        case let .forbidden(e):
+            if let reached = TimeLimitReached.from(try? e.body.json) { throw reached }
+            throw MarqueeError((try? e.body.json.message) ?? "This show isn't available on this profile")
         case .notFound: throw MarqueeError("That episode isn't available any more")
         case let .badGateway(e): throw MarqueeError(Self.vodFailed((try? e.body.json.message), what: "episode"))
         case .serviceUnavailable: throw MarqueeError(Self.vodBusy)
@@ -126,8 +130,12 @@ public extension AppSession {
     }
 
     /// Where the viewer is, so the film resumes there (and counts as watched near the end).
-    func reportVod(_ session: String, positionMs: Int64, durationMs: Int64?) async {
-        _ = try? await vodAPI.reportVodPlayback(path: .init(sessionId: session), body: .json(.init(positionMs: positionMs, durationMs: durationMs)))
+    /// Returns the time limit when it has run out (the session has ended on the server).
+    @discardableResult
+    func reportVod(_ session: String, positionMs: Int64, durationMs: Int64?) async -> TimeLimitReached? {
+        guard case let .undocumented(code, payload)? = try? await vodAPI.reportVodPlayback(
+            path: .init(sessionId: session), body: .json(.init(positionMs: positionMs, durationMs: durationMs))) else { return nil }
+        return await TimeLimitReached.from(statusCode: code, payload: payload)
     }
 
     func stopVod(_ session: String) async {

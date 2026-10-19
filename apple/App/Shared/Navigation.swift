@@ -22,6 +22,8 @@ enum Route: Hashable {
     case vodMovie(Int64)
     /// A show on demand (LIVE-6).
     case vodSeries(Int64)
+    /// The shows on demand the person follows (new episodes saved automatically).
+    case vodFollowing
     /// Every Continue Watching entry, library and on demand (Home's row's View more).
     case continueWatching
     case moodStyle(library: Int64, mood: Bool, name: String)
@@ -40,6 +42,8 @@ enum SettingsPage: Hashable {
     case stats, requests, users, cinema, librarySettings, libraryHealth, integrations, editHome, subtitleAppearance, remotePlayers
     /// The music equaliser (iPhone/iPad).
     case equalizer
+    /// Smart downloads (iPhone/iPad): next episodes and favourite music kept on the device.
+    case smartDownloads
 }
 
 /// The full lists behind a music library's landing page.
@@ -90,6 +94,7 @@ private func routeView(_ route: Route) -> some View {
     case .vodRecommended(let series): VodRecommendedView(series: series)
     case .vodMovie(let id): VodMovieView(id: id)
     case .vodSeries(let id): VodSeriesView(id: id)
+    case .vodFollowing: VodFollowingView()
     case .continueWatching: ContinueWatchingView()
     case let .moodStyle(library, mood, name): MoodStyleView(libraryID: library, kind: mood ? .mood : .style, name: name)
     case let .museVideo(library): VideoMuseView(libraryID: library)
@@ -126,8 +131,9 @@ private func settingsPage(_ page: SettingsPage) -> some View {
     case .integrations: IntegrationsView()
     case .remotePlayers: RemotePlayersView()
     case .equalizer: EqualizerView()
+    case .smartDownloads: SmartDownloadsSettingsView()
     #else
-    case .librarySettings, .libraryHealth, .integrations, .remotePlayers, .equalizer: EmptyView()
+    case .librarySettings, .libraryHealth, .integrations, .remotePlayers, .equalizer, .smartDownloads: EmptyView()
     #endif
     }
 }

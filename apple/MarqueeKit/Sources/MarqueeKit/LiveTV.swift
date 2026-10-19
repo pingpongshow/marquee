@@ -72,7 +72,9 @@ public extension AppSession {
             guard let url = absolute(s.url) else { throw MarqueeError("Not connected") }
             return (s.id, url)
         case let .badGateway(e): throw MarqueeError((try? e.body.json.message) ?? "The channel isn't available right now")
-        case let .forbidden(e): throw MarqueeError((try? e.body.json.message) ?? "Live TV isn't available here")
+        case let .forbidden(e):
+            if let reached = TimeLimitReached.from(try? e.body.json) { throw reached }
+            throw MarqueeError((try? e.body.json.message) ?? "Live TV isn't available here")
         // no_tuner: every connection to the channel's source is in use.
         case let .conflict(e): throw MarqueeError((try? e.body.json.message) ?? "No connection is free for this channel right now")
         default: throw MarqueeError("Couldn't tune the channel")

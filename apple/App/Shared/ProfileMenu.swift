@@ -30,6 +30,7 @@ struct ProfilesPage: View {
                 if let target {
                     entry(target)
                 } else {
+                    TimeLeftLabel() // "45 min left today" for a profile with a time limit
                     picker
                     if onAccountSettings != nil || showsSignOut { accountButtons }
                 }

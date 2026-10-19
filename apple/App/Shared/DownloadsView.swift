@@ -19,6 +19,7 @@ struct DownloadsView: View {
                 Label("You're offline. Downloads play without the server; what you watch syncs when you're back.", systemImage: "wifi.slash")
                     .font(.footnote).foregroundStyle(.secondary)
             }
+            SmartDownloadsSection()
             if !busy.isEmpty {
                 Section("In progress") { ForEach(busy) { row($0) } }
             }
@@ -54,7 +55,13 @@ struct DownloadsView: View {
                 poster(e)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(e.item.title).font(.body.weight(.medium)).lineLimit(1)
-                    Text(subtitle(e)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    HStack(spacing: 4) {
+                        if e.smart != nil {
+                            Image(systemName: "sparkles").accessibilityLabel("Smart download")
+                        }
+                        Text(subtitle(e))
+                    }
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     status(e)
                 }
                 Spacer(minLength: 0)
@@ -142,6 +149,10 @@ struct DownloadButton: View {
     @ViewBuilder private var single: some View {
         if let e = downloads.entries[item.id] {
             Menu {
+                if e.smart != nil {
+                    // A smart download becomes the person's own: never removed automatically.
+                    Button("Keep Download", systemImage: "pin") { downloads.markSmart(item.id, kind: nil, owner: nil) }
+                }
                 Button("Delete Download", systemImage: "trash", role: .destructive) { downloads.remove(item.id) }
             } label: {
                 switch e.state {

@@ -4,6 +4,9 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
+    #if os(iOS)
+    @Environment(SmartDownloads.self) private var smart
+    #endif
     @State private var local = QualityPreference.local
     @State private var remote = QualityPreference.remote
     @State private var switching = false
@@ -130,6 +133,16 @@ struct SettingsView: View {
                 Text("Audio quality shows each track's format, such as FLAC · 24-bit/96 kHz, in Now Playing and track lists.")
             }
             #if os(iOS)
+            Section {
+                NavigationLink(value: Route.settings(.smartDownloads)) {
+                    LabeledContent("Smart downloads", value: smart.settings.showsEnabled || smart.settings.musicEnabled ? "On" : "Off")
+                }
+                .accessibilityIdentifier("settings.smartDownloads")
+            } header: {
+                Text("Downloads")
+            } footer: {
+                Text("Keeps the next episodes of the shows you're watching, and your favourite music, on this device.")
+            }
             Section {
                 HStack {
                     TextField("Code shown on the TV", text: $linkCode)

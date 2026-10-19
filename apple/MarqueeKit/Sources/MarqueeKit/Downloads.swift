@@ -51,6 +51,10 @@ public final class Downloads {
         public var albumGainDb: Double?
         public var peak: Double?
         public var gainsChecked: Bool?
+        /// Downloaded by smart downloads ("shows" or "music"), for the person in `smartOwner`
+        /// ("server|user"): smart downloads may remove it again; downloads made by hand never are.
+        public var smart: String?
+        public var smartOwner: String?
     }
 
     /// A play made while offline, from the queue Downloads kept before offline sync (USER-18)
@@ -255,6 +259,15 @@ public final class Downloads {
         for it in items where entries[it.id] == nil {
             try? await download(it, quality: quality)
         }
+    }
+
+    /// Tags a download as smart downloads' (kind "shows" or "music"), or clears the tag (nil):
+    /// a download someone asks for by hand stops being smart downloads' to remove.
+    public func markSmart(_ itemID: Int64, kind: String?, owner: String?) {
+        guard entries[itemID] != nil else { return }
+        entries[itemID]?.smart = kind
+        entries[itemID]?.smartOwner = kind == nil ? nil : owner
+        save()
     }
 
     public func remove(_ itemID: Int64) {
