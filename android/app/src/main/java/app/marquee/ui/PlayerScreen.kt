@@ -104,8 +104,6 @@ import app.marquee.api.models.MediaStream
 import app.marquee.api.models.PlaybackProgress
 import app.marquee.api.models.PlaybackRequest
 import app.marquee.api.models.PlaybackSession
-import app.marquee.api.models.RemoteCommand
-import app.marquee.api.models.RemotePlayerState
 import app.marquee.core.AndroidProfile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -173,7 +171,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     var settings by remember { mutableStateOf(false) }
     var lastTouch by remember { mutableIntStateOf(0) } // bumps keep the controls up
     var scrub by remember { mutableStateOf<Long?>(null) }
-    // A dialog opened from the controls (Cast, Play on): the controls stay up while it's open.
+    // A dialog opened from the controls (Cast): the controls stay up while it's open.
     var menuOpen by remember { mutableStateOf(false) }
     // Set while the video plays on a Cast device (D82); the local player stays idle then.
     var casting by remember { mutableStateOf(false) }
@@ -195,10 +193,12 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     var roll by remember { mutableIntStateOf(-1) }
     // Bumped by a timing change; the session restarts once the stepping stops.
     var timingChange by remember { mutableIntStateOf(0) }
-    // The end screen (USER-19): the next video's countdown with a rating request beside it.
+    // Up Next, once the video has finished: the next one's countdown, with a rating request (USER-19) under its details.
     var endNext by remember { mutableStateOf<Long?>(null) }
+    var nextDetail by remember { mutableStateOf<ItemDetail?>(null) }
+    var endBackdrop by remember { mutableStateOf<Long?>(null) }
     var endPrompt by remember { mutableStateOf<app.marquee.core.RatingRequest?>(null) }
-    var countdown by remember { mutableIntStateOf(10) }
+    var countdown by remember { mutableIntStateOf(UP_NEXT_SECONDS) }
     var countdownHeld by remember { mutableStateOf(false) }
     // Set once the end was dealt with, so closing the player doesn't ask again.
     val endHandled = remember { booleanArrayOf(false) }
@@ -416,14 +416,23 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                 marquee.scope.launch(Dispatchers.Main) {
                     val next = upNext()
                     if (!stillShowing()) return@launch
-                    if (next != null && d != null) {
-                        // The stars sit beside the countdown; ignored, the next one still plays.
+                    if (next != null) {
+                        // Its details for the Up Next screen, and the show's art behind it.
+                        val cur = detail
+                        val (nd, show) = withContext(Dispatchers.IO) {
+                            val n = async { runCatching { marquee.items.getItem(next) }.getOrNull() }
+                            val sh = async { cur?.grandparentId?.takeIf { cur.images?.backdrop == null }?.let { runCatching { marquee.items.getItem(it) }.getOrNull() } }
+                            n.await() to sh.await()
+                        }
+                        if (!stillShowing()) return@launch
+                        // The stars sit under the next one's details; ignored, the next one still plays.
                         controls = false
-                        endPrompt = ratingRequestFor(marquee, d)
-                        countdown = 10
+                        nextDetail = nd
+                        endBackdrop = cur?.images?.backdrop ?: show?.images?.backdrop ?: nd?.images?.backdrop ?: nd?.images?.thumb
+                        endPrompt = d?.let { ratingRequestFor(marquee, it) }
+                        countdown = UP_NEXT_SECONDS
                         endNext = next
-                    } else if (next != null) playNext(next)
-                    else {
+                    } else {
                         d?.let { marquee.requestRating(ratingRequestFor(marquee, it)) }
                         nav.popBackStack()
                     }
@@ -492,59 +501,6 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
         // Only clears its own hand-off: the next episode's player may have set one already.
         onDispose { if (marquee.cast.onFinished === onCastFinished) marquee.cast.onFinished = null }
     }
-    // Remote control (USER-14): this player obeys the person's other apps while it's showing.
-    val remote = LocalRemote.current
-    DisposableEffect(Unit) {
-        val target = object : app.marquee.core.RemoteVideo {
-            override fun state(): RemotePlayerState {
-                val d = detail
-                val st = when {
-                    error != null -> RemotePlayerState.State.STOPPED
-                    player.isPlaying -> RemotePlayerState.State.PLAYING
-                    player.playWhenReady && player.playbackState == Player.STATE_BUFFERING -> RemotePlayerState.State.BUFFERING
-                    else -> RemotePlayerState.State.PAUSED
-                }
-                val sub = choice.subtitle ?: session?.subtitleStreamId
-                return RemotePlayerState(
-                    state = st, positionMs = player.currentPosition.coerceAtLeast(0), itemId = itemId, itemType = d?.type,
-                    title = d?.title,
-                    subtitle = d?.let { if (it.type == ItemType.EPISODE) listOfNotNull(it.grandparentTitle, it.parentTitle, it.index?.let { i -> "E$i" }).joinToString(" · ") else it.year?.toString() },
-                    artItemId = if (d?.type == ItemType.EPISODE) d.grandparentId ?: itemId else itemId,
-                    durationMs = player.duration.takeIf { it > 0 },
-                    volume = player.volume.toDouble(),
-                    audioStreamId = choice.audio ?: session?.audioStreamId,
-                    subtitleStreamId = if (sub == null || sub == -1L) -1L else sub,
-                )
-            }
-
-            override fun execute(c: RemoteCommand) {
-                when (c.type) {
-                    RemoteCommand.Type.PAUSE -> player.pause()
-                    RemoteCommand.Type.RESUME -> player.play()
-                    RemoteCommand.Type.SEEK -> c.positionMs?.let { player.seekTo(it) }
-                    RemoteCommand.Type.STOP -> if (stillShowing()) nav.popBackStack()
-                    RemoteCommand.Type.PREVIOUS -> player.seekTo(0)
-                    RemoteCommand.Type.NEXT -> marquee.scope.launch(Dispatchers.Main) {
-                        val next = upNext()
-                        if (next != null && stillShowing()) nav.navigate("player/$next?start=0") { popUpTo("player/{id}?start={start}&group={group}") { inclusive = true } }
-                    }
-                    RemoteCommand.Type.SET_VOLUME -> c.volume?.let { player.volume = it.toFloat().coerceIn(0f, 1f) }
-                    RemoteCommand.Type.SET_AUDIO, RemoteCommand.Type.SET_SUBTITLE -> if (local == null) {
-                        val id = c.streamId ?: return
-                        val next = if (c.type == RemoteCommand.Type.SET_AUDIO) choice.copy(audio = id) else choice.copy(subtitle = if (id < 0) -1 else id)
-                        choice = next
-                        val at = player.currentPosition
-                        scope.launch { start(at, next) }
-                    }
-                    else -> {}
-                }
-                poke()
-            }
-        }
-        remote.video = target
-        onDispose { if (remote.video === target) remote.video = null }
-    }
-
     fun seekBy(ms: Long) {
         val target = ((scrub ?: player.currentPosition) + ms).coerceIn(0, duration.coerceAtLeast(1))
         scrub = target
@@ -553,7 +509,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
     fun commitScrub() { scrub?.let { player.seekTo(it) }; scrub = null; poke() }
 
     val rootFocus = remember { FocusRequester() }
-    LaunchedEffect(controls, settings) { if (!controls && !settings) runCatching { rootFocus.requestFocus() } }
+    LaunchedEffect(controls, settings) { if (!controls && !settings && endNext == null) runCatching { rootFocus.requestFocus() } }
 
     Box(
         Modifier.fillMaxSize().background(Color.Black)
@@ -623,10 +579,6 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
                         }
                     }
                     if (local == null && roll < 0) CastButton(onOpenChange = { menuOpen = it; poke() })
-                    // Play on another Marquee app (USER-14): hands over at this position, then pauses here.
-                    if (local == null && roll < 0) PlayOnButton(nav, handoff = {
-                        RemoteCommand(RemoteCommand.Type.PLAY, itemIds = listOf(itemId), startMs = player.currentPosition)
-                    }, onSent = { player.pause() }, onOpenChange = { menuOpen = it; poke() })
                     if (local == null && roll < 0) IconButton({ settings = true; poke() }, Modifier.focusRing()) { Icon(Icons.Filled.Settings, "Playback settings", tint = Color.White) }
                 }
                 // Middle: back 10, play/pause, forward 30.
@@ -664,19 +616,20 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             }
         }
 
-        // The end screen (USER-19): Up Next's countdown, and the rating request beside it.
+        // Up Next: the video just watched, the next one's countdown and details, and the rating request (USER-19).
         endNext?.let { next ->
-            Column(
-                Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.65f)).padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically), horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(if (countdownHeld) "Up next" else "Up next in ${countdown}s", color = Color.White, style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold, modifier = Modifier.semantics { contentDescription = "Up next countdown" })
-                Button({ playNext(next) }, Modifier.focusRing().initialFocus(marquee.isTv && endPrompt == null)) { Text("Play next") }
-                endPrompt?.let { p ->
-                    RatingPromptCard(p, onDone = { endPrompt = null; countdownHeld = false }, onInteract = { countdownHeld = true })
-                }
-            }
+            UpNextScreen(
+                previous = upNextEntry(detail),
+                next = upNextEntry(nextDetail),
+                backdropUrl = marquee.imageUrl(endBackdrop, 960),
+                seconds = countdown, held = countdownHeld,
+                onPlayNext = { playNext(next) },
+                onReplay = { playNext(itemId) },
+                onCancel = { if (stillShowing()) nav.popBackStack() },
+                extra = endPrompt?.let { p -> {
+                    RatingPromptCard(p, onDone = { endPrompt = null; countdownHeld = false }, Modifier.padding(top = 12.dp), onInteract = { countdownHeld = true })
+                } },
+            )
         }
 
         groupError?.let { Text(it, Modifier.align(Alignment.TopCenter).padding(top = 72.dp), color = MaterialTheme.colorScheme.error) }
@@ -737,6 +690,19 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             }
         }
     }
+}
+
+/** A library video for the Up Next screen: an episode's show, season and number, or a film's year. */
+@Composable
+private fun upNextEntry(d: ItemDetail?): UpNextEntry {
+    val marquee = LocalMarquee.current
+    if (d == null) return UpNextEntry(null, "", null, null)
+    val episode = d.type == ItemType.EPISODE
+    // Seasons are known by their titles here ("Season 5", "Specials").
+    val season = d.parentTitle?.let { t -> Regex("\\d+").find(t)?.value?.toIntOrNull() ?: if (t.startsWith("Special", ignoreCase = true)) 0 else null }
+    val label = if (episode) episodeLabel(season, d.index) ?: d.parentTitle?.uppercase() else d.year?.toString()
+    val image = if (episode) d.images?.thumb ?: d.images?.backdrop else d.images?.backdrop ?: d.images?.thumb ?: d.images?.poster
+    return UpNextEntry(if (episode) d.grandparentTitle else null, d.title, label, marquee.imageUrl(image, 480) ?: marquee.imageUrl(d.images?.poster, 240), d.summary)
 }
 
 /** Times and a slider; while scrubbing, the preview frame floats above the thumb. */

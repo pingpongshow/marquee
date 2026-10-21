@@ -73,6 +73,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import app.marquee.api.models.HomeEntry
 import app.marquee.api.models.Hub
 import app.marquee.api.models.ItemSummary
 import app.marquee.api.models.ItemType
@@ -120,7 +121,7 @@ fun HomeScreen(nav: NavHostController) {
     // Watch on VOD's title opens VOD Movies while it's listed.
     val vodMovies by marquee.vodMovies.collectAsState()
     LaunchedEffect(connection, changes, vodChanged, favoriteChanges) {
-        val fresh = withContext(Dispatchers.IO) { runCatching { marquee.hubs.homeHubs(vod = true) } }
+        val fresh = withContext(Dispatchers.IO) { runCatching { marquee.hubs.homeHubs(vod = true, mixed = true) } }
         if (fresh.isSuccess || hubsState.value?.isSuccess != true) { hubsState.value = fresh; if (fresh.isSuccess) removed.clear() }
     }
     val cardWidth = if (marquee.isTv) 130.dp else 120.dp
@@ -174,7 +175,14 @@ fun HomeScreen(nav: NavHostController) {
                         onOpen = { k -> openedKey = k; opened = null }, onRemoved = { k -> removed.add(k) })
                     return@itemsIndexed
                 }
+                // Suggestion rows with films and series on demand mixed in (Recommended, holidays, Top Rated, genres).
+                hub.mixedEntries?.let { entries ->
+                    MixedRow(nav, hub, entries, cardWidth, focusFirst = first, opened = opened, openedKey = openedKey,
+                        onOpenItem = { id -> opened = id; openedKey = null }, onOpenVod = { k -> openedKey = "vodsug:$k"; opened = null })
+                    return@itemsIndexed
+                }
                 // Watch on VOD: films and series on demand picked for this person (LIVE-6, USER-16), hidden when empty.
+                // Older servers only: asking for mixed rows leaves it out.
                 hub.vodEntries?.let { vod ->
                     VodSuggestionRow(nav, hub.title, vod, autoFocusKey = openedKey?.takeIf { it.startsWith("vodsug:") }?.removePrefix("vodsug:")
                         ?: if (first) vod.firstOrNull()?.key else null,
@@ -189,6 +197,41 @@ fun HomeScreen(nav: NavHostController) {
                         actions = tileActions(it, nav = nav))
                 }
             }
+        }
+    }
+}
+
+/**
+ * A Home row of library titles and films and series on demand together, best first: library
+ * tiles open the item, VOD ones (marked with a VOD pill) the film's or show's page, with Not
+ * interested in their menu. Nothing when every entry is gone.
+ */
+@Composable
+private fun MixedRow(nav: NavHostController, hub: Hub, entries: List<HomeEntry>, cardWidth: androidx.compose.ui.unit.Dp, focusFirst: Boolean,
+    opened: Long?, openedKey: String?, onOpenItem: (Long) -> Unit, onOpenVod: (String) -> Unit) {
+    val marquee = LocalMarquee.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val hidden = remember { mutableStateListOf<String>() }
+    val shown = entries.filter { e ->
+        e.key !in hidden && when (e.kind) {
+            HomeEntry.Kind.ITEM -> e.item != null
+            HomeEntry.Kind.VOD -> e.vod?.let(::vodRoute) != null
+        }
+    }
+    if (shown.isEmpty()) return
+    val vodOpened = openedKey?.takeIf { it.startsWith("vodsug:") }?.removePrefix("vodsug:")
+    Shelf(hub.title, shown, sidePadding, onTitle = HomeRows.route(hub.id)?.let { r -> { nav.navigate(r) } }) { i, e ->
+        val focus = marquee.isTv && when {
+            opened != null -> e.item?.id == opened
+            vodOpened != null -> e.vod?.key == vodOpened
+            else -> focusFirst && i == 0
+        }
+        val item = e.item
+        val vod = e.vod
+        if (item != null) PosterCard(item, marquee.imageUrl(item.images?.poster, 300), cardWidth, { onOpenItem(item.id); openItem(nav, item) },
+            shape = shapeFor(item), autoFocus = focus, actions = tileActions(item, nav = nav))
+        else if (vod != null) VodSuggestionTile(nav, vod, cardWidth, autoFocus = focus, badge = true, onOpen = { onOpenVod(vod.key) }) {
+            hideVodSuggestion(marquee, context, vod, onHidden = { hidden.add(e.key) }, onFailed = { hidden.remove(e.key) })
         }
     }
 }
@@ -549,8 +592,6 @@ fun SettingsScreen(nav: NavHostController) {
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { nav.navigate("stats") }) { Text("Your Stats") }
             OutlinedButton(onClick = { nav.navigate("subtitles") }) { Text("Subtitle appearance") }
-            // Control Marquee on another screen (USER-14); TVs are players only.
-            if (!marquee.isTv) OutlinedButton(onClick = { nav.navigate("remote") }) { Text("Remote") }
             if (me?.isAdmin == true && !marquee.isTv) OutlinedButton(onClick = { nav.navigate("health") }) { Text("Library Health") }
             if (me?.isAdmin == true) OutlinedButton(onClick = { nav.navigate("approvals") }) { Text("Requests") }
             if (me?.isAdmin == true) OutlinedButton(onClick = { nav.navigate("users") }) { Text("Users & sharing") }

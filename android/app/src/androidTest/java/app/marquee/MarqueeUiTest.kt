@@ -1341,14 +1341,15 @@ class MarqueeUiTest {
         assumeTrue("phones", !isTv)
         connectAndSignIn()
         playMovie("31 Ocean", fromStart = true)
-        // It's two seconds long: held paused at the start (through the remote-control hook) so the player stays.
-        val application = context.applicationContext as MarqueeApplication
-        val inst = InstrumentationRegistry.getInstrumentation()
-        rule.waitUntil(15_000) { var on = false; inst.runOnMainSync { on = application.remote.video != null }; on }
+        // It's two seconds long: held paused at the start (with the player's own Pause) so the player stays.
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Video player"), 15_000)
         // Keeps pausing while the stream starts (starting it sets play again).
         val until = System.currentTimeMillis() + 6_000
         while (System.currentTimeMillis() < until) {
-            inst.runOnMainSync { application.remote.video?.execute(app.marquee.api.models.RemoteCommand(app.marquee.api.models.RemoteCommand.Type.PAUSE)) }
+            runCatching {
+                if (rule.onAllNodes(hasContentDescription("Pause")).fetchSemanticsNodes().isNotEmpty()) rule.onAllNodes(hasContentDescription("Pause")).onFirst().performClick()
+                else if (rule.onAllNodes(hasContentDescription("Close player")).fetchSemanticsNodes().isEmpty()) rule.onNode(hasContentDescription("Video player")).performClick()
+            }
             Thread.sleep(40)
         }
         openPlayerSettings()
@@ -1380,161 +1381,6 @@ class MarqueeUiTest {
         }
         back() // the panel
         back() // the player
-    }
-
-    /**
-     * Two devices of a temporary user, signed in through the API, once they list each other as
-     * remote players (each polls its inbox once). Tries again with new devices if they don't.
-     */
-    private class Devices(val a: String, val b: String, val nameA: String, val nameB: String)
-
-    private fun playerPair(u: TempUser, a: Pair<String, String>, b: Pair<String, String>): Devices {
-        repeat(6) { n ->
-            // Later tries get their own names, so a rejected try's devices can't be mistaken for them.
-            val na = a.first + if (n > 0) " $n" else ""
-            val nb = b.first + if (n > 0) " $n" else ""
-            val ta = login(u, "uitest-${u.name}-a$n", na, a.second)
-            val tb = login(u, "uitest-${u.name}-b$n", nb, b.second)
-            listOf(ta, tb).forEach { t ->
-                Thread { runCatching { adminApi("POST", "/remote/inbox", """{"cursor":0,"capabilities":["video","music"]}""", asToken = t) } }.apply { isDaemon = true; start() }
-            }
-            Thread.sleep(1500)
-            fun lists(t: String, name: String) = adminApi("GET", "/remote/players", asToken = t).contains("\"name\":\"$name\"")
-            if (lists(tb, na) && lists(ta, nb)) return Devices(ta, tb, na, nb)
-        }
-        throw AssertionError("no fresh remote devices")
-    }
-
-    /**
-     * Remote control as a player (USER-14): another device of the same person sends commands with
-     * the API; the app plays a movie, pauses, seeks, stops, then plays an album and skips, and
-     * reports its state each time.
-     */
-    @Test fun remoteControlPlayer() {
-        assumeTrue("phones", !isTv)
-        val u = tempUser("remote-player")
-        val app = context.applicationContext as MarqueeApplication
-        try {
-            val devices = playerPair(u, "UI Remote Phone" to "android", "UI Controller" to "web")
-            val appTok = devices.a
-            val ctl = devices.b
-            signInWith(appTok)
-            var device = 0L
-            rule.waitUntil(30_000) {
-                val list = org.json.JSONArray(adminApi("GET", "/remote/players", asToken = ctl))
-                (0 until list.length()).map { list.getJSONObject(it) }.firstOrNull { it.getString("name") == devices.nameA }?.let { device = it.getLong("deviceId") }
-                device != 0L
-            }
-            fun send(body: String) = adminApi("POST", "/remote/players/$device/commands", body, asToken = ctl)
-            fun state(): org.json.JSONObject = org.json.JSONObject(adminApi("GET", "/remote/players/$device", asToken = ctl)).optJSONObject("state") ?: org.json.JSONObject()
-
-            // A movie: it opens the player at the position asked for.
-            send("""{"type":"play","itemIds":[359],"startMs":5000}""")
-            rule.waitUntilAtLeastOneExists(videoPlaying, 30_000)
-            rule.waitUntil(20_000) { state().let { it.optLong("itemId") == 359L && it.optString("state") == "playing" } }
-            assertEquals("00 Preview Test", state().optString("title"))
-            shot("rc1-playing-from-remote")
-            send("""{"type":"pause"}""")
-            val paused = hasContentDescription("Video player") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Paused")
-            rule.waitUntilAtLeastOneExists(paused, 10_000)
-            rule.waitUntil(15_000) { state().optString("state") == "paused" }
-            send("""{"type":"seek","positionMs":60000}""")
-            rule.waitUntil(10_000) { var at = 0L; onMainPosition { at = it }; at in 58_000..62_000 }
-            rule.waitUntil(15_000) { state().optLong("positionMs") in 58_000..62_000 }
-            send("""{"type":"resume"}""")
-            rule.waitUntilAtLeastOneExists(videoPlaying, 10_000)
-            send("""{"type":"setVolume","volume":0.5}""")
-            rule.waitUntil(15_000) { state().optDouble("volume") == 0.5 }
-            send("""{"type":"stop"}""")
-            rule.waitUntil(10_000) { rule.onAllNodes(hasContentDescription("Video player")).fetchSemanticsNodes().isEmpty() }
-
-            // An album: its tracks play in order; next moves along.
-            send("""{"type":"play","itemIds":[324]}""")
-            rule.waitUntil(20_000) { app.music.now.value != null && app.music.playing.value }
-            rule.waitUntil(15_000) { state().let { it.optString("itemType") == "track" && it.optInt("queueLength") == 4 } }
-            val first = app.music.now.value!!.id
-            send("""{"type":"next"}""")
-            rule.waitUntil(10_000) { app.music.now.value?.id != first }
-            rule.waitUntil(15_000) { state().optInt("queueIndex") == 1 }
-            send("""{"type":"pause"}""")
-            rule.waitUntil(10_000) { !app.music.playing.value }
-            rule.waitUntil(15_000) { state().optString("state") == "paused" }
-            shot("rc2-music-paused-from-remote")
-            send("""{"type":"stop"}""")
-            rule.waitUntil(10_000) { app.music.now.value == null }
-        } finally {
-            InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.stop() }
-            adminApi("DELETE", "/users/${u.id}")
-        }
-    }
-
-    /**
-     * The controller (USER-14): a fake TV (an inbox polled with the API) shows in Settings → Remote;
-     * its Remote screen shows what it plays and sends Pause; an item page's Play on… sends it a play.
-     */
-    @Test fun remoteControlController() {
-        assumeTrue("phones", !isTv)
-        val u = tempUser("remote-ctl")
-        val commands = java.util.concurrent.CopyOnWriteArrayList<org.json.JSONObject>()
-        val stop = java.util.concurrent.atomic.AtomicBoolean(false)
-        var poller: Thread? = null
-        try {
-            val devices = playerPair(u, "UI Remote Phone" to "android", "UI Fake TV" to "androidtv")
-            val appTok = devices.a
-            val tv = devices.b
-            val tvName = devices.nameB
-            // The fake TV: polls its inbox, playing 00 Preview Test at 10 s.
-            poller = Thread {
-                var cursor = 0L
-                while (!stop.get()) {
-                    runCatching {
-                        val r = org.json.JSONObject(adminApi("POST", "/remote/inbox",
-                            """{"cursor":$cursor,"capabilities":["video","music"],"state":{"state":"playing","positionMs":10000,"itemId":359,"itemType":"movie","title":"00 Preview Test","artItemId":359,"durationMs":120000,"volume":0.8}}""",
-                            asToken = tv))
-                        cursor = r.getLong("cursor")
-                        val cs = r.getJSONArray("commands")
-                        for (i in 0 until cs.length()) commands.add(cs.getJSONObject(i))
-                    }.onFailure { Thread.sleep(1000) }
-                }
-            }.apply { isDaemon = true; start() }
-            signInWith(appTok)
-            tap("Settings")
-            rule.waitText("Remote")
-            tap("Remote")
-            rule.waitUntilAtLeastOneExists(hasContentDescription("Control $tvName"), 30_000)
-            shot("rcc1-players")
-            rule.onNode(hasContentDescription("Control $tvName")).performClick()
-            rule.waitUntilAtLeastOneExists(hasContentDescription("Remote title") and hasText("00 Preview Test"), 15_000)
-            rule.waitUntilAtLeastOneExists(hasContentDescription("Volume"), 10_000)
-            Thread.sleep(1500)
-            shot("rcc2-remote")
-            rule.onNode(hasContentDescription("Pause")).performClick()
-            // Only ours: admins elsewhere (other test runs) can see this fake TV too.
-            fun mine() = commands.filter { it.optString("from") == devices.nameA }
-            rule.waitUntil(15_000) { mine().any { it.getString("type") == "pause" } }
-            rule.onNode(hasContentDescription("Forward 30 seconds")).performClick()
-            rule.waitUntil(15_000) { mine().any { it.getString("type") == "seek" && it.getLong("positionMs") >= 40_000 } }
-            tap("Disconnect")
-
-            // Play on… from an item page.
-            tap("Home")
-            openLibrary("Movies")
-            rule.waitText("00 Preview Test")
-            tap("00 Preview Test")
-            rule.waitUntilAtLeastOneExists(hasContentDescription("Play on…"), 10_000)
-            rule.onNode(hasContentDescription("Play on…")).performClick()
-            rule.waitUntilAtLeastOneExists(hasContentDescription("Play on $tvName"), 15_000)
-            shot("rcc3-play-on")
-            rule.onNode(hasContentDescription("Play on $tvName")).performClick()
-            rule.waitUntil(15_000) { mine().any { it.getString("type") == "play" && it.getJSONArray("itemIds").getLong(0) == 359L } }
-            rule.waitUntilAtLeastOneExists(hasContentDescription("Remote title"), 10_000)
-            tap("Disconnect")
-            rule.waitUntilAtLeastOneExists(hasContentDescription("Play on…"), 10_000)
-        } finally {
-            stop.set(true)
-            poller?.join(30_000)
-            adminApi("DELETE", "/users/${u.id}")
-        }
     }
 
     /** Subtitle appearance (PLAY-20): chosen in Settings, previewed, saved to the person's preferences and used by the player. */
@@ -2596,7 +2442,7 @@ class MarqueeUiTest {
     }
 
     /**
-     * The player's overlay (close, Watch together, Play on, Cast, settings) fades with the controls
+     * The player's overlay (close, Watch together, Cast, settings) fades with the controls
      * after a few seconds of playing untouched, and a tap on the video brings it back.
      */
     @Test fun playerOverlayHides() {
@@ -2615,14 +2461,6 @@ class MarqueeUiTest {
         rule.onNode(hasContentDescription("Video player")).performClick()
         rule.waitUntilAtLeastOneExists(hasContentDescription("Close player"), 3_000)
         rule.onNode(hasContentDescription("Playback settings")).assertExists()
-        // With a menu open (Play on…) the controls stay up, so the menu isn't torn down with them.
-        rule.onNode(hasContentDescription("Play on…")).performClick()
-        rule.waitText("Play on…")
-        val hid = runCatching { rule.waitUntil(5_000) { rule.onAllNodes(hasContentDescription("Close player")).fetchSemanticsNodes().isEmpty() } }.isSuccess
-        assertTrue("controls stay up while a menu is open", !hid)
-        rule.onAllNodesWithText("Play on…").assertCountEquals(1)
-        key(KeyEvent.KEYCODE_BACK) // closes the dialog
-        rule.waitUntil(5_000) { rule.onAllNodesWithText("Play on…").fetchSemanticsNodes().isEmpty() }
         back()
     }
 
@@ -2779,8 +2617,11 @@ class MarqueeUiTest {
             rule.onNode(hasText("Play") and hasClickAction()).performClick()
             rule.waitUntilAtLeastOneExists(hasContentDescription("Video player"), 15_000)
             rule.waitUntil(15_000) { rule.onAllNodes(hasContentDescription("Video player")).fetchSemanticsNodes().isNotEmpty() && rule.onAllNodesWithText("20 Valley").fetchSemanticsNodes().isNotEmpty() }
-            // Two-second videos: the next one follows on its own.
-            rule.waitUntil(30_000) { rule.onAllNodes(hasContentDescription("Video player")).fetchSemanticsNodes().isNotEmpty() && rule.onAllNodesWithText("15 Thunder").fetchSemanticsNodes().isNotEmpty() }
+            // Two-second videos: the next one follows on its own, after Up Next's countdown.
+            rule.waitUntil(40_000) {
+                rule.onAllNodes(hasContentDescription("Video player")).fetchSemanticsNodes().isNotEmpty() && rule.onAllNodesWithText("15 Thunder").fetchSemanticsNodes().isNotEmpty() &&
+                    rule.onAllNodes(hasContentDescription("Up next countdown")).fetchSemanticsNodes().isEmpty()
+            }
             shot("vp3-next")
         } finally {
             adminApi("DELETE", "/playlists/${created.getLong("id")}", asToken = appToken)
@@ -3143,9 +2984,10 @@ class MarqueeUiTest {
             shot("vs9-playing")
             // A 16-second clip: Up Next counts down to the second episode.
             rule.waitUntilAtLeastOneExists(hasContentDescription("Up next countdown"), 40_000)
-            rule.waitText("S1 · E2 · The Second One")
+            rule.waitText("The Second One")
+            rule.waitText("SEASON 1 - EPISODE 2")
             shot("vs10-up-next")
-            tap("Play next")
+            rule.onNode(hasContentDescription("Play next")).performClick()
             rule.waitUntilAtLeastOneExists(playing, 30_000)
             rule.waitUntil(15_000) { rule.onAllNodesWithText("Droid Test Show · S1 · E2", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
             shot("vs11-next-playing")

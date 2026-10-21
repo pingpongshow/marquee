@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import app.marquee.api.apis.LivetvApi
 import app.marquee.api.models.VodRef
@@ -94,9 +95,23 @@ fun hideVodSuggestion(marquee: Marquee, context: Context, s: VodSuggestion, onHi
     }
 }
 
-/** One suggestion: the poster, the title (a film or show icon before it) and the reason under it. */
+/**
+ * The small "VOD" pill on a poster that's on demand rather than in a library (Home's mixed rows):
+ * bold caps on a dark backing, legible over any artwork.
+ */
 @Composable
-fun VodSuggestionTile(nav: NavHostController, s: VodSuggestion, width: Dp?, autoFocus: Boolean = false, onOpen: () -> Unit = {}, onHide: () -> Unit) {
+fun VodBadge(modifier: Modifier = Modifier) {
+    Text("VOD", modifier.background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(4.dp)).padding(horizontal = 5.dp, vertical = 1.dp),
+        color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
+}
+
+/**
+ * One suggestion: the poster, the title (a film or show icon before it) and the reason under it.
+ * [badge] marks the poster VOD, for rows that mix it with library titles.
+ */
+@Composable
+fun VodSuggestionTile(nav: NavHostController, s: VodSuggestion, width: Dp?, autoFocus: Boolean = false, badge: Boolean = false,
+    onOpen: () -> Unit = {}, onHide: () -> Unit) {
     val marquee = LocalMarquee.current
     var menu by remember { mutableStateOf(false) }
     val m = s.movie
@@ -121,6 +136,7 @@ fun VodSuggestionTile(nav: NavHostController, s: VodSuggestion, width: Dp?, auto
                     customActions = actions.map { a -> CustomAccessibilityAction(a.label) { a.run(); true } }
                 })
             TileMenu(actions, menu) { menu = false }
+            if (badge) VodBadge(Modifier.align(Alignment.TopStart).padding(6.dp))
             if (watched) Icon(Icons.Filled.CheckCircle, null, Modifier.align(Alignment.TopEnd).padding(6.dp).size(20.dp)
                 .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(50)), tint = Gold)
         }

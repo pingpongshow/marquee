@@ -82,15 +82,6 @@ fun MainScreen() {
         nav.navigate(r) { popUpTo("home") { saveState = true }; launchSingleTop = true; restoreState = true }
     }
 
-    // Remote control (USER-14): a video sent from another app opens here, replacing one playing.
-    val remote = LocalRemote.current
-    LaunchedEffect(Unit) {
-        remote.navigate.collect { r ->
-            val playing = nav.currentBackStackEntry?.destination?.route?.startsWith("player") == true
-            nav.navigate(r) { if (playing) popUpTo("player/{id}?start={start}&group={group}") { inclusive = true } }
-        }
-    }
-
     if (marquee.isTv) {
         Row(Modifier.fillMaxSize()) {
             if (!fullScreen) Column(Modifier.fillMaxHeight().width(112.dp).padding(vertical = 24.dp, horizontal = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -186,14 +177,12 @@ private fun Routes(nav: NavHostController) {
         composable("live/{id}", listOf(navArgument("id") { type = NavType.LongType })) { LiveWatchScreen(nav, it.arguments!!.getLong("id")) }
         composable("approvals") { ApprovalsScreen() }
         composable("stats") { StatsScreen(nav) }
-        composable("nowplaying") { NowPlayingScreen(onClose = { nav.popBackStack() }, onRemote = { nav.navigate("remote/$it") },
+        composable("nowplaying") { NowPlayingScreen(onClose = { nav.popBackStack() },
             onOpenPlaylist = { nav.navigate("playlist/$it") }) }
         composable("edithome") { EditHomeScreen(nav) }
         composable("users") { UsersScreen() }
         composable("serversettings") { ServerSettingsScreen() }
         composable("subtitles") { SubtitleAppearanceScreen() }
-        composable("remote") { RemotePlayersScreen(nav) }
-        composable("remote/{id}", listOf(navArgument("id") { type = NavType.LongType })) { RemoteScreen(nav, it.arguments!!.getLong("id")) }
         composable("recap/{year}", listOf(navArgument("year") { type = NavType.IntType })) { app.marquee.music.RecapScreen(nav, it.arguments!!.getInt("year")) }
         composable("muse?lib={lib}", listOf(navArgument("lib") { type = NavType.LongType; defaultValue = -1L })) {
             MuseVideoScreen(nav, it.arguments!!.getLong("lib").takeIf { l -> l >= 0 })

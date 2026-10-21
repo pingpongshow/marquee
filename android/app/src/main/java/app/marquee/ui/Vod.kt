@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -605,6 +604,7 @@ private fun VodVideo(nav: NavHostController, movieId: Long?, seriesId: Long?, ep
     val player = remember { videoPlayer(context, seekIncrements = true) }
     var movie by remember { mutableStateOf<VodMovieDetail?>(null) }
     var episode by remember { mutableStateOf<VodEpisode?>(null) }
+    var series by remember { mutableStateOf<app.marquee.api.models.VodSeriesDetail?>(null) }
     var session by remember { mutableStateOf<VodSession?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var position by remember { mutableLongStateOf(0L) }
@@ -614,10 +614,10 @@ private fun VodVideo(nav: NavHostController, movieId: Long?, seriesId: Long?, ep
     var controls by remember { mutableStateOf(true) }
     var lastTouch by remember { mutableIntStateOf(0) }
     var scrub by remember { mutableStateOf<Long?>(null) }
-    // Up Next (episodes): the next one in viewing order, fetched as playback starts; at the end a countdown plays it.
+    // Up Next (episodes): the next one in viewing order, fetched as playback starts; at the end its screen counts down to it.
     var next by remember { mutableStateOf<VodEpisode?>(null) }
     var upNext by remember { mutableStateOf(false) }
-    var countdown by remember { mutableIntStateOf(10) }
+    var countdown by remember { mutableIntStateOf(UP_NEXT_SECONDS) }
     val ownEntry = remember { nav.currentBackStackEntry }
     fun stillShowing() = ownEntry != null && nav.currentBackStackEntry === ownEntry
     val what = if (episodeId != null) "episode" else "movie"
@@ -647,11 +647,19 @@ private fun VodVideo(nav: NavHostController, movieId: Long?, seriesId: Long?, ep
         val n = next ?: return
         if (stillShowing()) nav.navigate("vodepplay/${n.seriesId}/${n.id}") { popUpTo(ownEntry!!.destination.id) { inclusive = true } }
     }
+    /** Up Next's Previous: this episode again, from the start. */
+    fun replay() {
+        if (stillShowing() && seriesId != null && episodeId != null)
+            nav.navigate("vodepplay/$seriesId/$episodeId?start=0") { popUpTo(ownEntry!!.destination.id) { inclusive = true } }
+    }
 
     LaunchedEffect(movieId, episodeId) {
         if (movieId != null) launch { movie = withContext(Dispatchers.IO) { runCatching { marquee.livetv.getVodMovie(movieId) }.getOrNull() } }
         if (seriesId != null && episodeId != null) {
-            launch { episode = withContext(Dispatchers.IO) { runCatching { marquee.livetv.getVodSeries(seriesId) }.getOrNull() }?.episodes?.firstOrNull { it.id == episodeId } }
+            launch {
+                series = withContext(Dispatchers.IO) { runCatching { marquee.livetv.getVodSeries(seriesId) }.getOrNull() }
+                episode = series?.episodes?.firstOrNull { it.id == episodeId }
+            }
             launch { next = withContext(Dispatchers.IO) { runCatching { marquee.livetv.vodNextEpisode(episodeId) }.getOrNull() }?.episode }
         }
         // Started on the session's own scope: if the player closes while the server is starting
@@ -718,7 +726,7 @@ private fun VodVideo(nav: NavHostController, movieId: Long?, seriesId: Long?, ep
                 if (next != null) {
                     report()
                     controls = false
-                    countdown = 10
+                    countdown = UP_NEXT_SECONDS
                     upNext = true
                 } else nav.popBackStack()
             }
@@ -816,20 +824,20 @@ private fun VodVideo(nav: NavHostController, movieId: Long?, seriesId: Long?, ep
                 }
             }
         }
-        // The end of an episode: Up Next's countdown, as library shows have it.
+        // The end of an episode: the Up Next screen, as library shows have it.
         val n = next
-        if (upNext && n != null) Column(
-            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.65f)).padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically), horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text("Up next in ${countdown}s", color = Color.White, style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold, modifier = Modifier.semantics { contentDescription = "Up next countdown" })
-            n.stillUrl?.let { AsyncImage(marquee.absolute(it), null, Modifier.width(320.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop) }
-            Text("${n.label()} · ${n.title}", color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button({ playNext() }, Modifier.focusRing().initialFocus(marquee.isTv)) { Text("Play next") }
-                OutlinedButton({ if (stillShowing()) nav.popBackStack() }, Modifier.focusRing()) { Text("Back to the show", color = Color.White) }
-            }
+        if (upNext && n != null) {
+            fun entry(e: VodEpisode) = UpNextEntry(e.seriesTitle, e.title, episodeLabel(e.season, e.episode),
+                marquee.absolute(e.stillUrl ?: series?.backdropUrl), e.overview)
+            val cur = episode
+            UpNextScreen(
+                previous = cur?.let(::entry) ?: UpNextEntry(n.seriesTitle, "", null, null),
+                next = entry(n),
+                backdropUrl = marquee.absolute(series?.backdropUrl ?: n.stillUrl),
+                seconds = countdown, held = false,
+                onPlayNext = { playNext() }, onReplay = { replay() },
+                onCancel = { if (stillShowing()) nav.popBackStack() },
+            )
         }
     }
 }

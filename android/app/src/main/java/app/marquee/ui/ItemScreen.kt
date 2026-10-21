@@ -267,9 +267,6 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
         TrailerButton()
         StateButtons()
         Download()
-        // Play on another Marquee app (USER-14); it expands albums and shows like its own Play button.
-        if (d.type in listOf(ItemType.MOVIE, ItemType.EPISODE, ItemType.VIDEO, ItemType.SHOW, ItemType.SEASON, ItemType.ALBUM, ItemType.ARTIST, ItemType.TRACK))
-            PlayOnButton(nav, tint = MaterialTheme.colorScheme.onSurface, handoff = { app.marquee.api.models.RemoteCommand(app.marquee.api.models.RemoteCommand.Type.PLAY, itemIds = listOf(d.id)) })
         MoreMenu()
     }
     // Ratings & comments (USER-17): everyone's, reloaded when yours changes.

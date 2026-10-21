@@ -12,18 +12,13 @@ class MarqueeApplication : Application(), SingletonImageLoader.Factory {
         private set
     val music by lazy { app.marquee.music.MusicController(this, marquee) }
     val downloads by lazy { app.marquee.core.Downloads(this, marquee) }
-    /** Remote control (USER-14): this app as a player other Marquee apps can control. */
-    val remote by lazy { app.marquee.core.RemoteReceiver(this, marquee) { music } }
 
     override fun onCreate() {
         super.onCreate()
         marquee = Marquee(this)
         app.marquee.music.TrackGains.init(this)
-        // A player for remote control while in the foreground (and while music plays).
-        remote.attach()
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: android.app.Activity) {
-                remote.activityStarted()
                 // Back in the foreground: send what was changed offline (USER-18).
                 if (marquee.state.value == Marquee.State.SignedIn) marquee.scope.launch { marquee.sync.syncNow() }
                 // Live TV entry points follow whether it's usable now (LIVE-1).
@@ -31,7 +26,7 @@ class MarqueeApplication : Application(), SingletonImageLoader.Factory {
                 // Rating requests follow the admin's switch (USER-19).
                 if (marquee.state.value == Marquee.State.SignedIn) marquee.refreshRatingPrompt()
             }
-            override fun onActivityStopped(activity: android.app.Activity) = remote.activityStopped()
+            override fun onActivityStopped(activity: android.app.Activity) {}
             override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {}
             override fun onActivityResumed(activity: android.app.Activity) {}
             override fun onActivityPaused(activity: android.app.Activity) {}

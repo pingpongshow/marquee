@@ -344,12 +344,8 @@ class MusicController(private val context: Context, private val marquee: Marquee
     }
 
     private fun with(block: (MediaController) -> Unit) { scope.launch { block(connect()) } }
-    /** Remote control (USER-14): explicit pause and resume, and the player's own volume (0–1). */
+    /** An explicit pause (not a toggle). */
     fun pause() = with { if (casting) marquee.cast.pause() else it.pause() }
-    fun resume() = with { if (casting) { if (!marquee.cast.playing.value) marquee.cast.toggle() } else it.play() }
-    fun setVolume(v: Float) = with { it.volume = v.coerceIn(0f, 1f) }
-    /** The player's volume, once connected. */
-    val volume: Float? get() = controller?.volume
     fun toggle() = with { if (casting) marquee.cast.toggle() else if (it.isPlaying) it.pause() else it.play() }
     fun next() = with { if (casting) castNext() else it.seekToNextMediaItem() }
     fun previous() = with {
