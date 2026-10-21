@@ -74,7 +74,7 @@ Marquee organises the films, shows, music and recordings already on your disks a
 
 ### Discover and personalise
 - **Muse for movies:** "90s sci-fi with time travel" or "acclaimed war films I haven't seen" finds matches in your library.
-- "Recommended for You", "Because you watched…", Top Rated, Trending Now and rows from the genres you watch, with films and shows on demand mixed in (marked VOD), plus a holiday row in the 30 days before Halloween, Thanksgiving and Christmas, and "More like this".
+- "Recommended for You", "Because you watched…", New Releases, Top Rated, Trending Now, Critically Acclaimed, Binge-Worthy Shows, Under 95 Minutes, Best of a decade, Timeless Classics, Family Movie Night, International Picks, Watch It Again and rows from the genres you watch, with films and shows on demand mixed in (marked VOD) and See all on every row, plus a holiday row in the 30 days before Halloween, Thanksgiving and Christmas, and "More like this".
 - A Home screen each person can reorder, hide and pin rows on.
 - Personal ratings, a household community rating with comments, a watchlist and statistics.
 - Favourites (the heart) on films, shows, episodes and music, which also steer recommendations.
@@ -225,11 +225,30 @@ The apps find the server on your network automatically, or you can type its addr
 
 ## Remote access
 
-Marquee works over any connection that reaches port 32500.
+> [!WARNING]
+> **Never expose Marquee to the internet.** Don't forward port 32500 (or any other port) on your router to the server, don't put the server in your router's DMZ, and don't publish it with a reverse proxy or a tunnel to the public internet. Marquee serves plain HTTP and holds your accounts, viewing history and media. Anything reachable from the internet is scanned and attacked within minutes. Port forwarding and DMZ are **not** safe alternatives to Tailscale.
 
-- **Tailscale (recommended):** install [Tailscale](https://tailscale.com) on the server and your devices, then enter the server's Tailscale address as the **Remote server address** under **Settings → Remote Access**. The apps learn it from the server, use the home address when they can reach it and the Tailscale one otherwise, and remote streams adapt their quality to the connection.
-- **Friends:** share the server's machine with them from the Tailscale admin console, then send an invite link from **Settings → Users**. Friends get their own account with the libraries and limits you choose.
-- **Reverse proxy:** you can also publish Marquee through a reverse proxy with HTTPS (Caddy, Nginx, Traefik). Set the remote address and your upload speed under **Settings → Remote Access** so remote quality is chosen well (there's a built-in speed test).
+**[Tailscale](https://tailscale.com) is the only supported way to use Marquee away from home.** It puts the server and your devices on a private, end-to-end encrypted network (WireGuard), with nothing opened on your router and no public address for anyone to find. It's free for personal use.
+
+### Set up Tailscale
+
+1. **Create a Tailscale account** at [tailscale.com](https://tailscale.com) (sign in with Google, Apple, Microsoft or GitHub).
+2. **Install Tailscale on the server** and sign in:
+   - **Unraid:** install the **Tailscale** plugin from Community Applications, open it and choose **Log in**.
+   - **Other Linux:** `curl -fsSL https://tailscale.com/install.sh | sh`, then `sudo tailscale up`.
+   - In the [Tailscale admin console](https://login.tailscale.com/admin/machines), open the server's **⋯** menu and choose **Disable key expiry**, so the server doesn't drop off your tailnet every few months.
+3. **Give Marquee an HTTPS address** (recommended). On the server, run:
+   ```bash
+   tailscale serve --bg 32500
+   ```
+   It prints an address like `https://media.your-tailnet.ts.net`, reachable only by devices in your tailnet. If Tailscale asks, turn on **HTTPS certificates** in the admin console under **DNS**.
+4. **Tell Marquee the address.** In **Settings → Remote Access**, turn on **Allow remote streaming** and set **Remote server address** to that `https://….ts.net` address (or to `http://<the server's 100.x.y.z Tailscale IP>:32500` if you skipped step 3).
+5. **Install Tailscale on each phone, tablet, TV or laptop** you'll use away from home, and sign in with the same account. Apple TV and Android TV have Tailscale apps too.
+6. **Open each Marquee app once at home.** The apps learn the remote address from the server and switch between the home and Tailscale addresses by themselves. Away from home, keep Tailscale connected on the device.
+
+Remote streams adapt their quality to the connection: set your upload speed under **Settings → Remote Access** (there's a built-in speed test).
+
+**Friends and family outside your home:** share just the server with them from the Tailscale admin console (**⋯ → Share**). They install Tailscale, accept the share, and only see that one machine. Then send them an invite link from **Settings → Users → Friends**. They get their own account with the libraries and limits you choose.
 
 ## Configuration
 
@@ -261,7 +280,7 @@ Everything is configured in the web app under **Settings**. Optional integration
 
 | Port | Used for |
 |---|---|
-| `32500/tcp` | Web app and API (the only port you need to expose) |
+| `32500/tcp` | Web app and API, on your home network and tailnet only (never forward it on your router) |
 | `5353/udp` | Bonjour/mDNS, so the apps find the server on your network |
 | `32501/tcp` | Soundprint, bound to `127.0.0.1` only |
 
@@ -329,7 +348,7 @@ The Soundprint container must be running (`docker compose ps`). Analysis of a la
 <details>
 <summary><b>Casting from the web app</b></summary>
 
-Browsers only allow Chromecast from HTTPS pages, so casting works from the iPhone, iPad and Android apps, or from the web app behind an HTTPS reverse proxy.
+Browsers only allow Chromecast from HTTPS pages, so casting works from the iPhone, iPad and Android apps, or from the web app over `tailscale serve` (HTTPS).
 </details>
 
 ## Building from source
@@ -371,7 +390,7 @@ Bug reports and pull requests are welcome.
 
 Please don't report security problems in public issues. Use GitHub's [private vulnerability reporting](https://github.com/pingpongshow/marquee/security/advisories/new) instead.
 
-Marquee serves plain HTTP on your home network by default. If you expose it to the internet directly, put it behind an HTTPS reverse proxy; over Tailscale, traffic is already encrypted.
+Marquee serves plain HTTP on your home network. Don't expose it to the internet: no port forwarding, no DMZ, no public reverse proxy or tunnel. Use [Tailscale](#remote-access) for access away from home; its traffic is end-to-end encrypted, and `tailscale serve` adds HTTPS.
 
 ## Acknowledgements
 

@@ -159,7 +159,7 @@ Marquee sends mail through your mail server or provider over SMTP.
 
 Email is on once a mail server, port and from address are saved. Then use **Send a test email to** (it starts with your own address) and **Send test**. The test uses the saved settings, so save first. If it doesn't arrive, check the spam folder.
 
-**Recommended:** set **Link address** to the address people use away from home (your Tailscale HTTPS address or reverse proxy address), so reset links work wherever they're opened.
+**Recommended:** set **Link address** to the address people use away from home (your Tailscale HTTPS address), so reset links work wherever they're opened.
 
 **Example: Gmail**
 

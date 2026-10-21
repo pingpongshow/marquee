@@ -48,7 +48,7 @@ Look at `docker logs marquee`. Common causes:
 
 - Check the container is running and healthy: `docker ps` shows `(healthy)` after about 20 seconds.
 - Use the server's own address and port 32500, e.g. `http://192.168.1.20:32500`. Marquee uses host networking, so there's no port mapping to check.
-- Use `http://`, not `https://`: Marquee serves plain HTTP unless you put a reverse proxy in front of it.
+- Use `http://`, not `https://`, at home: Marquee serves plain HTTP. HTTPS comes from `tailscale serve`, at its `https://….ts.net` address.
 - A firewall on the server (ufw, firewalld) must allow 32500/tcp.
 </details>
 
@@ -124,14 +124,13 @@ The Dashboard shows the encoder each session uses.
 
 Marquee decides local or remote by the device's address: **LAN subnets** in **Settings → Network** are local, and everything else (including Tailscale) is remote.
 
-- Behind a reverse proxy, every request comes from the proxy's home address. Set **Remote server address** to the proxy's public address so requests to it count as remote, and make sure the proxy passes the original `Host` header. See [Reverse proxy with HTTPS](apps-and-remote.md#reverse-proxy-with-https).
 - If a home device counts as remote, add its subnet to **LAN subnets**.
 </details>
 
 <details>
 <summary><b>Casting from the web app doesn't work</b></summary>
 
-Browsers only allow Chromecast from HTTPS pages, so casting works from the iPhone, iPad and Android apps, or from the web app behind an HTTPS reverse proxy or `tailscale serve`.
+Browsers only allow Chromecast from HTTPS pages, so casting works from the iPhone, iPad and Android apps, or from the web app over `tailscale serve` (HTTPS).
 </details>
 
 ## Libraries and metadata

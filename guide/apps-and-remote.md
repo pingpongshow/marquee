@@ -86,9 +86,9 @@ Profiles with a PIN ask for it. Locked profiles (five wrong PINs) open again aft
 
 ## Remote access
 
-Marquee works over any connection that reaches port 32500. Devices on your home network get full quality; everything else, including Tailscale, is treated as remote and gets a quality that fits the connection.
+Use Marquee away from home through Tailscale only (see below). Devices on your home network get full quality; everything else, including Tailscale, is treated as remote and gets a quality that fits the connection.
 
-### Tailscale (recommended)
+### Tailscale
 
 [Tailscale](https://tailscale.com) connects your devices to the server privately and encrypted, with nothing opened on your router.
 
@@ -101,21 +101,9 @@ Marquee works over any connection that reaches port 32500. Devices on your home 
 3. In **Settings → Remote Access**, turn on **Allow remote streaming** and set **Remote server address** to that address (or to `http://<tailscale ip>:32500` if you skipped step 2).
 4. Open the apps once at home. They learn the remote address from the server and switch between the home and Tailscale addresses by themselves. You can also type the Tailscale address into an app while you're away.
 
-### Reverse proxy with HTTPS
+### Don't expose Marquee to the internet
 
-You can also publish Marquee through a reverse proxy (Caddy, Nginx, Traefik) with a certificate. Proxy everything to `http://<server>:32500`; no WebSocket or special rules are needed. For example, with Caddy:
-
-```text
-media.example.com {
-    reverse_proxy 192.168.1.20:32500
-}
-```
-
-Then set **Remote server address** to `https://media.example.com`. This matters: requests to that address are always treated as remote, even though they reach Marquee from the proxy on your home network. Without it, everything through the proxy counts as local and gets full quality whatever the connection. Make sure the proxy passes the original `Host` header (Caddy and Traefik do by default; in Nginx, add `proxy_set_header Host $host;`).
-
-If the proxy runs on the Marquee server itself, Marquee also reads the client's real address from `X-Forwarded-For`. It only trusts that header from the same machine.
-
-Don't expose port 32500 directly to the internet: Marquee serves plain HTTP. HTTPS also lets you cast from the web app.
+Tailscale is the only supported way to reach Marquee away from home. Don't forward port 32500 (or any port) on your router, don't put the server in your router's DMZ, and don't publish Marquee through a public reverse proxy or tunnel. Marquee serves plain HTTP and holds your accounts and viewing history, and anything reachable from the internet is scanned and attacked within minutes. Port forwarding and DMZ are not safe alternatives.
 
 ### Settings → Network
 
@@ -134,7 +122,7 @@ The top of the page says whether the browser you're using is connected as **Loca
 | Setting | Default | What it does |
 |---|---|---|
 | **Allow remote streaming** | On | When on, apps are given the **Remote server address** so they can reach the server away from home. To keep one person at home, turn off **Allow streaming away from home** for them in **Settings → Users**. |
-| **Remote server address** | (empty) | The HTTPS address from `tailscale serve`, e.g. `https://media.example-tailnet.ts.net`, or your reverse proxy's address. |
+| **Remote server address** | (empty) | The HTTPS address from `tailscale serve`, e.g. `https://media.example-tailnet.ts.net`. |
 
 **Bandwidth**
 
@@ -154,7 +142,7 @@ The steps remote devices move between are in **Settings → Transcoder → Remot
 
 Friends outside your household get their own account with the libraries and limits you choose.
 
-1. Make sure they can reach the server: share it from the Tailscale admin console, or use your reverse proxy's address.
+1. Make sure they can reach the server: share it with them from the Tailscale admin console (**⋯ → Share**); they install Tailscale and accept.
 2. Open the web app **at that address** (the invite link uses the address in your browser), go to **Settings → Users → Friends** and choose **Invite a friend**.
 3. Fill in **Who it's for** (a note for you, e.g. Mum), **Expires after (days)** (default 7, between 1 and 90), and their access: libraries, maximum content rating, remote streaming and quality.
 4. Choose **Create invite link** and send them the link. It works once.
@@ -163,7 +151,7 @@ Your friend opens the link, picks a username and password, and joins. Friends si
 
 ## Casting and AirPlay
 
-- **Chromecast** from the iPhone, iPad and Android apps. Browsers only allow casting from HTTPS pages, so the web app can cast only behind an HTTPS reverse proxy or `tailscale serve`.
+- **Chromecast** from the iPhone, iPad and Android apps. Browsers only allow casting from HTTPS pages, so the web app can cast only over `tailscale serve` (HTTPS).
 - **AirPlay** on iPhone and iPad, to an Apple TV or AirPlay 2 speakers (HomePod, Sonos and others) for music.
 
 ## Offline downloads
