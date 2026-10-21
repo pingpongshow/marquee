@@ -67,6 +67,19 @@ object HomeRows {
         hubId.startsWith("playlist-") -> hubId.removePrefix("playlist-").toLongOrNull()?.let { "playlist/$it" }
         else -> null
     }
+
+    /**
+     * Where a row's See all goes: Continue Watching's page, the library of a Recently Added or
+     * Recently Played row, a pinned collection or playlist, else the row in full ([HOME_HUB_ROUTE]).
+     */
+    fun seeAllRoute(hubId: String): String = when {
+        hubId == CONTINUE_HUB -> CONTINUE_ROUTE
+        hubId.startsWith("recent-") || hubId.startsWith("played-") ->
+            hubId.substringAfter('-').toLongOrNull()?.let { "library/$it" } ?: homeHubRoute(hubId)
+        else -> route(hubId) ?: homeHubRoute(hubId)
+    }
+
+    fun homeHubRoute(hubId: String): String = "homehub/" + android.net.Uri.encode(hubId)
 }
 
 /** Edit Home: reorder with up/down buttons (D-pad friendly), hide or show, unpin, or reset. */

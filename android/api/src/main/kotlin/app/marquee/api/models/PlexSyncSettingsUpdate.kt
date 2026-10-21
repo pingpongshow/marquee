@@ -32,6 +32,7 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
+ * @param on 
  * @param url 
  * @param token The server owner's Plex token. An empty string removes it.
  * @param enabled 
@@ -45,6 +46,9 @@ import kotlinx.serialization.Contextual
 @Serializable
 
 data class PlexSyncSettingsUpdate (
+
+    @SerialName(value = "on")
+    val on: kotlin.Boolean? = null,
 
     @SerialName(value = "url")
     val url: kotlin.String? = null,

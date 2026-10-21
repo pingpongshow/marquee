@@ -32,6 +32,7 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
+ * @param on Plex sync is on. Off stops every run, automatic or manual, and the Plex settings page hides its options (the import too). On unless an admin turned it off.
  * @param url The Plex server's address, e.g. http://192.168.1.10:32400.
  * @param tokenSet A Plex token is saved (it is never returned).
  * @param enabled Automatic sync every intervalMinutes. Off by default; Sync now works either way.
@@ -45,6 +46,10 @@ import kotlinx.serialization.Contextual
 @Serializable
 
 data class PlexSyncSettings (
+
+    /* Plex sync is on. Off stops every run, automatic or manual, and the Plex settings page hides its options (the import too). On unless an admin turned it off. */
+    @SerialName(value = "on")
+    val on: kotlin.Boolean,
 
     /* The Plex server's address, e.g. http://192.168.1.10:32400. */
     @SerialName(value = "url")

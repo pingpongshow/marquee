@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.StarHalf
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.Icon
 import androidx.compose.foundation.lazy.LazyRow
@@ -226,15 +227,25 @@ fun PosterCard(item: ItemSummary, imageUrl: String?, width: Dp, onClick: () -> U
     }
 }
 
-/** A titled horizontal row of cards (Home hubs, cast, related); [onSeeAll] adds "See all" beside the title. */
+/**
+ * A titled horizontal row of cards (Home hubs, cast, related); [onSeeAll] adds "See all ›" beside
+ * the title. On TV, with [seeAllTileHeight] (the cards' artwork height), See all is instead a tile
+ * at the row's end, where the D-pad reaches it ([seeAllDetail] under it; [seeAllFocus] focuses it,
+ * for coming back from the page it opened).
+ */
 @Composable
 fun <T> Shelf(title: String, items: List<T>, sidePadding: Dp, onTitle: (() -> Unit)? = null, onSeeAll: (() -> Unit)? = null,
+    seeAllTileHeight: Dp? = null, seeAllDetail: String? = null, seeAllFocus: Boolean = false,
     content: @Composable (index: Int, item: T) -> Unit) {
+    val tile = onSeeAll != null && seeAllTileHeight != null && LocalMarquee.current.isTv
     Column {
         // A title that opens the whole list (a pinned collection or playlist) reads "Title ›".
-        if (onSeeAll != null) Row(Modifier.fillMaxWidth().padding(start = sidePadding, end = sidePadding - 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (onSeeAll != null && !tile) Row(Modifier.fillMaxWidth().padding(start = sidePadding, end = sidePadding - 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            androidx.compose.material3.TextButton(onSeeAll, Modifier.focusRing().semantics { contentDescription = "See all: $title" }) { Text("See all", maxLines = 1) }
+            androidx.compose.material3.TextButton(onSeeAll, Modifier.focusRing().semantics { contentDescription = "See all: $title" }) {
+                Text("See all", maxLines = 1)
+                Icon(Icons.Filled.ChevronRight, null, Modifier.size(18.dp))
+            }
         }
         else if (onTitle != null) Text("$title  ›", Modifier.padding(start = sidePadding - 4.dp, bottom = 4.dp).focusRing(RoundedCornerShape(6.dp))
             .clip(RoundedCornerShape(6.dp)).clickable(onClick = onTitle).padding(horizontal = 4.dp),
@@ -243,7 +254,20 @@ fun <T> Shelf(title: String, items: List<T>, sidePadding: Dp, onTitle: (() -> Un
         // Vertical padding leaves room for a focused card's scale and border.
         LazyRow(contentPadding = PaddingValues(horizontal = sidePadding, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             itemsIndexed(items) { i, it -> content(i, it) }
+            if (tile) item(key = "see-all") { SeeAllTile(title, seeAllTileHeight!!, seeAllDetail, seeAllFocus, onSeeAll!!) }
         }
+    }
+}
+
+/** A row's last tile on TV (as tall as the row's artwork): See all, opening the row's page. */
+@Composable
+fun SeeAllTile(title: String, height: Dp, detail: String? = null, autoFocus: Boolean = false, onClick: () -> Unit) {
+    Column(Modifier.width(height * 0.8f).height(height).initialFocus(autoFocus).focusCard(onClick).background(MaterialTheme.colorScheme.surfaceVariant)
+        .semantics(mergeDescendants = true) { contentDescription = "See all: $title" },
+        verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("See all", fontWeight = FontWeight.SemiBold)
+        detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        Icon(Icons.Filled.ChevronRight, null)
     }
 }
 

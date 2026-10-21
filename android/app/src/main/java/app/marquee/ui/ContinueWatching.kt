@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.CircularProgressIndicator
@@ -223,37 +222,21 @@ private fun VodContinueTile(nav: NavHostController, e: ContinueEntry, width: Dp,
     }
 }
 
-/** The row's last tile when there's more than it shows (as tall as the row's artwork): opens the Continue Watching page. */
-@Composable
-fun ViewMoreTile(total: Int, width: Dp, height: Dp, onClick: () -> Unit) {
-    Column(Modifier.width(width)) {
-        Column(Modifier.fillMaxWidth().height(height).focusCard(onClick).background(MaterialTheme.colorScheme.surfaceVariant)
-            .semantics { contentDescription = "View more, $total in all" },
-            verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("View more", fontWeight = FontWeight.SemiBold)
-            Text("$total in all", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Icon(Icons.Filled.ChevronRight, null)
-        }
-    }
-}
-
 /**
  * Home's Continue Watching row: [hub]'s entries less those removed here ([removed], keys) or just
- * marked watched or unwatched, ending in View more (and with a title that opens the page) when there are more.
+ * marked watched or unwatched, with See all for the page (on TV a tile at the end, saying how many
+ * there are when the row doesn't hold them all; [seeAllFocus] focuses it).
  */
 @Composable
 fun ContinueRow(nav: NavHostController, hub: Hub, removed: List<String>, width: Dp, focusFirst: Boolean, openedKey: String?,
-    onOpen: (String) -> Unit, onRemoved: (String) -> Unit) {
+    onOpen: (String) -> Unit, onRemoved: (String) -> Unit, seeAllFocus: Boolean = false, onSeeAll: () -> Unit = {}) {
     val marquee = LocalMarquee.current
     val marks by marquee.watch.marks.collectAsState()
     val shown = continueEntries(hub).filter { e -> e.key !in removed && e.item?.let { marquee.watch.markFor(it, marks) } == null }
     if (shown.isEmpty()) return
-    val more = continueHasMore(hub)
-    val openPage = { nav.navigate(CONTINUE_ROUTE) }
-    // null: the View more tile.
-    Shelf<ContinueEntry?>(hub.title, if (more) shown + null else shown, sidePadding, onTitle = if (more) openPage else null) { i, e ->
-        if (e == null) ViewMoreTile(hub.total ?: 0, width * 0.7f, width / Shape.Wide.ratio, openPage)
-        else ContinueTile(nav, e, width, autoFocus = marquee.isTv && (if (openedKey != null) e.key == openedKey else focusFirst && i == 0),
+    Shelf(hub.title, shown, sidePadding, onSeeAll = { onSeeAll(); nav.navigate(CONTINUE_ROUTE) }, seeAllTileHeight = width / Shape.Wide.ratio,
+        seeAllDetail = hub.total?.takeIf { continueHasMore(hub) }?.let { "$it in all" }, seeAllFocus = seeAllFocus) { i, e ->
+        ContinueTile(nav, e, width, autoFocus = marquee.isTv && (if (openedKey != null) e.key == openedKey else focusFirst && i == 0),
             onOpen = { onOpen(e.key) }, onRemoved = onRemoved)
     }
 }

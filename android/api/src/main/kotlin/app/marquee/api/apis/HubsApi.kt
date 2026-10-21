@@ -213,11 +213,98 @@ open class HubsApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
     }
 
     /**
+     * GET /hubs/home/{hubId}
+     * One Home row in full, for See all (USER-12): the hub ids GET /hubs/home returns (e.g. recommended, because-12, holiday-christmas, genre-comedy, top-rated, watchlist, favorites). Continue Watching, Recently Added, pinned collections and playlists have pages of their own; asking for them here gives the row as Home has it, longer.
+     * 
+     * @param hubId 
+     * @param mixed As for GET /hubs/home. (optional, default to false)
+     * @param limit How many library titles (and as many on demand again, when mixed). (optional, default to 100)
+     * @return Hub
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun homeHub(hubId: kotlin.String, mixed: kotlin.Boolean? = false, limit: kotlin.Int? = 100) : Hub {
+        val localVarResponse = homeHubWithHttpInfo(hubId = hubId, mixed = mixed, limit = limit)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as Hub
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /hubs/home/{hubId}
+     * One Home row in full, for See all (USER-12): the hub ids GET /hubs/home returns (e.g. recommended, because-12, holiday-christmas, genre-comedy, top-rated, watchlist, favorites). Continue Watching, Recently Added, pinned collections and playlists have pages of their own; asking for them here gives the row as Home has it, longer.
+     * 
+     * @param hubId 
+     * @param mixed As for GET /hubs/home. (optional, default to false)
+     * @param limit How many library titles (and as many on demand again, when mixed). (optional, default to 100)
+     * @return ApiResponse<Hub?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun homeHubWithHttpInfo(hubId: kotlin.String, mixed: kotlin.Boolean?, limit: kotlin.Int?) : ApiResponse<Hub?> {
+        val localVariableConfig = homeHubRequestConfig(hubId = hubId, mixed = mixed, limit = limit)
+
+        return request<Unit, Hub>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation homeHub
+     *
+     * @param hubId 
+     * @param mixed As for GET /hubs/home. (optional, default to false)
+     * @param limit How many library titles (and as many on demand again, when mixed). (optional, default to 100)
+     * @return RequestConfig
+     */
+    fun homeHubRequestConfig(hubId: kotlin.String, mixed: kotlin.Boolean?, limit: kotlin.Int?) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (mixed != null) {
+                    put("mixed", listOf(mixed.toString()))
+                }
+                if (limit != null) {
+                    put("limit", listOf(limit.toString()))
+                }
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/hubs/home/{hubId}".replace("{"+"hubId"+"}", encodeURIComponent(hubId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * GET /hubs/home
      * Rows for the Home screen (Continue Watching, Recently Added…).
      * 
      * @param vod Include the Watch on VOD row (id vod-suggestions; films and series on demand picked for the caller, in vodEntries, with items empty). Only apps that show vodEntries should ask for it; without it the row is left out. (optional, default to false)
-     * @param mixed Mix films and series on demand into the suggestion rows (Recommended for You, the holiday row, Top Rated and the genre rows), in mixedEntries, and leave out the separate Watch on VOD row. Only apps that show mixedEntries should ask for it; without it those rows hold library items only (and rows with nothing from the library are left out). (optional, default to false)
+     * @param mixed Mix films and series on demand into the suggestion rows (Recommended for You, the holiday rows, Top Rated, Trending Now, the genre rows and the other category rows), in mixedEntries, and leave out the separate Watch on VOD row. Only apps that show mixedEntries should ask for it; without it those rows hold library items only (and rows with nothing from the library are left out). (optional, default to false)
      * @return kotlin.collections.List<Hub>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -250,7 +337,7 @@ open class HubsApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
      * Rows for the Home screen (Continue Watching, Recently Added…).
      * 
      * @param vod Include the Watch on VOD row (id vod-suggestions; films and series on demand picked for the caller, in vodEntries, with items empty). Only apps that show vodEntries should ask for it; without it the row is left out. (optional, default to false)
-     * @param mixed Mix films and series on demand into the suggestion rows (Recommended for You, the holiday row, Top Rated and the genre rows), in mixedEntries, and leave out the separate Watch on VOD row. Only apps that show mixedEntries should ask for it; without it those rows hold library items only (and rows with nothing from the library are left out). (optional, default to false)
+     * @param mixed Mix films and series on demand into the suggestion rows (Recommended for You, the holiday rows, Top Rated, Trending Now, the genre rows and the other category rows), in mixedEntries, and leave out the separate Watch on VOD row. Only apps that show mixedEntries should ask for it; without it those rows hold library items only (and rows with nothing from the library are left out). (optional, default to false)
      * @return ApiResponse<kotlin.collections.List<Hub>?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -269,7 +356,7 @@ open class HubsApi(basePath: kotlin.String = defaultBasePath, client: Call.Facto
      * To obtain the request config of the operation homeHubs
      *
      * @param vod Include the Watch on VOD row (id vod-suggestions; films and series on demand picked for the caller, in vodEntries, with items empty). Only apps that show vodEntries should ask for it; without it the row is left out. (optional, default to false)
-     * @param mixed Mix films and series on demand into the suggestion rows (Recommended for You, the holiday row, Top Rated and the genre rows), in mixedEntries, and leave out the separate Watch on VOD row. Only apps that show mixedEntries should ask for it; without it those rows hold library items only (and rows with nothing from the library are left out). (optional, default to false)
+     * @param mixed Mix films and series on demand into the suggestion rows (Recommended for You, the holiday rows, Top Rated, Trending Now, the genre rows and the other category rows), in mixedEntries, and leave out the separate Watch on VOD row. Only apps that show mixedEntries should ask for it; without it those rows hold library items only (and rows with nothing from the library are left out). (optional, default to false)
      * @return RequestConfig
      */
     fun homeHubsRequestConfig(vod: kotlin.Boolean?, mixed: kotlin.Boolean?) : RequestConfig<Unit> {

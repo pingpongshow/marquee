@@ -169,16 +169,22 @@ fun HomeScreen(nav: NavHostController) {
             if (!marquee.isOffline) h.exceptionOrNull()?.let { e -> item { Text("Couldn't load: ${e.message}", Modifier.padding(horizontal = sidePadding), color = MaterialTheme.colorScheme.error) } }
             itemsIndexed(h.getOrDefault(emptyList()), key = { _, it -> it.id }) { hi, hub ->
                 val first = opened == null && openedKey == null && hi == 0
-                // Continue Watching: library titles and films and episodes on demand together, with View more (LIVE-6).
+                // Every row's See all (USER-12): its page; on TV the D-pad comes back to its tile.
+                val seeAllKey = "seeall:${hub.id}"
+                val seeAllFocus = openedKey == seeAllKey
+                val seeAll = { openedKey = seeAllKey; opened = null; nav.navigate(HomeRows.seeAllRoute(hub.id)) }
+                // Continue Watching: library titles and films and episodes on demand together, with See all (LIVE-6).
                 if (hub.id == CONTINUE_HUB) {
-                    ContinueRow(nav, hub, removed, cardWidth * 1.6f, focusFirst = first, openedKey = openedKey,
-                        onOpen = { k -> openedKey = k; opened = null }, onRemoved = { k -> removed.add(k) })
+                    ContinueRow(nav, hub, removed, cardWidth * 1.6f, focusFirst = first, openedKey = openedKey?.takeIf { it != seeAllKey },
+                        onOpen = { k -> openedKey = k; opened = null }, onRemoved = { k -> removed.add(k) },
+                        seeAllFocus = seeAllFocus, onSeeAll = { openedKey = seeAllKey; opened = null })
                     return@itemsIndexed
                 }
-                // Suggestion rows with films and series on demand mixed in (Recommended, holidays, Top Rated, genres).
+                // Suggestion rows with films and series on demand mixed in (Recommended, holidays, Top Rated, genres…).
                 hub.mixedEntries?.let { entries ->
                     MixedRow(nav, hub, entries, cardWidth, focusFirst = first, opened = opened, openedKey = openedKey,
-                        onOpenItem = { id -> opened = id; openedKey = null }, onOpenVod = { k -> openedKey = "vodsug:$k"; opened = null })
+                        onOpenItem = { id -> opened = id; openedKey = null }, onOpenVod = { k -> openedKey = "vodsug:$k"; opened = null },
+                        onSeeAll = seeAll, seeAllFocus = seeAllFocus)
                     return@itemsIndexed
                 }
                 // Watch on VOD: films and series on demand picked for this person (LIVE-6, USER-16), hidden when empty.
@@ -191,7 +197,8 @@ fun HomeScreen(nav: NavHostController) {
                     return@itemsIndexed
                 }
                 if (hub.items.isEmpty()) return@itemsIndexed
-                Shelf(hub.title, hub.items, sidePadding, onTitle = HomeRows.route(hub.id)?.let { r -> { nav.navigate(r) } }) { i, it ->
+                Shelf(hub.title, hub.items, sidePadding, onSeeAll = seeAll, seeAllTileHeight = cardWidth / shapeFor(hub.items.first()).ratio,
+                    seeAllFocus = seeAllFocus) { i, it ->
                     PosterCard(it, marquee.imageUrl(it.images?.poster, 300), cardWidth, { opened = it.id; openedKey = null; openItem(nav, it) },
                         shape = shapeFor(it), autoFocus = marquee.isTv && (if (opened != null) it.id == opened else first && i == 0),
                         actions = tileActions(it, nav = nav))
@@ -208,7 +215,7 @@ fun HomeScreen(nav: NavHostController) {
  */
 @Composable
 private fun MixedRow(nav: NavHostController, hub: Hub, entries: List<HomeEntry>, cardWidth: androidx.compose.ui.unit.Dp, focusFirst: Boolean,
-    opened: Long?, openedKey: String?, onOpenItem: (Long) -> Unit, onOpenVod: (String) -> Unit) {
+    opened: Long?, openedKey: String?, onOpenItem: (Long) -> Unit, onOpenVod: (String) -> Unit, onSeeAll: () -> Unit, seeAllFocus: Boolean) {
     val marquee = LocalMarquee.current
     val context = androidx.compose.ui.platform.LocalContext.current
     val hidden = remember { mutableStateListOf<String>() }
@@ -220,7 +227,7 @@ private fun MixedRow(nav: NavHostController, hub: Hub, entries: List<HomeEntry>,
     }
     if (shown.isEmpty()) return
     val vodOpened = openedKey?.takeIf { it.startsWith("vodsug:") }?.removePrefix("vodsug:")
-    Shelf(hub.title, shown, sidePadding, onTitle = HomeRows.route(hub.id)?.let { r -> { nav.navigate(r) } }) { i, e ->
+    Shelf(hub.title, shown, sidePadding, onSeeAll = onSeeAll, seeAllTileHeight = cardWidth / Shape.Poster.ratio, seeAllFocus = seeAllFocus) { i, e ->
         val focus = marquee.isTv && when {
             opened != null -> e.item?.id == opened
             vodOpened != null -> e.vod?.key == vodOpened

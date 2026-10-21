@@ -180,6 +180,7 @@ private fun Routes(nav: NavHostController) {
         composable("nowplaying") { NowPlayingScreen(onClose = { nav.popBackStack() },
             onOpenPlaylist = { nav.navigate("playlist/$it") }) }
         composable("edithome") { EditHomeScreen(nav) }
+        composable("homehub/{id}") { HomeHubScreen(nav, it.arguments!!.getString("id")!!) }
         composable("users") { UsersScreen() }
         composable("serversettings") { ServerSettingsScreen() }
         composable("subtitles") { SubtitleAppearanceScreen() }

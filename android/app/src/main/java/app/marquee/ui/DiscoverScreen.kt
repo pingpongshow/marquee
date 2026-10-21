@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -221,7 +222,7 @@ fun DiscoverScreen(nav: NavHostController) {
             if (list == null) item(span = { GridItemSpan(maxLineSpan) }) { Box(Modifier.padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
             else itemsIndexed(list, key = { _, it -> "${it.mediaType}-${it.tmdbId}" }) { i, it ->
                 if (i == list.lastIndex) LaunchedEffect(list.size) { loadMore() } // the next page, near the end
-                DiscoverCard(it) {
+                DiscoverCard(it, onVod = { v -> nav.navigate(vodRoute(v)) }, onRequest = { picked = it }) {
                     when {
                         it.itemId != null -> nav.navigate("item/${it.itemId}")
                         else -> picked = it // its details, with Request when it can be
@@ -241,8 +242,13 @@ private fun Message(title: String, body: String) {
     }
 }
 
+/**
+ * A Discover tile: the poster (it opens the title), the title, the year and kind on their own
+ * line, then small full-width buttons: Watch on VOD when it's on demand (also for a show the
+ * library has only part of) and Request when it can be requested (secondary beside VOD).
+ */
 @Composable
-private fun DiscoverCard(it: DiscoverItem, onClick: () -> Unit) {
+private fun DiscoverCard(it: DiscoverItem, onVod: (app.marquee.api.models.VodRef) -> Unit, onRequest: () -> Unit, onClick: () -> Unit) {
     Column {
         Box(
             Modifier.fillMaxWidth().aspectRatio(2f / 3f).focusCard(onClick)
@@ -258,17 +264,33 @@ private fun DiscoverCard(it: DiscoverItem, onClick: () -> Unit) {
                     .padding(horizontal = 6.dp, vertical = 2.dp),
                 color = Color.White, style = MaterialTheme.typography.labelSmall,
             )
-            // On VOD too: opening it offers Watch now on VOD.
-            if (it.vod != null) Text(
-                "VOD",
-                Modifier.align(Alignment.TopEnd).padding(6.dp).background(Gold, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
-                color = Color.Black, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
-            )
         }
         Text(it.title, Modifier.padding(top = 6.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
         Text(listOfNotNull(it.year?.toString(), if (it.mediaType == DiscoverItem.MediaType.TV) "Series" else "Movie").joinToString(" · "),
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val vod = it.vod
+        val request = it.requestable()
+        if (vod != null || request) Column(Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (vod != null) TileButton("Watch ${it.title} on VOD", filled = true, onClick = { onVod(vod) }) {
+                Icon(Icons.Filled.PlayArrow, null, Modifier.size(14.dp))
+                Text("VOD", Modifier.padding(start = 2.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+            }
+            if (request) TileButton("Request ${it.title}", filled = vod == null, onClick = onRequest) {
+                Text("Request", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+            }
+        }
     }
+}
+
+/** A Discover tile's small full-width button: gold when [filled], else outlined (secondary). */
+@Composable
+private fun TileButton(description: String, filled: Boolean, onClick: () -> Unit, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+    val shape = RoundedCornerShape(6.dp)
+    val m = Modifier.fillMaxWidth().height(28.dp).focusRing(shape).semantics { contentDescription = description }
+    val padding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+    if (filled) Button(onClick, m, shape = shape, contentPadding = padding,
+        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Gold, contentColor = Color.Black), content = content)
+    else OutlinedButton(onClick, m, shape = shape, contentPadding = padding, content = content)
 }
 
 @Composable
