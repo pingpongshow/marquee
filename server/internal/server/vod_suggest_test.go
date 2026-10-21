@@ -32,8 +32,9 @@ func TestVodSuggestionsAPI(t *testing.T) {
 		case "/api/v1/search":
 			w.Write([]byte(`{"page":1,"totalPages":1,"results":[
 				{"id":100,"mediaType":"movie","title":"Ronin","releaseDate":"1998-01-01"},
-				{"id":700,"mediaType":"tv","name":"1899","firstAirDate":"2022-01-01"},
-				{"id":555,"mediaType":"movie","title":"Elsewhere","releaseDate":"2020-01-01"}]}`))
+				{"id":700,"mediaType":"tv","name":"1899","firstAirDate":"2022-01-01","mediaInfo":{"status":4}},
+				{"id":555,"mediaType":"movie","title":"Elsewhere","releaseDate":"2020-01-01"},
+				{"id":101,"mediaType":"movie","title":"Thief","releaseDate":"1981-01-01","mediaInfo":{"status":5}}]}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -191,14 +192,17 @@ func TestVodSuggestionsAPI(t *testing.T) {
 			}
 		}
 	}
-	if code := h.do("GET", "/requests/search?q=x", nil, &page); code != 200 || len(page.Results) != 3 {
+	if code := h.do("GET", "/requests/search?q=x", nil, &page); code != 200 || len(page.Results) != 4 {
 		t.Fatalf("search: %d %+v", code, page)
 	}
 	if v := page.Results[0].Vod; v == nil || v.Kind != "movie" || v.Id != ronin {
 		t.Errorf("Ronin on demand: %+v", v)
 	}
 	if v := page.Results[1].Vod; v == nil || v.Kind != "series" {
-		t.Errorf("1899 on demand: %+v", v)
+		t.Errorf("1899 on demand (partly here): %+v", v)
+	}
+	if page.Results[3].Vod != nil {
+		t.Errorf("Thief is all here, so not offered on demand: %+v", page.Results[3].Vod)
 	}
 	if page.Results[2].Vod != nil {
 		t.Errorf("Elsewhere isn't on demand: %+v", page.Results[2].Vod)

@@ -24,6 +24,9 @@ var (
 	christmas    = Holiday{ID: "christmas", Title: "Christmas Classics", Keywords: []string{"christmas", "christmas party", "christmas eve", "christmas tree", "santa claus", "xmas", "holiday", "elf", "reindeer", "snowman", "christmas carol", "christmas spirit"}, Words: []string{"christmas", "xmas", "santa", "holiday", "noel", "grinch", "elf", "scrooge", "carol"}}
 )
 
+// Holidays are the holidays Home has a row for.
+func Holidays() []Holiday { return []Holiday{halloween_, thanksgiving, christmas} }
+
 // HolidayWindow is how many days before a holiday its row appears (the day itself included).
 const HolidayWindow = 30
 
@@ -92,42 +95,123 @@ func (s *Store) HolidayVideos(ctx context.Context, acc Access, h Holiday, libIDs
 	return s.ByIDs(ctx, acc, ids)
 }
 
+// DiscoverQuery picks unwatched movies and shows for a Home category row.
+type DiscoverQuery struct {
+	Types            []string // movie, show (nil = both)
+	Genres           []string // any of them
+	MinRating        float64  // audience/IMDb/critic rating, 0–10
+	MinCritic        int      // critics' score, 0–100 (Rotten Tomatoes, else Metacritic)
+	YearFrom, YearTo int      // 0 = open
+	MaxMinutes       int      // movies only
+	MinEpisodes      int      // shows only: long-running ones
+	Family           bool     // rated for families (or unrated family/animation/kids titles)
+	Foreign          bool     // not originally in English
+	Newest           bool     // newest first instead of best rated
+}
+
 // TopRated are well-rated movies and shows in libIDs the person hasn't started, best first.
 func (s *Store) TopRated(ctx context.Context, acc Access, libIDs []int64, limit int) ([]Summary, error) {
-	return s.unwatchedByRating(ctx, acc, libIDs, nil, 7.5, limit)
+	return s.Discover(ctx, acc, libIDs, DiscoverQuery{MinRating: 7.5}, limit)
 }
 
 // GenreVideos are movies and shows in libIDs with genre the person hasn't started, best rated first.
 func (s *Store) GenreVideos(ctx context.Context, acc Access, genre string, libIDs []int64, limit int) ([]Summary, error) {
-	return s.unwatchedByRating(ctx, acc, libIDs, []string{genre}, 0, limit)
+	return s.Discover(ctx, acc, libIDs, DiscoverQuery{Genres: []string{genre}}, limit)
 }
 
-func (s *Store) unwatchedByRating(ctx context.Context, acc Access, libIDs []int64, genres []string, minRating float64, limit int) ([]Summary, error) {
+// Discover are movies and shows in libIDs that fit q and the person hasn't started, best
+// rated (or newest) first.
+func (s *Store) Discover(ctx context.Context, acc Access, libIDs []int64, q DiscoverQuery, limit int) ([]Summary, error) {
 	if len(libIDs) == 0 {
 		return nil, nil
 	}
 	acc.LibraryIDs = intersect(acc.LibraryIDs, libIDs)
 	ac, aargs := acc.clause()
+	types := q.Types
+	if len(types) == 0 {
+		types = []string{"movie", "show"}
+	}
 	rating := `COALESCE(i.audience_rating, i.imdb_rating, i.critic_rating, 0)`
-	where := ` WHERE i.type IN ('movie', 'show') AND i.extra_type IS NULL AND ` + ac + ` AND ` + notStarted(acc.UserID) + ` AND ` + rating + ` >= ?`
-	args := append(append([]any{}, aargs...), minRating)
-	if len(genres) > 0 {
+	where := ` WHERE i.type IN ('` + strings.Join(types, "','") + `') AND i.extra_type IS NULL AND ` + ac + ` AND ` + notStarted(acc.UserID)
+	args := append([]any{}, aargs...)
+	if q.MinRating > 0 {
+		where += ` AND ` + rating + ` >= ?`
+		args = append(args, q.MinRating)
+	}
+	if q.MinCritic > 0 {
+		where += ` AND COALESCE(i.rt_critic, i.metacritic + 10, 0) >= ?`
+		args = append(args, q.MinCritic)
+	}
+	if q.YearFrom > 0 {
+		where += ` AND COALESCE(i.year, 0) >= ?`
+		args = append(args, q.YearFrom)
+	}
+	if q.YearTo > 0 {
+		where += ` AND COALESCE(i.year, 0) BETWEEN 1 AND ?`
+		args = append(args, q.YearTo)
+	}
+	if q.MaxMinutes > 0 {
+		where += ` AND i.type = 'movie' AND COALESCE(i.duration_ms, 0) BETWEEN 1 AND ?`
+		args = append(args, int64(q.MaxMinutes)*60000)
+	}
+	if q.MinEpisodes > 0 {
+		where += ` AND i.type = 'show' AND i.leaf_count >= ?`
+		args = append(args, q.MinEpisodes)
+	}
+	if q.Family {
+		where += ` AND (` + ratingCase("i.content_rating") + ` <= ? OR (COALESCE(i.content_rating, '') = '' AND EXISTS (SELECT 1 FROM item_tags it
+			JOIN tags t ON t.id = it.tag_id AND t.kind = 'genre' WHERE it.item_id = i.id AND t.name IN ('Family', 'Animation', 'Kids'))))`
+		args = append(args, familyMaxLevel)
+	}
+	if q.Foreign {
+		where += ` AND COALESCE(i.original_language, '') NOT IN ('', 'en')`
+	}
+	if len(q.Genres) > 0 {
 		where += ` AND EXISTS (SELECT 1 FROM item_tags it JOIN tags t ON t.id = it.tag_id AND t.kind = 'genre'
-			WHERE it.item_id = i.id AND t.name COLLATE NOCASE IN (?` + strings.Repeat(",?", len(genres)-1) + `))`
-		for _, g := range genres {
+			WHERE it.item_id = i.id AND t.name COLLATE NOCASE IN (?` + strings.Repeat(",?", len(q.Genres)-1) + `))`
+		for _, g := range q.Genres {
 			args = append(args, g)
 		}
 	}
+	order := rating + ` DESC, i.sort_title COLLATE NOCASE`
+	if q.Newest {
+		order = `COALESCE(i.originally_available_at, i.year) DESC, ` + order
+	}
+	return s.idsThenSummaries(ctx, acc, `SELECT i.id`+summaryFrom+where+` ORDER BY `+order+` LIMIT ?`, append(args, limit))
+}
+
+// WatchAgain are movies and shows the person loved (rated 8 or more, or a favourite) and
+// hasn't watched for three months, best loved first.
+func (s *Store) WatchAgain(ctx context.Context, acc Access, libIDs []int64, limit int) ([]Summary, error) {
+	if len(libIDs) == 0 || acc.UserID == 0 {
+		return nil, nil
+	}
+	acc.LibraryIDs = intersect(acc.LibraryIDs, libIDs)
+	ac, aargs := acc.clause()
+	last := `CASE WHEN i.type = 'movie' THEN us.last_viewed_at ELSE (SELECT MAX(x.last_viewed_at) FROM items e
+		JOIN user_item_state x ON x.item_id = e.id AND x.user_id = ? AND x.play_count > 0 WHERE e.grandparent_id = i.id AND e.type = 'episode') END`
+	q := `SELECT i.id` + summaryFrom + ` LEFT JOIN user_item_state us ON us.item_id = i.id AND us.user_id = ?
+		WHERE i.type IN ('movie', 'show') AND i.extra_type IS NULL AND ` + ac + `
+		AND (COALESCE(us.rating, 0) >= 8 OR ` + favoriteCond(acc.UserID, "i") + `)
+		AND (i.type = 'show' OR COALESCE(us.play_count, 0) > 0)
+		AND COALESCE(` + last + `, '') BETWEEN '1' AND ?
+		ORDER BY ` + favoriteCond(acc.UserID, "i") + ` DESC, COALESCE(us.rating, 0) DESC, i.sort_title COLLATE NOCASE LIMIT ?`
+	args := append([]any{acc.UserID}, aargs...)
+	args = append(args, acc.UserID, isoUTC(time.Now().AddDate(0, -3, 0)), limit)
+	return s.idsThenSummaries(ctx, acc, q, args)
+}
+
+// idsThenSummaries runs q (selecting item ids, in order) and loads their summaries.
+func (s *Store) idsThenSummaries(ctx context.Context, acc Access, q string, args []any) ([]Summary, error) {
 	var ids []int64
-	err := eachRow(ctx, s.db, `SELECT i.id`+summaryFrom+where+` ORDER BY `+rating+` DESC, i.sort_title COLLATE NOCASE LIMIT ?`, append(args, limit),
-		func(r *sql.Rows) error {
-			var id int64
-			if err := r.Scan(&id); err != nil {
-				return err
-			}
-			ids = append(ids, id)
-			return nil
-		})
+	err := eachRow(ctx, s.db, q, args, func(r *sql.Rows) error {
+		var id int64
+		if err := r.Scan(&id); err != nil {
+			return err
+		}
+		ids = append(ids, id)
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}

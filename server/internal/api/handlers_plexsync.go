@@ -13,7 +13,7 @@ import (
 func (h *Handlers) plexSyncStatus(ctx context.Context) PlexSyncStatus {
 	c := h.Settings.Get().PlexSync
 	out := PlexSyncStatus{
-		Settings: PlexSyncSettings{Url: c.URL, TokenSet: c.Token != "", Enabled: c.Enabled, IntervalMinutes: c.IntervalMinutes,
+		Settings: PlexSyncSettings{On: !c.Off, Url: c.URL, TokenSet: c.Token != "", Enabled: c.Enabled, IntervalMinutes: c.IntervalMinutes,
 			WatchState: c.WatchState, Ratings: c.Ratings, ResumePositions: c.ResumePositions, PlayHistory: c.PlayHistory,
 			PathMappings: []PlexPathMapping{}},
 		Users: []PlexSyncUser{},
@@ -88,6 +88,9 @@ func (h *Handlers) UpdatePlexSync(ctx context.Context, req UpdatePlexSyncRequest
 		if b.Token != nil {
 			c.Token = strings.TrimSpace(*b.Token)
 		}
+		if b.On != nil {
+			c.Off = !*b.On
+		}
 		set(&c.Enabled, b.Enabled)
 		set(&c.IntervalMinutes, b.IntervalMinutes)
 		set(&c.WatchState, b.WatchState)
@@ -125,6 +128,9 @@ func (h *Handlers) RunPlexSync(ctx context.Context, _ RunPlexSyncRequestObject) 
 	if h.PlexSync == nil || h.Tasks == nil {
 		return RunPlexSync400JSONResponse{BadRequestJSONResponse(apiErr("unavailable", "Plex sync isn't available"))}, nil
 	}
+	if h.Settings.Get().PlexSync.Off {
+		return RunPlexSync400JSONResponse{BadRequestJSONResponse(apiErr("off", plexsync.ErrOff.Error()))}, nil
+	}
 	if !h.Settings.Get().PlexSync.Configured() {
 		return RunPlexSync400JSONResponse{BadRequestJSONResponse(apiErr("not_configured", plexsync.ErrNotConfigured.Error()))}, nil
 	}
@@ -156,6 +162,8 @@ func (h *Handlers) PreviewPlexSync(ctx context.Context, _ PreviewPlexSyncRequest
 	switch {
 	case errors.Is(err, plexsync.ErrNotConfigured):
 		return PreviewPlexSync400JSONResponse{BadRequestJSONResponse(apiErr("not_configured", err.Error()))}, nil
+	case errors.Is(err, plexsync.ErrOff):
+		return PreviewPlexSync400JSONResponse{BadRequestJSONResponse(apiErr("off", err.Error()))}, nil
 	case errors.Is(err, plexsync.ErrRunning):
 		return PreviewPlexSync409JSONResponse{ConflictJSONResponse(apiErr("running", err.Error()))}, nil
 	case err != nil:

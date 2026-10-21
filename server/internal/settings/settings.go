@@ -50,6 +50,9 @@ type PlexSync struct {
 	URL string `json:"url"`
 	// Token is the server owner's Plex token. A secret: never returned by the API, never logged.
 	Token string `json:"token"`
+	// Off turns Plex sync off altogether: no automatic or manual runs, and Settings hides the
+	// Plex options. Off is false by default, so servers that already sync keep doing so.
+	Off bool `json:"off,omitempty"`
 	// Enabled turns automatic sync on (every IntervalMinutes). Manual runs work either way.
 	Enabled         bool `json:"enabled"`
 	IntervalMinutes int  `json:"intervalMinutes"`
@@ -71,6 +74,9 @@ type PlexPathMapping struct {
 
 // Configured reports whether a Plex server and token are set.
 func (p PlexSync) Configured() bool { return p.URL != "" && p.Token != "" }
+
+// Active reports whether sync is on and configured, so runs may happen.
+func (p PlexSync) Active() bool { return !p.Off && p.Configured() }
 
 // VODSave configures saving films and episodes from movies-on-demand (Xtream Codes) sources
 // into the library's folders. An empty folder turns saving of that kind off.

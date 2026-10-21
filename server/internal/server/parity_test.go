@@ -59,7 +59,7 @@ func TestSmartCollectionsHomeLayoutCinema(t *testing.T) {
 	pin := fmt.Sprintf("collection-%d", sc.Id)
 	var layout api.HomeLayout
 	h.do("GET", "/me/home-layout", nil, &layout)
-	if len(layout.Rows) != 10 || layout.Rows[0].Id != "continue-watching" || layout.Rows[2].Id != "recommended" {
+	if len(layout.Rows) != 19 || layout.Rows[0].Id != "continue-watching" || layout.Rows[2].Id != "recommended" {
 		t.Fatalf("default layout: %+v", layout)
 	}
 	h.do("PUT", "/me/home-layout", map[string]any{"rows": []map[string]any{{"id": recent}, {"id": pin}, {"id": "watchlist", "hidden": true}, {"id": "nope"}}}, &layout)
@@ -67,7 +67,7 @@ func TestSmartCollectionsHomeLayoutCinema(t *testing.T) {
 	for _, r := range layout.Rows {
 		ids = append(ids, r.Id)
 	}
-	if fmt.Sprint(ids) != fmt.Sprintf("[continue-watching %s %s watchlist recommended because-you-watched holiday top-rated trending genres favorites]", recent, pin) || !*layout.Rows[2].Pinned || *layout.Rows[2].Title != "90s" || !*layout.Rows[3].Hidden {
+	if fmt.Sprint(ids) != fmt.Sprintf("[continue-watching %s %s watchlist recommended because-you-watched holiday new-releases top-rated trending genres acclaimed binge-worthy short-films decades classics family international watch-again favorites]", recent, pin) || !*layout.Rows[2].Pinned || *layout.Rows[2].Title != "90s" || !*layout.Rows[3].Hidden {
 		t.Fatalf("saved layout: %v %+v", ids, layout.Rows)
 	}
 	var hubs []api.Hub
@@ -75,8 +75,27 @@ func TestSmartCollectionsHomeLayoutCinema(t *testing.T) {
 	if len(hubs) != 3 || hubs[0].Id != recent || hubs[1].Id != pin || len(hubs[1].Items) != 1 || hubs[2].Id != "top-rated" {
 		t.Fatalf("hubs: %+v", hubs)
 	}
+	// See all: one row in full, as long as asked; rows that aren't on Home today too.
+	var hub api.Hub
+	if code := h.do("GET", "/hubs/home/top-rated?limit=1", nil, &hub); code != 200 || hub.Title != "Top Rated" || len(hub.Items) != 1 {
+		t.Fatalf("see all: %d %+v", code, hub)
+	}
+	if code := h.do("GET", "/hubs/home/top-rated?mixed=true", nil, &hub); code != 200 || hub.MixedEntries == nil || len(*hub.MixedEntries) != 2 {
+		t.Fatalf("see all mixed: %d %+v", code, hub)
+	}
+	if code := h.do("GET", "/hubs/home/"+pin, nil, &hub); code != 200 || hub.Title != "90s" {
+		t.Fatalf("see all pinned: %d %+v", code, hub)
+	}
+	if code := h.do("GET", "/hubs/home/decade-1990", nil, &hub); code != 200 || hub.Title != "Best of the 90s" {
+		t.Fatalf("see all decade: %d %+v", code, hub)
+	}
+	for _, id := range []string{"nope", "genre-nope", "decade-1995", "holiday"} {
+		if code := h.do("GET", "/hubs/home/"+id, nil, nil); code != 404 {
+			t.Errorf("see all %s: %d", id, code)
+		}
+	}
 	h.do("PUT", "/me/home-layout", map[string]any{"rows": []any{}}, &layout)
-	if layout.Rows[0].Id != "continue-watching" || len(layout.Rows) != 10 {
+	if layout.Rows[0].Id != "continue-watching" || len(layout.Rows) != 19 {
 		t.Fatalf("reset: %+v", layout)
 	}
 

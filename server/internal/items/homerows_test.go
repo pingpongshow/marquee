@@ -105,4 +105,15 @@ func TestHomeRowQueries(t *testing.T) {
 	if got := titles(s.GenreVideos(ctx, acc, "crime", libs, 10)); got != "Ronin" { // Heat is watched
 		t.Errorf("crime: %s", got)
 	}
+	// Loved a while ago: Ronin (rated 9, four months back); Heat was just watched.
+	var ronin int64
+	d.QueryRow(`SELECT id FROM items WHERE title = 'Ronin'`).Scan(&ronin)
+	mustExec(t, d, `INSERT INTO user_item_state(user_id, item_id, play_count, last_viewed_at, rating) VALUES (?, ?, 1, ?, 9)`, uid, ronin, isoUTC(time.Now().AddDate(0, -4, 0)))
+	mustExec(t, d, `UPDATE user_item_state SET rating = 10 WHERE item_id = ?`, heat)
+	if got := titles(s.WatchAgain(ctx, acc, libs, 10)); got != "Ronin" {
+		t.Errorf("watch again: %s", got)
+	}
+	if got := titles(s.Discover(ctx, acc, libs, DiscoverQuery{MinRating: 7.5, Newest: true}, 10)); got != "Shelf Life,Halloween" {
+		t.Errorf("discover: %s", got)
+	}
 }

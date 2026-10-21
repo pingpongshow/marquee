@@ -52,6 +52,7 @@ const (
 
 var (
 	ErrNotConfigured = errors.New("set the Plex server address and token first")
+	ErrOff           = errors.New("Plex sync is turned off")
 	ErrRunning       = errors.New("a Plex sync is already running")
 )
 
@@ -219,7 +220,7 @@ func (s *Service) Task() tasks.Task {
 		Description: "Syncs watch status, plays, resume positions and ratings with Plex, both ways (Settings → Plex). Runs on its interval while automatic sync is on.",
 		EveryFunc: func() time.Duration {
 			c := s.Settings.Get().PlexSync
-			if !c.Enabled || !c.Configured() {
+			if !c.Enabled || !c.Active() {
 				return 0
 			}
 			return time.Duration(c.IntervalMinutes) * time.Minute
@@ -236,7 +237,7 @@ func (s *Service) Task() tasks.Task {
 // NextRun is when automatic sync runs next (nil while it's off).
 func (s *Service) NextRun(ctx context.Context) *time.Time {
 	c := s.Settings.Get().PlexSync
-	if !c.Enabled || !c.Configured() {
+	if !c.Enabled || !c.Active() {
 		return nil
 	}
 	var st state
@@ -331,6 +332,9 @@ func (s *Service) Run(ctx context.Context, dry bool) (*Report, error) {
 		s.mu.Unlock()
 	}()
 	cfg := s.Settings.Get().PlexSync
+	if cfg.Off {
+		return nil, ErrOff
+	}
 	if !cfg.Configured() {
 		return nil, ErrNotConfigured
 	}

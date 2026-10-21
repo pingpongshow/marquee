@@ -162,12 +162,12 @@ func (h *Handlers) ItemVodSimilar(ctx context.Context, req ItemVodSimilarRequest
 
 // vodSuggestHub is Home's Watch on VOD row; ok is false when it has nothing (or the caller
 // can't watch on demand).
-func (h *Handlers) vodSuggestHub(ctx context.Context, r homeRow) (Hub, bool, error) {
+func (h *Handlers) vodSuggestHub(ctx context.Context, r homeRow, n int) (Hub, bool, error) {
 	u, s, _, allowed := h.suggestSession(ctx)
 	if !allowed {
 		return Hub{}, false, nil
 	}
-	list, err := h.VODSuggest.For(ctx, u, "", vodSuggestRowSize)
+	list, err := h.VODSuggest.For(ctx, u, "", n)
 	if err != nil || len(list) == 0 {
 		return Hub{}, false, err
 	}
@@ -278,7 +278,8 @@ func (h *Handlers) rerankVod(ctx context.Context, prompt string, mq vodsuggest.M
 	return append(out, list[len(top):]...)
 }
 
-// markOnDemand sets vod on Discover results the caller can watch on demand.
+// markOnDemand sets vod on Discover results the caller can watch on demand, unless the
+// library already has all of it (a show missing episodes still gets it).
 func (h *Handlers) markOnDemand(ctx context.Context, page *DiscoverPage) {
 	_, maxRating, _, allowed := h.vodSession(ctx)
 	if !allowed || h.VODSuggest == nil || len(page.Results) == 0 {
@@ -298,6 +299,9 @@ func (h *Handlers) markOnDemand(ctx context.Context, page *DiscoverPage) {
 		return
 	}
 	for i, d := range page.Results {
+		if d.Availability == AvailabilityAvailable {
+			continue
+		}
 		if d.MediaType == DiscoverItemMediaTypeTv {
 			if id, ok := t[d.TmdbId]; ok {
 				page.Results[i].Vod = &VodRef{Kind: VodRefKindSeries, Id: id}

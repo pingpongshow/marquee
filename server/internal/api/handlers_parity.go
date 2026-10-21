@@ -147,30 +147,30 @@ func (h *Handlers) savedLayout(ctx context.Context, uid int64) []savedRow {
 }
 
 // pinnedRow resolves a pinned collection-<id> or playlist-<id> the person can see.
-func (h *Handlers) pinnedRow(ctx context.Context, uid int64, id string) (homeRow, bool) {
+func (h *Handlers) pinnedRow(ctx context.Context, uid int64, id string, n int) (homeRow, bool) {
 	kind, num, _ := strings.Cut(id, "-")
-	n, err := strconv.ParseInt(num, 10, 64)
+	ref, err := strconv.ParseInt(num, 10, 64)
 	if err != nil {
 		return homeRow{}, false
 	}
 	acc := access(ctx)
 	switch kind {
 	case "collection":
-		d, err := h.Items.Get(ctx, acc, n, false)
+		d, err := h.Items.Get(ctx, acc, ref, false)
 		if err != nil || d.Type != "collection" || !h.canSeeLibrary(ctx, d.LibraryID) {
 			return homeRow{}, false
 		}
 		return homeRow{id: id, title: d.Title, lib: d.LibraryID, pinned: true, fill: func() ([]items.Summary, error) {
-			list, _, err := h.Items.Children(ctx, acc, n, 0, 20)
+			list, _, err := h.Items.Children(ctx, acc, ref, 0, n)
 			return list, err
 		}}, true
 	case "playlist":
-		p, err := h.Items.Playlist(ctx, uid, n)
+		p, err := h.Items.Playlist(ctx, uid, ref)
 		if err != nil {
 			return homeRow{}, false
 		}
 		return homeRow{id: id, title: p.Title, pinned: true, fill: func() ([]items.Summary, error) {
-			list, _, err := h.Items.PlaylistItems(ctx, acc, n, 0, 20)
+			list, _, err := h.Items.PlaylistItems(ctx, acc, ref, 0, n)
 			out := make([]items.Summary, len(list))
 			for i, e := range list {
 				out[i] = e.Item
@@ -181,8 +181,8 @@ func (h *Handlers) pinnedRow(ctx context.Context, uid int64, id string) (homeRow
 	return homeRow{}, false
 }
 
-// homeRows is every row Home can show, arranged by the person's layout.
-func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow) ([]homeRow, error) {
+// homeRows is every row Home can show, arranged by the person's layout, n titles a row.
+func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow, n int) ([]homeRow, error) {
 	acc := access(ctx)
 	libs, err := h.Libraries.List(ctx)
 	if err != nil {
@@ -195,8 +195,8 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow) ([
 		}
 	}
 	defaults := []homeRow{
-		{id: "continue-watching", title: "Continue Watching", fill: func() ([]items.Summary, error) { return h.Items.ContinueWatching(ctx, acc, home, 20) }},
-		{id: "watchlist", title: "Your Watchlist", fill: func() ([]items.Summary, error) { return h.Items.Watchlist(ctx, acc, 30) }},
+		{id: "continue-watching", title: "Continue Watching", fill: func() ([]items.Summary, error) { return h.Items.ContinueWatching(ctx, acc, home, n) }},
+		{id: "watchlist", title: "Your Watchlist", fill: func() ([]items.Summary, error) { return h.Items.Watchlist(ctx, acc, max(n, 30)) }},
 	}
 	// Recommendations (USER-16). Always offered, so a saved layout keeps their place; they
 	// stay empty until movies and shows are embedded.
@@ -208,14 +208,14 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow) ([
 				if idx.Len() == 0 {
 					return nil, nil
 				}
-				return h.Items.Recommended(ctx, acc, idx, home, 20)
+				return h.Items.Recommended(ctx, acc, idx, home, n)
 			}},
 			homeRow{id: "because-you-watched", title: "Because You Watched", expand: func() ([]homeRow, error) {
 				idx := h.videoIndex()
 				if idx.Len() == 0 {
 					return nil, nil
 				}
-				rows, err := h.Items.BecauseYouWatched(ctx, acc, idx, home, 2, 20)
+				rows, err := h.Items.BecauseYouWatched(ctx, acc, idx, home, 2, n)
 				out := make([]homeRow, len(rows))
 				for i, b := range rows {
 					list := b.Items
@@ -234,13 +234,13 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow) ([
 			if !allowed {
 				return nil, nil
 			}
-			list, err := h.VODSuggest.For(ctx, u, "", vodSuggestRowSize)
+			list, err := h.VODSuggest.For(ctx, u, "", n)
 			if err != nil || len(list) == 0 {
 				return nil, err
 			}
 			return h.toAPIVodSuggestions(ctx, s.User.ID, list)
 		}
-		defaults = append(defaults, h.moreHomeRows(ctx, home)...)
+		defaults = append(defaults, h.newMoreRows(ctx, home, n).rows()...)
 	}
 	// Films and series on demand picked for them (Watch on VOD), when on demand is theirs to
 	// watch. Its content (vodEntries) is only sent to apps that ask for it (HomeHubs).
@@ -250,17 +250,17 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow) ([
 	}
 	// The person's favourite movies and shows, newest first; hidden until they show it.
 	defaults = append(defaults, homeRow{id: "favorites", title: "Your Favourites", hiddenByDefault: true, fill: func() ([]items.Summary, error) {
-		return h.Items.Favorites(ctx, acc, []string{"movie", "show"}, append([]int64{}, home...), 30)
+		return h.Items.Favorites(ctx, acc, []string{"movie", "show"}, append([]int64{}, home...), max(n, 30))
 	}})
 	for _, l := range libs {
 		if !h.canSeeLibrary(ctx, l.ID) || (l.Options.IncludeInHome != nil && !*l.Options.IncludeInHome) {
 			continue
 		}
 		defaults = append(defaults, homeRow{id: fmt.Sprintf("recent-%d", l.ID), title: "Recently Added " + l.Name, lib: l.ID,
-			fill: func() ([]items.Summary, error) { return h.Items.RecentlyAdded(ctx, acc, l.ID, string(l.Type), 20) }})
+			fill: func() ([]items.Summary, error) { return h.Items.RecentlyAdded(ctx, acc, l.ID, string(l.Type), n) }})
 		if l.Type == library.Music {
 			defaults = append(defaults, homeRow{id: fmt.Sprintf("played-%d", l.ID), title: "Recently Played in " + l.Name, lib: l.ID,
-				fill: func() ([]items.Summary, error) { return h.Items.RecentlyPlayedAlbums(ctx, acc, l.ID, 20) }})
+				fill: func() ([]items.Summary, error) { return h.Items.RecentlyPlayedAlbums(ctx, acc, l.ID, n) }})
 		}
 	}
 	byID := map[string]homeRow{}
@@ -275,7 +275,7 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow) ([
 		}
 		r, ok := byID[s.ID]
 		if !ok {
-			if r, ok = h.pinnedRow(ctx, uid, s.ID); !ok {
+			if r, ok = h.pinnedRow(ctx, uid, s.ID, n); !ok {
 				continue // a library or collection that's gone
 			}
 		}
@@ -314,7 +314,7 @@ func (h *Handlers) HomeHubs(ctx context.Context, req HomeHubsRequestObject) (Hom
 	if !ok {
 		return HomeHubs401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	rows, err := h.homeRows(ctx, s.User.ID, h.savedLayout(ctx, s.User.ID))
+	rows, err := h.homeRows(ctx, s.User.ID, h.savedLayout(ctx, s.User.ID), homeRowSize)
 	if err != nil {
 		return nil, internal(ctx, "hubs", err)
 	}
@@ -334,7 +334,7 @@ func (h *Handlers) HomeHubs(ctx context.Context, req HomeHubsRequestObject) (Hom
 			if req.Params.Vod == nil || !*req.Params.Vod || mixed {
 				continue
 			}
-			hub, ok, err := h.vodSuggestHub(ctx, r)
+			hub, ok, err := h.vodSuggestHub(ctx, r, vodSuggestRowSize)
 			if err != nil {
 				return nil, internal(ctx, "hubs", err)
 			}
@@ -361,27 +361,12 @@ func (h *Handlers) HomeHubs(ctx context.Context, req HomeHubsRequestObject) (Hom
 			}
 		}
 		for _, r := range subs {
-			list, err := r.fill()
+			hub, ok, err := h.fillHub(r, mixed, homeRowSize)
 			if err != nil {
 				return nil, internal(ctx, "hubs", err)
 			}
-			var vod []VodSuggestion
-			if mixed && r.vodFill != nil {
-				if vod, err = r.vodFill(); err != nil {
-					return nil, internal(ctx, "hubs", err)
-				}
-			}
-			if len(list) == 0 && len(vod) == 0 {
+			if !ok {
 				continue
-			}
-			hub := Hub{Id: r.id, Title: r.title, LibraryId: nz(r.lib), Items: make([]ItemSummary, len(list))}
-			for i, it := range list {
-				hub.Items[i] = toAPISummary(it)
-			}
-			if mixed && r.vodFill != nil {
-				hub.MixedEntries = ptr(mixEntries(list, vod))
-			} else if len(list) == 0 {
-				continue // nothing older apps can show
 			}
 			out = append(out, hub)
 		}
@@ -394,7 +379,7 @@ func (h *Handlers) GetHomeLayout(ctx context.Context, _ GetHomeLayoutRequestObje
 	if !ok {
 		return GetHomeLayout401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
 	}
-	rows, err := h.homeRows(ctx, s.User.ID, h.savedLayout(ctx, s.User.ID))
+	rows, err := h.homeRows(ctx, s.User.ID, h.savedLayout(ctx, s.User.ID), homeRowSize)
 	if err != nil {
 		return nil, internal(ctx, "homeLayout", err)
 	}
@@ -414,7 +399,7 @@ func (h *Handlers) SetHomeLayout(ctx context.Context, req SetHomeLayoutRequestOb
 		saved = append(saved, savedRow{ID: r.Id, Hidden: r.Hidden != nil && *r.Hidden})
 	}
 	// Keep only rows that exist (and pinned ones the person may see).
-	rows, err := h.homeRows(ctx, s.User.ID, saved)
+	rows, err := h.homeRows(ctx, s.User.ID, saved, homeRowSize)
 	if err != nil {
 		return nil, internal(ctx, "homeLayout", err)
 	}

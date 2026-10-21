@@ -21,7 +21,7 @@ func TestPlexSyncSettings(t *testing.T) {
 	h.handlers.PlexSync = &plexsync.Service{DB: h.db, Settings: h.store}
 
 	var st api.PlexSyncStatus
-	if code := h.do("GET", "/plex-sync", nil, &st); code != 200 || st.Settings.Enabled || st.Settings.TokenSet || st.Settings.IntervalMinutes != 30 ||
+	if code := h.do("GET", "/plex-sync", nil, &st); code != 200 || !st.Settings.On || st.Settings.Enabled || st.Settings.TokenSet || st.Settings.IntervalMinutes != 30 ||
 		!st.Settings.WatchState || st.Reachable != nil || st.NextRunAt != nil {
 		t.Fatalf("defaults: %d %+v", code, st)
 	}
@@ -52,6 +52,20 @@ func TestPlexSyncSettings(t *testing.T) {
 	}
 	if code := h.do("PATCH", "/plex-sync", map[string]any{"enabled": true}, &st); code != 200 || !st.Settings.Enabled || st.NextRunAt == nil {
 		t.Errorf("enable: %d %+v", code, st)
+	}
+	// Turned off: no next run, and neither a run nor a preview starts.
+	st = api.PlexSyncStatus{}
+	if code := h.do("PATCH", "/plex-sync", map[string]any{"on": false}, &st); code != 200 || st.Settings.On || !st.Settings.Enabled || st.NextRunAt != nil {
+		t.Errorf("off: %d %+v", code, st)
+	}
+	if code := h.do("POST", "/plex-sync/run", nil, nil); code != 400 {
+		t.Errorf("run while off: %d", code)
+	}
+	if code := h.do("POST", "/plex-sync/preview", nil, nil); code != 400 {
+		t.Errorf("preview while off: %d", code)
+	}
+	if code := h.do("PATCH", "/plex-sync", map[string]any{"on": true}, &st); code != 200 || !st.Settings.On || st.NextRunAt == nil {
+		t.Errorf("on again: %d %+v", code, st)
 	}
 	if code := h.do("PUT", "/plex-sync/users/5", map[string]any{"userId": 1}, nil); code != 404 {
 		t.Errorf("unknown Plex account: %d", code)

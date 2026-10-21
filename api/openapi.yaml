@@ -2601,7 +2601,7 @@ paths:
           schema: { type: boolean, default: false }
         - name: mixed
           in: query
-          description: "Mix films and series on demand into the suggestion rows (Recommended for You, the holiday row, Top Rated and the genre rows), in mixedEntries, and leave out the separate Watch on VOD row. Only apps that show mixedEntries should ask for it; without it those rows hold library items only (and rows with nothing from the library are left out)."
+          description: "Mix films and series on demand into the suggestion rows (Recommended for You, the holiday rows, Top Rated, Trending Now, the genre rows and the other category rows), in mixedEntries, and leave out the separate Watch on VOD row. Only apps that show mixedEntries should ask for it; without it those rows hold library items only (and rows with nothing from the library are left out)."
           schema: { type: boolean, default: false }
       responses:
         "200":
@@ -2612,6 +2612,33 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/Hub" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /hubs/home/{hubId}:
+    get:
+      tags: [hubs]
+      operationId: homeHub
+      summary: "One Home row in full, for See all (USER-12): the hub ids GET /hubs/home returns (e.g. recommended, because-12, holiday-christmas, genre-comedy, top-rated, watchlist, favorites). Continue Watching, Recently Added, pinned collections and playlists have pages of their own; asking for them here gives the row as Home has it, longer."
+      parameters:
+        - name: hubId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: mixed
+          in: query
+          description: As for GET /hubs/home.
+          schema: { type: boolean, default: false }
+        - name: limit
+          in: query
+          description: How many library titles (and as many on demand again, when mixed).
+          schema: { type: integer, minimum: 1, maximum: 200, default: 100 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Hub" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /activity/history:
     get:
@@ -6915,8 +6942,9 @@ components:
     # ---------- Plex sync ----------
     PlexSyncSettings:
       type: object
-      required: [url, tokenSet, enabled, intervalMinutes, watchState, ratings, resumePositions, playHistory, pathMappings]
+      required: ["on", url, tokenSet, enabled, intervalMinutes, watchState, ratings, resumePositions, playHistory, pathMappings]
       properties:
+        "on": { type: boolean, description: "Plex sync is on. Off stops every run, automatic or manual, and the Plex settings page hides its options (the import too). On unless an admin turned it off." }
         url: { type: string, description: "The Plex server's address, e.g. http://192.168.1.10:32400." }
         tokenSet: { type: boolean, description: A Plex token is saved (it is never returned). }
         enabled: { type: boolean, description: "Automatic sync every intervalMinutes. Off by default; Sync now works either way." }
@@ -6933,6 +6961,7 @@ components:
     PlexSyncSettingsUpdate:
       type: object
       properties:
+        "on": { type: boolean }
         url: { type: string }
         token: { type: string, writeOnly: true, description: "The server owner's Plex token. An empty string removes it." }
         enabled: { type: boolean }
@@ -7631,7 +7660,7 @@ components:
     HomeLayout:
       type: object
       required: [rows]
-      description: "The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two \"Because you watched X\" rows with hub ids because-<itemId>, \"Because you love X\" when X is a favourite; USER-16), favorites (your favourite movies and shows, newest first; hidden until shown), holiday (in the 30 days up to and including Halloween, Thanksgiving and Christmas, a row of each one's films and shows, hub ids holiday-halloween, holiday-thanksgiving, holiday-christmas), top-rated (acclaimed titles you haven't watched), trending (most watched in the household lately), genres (up to three rows from genres you watch, hub ids genre-<name>, changing daily), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones."
+      description: "The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two \"Because you watched X\" rows with hub ids because-<itemId>, \"Because you love X\" when X is a favourite; USER-16), favorites (your favourite movies and shows, newest first; hidden until shown), holiday (in the 30 days up to and including Halloween, Thanksgiving and Christmas, a row of each one's films and shows, hub ids holiday-halloween, holiday-thanksgiving, holiday-christmas), top-rated (acclaimed titles you haven't watched), trending (most watched in the household lately), genres (up to three rows from genres you watch, hub ids genre-<name>, changing daily), new-releases, acclaimed (critics' favourites), binge-worthy (long-running shows), short-films (under 95 minutes), decades (the best of one decade, hub ids decade-<year>, changing daily), classics (before 1980), family (family films and shows), international (not originally in English), watch-again (films you loved a while ago), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones."
       properties:
         rows:
           type: array
