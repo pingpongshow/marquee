@@ -43,3 +43,18 @@ export function pinnedTarget(hubId: string): { to: "/item/$itemId"; params: { it
   if (!m) return null;
   return m[1] === "collection" ? { to: "/item/$itemId", params: { itemId: m[2]! } } : { to: "/playlist/$playlistId", params: { playlistId: m[2]! } };
 }
+
+export type SeeAllTarget =
+  | NonNullable<ReturnType<typeof pinnedTarget>>
+  | { to: "/continue-watching" }
+  | { to: "/library/$libraryId"; params: { libraryId: string } }
+  | { to: "/home/row/$hubId"; params: { hubId: string } };
+
+/** Where a Home row's See all leads: a page of its own when it has one, else the row in full. */
+export function seeAllTarget(hub: { id: string; libraryId?: number }): SeeAllTarget {
+  if (hub.id === "continue-watching") return { to: "/continue-watching" };
+  const pinned = pinnedTarget(hub.id);
+  if (pinned) return pinned;
+  if (hub.libraryId && /^(recent|played)-\d+$/.test(hub.id)) return { to: "/library/$libraryId", params: { libraryId: String(hub.libraryId) } };
+  return { to: "/home/row/$hubId", params: { hubId: hub.id } };
+}

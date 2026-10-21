@@ -13,7 +13,7 @@ type Status = S["PlexSyncStatus"];
 type Report = S["PlexSyncReport"];
 type Update = S["PlexSyncSettingsUpdate"];
 
-const syncQuery = {
+export const syncQuery = {
   queryKey: ["plex-sync"],
   queryFn: () => unwrap(api.GET("/plex-sync")),
 };

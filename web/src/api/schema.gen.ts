@@ -2023,6 +2023,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/hubs/home/{hubId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One Home row in full, for See all (USER-12): the hub ids GET /hubs/home returns (e.g. recommended, because-12, holiday-christmas, genre-comedy, top-rated, watchlist, favorites). Continue Watching, Recently Added, pinned collections and playlists have pages of their own; asking for them here gives the row as Home has it, longer. */
+        get: operations["homeHub"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/activity/history": {
         parameters: {
             query?: never;
@@ -5991,6 +6008,8 @@ export interface components {
             lastReport?: components["schemas"]["PlexImportReport"];
         };
         PlexSyncSettings: {
+            /** @description Plex sync is on. Off stops every run, automatic or manual, and the Plex settings page hides its options (the import too). On unless an admin turned it off. */
+            on: boolean;
             /** @description The Plex server's address, e.g. http://192.168.1.10:32400. */
             url: string;
             /** @description A Plex token is saved (it is never returned). */
@@ -6008,6 +6027,7 @@ export interface components {
             pathMappings: components["schemas"]["PlexPathMapping"][];
         };
         PlexSyncSettingsUpdate: {
+            on?: boolean;
             url?: string;
             /** @description The server owner's Plex token. An empty string removes it. */
             token?: string;
@@ -6795,7 +6815,7 @@ export interface components {
             title?: string;
             rules: components["schemas"]["SmartCollectionRules"];
         };
-        /** @description The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two "Because you watched X" rows with hub ids because-<itemId>, "Because you love X" when X is a favourite; USER-16), favorites (your favourite movies and shows, newest first; hidden until shown), holiday (in the 30 days up to and including Halloween, Thanksgiving and Christmas, a row of each one's films and shows, hub ids holiday-halloween, holiday-thanksgiving, holiday-christmas), top-rated (acclaimed titles you haven't watched), trending (most watched in the household lately), genres (up to three rows from genres you watch, hub ids genre-<name>, changing daily), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones. */
+        /** @description The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two "Because you watched X" rows with hub ids because-<itemId>, "Because you love X" when X is a favourite; USER-16), favorites (your favourite movies and shows, newest first; hidden until shown), holiday (in the 30 days up to and including Halloween, Thanksgiving and Christmas, a row of each one's films and shows, hub ids holiday-halloween, holiday-thanksgiving, holiday-christmas), top-rated (acclaimed titles you haven't watched), trending (most watched in the household lately), genres (up to three rows from genres you watch, hub ids genre-<name>, changing daily), new-releases, acclaimed (critics' favourites), binge-worthy (long-running shows), short-films (under 95 minutes), decades (the best of one decade, hub ids decade-<year>, changing daily), classics (before 1980), family (family films and shows), international (not originally in English), watch-again (films you loved a while ago), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones. */
         HomeLayout: {
             rows: components["schemas"]["HomeLayoutRow"][];
         };
@@ -11455,7 +11475,7 @@ export interface operations {
             query?: {
                 /** @description Include the Watch on VOD row (id vod-suggestions; films and series on demand picked for the caller, in vodEntries, with items empty). Only apps that show vodEntries should ask for it; without it the row is left out. */
                 vod?: boolean;
-                /** @description Mix films and series on demand into the suggestion rows (Recommended for You, the holiday row, Top Rated and the genre rows), in mixedEntries, and leave out the separate Watch on VOD row. Only apps that show mixedEntries should ask for it; without it those rows hold library items only (and rows with nothing from the library are left out). */
+                /** @description Mix films and series on demand into the suggestion rows (Recommended for You, the holiday rows, Top Rated, Trending Now, the genre rows and the other category rows), in mixedEntries, and leave out the separate Watch on VOD row. Only apps that show mixedEntries should ask for it; without it those rows hold library items only (and rows with nothing from the library are left out). */
                 mixed?: boolean;
             };
             header?: never;
@@ -11474,6 +11494,35 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    homeHub: {
+        parameters: {
+            query?: {
+                /** @description As for GET /hubs/home. */
+                mixed?: boolean;
+                /** @description How many library titles (and as many on demand again, when mixed). */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                hubId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Hub"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     playHistory: {

@@ -8,7 +8,7 @@ import { Alert, Button, Spinner } from "@/components/ui";
 import { ContinueTile, HubItem, ViewMoreTile } from "./ContinueWatching";
 import { EditHomeDialog } from "./EditHome";
 import { GettingStarted } from "./GettingStarted";
-import { pinnedTarget } from "./layout";
+import { seeAllTarget } from "./layout";
 import { MuseButton } from "../search/MuseVideo";
 import { fetchHubs, hubsKey } from "../browse/watched";
 import { VodSuggestionTile } from "../livetv/VodSuggestions";
@@ -62,50 +62,17 @@ export function HomePage() {
         // Suggestion rows: library titles and on-demand ones (marked VOD) together.
         const mixed = hub.mixedEntries;
         if (mixed && !mixed.length) return null;
-        // A pinned collection or playlist opens itself (USER-12).
-        const pinned = pinnedTarget(hub.id);
         return (
           <section key={hub.id}>
-            <div className="mb-3 flex items-center gap-2 px-6 lg:px-8">
-              <h2 className="text-lg font-semibold">
-                {wide ? (
-                  <Link to="/continue-watching" className="hover:underline">
-                    {hub.title}
-                  </Link>
-                ) : pinned ? (
-                  <Link {...pinned} className="hover:underline">
-                    {hub.title}
-                  </Link>
-                ) : (
-                  hub.title
-                )}
-              </h2>
-              {wide ? (
-                <Link to="/continue-watching" className="text-muted hover:text-text" aria-label={`Open ${hub.title}`}>
-                  <ChevronRight className="size-5" />
-                </Link>
-              ) : pinned ? (
-                <Link
-                  {...pinned}
-                  className="text-muted hover:text-text"
-                  aria-label={`Open ${hub.title}`}
-                >
-                  <ChevronRight className="size-5" />
-                </Link>
-              ) : vod ? (
-                <Link to="/vod" className="text-muted hover:text-text" aria-label="Open VOD Movies">
-                  <ChevronRight className="size-5" />
-                </Link>
-              ) : hub.libraryId && (
-                <Link
-                  to="/library/$libraryId"
-                  params={{ libraryId: String(hub.libraryId) }}
-                  className="text-muted hover:text-text"
-                  aria-label={`Open ${hub.title}`}
-                >
-                  <ChevronRight className="size-5" />
-                </Link>
-              )}
+            <div className="mb-3 flex items-center gap-3 px-6 lg:px-8">
+              <h2 className="min-w-0 truncate text-lg font-semibold">{hub.title}</h2>
+              <Link
+                {...seeAllTarget(hub)}
+                className="ml-auto flex shrink-0 items-center gap-0.5 text-sm font-medium text-muted hover:text-accent"
+                aria-label={`See all of ${hub.title}`}
+              >
+                See all <ChevronRight className="size-4" aria-hidden />
+              </Link>
             </div>
             <ul className="flex gap-4 overflow-x-auto px-6 pb-2 lg:px-8">
               {mixed

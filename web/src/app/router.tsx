@@ -22,6 +22,7 @@ import {
 } from "@/features/browse/LibraryPage";
 import { PersonPage } from "@/features/browse/PersonPage";
 import { ContinueWatchingPage } from "@/features/home/ContinueWatching";
+import { HomeRowPage } from "@/features/home/HomeRowPage";
 import { HomePage } from "@/features/home/HomePage";
 import { MusicProvider } from "@/features/player/MusicPlayer";
 import { PlayerPage } from "@/features/player/PlayerPage";
@@ -203,6 +204,12 @@ const continueWatchingRoute = createRoute({
   path: "/continue-watching",
   component: ContinueWatchingPage,
 });
+// See all: one Home row in full (USER-12).
+const homeRowRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/home/row/$hubId",
+  component: HomeRowPage,
+});
 const playlistsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/playlists",
@@ -364,6 +371,7 @@ const routeTree = rootRoute.addChildren([
   discoverRoute,
   homeRoute,
   continueWatchingRoute,
+  homeRowRoute,
   playRoute,
   libraryRoute,
   librarySectionRoute,

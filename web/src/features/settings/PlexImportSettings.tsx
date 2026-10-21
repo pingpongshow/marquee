@@ -5,7 +5,7 @@ import { api, unwrap } from "@/api/client";
 import { usersQuery } from "@/api/queries";
 import type { components } from "@/api/schema.gen";
 import { Alert, Button, Card, Input, Select, Spinner, Toggle } from "@/components/ui";
-import { PlexSyncSettings } from "./PlexSyncSettings";
+import { PlexSyncSettings, syncQuery } from "./PlexSyncSettings";
 
 type S = components["schemas"];
 type Preview = S["PlexImportPreview"];
@@ -71,10 +71,36 @@ function ReportView({ r }: { r: Report }) {
 
 /** Settings → Plex: two-way sync, then the one-time import. */
 export function PlexImportSettings() {
+  const qc = useQueryClient();
+  const status = useQuery(syncQuery);
+  const turn = useMutation({
+    mutationFn: (on: boolean) => unwrap(api.PATCH("/plex-sync", { body: { on } })),
+    onSuccess: (st) => qc.setQueryData(syncQuery.queryKey, st),
+  });
+  if (status.isPending) return <Spinner />;
+  if (status.isError) return <Alert tone="error">{status.error.message}</Alert>;
+  const on = status.data.settings.on;
   return (
     <div className="space-y-6">
-      <PlexSyncSettings />
-      <PlexImport />
+      <Card>
+        <Toggle
+          label="Plex sync"
+          help={
+            on
+              ? "Two-way sync and the Plex import are available below. Turn this off to stop syncing with Plex and hide its settings; what's set is kept."
+              : "Off: Marquee doesn't sync with Plex, automatically or by hand. Turn it on to set up two-way sync or import from Plex."
+          }
+          checked={turn.isPending ? !!turn.variables : on}
+          onChange={(v) => turn.mutate(v)}
+        />
+        {turn.isError && <Alert tone="error">{turn.error.message}</Alert>}
+      </Card>
+      {on && (
+        <>
+          <PlexSyncSettings />
+          <PlexImport />
+        </>
+      )}
     </div>
   );
 }

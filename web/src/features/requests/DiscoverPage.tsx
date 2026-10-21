@@ -320,7 +320,7 @@ function DetailsDialog({
               Open in library
             </Link>
           ) : null}
-          {!item.itemId && <WatchOnVod item={item} />}
+          <WatchOnVod item={item} />
           {requestable(item) && (
             <Button variant={item.vod ? "secondary" : "primary"} onClick={onRequest}>
               Request
@@ -519,28 +519,30 @@ function Card({
       <div className="truncate text-sm font-medium" title={item.title}>
         {item.title}
       </div>
-      <div className="flex items-center gap-2 text-xs text-faint">
-        <span>
-          {[item.year, item.mediaType === "tv" ? "Series" : "Movie"]
-            .filter(Boolean)
-            .join(" · ")}
-        </span>
-        {!item.itemId && item.vod && (
-          <span className="ml-auto">
-            <WatchOnVod item={item} size="sm" />
-          </span>
-        )}
-        {requestable(item) && (
-          <Button
-            size="sm"
-            variant={item.vod ? "secondary" : "primary"}
-            className={item.vod && !item.itemId ? undefined : "ml-auto"}
-            onClick={onRequest}
-          >
-            Request
-          </Button>
-        )}
+      <div className="truncate text-xs text-faint">
+        {[item.year, item.mediaType === "tv" ? "Series" : "Movie"]
+          .filter(Boolean)
+          .join(" · ")}
       </div>
+      {/* Stacked under the details so they never crowd them; the server leaves VOD off
+          what the library already has all of. */}
+      {(item.vod || requestable(item)) && (
+        <div className="flex flex-col gap-1 pt-0.5">
+          <WatchOnVod item={item} size="xs" />
+          {requestable(item) && (
+            <button
+              type="button"
+              onClick={onRequest}
+              className={clsx(
+                "rounded px-2 py-0.5 text-[11px] font-medium",
+                item.vod ? "bg-surface-3 text-text hover:bg-border" : "bg-accent text-black hover:brightness-110",
+              )}
+            >
+              Request
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
