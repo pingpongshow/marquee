@@ -42,43 +42,20 @@ struct VodSuggestionRow: View {
     let title: String
     let list: [VodSuggestion]
     var identifier = "vod.suggestions"
-    /// The recommendations page: See All in the header (a tile at the row's end on the TV).
+    /// The full list: See all in the header (a tile at the row's end on the TV).
     var seeAll: Route?
 
     var body: some View {
         let shown = VodSuggestionHides.shared.visible(list)
         if !shown.isEmpty {
-            ShelfRow(title: title, seeAll: seeAll) {
+            ShelfRow(title: title, seeAll: seeAll,
+                     seeAllSize: CGSize(width: VodSuggestionTile.defaultWidth, height: VodSuggestionTile.defaultWidth * 1.5)) {
                 ForEach(shown, id: \.key) { VodSuggestionTile(suggestion: $0) }
-                #if os(tvOS)
-                if let seeAll { VodSeeAllTile(route: seeAll) }
-                #endif
             }
             .accessibilityIdentifier(identifier)
         }
     }
 }
-
-#if os(tvOS)
-/// The TV's See All: a poster-sized tile at the end of Recommended for you.
-struct VodSeeAllTile: View {
-    let route: Route
-
-    var body: some View {
-        NavigationLink(value: route) {
-            VStack(spacing: 10) {
-                Image(systemName: "square.grid.2x2").font(.title2)
-                Text("See All").font(.headline)
-            }
-            .frame(width: VodSuggestionTile.defaultWidth, height: VodSuggestionTile.defaultWidth * 1.5)
-            .background(Color.secondary.opacity(0.15), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        }
-        .buttonStyle(.card)
-        .accessibilityLabel("See All")
-        .accessibilityIdentifier("shelf.seeAll")
-    }
-}
-#endif
 
 /// Recommended for you's See All (USER-16): rows of films or series on demand, each with its
 /// own angle, from the viewer's own taste; Movies and Shows switch between the two.
@@ -231,29 +208,5 @@ struct VodSuggestionTile: View {
             }
             Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(isTV || mixed ? 1 : 2)
         }
-    }
-}
-
-/// Watch now on VOD: the same title on demand (its film's or show's page), on Discover.
-struct WatchOnVodLink: View {
-    let ref: VodRef
-    /// "VOD" on a card; the full label elsewhere.
-    var compact = false
-
-    var body: some View {
-        NavigationLink(value: ref.kind == .movie ? Route.vodMovie(ref.id) : Route.vodSeries(ref.id)) {
-            Label(compact ? "VOD" : "Watch now on VOD", systemImage: "play.fill")
-                .font(compact ? .caption2.weight(.semibold) : .subheadline.weight(.semibold))
-                #if os(iOS)
-                .padding(.horizontal, compact ? 8 : 14).padding(.vertical, compact ? 4 : 8)
-                .background(Color.marqueeGold, in: RoundedRectangle(cornerRadius: 6))
-                .foregroundStyle(.black)
-                #endif
-        }
-        #if os(iOS)
-        .buttonStyle(.plain)
-        #endif
-        .accessibilityLabel("Watch now on VOD")
-        .accessibilityIdentifier("discover.watchOnVod")
     }
 }

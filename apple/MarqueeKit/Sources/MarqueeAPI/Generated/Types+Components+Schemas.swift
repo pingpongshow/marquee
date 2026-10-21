@@ -7641,6 +7641,10 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/PlexSyncSettings`.
         public struct PlexSyncSettings: Codable, Hashable, Sendable {
+            /// Plex sync is on. Off stops every run, automatic or manual, and the Plex settings page hides its options (the import too). On unless an admin turned it off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettings/on`.
+            public var on: Swift.Bool
             /// The Plex server's address, e.g. http://192.168.1.10:32400.
             ///
             /// - Remark: Generated from `#/components/schemas/PlexSyncSettings/url`.
@@ -7674,6 +7678,7 @@ extension Components {
             /// Creates a new `PlexSyncSettings`.
             ///
             /// - Parameters:
+            ///   - on: Plex sync is on. Off stops every run, automatic or manual, and the Plex settings page hides its options (the import too). On unless an admin turned it off.
             ///   - url: The Plex server's address, e.g. http://192.168.1.10:32400.
             ///   - tokenSet: A Plex token is saved (it is never returned).
             ///   - enabled: Automatic sync every intervalMinutes. Off by default; Sync now works either way.
@@ -7684,6 +7689,7 @@ extension Components {
             ///   - playHistory: Plays recorded in Plex come into Marquee's history. Plays made in Marquee reach Plex as a play at sync time.
             ///   - pathMappings: Plex folders and the Marquee folders they correspond to (from the Plex import); empty uses suggested ones.
             public init(
+                on: Swift.Bool,
                 url: Swift.String,
                 tokenSet: Swift.Bool,
                 enabled: Swift.Bool,
@@ -7694,6 +7700,7 @@ extension Components {
                 playHistory: Swift.Bool,
                 pathMappings: [Components.Schemas.PlexPathMapping]
             ) {
+                self.on = on
                 self.url = url
                 self.tokenSet = tokenSet
                 self.enabled = enabled
@@ -7705,6 +7712,7 @@ extension Components {
                 self.pathMappings = pathMappings
             }
             public enum CodingKeys: String, CodingKey {
+                case on
                 case url
                 case tokenSet
                 case enabled
@@ -7718,6 +7726,8 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/PlexSyncSettingsUpdate`.
         public struct PlexSyncSettingsUpdate: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/PlexSyncSettingsUpdate/on`.
+            public var on: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/PlexSyncSettingsUpdate/url`.
             public var url: Swift.String?
             /// The server owner's Plex token. An empty string removes it.
@@ -7741,6 +7751,7 @@ extension Components {
             /// Creates a new `PlexSyncSettingsUpdate`.
             ///
             /// - Parameters:
+            ///   - on:
             ///   - url:
             ///   - token: The server owner's Plex token. An empty string removes it.
             ///   - enabled:
@@ -7751,6 +7762,7 @@ extension Components {
             ///   - playHistory:
             ///   - pathMappings:
             public init(
+                on: Swift.Bool? = nil,
                 url: Swift.String? = nil,
                 token: Swift.String? = nil,
                 enabled: Swift.Bool? = nil,
@@ -7761,6 +7773,7 @@ extension Components {
                 playHistory: Swift.Bool? = nil,
                 pathMappings: [Components.Schemas.PlexPathMapping]? = nil
             ) {
+                self.on = on
                 self.url = url
                 self.token = token
                 self.enabled = enabled
@@ -7772,6 +7785,7 @@ extension Components {
                 self.pathMappings = pathMappings
             }
             public enum CodingKeys: String, CodingKey {
+                case on
                 case url
                 case token
                 case enabled
@@ -11051,7 +11065,7 @@ extension Components {
                 case rules
             }
         }
-        /// The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two "Because you watched X" rows with hub ids because-<itemId>, "Because you love X" when X is a favourite; USER-16), favorites (your favourite movies and shows, newest first; hidden until shown), holiday (in the 30 days up to and including Halloween, Thanksgiving and Christmas, a row of each one's films and shows, hub ids holiday-halloween, holiday-thanksgiving, holiday-christmas), top-rated (acclaimed titles you haven't watched), trending (most watched in the household lately), genres (up to three rows from genres you watch, hub ids genre-<name>, changing daily), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones.
+        /// The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two "Because you watched X" rows with hub ids because-<itemId>, "Because you love X" when X is a favourite; USER-16), favorites (your favourite movies and shows, newest first; hidden until shown), holiday (in the 30 days up to and including Halloween, Thanksgiving and Christmas, a row of each one's films and shows, hub ids holiday-halloween, holiday-thanksgiving, holiday-christmas), top-rated (acclaimed titles you haven't watched), trending (most watched in the household lately), genres (up to three rows from genres you watch, hub ids genre-<name>, changing daily), new-releases, acclaimed (critics' favourites), binge-worthy (long-running shows), short-films (under 95 minutes), decades (the best of one decade, hub ids decade-<year>, changing daily), classics (before 1980), family (family films and shows), international (not originally in English), watch-again (films you loved a while ago), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones.
         ///
         /// - Remark: Generated from `#/components/schemas/HomeLayout`.
         public struct HomeLayout: Codable, Hashable, Sendable {

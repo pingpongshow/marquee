@@ -48,7 +48,7 @@ struct DiscoverView: View {
                         if category == .movies || category == .tv { filterMenus }
                     }
                     if let error { Text(error).foregroundStyle(.red).padding(.horizontal, sidePadding) }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: cardWidth), spacing: gridSpacing)], spacing: gridSpacing) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: cardWidth), spacing: gridSpacing, alignment: .top)], spacing: gridSpacing) {
                         ForEach(items, id: \.id) { it in
                             card(it).onAppear { if it.id == items.last?.id { Task { await loadMore() } } }
                         }
@@ -84,18 +84,19 @@ struct DiscoverView: View {
             }
             Text(it.title).font(.caption.weight(.medium)).lineLimit(1)
             Text([it.year.map(String.init), it.mediaType == .tv ? "Series" : "Movie"].compactMap { $0 }.joined(separator: " · "))
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
         }
-        if let id = it.itemId {
-            NavigationLink(value: Route.item(id)) { label }.buttonStyle(cardStyle)
-        } else {
-            VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: isTV ? 12 : 6) {
+            if let id = it.itemId {
+                NavigationLink(value: Route.item(id)) { label }.buttonStyle(cardStyle)
+            } else {
                 Button { picked = it } label: { label } // its details, with Request when it can be
                     .buttonStyle(cardStyle)
                     .accessibilityLabel(requestable(it) ? "Request \(it.title)" : "\(it.title), \(it.availability.label)")
-                // On demand already: watch it there now rather than wait for a request.
-                if let v = it.vod?.value1 { WatchOnVodLink(ref: v, compact: true) }
             }
+            // Under the year line, never beside it: on demand already (watch it there now rather
+            // than wait), and Request (a show the library has part of can still be requested).
+            DiscoverTileButtons(title: it.title, vod: it.vod?.value1, requestable: requestable(it)) { picked = it }
         }
     }
 
@@ -222,6 +223,73 @@ struct DiscoverView: View {
     #endif
 }
 
+/// A Discover tile's buttons, one above the other at the tile's width: a gold ▶ VOD when the
+/// title is on demand, and Request when it can be requested (secondary under VOD, primary
+/// alone). Small, so they never crowd the year line above them.
+struct DiscoverTileButtons: View {
+    let title: String
+    let vod: VodRef?
+    let requestable: Bool
+    let request: () -> Void
+
+    var body: some View {
+        if vod != nil || requestable {
+            VStack(spacing: isTV ? 10 : 4) {
+                if let vod {
+                    NavigationLink(value: vod.kind == .movie ? Route.vodMovie(vod.id) : Route.vodSeries(vod.id)) {
+                        tileLabel("VOD", systemImage: "play.fill", prominent: true)
+                    }
+                    .modifier(TileButtonStyle(prominent: true))
+                    .accessibilityLabel("Watch \(title) now on VOD")
+                    .accessibilityIdentifier("discover.watchOnVod")
+                }
+                if requestable {
+                    Button(action: request) {
+                        tileLabel("Request", systemImage: nil, prominent: vod == nil)
+                    }
+                    .modifier(TileButtonStyle(prominent: vod == nil))
+                    .accessibilityLabel("Request \(title)")
+                    .accessibilityIdentifier("discover.request")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func tileLabel(_ text: String, systemImage: String?, prominent: Bool) -> some View {
+        let content = HStack(spacing: 3) {
+            if let systemImage { Image(systemName: systemImage).imageScale(.small) }
+            Text(text).lineLimit(1)
+        }
+        .font(isTV ? .caption.weight(.semibold) : .caption2.weight(.semibold))
+        .frame(maxWidth: .infinity)
+        #if os(tvOS)
+        content
+        #else
+        content
+            .padding(.vertical, 4)
+            .background(prominent ? Color.marqueeGold : Color.secondary.opacity(0.2), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .foregroundStyle(prominent ? Color.black : Color.primary)
+            .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        #endif
+    }
+}
+
+/// iPhone/iPad: the label draws itself. TV: the system's bordered buttons, so focus shows.
+private struct TileButtonStyle: ViewModifier {
+    let prominent: Bool
+    func body(content: Content) -> some View {
+        #if os(tvOS)
+        if prominent {
+            content.buttonStyle(.borderedProminent).tint(Color.marqueeGold).foregroundStyle(.black)
+        } else {
+            content.buttonStyle(.bordered)
+        }
+        #else
+        content.buttonStyle(.plain)
+        #endif
+    }
+}
+
 extension DiscoverItem: @retroactive Identifiable {
     public var id: String { "\(mediaType.rawValue)-\(tmdbId)" }
 }
@@ -244,7 +312,8 @@ struct RequestSheet: View {
         NavigationStack {
             Form {
                 header
-                if item.itemId == nil, let v = item.vod?.value1, let onWatchVod {
+                // On demand: the server sends it only when the library hasn't all of it.
+                if let v = item.vod?.value1, let onWatchVod {
                     Section {
                         Button {
                             dismiss()

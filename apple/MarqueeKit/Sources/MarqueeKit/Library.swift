@@ -36,6 +36,16 @@ public extension AppSession {
         try await api.homeHubs(query: .init(vod: vod ? true : nil, mixed: mixed ? true : nil)).ok.body.json
     }
 
+    /// One Home row in full, for its See all: up to `limit` library titles, and with `mixed` as
+    /// many on demand again (in mixedEntries).
+    func hub(_ id: String, mixed: Bool = true, limit: Int = 100) async throws -> Hub {
+        switch try await api.homeHub(path: .init(hubId: id), query: .init(mixed: mixed ? true : nil, limit: limit)) {
+        case .ok(let ok): return try ok.body.json
+        case .notFound: throw MarqueeError("This row isn't on your Home any more.")
+        default: throw MarqueeError("The server didn't answer")
+        }
+    }
+
     func items(library: Int64, sort: ItemSort = .title, offset: Int = 0, limit: Int = 100,
                watch: Operations.ListLibraryItems.Input.Query.WatchPayload? = nil, genre: String? = nil,
                type: Schemas.ItemType? = nil, decade: Int? = nil, minMyRating: Int? = nil,

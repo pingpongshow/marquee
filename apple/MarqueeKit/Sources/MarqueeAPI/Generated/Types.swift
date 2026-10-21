@@ -717,6 +717,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /hubs/home`.
     /// - Remark: Generated from `#/paths//hubs/home/get(homeHubs)`.
     func homeHubs(_ input: Operations.HomeHubs.Input) async throws -> Operations.HomeHubs.Output
+    /// One Home row in full, for See all (USER-12): the hub ids GET /hubs/home returns (e.g. recommended, because-12, holiday-christmas, genre-comedy, top-rated, watchlist, favorites). Continue Watching, Recently Added, pinned collections and playlists have pages of their own; asking for them here gives the row as Home has it, longer.
+    ///
+    /// - Remark: HTTP `GET /hubs/home/{hubId}`.
+    /// - Remark: Generated from `#/paths//hubs/home/{hubId}/get(homeHub)`.
+    func homeHub(_ input: Operations.HomeHub.Input) async throws -> Operations.HomeHub.Output
     /// Recent plays, newest first (admin only).
     ///
     /// - Remark: HTTP `GET /activity/history`.
@@ -3118,6 +3123,21 @@ extension APIProtocol {
         headers: Operations.HomeHubs.Input.Headers = .init()
     ) async throws -> Operations.HomeHubs.Output {
         try await homeHubs(Operations.HomeHubs.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// One Home row in full, for See all (USER-12): the hub ids GET /hubs/home returns (e.g. recommended, because-12, holiday-christmas, genre-comedy, top-rated, watchlist, favorites). Continue Watching, Recently Added, pinned collections and playlists have pages of their own; asking for them here gives the row as Home has it, longer.
+    ///
+    /// - Remark: HTTP `GET /hubs/home/{hubId}`.
+    /// - Remark: Generated from `#/paths//hubs/home/{hubId}/get(homeHub)`.
+    public func homeHub(
+        path: Operations.HomeHub.Input.Path,
+        query: Operations.HomeHub.Input.Query = .init(),
+        headers: Operations.HomeHub.Input.Headers = .init()
+    ) async throws -> Operations.HomeHub.Output {
+        try await homeHub(Operations.HomeHub.Input(
+            path: path,
             query: query,
             headers: headers
         ))

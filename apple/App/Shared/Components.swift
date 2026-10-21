@@ -554,8 +554,11 @@ struct ErrorBanner: View {
 struct ShelfRow<Content: View>: View {
     let title: String
     var destination: Route?
-    /// A See All link at the header's right (iPhone/iPad; the TV puts a tile at the row's end).
+    /// A See all link at the header's right (iPhone/iPad; the TV puts a tile at the row's end,
+    /// as headers can't take focus there).
     var seeAll: Route?
+    /// The TV's See all tile: the size of the row's artwork.
+    var seeAllSize = SeeAllTile.posterSize
     @ViewBuilder let content: () -> Content
 
     var body: some View {
@@ -564,10 +567,16 @@ struct ShelfRow<Content: View>: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text(title).font(.title3.bold())
                     Spacer()
-                    NavigationLink("See All", value: seeAll)
-                        .font(.subheadline)
-                        .foregroundStyle(Color.marqueeGold)
-                        .accessibilityIdentifier("shelf.seeAll")
+                    NavigationLink(value: seeAll) {
+                        HStack(spacing: 3) {
+                            Text("See all")
+                            Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                        }
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Color.marqueeGold)
+                    .accessibilityLabel("See all \(title)")
+                    .accessibilityIdentifier("shelf.seeAll")
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, sidePadding)
@@ -581,7 +590,12 @@ struct ShelfRow<Content: View>: View {
                 Text(title).font(.title3.bold()).padding(.horizontal, sidePadding)
             }
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(alignment: .top, spacing: spacing) { content() }
+                LazyHStack(alignment: .top, spacing: spacing) {
+                    content()
+                    #if os(tvOS)
+                    if let seeAll { SeeAllTile(route: seeAll, title: title, size: seeAllSize) }
+                    #endif
+                }
                     .padding(.horizontal, sidePadding)
                     #if os(tvOS)
                     .padding(.vertical, 30)
@@ -598,6 +612,39 @@ struct ShelfRow<Content: View>: View {
     #else
     private let spacing: CGFloat = 12
     #endif
+}
+
+/// The TV's See all: a tile the size of the row's artwork, at the row's end.
+struct SeeAllTile: View {
+    let route: Route
+    /// The row's title, for VoiceOver.
+    let title: String
+    var size = SeeAllTile.posterSize
+
+    static var posterSize: CGSize { CGSize(width: PosterCard.defaultWidth, height: PosterCard.defaultWidth * 1.5) }
+
+    /// The size of `shape` artwork at PosterCard's width.
+    static func size(_ shape: PosterShape) -> CGSize {
+        CGSize(width: PosterCard.defaultWidth, height: PosterCard.defaultWidth / shape.aspect)
+    }
+
+    var body: some View {
+        NavigationLink(value: route) {
+            VStack(spacing: 10) {
+                Image(systemName: "square.grid.2x2").font(.title2)
+                Text("See all").font(.headline)
+            }
+            .frame(width: size.width, height: size.height)
+            .background(Color.secondary.opacity(0.15), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        #if os(tvOS)
+        .buttonStyle(.card)
+        #else
+        .buttonStyle(.plain)
+        #endif
+        .accessibilityLabel("See all \(title)")
+        .accessibilityIdentifier("shelf.seeAll")
+    }
 }
 
 #if os(tvOS)

@@ -57,32 +57,28 @@ struct HomeView: View {
                     if hub.id == Self.vodRow {
                         // Watch on VOD (LIVE-6, USER-16): films and series on demand picked
                         // for this viewer.
-                        VodSuggestionRow(title: hub.title, list: hub.vodEntries ?? [], identifier: "home.vodSuggestions")
+                        VodSuggestionRow(title: hub.title, list: hub.vodEntries ?? [], identifier: "home.vodSuggestions",
+                                         seeAll: seeAll(hub))
                     } else if let mixed = hub.mixedEntries {
                         // Suggestion rows (USER-16): library titles and films and series on
                         // demand together, in the server's order; those on demand are marked VOD
                         // and open their own pages.
-                        ShelfRow(title: hub.title, destination: destination(hub)) {
-                            ForEach(Self.visible(mixed), id: \.key) { e in
-                                if let item = e.item {
-                                    PosterCard(item: item, shape: PosterShape.for(item) == .wide ? .wide : nil)
-                                } else if let s = e.vod {
-                                    VodSuggestionTile(suggestion: s, width: PosterCard.defaultWidth, mixed: true)
-                                }
-                            }
+                        ShelfRow(title: hub.title, seeAll: seeAll(hub), seeAllSize: seeAllSize(hub)) {
+                            ForEach(Self.visible(mixed), id: \.key) { HomeEntryTile(entry: $0) }
                         }
                     } else if wide, let entries = hub.entries {
                         // Library titles and films and episodes on demand together, in the
-                        // server's order; View more when there are more than the row holds.
+                        // server's order; View more when there are more than the row holds (on
+                        // the TV it stands in for the See all tile, which goes to the same page).
                         let more = (hub.total ?? 0) > entries.count
-                        ShelfRow(title: hub.title, destination: more ? .continueWatching : nil) {
+                        ShelfRow(title: hub.title, seeAll: isTV && more ? nil : seeAll(hub), seeAllSize: seeAllSize(hub)) {
                             ForEach(entries, id: \.key) { e in
                                 ContinueEntryTile(entry: e, onRemove: { removeFromContinue(e) }, playVod: playVod)
                             }
                             if more, let total = hub.total { ContinueViewMoreTile(total: total) }
                         }
                     } else {
-                        ShelfRow(title: hub.title, destination: destination(hub)) {
+                        ShelfRow(title: hub.title, seeAll: seeAll(hub), seeAllSize: seeAllSize(hub)) {
                             ForEach(hub.items, id: \.id) { item in
                                 let remove: (() -> Void)? = wide ? { removeFromContinue(item) } : nil
                                 if wide && item.isPlayableVideo {
@@ -204,13 +200,25 @@ struct HomeView: View {
     private let rowSpacing: CGFloat = 28
     #endif
 
-    /// Where a row's title leads: its library, or a pinned collection or playlist (USER-12).
-    /// Recommendations (USER-16) have no "see all".
-    private func destination(_ hub: Hub) -> Route? {
-        if hub.id == "recommended" || hub.id.hasPrefix("because-") { return nil }
-        if hub.id.hasPrefix("collection-"), let id = Int64(hub.id.dropFirst("collection-".count)) { return .item(id) }
-        if hub.id.hasPrefix("playlist-"), let id = Int64(hub.id.dropFirst("playlist-".count)) { return .playlist(id) }
-        return hub.libraryId.map { .library($0) }
+    /// Where a row's See all leads (USER-12): Continue Watching's page; a library's page for its
+    /// Recently Added and Recently Played rows; a pinned collection or playlist; every other row
+    /// in full on a page of its own.
+    private func seeAll(_ hub: Hub) -> Route {
+        let id = hub.id
+        if id == "continue-watching" { return .continueWatching }
+        for prefix in ["recent-", "played-"] where id.hasPrefix(prefix) {
+            if let lib = Int64(id.dropFirst(prefix.count)) ?? hub.libraryId { return .library(lib) }
+        }
+        if id.hasPrefix("collection-"), let c = Int64(id.dropFirst("collection-".count)) { return .item(c) }
+        if id.hasPrefix("playlist-"), let p = Int64(id.dropFirst("playlist-".count)) { return .playlist(p) }
+        return .homeHub(id: id, title: hub.title)
+    }
+
+    /// The TV's See all tile, the size of the row's artwork.
+    private func seeAllSize(_ hub: Hub) -> CGSize {
+        if hub.id == "continue-watching" { return CGSize(width: PosterCard.defaultWidth, height: ContinueCard.width * 9 / 16) }
+        let first = hub.mixedEntries.map { $0.first?.item } ?? hub.items.first
+        return SeeAllTile.size(first.map(PosterShape.for) ?? .poster)
     }
 
     /// Takes a title off Continue Watching (USER-6): gone from the row at once (an episode

@@ -26133,7 +26133,7 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/hubs/home/GET/query/vod`.
                 public var vod: Swift.Bool?
-                /// Mix films and series on demand into the suggestion rows (Recommended for You, the holiday row, Top Rated and the genre rows), in mixedEntries, and leave out the separate Watch on VOD row. Only apps that show mixedEntries should ask for it; without it those rows hold library items only (and rows with nothing from the library are left out).
+                /// Mix films and series on demand into the suggestion rows (Recommended for You, the holiday rows, Top Rated, Trending Now, the genre rows and the other category rows), in mixedEntries, and leave out the separate Watch on VOD row. Only apps that show mixedEntries should ask for it; without it those rows hold library items only (and rows with nothing from the library are left out).
                 ///
                 /// - Remark: Generated from `#/paths/hubs/home/GET/query/mixed`.
                 public var mixed: Swift.Bool?
@@ -26141,7 +26141,7 @@ public enum Operations {
                 ///
                 /// - Parameters:
                 ///   - vod: Include the Watch on VOD row (id vod-suggestions; films and series on demand picked for the caller, in vodEntries, with items empty). Only apps that show vodEntries should ask for it; without it the row is left out.
-                ///   - mixed: Mix films and series on demand into the suggestion rows (Recommended for You, the holiday row, Top Rated and the genre rows), in mixedEntries, and leave out the separate Watch on VOD row. Only apps that show mixedEntries should ask for it; without it those rows hold library items only (and rows with nothing from the library are left out).
+                ///   - mixed: Mix films and series on demand into the suggestion rows (Recommended for You, the holiday rows, Top Rated, Trending Now, the genre rows and the other category rows), in mixedEntries, and leave out the separate Watch on VOD row. Only apps that show mixedEntries should ask for it; without it those rows hold library items only (and rows with nothing from the library are left out).
                 public init(
                     vod: Swift.Bool? = nil,
                     mixed: Swift.Bool? = nil
@@ -26246,6 +26246,207 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// One Home row in full, for See all (USER-12): the hub ids GET /hubs/home returns (e.g. recommended, because-12, holiday-christmas, genre-comedy, top-rated, watchlist, favorites). Continue Watching, Recently Added, pinned collections and playlists have pages of their own; asking for them here gives the row as Home has it, longer.
+    ///
+    /// - Remark: HTTP `GET /hubs/home/{hubId}`.
+    /// - Remark: Generated from `#/paths//hubs/home/{hubId}/get(homeHub)`.
+    public enum HomeHub {
+        public static let id: Swift.String = "homeHub"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/hubs/home/{hubId}/GET/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/hubs/home/{hubId}/GET/path/hubId`.
+                public var hubId: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - hubId:
+                public init(hubId: Swift.String) {
+                    self.hubId = hubId
+                }
+            }
+            public var path: Operations.HomeHub.Input.Path
+            /// - Remark: Generated from `#/paths/hubs/home/{hubId}/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// As for GET /hubs/home.
+                ///
+                /// - Remark: Generated from `#/paths/hubs/home/{hubId}/GET/query/mixed`.
+                public var mixed: Swift.Bool?
+                /// How many library titles (and as many on demand again, when mixed).
+                ///
+                /// - Remark: Generated from `#/paths/hubs/home/{hubId}/GET/query/limit`.
+                public var limit: Swift.Int?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - mixed: As for GET /hubs/home.
+                ///   - limit: How many library titles (and as many on demand again, when mixed).
+                public init(
+                    mixed: Swift.Bool? = nil,
+                    limit: Swift.Int? = nil
+                ) {
+                    self.mixed = mixed
+                    self.limit = limit
+                }
+            }
+            public var query: Operations.HomeHub.Input.Query
+            /// - Remark: Generated from `#/paths/hubs/home/{hubId}/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.HomeHub.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.HomeHub.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.HomeHub.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - query:
+            ///   - headers:
+            public init(
+                path: Operations.HomeHub.Input.Path,
+                query: Operations.HomeHub.Input.Query = .init(),
+                headers: Operations.HomeHub.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/hubs/home/{hubId}/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/hubs/home/{hubId}/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.Hub)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.Hub {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.HomeHub.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.HomeHub.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//hubs/home/{hubId}/get(homeHub)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.HomeHub.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.HomeHub.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Missing or invalid credentials.
+            ///
+            /// - Remark: Generated from `#/paths//hubs/home/{hubId}/get(homeHub)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Components.Responses.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Components.Responses.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Not found.
+            ///
+            /// - Remark: Generated from `#/paths//hubs/home/{hubId}/get(homeHub)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Components.Responses.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Components.Responses.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
                             response: self
                         )
                     }

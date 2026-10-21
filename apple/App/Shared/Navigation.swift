@@ -26,6 +26,8 @@ enum Route: Hashable {
     case vodFollowing
     /// Every Continue Watching entry, library and on demand (Home's row's View more).
     case continueWatching
+    /// A Home row in full (its See all), by hub id, titled as on Home.
+    case homeHub(id: String, title: String)
     case moodStyle(library: Int64, mood: Bool, name: String)
     /// Muse for movies and shows (USER-15), optionally in one library.
     case museVideo(library: Int64?)
@@ -96,6 +98,7 @@ private func routeView(_ route: Route) -> some View {
     case .vodSeries(let id): VodSeriesView(id: id)
     case .vodFollowing: VodFollowingView()
     case .continueWatching: ContinueWatchingView()
+    case let .homeHub(id, title): HomeHubView(id: id, title: title)
     case let .moodStyle(library, mood, name): MoodStyleView(libraryID: library, kind: mood ? .mood : .style, name: name)
     case let .museVideo(library): VideoMuseView(libraryID: library)
     case let .musicBrowse(library, kind):
