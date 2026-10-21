@@ -212,7 +212,7 @@ func TestMuseRecommendationsRecap(t *testing.T) {
 	}
 	// The layout entry hides both "Because you watched" rows.
 	h.do("PUT", "/me/home-layout", map[string]any{"rows": []map[string]any{{"id": "because-you-watched", "hidden": true}}}, &layout)
-	if layout.Rows[0].Id != "because-you-watched" || !*layout.Rows[0].Hidden {
+	if layout.Rows[3].Id != "because-you-watched" || !*layout.Rows[3].Hidden {
 		t.Fatalf("saved: %+v", layout.Rows)
 	}
 	if got := hubIDs(); strings.Contains(got, "because") || !strings.Contains(got, "recommended") {

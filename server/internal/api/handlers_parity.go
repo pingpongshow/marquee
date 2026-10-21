@@ -132,6 +132,8 @@ type homeRow struct {
 	expand func() ([]homeRow, error)
 	// vod rows hold films and series on demand (vodEntries), not items.
 	vod bool
+	// vodFill, when set, loads films and series on demand to mix into the row (mixedEntries).
+	vodFill func() ([]VodSuggestion, error)
 }
 
 func (h *Handlers) savedLayout(ctx context.Context, uid int64) []savedRow {
@@ -226,6 +228,19 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow) ([
 				}
 				return out, err
 			}})
+		// Library recommendations with on-demand ones mixed in, for apps that ask.
+		defaults[len(defaults)-2].vodFill = func() ([]VodSuggestion, error) {
+			u, s, _, allowed := h.suggestSession(ctx)
+			if !allowed {
+				return nil, nil
+			}
+			list, err := h.VODSuggest.For(ctx, u, "", vodSuggestRowSize)
+			if err != nil || len(list) == 0 {
+				return nil, err
+			}
+			return h.toAPIVodSuggestions(ctx, s.User.ID, list)
+		}
+		defaults = append(defaults, h.moreHomeRows(ctx, home)...)
 	}
 	// Films and series on demand picked for them (Watch on VOD), when on demand is theirs to
 	// watch. Its content (vodEntries) is only sent to apps that ask for it (HomeHubs).
@@ -268,11 +283,20 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow) ([
 		r.hidden = s.Hidden
 		out = append(out, r)
 	}
+	// Rows the saved layout doesn't have yet go after the default row before them (or first).
+	after := -1
 	for _, r := range defaults {
-		if !used[r.id] {
-			r.hidden = r.hiddenByDefault
-			out = append(out, r) // new rows show up at the end
+		if used[r.id] {
+			for i := range out {
+				if out[i].id == r.id {
+					after = i
+				}
+			}
+			continue
 		}
+		r.hidden = r.hiddenByDefault
+		out = append(out[:after+1], append([]homeRow{r}, out[after+1:]...)...)
+		after++
 	}
 	return out, nil
 }
@@ -298,14 +322,16 @@ func (h *Handlers) HomeHubs(ctx context.Context, req HomeHubsRequestObject) (Hom
 	if err != nil {
 		return nil, internal(ctx, "hubs", err)
 	}
+	mixed := req.Params.Mixed != nil && *req.Params.Mixed
 	out := HomeHubs200JSONResponse{}
 	for _, r := range rows {
 		if r.hidden {
 			continue
 		}
 		if r.vod {
-			// Only for apps that show vodEntries: older ones would show an empty row.
-			if req.Params.Vod == nil || !*req.Params.Vod {
+			// Only for apps that show vodEntries: older ones would show an empty row. Apps
+			// that mix on demand into the other rows don't need it.
+			if req.Params.Vod == nil || !*req.Params.Vod || mixed {
 				continue
 			}
 			hub, ok, err := h.vodSuggestHub(ctx, r)
@@ -339,12 +365,23 @@ func (h *Handlers) HomeHubs(ctx context.Context, req HomeHubsRequestObject) (Hom
 			if err != nil {
 				return nil, internal(ctx, "hubs", err)
 			}
-			if len(list) == 0 {
+			var vod []VodSuggestion
+			if mixed && r.vodFill != nil {
+				if vod, err = r.vodFill(); err != nil {
+					return nil, internal(ctx, "hubs", err)
+				}
+			}
+			if len(list) == 0 && len(vod) == 0 {
 				continue
 			}
 			hub := Hub{Id: r.id, Title: r.title, LibraryId: nz(r.lib), Items: make([]ItemSummary, len(list))}
 			for i, it := range list {
 				hub.Items[i] = toAPISummary(it)
+			}
+			if mixed && r.vodFill != nil {
+				hub.MixedEntries = ptr(mixEntries(list, vod))
+			} else if len(list) == 0 {
+				continue // nothing older apps can show
 			}
 			out = append(out, hub)
 		}

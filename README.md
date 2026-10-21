@@ -60,10 +60,9 @@ Marquee organises the films, shows, music and recordings already on your disks a
 - Direct play, direct stream (remux) or transcode, chosen per device and network, with HDR-to-SDR tone mapping.
 - Automatic quality for remote viewers, adaptive bitrate, and a fair share of your upload bandwidth.
 - Subtitles: text, styled ASS with embedded fonts, and burned-in image subtitles. Each person picks size, colour, background and position, and can adjust subtitle and audio timing (remembered per file). Search OpenSubtitles or use **Bazarr**.
-- Skip Intro and Skip Credits (detected automatically), chapters, seek-bar thumbnails, playback speed, Up Next and cinema trailers before films.
+- Skip Intro and Skip Credits (detected automatically), chapters, seek-bar thumbnails, playback speed, an Up Next countdown between episodes and cinema trailers before films.
 - Continue Watching and On Deck, with any title removable from the row.
 - **Watch together:** shared play, pause and seek across devices.
-- **Remote control:** send what you're watching to another open Marquee app ("Play on…") and control it from your phone.
 - Chromecast from iPhone, iPad and Android; AirPlay on Apple devices.
 - Offline downloads on iPhone, iPad and Android, optionally converted on the server. Ratings, watched marks and progress made offline sync when you reconnect.
 
@@ -75,7 +74,7 @@ Marquee organises the films, shows, music and recordings already on your disks a
 
 ### Discover and personalise
 - **Muse for movies:** "90s sci-fi with time travel" or "acclaimed war films I haven't seen" finds matches in your library.
-- "Recommended for You" and "Because you watched…" rows, and "More like this".
+- "Recommended for You", "Because you watched…", Top Rated, Trending Now and rows from the genres you watch, with films and shows on demand mixed in (marked VOD), plus a holiday row in the 30 days before Halloween, Thanksgiving and Christmas, and "More like this".
 - A Home screen each person can reorder, hide and pin rows on.
 - Personal ratings, a household community rating with comments, a watchlist and statistics.
 - Favourites (the heart) on films, shows, episodes and music, which also steer recommendations.
@@ -98,9 +97,9 @@ Marquee organises the films, shows, music and recordings already on your disks a
 | Platform | Highlights |
 |---|---|
 | **Web** | Everything, including settings and administration. Built into the server: open `http://<server>:32500`. |
-| **iPhone and iPad** | Downloads, AirPlay and Chromecast, lock-screen controls, remote control. |
+| **iPhone and iPad** | Downloads, AirPlay and Chromecast, lock-screen controls. |
 | **Apple TV** | Top Shelf, Quick Connect sign-in, remote-controllable. |
-| **Android phone and tablet** | Downloads, Android Auto, Chromecast, remote control. |
+| **Android phone and tablet** | Downloads, Android Auto, Chromecast. |
 | **Android TV** | A D-pad interface with the same features as phones, remote-controllable. |
 
 ## Requirements

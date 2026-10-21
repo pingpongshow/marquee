@@ -9,7 +9,7 @@ Install the apps, sign in, stream away from home and set your own preferences.
 - [Profiles and switching](#profiles-and-switching)
 - [Remote access](#remote-access)
 - [Share with friends](#share-with-friends)
-- [Casting, AirPlay and remote control](#casting-airplay-and-remote-control)
+- [Casting and AirPlay](#casting-and-airplay)
 - [Offline downloads](#offline-downloads)
 - [Your account and preferences](#your-account-and-preferences)
 
@@ -161,12 +161,10 @@ Friends outside your household get their own account with the libraries and limi
 
 Your friend opens the link, picks a username and password, and joins. Friends sign in with their own password and aren't shown on the profile picker. Remove a friend from the **Friends** list at any time.
 
-## Casting, AirPlay and remote control
+## Casting and AirPlay
 
 - **Chromecast** from the iPhone, iPad and Android apps. Browsers only allow casting from HTTPS pages, so the web app can cast only behind an HTTPS reverse proxy or `tailscale serve`.
 - **AirPlay** on iPhone and iPad, to an Apple TV or AirPlay 2 speakers (HomePod, Sonos and others) for music.
-- **Play on…**: send what you're watching to another open Marquee app (a TV, a phone, another browser) and keep controlling it from where you are.
-- **Remote:** in the web app, avatar → **Remote** controls Marquee playing on your TV, phone, tablet or another browser: play, pause, seek, audio track and subtitles.
 
 ## Offline downloads
 

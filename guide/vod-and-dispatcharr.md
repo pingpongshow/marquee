@@ -230,7 +230,7 @@ Marquee suggests VOD titles from each person's own taste: their favourites (coun
 
 Suggestions appear in several places:
 
-- **Home: Watch on VOD,** a row of picks with the reason for each (*Because you love Arrival*, *Similar to Dune*). Like any Home row, each person can move, hide or pin it.
+- **Home:** VOD picks are mixed into Home's suggestion rows (Recommended for You, Top Rated, Trending Now, the genre rows and the holiday row) beside the library's titles, with a **VOD** badge on their posters. Older app versions show them in their own **Watch on VOD** row instead.
 - **Also on VOD,** at the bottom of a library film's or show's page: VOD titles like this one.
 - **Recommended for you,** at the top of VOD Movies and VOD Shows. **See all** opens the **Recommended** page.
 - **Muse:** tick **Include VOD** under the search box in Muse for movies to get VOD titles that fit your description beside the library's.

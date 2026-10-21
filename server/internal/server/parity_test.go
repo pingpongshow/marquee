@@ -53,12 +53,13 @@ func TestSmartCollectionsHomeLayoutCinema(t *testing.T) {
 		t.Errorf("tracks accepted: %d", code)
 	}
 
-	// Home layout (USER-12): reorder, hide, pin; unknown rows dropped; new rows appended.
+	// Home layout (USER-12): reorder, hide, pin; unknown rows dropped; new rows placed after
+	// the default row before them.
 	recent := fmt.Sprintf("recent-%d", lib.Id)
 	pin := fmt.Sprintf("collection-%d", sc.Id)
 	var layout api.HomeLayout
 	h.do("GET", "/me/home-layout", nil, &layout)
-	if len(layout.Rows) != 6 || layout.Rows[0].Id != "continue-watching" || layout.Rows[2].Id != "recommended" {
+	if len(layout.Rows) != 10 || layout.Rows[0].Id != "continue-watching" || layout.Rows[2].Id != "recommended" {
 		t.Fatalf("default layout: %+v", layout)
 	}
 	h.do("PUT", "/me/home-layout", map[string]any{"rows": []map[string]any{{"id": recent}, {"id": pin}, {"id": "watchlist", "hidden": true}, {"id": "nope"}}}, &layout)
@@ -66,16 +67,16 @@ func TestSmartCollectionsHomeLayoutCinema(t *testing.T) {
 	for _, r := range layout.Rows {
 		ids = append(ids, r.Id)
 	}
-	if fmt.Sprint(ids) != fmt.Sprintf("[%s %s watchlist continue-watching recommended because-you-watched favorites]", recent, pin) || !*layout.Rows[1].Pinned || *layout.Rows[1].Title != "90s" || !*layout.Rows[2].Hidden {
+	if fmt.Sprint(ids) != fmt.Sprintf("[continue-watching %s %s watchlist recommended because-you-watched holiday top-rated trending genres favorites]", recent, pin) || !*layout.Rows[2].Pinned || *layout.Rows[2].Title != "90s" || !*layout.Rows[3].Hidden {
 		t.Fatalf("saved layout: %v %+v", ids, layout.Rows)
 	}
 	var hubs []api.Hub
 	h.do("GET", "/hubs/home", nil, &hubs)
-	if len(hubs) != 2 || hubs[0].Id != recent || hubs[1].Id != pin || len(hubs[1].Items) != 1 {
+	if len(hubs) != 3 || hubs[0].Id != recent || hubs[1].Id != pin || len(hubs[1].Items) != 1 || hubs[2].Id != "top-rated" {
 		t.Fatalf("hubs: %+v", hubs)
 	}
 	h.do("PUT", "/me/home-layout", map[string]any{"rows": []any{}}, &layout)
-	if layout.Rows[0].Id != "continue-watching" || len(layout.Rows) != 6 {
+	if layout.Rows[0].Id != "continue-watching" || len(layout.Rows) != 10 {
 		t.Fatalf("reset: %+v", layout)
 	}
 
