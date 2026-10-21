@@ -13,7 +13,6 @@ import { useMusicState } from "../player/MusicPlayer";
 import { ItemActions } from "./ItemActions";
 import { DownloadOriginal, DownloadZip, EpisodeDownloadLink } from "./Download";
 import { ItemMenu } from "./ItemMenu";
-import { PlayOnButton } from "../remote/PlayOn";
 import { RowRating } from "../music/Rating";
 import { FavoriteButton, favoriteTypes, RowFavorite } from "./Favorite";
 import { ItemRatings, Reviews } from "./Reviews";
@@ -478,9 +477,6 @@ export function ItemPage() {
           <div className="mt-4 flex flex-wrap items-center gap-3">
             {favoriteTypes.has(d.type) && <FavoriteButton key={d.id} item={d} />}
             <ItemMenu item={d} />
-            {d.type !== "collection" && (
-              <PlayOnButton itemIds={[d.id]} className="rounded-full p-1.5 text-muted hover:bg-surface-3 hover:text-text" />
-            )}
             {(d.type === "movie" || d.type === "episode") && <DownloadOriginal item={d} />}
             {(d.type === "season" || d.type === "show") && <DownloadZip item={d} />}
             {me.data?.isAdmin && <ItemActions item={d} />}

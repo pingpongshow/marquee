@@ -6795,7 +6795,7 @@ export interface components {
             title?: string;
             rules: components["schemas"]["SmartCollectionRules"];
         };
-        /** @description The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two "Because you watched X" rows with hub ids because-<itemId>, "Because you love X" when X is a favourite; USER-16), favorites (your favourite movies and shows, newest first; hidden until shown), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones. */
+        /** @description The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two "Because you watched X" rows with hub ids because-<itemId>, "Because you love X" when X is a favourite; USER-16), favorites (your favourite movies and shows, newest first; hidden until shown), holiday (in the 30 days up to and including Halloween, Thanksgiving and Christmas, a row of each one's films and shows, hub ids holiday-halloween, holiday-thanksgiving, holiday-christmas), top-rated (acclaimed titles you haven't watched), trending (most watched in the household lately), genres (up to three rows from genres you watch, hub ids genre-<name>, changing daily), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones. */
         HomeLayout: {
             rows: components["schemas"]["HomeLayoutRow"][];
         };
@@ -6861,6 +6861,17 @@ export interface components {
             total?: number;
             /** @description Watch on VOD (id vod-suggestions) only, sent when the request asks with vod=true: films and series on demand picked for the caller, best first (items is empty). */
             vodEntries?: components["schemas"]["VodSuggestion"][];
+            /** @description Sent when the request asks with mixed=true, on suggestion rows: library items and films and series on demand together, best first. When it's present show it instead of items (mark the on-demand ones as VOD). */
+            mixedEntries?: components["schemas"]["HomeEntry"][];
+        };
+        /** @description One title in a mixed Home row: a library movie or show, or a film or series on demand. */
+        HomeEntry: {
+            /** @enum {string} */
+            kind: "item" | "vod";
+            /** @description Unique within the row, e.g. item:12, vod:movie:5, vod:series:7. */
+            key: string;
+            item?: components["schemas"]["ItemSummary"];
+            vod?: components["schemas"]["VodSuggestion"];
         };
         /** @description A Continue Watching entry: a library item (an in-progress movie, episode or video, or a show's next episode) or a film or episode on demand stopped part-way through. */
         ContinueEntry: {
@@ -11444,6 +11455,8 @@ export interface operations {
             query?: {
                 /** @description Include the Watch on VOD row (id vod-suggestions; films and series on demand picked for the caller, in vodEntries, with items empty). Only apps that show vodEntries should ask for it; without it the row is left out. */
                 vod?: boolean;
+                /** @description Mix films and series on demand into the suggestion rows (Recommended for You, the holiday row, Top Rated and the genre rows), in mixedEntries, and leave out the separate Watch on VOD row. Only apps that show mixedEntries should ask for it; without it those rows hold library items only (and rows with nothing from the library are left out). */
+                mixed?: boolean;
             };
             header?: never;
             path?: never;

@@ -39,7 +39,16 @@ function posterFor(s: VodSuggestion) {
 }
 
 /** One suggestion: the poster, the title and the reason (the whole reason in a tooltip). */
-export function VodSuggestionTile({ s, className = "w-36 shrink-0" }: { s: VodSuggestion; className?: string }) {
+export function VodSuggestionTile({
+  s,
+  className = "w-36 shrink-0",
+  badge,
+}: {
+  s: VodSuggestion;
+  className?: string;
+  /** Marks it as on demand, among library titles. */
+  badge?: boolean;
+}) {
   const hide = useHideVodSuggestion();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -78,6 +87,11 @@ export function VodSuggestionTile({ s, className = "w-36 shrink-0" }: { s: VodSu
           {body}
         </Link>
       ) : null}
+      {badge && (
+        <span className="pointer-events-none absolute top-1.5 left-1.5 z-10 rounded bg-black/75 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-accent shadow ring-1 ring-white/15 backdrop-blur-sm">
+          VOD
+        </span>
+      )}
       <div
         className={clsx(
           "absolute top-1.5 right-1.5 z-20 rounded-full bg-black/70 text-white transition-opacity [&>div>button]:text-white",

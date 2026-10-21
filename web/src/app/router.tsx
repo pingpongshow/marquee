@@ -66,10 +66,6 @@ const AccountPage = lazyRouteComponent(
   () => import("@/features/users/AccountPage"),
   "AccountPage",
 );
-const RemotePage = lazyRouteComponent(
-  () => import("@/features/remote/RemotePage"),
-  "RemotePage",
-);
 const RecapPage = lazyRouteComponent(
   () => import("@/features/music/Recap"),
   "RecapPage",
@@ -325,15 +321,6 @@ const accountRoute = createRoute({
   component: AccountPage,
 });
 
-// Remote control (USER-14): the player list, or one player's controls (?d=deviceId).
-const remoteRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/remote",
-  validateSearch: (s: Record<string, unknown>): { d?: number } => ({
-    d: typeof s.d === "number" ? s.d : undefined,
-  }),
-  component: RemotePage,
-});
 // Year in Music (MUSIC-22).
 const recapRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -383,7 +370,6 @@ const routeTree = rootRoute.addChildren([
   itemRoute,
   searchRoute,
   accountRoute,
-  remoteRoute,
   recapRoute,
   playlistsRoute,
   playlistRoute,

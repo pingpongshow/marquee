@@ -24,7 +24,6 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
-  imageUrl,
   session as authSession,
   trickplaySheetUrl,
   unwrap,
@@ -43,10 +42,9 @@ import { ignoreShortcut } from "@/lib/keys";
 import { cueCss, placeCues, resolveSubtitleStyle } from "@/lib/subtitleStyle";
 import { deviceProfile, prefersNativeHLS } from "./deviceProfile";
 import { SubtitleSearchDialog } from "./SubtitleSearch";
-import { remoteStateChanged, setVideoTarget, type RemoteTarget } from "../remote/bus";
-import { PlayOnButton } from "../remote/PlayOn";
 import { nextInPlaylist } from "../playlists/order";
 import { RatingPromptCard, showRatingPrompt } from "./RatingPrompt";
+import { UpNextScreen } from "./UpNextScreen";
 import { finishedWatching, wantsRatingPrompt } from "./ratingRules";
 
 type PlaybackSession = components["schemas"]["PlaybackSession"];
@@ -243,9 +241,8 @@ export function VideoPlayer({
   >(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [next, setNext] = useState<ItemSummary | null>(null);
-  const [nextDismissed, setNextDismissed] = useState(false);
-  // The rating request (USER-19): asked once per playback. Touching it beside Up Next holds
-  // the autoplay until it's answered or closed.
+  // The rating request (USER-19): asked once per playback. Touching it on Up Next holds
+  // the countdown until it's answered or closed.
   const [ratingDone, setRatingDone] = useState(false);
   const [ratingHold, setRatingHold] = useState(false);
   const [ended, setEnded] = useState(false);
@@ -679,84 +676,14 @@ export function VideoPlayer({
     };
   });
 
-  // Remote control (USER-14): this player obeys commands and reports what it's playing.
-  const remoteRef = useRef<RemoteTarget | null>(null);
-  useEffect(() => {
-    const d = item.data;
-    const episode = d?.type === "episode";
-    remoteRef.current = {
-      state: () => {
-        const v = videoRef.current;
-        return {
-          state: !sess || buffering ? "buffering" : !v || v.paused ? "paused" : "playing",
-          itemId,
-          itemType: d?.type,
-          title: preroll ? preroll.label : episode ? (d?.grandparentTitle ?? d.title) : (d?.title ?? ""),
-          subtitle: episode ? `${d?.parentTitle ?? ""} · Episode ${d?.index ?? ""} · ${d?.title ?? ""}` : d?.year ? String(d.year) : undefined,
-          artItemId: episode ? (d?.grandparentId ?? itemId) : itemId,
-          positionMs: Math.round((v?.currentTime ?? 0) * 1000),
-          durationMs: Math.round(duration * 1000),
-          volume: v ? (v.muted ? 0 : v.volume) : undefined,
-          audioStreamId: sess?.audioStreamId,
-          subtitleStreamId: sess?.subtitleStreamId,
-        };
-      },
-      pause: () => videoRef.current?.pause(),
-      resume: () => void videoRef.current?.play().catch(() => {}),
-      seek: (ms) => {
-        const v = videoRef.current;
-        if (v) v.currentTime = Math.max(0, ms / 1000);
-      },
-      stop: () =>
-        navigate({
-          to: "/item/$itemId",
-          params: { itemId: String(preroll?.movieId ?? itemId) },
-        }),
-      next: () => (preroll ? preroll.onDone() : playNext()),
-      previous: () => {
-        const v = videoRef.current;
-        if (v) v.currentTime = 0;
-      },
-      setAudio: (id) => restart({ audio: id }),
-      setSubtitle: (id) => restart({ subtitle: id }),
-      setVolume: (vol) => {
-        const v = videoRef.current;
-        if (!v) return;
-        v.volume = vol;
-        v.muted = vol === 0;
-      },
-    };
-  });
-  useEffect(() => {
-    const proxy: RemoteTarget = {
-      state: () => remoteRef.current!.state(),
-      pause: () => remoteRef.current?.pause(),
-      resume: () => remoteRef.current?.resume(),
-      seek: (ms) => remoteRef.current?.seek(ms),
-      stop: () => remoteRef.current?.stop(),
-      next: () => remoteRef.current?.next(),
-      previous: () => remoteRef.current?.previous(),
-      setAudio: (id) => remoteRef.current?.setAudio?.(id),
-      setSubtitle: (id) => remoteRef.current?.setSubtitle?.(id),
-      setVolume: (v) => remoteRef.current?.setVolume?.(v),
-    };
-    setVideoTarget(proxy);
-    return () => setVideoTarget(null);
-  }, []);
-  useEffect(() => {
-    remoteStateChanged();
-  }, [sess, item.data?.id]);
-
   const d = item.data;
   // Subtitle appearance (PLAY-20) for text subtitles; styled ASS keeps its own look.
   const subStyle = resolveSubtitleStyle(me.data?.preferences?.subtitleStyle);
   const marker = sess?.markers.find(
     (m) => time * 1000 >= m.startMs && time * 1000 < m.endMs - 1000,
   );
-  const nearEnd =
-    duration > 0 &&
-    (duration - time < 30 || (marker?.kind === "credits" && !!next));
-  const showUpNext = !!next && nearEnd && !nextDismissed && !preroll;
+  // Up Next takes over once the episode has finished.
+  const showUpNext = !!next && ended && !preroll;
   const rateable = wantsRatingPrompt({
     item: d,
     serverOn: info.data?.ratingPrompt,
@@ -776,9 +703,12 @@ export function VideoPlayer({
   const finishRating = () => {
     setRatingDone(true);
     setRatingHold(false);
-    // The episode ended while the card held Up Next: go on now.
-    if (ended && next && !nextDismissed) playNext();
   };
+  const leave = () =>
+    navigate({
+      to: "/item/$itemId",
+      params: { itemId: String(preroll?.movieId ?? itemId) },
+    });
 
   return (
     <div
@@ -801,18 +731,15 @@ export function VideoPlayer({
           setPlaying(true);
           setEnded(false);
           report("playing");
-          remoteStateChanged();
           poke();
         }}
         onPause={() => {
           setPlaying(false);
           setChrome(true);
           report("paused");
-          remoteStateChanged();
         }}
         onSeeked={() => {
           report(videoRef.current?.paused ? "paused" : "playing");
-          remoteStateChanged();
         }}
         onTimeUpdate={(e) => {
           setTime(e.currentTarget.currentTime);
@@ -823,7 +750,6 @@ export function VideoPlayer({
         onPlaying={() => {
           startedRef.current = true;
           setBuffering(false);
-          remoteStateChanged();
         }}
         onError={(e) => {
           const err = e.currentTarget.error;
@@ -842,8 +768,8 @@ export function VideoPlayer({
           report("paused");
           setEnded(true);
           if (preroll) preroll.onDone();
-          else if (next && !nextDismissed) {
-            if (!ratingHold) playNext();
+          else if (next) {
+            // Up Next shows, with its countdown.
           } else if (rateable && !ratingDone && d) {
             setRatingDone(true);
             showRatingPrompt(d);
@@ -950,24 +876,29 @@ export function VideoPlayer({
         </button>
       )}
 
-      {/* Up Next (above the bottom controls, whose gradient reaches up behind it and would take its clicks) */}
-      {showUpNext && next && (
-        <div className="absolute right-8 bottom-28 z-10 flex w-80 flex-col gap-2">
-          {showRatingInline && d && (
+      {/* Up Next, over everything once the episode has finished */}
+      {showUpNext && next && d && (
+        <UpNextScreen
+          previous={d}
+          next={next}
+          onPlay={playNext}
+          onReplay={() => {
+            const v = videoRef.current;
+            if (!v) return;
+            v.currentTime = 0;
+            v.play().catch(() => {});
+          }}
+          onClose={leave}
+          held={ratingHold}
+        >
+          {showRatingInline && (
             <RatingPromptCard
               item={d}
               onInteract={() => setRatingHold(true)}
               onClose={finishRating}
             />
           )}
-          <UpNext
-            next={next}
-            onPlay={playNext}
-            onDismiss={() => setNextDismissed(true)}
-            secondsLeft={Math.max(0, Math.ceil(duration - time))}
-            held={ratingHold}
-          />
-        </div>
+        </UpNextScreen>
       )}
       {finding && (
         <SubtitleSearchDialog
@@ -1101,16 +1032,6 @@ export function VideoPlayer({
                 </span>
               )}
             </button>
-            )}
-            {!preroll && !syncing && (
-              <PlayOnButton
-                itemIds={[itemId]}
-                startMs={() =>
-                  Math.round((videoRef.current?.currentTime ?? 0) * 1000)
-                }
-                onHandoff={() => videoRef.current?.pause()}
-                className="rounded-full p-2 text-white hover:bg-white/10"
-              />
             )}
             <button
               onClick={() => setMenu(menu === "info" ? null : "info")}
@@ -1597,59 +1518,6 @@ function PreviewThumb({
         backgroundPosition: `-${(tile % p.columns) * PREVIEW_W}px -${Math.floor(tile / p.columns) * h}px`,
       }}
     />
-  );
-}
-
-function UpNext({
-  next,
-  onPlay,
-  onDismiss,
-  secondsLeft,
-  held,
-}: {
-  next: ItemSummary;
-  onPlay: () => void;
-  onDismiss: () => void;
-  secondsLeft: number;
-  /** Autoplay waits while the person answers the rating card. */
-  held?: boolean;
-}) {
-  const art = next.images?.thumb ?? next.images?.backdrop;
-  return (
-    <div className="w-80 overflow-hidden rounded-lg border border-white/15 bg-black/85 text-white shadow-2xl backdrop-blur">
-      {art && (
-        <img
-          src={imageUrl(art, 320)}
-          alt=""
-          className="aspect-video w-full object-cover"
-        />
-      )}
-      <div className="space-y-2 p-3">
-        <div className="text-xs text-white/60 uppercase">
-          Up next
-          {held ? " · paused" : secondsLeft <= 30 ? ` in ${secondsLeft}s` : ""}
-        </div>
-        <div className="truncate font-semibold">
-          {next.type === "episode"
-            ? `${next.grandparentTitle ?? next.parentTitle} · ${next.parentTitle} · E${next.index} · ${next.title}`
-            : next.title}
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={onPlay}
-            className="flex-1 rounded bg-accent px-3 py-1.5 font-semibold text-black"
-          >
-            Play now
-          </button>
-          <button
-            onClick={onDismiss}
-            className="rounded bg-white/10 px-3 py-1.5"
-          >
-            Hide
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 

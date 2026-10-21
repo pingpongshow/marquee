@@ -14,7 +14,6 @@ import {
   LogOut,
   Menu,
   MonitorPlay,
-  MonitorSpeaker,
   Music,
   Settings,
   Sparkles,
@@ -34,7 +33,6 @@ import { Avatar } from "@/features/users/Avatar";
 import { ProfileSwitcher } from "@/features/users/ProfileSwitcher";
 import { TimeLeftNote, TimeUpHost } from "@/features/player/TimeUp";
 import { useMusicState } from "@/features/player/MusicPlayer";
-import { RemoteHost } from "@/features/remote/RemoteHost";
 import { RatingPromptHost } from "@/features/player/RatingPrompt";
 import { Toaster } from "@/components/Toast";
 import { useAuth } from "@/lib/auth";
@@ -111,9 +109,6 @@ function UserMenu({
           <TimeLeftNote className="border-b border-border px-4 pt-1 pb-2 text-xs text-muted" />
           <Link to="/account" className={item}>
             <UserRound className="size-4" aria-hidden /> Account
-          </Link>
-          <Link to="/remote" search={{ d: undefined }} className={item}>
-            <MonitorSpeaker className="size-4" aria-hidden /> Remote
           </Link>
           {onSwitch && (
             <button onClick={onSwitch} className={item}>
@@ -365,7 +360,6 @@ export function Shell({ children }: { children: ReactNode }) {
         </main>
       </div>
       {switching && <ProfileSwitcher onClose={() => setSwitching(false)} />}
-      <RemoteHost />
       <RatingPromptHost />
       <TimeUpHost />
       <Toaster />

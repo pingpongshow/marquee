@@ -37,7 +37,6 @@ import {
 import type { Entry } from "./queue";
 import { EqualizerSheet } from "./Equalizer";
 import { audioQualityLabel, isHiRes, setShowAudioQuality, streamedLabel, useShowAudioQuality } from "./audioQuality";
-import { PlayOnButton } from "../remote/PlayOn";
 import { queueTitle, SaveAsPlaylistDialog } from "../playlists/SaveAsPlaylist";
 
 export function fmtTime(s: number) {
@@ -509,16 +508,6 @@ export function NowPlaying() {
         </div>
         <SaveQueueButton label="Save as playlist" className="rounded-full p-2 hover:bg-white/10" iconClass="size-5" />
         <SleepMenu />
-        <PlayOnButton
-          itemIds={m.queue.entries.map((e) => e.item.id)}
-          index={m.queue.index}
-          startMs={() => Math.round(m.time * 1000)}
-          onHandoff={() => {
-            if (m.playing) m.toggle();
-            m.setExpanded(false);
-          }}
-          className="rounded-full p-2 hover:bg-white/10"
-        />
         <button
           onClick={() => setEqOpen(true)}
           className={clsx(

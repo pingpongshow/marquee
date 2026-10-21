@@ -59,6 +59,9 @@ export function HomePage() {
         // Watch on VOD: films and series on demand picked for you (items is empty).
         const vod = hub.vodEntries;
         if (vod && !vod.length) return null;
+        // Suggestion rows: library titles and on-demand ones (marked VOD) together.
+        const mixed = hub.mixedEntries;
+        if (mixed && !mixed.length) return null;
         // A pinned collection or playlist opens itself (USER-12).
         const pinned = pinnedTarget(hub.id);
         return (
@@ -105,7 +108,15 @@ export function HomePage() {
               )}
             </div>
             <ul className="flex gap-4 overflow-x-auto px-6 pb-2 lg:px-8">
-              {vod
+              {mixed
+                ? mixed.map((e) =>
+                    e.vod ? (
+                      <VodSuggestionTile key={e.key} s={e.vod} badge />
+                    ) : e.item ? (
+                      <HubItem key={e.key} it={e.item} wide={false} continueWatching={false} />
+                    ) : null,
+                  )
+                : vod
                 ? vod.map((s) => <VodSuggestionTile key={s.key} s={s} />)
                 : entries
                 ? entries.map((e) => <ContinueTile key={e.key} e={e} />)
