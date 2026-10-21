@@ -533,6 +533,8 @@ struct VodArt: View {
     var aspect: CGFloat = 1.5
     /// A library the viewer can see already has it: a green border round the art.
     var inLibrary = false
+    /// A "VOD" badge in the top corner, where titles on demand sit among library ones.
+    var vodBadge = false
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -551,6 +553,9 @@ struct VodArt: View {
                     .accessibilityLabel(VodInLibraryBadge.text)
                     .accessibilityIdentifier("vod.inLibrary")
             }
+        }
+        .overlay(alignment: .topLeading) {
+            if vodBadge { VodBadge().padding(isTV ? 10 : 6) }
         }
         .overlay(alignment: .topTrailing) {
             if watched {
@@ -580,6 +585,22 @@ struct VodArt: View {
             .overlay(alignment: .bottomLeading) {
                 Text(title).font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.85)).lineLimit(3).padding(8)
             }
+    }
+}
+
+/// "VOD" on a poster: small bold capitals on a dark capsule, legible over any art.
+struct VodBadge: View {
+    var body: some View {
+        Text("VOD")
+            .font(.system(size: isTV ? 18 : 10, weight: .heavy))
+            .kerning(0.6)
+            .foregroundStyle(Color.marqueeGold)
+            .padding(.horizontal, isTV ? 10 : 6)
+            .padding(.vertical, isTV ? 4 : 2.5)
+            .background(.black.opacity(0.72), in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.marqueeGold.opacity(0.5), lineWidth: isTV ? 1.5 : 1))
+            .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+            .accessibilityHidden(true) // the tile's label says it
     }
 }
 
@@ -854,14 +875,16 @@ struct VodPlayTarget: Identifiable {
 
 /// Full-screen playback of a film or an episode: the source's HLS through the server (or its
 /// file made into HLS), seekable, in AVKit's player. Its own player, not the library's: no
-/// trailers, rating request or watch together on demand. Episodes end with Up Next: a
-/// countdown to the next one in viewing order (the server's), as library shows do.
+/// trailers, rating request or watch together on demand. Episodes end with the Up Next screen:
+/// a countdown to the next one in viewing order (the server's), as library shows do.
 struct VodPlayerView: View {
     @Environment(AppSession.self) private var app
     @Environment(MusicPlayer.self) private var music
     @Environment(\.dismiss) private var dismiss
     /// What's playing (an episode's Up Next replaces it in place).
     @State private var current: VodPlayable
+    /// Counts plays of `current`, so playing the same one again from Up Next starts it afresh.
+    @State private var plays = 0
     /// nil: from the viewer's resume point.
     @State private var startMs: Int64?
     @State private var player = AVPlayer()
@@ -875,7 +898,10 @@ struct VodPlayerView: View {
     @State private var rateWatch: NSKeyValueObservation?
     /// The episode after this one, fetched as it starts.
     @State private var next: VodEpisode?
+    /// Up Next, once an episode with one after it has played to its end.
+    @State private var upNext: UpNextContent?
     @State private var countdown: Int?
+    @State private var countdownTask: Task<Void, Never>?
     #if os(iOS)
     @State private var chrome = PlayerChrome()
     #endif
@@ -894,8 +920,8 @@ struct VodPlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             // On the TV the player's transport bar keeps focus: it goes while Up Next is up,
-            // so the remote reaches Play Now and Cancel.
-            if !(isTV && countdown != nil) {
+            // so the remote reaches the Up Next cards.
+            if !(isTV && upNext != nil) {
                 VodPlayerController(player: player, chrome: chromeModel)
                     .ignoresSafeArea()
                     .accessibilityIdentifier("vod.player")
@@ -913,18 +939,13 @@ struct VodPlayerView: View {
                 #endif
                 if let error { ErrorBanner(message: error).padding().frame(maxWidth: 600) }
                 Spacer()
-                if let next, let countdown {
-                    HStack {
-                        Spacer()
-                        UpNextCard(title: "\(next.label) · \(next.title)", seconds: countdown, play: playNext,
-                                   cancel: { self.countdown = nil; close() })
-                    }
-                    .padding(.trailing, 40).padding(.bottom, 60)
-                }
+            }
+            if let content = upNext, let countdown {
+                UpNextScreen(content: content, seconds: countdown, playNext: playNext, replay: replay, cancel: close)
             }
             if let timeLimit { TimeLimitScreen(reason: timeLimit, close: close) }
         }
-        .task(id: current.key) { await start() }
+        .task(id: "\(current.key)#\(plays)") { await start() }
         .onDisappear { finish() }
         #if os(tvOS)
         .onExitCommand { close() }
@@ -1005,7 +1026,7 @@ struct VodPlayerView: View {
     /// session), and the reason shows full screen.
     private func reachedTimeLimit(_ reached: TimeLimitReached) {
         TimeLimits.shared.noteReached(reached, app: app)
-        countdown = nil
+        endUpNext()
         next = nil
         session = nil
         player.pause()
@@ -1032,26 +1053,52 @@ struct VodPlayerView: View {
     }
 
     private func ended() {
-        guard current.isEpisode, next != nil else { close(); return }
+        guard case .episode(let e) = current, let next else { close(); return }
         endSession() // counts the episode watched and ends its session
+        upNext = UpNextContent(previous: upNextEntry(e), next: upNextEntry(next),
+                               background: app.vodImageURL(next.stillUrl ?? e.stillUrl))
         startCountdown()
     }
 
+    private func upNextEntry(_ e: VodEpisode) -> UpNextEntry {
+        UpNextEntry(heading: e.seriesTitle, title: e.title,
+                    detail: UpNextEntry.episodeLine(season: e.season, seasonTitle: nil, episode: e.episode),
+                    overview: e.overview, image: app.vodImageURL(e.stillUrl))
+    }
+
     private func startCountdown() {
-        countdown = 10
-        Task {
+        countdownTask?.cancel()
+        countdown = UpNextContent.countdown
+        countdownTask = Task {
             while let c = countdown, c > 0 {
                 try? await Task.sleep(for: .seconds(1))
+                if Task.isCancelled { return }
                 if let now = countdown { countdown = now - 1 }
             }
             if countdown == 0 { playNext() }
         }
     }
 
+    /// Up Next goes (playing on, playing again, or closing).
+    private func endUpNext() {
+        countdownTask?.cancel()
+        countdownTask = nil
+        countdown = nil
+        upNext = nil
+    }
+
+    /// The episode that ended, again from its start, in this player.
+    private func replay() {
+        guard !closing else { return }
+        endUpNext()
+        startMs = 0
+        plays += 1
+    }
+
     /// The next episode, in this player, from its start.
     private func playNext() {
         guard let next, !closing else { return }
-        countdown = nil
+        endUpNext()
         endSession()
         startMs = 0
         current = .episode(next)
@@ -1072,7 +1119,7 @@ struct VodPlayerView: View {
     }
 
     private func close() {
-        countdown = nil
+        endUpNext()
         finish()
         dismiss()
     }

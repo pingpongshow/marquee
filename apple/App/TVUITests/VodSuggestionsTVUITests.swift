@@ -1,8 +1,8 @@
 import XCTest
 
-/// Suggestions on demand on Apple TV (LIVE-6, USER-16): Home's Watch on VOD row (a title opens
-/// its page; Not interested from the long-press menu takes it away) and Also on VOD on a
-/// movie's page. Needs the seed data the iOS VodSuggestionsUITests describe; skips without it.
+/// Suggestions on demand on Apple TV (LIVE-6, USER-16): films on demand in Home's suggestion
+/// rows, marked VOD (a title opens its page; Not interested from the long-press menu takes it
+/// away) and Also on VOD on a movie's page. Needs the seed data the iOS VodSuggestionsUITests describe; skips without it.
 final class VodSuggestionsTVUITests: XCTestCase {
     private var app: XCUIApplication!
     private let remote = XCUIRemote.shared
@@ -151,20 +151,22 @@ final class VodSuggestionsTVUITests: XCTestCase {
     }
 
     private func tile(_ title: String) -> XCUIElement {
-        app.buttons.matching(identifier: "vod.suggestion").matching(NSPredicate(format: "label == %@", title)).firstMatch
+        // Among library titles on Home it's marked VOD.
+        app.buttons.matching(identifier: "vod.suggestion").matching(NSPredicate(format: "label == %@ OR label == %@", title, "\(title), VOD")).firstMatch
     }
 
     // MARK: - Tests
 
-    /// Watch on VOD on Home: a title opens its film's page; holding Select offers Not
-    /// interested, which takes it off the row and off the server's suggestions.
+    /// Films on demand among Home's suggestions (mixed rows): a title opens its film's page;
+    /// holding Select offers Not interested, which takes it off the row and off the server's
+    /// suggestions.
     func testHomeWatchOnVodRowTV() throws {
         let token = try temporaryAccount()
         guard let first = try seed(token).first else { throw XCTSkip("no VOD suggestions (seed data missing)") }
         try signIn(as: token)
         let t = tile(first)
-        XCTAssertTrue(t.waitForExistence(timeout: 15), "Watch on VOD is on Home")
-        XCTAssertTrue(app.staticTexts["Watch on VOD"].exists)
+        XCTAssertTrue(t.waitForExistence(timeout: 15), "the film is among Home's suggestions")
+        XCTAssertEqual(t.label, "\(first), VOD", "marked VOD")
         for _ in 0..<6 where !t.hasFocus && focused.frame.minX < 100 { remote.press(.right) }
         focus(t, direction: .down, tries: 4)
         for _ in 0..<4 where !t.hasFocus { remote.press(.left) }

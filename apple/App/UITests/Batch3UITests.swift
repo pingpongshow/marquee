@@ -481,7 +481,7 @@ final class Batch3UITests: XCTestCase {
         sleep(2)
         app.buttons["np.playPause"].tap()
     }
-    /// Now Playing's header: no car mode or equaliser buttons; Play On, AirPlay and Cast are
+    /// Now Playing's header: no car mode or equaliser buttons; AirPlay and Cast are
     /// the same size and overlap neither each other nor the (long, truncated) source title,
     /// in portrait and landscape.
     func testNowPlayingHeaderTidy() throws {
@@ -511,7 +511,7 @@ final class Batch3UITests: XCTestCase {
             XCTAssertFalse(app.buttons["Car Mode"].exists, "\(name): no car mode button")
             XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Equali'")).firstMatch.exists, "\(name): no EQ button")
             let window = app.windows.firstMatch.frame
-            var buttons = [app.buttons["Play on…"].firstMatch, app.buttons["AirPlay"].firstMatch]
+            var buttons = [app.buttons["AirPlay"].firstMatch]
             let cast = app.descendants(matching: .any)["castButton"].firstMatch
             if cast.exists, !cast.frame.isEmpty { buttons.append(cast) }
             for b in buttons { XCTAssertTrue(b.waitForExistence(timeout: 5), "\(name): \(b)") }

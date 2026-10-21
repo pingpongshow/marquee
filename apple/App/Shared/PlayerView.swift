@@ -13,10 +13,13 @@ struct PlayerView: View {
     @Environment(\.dismiss) private var dismiss
     let request: VideoRequest
     @State private var playback: VideoPlayback?
+    /// Up Next, once a video with something after it has played to its end.
+    @State private var upNext: UpNextContent?
     @State private var countdown: Int?
+    @State private var countdownTask: Task<Void, Never>?
     /// The person is answering the rating request: the Up Next countdown waits (USER-19).
     @State private var countdownPaused = false
-    /// The rating request on the end screen, beside Up Next (USER-19).
+    /// The rating request on the Up Next screen, below the cards (USER-19).
     @State private var endPrompt: RatingPromptItem?
     /// This video's rating request has been made (on the end screen or after closing).
     @State private var prompted = false
@@ -40,14 +43,29 @@ struct PlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             if let p = playback {
-                PlayerController(playback: p, together: together, onNext: playNext,
-                                 trailer: trailerIndex == nil ? nil : TrailerActions(skip: nextTrailer, skipAll: skipTrailers),
-                                 chrome: chromeModel)
-                    .ignoresSafeArea()
+                // On the TV the player's transport bar keeps focus: it goes while Up Next is up,
+                // so the remote reaches the Up Next cards.
+                if !(isTV && upNext != nil) {
+                    PlayerController(playback: p, together: together, onNext: playNext,
+                                     trailer: trailerIndex == nil ? nil : TrailerActions(skip: nextTrailer, skipAll: skipTrailers),
+                                     chrome: chromeModel)
+                        .ignoresSafeArea()
+                }
                 overlays(p)
                 #if os(iOS)
                 if casting { CastingPanel(title: p.item?.title ?? "", close: close) }
                 #endif
+                if let content = upNext, let countdown {
+                    UpNextScreen(content: content, seconds: countdown, paused: countdownPaused,
+                                 playNext: playNext, replay: replay, cancel: close) {
+                        if let ask = endPrompt {
+                            RatingPromptCard(prompt: ask, onInteract: { countdownPaused = true }) {
+                                endPrompt = nil
+                                countdownPaused = false
+                            }
+                        }
+                    }
+                }
                 // The time limit refused or ended playback (kids' profiles): the reason, full
                 // screen, instead of an error; nothing plays behind it.
                 if let reason = p.timeLimitReason { TimeLimitScreen(reason: reason, close: close) }
@@ -60,7 +78,6 @@ struct PlayerView: View {
             Task { await app.refreshInfo() } // the rating request switch may have changed (USER-19)
             let p = VideoPlayback(app: app, playlistID: request.playlistID, order: request.order)
             playback = p
-            RemoteReceiver.shared.video = RemoteVideoTarget(playback: p, next: playNext, close: close)
             let t = WatchTogether(app: app, player: p.player, itemID: request.itemID)
             together = t
             p.onRestart = { [weak t] in t?.restarting() }
@@ -90,20 +107,19 @@ struct PlayerView: View {
             cast.onVideoFinished = nil
             #endif
             together?.leave()
-            if let p = playback, RemoteReceiver.shared.video?.playback === p { RemoteReceiver.shared.video = nil }
             Task { await playback?.stop() }
         }
         .onChange(of: playback?.finished) { _, done in
             guard done == true, playback?.timeLimitReason == nil else { return }
             if trailerIndex != nil { nextTrailer(); return }
-            if playback?.nextUp != nil {
-                // The rating request sits beside the countdown; autoplay carries on unless
-                // the person touches it (USER-19).
-                if !prompted, let ask = RatingPrompt.wanted(playback?.item, app: app) {
+            if let p = playback, let next = p.nextUp {
+                // The rating request sits below the cards; autoplay carries on unless the
+                // person touches it (USER-19).
+                if !prompted, let ask = RatingPrompt.wanted(p.item, app: app) {
                     prompted = true
                     endPrompt = ask
                 }
-                startCountdown()
+                showUpNext(p, next: next)
             } else {
                 close() // asks for a rating over the page (USER-19)
             }
@@ -116,7 +132,6 @@ struct PlayerView: View {
         #if os(tvOS)
         .onExitCommand { close() }
         #endif
-        .remoteToast()
     }
 
     @ViewBuilder private func overlays(_ p: VideoPlayback) -> some View {
@@ -154,25 +169,12 @@ struct PlayerView: View {
                     .padding(.trailing, 24).padding(.bottom, 90)
                 }
                 #endif
-                if let next = p.nextUp, let countdown {
-                    VStack(alignment: .trailing, spacing: 14) {
-                        if let ask = endPrompt {
-                            RatingPromptCard(prompt: ask, onInteract: { countdownPaused = true }) {
-                                endPrompt = nil
-                                countdownPaused = false
-                            }
-                        }
-                        UpNextCard(title: next._type == .episode ? "\(next.grandparentTitle ?? "") · \(next.subtitle) · \(next.title)" : next.title,
-                                   seconds: countdown, paused: countdownPaused, play: playNext, cancel: { self.countdown = nil; close() })
-                    }
-                    .padding(.trailing, 40).padding(.bottom, 60)
-                }
             }
         }
     }
 
     #if os(iOS)
-    /// Close at the left; settings, Play On, Cast and Watch Together at the right.
+    /// Close at the left; settings, Cast and Watch Together at the right.
     private func topButtons(_ p: VideoPlayback) -> some View {
         HStack {
             Button { close() } label: { PlayerBubble(systemImage: "xmark") }
@@ -180,13 +182,6 @@ struct PlayerView: View {
             Spacer()
             if trailerIndex == nil {
                 if together?.group == nil { optionsMenu(p) }
-                if p.offlineTitle == nil {
-                    // Another Marquee app (USER-14): carries on there from here.
-                    PlayOnButton(target: {
-                        guard let id = p.item?.id else { return nil }
-                        return PlayOnTarget(itemIDs: [id], startMs: Int64(p.position * 1000), pauseHere: { p.player.pause() })
-                    }, compact: true, bubble: true)
-                }
                 CastButton(tint: .white).frame(width: 28, height: 28).modifier(PlayerBubbleBackground())
                 if let t = together { togetherButton(t) }
             }
@@ -362,22 +357,81 @@ struct PlayerView: View {
     }
     #endif
 
-    private func startCountdown() {
-        countdown = 10
-        countdownPaused = false
+    // MARK: - Up Next
+
+    /// The Up Next screen and its countdown; the next one's overview (and the show's art, when
+    /// the episode has none) arrive as it shows.
+    private func showUpNext(_ p: VideoPlayback, next: Item) {
+        let ended = p.item
+        upNext = UpNextContent(previous: ended.map { upNextEntry($0.base, overview: $0.info.summary) },
+                               next: upNextEntry(next, overview: nil),
+                               background: app.imageURL(next.images?.backdrop ?? ended?.base.images?.backdrop, pixels: 1920))
+        startCountdown()
         Task {
+            let detail = try? await app.item(next.id)
+            guard upNext != nil, playback?.nextUp?.id == next.id else { return }
+            if let o = detail?.info.summary { upNext?.next.overview = o }
+            if upNext?.background == nil, let show = next.grandparentId, let s = try? await app.item(show), upNext != nil {
+                upNext?.background = app.imageURL(s.base.images?.backdrop ?? s.base.images?.poster, pixels: 1920)
+            }
+        }
+    }
+
+    private func upNextEntry(_ i: Item, overview: String?) -> UpNextEntry {
+        let still = app.imageURL(i.images?.thumb ?? i.images?.backdrop ?? i.images?.poster, width: isTV ? 640 : 420)
+        if i._type == .episode {
+            return UpNextEntry(heading: i.grandparentTitle ?? i.title, title: i.title,
+                               detail: UpNextEntry.episodeLine(season: nil, seasonTitle: i.parentTitle, episode: i.index),
+                               overview: overview, image: still)
+        }
+        return UpNextEntry(heading: i.title, title: nil, detail: i.year.map(String.init) ?? "", overview: overview, image: still)
+    }
+
+    private func startCountdown() {
+        countdownTask?.cancel()
+        countdown = UpNextContent.countdown
+        countdownPaused = false
+        countdownTask = Task {
             while let c = countdown, c > 0 {
                 try? await Task.sleep(for: .seconds(1))
+                if Task.isCancelled { return }
                 if let now = countdown, !countdownPaused { countdown = now - 1 }
             }
             if countdown == 0 { playNext() }
         }
     }
 
-    private func playNext() {
-        guard let next = playback?.nextUp else { return }
+    /// Up Next goes (playing on, playing again, or closing).
+    private func endUpNext() {
+        countdownTask?.cancel()
+        countdownTask = nil
         countdown = nil
         endPrompt = nil
+        upNext = nil
+    }
+
+    /// The one that ended, again from its start, in this player.
+    private func replay() {
+        guard let p = playback else { return }
+        endUpNext()
+        let s = p.session
+        Task {
+            #if os(iOS)
+            if p.offlineTitle != nil, let file = downloads.localURL(request.itemID) {
+                guard await begin(p, { await p.startLocal(itemID: request.itemID, file: file, downloads: downloads) }) else { return }
+                await p.player.seek(to: .zero)
+                return
+            }
+            #endif
+            await begin(p) {
+                await p.start(itemID: request.itemID, startMs: 0, audio: s?.audioStreamId, subtitle: s?.subtitleStreamId, fileID: s?.fileId)
+            }
+        }
+    }
+
+    private func playNext() {
+        guard let next = playback?.nextUp else { return }
+        endUpNext()
         Task {
             await playback?.stop()
             presenter.play(next.id, startMs: 0, playlistID: request.playlistID, order: request.order)
@@ -395,8 +449,7 @@ struct PlayerView: View {
 
     private func close() {
         askAfterClosing()
-        countdown = nil
-        endPrompt = nil
+        endUpNext()
         presenter.request = nil
         dismiss()
     }
@@ -424,30 +477,7 @@ struct PlayerView: View {
     var closed = false
 }
 
-/// The countdown to the next episode at the end of one (library and on-demand shows).
-struct UpNextCard: View {
-    let title: String
-    let seconds: Int
-    /// Waiting while the person answers the rating request.
-    var paused = false
-    let play: () -> Void
-    let cancel: () -> Void
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(paused ? "Up next" : "Up next in \(seconds)s").font(.caption).foregroundStyle(.secondary)
-            Text(title).font(.headline).lineLimit(2)
-            HStack {
-                Button("Play now", action: play).buttonStyle(.borderedProminent)
-                Button("Cancel", action: cancel).buttonStyle(.bordered)
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: isTV ? 620 : 380, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
-    }
-}
-
-/// When the player's own overlay buttons (close, settings, Play On, Cast, Watch Together)
+/// When the player's own overlay buttons (close, settings, Cast, Watch Together)
 /// show. AVPlayerViewController has no public callback for its controls coming and going, so
 /// this keeps roughly in step with them: shown when playback starts, on a tap, while paused or
 /// while a menu or sheet is open; hidden after a few seconds of playing untouched, and in

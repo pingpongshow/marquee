@@ -480,7 +480,7 @@ final class MarqueeTVUITests: XCTestCase {
         remote.press(.menu)
     }
 
-    // MARK: - Batch 2 (USER-14, MUSIC-22, PLAY-20)
+    // MARK: - Batch 2 (MUSIC-22, PLAY-20)
 
     private func list(_ path: String, token: String) throws -> [[String: Any]] {
         var req = URLRequest(url: URL(string: server + "/api/v1" + path)!)
@@ -502,39 +502,6 @@ final class MarqueeTVUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 1)
         }
         XCTFail("timed out: \(what)")
-    }
-
-    /// The Apple TV as a remote-controlled player (USER-14): another device of the same person
-    /// sends play, pause, seek and stop, and sees the state the TV reports.
-    func testRemoteControlledTV() throws {
-        let controller = try signInTemporaryUser() // the token that approved Quick Connect: another device
-        let tvID = try XCTUnwrap(try list("/devices", token: controller).first { $0["current"] as? Bool != true && $0["platform"] as? String == "tvos" }?["id"] as? Int)
-        try eventually(60, "the TV listed as a player") {
-            try list("/remote/players", token: controller).contains { $0["deviceId"] as? Int == tvID }
-        }
-        func state() throws -> [String: Any] {
-            try api("GET", "/remote/players/\(tvID)", token: controller)["state"] as? [String: Any] ?? [:]
-        }
-        func command(_ body: [String: Any]) throws { try api("POST", "/remote/players/\(tvID)/commands", body, token: controller) }
-        try command(["type": "play", "itemIds": [322], "startMs": 5000])
-        try eventually(30, "playing 00 Long Test") {
-            let s = try state()
-            if s["itemId"] as? Int != 322 { return false } // a cinema trailer may play first
-            return s["state"] as? String == "playing"
-        }
-        sleep(2)
-        shot("tv-rc1-playing")
-        try command(["type": "pause"])
-        try eventually(15, "paused") { try state()["state"] as? String == "paused" }
-        try command(["type": "seek", "positionMs": 30000])
-        try eventually(15, "at 30 s") {
-            let p = try state()["positionMs"] as? Int ?? 0
-            return p >= 28000 && p <= 33000
-        }
-        shot("tv-rc2-paused")
-        try command(["type": "stop"])
-        try eventually(15, "stopped") { (try state()["itemId"] as? Int) == nil }
-        XCTAssertEqual(app.state, .runningForeground)
     }
 
     /// The year-in-music recap on the TV (MUSIC-22): Kiddo's, page by page with Next.

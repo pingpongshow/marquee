@@ -3,6 +3,7 @@ import MarqueeAPI
 
 public typealias Library = Components.Schemas.Library
 public typealias Hub = Components.Schemas.Hub
+public typealias HomeEntry = Components.Schemas.HomeEntry
 public typealias Playlist = Components.Schemas.Playlist
 public typealias PlaylistEntry = Components.Schemas.PlaylistEntry
 public typealias Person = Components.Schemas.PersonDetail
@@ -28,9 +29,11 @@ public extension AppSession {
 
     func libraries() async throws -> [Library] { try await api.listLibraries().ok.body.json }
 
-    /// Home's rows. `vod` adds Watch on VOD (id vod-suggestions, its titles in vodEntries).
-    func hubs(vod: Bool = false) async throws -> [Hub] {
-        try await api.homeHubs(query: .init(vod: vod ? true : nil)).ok.body.json
+    /// Home's rows. `vod` adds Watch on VOD (id vod-suggestions, its titles in vodEntries);
+    /// `mixed` puts films and series on demand into the suggestion rows instead (in
+    /// mixedEntries), leaving that row out.
+    func hubs(vod: Bool = false, mixed: Bool = false) async throws -> [Hub] {
+        try await api.homeHubs(query: .init(vod: vod ? true : nil, mixed: mixed ? true : nil)).ok.body.json
     }
 
     func items(library: Int64, sort: ItemSort = .title, offset: Int = 0, limit: Int = 100,
@@ -257,6 +260,3 @@ public extension Components.Schemas.ItemDetail {
 extension Components.Schemas.ItemSummary: Identifiable {}
 extension Components.Schemas.Profile: Identifiable {}
 extension Components.Schemas.Playlist: Identifiable {}
-extension Components.Schemas.RemotePlayer: Identifiable {
-    public var id: Int64 { deviceId }
-}

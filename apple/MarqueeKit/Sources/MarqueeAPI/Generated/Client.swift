@@ -16524,6 +16524,13 @@ public struct Client: APIProtocol {
                     name: "vod",
                     value: input.query.vod
                 )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "mixed",
+                    value: input.query.mixed
+                )
                 converter.setAcceptHeader(
                     in: &request.headerFields,
                     contentTypes: input.headers.accept

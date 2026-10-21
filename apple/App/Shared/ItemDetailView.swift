@@ -395,12 +395,6 @@ struct ItemDetailView: View {
             .buttonStyle(.bordered)
             .accessibilityIdentifier("markWatched")
         }
-        #if os(iOS)
-        if [.movie, .episode, .video, .season, .show, .album, .artist, .track].contains(d.type) {
-            // Remote control (USER-14): play this on another of your Marquee apps.
-            PlayOnButton(target: { PlayOnTarget(itemIDs: [d.id]) }).buttonStyle(.bordered)
-        }
-        #endif
         // Watchlist, Watched and the heart are buttons above (always current), so the menu leaves them
         // out, except the other watched mark (Mark Unwatched for something part-way through).
         Menu {

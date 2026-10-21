@@ -11051,7 +11051,7 @@ extension Components {
                 case rules
             }
         }
-        /// The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two "Because you watched X" rows with hub ids because-<itemId>, "Because you love X" when X is a favourite; USER-16), favorites (your favourite movies and shows, newest first; hidden until shown), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones.
+        /// The person's Home rows (USER-12), in order. Built-in rows have ids like continue-watching, watchlist, recommended, because-you-watched (shown as up to two "Because you watched X" rows with hub ids because-<itemId>, "Because you love X" when X is a favourite; USER-16), favorites (your favourite movies and shows, newest first; hidden until shown), holiday (in the 30 days up to and including Halloween, Thanksgiving and Christmas, a row of each one's films and shows, hub ids holiday-halloween, holiday-thanksgiving, holiday-christmas), top-rated (acclaimed titles you haven't watched), trending (most watched in the household lately), genres (up to three rows from genres you watch, hub ids genre-<name>, changing daily), recent-<libraryId> and played-<libraryId>; pinned collections and playlists are collection-<id> and playlist-<id>. Rows not listed (e.g. a new library's) appear after the listed ones.
         ///
         /// - Remark: Generated from `#/components/schemas/HomeLayout`.
         public struct HomeLayout: Codable, Hashable, Sendable {
@@ -11320,6 +11320,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Hub/vodEntries`.
             public var vodEntries: [Components.Schemas.VodSuggestion]?
+            /// Sent when the request asks with mixed=true, on suggestion rows: library items and films and series on demand together, best first. When it's present show it instead of items (mark the on-demand ones as VOD).
+            ///
+            /// - Remark: Generated from `#/components/schemas/Hub/mixedEntries`.
+            public var mixedEntries: [Components.Schemas.HomeEntry]?
             /// Creates a new `Hub`.
             ///
             /// - Parameters:
@@ -11330,6 +11334,7 @@ extension Components {
             ///   - entries: Continue Watching only: the row's entries, library items and films and episodes on demand together, newest first (up to 20; items stays library-only for older apps). When it's present show it instead of items. The row is sent when either has something.
             ///   - total: Continue Watching only: how many entries there are in all (GET /hubs/continue-watching); more than entries holds means a View more link.
             ///   - vodEntries: Watch on VOD (id vod-suggestions) only, sent when the request asks with vod=true: films and series on demand picked for the caller, best first (items is empty).
+            ///   - mixedEntries: Sent when the request asks with mixed=true, on suggestion rows: library items and films and series on demand together, best first. When it's present show it instead of items (mark the on-demand ones as VOD).
             public init(
                 id: Swift.String,
                 title: Swift.String,
@@ -11337,7 +11342,8 @@ extension Components {
                 items: [Components.Schemas.ItemSummary],
                 entries: [Components.Schemas.ContinueEntry]? = nil,
                 total: Swift.Int? = nil,
-                vodEntries: [Components.Schemas.VodSuggestion]? = nil
+                vodEntries: [Components.Schemas.VodSuggestion]? = nil,
+                mixedEntries: [Components.Schemas.HomeEntry]? = nil
             ) {
                 self.id = id
                 self.title = title
@@ -11346,6 +11352,7 @@ extension Components {
                 self.entries = entries
                 self.total = total
                 self.vodEntries = vodEntries
+                self.mixedEntries = mixedEntries
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -11355,6 +11362,51 @@ extension Components {
                 case entries
                 case total
                 case vodEntries
+                case mixedEntries
+            }
+        }
+        /// One title in a mixed Home row: a library movie or show, or a film or series on demand.
+        ///
+        /// - Remark: Generated from `#/components/schemas/HomeEntry`.
+        public struct HomeEntry: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/HomeEntry/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case item = "item"
+                case vod = "vod"
+            }
+            /// - Remark: Generated from `#/components/schemas/HomeEntry/kind`.
+            public var kind: Components.Schemas.HomeEntry.KindPayload
+            /// Unique within the row, e.g. item:12, vod:movie:5, vod:series:7.
+            ///
+            /// - Remark: Generated from `#/components/schemas/HomeEntry/key`.
+            public var key: Swift.String
+            /// - Remark: Generated from `#/components/schemas/HomeEntry/item`.
+            public var item: Components.Schemas.ItemSummary?
+            /// - Remark: Generated from `#/components/schemas/HomeEntry/vod`.
+            public var vod: Components.Schemas.VodSuggestion?
+            /// Creates a new `HomeEntry`.
+            ///
+            /// - Parameters:
+            ///   - kind:
+            ///   - key: Unique within the row, e.g. item:12, vod:movie:5, vod:series:7.
+            ///   - item:
+            ///   - vod:
+            public init(
+                kind: Components.Schemas.HomeEntry.KindPayload,
+                key: Swift.String,
+                item: Components.Schemas.ItemSummary? = nil,
+                vod: Components.Schemas.VodSuggestion? = nil
+            ) {
+                self.kind = kind
+                self.key = key
+                self.item = item
+                self.vod = vod
+            }
+            public enum CodingKeys: String, CodingKey {
+                case kind
+                case key
+                case item
+                case vod
             }
         }
         /// A Continue Watching entry: a library item (an in-progress movie, episode or video, or a show's next episode) or a film or episode on demand stopped part-way through.

@@ -26133,12 +26133,21 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/hubs/home/GET/query/vod`.
                 public var vod: Swift.Bool?
+                /// Mix films and series on demand into the suggestion rows (Recommended for You, the holiday row, Top Rated and the genre rows), in mixedEntries, and leave out the separate Watch on VOD row. Only apps that show mixedEntries should ask for it; without it those rows hold library items only (and rows with nothing from the library are left out).
+                ///
+                /// - Remark: Generated from `#/paths/hubs/home/GET/query/mixed`.
+                public var mixed: Swift.Bool?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
                 ///   - vod: Include the Watch on VOD row (id vod-suggestions; films and series on demand picked for the caller, in vodEntries, with items empty). Only apps that show vodEntries should ask for it; without it the row is left out.
-                public init(vod: Swift.Bool? = nil) {
+                ///   - mixed: Mix films and series on demand into the suggestion rows (Recommended for You, the holiday row, Top Rated and the genre rows), in mixedEntries, and leave out the separate Watch on VOD row. Only apps that show mixedEntries should ask for it; without it those rows hold library items only (and rows with nothing from the library are left out).
+                public init(
+                    vod: Swift.Bool? = nil,
+                    mixed: Swift.Bool? = nil
+                ) {
                     self.vod = vod
+                    self.mixed = mixed
                 }
             }
             public var query: Operations.HomeHubs.Input.Query

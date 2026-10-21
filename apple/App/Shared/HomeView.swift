@@ -58,6 +58,19 @@ struct HomeView: View {
                         // Watch on VOD (LIVE-6, USER-16): films and series on demand picked
                         // for this viewer.
                         VodSuggestionRow(title: hub.title, list: hub.vodEntries ?? [], identifier: "home.vodSuggestions")
+                    } else if let mixed = hub.mixedEntries {
+                        // Suggestion rows (USER-16): library titles and films and series on
+                        // demand together, in the server's order; those on demand are marked VOD
+                        // and open their own pages.
+                        ShelfRow(title: hub.title, destination: destination(hub)) {
+                            ForEach(Self.visible(mixed), id: \.key) { e in
+                                if let item = e.item {
+                                    PosterCard(item: item, shape: PosterShape.for(item) == .wide ? .wide : nil)
+                                } else if let s = e.vod {
+                                    VodSuggestionTile(suggestion: s, width: PosterCard.defaultWidth, mixed: true)
+                                }
+                            }
+                        }
                     } else if wide, let entries = hub.entries {
                         // Library titles and films and episodes on demand together, in the
                         // server's order; View more when there are more than the row holds.
@@ -171,8 +184,13 @@ struct HomeView: View {
         }
     }
 
-    /// Home's Watch on VOD row.
+    /// Home's Watch on VOD row (sent only when the suggestion rows aren't mixed).
     private static let vodRow = "vod-suggestions"
+
+    /// A mixed row's titles, less those on demand this viewer said Not interested to.
+    private static func visible(_ entries: [HomeEntry]) -> [HomeEntry] {
+        entries.filter { e in e.vod.map { !VodSuggestionHides.shared.isHidden($0) } ?? true }
+    }
 
     /// Continue Watching with nothing in it (the server may send the row with no library items
     /// but films on demand, or nothing left after a removal).
@@ -221,7 +239,10 @@ struct HomeView: View {
     private func load() async {
         loadedVersion = HomeChanges.shared.version
         do {
-            hubs = try await app.hubs(vod: true).filter { !Self.isEmptyContinue($0) && !($0.id == Self.vodRow && ($0.vodEntries ?? []).isEmpty) }
+            hubs = try await app.hubs(vod: true, mixed: true).filter {
+                !Self.isEmptyContinue($0) && !($0.id == Self.vodRow && ($0.vodEntries ?? []).isEmpty)
+                    && !($0.mixedEntries?.isEmpty == true && $0.items.isEmpty)
+            }
             error = nil
             #if os(tvOS)
             if let lists = try? await app.playlists(kind: .video) { videoPlaylists = lists }

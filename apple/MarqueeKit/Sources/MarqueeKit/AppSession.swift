@@ -82,7 +82,7 @@ public final class AppSession {
     private var imageKey: String?
     public private(set) var lastError: String?
     public private(set) var client: Client?
-    /// For requests the server holds open (remote control's long polls, USER-14).
+    /// For requests the server holds open (watch together's long polls).
     public private(set) var longPollClient: Client?
     /// True while the address is being re-checked in the background (the app stays usable).
     public private(set) var isReconnecting = false

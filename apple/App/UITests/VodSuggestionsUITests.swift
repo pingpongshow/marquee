@@ -1,7 +1,7 @@
 import XCTest
 
-/// Suggestions on demand (LIVE-6, USER-16): Home's Watch on VOD row (a title opens its page;
-/// Not interested takes it away) and Also on VOD on a movie's page.
+/// Suggestions on demand (LIVE-6, USER-16): films on demand in Home's suggestion rows, marked
+/// VOD (a title opens its page; Not interested takes it away) and Also on VOD on a movie's page.
 ///
 /// Needs on-demand films with TMDB ids and a library movie whose TMDB recommendations point at
 /// them: the films "Apple Test Alpha/Bravo/Charlie" (the VodUITests source) matched to TMDB
@@ -99,20 +99,22 @@ final class VodSuggestionsUITests: XCTestCase {
     }
 
     private func tile(_ title: String) -> XCUIElement {
-        app.buttons.matching(identifier: "vod.suggestion").matching(NSPredicate(format: "label == %@", title)).firstMatch
+        // Among library titles on Home it's marked VOD.
+        app.buttons.matching(identifier: "vod.suggestion").matching(NSPredicate(format: "label == %@ OR label == %@", title, "\(title), VOD")).firstMatch
     }
 
-    /// Home's Watch on VOD row: a title opens its film's page; Not interested takes it off the
-    /// row (and the server stops suggesting it).
+    /// Films on demand among Home's suggestions (mixed rows): a title opens its film's page; Not
+    /// interested takes it off the row (and the server stops suggesting it).
     func testHomeWatchOnVodRow() throws {
         let user = try temporaryUser()
         let titles = try suggested(user.token)
         guard let first = titles.first else { throw XCTSkip("no VOD suggestions (seed data missing)") }
         signIn(user)
 
-        XCTAssertTrue(app.staticTexts["Watch on VOD"].waitForExistence(timeout: 15), "the Watch on VOD row is on Home")
         let t = tile(first)
-        XCTAssertTrue(t.waitForExistence(timeout: 10))
+        XCTAssertTrue(t.waitForExistence(timeout: 20), "the film is among Home's suggestions")
+        XCTAssertFalse(app.staticTexts["Watch on VOD"].exists, "no separate Watch on VOD row")
+        XCTAssertEqual(t.label, "\(first), VOD", "marked VOD")
         XCTAssertTrue((t.value as? String ?? "").contains("Because you"), "the reason shows under the title: \(t.value ?? "")")
         shot("home-watch-on-vod")
 

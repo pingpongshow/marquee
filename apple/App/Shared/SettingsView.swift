@@ -39,9 +39,6 @@ struct SettingsView: View {
                 }
                 NavigationLink("Edit Home", value: Route.settings(.editHome))
                 NavigationLink("Subtitle Appearance", value: Route.settings(.subtitleAppearance))
-                #if os(iOS)
-                NavigationLink("Remote Control", value: Route.settings(.remotePlayers))
-                #endif
                 Button("Switch Profile") { switching = true }
                 Button("Sign Out", role: .destructive) { Task { await app.signOut() } }
             }

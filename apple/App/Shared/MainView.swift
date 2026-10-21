@@ -117,10 +117,7 @@ struct MainView: View {
         .environment(video)
         // A rating request after a movie or episode ended (USER-19).
         .ratingPromptOverlay(active: linkedItem == nil)
-        .remoteToast()
-        // Remote control (USER-14): a player while open, and while music plays in the background.
-        .onChange(of: scenePhase, initial: true) { old, new in
-            updateRemote()
+        .onChange(of: scenePhase) { old, new in
             // Back in the app: anything that failed at launch (server unreachable) loads now,
             // and Live TV is checked again (a source may have lost its channels, LIVE-1).
             if old != new, new == .active { Task { await loadAll() } }
@@ -134,7 +131,6 @@ struct MainView: View {
                 }
             }
         }
-        .onChange(of: music.playing) { updateRemote() }
         // A video played: its watched state is the server's again.
         .onChange(of: video.request) { old, new in
             if new == nil, let old { WatchStore.shared.played(old.itemID) }
@@ -143,7 +139,6 @@ struct MainView: View {
             if new == nil, old != nil { Task { try? await Task.sleep(for: .seconds(3)); await smart.run(app) } }
             #endif
         }
-        .onDisappear { RemoteReceiver.shared.stop() }
         // Again whenever the connection changes (another address, reconnected, signed in).
         .task(id: "\(app.baseURL?.absoluteString ?? "")|\(app.state)|\(app.me?.id ?? 0)") { await loadAll() }
         .sheet(item: $playlistPicker.item) { item in AddToPlaylistSheet(item: item) }
@@ -253,15 +248,6 @@ struct MainView: View {
         // itself didn't reach the scroll views inside, so lists ended under the bar.
         .overlay(alignment: .bottom) { MiniPlayerBar() }
         #endif
-    }
-
-    private func updateRemote() {
-        let remote = RemoteReceiver.shared
-        if scenePhase == .background && !music.playing {
-            remote.stop()
-        } else {
-            remote.start(app: app, music: music, presenter: video)
-        }
     }
 
     private func loadAll() async {

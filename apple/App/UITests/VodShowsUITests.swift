@@ -325,8 +325,8 @@ final class VodShowsUITests: XCTestCase {
         try eventually(10, "back to the start") { play.label == "Start S1 · E1" }
     }
 
-    /// An episode plays, its end brings Up Next, and Play Now carries on with the next one; the
-    /// first counts as watched and Continue Watching offers the show.
+    /// An episode plays, its end brings the Up Next screen, and its Playing next card carries on
+    /// with the next one; the first counts as watched and Continue Watching offers the show.
     func testEpisodePlaysIntoUpNext() throws {
         let id = try ensureShows()
         let user = try temporaryUser()
@@ -336,19 +336,22 @@ final class VodShowsUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Close player"].waitForExistence(timeout: 15), "the player opens")
         sleep(4)
         shot("1-episode-playing")
-        let upNext = app.staticTexts["S1 · E2 · Second"]
+        let upNext = app.buttons.matching(NSPredicate(format: "identifier == 'upNext.next' AND label CONTAINS 'Second'")).firstMatch
         XCTAssertTrue(upNext.waitForExistence(timeout: 40), "Up Next at the end")
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Up next in'")).firstMatch.exists, "with a countdown")
+        XCTAssertTrue(app.staticTexts["upNext.countdown"].exists, "with a countdown")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier == 'upNext.previous' AND label CONTAINS 'First'")).firstMatch.exists,
+                      "and the episode that ended, to play again")
         shot("2-up-next")
         try eventually(10, "episode 1 counted watched") { try episodes(id, user.token).first?["watched"] as? Bool == true }
-        app.buttons["Play now"].tap()
-        XCTAssertTrue(app.staticTexts["S1 · E2 · Second"].waitForNonExistence(timeout: 10))
+        upNext.tap()
+        XCTAssertTrue(upNext.waitForNonExistence(timeout: 10))
         sleep(4)
         shot("3-next-episode")
-        // The next one plays through to its own Up Next; Cancel goes back to the show.
-        XCTAssertTrue(app.staticTexts["S1 · E3 · Third"].waitForExistence(timeout: 40), "Up Next again after episode 2")
+        // The next one plays through to its own Up Next; Close goes back to the show.
+        let third = app.buttons.matching(NSPredicate(format: "identifier == 'upNext.next' AND label CONTAINS 'Third'")).firstMatch
+        XCTAssertTrue(third.waitForExistence(timeout: 40), "Up Next again after episode 2")
         try eventually(10, "episode 2 counted watched") { try episodes(id, user.token).dropFirst().first?["watched"] as? Bool == true }
-        app.buttons["Cancel"].tap()
+        app.buttons["upNext.cancel"].tap()
         let play = app.buttons["vod.show.play"]
         XCTAssertTrue(play.waitForExistence(timeout: 10), "back on the show's page")
         try eventually(10, "the next episode is offered") { play.label == "Play S1 · E3" }

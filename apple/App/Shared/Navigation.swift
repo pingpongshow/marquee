@@ -39,7 +39,7 @@ enum Route: Hashable {
 
 /// Screens opened from Settings (value links, so the stack never re-pushes or pops them).
 enum SettingsPage: Hashable {
-    case stats, requests, users, cinema, librarySettings, libraryHealth, integrations, editHome, subtitleAppearance, remotePlayers
+    case stats, requests, users, cinema, librarySettings, libraryHealth, integrations, editHome, subtitleAppearance
     /// The music equaliser (iPhone/iPad).
     case equalizer
     /// Smart downloads (iPhone/iPad): next episodes and favourite music kept on the device.
@@ -129,11 +129,10 @@ private func settingsPage(_ page: SettingsPage) -> some View {
     case .librarySettings: LibrarySettingsView()
     case .libraryHealth: LibraryHealthView()
     case .integrations: IntegrationsView()
-    case .remotePlayers: RemotePlayersView()
     case .equalizer: EqualizerView()
     case .smartDownloads: SmartDownloadsSettingsView()
     #else
-    case .librarySettings, .libraryHealth, .integrations, .remotePlayers, .equalizer, .smartDownloads: EmptyView()
+    case .librarySettings, .libraryHealth, .integrations, .equalizer, .smartDownloads: EmptyView()
     #endif
     }
 }

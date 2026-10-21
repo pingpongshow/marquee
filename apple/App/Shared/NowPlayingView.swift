@@ -225,18 +225,11 @@ struct NowPlayingView: View {
 
     @ViewBuilder private var sourceHeader: some View {
         #if os(iOS)
-        // Where it plays, in two groups of the same width either side of what's playing, so
-        // the title has the middle to itself (truncated, never under a button): another
-        // Marquee app on the left; AirPlay (HomePod, Sonos…) and Chromecast on the right.
+        // Where it plays, AirPlay (HomePod, Sonos…) and Chromecast, on the right; the same width
+        // is kept free on the left, so the title has the middle to itself (truncated, never
+        // under a button).
         HStack(alignment: .center, spacing: 8) {
-            HStack(spacing: Self.headerSpacing) {
-                // Another Marquee app (USER-14): the queue carries on there from here.
-                PlayOnButton(target: handOff, compact: true)
-                    .font(.system(size: 17, weight: .regular)).foregroundStyle(.secondary)
-                    .headerButton()
-                Spacer(minLength: 0)
-            }
-            .frame(width: Self.headerGroup)
+            Color.clear.frame(width: Self.headerGroup, height: Self.headerButtonSize)
             sourceTitle.frame(maxWidth: .infinity)
             HStack(spacing: Self.headerSpacing) {
                 Spacer(minLength: 0)
@@ -251,20 +244,7 @@ struct NowPlayingView: View {
     }
 
     #if os(iOS)
-    /// The queue from the current track, at the current position.
-    private func handOff() -> PlayOnTarget? {
-        let entries = music.queue.entries
-        guard music.current != nil, !entries.isEmpty else { return nil }
-        let i = max(0, min(music.queue.index, entries.count - 1))
-        // The server takes up to 1000 items; keep the part around what's playing.
-        let from = max(0, i - 200), to = min(entries.count, from + 1000)
-        return PlayOnTarget(itemIDs: entries[from..<to].map(\.item.id), index: i - from,
-                            startMs: Int64(music.time * 1000), pauseHere: { music.pause() })
-    }
-    #endif
-
-    #if os(iOS)
-    /// Header buttons: all the same size, two to a side.
+    /// Header buttons: all the same size, two on the right.
     static let headerButtonSize: CGFloat = 36
     static let headerSpacing: CGFloat = 6
     static let headerGroup: CGFloat = headerButtonSize * 2 + headerSpacing

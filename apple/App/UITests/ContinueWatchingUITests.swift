@@ -247,9 +247,10 @@ final class ContinueWatchingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Apple Test Show · S1 · E1"].waitForExistence(timeout: 5), "with the episode")
         sleep(3)
         shot("1-episode-playing")
-        XCTAssertTrue(app.staticTexts["S1 · E2 · Second"].waitForExistence(timeout: 40), "Up Next at its end")
+        let upNext = app.buttons.matching(NSPredicate(format: "identifier == 'upNext.next' AND label CONTAINS 'Second'")).firstMatch
+        XCTAssertTrue(upNext.waitForExistence(timeout: 40), "Up Next at its end")
         shot("2-up-next")
-        app.buttons["Cancel"].tap()
+        app.buttons["upNext.cancel"].tap()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10), "back on Home")
         // Watched now: it leaves the row, which reloads.
         try eventually(15, "the watched episode leaves the row") { !tile(keys.episode).exists }

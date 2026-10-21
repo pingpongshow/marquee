@@ -149,6 +149,8 @@ struct VodSuggestionTile: View {
     @Environment(AppSession.self) private var app
     let suggestion: VodSuggestion
     var width: CGFloat = VodSuggestionTile.defaultWidth
+    /// In a Home row beside library titles: a VOD badge on the poster, and one line under it.
+    var mixed = false
 
     #if os(tvOS)
     static let defaultWidth: CGFloat = 220
@@ -168,7 +170,7 @@ struct VodSuggestionTile: View {
             VStack(alignment: .leading, spacing: 14) {
                 NavigationLink(value: route) { poster }
                     .buttonStyle(.card)
-                    .accessibilityLabel(suggestion.title)
+                    .accessibilityLabel(label)
                     .accessibilityValue(subtitle)
                     .accessibilityIdentifier("vod.suggestion")
                     .contextMenu { menu(route) }
@@ -185,7 +187,7 @@ struct VodSuggestionTile: View {
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(suggestion.title)
+            .accessibilityLabel(label)
             .accessibilityValue(subtitle)
             .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier("vod.suggestion")
@@ -207,8 +209,11 @@ struct VodSuggestionTile: View {
     private var poster: some View {
         VodArt(title: suggestion.title, path: suggestion.posterUrl,
                watched: suggestion.movie?.watched ?? suggestion.series?.watched ?? false,
-               progress: suggestion.movie?.progress ?? suggestion.series?.progress, width: width)
+               progress: suggestion.movie?.progress ?? suggestion.series?.progress, width: width, vodBadge: mixed)
     }
+
+    /// The title, said to be on demand where the poster's badge shows it.
+    private var label: String { mixed ? "\(suggestion.title), VOD" : suggestion.title }
 
     /// Why it's suggested, else the year and length (or seasons).
     private var subtitle: String {
@@ -224,7 +229,7 @@ struct VodSuggestionTile: View {
                     .accessibilityHidden(true)
                 Text(suggestion.title).font(.subheadline.weight(.medium)).lineLimit(1)
             }
-            Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(isTV ? 1 : 2)
+            Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(isTV || mixed ? 1 : 2)
         }
     }
 }

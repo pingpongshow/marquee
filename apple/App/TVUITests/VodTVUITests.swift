@@ -393,18 +393,19 @@ final class VodTVUITests: XCTestCase {
         remote.press(.select)
         sleep(5)
         shot("tv-episode-playing")
-        let upNext = app.staticTexts["S1 · E2 · Second"]
+        let upNext = app.buttons.matching(NSPredicate(format: "identifier == 'upNext.next' AND label CONTAINS 'Second'")).firstMatch
         XCTAssertTrue(upNext.waitForExistence(timeout: 40), "Up Next at the end")
+        sleep(1)
+        XCTAssertTrue(upNext.hasFocus, "Playing next has the focus")
         shot("tv-up-next")
-        let now = app.buttons["Play now"]
-        if !now.hasFocus { focusOn(now, tries: 6) }
         remote.press(.select)
         XCTAssertTrue(upNext.waitForNonExistence(timeout: 10))
         try eventually(10, "episode 1 counted watched") {
             ((try api("GET", "/livetv/vod/series/\(id)", token: token)["episodes"] as? [[String: Any]])?.first?["watched"] as? Bool) == true
         }
-        XCTAssertTrue(app.staticTexts["S1 · E3 · Third"].waitForExistence(timeout: 40), "the next episode played to its Up Next")
-        let cancel = app.buttons["Cancel"]
+        let third = app.buttons.matching(NSPredicate(format: "identifier == 'upNext.next' AND label CONTAINS 'Third'")).firstMatch
+        XCTAssertTrue(third.waitForExistence(timeout: 40), "the next episode played to its Up Next")
+        let cancel = app.buttons["upNext.cancel"]
         if !cancel.hasFocus { focusOn(cancel, tries: 6) }
         remote.press(.select)
         XCTAssertTrue(play.waitForExistence(timeout: 10))
