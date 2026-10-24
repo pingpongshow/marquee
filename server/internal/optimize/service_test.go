@@ -493,6 +493,44 @@ func TestThresholdAndVerify(t *testing.T) {
 	}
 }
 
+// A film whose picture ends before its audio (the file's length is the audio's) verifies:
+// the end is sampled where the picture ends, not in the sound after it. A result whose
+// picture is cut short of the original's still fails.
+func TestVerifyPictureEndsEarly(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	if _, err := exec.LookPath("ffprobe"); err != nil {
+		t.Skip("ffprobe not installed")
+	}
+	p := filepath.Join(e.dir, "early.mkv")
+	clip(t, p, "1") // skips without ffmpeg
+	if out, err := exec.Command("ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=25:duration=6",
+		"-f", "lavfi", "-i", "sine=frequency=440:duration=12", "-map", "0:v", "-map", "1:a", "-c:v", "mpeg2video", "-c:a", "ac3", p).CombinedOutput(); err != nil {
+		t.Fatalf("%v %s", err, out)
+	}
+	s := &Service{DB: e.db, Settings: e.settings, LookPath: noLook}
+	src, err := s.Probe(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if src.DurationMS < 11_000 {
+		t.Fatalf("the file should run to the end of the audio: %d ms", src.DurationMS)
+	}
+	pl, _ := NewPlan(src, preset("same-hevc"))
+	if err := s.verify(ctx, p, src, pl); err != nil {
+		t.Errorf("a picture shorter than the file was rejected: %v", err)
+	}
+	// The same audio with the picture cut at 3 s of 6.
+	cut := filepath.Join(e.dir, "cut.mkv")
+	if out, err := exec.Command("ffmpeg", "-v", "error", "-y", "-t", "3", "-i", p, "-i", p,
+		"-map", "0:v", "-map", "1:a", "-c", "copy", cut).CombinedOutput(); err != nil {
+		t.Fatalf("%v %s", err, out)
+	}
+	if err := s.verify(ctx, cut, src, pl); err == nil {
+		t.Error("a picture cut short was accepted")
+	}
+}
+
 // NVENC: a session is always left free for playback, and a job gives its session up when
 // playback takes the last free one.
 func TestNVENCYieldsToPlayback(t *testing.T) {

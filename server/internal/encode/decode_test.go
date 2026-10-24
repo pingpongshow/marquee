@@ -15,3 +15,16 @@ func TestDecodeErrorsIgnoresNullMuxer(t *testing.T) {
 		}
 	}
 }
+
+// "Last message repeated N times" counts the message before it; it isn't an error itself.
+func TestDecodeErrorsIgnoresRepeatNotes(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"[null @ 0x1] Application provided invalid, non monotonically increasing dts to muxer in stream 1: 32744 >= 29712\n    Last message repeated 1 times\n", ""},
+		{"[h264 @ 0x2] error while decoding MB 3 4\n    Last message repeated 2 times\n", "[h264 @ 0x2] error while decoding MB 3 4"},
+	}
+	for _, c := range cases {
+		if got := decodeErrors(c.in); got != c.want {
+			t.Errorf("decodeErrors(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}

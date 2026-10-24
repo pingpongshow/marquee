@@ -406,7 +406,7 @@ func (s *Service) progress(j *job, p encode.Progress) {
 
 // verify checks the result before it replaces anything: FFprobe reads it, it's as long as
 // the original (within 1%), it has the streams the plan maps, and a few seconds at the
-// start, middle and end decode cleanly.
+// start, middle and end of the picture decode cleanly.
 func (s *Service) verify(ctx context.Context, path string, src Source, plan Plan) error {
 	got, err := s.Probe(ctx, path)
 	if err != nil {
@@ -422,13 +422,49 @@ func (s *Service) verify(ctx context.Context, path string, src Source, plan Plan
 	if b, ok := boxes[plan.Preset.MaxHeight]; ok && (got.Width > b[0] || got.Height > b[1]) {
 		return fmt.Errorf("it is %d×%d; expected at most %d×%d", got.Width, got.Height, b[0], b[1])
 	}
-	secs := float64(got.DurationMS) / 1000
-	for _, at := range []float64{0, secs * 0.5, max(0, secs-min(30, secs/3))} {
+	// The picture can end before the file does (audio or subtitles running on after the last
+	// frame), with nothing to decode after it in the original either. The samples stop where
+	// the original's picture stops, so a result whose picture is cut short still fails.
+	end := float64(got.DurationMS) / 1000
+	if ms, ok := s.videoEnd(ctx, src); ok {
+		end = min(end, float64(ms)/1000)
+	}
+	for _, at := range []float64{0, end * 0.5, max(0, end-min(30, end/3))} {
 		if err := encode.DecodeCheck(ctx, or(s.FFmpeg, "ffmpeg"), path, at, 5, true); err != nil {
 			return fmt.Errorf("%s in doesn't decode: %v", clock(int64(at*1000)), err)
 		}
 	}
 	return nil
+}
+
+// videoEnd is where the original's picture ends, in ms: the end of its last video packet,
+// read from the last five minutes of the file. ok=false when FFprobe can't tell.
+func (s *Service) videoEnd(ctx context.Context, src Source) (ms int64, ok bool) {
+	if src.VideoIndex < 0 || src.DurationMS <= 0 {
+		return 0, false
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	from := max(0, src.DurationMS/1000-300)
+	out, err := exec.CommandContext(ctx, or(s.FFprobe, "ffprobe"), "-v", "error", "-select_streams", strconv.Itoa(src.VideoIndex),
+		"-read_intervals", strconv.FormatInt(from, 10)+"%", "-show_entries", "packet=pts_time,duration_time", "-of", "csv=p=0", src.Path).Output()
+	if err != nil {
+		return 0, false
+	}
+	var end float64
+	for _, line := range strings.Split(string(out), "\n") {
+		pts, dur, _ := strings.Cut(strings.TrimSpace(line), ",")
+		p, err := strconv.ParseFloat(pts, 64)
+		if err != nil {
+			continue
+		}
+		d, _ := strconv.ParseFloat(dur, 64) // N/A: 0
+		end = max(end, p+d)
+	}
+	if end <= 0 {
+		return 0, false
+	}
+	return int64(math.Round(end * 1000)), true
 }
 
 // swap puts the new file in the original's place, keeping the library's record (so the

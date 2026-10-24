@@ -284,11 +284,13 @@ func decodeCheck(ctx context.Context, lookPath func(string) (string, error), ffm
 
 // decodeErrors is FFmpeg's error output without the null muxer's own complaints (such as
 // "non monotonically increasing dts" after seeking into a stream with uneven timestamps):
-// nothing is written anywhere, so they say nothing about whether the file decodes.
+// nothing is written anywhere, so they say nothing about whether the file decodes. Nor do
+// FFmpeg's "Last message repeated N times" notes: the message they count stands or goes
+// on its own.
 func decodeErrors(stderr string) string {
 	var keep []string
 	for _, line := range strings.Split(stderr, "\n") {
-		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "[null @") {
+		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "[null @") && !strings.HasPrefix(line, "Last message repeated") {
 			keep = append(keep, line)
 		}
 	}
