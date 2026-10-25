@@ -87,8 +87,10 @@ struct ProfilesPage: View {
                 .accessibilityIdentifier("profiles.accountSettings")
             }
             if showsSignOut {
-                Button(role: .destructive) { Task { await app.signOut() } } label: {
+                // The TV draws a destructive bordered button red on red: red text on the usual platter.
+                Button(role: isTV ? nil : .destructive) { Task { await app.signOut() } } label: {
                     Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right").frame(maxWidth: buttonWidth)
+                        .foregroundStyle(isTV ? AnyShapeStyle(Color.red) : AnyShapeStyle(.tint))
                 }
                 .buttonStyle(.bordered)
                 .accessibilityIdentifier("profiles.signOut")

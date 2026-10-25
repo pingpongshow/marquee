@@ -9,6 +9,11 @@ struct HomeEditView: View {
     @State private var rows: [HomeLayoutRow] = []
     @State private var loaded = false
     @State private var error: String?
+    #if os(tvOS)
+    /// The first row's show/hide button takes the focus once the rows load: until then only the
+    /// disabled Reset was there, so the focus went nowhere and Back did nothing.
+    @FocusState private var focusedRow: String?
+    #endif
 
     var body: some View {
         content
@@ -85,6 +90,9 @@ struct HomeEditView: View {
                     .foregroundStyle(hidden ? Color.secondary : Color.marqueeGold)
             }
             .accessibilityLabel(hidden ? "Show \(title)" : "Hide \(title)")
+            #if os(tvOS)
+            .focused($focusedRow, equals: row.id)
+            #endif
             if row.pinned == true {
                 Button(role: .destructive) { unpin(row.id) } label: { Label("Unpin", systemImage: "pin.slash").labelStyle(.iconOnly) }
                     .accessibilityLabel("Unpin \(title)")
@@ -103,6 +111,10 @@ struct HomeEditView: View {
             self.error = error.localizedDescription
         }
         loaded = true
+        #if os(tvOS)
+        try? await Task.sleep(for: .milliseconds(150)) // the rows are there to focus
+        if focusedRow == nil { focusedRow = rows.first?.id }
+        #endif
     }
 
     private func toggle(_ id: String) {

@@ -2,7 +2,7 @@ import AVKit
 import MarqueeKit
 import SwiftUI
 
-/// The bar above the tab bar while music plays (iPhone/iPad).
+/// The bar above the tab bar while music plays (iPhone/iPad; the TV's is TVNowPlayingBar).
 struct MiniPlayerBar: View {
     @Environment(MusicPlayer.self) private var music
     @Environment(AppSession.self) private var app
@@ -41,6 +41,43 @@ struct MiniPlayerBar: View {
         }
     }
 }
+
+#if os(tvOS)
+/// The bar along the bottom while music plays (Apple TV): what's playing, whether it's playing or
+/// paused, and how far through. Down from a page focuses it; selecting it opens Now Playing.
+struct TVNowPlayingBar: View {
+    @Environment(MusicPlayer.self) private var music
+    @Environment(\.openNowPlaying) private var openNowPlaying
+
+    var body: some View {
+        if let t = music.current?.item {
+            Button { openNowPlaying() } label: {
+                HStack(spacing: 24) {
+                    ArtworkView(item: t, shape: .square, width: 72).frame(width: 72)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(t.title).font(.headline).lineLimit(1)
+                        Text(t.artistCredit ?? t.grandparentTitle ?? "").font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    Label(music.playing ? "Playing" : "Paused", systemImage: music.playing ? "waveform" : "pause.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 28)
+                .padding(.vertical, 14)
+                .overlay(alignment: .bottom) { MiniPlayerProgress().padding(.horizontal, 20).padding(.bottom, 4) }
+            }
+            .buttonStyle(.card)
+            .accessibilityLabel("Now Playing: \(t.title)")
+            .accessibilityValue(music.playing ? "Playing" : "Paused")
+            .accessibilityIdentifier("nowPlayingBar")
+            .frame(maxWidth: 1200)
+            .padding(.bottom, 24)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { MiniPlayerMetrics.shared.height = $0 + 24 }
+        }
+    }
+}
+#endif
 
 /// The mini player's height, measured, for the room screens keep under their content.
 @MainActor @Observable

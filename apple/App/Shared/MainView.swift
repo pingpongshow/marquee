@@ -188,11 +188,17 @@ struct MainView: View {
             }
         }
         .sheet(isPresented: $showNowPlaying) { NowPlayingView() }
-        .environment(\.openNowPlaying, OpenNowPlayingAction { showNowPlaying = true })
+        #else
+        // The TV: Now Playing over the page it was opened from; Back returns to it. It closes
+        // when the music stops.
+        .fullScreenCover(isPresented: $showNowPlaying) { NowPlayingView().background(Color.black.ignoresSafeArea()) }
+        .onChange(of: music.current == nil) { _, stopped in if stopped { showNowPlaying = false } }
         #endif
+        .environment(\.openNowPlaying, OpenNowPlayingAction { showNowPlaying = true })
     }
 
-    /// Playlists, Discover, Downloads (iPad), Now Playing (TV), Settings and Search.
+    /// Playlists, Discover, Downloads (iPad), Now Playing (TV; also the bar along the bottom),
+    /// Settings and Search.
     @TabContentBuilder<String>
     private var otherTabs: some TabContent<String> {
         Tab("Playlists", systemImage: "music.note.list", value: "playlists") { stack { PlaylistsView() } }
@@ -242,11 +248,14 @@ struct MainView: View {
                 #endif
                 .marqueeDestinations()
         }
+        // The bar floats above the tab bar (along the bottom on the TV), and every screen in the
+        // stack (the root here, pushed ones in marqueeDestinations) keeps room for it at the
+        // bottom: an inset on the stack itself didn't reach the scroll views inside, so lists
+        // ended under the bar.
         #if os(iOS)
-        // The bar floats above the tab bar, and every screen in the stack (the root here, pushed
-        // ones in marqueeDestinations) keeps room for it at the bottom: an inset on the stack
-        // itself didn't reach the scroll views inside, so lists ended under the bar.
         .overlay(alignment: .bottom) { MiniPlayerBar() }
+        #else
+        .overlay(alignment: .bottom) { TVNowPlayingBar() }
         #endif
     }
 

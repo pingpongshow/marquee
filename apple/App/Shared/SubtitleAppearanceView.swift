@@ -9,6 +9,11 @@ struct SubtitleAppearanceView: View {
     @State private var loaded = false
     @State private var error: String?
     @State private var saving: Task<Void, Never>?
+    #if os(tvOS)
+    /// Size takes the focus once the style has loaded: the form is disabled until then, so the
+    /// focus went nowhere and Back did nothing.
+    @FocusState private var sizeFocused: Bool
+    #endif
 
     var body: some View {
         Form {
@@ -21,6 +26,9 @@ struct SubtitleAppearanceView: View {
                 Picker("Size", selection: binding(\.sizeValue) { $0.size = $1 }) {
                     ForEach(SubtitleStyle.SizePayload.allCases, id: \.self) { Text($0.label).tag($0) }
                 }
+                #if os(tvOS)
+                .focused($sizeFocused)
+                #endif
                 Picker("Colour", selection: binding(\.colorValue) { $0.color = $1 }) {
                     ForEach(colorChoices, id: \.hex) { c in Text(c.name).tag(c.hex) }
                 }
@@ -43,6 +51,10 @@ struct SubtitleAppearanceView: View {
             await app.refreshMe()
             style = app.subtitleStyle
             loaded = true
+            #if os(tvOS)
+            try? await Task.sleep(for: .milliseconds(150)) // enabled now, so it can take the focus
+            sizeFocused = true
+            #endif
         }
     }
 

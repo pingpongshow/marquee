@@ -51,6 +51,9 @@ struct UpNextScreen<Accessory: View>: View {
 
     #if os(tvOS)
     @Namespace private var focusScope
+    /// Playing next takes the focus when the screen comes up: the default focus alone lost to
+    /// Cancel, so Select cancelled instead of playing on. The rating request keeps it while it waits.
+    @FocusState private var nextFocused: Bool
     #endif
 
     var body: some View {
@@ -86,6 +89,11 @@ struct UpNextScreen<Accessory: View>: View {
         #if os(tvOS)
         .focusScope(focusScope)
         .onExitCommand(perform: cancel)
+        .task {
+            try? await Task.sleep(for: .milliseconds(150)) // the cards are there to focus
+            if !paused { nextFocused = true }
+        }
+        .onChange(of: paused) { _, waiting in if !waiting { nextFocused = true } }
         #endif
     }
 
@@ -200,6 +208,7 @@ struct UpNextScreen<Accessory: View>: View {
             #if os(tvOS)
             .buttonStyle(.card)
             .prefersDefaultFocus(true, in: focusScope)
+            .focused($nextFocused)
             #else
             .buttonStyle(.plain)
             #endif

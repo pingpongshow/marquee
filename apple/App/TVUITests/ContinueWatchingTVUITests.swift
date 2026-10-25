@@ -265,6 +265,10 @@ final class ContinueWatchingTVUITests: XCTestCase {
             let remove = app.descendants(matching: .any)["removeFromContinue"]
             XCTAssertTrue(remove.waitForExistence(timeout: 5), "the context menu offers it")
             shot("tv-vod-row-\(identifier)-menu")
+            // A show's menu offers Mark Watched and Mark Unwatched first: down to Remove.
+            let onRemove = { abs(self.focused.frame.midY - remove.frame.midY) < 30 }
+            for _ in 0..<4 where !onRemove() { remote.press(.down) }
+            XCTAssertTrue(onRemove(), "focus on Remove from Continue Watching")
             remote.press(.select)
             try eventually(10, "\(title) gone from the row") { tiles.count == count - 1 && !app.descendants(matching: .any)["vod.continue"].exists }
             try eventually(10, "gone on the server") { try !continueKeys(token).contains { $0.hasPrefix(key) } }

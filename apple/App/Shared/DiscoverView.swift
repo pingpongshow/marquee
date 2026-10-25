@@ -447,7 +447,12 @@ struct RequestApprovalsView: View {
             if let error { Text(error).foregroundStyle(.red) }
             let pending = list.filter { $0.status == .pending }
             Section("Waiting for approval") {
-                if pending.isEmpty { Text("Nothing to approve.").foregroundStyle(.secondary) }
+                if pending.isEmpty {
+                    Text("Nothing to approve.").foregroundStyle(.secondary)
+                        #if os(tvOS)
+                        .focusable() // something to focus, so Back leaves the page
+                        #endif
+                }
                 ForEach(pending, id: \.id) { r in
                     VStack(alignment: .leading, spacing: 6) {
                         Text(r.year.map { "\(r.title) (\($0))" } ?? r.title).font(.headline)
@@ -465,6 +470,9 @@ struct RequestApprovalsView: View {
                 Section("Recent") {
                     ForEach(Array(done), id: \.id) { r in
                         LabeledContent(r.title, value: "\(r.userName) · \(r.status.label)")
+                            #if os(tvOS)
+                            .focusable() // the remote can scroll through them, and Back leaves
+                            #endif
                     }
                 }
             }

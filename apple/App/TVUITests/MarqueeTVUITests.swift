@@ -77,6 +77,7 @@ final class MarqueeTVUITests: XCTestCase {
             app.typeText(server.replacingOccurrences(of: "http://", with: "") + "\n")
             let connect = app.buttons["Connect"]
             if !app.buttons["Use Quick Connect"].waitForExistence(timeout: 8), connect.exists {
+                if app.keyboards.count > 0 { remote.press(.menu) } // the keyboard held the focus
                 focus(connect)
                 remote.press(.select)
             }
@@ -91,6 +92,43 @@ final class MarqueeTVUITests: XCTestCase {
         XCTAssertTrue(homeShows())
     }
 
+    /// While music plays a Now Playing bar runs along the bottom of every page: down from the page
+    /// focuses it, selecting it opens Now Playing over the page, and Back returns to the page.
+    func testNowPlayingBar() throws {
+        try signIn()
+        XCTAssertTrue(app.buttons["Music"].firstMatch.waitForExistence(timeout: 10))
+        app.openSection("Music")
+        // Shuffle All plays from the library itself (Library Radio needs the server's radio).
+        let radio = app.buttons["Library Radio"], shuffle = app.buttons["Shuffle All"]
+        XCTAssertTrue(shuffle.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["nowPlayingBar"].exists, "the bar shows with nothing playing")
+        let actions = ["Library Radio", "Shuffle All", "Muse"]
+        let focused = app.descendants(matching: .any).element(matching: NSPredicate(format: "hasFocus == true"))
+        for _ in 0..<8 where !actions.contains(where: { focused.label.hasPrefix($0) }) { remote.press(.down) }
+        if radio.exists { focus(radio, direction: .left) }
+        focus(shuffle, direction: .right)
+        remote.press(.select)
+
+        let bar = app.buttons["nowPlayingBar"]
+        XCTAssertTrue(bar.waitForExistence(timeout: 20))
+        XCTAssertTrue(bar.label.hasPrefix("Now Playing: "), bar.label)
+        for _ in 0..<20 where !bar.hasFocus { remote.press(.down) }
+        XCTAssertTrue(bar.hasFocus, "down from the page didn't reach the bar")
+        sleep(1)
+        shot("tv-np1-bar-focused")
+
+        remote.press(.select)
+        XCTAssertTrue(app.staticTexts["PLAYING FROM"].waitForExistence(timeout: 10))
+        sleep(1)
+        shot("tv-np2-now-playing")
+
+        remote.press(.menu)
+        XCTAssertTrue(app.staticTexts["PLAYING FROM"].waitForNonExistence(timeout: 10))
+        XCTAssertTrue(shuffle.waitForExistence(timeout: 5), "Back didn't return to the Music page")
+        XCTAssertTrue(bar.exists)
+        shot("tv-np3-back")
+    }
+
     /// Stations and Now Playing with lyrics on the TV (M6.5).
     func testMusicStation() throws {
         try signIn()
@@ -99,7 +137,9 @@ final class MarqueeTVUITests: XCTestCase {
         // The landing page: quick actions first, the Library list at the bottom (MUSIC-15).
         XCTAssertTrue(app.buttons["musicLibrary.artists"].waitForExistence(timeout: 10))
         let radio = app.buttons["Library Radio"]
-        XCTAssertTrue(radio.waitForExistence(timeout: 10))
+        guard radio.waitForExistence(timeout: 10) else {
+            throw XCTSkip("Library Radio needs Soundprint's analysis, which this server doesn't have")
+        }
         // Down to the quick actions (focus lands wherever is closest), then left along them.
         let actions = ["Library Radio", "Shuffle All", "Muse"]
         let focused = app.descendants(matching: .any).element(matching: NSPredicate(format: "hasFocus == true"))
@@ -184,8 +224,11 @@ final class MarqueeTVUITests: XCTestCase {
     }
 
     /// Signed in: Home's rows show (which come first depends on the server's Home layout).
+    /// Home has loaded: one of the rows that comes first on it (since the 1.3.0 rows, New Releases
+    /// and, near a holiday, its row, such as Halloween Favourites).
     private func homeShows() -> Bool {
-        let row = app.staticTexts.matching(NSPredicate(format: "label IN {'Continue Watching', 'Recently Added Movies', 'Recommended for You'}")).firstMatch
+        let row = app.staticTexts.matching(NSPredicate(format:
+            "label IN {'Continue Watching', 'Recently Added Movies', 'Recommended for You', 'New Releases'} OR label ENDSWITH ' Favourites'")).firstMatch
         return row.waitForExistence(timeout: 20)
     }
 
@@ -507,7 +550,12 @@ final class MarqueeTVUITests: XCTestCase {
     /// The year-in-music recap on the TV (MUSIC-22): Kiddo's, page by page with Next.
     func testRecapTV() throws {
         let kid = try api("POST", "/auth/pin", ["userId": 2, "device": ["clientId": "uitest-\(UUID().uuidString)", "name": "UI test", "platform": "tvos"]])
-        try signIn(as: try XCTUnwrap(kid["token"] as? String))
+        let token = try XCTUnwrap(kid["token"] as? String)
+        // The card shows only with music history: three of Floating's tracks played this year.
+        let tracks = (try api("GET", "/items/324/children", token: token)["items"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? Int }
+        XCTAssertFalse(tracks.isEmpty, "Floating's tracks")
+        for id in tracks.prefix(3) { _ = try api("PUT", "/items/\(id)/progress", ["positionMs": 40000, "watched": true], token: token) }
+        try signIn(as: token)
         XCTAssertTrue(app.buttons["Music"].firstMatch.waitForExistence(timeout: 10))
         app.openSection("Music")
         let card = app.buttons["recapCard"]

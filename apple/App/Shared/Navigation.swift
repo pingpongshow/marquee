@@ -65,14 +65,10 @@ extension View {
         }
     }
 
-    /// Room at the bottom for the mini player while music plays (iPhone/iPad), so the end of
-    /// every list and page can be scrolled clear of it.
+    /// Room at the bottom for the mini player (iPhone/iPad) or the Now Playing bar (TV) while
+    /// music plays, so the end of every list and page can be scrolled clear of it.
     func miniPlayerSpace() -> some View {
-        #if os(iOS)
         modifier(MiniPlayerSpace())
-        #else
-        self
-        #endif
     }
 }
 
@@ -115,7 +111,12 @@ private func routeView(_ route: Route) -> some View {
         case .favorites: MusicFavoritesView(libraryID: library)
         }
     case let .musicMuse(library): MuseStationsView(libraryID: library)
-    case let .settings(page): settingsPage(page)
+    case let .settings(page):
+        settingsPage(page)
+            #if os(tvOS)
+            // Below the sidebar's button at the top left: the pages under Settings began under it.
+            .contentMargins(.top, 60, for: .scrollContent)
+            #endif
     }
 }
 

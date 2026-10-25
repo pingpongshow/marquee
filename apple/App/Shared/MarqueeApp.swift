@@ -34,6 +34,10 @@ struct MarqueeApp: App {
         if ProcessInfo.processInfo.arguments.contains("-marquee-reset") {
             for s in ServerStore.servers { ServerStore.forget(s.id) }
             for key in ["marquee.showAudioQuality", "marquee.dj"] { UserDefaults.standard.removeObject(forKey: key) }
+            // And the VOD pages' remembered category, sort and filters.
+            for key in UserDefaults.standard.dictionaryRepresentation().keys where key.hasPrefix("marquee.vod.") {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
         }
         let session = AppSession()
         let player = MusicPlayer(app: session)

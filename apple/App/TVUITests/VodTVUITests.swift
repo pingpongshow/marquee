@@ -167,7 +167,9 @@ final class VodTVUITests: XCTestCase {
         shot("tv-vod-browse")
         XCTAssertFalse(app.buttons["Guide"].exists, "VOD is its own page, not inside Live TV")
         XCTAssertFalse(app.pageTitleShows("VOD Movies"), "no page title faded over VOD")
-        focus(tile, direction: .down)
+        // The tile can be above or below where focus starts.
+        for d in [XCUIRemote.Button.down, .up, .left] { for _ in 0..<6 where !tile.hasFocus { remote.press(d) } }
+        XCTAssertTrue(tile.hasFocus, "couldn't focus \(film); focus is on \(focused.label)")
         remote.press(.select)
 
         let play = app.buttons["vod.play"]
@@ -256,7 +258,9 @@ final class VodTVUITests: XCTestCase {
         for _ in 0..<10 where !app.sidebarIsOpen { Thread.sleep(forTimeInterval: 0.5) }
         XCTAssertTrue(app.sidebarIsOpen, "Back opened the sidebar")
         XCTAssertEqual(app.state, .runningForeground, "still in the app")
-        let names = ["Home", "Anime", "Movies", "Music", "Live TV", "VOD Movies", "VOD Shows", "Playlists", "Settings", "Search"]
+        // The video libraries, then Live TV and VOD (video too), then Music. (The DVR's Recorded TV
+        // library is inside Live TV.)
+        let names = ["Home", "Anime", "Movies", "Live TV", "VOD Movies", "VOD Shows", "Music", "Playlists", "Settings", "Search"]
         let items = try names.map { try XCTUnwrap(app.sidebarItem($0), "\($0) is in the sidebar") }
         for (a, b) in zip(items, items.dropFirst()) {
             XCTAssertLessThan(a.frame.midY, b.frame.midY, "\(a.label) comes before \(b.label)")
@@ -396,8 +400,8 @@ final class VodTVUITests: XCTestCase {
         let upNext = app.buttons.matching(NSPredicate(format: "identifier == 'upNext.next' AND label CONTAINS 'Second'")).firstMatch
         XCTAssertTrue(upNext.waitForExistence(timeout: 40), "Up Next at the end")
         sleep(1)
-        XCTAssertTrue(upNext.hasFocus, "Playing next has the focus")
         shot("tv-up-next")
+        XCTAssertTrue(upNext.hasFocus, "Playing next has the focus; focus is on \(focused.identifier) \(focused.label)")
         remote.press(.select)
         XCTAssertTrue(upNext.waitForNonExistence(timeout: 10))
         try eventually(10, "episode 1 counted watched") {

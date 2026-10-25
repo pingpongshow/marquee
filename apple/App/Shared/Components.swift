@@ -36,7 +36,7 @@ struct ArtworkView: View {
             }
         }
         .aspectRatio(shape.aspect, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: shape == .square && item._type == .artist ? width : 8, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: round ? width : 8, style: .continuous))
         .overlay(alignment: .topTrailing) { badge }
         .overlay(alignment: .bottom) {
             if let p = WatchStore.shared.progress(item) {
@@ -52,14 +52,20 @@ struct ArtworkView: View {
         .opacity(item.available ? 1 : 0.4)
     }
 
+    /// Artists are round (the corner radius makes a circle).
+    private var round: Bool { shape == .square && item._type == .artist }
+
     private var placeholder: some View {
         // A stable hash (String.hashValue changes every launch), so a title keeps its colour.
         let hash = item.title.unicodeScalars.reduce(UInt32(5381)) { ($0 &<< 5) &+ $0 &+ $1.value }
         let hue = Double(hash % 360) / 360
+        // In a circle the name sits in the middle: the bottom corner is clipped away.
         return LinearGradient(colors: [Color(hue: hue, saturation: 0.35, brightness: 0.3), Color(hue: hue, saturation: 0.3, brightness: 0.12)],
                               startPoint: .topLeading, endPoint: .bottomTrailing)
-            .overlay(alignment: .bottomLeading) {
-                Text(item.title).font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.85)).lineLimit(3).padding(8)
+            .overlay(alignment: round ? .center : .bottomLeading) {
+                Text(item.title).font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.85)).lineLimit(3)
+                    .multilineTextAlignment(round ? .center : .leading)
+                    .padding(round ? width * 0.16 : 8)
             }
     }
 
@@ -328,7 +334,7 @@ struct RowRating: View {
             // One width rated or not, so durations beside it line up down a list; wide enough
             // for five stars (and never narrower than them), with a fixed gap before it so the
             // duration beside it never touches the stars.
-            .frame(minWidth: isTV ? 110 : 56, alignment: .trailing)
+            .frame(minWidth: isTV ? 110 : 56, alignment: isTV && (current ?? 0) <= 0 ? .center : .trailing)
             .padding(.leading, gap)
             .frame(minHeight: isTV ? 50 : 30)
             .contentShape(Rectangle())

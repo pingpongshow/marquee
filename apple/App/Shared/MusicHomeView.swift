@@ -23,7 +23,9 @@ struct MusicHomeView: View {
     @State private var loaded = false
 
     private var libraryID: Int64 { library.id }
-    private var soundprint: Bool { status?.enabled == true }
+    /// Soundprint is on and has analysed some music: what needs the analysis (Library Radio, Muse,
+    /// Moods & Styles, Mixes for You) shows. On with nothing analysed yet, it could only fail.
+    private var soundprint: Bool { status?.enabled == true && (status?.analyzed ?? 0) > 0 }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -436,6 +438,11 @@ struct MusicGenresView: View {
     @State private var genres: [Schemas.Facet] = []
     @State private var bySize = false
     @State private var loaded = false
+    #if os(tvOS)
+    /// The first genre takes the focus once they've loaded: nothing on the page could have it
+    /// before, so the focus went nowhere and Back did nothing.
+    @FocusState private var focused: String?
+    #endif
 
     private var sorted: [Schemas.Facet] {
         bySize ? genres.sorted { $0.count > $1.count }
@@ -452,6 +459,9 @@ struct MusicGenresView: View {
                         Text("\(g.count)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                     }
                 }
+                #if os(tvOS)
+                .focused($focused, equals: g.value)
+                #endif
             }
             if loaded && genres.isEmpty {
                 ContentUnavailableView("No genres", systemImage: "guitars", description: Text("Your albums' tags don't name any genres."))
@@ -473,6 +483,10 @@ struct MusicGenresView: View {
         .task {
             genres = (try? await app.filters(library: libraryID, type: .album))?.genres ?? []
             loaded = true
+            #if os(tvOS)
+            try? await Task.sleep(for: .milliseconds(150)) // the rows are there to focus
+            if focused == nil { focused = sorted.first?.value }
+            #endif
         }
     }
 }
@@ -500,6 +514,11 @@ struct MusicDecadesView: View {
     @Environment(AppSession.self) private var app
     let libraryID: Int64
     @State private var decades: [Schemas.Facet] = []
+    #if os(tvOS)
+    /// The first decade takes the focus once they've loaded: nothing on the page could have it
+    /// before, so the focus went nowhere and Back did nothing.
+    @FocusState private var focused: String?
+    #endif
 
     var body: some View {
         List {
@@ -512,12 +531,19 @@ struct MusicDecadesView: View {
                             Text("\(d.count)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                         }
                     }
+                    #if os(tvOS)
+                    .focused($focused, equals: d.value)
+                    #endif
                 }
             }
         }
         .navigationTitle("Decades")
         .task {
             decades = ((try? await app.filters(library: libraryID, type: .album))?.decades ?? []).sorted { $0.value > $1.value }
+            #if os(tvOS)
+            try? await Task.sleep(for: .milliseconds(150)) // the rows are there to focus
+            if focused == nil { focused = decades.first?.value }
+            #endif
         }
     }
 }
