@@ -373,6 +373,9 @@ func TrackIDs(ts []*Track) []int64 {
 type Station struct {
 	Title string
 	IDs   []int64
+	// Query is a Muse playlist's query as it ran: without the filters that had to be relaxed
+	// for it to find enough tracks.
+	Query MusicQuery
 }
 
 // RadioFromItem starts an endless-feeling station from a track, album or artist.

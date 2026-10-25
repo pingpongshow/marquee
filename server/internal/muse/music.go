@@ -292,7 +292,44 @@ func applyMusicDetails(q *soundprint.MusicQuery, a musicAnswer, lib MusicLibrary
 		return out
 	}
 	q.AlbumTypes, q.ExcludeAlbumTypes = valid(a.AlbumTypes), valid(a.ExcludeAlbum)
+	byNamedArtists(q)
 	return append(lbl, DetailLabels(*q)...)
+}
+
+// byNamedArtists drops the artist traits (origin, solo or band, gender, active years) when
+// the music must be by named artists: the traits can only describe those artists, so as
+// filters they'd only take tracks away (the AI adds them unasked for "songs by U2 and
+// Coldplay": Irish and British bands, active 1980–2020).
+func byNamedArtists(q *soundprint.MusicQuery) {
+	if len(q.ArtistIDs) > 0 {
+		q.Countries, q.Areas, q.ArtistType, q.Gender, q.ActiveFrom, q.ActiveTo = nil, nil, "", "", 0, 0
+	}
+}
+
+// Eased takes the labels of the filters a Muse playlist had to relax (ran is the query as
+// it ran, Station.Query) out of understood, so the description doesn't promise live
+// albums that aren't there.
+func Eased(understood []string, asked, ran soundprint.MusicQuery) []string {
+	still := map[string]bool{yearLabel(ran.YearFrom, ran.YearTo): true}
+	for _, l := range DetailLabels(ran) {
+		still[l] = true
+	}
+	gone := map[string]bool{}
+	for _, l := range append(DetailLabels(asked), yearLabel(asked.YearFrom, asked.YearTo)) {
+		if l != "" && !still[l] {
+			gone[l] = true
+		}
+	}
+	if len(gone) == 0 {
+		return understood
+	}
+	var out []string
+	for _, l := range understood {
+		if !gone[l] {
+			out = append(out, l)
+		}
+	}
+	return out
 }
 
 // addOrigin maps a country, nationality or place onto the library's artist countries and
@@ -606,6 +643,7 @@ func keywordDetails(q *soundprint.MusicQuery, lib MusicLibrary, low string) []st
 	if has(noCompWords) {
 		q.ExcludeAlbumTypes = []string{"compilation"}
 	}
+	byNamedArtists(q)
 	return DetailLabels(*q)
 }
 

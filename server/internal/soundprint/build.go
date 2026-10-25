@@ -24,6 +24,10 @@ type Options struct {
 	// tracks) among the candidates in Flow and Pick, without widening the search the way
 	// Boost does (see Service.Favour).
 	Favour map[int64]float64
+	// PerArtist and PerAlbum cap how many tracks of one artist or album Pick chooses (0 = no
+	// cap). When the caps would leave the list short they're raised a step at a time. With
+	// either set, Pick's order also keeps an artist's tracks apart.
+	PerArtist, PerAlbum int
 }
 
 func (o *Options) rng() *rand.Rand {
@@ -120,10 +124,21 @@ func (x *Index) Pick(v []float32, n int, o Options) []*Track {
 	}
 	var chosen []*Track
 	used := map[int]bool{}
+	perArtist, perAlbum := o.PerArtist, o.PerAlbum
+	byArtist, byAlbum := map[int64]int{}, map[int64]int{}
 	for len(chosen) < n {
 		best, bestScore := -1, math.Inf(-1)
+		artistFull, albumFull := false, false // some candidate waits on that cap alone
 		for i, c := range pool {
 			if used[i] {
+				continue
+			}
+			if perArtist > 0 && c.ArtistID != 0 && byArtist[c.ArtistID] >= perArtist {
+				artistFull = true
+				continue
+			}
+			if perAlbum > 0 && c.AlbumID != 0 && byAlbum[c.AlbumID] >= perAlbum {
+				albumFull = true
 				continue
 			}
 			sim := 0.0
@@ -142,10 +157,24 @@ func (x *Index) Pick(v []float32, n int, o Options) []*Track {
 			}
 		}
 		if best < 0 {
-			break
+			// Too few artists or albums left for the caps: first one more from an album of an
+			// artist with room (keeping the artists varied), then one more by each artist.
+			if albumFull {
+				perAlbum++
+			} else if artistFull {
+				perArtist++
+			} else {
+				break
+			}
+			continue
 		}
 		used[best] = true
 		chosen = append(chosen, pool[best].Track)
+		byArtist[pool[best].ArtistID]++
+		byAlbum[pool[best].AlbumID]++
+	}
+	if o.PerArtist > 0 || o.PerAlbum > 0 {
+		return orderApart(chosen, v)
 	}
 	return order(chosen, v)
 }
@@ -153,29 +182,65 @@ func (x *Index) Pick(v []float32, n int, o Options) []*Track {
 // order chains tracks greedily by similarity, starting from the one closest to v (the
 // prompt or mix centre) so the strongest match plays first.
 func order(ts []*Track, v []float32) []*Track {
+	return chain(ts, v, false)
+}
+
+// orderApart is order without an artist twice in a row (as far as the artists allow): an
+// artist's tracks sound most alike, so plain chaining plays them back to back.
+func orderApart(ts []*Track, v []float32) []*Track {
+	return chain(ts, v, true)
+}
+
+func chain(ts []*Track, v []float32, apart bool) []*Track {
 	if len(ts) < 3 {
 		return ts
 	}
-	start := 0
-	for i, t := range ts {
-		if dot(v, t.Vec) > dot(v, ts[start].Vec) {
-			start = i
-		}
-	}
-	out := []*Track{ts[start]}
-	left := append(append([]*Track{}, ts[:start]...), ts[start+1:]...)
+	var out []*Track
+	left := append([]*Track{}, ts...)
+	ref := v
 	for len(left) > 0 {
-		cur := out[len(out)-1]
-		bi := 0
-		for i, t := range left {
-			if dot(cur.Vec, t.Vec) > dot(cur.Vec, left[bi].Vec) {
-				bi = i
+		var cnt map[int64]int
+		if apart {
+			cnt = map[int64]int{}
+			for _, t := range left {
+				if t.ArtistID != 0 {
+					cnt[t.ArtistID]++
+				}
 			}
 		}
+		bi, fit := 0, -1
+		for i, t := range left {
+			if dot(ref, t.Vec) > dot(ref, left[bi].Vec) {
+				bi = i
+			}
+			if apart && (len(out) == 0 || t.ArtistID != out[len(out)-1].ArtistID || t.ArtistID == 0) &&
+				spaced(cnt, len(left)-1, t.ArtistID) && (fit < 0 || dot(ref, t.Vec) > dot(ref, left[fit].Vec)) {
+				fit = i
+			}
+		}
+		if fit >= 0 {
+			bi = fit
+		}
 		out = append(out, left[bi])
+		ref = left[bi].Vec
 		left = append(left[:bi], left[bi+1:]...)
 	}
 	return out
+}
+
+// spaced reports whether, after a track by artist a, the rest tracks left (by artist,
+// counts including that track) can still be ordered with no artist twice in a row.
+func spaced(cnt map[int64]int, rest int, a int64) bool {
+	for b, c := range cnt {
+		if b == a {
+			if c-1 > rest/2 {
+				return false
+			}
+		} else if c > (rest+1)/2 {
+			return false
+		}
+	}
+	return true
 }
 
 // Journey travels from one track to another through tracks that sit between them in

@@ -269,6 +269,7 @@ func (h *Handlers) MusicMuse(ctx context.Context, req MusicMuseRequestObject) (M
 	if err != nil {
 		return nil, internal(ctx, "muse", err)
 	}
+	reading.Understood = muse.Eased(reading.Understood, reading.Query, st.Query)
 	if len(reading.Understood) > 0 {
 		out.Description = ptr(strings.Join(reading.Understood, " · "))
 	}

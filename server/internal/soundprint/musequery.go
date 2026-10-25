@@ -336,12 +336,35 @@ func (s *Service) museQuery(ctx context.Context, q MusicQuery, f MuseFilters, n 
 		pool = s.Index.Where(keep)
 		o.Boost = addBoosts(cloneBoost(o.Boost), q.describedBoost(pool))
 	}
+	withGenres := true
 	if len(pool) < enough && f.GenreTracks != nil {
+		withGenres = false
 		keep = q.Keep(f, o.Keep, false)
 		pool = s.Index.Where(keep)
 	}
+	// Still too few: the filters a reading infers rather than the prompt spells out give way
+	// one at a time (the AI read "U2 & Coldplay anthems" as live albums, and neither has
+	// one), so a list never comes back empty for them. Named artists, history and track
+	// length stay; Station.Query says what ran. The few tracks that did pass lead the list.
+	strict := pool
+	for _, ease := range easings {
+		if len(pool) >= enough {
+			break
+		}
+		if ease(&q, &f) {
+			keep = q.Keep(f, o.Keep, withGenres)
+			pool = s.Index.Where(keep)
+		}
+	}
+	if len(strict) < len(pool) && len(strict) > 0 {
+		lead := map[int64]float64{}
+		for _, t := range strict {
+			lead[t.ItemID] = easedBoost
+		}
+		o.Boost = addBoosts(cloneBoost(o.Boost), lead)
+	}
 	if len(pool) == 0 {
-		return Station{Title: q.Title}, nil
+		return Station{Title: q.Title, Query: q}, nil
 	}
 	o.Boost = addBoosts(cloneBoost(o.Boost), q.keyBoosts(pool))
 	var sound, seeds, genres []float32
@@ -370,6 +393,7 @@ func (s *Service) museQuery(ctx context.Context, q MusicQuery, f MuseFilters, n 
 		v = Mean(pool) // filters only ("unplayed 90s"): the middle of what's left
 	}
 	o.Keep = keep
+	o.PerArtist, o.PerAlbum = q.spread(n)
 	ts := s.Index.Pick(v, n, o)
 	if q.TotalMinutes > 0 && f.DurationMS != nil {
 		var total int64
@@ -382,7 +406,63 @@ func (s *Service) museQuery(ctx context.Context, q MusicQuery, f MuseFilters, n 
 			}
 		}
 	}
-	return Station{Title: q.Title, IDs: TrackIDs(ts)}, nil
+	return Station{Title: q.Title, IDs: TrackIDs(ts), Query: q}, nil
+}
+
+// easedBoost lifts the tracks that passed a query's filters before they were relaxed.
+const easedBoost = 0.3
+
+// easings relax a query's inferred filters, most often guessed first; each reports whether
+// it changed anything.
+var easings = []func(q *MusicQuery, f *MuseFilters) bool{
+	func(q *MusicQuery, f *MuseFilters) bool { // release types
+		if len(q.AlbumTypes)+len(q.ExcludeAlbumTypes) == 0 {
+			return false
+		}
+		q.AlbumTypes, q.ExcludeAlbumTypes, f.AlbumsIn, f.AlbumsOut = nil, nil, nil, nil
+		return true
+	},
+	func(q *MusicQuery, f *MuseFilters) bool { // origin, solo or band, gender, active years
+		if !q.artistFiltered() {
+			return false
+		}
+		q.Countries, q.Areas, q.ArtistType, q.Gender, q.ActiveFrom, q.ActiveTo = nil, nil, "", "", 0, 0
+		f.Artists = nil
+		return true
+	},
+	func(q *MusicQuery, f *MuseFilters) bool { // energy and tempo
+		if q.Energy == "" && q.TempoMin <= 0 && q.TempoMax <= 0 {
+			return false
+		}
+		q.Energy, q.TempoMin, q.TempoMax = "", 0, 0
+		return true
+	},
+	func(q *MusicQuery, f *MuseFilters) bool { // hits or deep cuts
+		if q.Popular == 0 {
+			return false
+		}
+		q.Popular = 0
+		return true
+	},
+	func(q *MusicQuery, f *MuseFilters) bool { // release years
+		if q.YearFrom <= 0 && q.YearTo <= 0 {
+			return false
+		}
+		q.YearFrom, q.YearTo = 0, 0
+		return true
+	},
+}
+
+// spread is how many tracks of one artist and of one album a playlist of n takes (Pick's
+// caps). A few artists can own most of a prompt's closest tracks (one long acoustic album
+// for "coffeehouse"), so without caps they fill the list. A prompt that names its artists
+// shares the list between them and spreads only across their albums.
+func (q MusicQuery) spread(n int) (perArtist, perAlbum int) {
+	if len(q.ArtistIDs) > 0 {
+		return (n + len(q.ArtistIDs) - 1) / len(q.ArtistIDs), max(2, (n+7)/8)
+	}
+	perArtist = max(2, (n+9)/10)
+	return perArtist, max(1, (perArtist+1)/2)
 }
 
 func cloneBoost(b map[int64]float64) map[int64]float64 {
