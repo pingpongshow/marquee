@@ -383,6 +383,14 @@ func (s *Service) refreshXtream(ctx context.Context, src settings.VODSource) (in
 		existing[k] = id
 	}
 	rows.Close()
+	// Films renumbered by the source keep their rows (see carry.go).
+	listing := make([]listed, len(films))
+	for i, f := range films {
+		listing[i] = listed{key: f.key, title: f.title, category: f.category, file: f.file, year: f.year, tmdb: f.tmdb}
+	}
+	if _, err := carryFilms(ctx, tx, src.ID, existing, listing); err != nil {
+		return 0, err
+	}
 	// The source's TMDB id is kept until the film is matched, so matching looks it up directly.
 	stmt, err := tx.PrepareContext(ctx, `INSERT INTO vod_movies(source_id, source_key, title, category, stream_url, logo_url,
 		year, rating, tmdb_id, added_at) VALUES(?,?,?,?,?,?,?,?,?,?)

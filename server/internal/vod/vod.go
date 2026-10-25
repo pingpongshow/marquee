@@ -302,6 +302,18 @@ func (s *Service) refreshSource(ctx context.Context, src settings.VODSource) (in
 		existing[k] = id
 	}
 	rows.Close()
+	// Films whose links changed keep their rows (see carry.go): an M3U names no TMDB id, so by title.
+	var list []listed
+	listedKeys := map[string]bool{}
+	for _, e := range pl.Entries {
+		if k := sourceKey(e.URL); !listedKeys[k] && e.Name != "" {
+			listedKeys[k] = true
+			list = append(list, listed{key: k, title: strings.TrimSpace(e.Name), category: e.Group, file: e.URL})
+		}
+	}
+	if _, err := carryFilms(ctx, tx, src.ID, existing, list); err != nil {
+		return 0, err
+	}
 	seen := map[string]bool{}
 	added := now()
 	for _, e := range pl.Entries {

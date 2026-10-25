@@ -325,6 +325,14 @@ func (s *Service) refreshXtreamSeries(ctx context.Context, src settings.VODSourc
 	if len(shows) == 0 && len(existing) > 0 {
 		return 0, fmt.Errorf("the server lists no series (keeping the %d listed before)", len(existing))
 	}
+	// Series renumbered by the source keep their rows and follows (see carry.go).
+	listing := make([]listed, len(shows))
+	for i, sh := range shows {
+		listing[i] = listed{key: sh.key, title: sh.title, category: sh.category, year: sh.year, tmdb: sh.tmdb}
+	}
+	if _, err := carrySeries(ctx, tx, src.ID, existing, listing); err != nil {
+		return 0, err
+	}
 	// The source's details stand until TMDB's replace them (matched). A changed TMDB id is
 	// looked up again; a changed last_modified fetches the episodes again when next opened.
 	stmt, err := tx.PrepareContext(ctx, `INSERT INTO vod_series(source_id, source_key, title, category, logo_url, year,
@@ -545,6 +553,15 @@ func (s *Service) LoadEpisodes(ctx context.Context, seriesID int64, force bool) 
 	return nil
 }
 
+// episodeExt is an episode's file extension (mp4 unless the source names a safe one).
+func episodeExt(e xtreamEpisode) string {
+	ext := strings.ToLower(strings.TrimPrefix(e.Extension.String(), "."))
+	if !safeFileExt.MatchString(ext) {
+		ext = "mp4"
+	}
+	return ext
+}
+
 func (s *Service) storeEpisodes(ctx context.Context, x *xtream, seriesID int64, info xtreamSeriesInfo) error {
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -581,6 +598,17 @@ func (s *Service) storeEpisodes(ctx context.Context, x *xtream, seriesID int64, 
 	if len(existing) > 0 && !anyEpisode(info.Episodes) {
 		return errors.New("the server gave no episodes for this series")
 	}
+	// Episodes renumbered by the source keep their rows, by season and number (see carry.go).
+	var list []listedEpisode
+	for _, e := range info.Episodes {
+		if id := e.ID.Int(); id > 0 {
+			k := strconv.FormatInt(id, 10)
+			list = append(list, listedEpisode{key: k, file: k + "." + episodeExt(e), season: int(e.Season.Int()), episode: int(e.Episode.Int())})
+		}
+	}
+	if _, err := carryEpisodes(ctx, tx, seriesID, existing, list); err != nil {
+		return err
+	}
 	seen := map[string]bool{}
 	seasons := map[int]bool{}
 	quality := map[string]Quality{} // what the server says the files are
@@ -596,10 +624,7 @@ func (s *Service) storeEpisodes(ctx context.Context, x *xtream, seriesID int64, 
 		seen[k] = true
 		season, num := int(e.Season.Int()), int(e.Episode.Int())
 		seasons[season] = true
-		ext := strings.ToLower(strings.TrimPrefix(e.Extension.String(), "."))
-		if !safeFileExt.MatchString(ext) {
-			ext = "mp4"
-		}
+		ext := episodeExt(e)
 		var ei xtreamEpisodeInfo
 		if b := bytes.TrimSpace(e.Info); len(b) > 0 && b[0] == '{' {
 			json.Unmarshal(b, &ei)
