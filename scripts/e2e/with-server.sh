@@ -1,6 +1,7 @@
 #!/bin/sh
-# Runs a command with the local e2e server (port 32597), the fake IPTV source (32598) and the
-# fake Bazarr (32767) up, then stops them. Run scripts/e2e/setup.sh once first.
+# Runs a command with the local e2e server (port 32597), the fake IPTV source (32598), the
+# fake Bazarr (32767) and the fake VOD sources (films.m3u on 32621, Xtream on 32622) up, then
+# stops them. Run scripts/e2e/setup.sh once first.
 #
 #   scripts/e2e/with-server.sh '<command>'
 . "$(dirname "$0")/env.sh"

@@ -6,6 +6,8 @@ E="$REPO/.e2e"
 PORT=32597
 IPTV_PORT=32598
 BAZARR_PORT=32767
+VOD_M3U_PORT=32621
+VOD_XTREAM_PORT=32622
 BASE="http://127.0.0.1:$PORT/api/v1"
 
 # Starts the server in the background (pid in $E/server.pid) and waits until it answers.
@@ -39,17 +41,27 @@ e2e_start_server() {
   done
 }
 
-# Starts the fake IPTV source and the fake Bazarr (pids in $E/fakes.pid).
+# Starts the fake IPTV source, the fake Bazarr and the fake VOD sources (pids in $E/fakes.pid).
 e2e_start_fakes() {
   python3 "$REPO/scripts/fake-iptv.py" $IPTV_PORT > "$E/fake-iptv.log" 2>&1 &
   echo $! > "$E/fakes.pid"
   python3 "$REPO/scripts/fake-bazarr.py" --port $BAZARR_PORT --movies "$E/media/movies" \
     --tv "$E/recordings/TV" --anime "$E/media/anime" > "$E/fake-bazarr.log" 2>&1 &
   echo $! >> "$E/fakes.pid"
+  python3 "$REPO/scripts/fake-vod.py" --m3u-port $VOD_M3U_PORT --xtream-port $VOD_XTREAM_PORT \
+    --media "$E/vod-media" > "$E/fake-vod.log" 2>&1 &
+  echo $! >> "$E/fakes.pid"
   i=0
   until curl -s -m 1 -o /dev/null "http://127.0.0.1:$BAZARR_PORT/" && curl -s -m 1 -o /dev/null "http://127.0.0.1:$IPTV_PORT/output/m3u"; do
     i=$((i + 1))
     [ $i -gt 40 ] && { echo "e2e: the fake IPTV source or Bazarr didn't start; see $E/fake-*.log" >&2; return 0; }
+    sleep 0.25
+  done
+  # The fake VOD sources make their videos the first time (a few seconds).
+  i=0
+  until curl -s -m 1 -o /dev/null "http://127.0.0.1:$VOD_M3U_PORT/films.m3u" && curl -s -m 1 -o /dev/null "http://127.0.0.1:$VOD_XTREAM_PORT/player_api.php"; do
+    i=$((i + 1))
+    [ $i -gt 240 ] && { echo "e2e: the fake VOD sources didn't start; see $E/fake-vod.log" >&2; return 0; }
     sleep 0.25
   done
 }
