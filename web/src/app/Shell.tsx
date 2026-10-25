@@ -28,6 +28,7 @@ import type { LibraryType } from "@/api/types";
 import { ActivityIndicator } from "@/features/activity/ActivityIndicator";
 import { NotificationBell } from "@/features/activity/NotificationBell";
 import { UpdateBanner } from "@/features/activity/UpdateBanner";
+import { MuseButton } from "@/features/search/MuseVideo";
 import { SearchBox } from "@/features/search/SearchBox";
 import { Avatar } from "@/features/users/Avatar";
 import { ProfileSwitcher } from "@/features/users/ProfileSwitcher";
@@ -301,6 +302,10 @@ export function Shell({ children }: { children: ReactNode }) {
         </button>
         <Logo />
         <SearchBox />
+        {/* Muse beside the search it belongs with (on Home it sat over the first row's See all). */}
+        <div className="hidden shrink-0 md:block">
+          <MuseButton />
+        </div>
         <div className="ml-auto flex items-center gap-3">
           <Link
             to="/search"

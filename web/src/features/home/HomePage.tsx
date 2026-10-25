@@ -9,7 +9,6 @@ import { ContinueTile, HubItem, ViewMoreTile } from "./ContinueWatching";
 import { EditHomeDialog } from "./EditHome";
 import { GettingStarted } from "./GettingStarted";
 import { seeAllTarget } from "./layout";
-import { MuseButton } from "../search/MuseVideo";
 import { fetchHubs, hubsKey } from "../browse/watched";
 import { VodSuggestionTile } from "../livetv/VodSuggestions";
 
@@ -42,9 +41,6 @@ export function HomePage() {
 
   return (
     <div className="space-y-10 py-6 lg:py-8">
-      <div className="-mb-6 flex justify-end px-6 lg:px-8">
-        <MuseButton />
-      </div>
       {me.data?.isAdmin && <GettingStarted />}
       <WatchTogetherBanner myId={me.data?.id} />
       {hubs.isError && (
