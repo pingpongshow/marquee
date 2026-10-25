@@ -1,4 +1,5 @@
-// Package mediatrash deletes media files from Library Health (ADM-11). A deleted file,
+// Package mediatrash deletes media files from Library Health, and titles from their pages
+// (ADM-11). A deleted file,
 // with the subtitles and artwork beside it that belong only to it, moves into a
 // .marquee-trash folder in its library folder (<root>/.marquee-trash/<YYYY-MM-DD>/<path
 // relative to the root>) and is removed for good by the nightly "Empty media trash" task. Moves are renames, so the trash stays on the same filesystem.
@@ -23,7 +24,10 @@ import (
 
 const dateLayout = "2006-01-02"
 
-var ErrNotFound = errors.New("file not found")
+var (
+	ErrNotFound = errors.New("file not found")
+	ErrNoItem   = errors.New("item not found")
+)
 
 // MoveError says why a file couldn't be moved to the trash.
 type MoveError struct{ Msg string }
@@ -53,12 +57,81 @@ func (s *Service) Delete(ctx context.Context, fileID int64, by string) error {
 	if err != nil {
 		return err
 	}
-	if err := s.forget(ctx, fileID, m.libID); err != nil {
+	if err := s.forget(ctx, m); err != nil {
 		m.undo()
 		return err
 	}
 	slog.InfoContext(ctx, "media file deleted to the trash", "by", by, "file", m.path, "trash", m.moved[0][1], "sidecars", len(m.moved)-1)
 	return nil
+}
+
+// DeleteItem moves every media file of an item and of everything under it (a show's or
+// season's episodes, an artist's or album's tracks, a title's extras), each with its own
+// sidecars, to the trash and removes them from the library, so the item goes too, with a
+// season or show (or album or artist) left empty. Nothing moves unless everything can. It
+// returns how many media files moved; by names who asked, for the log.
+func (s *Service) DeleteItem(ctx context.Context, itemID int64, by string) (int, error) {
+	var typ, title string
+	err := s.DB.QueryRowContext(ctx, `SELECT type, title FROM items WHERE id = ?`, itemID).Scan(&typ, &title)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNoItem
+	}
+	if err != nil {
+		return 0, err
+	}
+	if typ == "collection" {
+		return 0, &MoveError{"A collection has no files of its own: delete the collection instead, and its titles stay in the library"}
+	}
+	ids, err := s.itemFiles(ctx, itemID)
+	if err != nil {
+		return 0, err
+	}
+	if len(ids) == 0 {
+		return 0, &MoveError{"It has no media files to delete"}
+	}
+	var done []moved
+	undo := func() {
+		for i := len(done) - 1; i >= 0; i-- {
+			done[i].undo()
+		}
+	}
+	for _, id := range ids {
+		m, err := s.move(ctx, id)
+		if err != nil {
+			undo()
+			return 0, err
+		}
+		done = append(done, m)
+	}
+	if err := s.forget(ctx, done...); err != nil {
+		undo()
+		return 0, err
+	}
+	for _, m := range done {
+		slog.InfoContext(ctx, "media file deleted to the trash", "by", by, "item", title, "file", m.path, "trash", m.moved[0][1], "sidecars", len(m.moved)-1)
+	}
+	return len(done), nil
+}
+
+// itemFiles lists the media files of an item and of the items under it, in path order.
+func (s *Service) itemFiles(ctx context.Context, itemID int64) ([]int64, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+		WITH RECURSIVE under(id) AS (SELECT ? UNION SELECT i.id FROM items i JOIN under u ON i.parent_id = u.id)
+		SELECT f.id FROM media_files f JOIN media_versions v ON v.id = f.version_id
+		WHERE v.item_id IN (SELECT id FROM under) ORDER BY f.path`, itemID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 // Trash moves media files (each with its own sidecars) to the trash and leaves the
@@ -119,6 +192,7 @@ func (s *Service) Stash(ctx context.Context, fileID int64, why string) (to strin
 
 // moved is a file (and its sidecars) moved to the trash.
 type moved struct {
+	id    int64
 	path  string
 	libID int64
 	moved [][2]string // from, to
@@ -141,7 +215,7 @@ func (s *Service) move(ctx context.Context, fileID int64) (moved, error) {
 	if err != nil {
 		return moved{}, err
 	}
-	m := moved{path: path, libID: libID}
+	m := moved{id: fileID, path: path, libID: libID}
 	root, err := s.rootFor(ctx, libID, path)
 	if err != nil {
 		return m, err
@@ -182,19 +256,26 @@ func (s *Service) move(ctx context.Context, fileID int64) (moved, error) {
 	return m, nil
 }
 
-// forget removes the file's row (streams and the rest cascade) and tidies the library the
-// way a scan does, so an item without files goes, and so do containers left empty.
-func (s *Service) forget(ctx context.Context, fileID, libID int64) error {
+// forget removes the moved files' rows (streams and the rest cascade) and tidies their
+// libraries the way a scan does, so an item without files goes, and so do containers left
+// empty. It's one transaction: all the rows go, or none.
+func (s *Service) forget(ctx context.Context, files ...moved) error {
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM media_files WHERE id = ?`, fileID); err != nil {
-		return err
+	libs := map[int64]bool{}
+	for _, m := range files {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM media_files WHERE id = ?`, m.id); err != nil {
+			return err
+		}
+		libs[m.libID] = true
 	}
-	if err := scanner.Tidy(ctx, tx, libID); err != nil {
-		return err
+	for lib := range libs {
+		if err := scanner.Tidy(ctx, tx, lib); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }

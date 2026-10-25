@@ -108,3 +108,88 @@ func TestDeleteDuplicateFile(t *testing.T) {
 		t.Errorf("non-admin: %d", code)
 	}
 }
+
+// TestDeleteTitle covers deleting a title from its page (ADM-11) over HTTP: a season takes
+// its episodes' files to the trash and leaves the rest of the show; then the show itself.
+func TestDeleteTitle(t *testing.T) {
+	h := newHarness(t)
+	var res api.AuthResult
+	h.do("POST", "/setup", map[string]any{"serverName": "T", "username": "admin", "password": "correct horse", "device": device}, &res)
+	h.token = res.Token
+	root := filepath.Join(h.media, "video/Shows")
+	var lib api.Library
+	h.do("POST", "/libraries", map[string]any{"name": "Shows", "type": "shows", "paths": []string{root}}, &lib)
+	exec := func(q string, args ...any) int64 {
+		r, err := h.db.Exec(q, args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		id, _ := r.LastInsertId()
+		return id
+	}
+	item := func(typ, title string, parent, grandparent any) int64 {
+		return exec(`INSERT INTO items(library_id, type, title, sort_title, parent_id, grandparent_id) VALUES (?, ?, ?, ?, ?, ?)`, lib.Id, typ, title, title, parent, grandparent)
+	}
+	file := func(id int64, rel string) string {
+		p := filepath.Join(root, rel)
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		os.WriteFile(p, []byte("video"), 0o644)
+		v := exec(`INSERT INTO media_versions(item_id) VALUES (?)`, id)
+		f := exec(`INSERT INTO media_files(version_id, library_id, path, size, mtime) VALUES (?, ?, ?, 5, 1)`, v, lib.Id, p)
+		exec(`INSERT INTO streams(file_id, kind, codec) VALUES (?, 'video', 'h264')`, f)
+		return p
+	}
+	show := item("show", "Severance", nil, nil)
+	s1, s2 := item("season", "Season 1", show, nil), item("season", "Season 2", show, nil)
+	e1 := file(item("episode", "Good News About Hell", s1, show), "Severance/Season 1/Severance - S01E01.mkv")
+	e2 := file(item("episode", "Half Loop", s1, show), "Severance/Season 1/Severance - S01E02.mkv")
+	file(item("episode", "Hello, Ms. Cobel", s2, show), "Severance/Season 2/Severance - S02E01.mkv")
+	coll := item("collection", "Office", nil, nil)
+
+	// Off by default.
+	if code := h.do("DELETE", fmt.Sprintf("/items/%d", s1), nil, nil); code != 403 {
+		t.Errorf("deletion off: %d", code)
+	}
+	h.do("PATCH", "/settings", map[string]any{"library": map[string]any{"allowMediaDeletion": true}}, nil)
+
+	var out struct{ Deleted int }
+	if code := h.do("DELETE", fmt.Sprintf("/items/%d", s1), nil, &out); code != 200 || out.Deleted != 2 {
+		t.Fatalf("season: %d %+v", code, out)
+	}
+	for _, p := range []string{e1, e2} {
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Errorf("%s still in place", p)
+		}
+	}
+	if m, _ := filepath.Glob(filepath.Join(root, library.TrashDir, "*", "Severance", "Season 1", "*.mkv")); len(m) != 2 {
+		t.Errorf("not in the trash: %v", m)
+	}
+	if code := h.do("GET", fmt.Sprintf("/items/%d", s1), nil, nil); code != 404 {
+		t.Errorf("the season should be gone: %d", code)
+	}
+	if code := h.do("GET", fmt.Sprintf("/items/%d", s2), nil, nil); code != 200 {
+		t.Errorf("the other season should stay: %d", code)
+	}
+	if code := h.do("DELETE", fmt.Sprintf("/items/%d", show), nil, &out); code != 200 || out.Deleted != 1 {
+		t.Fatalf("show: %d %+v", code, out)
+	}
+	if code := h.do("GET", fmt.Sprintf("/items/%d", show), nil, nil); code != 404 {
+		t.Errorf("the show should be gone: %d", code)
+	}
+	if code := h.do("DELETE", fmt.Sprintf("/items/%d", show), nil, nil); code != 404 {
+		t.Errorf("deleted twice: %d", code)
+	}
+	if code := h.do("DELETE", fmt.Sprintf("/items/%d", coll), nil, nil); code != 409 {
+		t.Errorf("collection: %d", code)
+	}
+
+	// Admins only.
+	var kid api.User
+	h.do("POST", "/users", map[string]any{"username": "kid", "isManaged": true}, &kid)
+	var sw api.AuthResult
+	h.do("POST", fmt.Sprintf("/profiles/%d/switch", kid.Id), map[string]any{"device": map[string]any{"clientId": "kid-client", "name": "Kid", "platform": "web"}}, &sw)
+	h.token = sw.Token
+	if code := h.do("DELETE", fmt.Sprintf("/items/%d", s2), nil, nil); code != 403 {
+		t.Errorf("non-admin: %d", code)
+	}
+}

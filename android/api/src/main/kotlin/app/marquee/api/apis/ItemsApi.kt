@@ -34,6 +34,7 @@ import app.marquee.api.models.BazarrPick
 import app.marquee.api.models.BazarrStatus
 import app.marquee.api.models.CommercialScan
 import app.marquee.api.models.CreateCollectionRequest
+import app.marquee.api.models.DeleteItem200Response
 import app.marquee.api.models.Error
 import app.marquee.api.models.ItemDetail
 import app.marquee.api.models.ItemEdit
@@ -1058,6 +1059,79 @@ open class ItemsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.DELETE,
             path = "/collections/{collectionId}".replace("{"+"collectionId"+"}", encodeURIComponent(collectionId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /items/{itemId}
+     * Delete a title from its page (ADM-11, admin only, when allowMediaDeletion is on).
+     * Every media file of the item and of everything under it (a show&#39;s or season&#39;s episodes, an artist&#39;s or album&#39;s tracks, a title&#39;s extras), with the subtitles and artwork beside each that belong only to it, moves to a .marquee-trash folder in its library folder and is removed for good when the daily Empty media trash task runs. The item leaves the library with its watch history, and so does a season or show (or album or artist) left empty. Nothing moves unless everything can: a file that isn&#39;t on disk or can&#39;t be moved stops the delete (409) and every file stays where it was. Collections are deleted with DELETE /collections/{collectionId}, which leaves their titles alone.
+     * @param itemId 
+     * @return DeleteItem200Response
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun deleteItem(itemId: kotlin.Long) : DeleteItem200Response {
+        val localVarResponse = deleteItemWithHttpInfo(itemId = itemId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as DeleteItem200Response
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /items/{itemId}
+     * Delete a title from its page (ADM-11, admin only, when allowMediaDeletion is on).
+     * Every media file of the item and of everything under it (a show&#39;s or season&#39;s episodes, an artist&#39;s or album&#39;s tracks, a title&#39;s extras), with the subtitles and artwork beside each that belong only to it, moves to a .marquee-trash folder in its library folder and is removed for good when the daily Empty media trash task runs. The item leaves the library with its watch history, and so does a season or show (or album or artist) left empty. Nothing moves unless everything can: a file that isn&#39;t on disk or can&#39;t be moved stops the delete (409) and every file stays where it was. Collections are deleted with DELETE /collections/{collectionId}, which leaves their titles alone.
+     * @param itemId 
+     * @return ApiResponse<DeleteItem200Response?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun deleteItemWithHttpInfo(itemId: kotlin.Long) : ApiResponse<DeleteItem200Response?> {
+        val localVariableConfig = deleteItemRequestConfig(itemId = itemId)
+
+        return request<Unit, DeleteItem200Response>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation deleteItem
+     *
+     * @param itemId 
+     * @return RequestConfig
+     */
+    fun deleteItemRequestConfig(itemId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/items/{itemId}".replace("{"+"itemId"+"}", encodeURIComponent(itemId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

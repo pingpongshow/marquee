@@ -231,3 +231,100 @@ func TestEmptyDeletesAllTrashAndNothingElse(t *testing.T) {
 		t.Errorf("empty trash: %q", msg)
 	}
 }
+
+// Deleting a title moves the files of everything under it, each with its own sidecars, and
+// takes the title and its empty containers out of the library; the rest stays.
+func TestDeleteItemMovesEverythingUnderIt(t *testing.T) {
+	e := newEnv(t, library.Shows)
+	show := e.item("show", "Show", nil, nil)
+	s1 := e.item("season", "Season 1", show, nil)
+	s2 := e.item("season", "Season 2", show, nil)
+	ep1 := e.item("episode", "One", s1, show)
+	ep2 := e.item("episode", "Two", s1, show)
+	ep3 := e.item("episode", "Three", s2, show)
+	e.file(ep1, "Show/Season 1/Show - S01E01.mkv")
+	e.touch("Show/Season 1/Show - S01E01.en.srt")
+	e.file(ep2, "Show/Season 1/Show - S01E02.mkv")
+	e.file(ep3, "Show/Season 2/Show - S02E01.mkv")
+	other := e.item("show", "Other", nil, nil)
+	oe := e.item("episode", "Pilot", e.item("season", "Season 1", other, nil), other)
+	keep := e.file(oe, "Other/Season 1/Other - S01E01.mkv")
+	ctx := context.Background()
+
+	n, err := e.svc.DeleteItem(ctx, s1, "admin")
+	if err != nil || n != 2 {
+		t.Fatalf("season: %d %v", n, err)
+	}
+	day := filepath.Join(e.root, library.TrashDir, "2026-10-02", "Show", "Season 1")
+	for _, name := range []string{"Show - S01E01.mkv", "Show - S01E01.en.srt", "Show - S01E02.mkv"} {
+		if !exists(filepath.Join(day, name)) {
+			t.Errorf("%s not in the trash", name)
+		}
+	}
+	if c := e.count(`SELECT COUNT(*) FROM items WHERE id IN (?, ?, ?)`, s1, ep1, ep2); c != 0 {
+		t.Errorf("the season and its episodes should be gone, %d left", c)
+	}
+	if c := e.count(`SELECT COUNT(*) FROM items WHERE id IN (?, ?, ?)`, show, s2, ep3); c != 3 {
+		t.Errorf("the rest of the show should stay, %d left", c)
+	}
+
+	if n, err := e.svc.DeleteItem(ctx, show, "admin"); err != nil || n != 1 {
+		t.Fatalf("show: %d %v", n, err)
+	}
+	if c := e.count(`SELECT COUNT(*) FROM items WHERE id = ? OR parent_id = ? OR grandparent_id = ?`, show, show, show); c != 0 {
+		t.Errorf("the show should be gone, %d items left", c)
+	}
+	if c := e.count(`SELECT COUNT(*) FROM media_files WHERE id = ?`, keep); c != 1 || !exists(filepath.Join(e.root, "Other/Season 1/Other - S01E01.mkv")) {
+		t.Error("another show was touched")
+	}
+	if _, err := e.svc.DeleteItem(ctx, show, "admin"); !errors.Is(err, ErrNoItem) {
+		t.Errorf("deleting again: %v, want ErrNoItem", err)
+	}
+}
+
+// Nothing moves unless everything can: a file missing from disk stops the delete and every
+// other file stays where it was, still in the library.
+func TestDeleteItemIsAllOrNothing(t *testing.T) {
+	e := newEnv(t, library.Movies)
+	movie := e.item("movie", "Heat", nil, nil)
+	a := e.file(movie, "Heat (1995)/Heat (1995) 1080p.mkv")
+	b := e.file(movie, "Heat (1995)/Heat (1995) 4K.mkv")
+	os.Remove(filepath.Join(e.root, "Heat (1995)/Heat (1995) 4K.mkv"))
+
+	_, err := e.svc.DeleteItem(context.Background(), movie, "admin")
+	var me *MoveError
+	if !errors.As(err, &me) {
+		t.Fatalf("got %v, want a MoveError", err)
+	}
+	if !exists(filepath.Join(e.root, "Heat (1995)/Heat (1995) 1080p.mkv")) {
+		t.Error("the file that could move was left in the trash")
+	}
+	if c := e.count(`SELECT COUNT(*) FROM media_files WHERE id IN (?, ?)`, a, b); c != 2 {
+		t.Errorf("file rows removed though the delete failed: %d left", c)
+	}
+}
+
+// A collection has no files of its own (its titles are its members, not its children), and
+// an item without files has nothing to delete.
+func TestDeleteItemRefusesCollectionsAndEmptyItems(t *testing.T) {
+	e := newEnv(t, library.Movies)
+	movie := e.item("movie", "Heat", nil, nil)
+	e.file(movie, "Heat/Heat.mkv")
+	coll := e.item("collection", "Crime", nil, nil)
+	e.exec(`INSERT INTO collection_items(collection_id, item_id) VALUES (?, ?)`, coll, movie)
+	ctx := context.Background()
+	var me *MoveError
+	if _, err := e.svc.DeleteItem(ctx, coll, "admin"); !errors.As(err, &me) {
+		t.Errorf("collection: %v, want a MoveError", err)
+	}
+	if !exists(filepath.Join(e.root, "Heat/Heat.mkv")) {
+		t.Error("a collection's member was deleted")
+	}
+	empty := e.item("movie", "Nothing", nil, nil)
+	if _, err := e.svc.DeleteItem(ctx, empty, "admin"); !errors.As(err, &me) {
+		t.Errorf("no files: %v, want a MoveError", err)
+	}
+	if _, err := e.svc.DeleteItem(ctx, 9999, "admin"); !errors.Is(err, ErrNoItem) {
+		t.Errorf("unknown: %v, want ErrNoItem", err)
+	}
+}

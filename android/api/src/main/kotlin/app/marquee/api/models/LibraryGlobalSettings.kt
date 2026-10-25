@@ -38,7 +38,7 @@ import kotlinx.serialization.Contextual
  * @param watchedThresholdPercent 
  * @param detectIntros Find intros and end credits in TV episodes by comparing their audio, for Skip Intro and Skip Credits (PLAY-12). Markers from Plex or the files take precedence.
  * @param trickplay Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie.
- * @param allowMediaDeletion Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good by the daily Empty media trash task.
+ * @param allowMediaDeletion Lets admins delete media: files from Library Health, and titles from their pages. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good by the daily Empty media trash task.
  */
 @Serializable
 
@@ -68,7 +68,7 @@ data class LibraryGlobalSettings (
     @SerialName(value = "trickplay")
     val trickplay: kotlin.Boolean? = null,
 
-    /* Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good by the daily Empty media trash task. */
+    /* Lets admins delete media: files from Library Health, and titles from their pages. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good by the daily Empty media trash task. */
     @SerialName(value = "allowMediaDeletion")
     val allowMediaDeletion: kotlin.Boolean? = false
 

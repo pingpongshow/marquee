@@ -289,8 +289,7 @@ func (h *Handlers) DeleteMediaFile(ctx context.Context, req DeleteMediaFileReque
 	case !s.User.IsAdmin:
 		return DeleteMediaFile403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
 	case !h.Settings.Get().Library.AllowMediaDeletion:
-		return DeleteMediaFile403JSONResponse{ForbiddenJSONResponse(apiErr("deletion_off",
-			"Deleting media is turned off. Turn on Allow media deletion in Library settings."))}, nil
+		return DeleteMediaFile403JSONResponse{ForbiddenJSONResponse(errDeletionOff)}, nil
 	}
 	err := h.trash().Delete(ctx, req.FileId, s.User.Username)
 	var me *mediatrash.MoveError
@@ -304,6 +303,34 @@ func (h *Handlers) DeleteMediaFile(ctx context.Context, req DeleteMediaFileReque
 		return DeleteMediaFile409JSONResponse{ConflictJSONResponse(apiErr("cannot_move", me.Msg))}, nil
 	}
 	return nil, internal(ctx, "deleteMediaFile", err)
+}
+
+var errDeletionOff = apiErr("deletion_off", "Deleting media is turned off. Turn on Allow media deletion in Library settings.")
+
+// DeleteItem deletes a title from its page (ADM-11): its files and those of everything under
+// it go to the media trash, and the title leaves the library.
+func (h *Handlers) DeleteItem(ctx context.Context, req DeleteItemRequestObject) (DeleteItemResponseObject, error) {
+	s, ok := session(ctx)
+	switch {
+	case !ok:
+		return DeleteItem401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !s.User.IsAdmin:
+		return DeleteItem403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	case !h.Settings.Get().Library.AllowMediaDeletion:
+		return DeleteItem403JSONResponse{ForbiddenJSONResponse(errDeletionOff)}, nil
+	}
+	n, err := h.trash().DeleteItem(ctx, req.ItemId, s.User.Username)
+	var me *mediatrash.MoveError
+	switch {
+	case err == nil:
+		return DeleteItem200JSONResponse{Deleted: n}, nil
+	case errors.Is(err, mediatrash.ErrNoItem):
+		return DeleteItem404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "item not found"))}, nil
+	case errors.As(err, &me):
+		slog.WarnContext(ctx, "delete item", "item", req.ItemId, "err", err)
+		return DeleteItem409JSONResponse{ConflictJSONResponse(apiErr("cannot_move", me.Msg))}, nil
+	}
+	return nil, internal(ctx, "deleteItem", err)
 }
 
 // healthNotFoundMsg names what wasn't found: the check or the item.

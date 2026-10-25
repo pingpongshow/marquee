@@ -297,6 +297,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /items/{itemId}`.
     /// - Remark: Generated from `#/paths//items/{itemId}/get(getItem)`.
     func getItem(_ input: Operations.GetItem.Input) async throws -> Operations.GetItem.Output
+    /// Delete a title from its page (ADM-11, admin only, when allowMediaDeletion is on).
+    ///
+    /// Every media file of the item and of everything under it (a show's or season's episodes, an artist's or album's tracks, a title's extras), with the subtitles and artwork beside each that belong only to it, moves to a .marquee-trash folder in its library folder and is removed for good when the daily Empty media trash task runs. The item leaves the library with its watch history, and so does a season or show (or album or artist) left empty. Nothing moves unless everything can: a file that isn't on disk or can't be moved stops the delete (409) and every file stays where it was. Collections are deleted with DELETE /collections/{collectionId}, which leaves their titles alone.
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/delete(deleteItem)`.
+    func deleteItem(_ input: Operations.DeleteItem.Input) async throws -> Operations.DeleteItem.Output
     /// Edit metadata fields (admin only). Edited fields are locked so agents won't overwrite them.
     ///
     /// - Remark: HTTP `PATCH /items/{itemId}/metadata`.
@@ -2071,6 +2078,21 @@ extension APIProtocol {
         headers: Operations.GetItem.Input.Headers = .init()
     ) async throws -> Operations.GetItem.Output {
         try await getItem(Operations.GetItem.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Delete a title from its page (ADM-11, admin only, when allowMediaDeletion is on).
+    ///
+    /// Every media file of the item and of everything under it (a show's or season's episodes, an artist's or album's tracks, a title's extras), with the subtitles and artwork beside each that belong only to it, moves to a .marquee-trash folder in its library folder and is removed for good when the daily Empty media trash task runs. The item leaves the library with its watch history, and so does a season or show (or album or artist) left empty. Nothing moves unless everything can: a file that isn't on disk or can't be moved stops the delete (409) and every file stays where it was. Collections are deleted with DELETE /collections/{collectionId}, which leaves their titles alone.
+    ///
+    /// - Remark: HTTP `DELETE /items/{itemId}`.
+    /// - Remark: Generated from `#/paths//items/{itemId}/delete(deleteItem)`.
+    public func deleteItem(
+        path: Operations.DeleteItem.Input.Path,
+        headers: Operations.DeleteItem.Input.Headers = .init()
+    ) async throws -> Operations.DeleteItem.Output {
+        try await deleteItem(Operations.DeleteItem.Input(
             path: path,
             headers: headers
         ))

@@ -3,8 +3,10 @@ import { useNavigate } from "@tanstack/react-router";
 import { Check, Disc3, History, Lock, Pencil, RefreshCw, Scissors, Search, Trash2, Unlock } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, unwrap } from "@/api/client";
+import { settingsQuery } from "@/api/queries";
 import type { components } from "@/api/schema.gen";
 import type { ItemDetail } from "@/api/types";
+import { toast } from "@/components/Toast";
 import { Alert, Button, Dialog, Field, Input, Spinner } from "@/components/ui";
 import { ItemFiles } from "./FileNames";
 import { MoveTrackDialog, MusicMatchDialog } from "./MusicFixes";
@@ -202,11 +204,72 @@ function EditDialog({ item, onClose }: { item: ItemDetail; onClose: () => void }
   );
 }
 
-/** Admin actions for an item: edit, fix match, refresh. */
+/** What deleting a title takes with it besides its own files. */
+const deletesWith: Partial<Record<ItemDetail["type"], string>> = {
+  show: "every episode",
+  season: "every episode",
+  artist: "every album and track",
+  album: "every track",
+};
+
+/**
+ * Deletes a title from its page (ADM-11): its files, and those of everything in it, go to the media
+ * trash, and the title leaves the library. Only while Allow deleting media files is on.
+ */
+function DeleteItemDialog({ item, onClose }: { item: ItemDetail; onClose: () => void }) {
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const settings = useQuery(settingsQuery);
+  const allowed = !!settings.data?.library?.allowMediaDeletion;
+  const del = useMutation({
+    mutationFn: () => unwrap(api.DELETE("/items/{itemId}", { params: { path: { itemId: item.id } } })),
+    onSuccess: (r) => {
+      toast(`Moved “${item.title}” to the trash (${r.deleted === 1 ? "1 file" : `${r.deleted} files`}).`);
+      qc.removeQueries({ queryKey: ["items", item.id] });
+      qc.invalidateQueries();
+      navigate({ to: "/library/$libraryId", params: { libraryId: String(item.libraryId) } });
+    },
+  });
+  const also = deletesWith[item.type];
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title={`Delete “${item.title}”?`}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="danger" disabled={!allowed} loading={del.isPending} onClick={() => del.mutate()}>
+            Move to trash
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3 text-sm text-muted">
+        {settings.isSuccess && !allowed ? (
+          <Alert>Turn on 'Allow deleting media files' in Settings → Libraries to delete from here.</Alert>
+        ) : (
+          <>
+            <p>
+              Its files{also ? `, and those of ${also} in it,` : ""} move to the <code className="text-text">.marquee-trash</code> folder in the library folder and are deleted for good when the media trash is emptied
+              (every night, in the maintenance window). Until then you can move them back by hand.
+            </p>
+            <p>It leaves the library now, with its watch history, which doesn't come back if you move the files back.</p>
+          </>
+        )}
+        {del.isError && <Alert tone="error">{del.error.message}</Alert>}
+      </div>
+    </Dialog>
+  );
+}
+
+/** Admin actions for an item: edit, fix match, refresh, delete. */
 export function ItemActions({ item }: { item: ItemDetail }) {
   const updated = useItemUpdated();
   const [open, setOpen] = useState(false);
-  const [dialog, setDialog] = useState<"edit" | "match" | "musicMatch" | "move" | null>(null);
+  const [dialog, setDialog] = useState<"edit" | "match" | "musicMatch" | "move" | "delete" | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const matchable = item.type === "movie" || item.type === "show";
   const musicMatchable = item.type === "artist" || item.type === "album";
@@ -234,7 +297,7 @@ export function ItemActions({ item }: { item: ItemDetail }) {
   return (
     <>
       <div className="relative" ref={ref}>
-        <Button variant="secondary" size="sm" onClick={() => setOpen((v) => !v)} aria-label="Edit, fix match or refresh" title="Edit, fix match or refresh" aria-expanded={open} loading={refresh.isPending}>
+        <Button variant="secondary" size="sm" onClick={() => setOpen((v) => !v)} aria-label="Edit, fix match, refresh or delete" title="Edit, fix match, refresh or delete" aria-expanded={open} loading={refresh.isPending}>
           <Pencil className="size-4" />
         </Button>
         {open && (
@@ -277,12 +340,16 @@ export function ItemActions({ item }: { item: ItemDetail }) {
                 )}
               </>
             )}
-            {item.type === "collection" && (
+            {item.type === "collection" ? (
               <button
                 className={itemCls + " text-danger"}
                 onClick={() => window.confirm(`Delete the collection “${item.title}”? Its titles stay in the library.`) && removeCollection.mutate()}
               >
                 <Trash2 className="size-4" /> Delete collection
+              </button>
+            ) : (
+              <button className={itemCls + " mt-1 border-t border-border pt-2 text-danger"} onClick={() => setDialog("delete")}>
+                <Trash2 className="size-4" /> Delete…
               </button>
             )}
           </div>
@@ -294,6 +361,7 @@ export function ItemActions({ item }: { item: ItemDetail }) {
       {dialog === "musicMatch" && <MusicMatchDialog item={item} onClose={() => setDialog(null)} />}
       {dialog === "move" && <MoveTrackDialog track={item} onClose={() => setDialog(null)} />}
       {dialog === "edit" && <EditDialog item={item} onClose={() => setDialog(null)} />}
+      {dialog === "delete" && <DeleteItemDialog item={item} onClose={() => setDialog(null)} />}
     </>
   );
 }

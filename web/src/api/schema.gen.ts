@@ -756,7 +756,11 @@ export interface paths {
         get: operations["getItem"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete a title from its page (ADM-11, admin only, when allowMediaDeletion is on).
+         * @description Every media file of the item and of everything under it (a show's or season's episodes, an artist's or album's tracks, a title's extras), with the subtitles and artwork beside each that belong only to it, moves to a .marquee-trash folder in its library folder and is removed for good when the daily Empty media trash task runs. The item leaves the library with its watch history, and so does a season or show (or album or artist) left empty. Nothing moves unless everything can: a file that isn't on disk or can't be moved stops the delete (409) and every file stays where it was. Collections are deleted with DELETE /collections/{collectionId}, which leaves their titles alone.
+         */
+        delete: operations["deleteItem"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4816,7 +4820,7 @@ export interface components {
             /** @description Make seek-bar preview thumbnails for videos in the maintenance window (PLAY-13). Uses roughly 3–7 MB per movie. */
             trickplay?: boolean;
             /**
-             * @description Lets admins delete media files from Library Health. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good by the daily Empty media trash task.
+             * @description Lets admins delete media: files from Library Health, and titles from their pages. Deleted files are moved to a .marquee-trash folder in their library folder and removed for good by the daily Empty media trash task.
              * @default false
              */
             allowMediaDeletion: boolean;
@@ -9289,6 +9293,35 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    deleteItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Moved to the trash. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description How many media files moved to the trash. */
+                        deleted: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     editItem: {
