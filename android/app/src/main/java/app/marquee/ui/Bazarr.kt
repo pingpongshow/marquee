@@ -83,7 +83,7 @@ fun BazarrSection(itemId: Long, modifier: Modifier = Modifier, onQueued: () -> U
         busy = true
         scope.launch {
             withContext(Dispatchers.IO) { runCatching { marquee.items.bazarrDownload(itemId, BazarrDownloadRequest(code, forced, hi)) } }
-                .onSuccess { queued("$name${if (forced) " (forced)" else ""}") }.onFailure { error = it.message ?: "Couldn't ask Bazarr" }
+                .onSuccess { queued("$name${if (forced) " (forced)" else ""}") }.onFailure { error = serverMessage(it, "Couldn't ask Bazarr") }
             busy = false
         }
     }
@@ -117,7 +117,7 @@ fun BazarrSection(itemId: Long, modifier: Modifier = Modifier, onQueued: () -> U
                 scope.launch {
                     // Bazarr asks every provider: this can take up to a minute.
                     withContext(Dispatchers.IO) { runCatching { marquee.items.bazarrSearch(itemId) } }
-                        .onSuccess { candidates = it }.onFailure { error = it.message ?: "The search failed" }
+                        .onSuccess { candidates = it }.onFailure { error = serverMessage(it, "The search failed") }
                     searching = false
                 }
             }, Modifier.focusRing(), enabled = !searching) {
@@ -151,7 +151,7 @@ fun BazarrSection(itemId: Long, modifier: Modifier = Modifier, onQueued: () -> U
                         busy = true
                         scope.launch {
                             withContext(Dispatchers.IO) { runCatching { marquee.items.bazarrPick(itemId, BazarrPick(c.provider, c.subtitle, c.hi, c.forced, c.originalFormat)) } }
-                                .onSuccess { queued("The ${c.provider} subtitle") }.onFailure { error = it.message ?: "Couldn't download it" }
+                                .onSuccess { queued("The ${c.provider} subtitle") }.onFailure { error = serverMessage(it, "Couldn't download it") }
                             busy = false
                         }
                     }, Modifier.focusRing().semantics { contentDescription = "Download from ${c.provider}: ${c.release ?: c.subtitle}" }, enabled = !busy) { Text("Download") }

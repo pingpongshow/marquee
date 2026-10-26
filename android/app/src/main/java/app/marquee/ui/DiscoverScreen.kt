@@ -163,7 +163,7 @@ fun DiscoverScreen(nav: NavHostController) {
         if (query.isNotBlank()) delay(350)
         runCatching { fetch(1) }
             .onSuccess { if (gen == generation) { items = it.results; page = it.page; hasMore = it.page < it.totalPages; error = null } }
-            .onFailure { error = it.message }
+            .onFailure { error = serverMessage(it) }
     }
     fun loadMore() {
         if (!hasMore || loadingMore) return
@@ -378,7 +378,7 @@ private fun RequestDialog(item: DiscoverItem, onVod: (app.marquee.api.models.Vod
                         val mt = if (isShow) MediaRequestCreate.MediaType.TV else MediaRequestCreate.MediaType.MOVIE
                         withContext(Dispatchers.IO) { runCatching { marquee.requests.createRequest(MediaRequestCreate(item.tmdbId, mt, if (isShow) seasons.sorted() else null)) } }
                             .onSuccess { onDone(true) }
-                            .onFailure { error = it.message }
+                            .onFailure { error = serverMessage(it) }
                         busy = false
                     }
                 },
@@ -399,10 +399,10 @@ fun ApprovalsScreen() {
     var reload by remember { mutableIntStateOf(0) }
     var error by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(reload) {
-        list = withContext(Dispatchers.IO) { runCatching { marquee.requests.listRequests(RequestsApi.ScopeListRequests.ALL) }.onFailure { error = it.message }.getOrNull() }
+        list = withContext(Dispatchers.IO) { runCatching { marquee.requests.listRequests(RequestsApi.ScopeListRequests.ALL) }.onFailure { error = serverMessage(it) }.getOrNull() }
     }
     fun act(work: suspend () -> Unit) = scope.launch {
-        withContext(Dispatchers.IO) { runCatching { work() }.onFailure { error = it.message } }
+        withContext(Dispatchers.IO) { runCatching { work() }.onFailure { error = serverMessage(it) } }
         reload++
     }
     androidx.compose.foundation.lazy.LazyColumn(contentPadding = PaddingValues(sidePadding), verticalArrangement = Arrangement.spacedBy(4.dp)) {

@@ -75,7 +75,7 @@ import java.time.format.FormatStyle
 
 /** "Play trailers before movies" (PLAY-18): the signed-in person's own preference. */
 @Composable
-fun TrailersPreference() {
+fun TrailersPreference(focusFirst: Boolean = false) {
     val marquee = LocalMarquee.current
     val me by marquee.me.collectAsState()
     val scope = rememberCoroutineScope()
@@ -91,9 +91,9 @@ fun TrailersPreference() {
         Switch(on, { v ->
             scope.launch {
                 withContext(Dispatchers.IO) { runCatching { marquee.auth.updateMe(MeUpdate(preferences = u.preferences.copy(cinemaTrailers = v))) } }
-                    .onSuccess { marquee.updated(it); error = null }.onFailure { error = it.message ?: "Couldn't save" }
+                    .onSuccess { marquee.updated(it); error = null }.onFailure { error = serverMessage(it, "Couldn't save") }
             }
-        }, Modifier.focusRing().semantics { contentDescription = "Play trailers before movies" })
+        }, Modifier.focusRing().initialFocus(focusFirst).semantics { contentDescription = "Play trailers before movies" })
     }
 }
 
@@ -115,7 +115,7 @@ fun NightModePreference() {
         Switch(on, { v ->
             scope.launch {
                 withContext(Dispatchers.IO) { runCatching { marquee.auth.updateMe(MeUpdate(preferences = u.preferences.copy(nightMode = v))) } }
-                    .onSuccess { marquee.updated(it); error = null }.onFailure { error = it.message ?: "Couldn't save" }
+                    .onSuccess { marquee.updated(it); error = null }.onFailure { error = serverMessage(it, "Couldn't save") }
             }
         }, Modifier.focusRing().semantics { contentDescription = "Night mode by default" })
     }
@@ -141,7 +141,7 @@ fun RatingPromptPreference() {
         Switch(on, { v ->
             scope.launch {
                 withContext(Dispatchers.IO) { runCatching { marquee.auth.updateMe(MeUpdate(preferences = u.preferences.copy(ratingPrompt = v))) } }
-                    .onSuccess { marquee.updated(it); error = null }.onFailure { error = it.message ?: "Couldn't save" }
+                    .onSuccess { marquee.updated(it); error = null }.onFailure { error = serverMessage(it, "Couldn't save") }
             }
         }, Modifier.focusRing().semantics { contentDescription = "Ask me to rate after watching" })
     }
@@ -191,7 +191,7 @@ fun ServerSettingsScreen() {
                     bazarrUrl = i.bazarrUrl.orEmpty(); bazarrKeySet = i.bazarrApiKeySet == true
                 }
                 loaded = true
-            }.onFailure { status = "Couldn't load the settings: ${it.message}" }
+            }.onFailure { status = "Couldn't load the settings: ${serverMessage(it)}" }
     }
     fun saveIntegrations() {
         scope.launch {
@@ -205,7 +205,7 @@ fun ServerSettingsScreen() {
                     seerrKeySet = st.integrations?.seerrApiKeySet == true
                     bazarrKeySet = st.integrations?.bazarrApiKeySet == true
                     "Saved."
-                }, { "Couldn't save: ${it.message}" })
+                }, { "Couldn't save: ${serverMessage(it)}" })
         }
     }
     // The picked pre-roll's title.
@@ -242,7 +242,7 @@ fun ServerSettingsScreen() {
         scope.launch {
             status = withContext(Dispatchers.IO) {
                 runCatching { marquee.settings.updateSettings(ServerSettingsUpdate(cinema = CinemaSettings(trailers, prerollId ?: 0))) }
-            }.fold({ "Saved." }, { "Couldn't save: ${it.message}" })
+            }.fold({ "Saved." }, { "Couldn't save: ${serverMessage(it)}" })
         }
     }
 
@@ -374,7 +374,7 @@ fun UsersScreen() {
     LaunchedEffect(reload) {
         withContext(Dispatchers.IO) { runCatching { marquee.users.listUsers() to marquee.users.listInvites() } }
             .onSuccess { (u, i) -> users = u; invites = i.sortedByDescending { it.createdAt }; error = null }
-            .onFailure { error = it.message }
+            .onFailure { error = serverMessage(it) }
     }
     val (friends, household) = (users ?: emptyList()).partition { it.restrictions.friend == true }
 
@@ -413,7 +413,7 @@ fun UsersScreen() {
                     IconButton({
                         scope.launch {
                             withContext(Dispatchers.IO) { runCatching { marquee.users.deleteInvite(i.id) } }
-                                .onSuccess { reload++ }.onFailure { error = it.message }
+                                .onSuccess { reload++ }.onFailure { error = serverMessage(it) }
                         }
                     }, Modifier.focusRing()) { Icon(Icons.Filled.Delete, "Delete invite $name") }
                 },
@@ -489,7 +489,7 @@ private fun InviteDialog(onDismiss: () -> Unit, onCreated: (InviteCreated) -> Un
                 scope.launch {
                     withContext(Dispatchers.IO) {
                         runCatching { marquee.users.createInvite(InviteCreate(note.trim().ifBlank { null }, days, restrictions)) }
-                    }.onSuccess(onCreated).onFailure { error = it.message ?: "Couldn't create the invite" }
+                    }.onSuccess(onCreated).onFailure { error = serverMessage(it, "Couldn't create the invite") }
                     busy = false
                 }
             }, Modifier.focusRing(), enabled = !busy && (allLibraries || picked.isNotEmpty())) { Text("Create invite") }

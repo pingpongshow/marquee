@@ -90,11 +90,11 @@ internal fun VodEpisode.progress(): Float? {
 
 /** A show's poster with its title underneath; a watched tick once every episode is watched, or how many are. */
 @Composable
-internal fun VodShowTile(s: VodSeries, width: Dp?, onOpen: () -> Unit) {
+internal fun VodShowTile(s: VodSeries, width: Dp?, autoFocus: Boolean = false, onOpen: () -> Unit) {
     val marquee = LocalMarquee.current
     Column(if (width != null) Modifier.width(width) else Modifier.fillMaxWidth()) {
         Box {
-            Artwork(marquee.absolute(s.posterUrl), s.title, Shape.Poster, Modifier.fillMaxWidth().focusCard(onOpen).inLibraryBorder(s.inLibrary)
+            Artwork(marquee.absolute(s.posterUrl), s.title, Shape.Poster, Modifier.fillMaxWidth().initialFocus(autoFocus).focusCard(onOpen).inLibraryBorder(s.inLibrary)
                 .semantics {
                     contentDescription = s.title
                     vodTileState(s.watched, s.inLibrary)?.let { stateDescription = it }
@@ -112,13 +112,13 @@ internal fun VodShowTile(s: VodSeries, width: Dp?, onOpen: () -> Unit) {
 
 /** Continue Watching for shows: the next episode's still, with the show and episode under it; opening it plays that episode. */
 @Composable
-internal fun VodNextEpisodeTile(s: VodSeries, width: Dp, actions: List<TileAction> = emptyList(), onOpen: () -> Unit) {
+internal fun VodNextEpisodeTile(s: VodSeries, width: Dp, actions: List<TileAction> = emptyList(), autoFocus: Boolean = false, onOpen: () -> Unit) {
     val marquee = LocalMarquee.current
     val e = s.nextEpisode
     var menu by remember { mutableStateOf(false) }
     Column(Modifier.width(width)) {
         Box {
-            Artwork(marquee.absolute(e?.stillUrl ?: s.posterUrl), s.title, Shape.Wide, Modifier.fillMaxWidth()
+            Artwork(marquee.absolute(e?.stillUrl ?: s.posterUrl), s.title, Shape.Wide, Modifier.fillMaxWidth().initialFocus(autoFocus)
                 .focusCard(onOpen, onLongClick = if (actions.isEmpty()) null else ({ menu = true }))
                 .inLibraryBorder(s.inLibrary)
                 .semantics {
@@ -161,7 +161,7 @@ fun VodShowScreen(nav: NavHostController, seriesId: Long) {
                 // Opens on the next episode's season, then stays where the person put it (marking watched moves "next").
                 if (season == null) season = it.nextEpisode?.season ?: it.seasons.firstOrNull()?.season
             }
-            .onFailure { if (show == null) error = it.message ?: "Couldn't load the show" }
+            .onFailure { if (show == null) error = serverMessage(it, "Couldn't load the show") }
     }
     val s = show
     if (s == null) {
@@ -172,7 +172,7 @@ fun VodShowScreen(nav: NavHostController, seriesId: Long) {
                 // The first open fetches the episodes from the source, which can take a few seconds.
                 Text("Loading the episodes…", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (!marquee.isTv) IconButton({ nav.popBackStack() }, Modifier.align(Alignment.TopStart).padding(4.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+            if (!marquee.isTv) FloatingBack({ nav.popBackStack() }, Modifier.align(Alignment.TopStart))
         }
         return
     }
@@ -312,7 +312,7 @@ fun VodShowScreen(nav: NavHostController, seriesId: Long) {
                 }
             }
         }
-        if (!marquee.isTv) IconButton({ nav.popBackStack() }, Modifier.padding(4.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+        if (!marquee.isTv) FloatingBack({ nav.popBackStack() })
     }
 }
 

@@ -66,7 +66,7 @@ internal fun profileNeeds(p: Profile, isAdmin: Boolean): Profile.Requires =
 private fun switchError(e: Throwable): String = when ((e as? ClientException)?.statusCode) {
     429 -> "Too many tries. Wait a minute and try again."
     401, 403 -> "That didn't work. Try again."
-    else -> e.message ?: "Couldn't switch profile"
+    else -> serverMessage(e, "Couldn't switch profile")
 }
 
 /**
@@ -122,6 +122,7 @@ fun ProfileSwitcher(nav: NavHostController, onDismiss: () -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var asking by remember { mutableStateOf<Profile?>(null) }
+    var confirmSignOut by remember { mutableStateOf(false) }
     val profiles by produceState<Result<List<Profile>>?>(null) {
         value = withContext(Dispatchers.IO) { runCatching { marquee.users.listProfiles() } }
     }
@@ -156,7 +157,7 @@ fun ProfileSwitcher(nav: NavHostController, onDismiss: () -> Unit) {
                 val list = profiles
                 when {
                     list == null || busy -> CircularProgressIndicator(Modifier.padding(24.dp))
-                    list.isFailure -> Text(list.exceptionOrNull()?.message ?: "Couldn't load profiles", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error)
+                    list.isFailure -> Text(list.exceptionOrNull()?.let { serverMessage(it) } ?: "Couldn't load profiles", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error)
                     else -> FlowRow(
                         Modifier.padding(vertical = 20.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -186,16 +187,33 @@ fun ProfileSwitcher(nav: NavHostController, onDismiss: () -> Unit) {
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton({ onDismiss(); nav.navigate("settings") { launchSingleTop = true } }, Modifier.focusRing()) { Text("Account settings") }
-                    TextButton({ onDismiss(); marquee.scope.launch { marquee.signOut() } }, Modifier.focusRing()) { Text("Sign out") }
+                    TextButton({ confirmSignOut = true }, Modifier.focusRing()) { Text("Sign out") }
                 }
             }
         }
     }
 
+    if (confirmSignOut) SignOutDialog(onDismiss = { confirmSignOut = false }, onSignedOut = onDismiss)
     asking?.let { p ->
         val pin = profileNeeds(p, isAdmin) == Profile.Requires.PIN
         SecretDialog(title = p.displayName, label = if (pin) "PIN" else "Password", numeric = pin, onDismiss = { asking = null }) { secret, _ ->
             runCatching { if (pin) switchTo(p, secret, null) else switchTo(p, null, secret) }.exceptionOrNull()?.let(::switchError)
         }
     }
+}
+
+/**
+ * Sign out, once confirmed: on a TV remote it's one press away from Switch profile and the
+ * page's other buttons, and signing in again needs the password (or Quick Connect).
+ */
+@Composable
+internal fun SignOutDialog(onDismiss: () -> Unit, onSignedOut: () -> Unit = {}) {
+    val marquee = LocalMarquee.current
+    val me by marquee.me.collectAsState()
+    androidx.compose.material3.AlertDialog(onDismissRequest = onDismiss,
+        title = { Text("Sign out${me?.displayName?.let { " $it" } ?: ""}?") },
+        text = { Text("This device goes back to Who's watching." + if (marquee.isTv) "" else " Downloads stay on it.") },
+        confirmButton = { TextButton({ onDismiss(); onSignedOut(); marquee.scope.launch { marquee.signOut() } }, Modifier.focusRing()) { Text("Sign out") } },
+        // Cancel first under the D-pad, so a stray press of OK doesn't sign out.
+        dismissButton = { TextButton(onDismiss, Modifier.focusRing().initialFocus(marquee.isTv)) { Text("Cancel") } })
 }

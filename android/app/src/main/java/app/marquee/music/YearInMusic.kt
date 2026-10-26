@@ -1,6 +1,7 @@
 package app.marquee.music
 
 import android.widget.Toast
+import app.marquee.ui.serverMessage
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -154,7 +155,7 @@ fun RecapScreen(nav: NavHostController, year: Int) {
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         when {
             r == null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-            r.isFailure -> Text("Couldn't load your year: ${r.exceptionOrNull()?.message}", Modifier.align(Alignment.Center).padding(24.dp), color = MaterialTheme.colorScheme.error)
+            r.isFailure -> Text("Couldn't load your year: ${r.exceptionOrNull()?.let { serverMessage(it) }}", Modifier.align(Alignment.Center).padding(24.dp), color = MaterialTheme.colorScheme.error)
             r.getOrThrow().plays == 0 -> Text("Nothing played in $year yet.", Modifier.align(Alignment.Center), color = Color.White)
             else -> Story(nav, r.getOrThrow())
         }
@@ -191,7 +192,7 @@ private fun Story(nav: NavHostController, r: ListeningRecap) {
             saving = false
             p.onSuccess { pl ->
                 if (snackbar.showSnackbar("Saved “${pl.title}”", actionLabel = "Open") == SnackbarResult.ActionPerformed) nav.navigate("playlist/${pl.id}")
-            }.onFailure { snackbar.showSnackbar("Couldn't save the playlist: ${it.message}") }
+            }.onFailure { snackbar.showSnackbar("Couldn't save the playlist: ${serverMessage(it)}") }
         }
     }
 

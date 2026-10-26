@@ -74,7 +74,7 @@ fun AddToPlaylistDialog(itemId: Long, music: Boolean, onDone: () -> Unit) {
         scope.launch {
             runCatching { withContext(Dispatchers.IO) { work() } }
                 .onSuccess { done = label }
-                .onFailure { error = it.message ?: "That didn't work" }
+                .onFailure { error = serverMessage(it, "That didn't work") }
             busy = false
         }
     }

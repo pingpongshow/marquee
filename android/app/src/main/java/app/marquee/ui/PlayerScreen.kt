@@ -71,6 +71,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -137,9 +138,9 @@ private val qualities = listOf<Pair<String, Int?>>(
 )
 
 /** Playback speeds offered in the player (PLAY-19). */
-private val speeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+internal val speeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
 
-private fun speedLabel(s: Float) = (if (s == s.toInt().toFloat()) s.toInt().toString() else s.toString()) + "×"
+internal fun speedLabel(s: Float) = (if (s == s.toInt().toFloat()) s.toInt().toString() else s.toString()) + "×"
 
 /** Subtitle and audio timing limits and step (PLAY-17), ms. */
 private const val maxOffset = 30_000
@@ -289,7 +290,7 @@ fun PlayerScreen(nav: NavHostController, itemId: Long, startMs: Long?, groupId: 
             }
             .onFailure { e ->
                 val limit = app.marquee.core.TimeLimitRules.reason(e)
-                if (limit != null) timeUp(limit) else error = e.message ?: "Couldn't start playback"
+                if (limit != null) timeUp(limit) else error = serverMessage(e, "Couldn't start playback")
             }
     }
 
@@ -746,10 +747,13 @@ private fun PlayerSettings(
     val curSub = if (choice.subtitle == -1L) null else choice.subtitle ?: session?.subtitleStreamId
     val subOffset = choice.subOffset ?: session?.subtitleOffsetMs ?: 0
     val audioOffset = choice.audioOffset ?: session?.audioOffsetMs ?: 0
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)).clickable(remember { MutableInteractionSource() }, null, onClick = onClose)) {
+    // Back closes the panel (not the player), on phones and TVs alike. The scrim and the panel catch
+    // taps but never the D-pad's focus, which would go somewhere unseen.
+    Box(Modifier.fillMaxSize().closeOnBack(onClose).background(Color.Black.copy(alpha = 0.6f)).focusProperties { canFocus = false }
+        .clickable(remember { MutableInteractionSource() }, null, onClick = onClose)) {
         LazyColumn(
             Modifier.align(Alignment.CenterEnd).width(340.dp).fillMaxSize().background(MaterialTheme.colorScheme.surface).padding(vertical = 16.dp)
-                .clickable(remember { MutableInteractionSource() }, null) {},
+                .focusProperties { canFocus = false }.clickable(remember { MutableInteractionSource() }, null) {},
         ) {
             item { Text("Playback", Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
             if ((detail?.versions?.size ?: 0) > 1) {
@@ -797,6 +801,17 @@ private fun PlayerSettings(
     }
 }
 
+/** Back closes a panel over the player: as a key (TV, where Compose would otherwise only move the focus out) and as a gesture. */
+@Composable
+internal fun Modifier.closeOnBack(onClose: () -> Unit): Modifier {
+    androidx.activity.compose.BackHandler(onBack = onClose)
+    return onPreviewKeyEvent { e ->
+        if (e.nativeKeyEvent.keyCode != android.view.KeyEvent.KEYCODE_BACK) return@onPreviewKeyEvent false
+        if (e.type == KeyEventType.KeyUp) onClose()
+        true
+    }
+}
+
 /** A timing offset: earlier and later by 100 ms, the value, and Reset. Positive = later. */
 @Composable
 private fun Timing(label: String, ms: Int, onChange: (Int) -> Unit) {
@@ -811,10 +826,10 @@ private fun Timing(label: String, ms: Int, onChange: (Int) -> Unit) {
 }
 
 @Composable
-private fun Heading(t: String) = Text(t.uppercase(), Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp), style = MaterialTheme.typography.labelMedium, color = Gold)
+internal fun Heading(t: String) = Text(t.uppercase(), Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp), style = MaterialTheme.typography.labelMedium, color = Gold)
 
 @Composable
-private fun Option(label: String, selected: Boolean, first: Boolean = false, onClick: () -> Unit) {
+internal fun Option(label: String, selected: Boolean, first: Boolean = false, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().initialFocus(first).focusCard(onClick).semantics { this.selected = selected }.padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -870,14 +885,15 @@ private fun FindSubtitles(itemId: Long, bazarr: Boolean, onClose: () -> Unit, on
     var error by remember { mutableStateOf<String?>(null) }
     val results by androidx.compose.runtime.produceState<List<app.marquee.api.models.SubtitleResult>?>(null) {
         value = withContext(Dispatchers.IO) {
-            runCatching { marquee.playback.searchSubtitles(itemId, if (lang == "en") "en" else "$lang,en") }.onFailure { error = it.message }.getOrDefault(emptyList())
+            runCatching { marquee.playback.searchSubtitles(itemId, if (lang == "en") "en" else "$lang,en") }.onFailure { error = serverMessage(it) }.getOrDefault(emptyList())
         }
     }
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)).clickable(remember { MutableInteractionSource() }, null, onClick = onClose)) {
+    Box(Modifier.fillMaxSize().closeOnBack(onClose).background(Color.Black.copy(alpha = 0.6f)).focusProperties { canFocus = false }
+        .clickable(remember { MutableInteractionSource() }, null, onClick = onClose)) {
         LazyColumn(
             Modifier.align(Alignment.CenterEnd).width(380.dp).fillMaxSize().background(MaterialTheme.colorScheme.surface).padding(vertical = 16.dp)
                 .semantics { contentDescription = "Find subtitles panel" }
-                .clickable(remember { MutableInteractionSource() }, null) {},
+                .focusProperties { canFocus = false }.clickable(remember { MutableInteractionSource() }, null) {},
         ) {
             item { Text("Find subtitles", Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
             // Bazarr first, when it manages this title (META-12).
@@ -894,7 +910,7 @@ private fun FindSubtitles(itemId: Long, bazarr: Boolean, onClose: () -> Unit, on
                     scope.launch {
                         withContext(Dispatchers.IO) {
                             runCatching { marquee.playback.downloadSubtitle(itemId, app.marquee.api.models.DownloadSubtitleRequest(r.fileId, r.language, r.release, r.hearingImpaired)).streamId }
-                        }.onSuccess(onDownloaded).onFailure { error = it.message; busy = false }
+                        }.onSuccess(onDownloaded).onFailure { error = serverMessage(it); busy = false }
                     }
                 }).padding(horizontal = 16.dp, vertical = 10.dp)) {
                     Text(r.release, maxLines = 2, fontWeight = if (r.hashMatch) FontWeight.Bold else FontWeight.Normal)

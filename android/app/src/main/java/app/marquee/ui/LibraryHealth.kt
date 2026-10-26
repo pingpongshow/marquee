@@ -72,7 +72,7 @@ fun LibraryHealthScreen(nav: NavHostController) {
     var error by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) { runCatching { marquee.libraries.libraryHealth() } }
-            .onSuccess { checks = it }.onFailure { error = it.message }
+            .onSuccess { checks = it }.onFailure { error = serverMessage(it) }
     }
     LazyColumn(contentPadding = PaddingValues(vertical = 16.dp)) {
         item { Text("Library Health", Modifier.padding(horizontal = sidePadding, vertical = 8.dp), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
@@ -134,7 +134,7 @@ fun HealthIssuesScreen(nav: NavHostController, checkId: String) {
         scope.launch {
             withContext(Dispatchers.IO) { runCatching { marquee.libraries.libraryHealthIssues(checkId, offset, 50) } }
                 .onSuccess { p -> issues.addAll(p.items.filter { n -> issues.none { it.item.id == n.item.id && it.fileId == n.fileId } }); total = p.total; offset = p.offset + p.items.size }
-                .onFailure { error = it.message }
+                .onFailure { error = serverMessage(it) }
             loading = false
         }
     }
@@ -153,13 +153,13 @@ fun HealthIssuesScreen(nav: NavHostController, checkId: String) {
         issues.remove(issue)
         scope.launch {
             val ok = withContext(Dispatchers.IO) { runCatching { marquee.libraries.ignoreHealthIssue(checkId, issue.item.id) } }
-            if (ok.isFailure) { issues.add(at.coerceIn(0, issues.size), issue); snackbar.showSnackbar("Couldn't ignore it: ${ok.exceptionOrNull()?.message}"); return@launch }
+            if (ok.isFailure) { issues.add(at.coerceIn(0, issues.size), issue); snackbar.showSnackbar("Couldn't ignore it: ${ok.exceptionOrNull()?.let { serverMessage(it) }}"); return@launch }
             // It's gone from the server's list: the next page starts one earlier, and there's one fewer.
             offset = (offset - 1).coerceAtLeast(0); if (total > 0) total--
             if (snackbar.showSnackbar("Ignored “${issue.item.title}”", actionLabel = "Undo", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) {
                 withContext(Dispatchers.IO) { runCatching { marquee.libraries.unignoreHealthIssue(checkId, issue.item.id) } }
                     .onSuccess { issues.add(at.coerceIn(0, issues.size), issue); offset++; if (total >= 0) total++ }
-                    .onFailure { snackbar.showSnackbar("Couldn't undo: ${it.message}") }
+                    .onFailure { snackbar.showSnackbar("Couldn't undo: ${serverMessage(it)}") }
             }
         }
     }
@@ -177,7 +177,7 @@ fun HealthIssuesScreen(nav: NavHostController, checkId: String) {
     }
     fun refresh(issue: HealthIssue) = scope.launch {
         val r = withContext(Dispatchers.IO) { runCatching { marquee.items.refreshItem(issue.item.id) } }
-        snackbar.showSnackbar(if (r.isSuccess) "Refreshing “${issue.item.title}”" else "Couldn't refresh: ${r.exceptionOrNull()?.message}")
+        snackbar.showSnackbar(if (r.isSuccess) "Refreshing “${issue.item.title}”" else "Couldn't refresh: ${r.exceptionOrNull()?.let { serverMessage(it) }}")
     }
 
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }, containerColor = MaterialTheme.colorScheme.background,

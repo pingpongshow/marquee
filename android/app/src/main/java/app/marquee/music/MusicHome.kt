@@ -1,6 +1,10 @@
 package app.marquee.music
 
 import android.widget.Toast
+import app.marquee.ui.serverMessage
+import app.marquee.ui.inRowFirst
+import app.marquee.ui.rememberInRowFocus
+import app.marquee.ui.rowFocus
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -177,17 +182,18 @@ fun MusicHome(nav: NavHostController, library: Library) {
         }
     }
     // The Library list's counts, loaded after the shelves.
-    val counts by produceState(emptyMap<ItemType, Int>(), lib) {
-        value = withContext(Dispatchers.IO) {
+    val loadedCounts by app.marquee.ui.cachedLoad<Map<ItemType, Int>>("musichome-$lib-counts", lib) {
+        withContext(Dispatchers.IO) {
             listOf(ItemType.ARTIST, ItemType.ALBUM, ItemType.TRACK).mapNotNull { t ->
                 runCatching { t to marquee.items.listLibraryItems(lib, t, limit = 1).total }.getOrNull()
             }.toMap()
         }
     }
+    val counts = loadedCounts ?: emptyMap()
     fun start(what: String, work: suspend () -> Unit) {
         scope.launch {
             // The failure can arrive off the main thread (after withContext), where Toast.makeText throws.
-            runCatching { work() }.onFailure { if (it !is kotlinx.coroutines.CancellationException) app.marquee.ui.toast(context, it.message ?: "Couldn't start $what", long = true) }
+            runCatching { work() }.onFailure { if (it !is kotlinx.coroutines.CancellationException) app.marquee.ui.toast(context, serverMessage(it, "Couldn't start $what"), long = true) }
         }
     }
     val card = if (marquee.isTv) 130.dp else 120.dp
@@ -223,7 +229,9 @@ fun MusicHome(nav: NavHostController, library: Library) {
             }
             Row(Modifier.fillMaxWidth().padding(horizontal = sidePadding).semantics { contentDescription = "Quick actions" },
                 horizontalArrangement = Arrangement.spacedBy(if (marquee.isTv) 28.dp else 8.dp, if (marquee.isTv) Alignment.Start else Alignment.CenterHorizontally)) {
-                actions.forEachIndexed { i, (label, icon, go) -> QuickAction(label, icon, go, Modifier.weight(1f, fill = !marquee.isTv), focus = marquee.isTv && i == 0) }
+                actions.forEachIndexed { i, (label, icon, go) -> QuickAction(label, icon, go,
+                    // TV: each as wide as its label needs (a weight squeezed "Shuffle All" to "huffle Al").
+                    if (marquee.isTv) Modifier.widthIn(min = 96.dp) else Modifier.weight(1f), focus = marquee.isTv && i == 0) }
             }
         }
 
@@ -449,18 +457,19 @@ private fun PagedMusic(nav: NavHostController, libraryId: Long, kind: MusicBrows
         LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
             itemsIndexed(items, key = { _, it -> it.id }) { i, t ->
                 if (i >= items.size - 30) LaunchedEffect(i) { loadMore() }
+                val inRow = rememberInRowFocus()
                 ListItem(
                     headlineContent = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     supportingContent = { Text(subtitleFor(t), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     leadingContent = { Artwork(marquee.imageUrl(t.images?.poster, 120), t.title, Shape.Square, Modifier.width(44.dp)) },
                     trailingContent = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            app.marquee.ui.FavoriteButton(t, small = true)
+                            app.marquee.ui.FavoriteButton(t, Modifier.inRowFirst(inRow), small = true)
                             TrackRating(t)
                         }
                     },
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                    modifier = Modifier.initialFocus(first(i, t.id)).focusCard({ opened = t.id; music.play(items.toList(), i, source = "Songs") }),
+                    modifier = Modifier.initialFocus(first(i, t.id)).rowFocus(inRow).focusCard({ opened = t.id; music.play(items.toList(), i, source = "Songs") }),
                 )
             }
         }
@@ -532,7 +541,7 @@ private fun FavoritesList(nav: NavHostController, libraryId: Long, type: ItemTyp
     }
     val source = if (rated) "Rated 4★+" else "Favourite songs"
     val l = list ?: return Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-    val items = l.getOrElse { Text("Couldn't load favourites: ${it.message}", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.error); return }
+    val items = l.getOrElse { Text("Couldn't load favourites: ${serverMessage(it)}", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.error); return }
     if (items.isEmpty()) {
         Text(if (rated) "Nothing here yet. $label you rate 4 stars or more show up here; rate them with the stars on their page or in Now Playing."
             else "Nothing here yet. $label you heart show up here; tap the heart on a page, a song or in Now Playing.",
@@ -552,6 +561,7 @@ private fun FavoritesList(nav: NavHostController, libraryId: Long, type: ItemTyp
                 }
             }
             itemsIndexed(items, key = { _, it -> it.id }) { i, t ->
+                val inRow = rememberInRowFocus()
                 ListItem(
                     headlineContent = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     supportingContent = { Text(subtitleFor(t), maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -559,12 +569,12 @@ private fun FavoritesList(nav: NavHostController, libraryId: Long, type: ItemTyp
                     trailingContent = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             app.marquee.ui.CommunityScore(t.communityRating, Modifier.padding(end = 4.dp))
-                            app.marquee.ui.FavoriteButton(t, small = true)
+                            app.marquee.ui.FavoriteButton(t, Modifier.inRowFirst(inRow), small = true)
                             TrackRating(t)
                         }
                     },
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                    modifier = Modifier.focusCard({ music.play(items, i, source = source) }),
+                    modifier = Modifier.rowFocus(inRow).focusCard({ music.play(items, i, source = source) }),
                 )
             }
         }
@@ -635,7 +645,7 @@ private fun DecadesPage(libraryId: Long) {
                 modifier = Modifier.initialFocus(marquee.isTv && i == 0).focusCard({
                     scope.launch {
                         runCatching { music.startRadio(RadioRequest(RadioRequest.Seed.DECADE, value = dec, libraryId = libraryId)) }
-                            .onFailure { app.marquee.ui.toast(context, it.message ?: "Couldn't start the radio", long = true) }
+                            .onFailure { app.marquee.ui.toast(context, serverMessage(it, "Couldn't start the radio"), long = true) }
                     }
                 }),
             )

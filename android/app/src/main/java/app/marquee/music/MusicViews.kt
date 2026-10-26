@@ -1,6 +1,7 @@
 package app.marquee.music
 
 import androidx.compose.ui.text.style.TextOverflow
+import app.marquee.ui.serverMessage
 
 import androidx.compose.material3.TextButton
 
@@ -108,15 +109,20 @@ val museSuggestions = listOf("Rainy Sunday jazz", "Late-night drive synthwave", 
 
 /** What the music home and the Muse page need from the server: analysis status, mixes and the library's decades and styles. */
 class MusicDiscoverData(val status: MusicStatus?, val mixes: List<Station>, val decades: List<String>, val styles: List<String> = emptyList()) {
-    /** Soundprint is on, so radios, Muse, moods and mixes work. */
-    val enabled get() = status?.enabled == true
+    /**
+     * Soundprint is on and has analysed some music, so radios, Muse, moods and mixes work. On with
+     * nothing analysed yet they could only fail (as on the Apple apps, they show once there is).
+     */
+    val enabled get() = status?.let { it.enabled && it.analyzed > 0 } == true
 }
 
 @Composable
 fun rememberMusicDiscoverData(libraryId: Long): MusicDiscoverData? {
     val marquee = LocalMarquee.current
-    val data by produceState<MusicDiscoverData?>(null, libraryId) {
-        value = withContext(Dispatchers.IO) {
+    // Kept while the page is on the back stack: the music home's rows are there at once on coming
+    // back, so its list keeps its place instead of shifting as they load again.
+    val data by app.marquee.ui.cachedLoad<MusicDiscoverData>("music-discover-$libraryId", libraryId) {
+        withContext(Dispatchers.IO) {
             val st = runCatching { marquee.music.musicStatus() }.getOrNull()
             if (st?.enabled != true) MusicDiscoverData(st, emptyList(), emptyList())
             else {
@@ -147,8 +153,9 @@ fun MusicDiscover(libraryId: Long, d: MusicDiscoverData, onOpenPlaylist: ((Long)
     var savingMix by remember { mutableStateOf(false) }
     var savedMix by remember { mutableStateOf<app.marquee.api.models.Playlist?>(null) }
     val st = d.status
-    if (st == null || !st.enabled) {
-        Text("Muse and stations need the Soundprint analysis service, which isn't turned on.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (st == null || !d.enabled) {
+        Text(if (st?.enabled == true) "Muse and stations start once Soundprint has analysed some of your music."
+            else "Muse and stations need the Soundprint analysis service, which isn't turned on.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         return
     }
 
@@ -157,7 +164,7 @@ fun MusicDiscover(libraryId: Long, d: MusicDiscoverData, onOpenPlaylist: ((Long)
         busy = true
         error = null
         scope.launch {
-            runCatching { work() }.onFailure { error = it.message ?: "Couldn't start that" }
+            runCatching { work() }.onFailure { error = serverMessage(it, "Couldn't start that") }
             busy = false
         }
     }

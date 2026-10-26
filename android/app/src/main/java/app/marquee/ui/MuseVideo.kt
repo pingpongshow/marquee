@@ -108,7 +108,7 @@ fun MuseVideoPanel(nav: NavHostController, libraryId: Long?, focusPrompt: Boolea
         scope.launch {
             withContext(Dispatchers.IO) { runCatching { marquee.items.museVideo(MuseVideoRequest(p, libraryId = libraryId, includeVod = canVod && includeVod)) } }
                 .onSuccess { r -> results = r.items; vodResults = r.vod.orEmpty(); vodHidden.clear(); understood = r.understood; analysed = r.analysed; asked = p }
-                .onFailure { error = it.message ?: "Muse couldn't answer that" }
+                .onFailure { error = serverMessage(it, "Muse couldn't answer that") }
             busy = false
         }
     }
@@ -119,7 +119,7 @@ fun MuseVideoPanel(nav: NavHostController, libraryId: Long?, focusPrompt: Boolea
         scope.launch {
             withContext(Dispatchers.IO) {
                 runCatching { marquee.playlists.createPlaylist(PlaylistCreate("Muse: ${asked.take(60)}", PlaylistKind.VIDEO, itemIds = list.map { it.id })) }
-            }.onSuccess { saved = it.id to it.title }.onFailure { error = "Couldn't save the playlist: ${it.message}" }
+            }.onSuccess { saved = it.id to it.title }.onFailure { error = "Couldn't save the playlist: ${serverMessage(it)}" }
             saving = false
         }
     }

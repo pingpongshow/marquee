@@ -100,7 +100,7 @@ fun removeVodContinue(marquee: Marquee, context: Context, kind: HubsApi.KindRemo
     marquee.scope.launch {
         withContext(Dispatchers.IO) { runCatching { marquee.hubs.removeVodFromContinueWatching(kind, id) } }
             .onSuccess { withContext(Dispatchers.Main) { onRemoved() }; marquee.watch.changed(); VodChanges.bump() }
-            .onFailure { withContext(Dispatchers.Main) { onFailed(); toast(context, "Couldn't remove “$title”: ${it.message ?: ""}") } }
+            .onFailure { withContext(Dispatchers.Main) { onFailed(); toast(context, "Couldn't remove “$title”: ${serverMessage(it, "")}") } }
     }
 }
 
@@ -125,7 +125,7 @@ fun setVodWatched(marquee: Marquee, context: Context, kind: HubsApi.KindRemoveVo
             }
         }
             .onSuccess { withContext(Dispatchers.Main) { onDone() }; marquee.watch.changed(); VodChanges.bump() }
-            .onFailure { withContext(Dispatchers.Main) { toast(context, "Couldn't update “$title”: ${it.message ?: ""}") } }
+            .onFailure { withContext(Dispatchers.Main) { toast(context, "Couldn't update “$title”: ${serverMessage(it, "")}") } }
     }
 }
 
@@ -276,7 +276,7 @@ fun ContinueWatchingScreen(nav: NavHostController) {
                         page.entries.addAll(p.propertyEntries.filter { it.key !in have }); page.total = p.total; page.error = null
                     }
                 }
-                .onFailure { if (gen == page.generation) page.error = it.message ?: "Couldn't load" }
+                .onFailure { if (gen == page.generation) page.error = serverMessage(it, "Couldn't load") }
             if (gen == page.generation) page.loading = false
         }
     }
@@ -289,7 +289,7 @@ fun ContinueWatchingScreen(nav: NavHostController) {
             .onSuccess { p ->
                 if (gen == page.generation) { page.entries.clear(); page.entries.addAll(p.propertyEntries); page.total = p.total; page.error = null; removed.clear() }
             }
-            .onFailure { if (gen == page.generation && page.total < 0) page.error = it.message ?: "Couldn't load" }
+            .onFailure { if (gen == page.generation && page.total < 0) page.error = serverMessage(it, "Couldn't load") }
         if (gen == page.generation) page.loading = false
     }
     val width = if (marquee.isTv) 240.dp else 168.dp

@@ -134,7 +134,7 @@ internal fun vodStartError(e: Throwable, what: String): String {
     return when (code) {
         502 -> "The source couldn't play this $what just now. Try again in a moment."
         503 -> "The source is busy (it allows only so many streams at once). Try again shortly."
-        else -> e.message ?: "Couldn't start the $what"
+        else -> serverMessage(e, "Couldn't start the $what")
     }
 }
 

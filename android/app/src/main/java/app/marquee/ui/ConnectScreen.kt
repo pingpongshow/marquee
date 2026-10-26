@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -48,6 +49,9 @@ fun ConnectScreen() {
     val context = LocalContext.current
     val found by remember { discoverServers(context) }.collectAsState(initial = emptyList())
     var address by remember { mutableStateOf("") }
+    // TV: the address field waits behind a button, so focusing it can't open the keyboard over the
+    // servers found (it took the focus first, before any were listed).
+    var typing by remember { mutableStateOf(!marquee.isTv) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -55,7 +59,7 @@ fun ConnectScreen() {
         busy = true
         error = null
         scope.launch {
-            runCatching { marquee.addServer(url) }.onFailure { error = it.message }
+            runCatching { marquee.addServer(url) }.onFailure { error = serverMessage(it) }
             busy = false
         }
     }
@@ -69,8 +73,8 @@ fun ConnectScreen() {
         Text("Choose your server", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp, bottom = 24.dp))
         Column(Modifier.widthIn(max = 520.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (found.isEmpty()) Text("Looking on your network…", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            found.forEach { s ->
-                Card(Modifier.fillMaxWidth().focusCard({ connect(s.url) })) {
+            found.forEachIndexed { i, s ->
+                Card(Modifier.fillMaxWidth().initialFocus(marquee.isTv && i == 0).focusCard({ connect(s.url) })) {
                     Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         Icon(Icons.Filled.Dns, contentDescription = null, tint = Gold)
                         Column {
@@ -80,14 +84,16 @@ fun ConnectScreen() {
                     }
                 }
             }
-            OutlinedTextField(
+            if (!typing) OutlinedButton({ typing = true }, Modifier.fillMaxWidth().padding(top = 12.dp).focusRing()) { Text("Enter the server's address") }
+            else OutlinedTextField(
                 value = address, onValueChange = { address = it }, singleLine = true,
                 label = { Text("Home address, e.g. 192.168.1.20:32500") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
                 keyboardActions = KeyboardActions(onGo = { if (address.isNotBlank()) connect(address) }),
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                // Opened from the TV's button: straight into the field, with its keyboard.
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp).initialFocus(marquee.isTv),
             )
-            Button(onClick = { connect(address) }, enabled = address.isNotBlank() && !busy, modifier = Modifier.fillMaxWidth()) {
+            if (typing) Button(onClick = { connect(address) }, enabled = address.isNotBlank() && !busy, modifier = Modifier.fillMaxWidth().focusRing()) {
                 if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("Connect")
             }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }

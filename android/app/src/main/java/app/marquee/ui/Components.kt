@@ -15,6 +15,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.automirrored.filled.StarHalf
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ChevronRight
@@ -39,6 +43,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -83,9 +88,13 @@ fun shapeFor(item: ItemSummary): Shape = when (item.type) {
 @Composable
 fun Modifier.focusCard(onClick: () -> Unit, shape: RoundedCornerShape = RoundedCornerShape(8.dp), onLongClick: (() -> Unit)? = null): Modifier {
     var focused by remember { mutableStateOf(false) }
-    val s by animateFloatAsState(if (focused) 1.06f else 1f, label = "focus")
+    // Posters grow 6%; a full-width row only by about 24dp in all, so it doesn't run off the screen's edge.
+    var width by remember { mutableIntStateOf(0) }
+    val grow = with(androidx.compose.ui.platform.LocalDensity.current) { 24.dp.toPx() }
+    val s by animateFloatAsState(if (focused) 1f + (if (width > 0) minOf(0.06f, grow / width) else 0.06f) else 1f, label = "focus")
     var heldCentre by remember { mutableStateOf(false) }
     val base = this
+        .onSizeChanged { width = it.width }
         .scale(s)
         .onFocusChanged { focused = it.isFocused }
         .clip(shape)
@@ -136,7 +145,13 @@ fun Artwork(url: String?, title: String, shape: Shape, modifier: Modifier = Modi
             .background(Brush.linearGradient(listOf(Color(0xFF2A2A36), Color(0xFF15151B)))),
         contentAlignment = Alignment.BottomStart,
     ) {
-        Text(title, Modifier.padding(8.dp), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.8f), maxLines = 3)
+        // Too small for the title (a song row's thumbnail): its first letter, rather than a word split mid-way.
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.matchParentSize()) {
+            if (maxWidth < 72.dp) Text(title.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "", Modifier.align(Alignment.Center),
+                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = 0.6f))
+            else Text(title, Modifier.align(Alignment.BottomStart).padding(8.dp), style = MaterialTheme.typography.labelMedium,
+                color = Color.White.copy(alpha = 0.8f), maxLines = 3, overflow = TextOverflow.Ellipsis)
+        }
         if (url != null) AsyncImage(url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
     }
 }
@@ -300,5 +315,30 @@ fun PlaylistMosaic(imageIds: List<Long>, title: String, modifier: Modifier = Mod
                 }
             }
         }
+    }
+}
+
+/**
+ * A list row whose own small buttons (a heart, the stars) sit inside it. The D-pad looks for the
+ * next focus beside the focused row, so on TV it could never reach them: Right from the row goes
+ * to the first of them ([inRowFirst]), and Left from that one back to the row.
+ */
+class InRowFocus {
+    val row = FocusRequester()
+    val first = FocusRequester()
+}
+
+@Composable
+fun rememberInRowFocus() = remember { InRowFocus() }
+
+fun Modifier.rowFocus(f: InRowFocus) = focusRequester(f.row).focusProperties { right = f.first }
+
+fun Modifier.inRowFirst(f: InRowFocus) = focusRequester(f.first).focusProperties { left = f.row }
+
+/** A page's own Back (phones), floating over its top corner: on a backing, so the page scrolling under it can't show through. */
+@Composable
+fun FloatingBack(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    IconButton(onClick, modifier.padding(4.dp).background(MaterialTheme.colorScheme.background.copy(alpha = 0.75f), androidx.compose.foundation.shape.CircleShape)) {
+        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
     }
 }

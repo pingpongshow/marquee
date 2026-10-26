@@ -301,6 +301,6 @@ fun VodFollowsScreen(nav: NavHostController) {
                 }
             }
         }
-        if (!marquee.isTv) IconButton({ nav.popBackStack() }, Modifier.padding(4.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+        if (!marquee.isTv) FloatingBack({ nav.popBackStack() })
     }
 }

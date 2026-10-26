@@ -69,7 +69,7 @@ fun HomeHubScreen(nav: NavHostController, hubId: String) {
         withContext(Dispatchers.IO) { runCatching { marquee.hubs.homeHub(hubId, mixed = true, limit = HOME_HUB_LIMIT) } }
             .onSuccess { page.hub = it; page.error = null }
             // A failed refresh keeps what's shown.
-            .onFailure { if (page.hub == null) page.error = it.message ?: "Couldn't load" }
+            .onFailure { if (page.hub == null) page.error = serverMessage(it, "Couldn't load") }
     }
     val hub = page.hub
     val entries = hub?.let(::homeHubEntries).orEmpty().filter { e ->

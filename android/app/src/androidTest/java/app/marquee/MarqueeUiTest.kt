@@ -101,11 +101,25 @@ class MarqueeUiTest {
 
     private fun back() = scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
 
-    private fun connectAndSignIn() {
+    /** A Settings page's button: scrolled into view first (on a phone they sit below Link a TV, off the screen). */
+    private fun openSetting(name: String) {
+        rule.waitText(name)
+        rule.onAllNodes(hasText(name) and hasClickAction()).onFirst().performScrollTo().performClick()
+    }
+
+    /** Types the server's address on the Connect screen and connects (TV: the field opens from its button). */
+    private fun enterServer() {
+        rule.waitUntilAtLeastOneExists(hasSetTextAction() or hasText("Enter the server's address"), 10_000)
+        if (rule.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().isEmpty()) tap("Enter the server's address")
         rule.waitUntilAtLeastOneExists(hasSetTextAction(), 10_000)
-        shot("01-connect")
         rule.onNode(hasSetTextAction()).performTextInput(server)
         rule.onNodeWithText("Connect").performClick()
+    }
+
+    private fun connectAndSignIn() {
+        rule.waitUntilAtLeastOneExists(hasSetTextAction() or hasText("Enter the server's address"), 10_000)
+        shot("01-connect")
+        enterServer()
         rule.waitText("Who's watching?")
         shot("02-who-is-watching")
         tap(profile)
@@ -187,6 +201,7 @@ class MarqueeUiTest {
      */
     @Test fun musicFeatures() {
         connectAndSignIn()
+        assumeTrue("Soundprint has analysed the test music", soundprintReady())
         openLibrary("Music")
         rule.waitText("Muse", 20_000)
         tap("Muse")
@@ -263,7 +278,13 @@ class MarqueeUiTest {
         key(KeyEvent.KEYCODE_DPAD_CENTER)
         rule.waitText("Seasons")
         shot("t1-show")
-        key(KeyEvent.KEYCODE_DPAD_DOWN) // Play → Season 1
+        // Down from Play to Season 1, past the header's buttons when they wrap onto a second line.
+        val season = isFocused() and (hasText("Season 1") or androidx.compose.ui.test.hasAnyDescendant(hasText("Season 1")))
+        for (i in 0 until 4) {
+            key(KeyEvent.KEYCODE_DPAD_DOWN)
+            if (rule.onAllNodes(season).fetchSemanticsNodes().isNotEmpty()) break
+        }
+        rule.onNode(season).assertExists()
         key(KeyEvent.KEYCODE_DPAD_CENTER)
         rule.waitText("Episodes")
         shot("t2-season")
@@ -271,6 +292,26 @@ class MarqueeUiTest {
         rule.waitText("Seasons")
         key(KeyEvent.KEYCODE_BACK)
         rule.waitUntilAtLeastOneExists(hasText("Recently Added", substring = true) or hasText("Recommended for You"), 15_000)
+    }
+
+    /** TV: Right from an album's track row reaches its heart (inside the row), and Left comes back to the row. */
+    @Test fun tvTrackRowHeart() {
+        assumeTrue("TV only", isTv)
+        connectAndSignIn()
+        openLibrary("Music")
+        openArtist("Calm Pads")
+        tap("Calm Pads", substring = true)
+        rule.waitText("Floating")
+        rule.onAllNodes(hasContentDescription("Floating")).onFirst().performClick()
+        rule.waitText("Floating 1")
+        val row = hasText("Floating 1") and hasClickAction()
+        rule.onAllNodes(row).onFirst().performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus)
+        key(KeyEvent.KEYCODE_DPAD_RIGHT)
+        val heart = (hasContentDescription("Add Floating 1 to favourites") or hasContentDescription("Remove Floating 1 from favourites")) and isFocused()
+        rule.waitUntilAtLeastOneExists(heart, 5_000)
+        shot("tv-heart-focused")
+        key(KeyEvent.KEYCODE_DPAD_LEFT)
+        rule.waitUntilAtLeastOneExists(row and isFocused(), 5_000)
     }
 
     private fun key(code: Int) {
@@ -483,6 +524,11 @@ class MarqueeUiTest {
     }
 
     /** Scrolls whichever scrollable container holds a matching node there; false when none does. */
+    /** Soundprint is on and has analysed some music: only then do radios, Muse and Moods & Styles show (MUSIC-6). */
+    private fun soundprintReady(): Boolean = org.json.JSONObject(adminApi("GET", "/music/status", asToken = appToken)).let {
+        it.optBoolean("enabled") && it.optInt("analyzed") > 0
+    }
+
     private fun scrollTo(m: SemanticsMatcher): Boolean {
         val n = rule.onAllNodes(hasScrollToNodeAction()).fetchSemanticsNodes().size
         return (0 until n).any { i -> runCatching { rule.onAllNodes(hasScrollToNodeAction())[i].performScrollToNode(m) }.isSuccess }
@@ -620,6 +666,7 @@ class MarqueeUiTest {
     /** Moods and styles (MUSIC-18): the Chill mood lists tracks and starts its radio. */
     @Test fun moodsAndStyles() {
         connectAndSignIn()
+        assumeTrue("Soundprint has analysed the test music", soundprintReady())
         openLibrary("Music")
         // The music home's Library list: Moods & Styles.
         rule.waitUntil(20_000) { scrollTo(hasText("Moods & Styles") and hasClickAction()) }
@@ -656,6 +703,7 @@ class MarqueeUiTest {
     @Test fun crossfade() {
         assumeTrue("phones", !isTv)
         connectAndSignIn()
+        assumeTrue("Soundprint has analysed the test music", soundprintReady())
         val app = context.applicationContext as MarqueeApplication
         InstrumentationRegistry.getInstrumentation().runOnMainSync { app.music.setCrossfade(4) }
         openLibrary("Music")
@@ -694,14 +742,19 @@ class MarqueeUiTest {
         tap("On Watchlist") // back off the watchlist
         back()
         rule.waitText("Collections")
-        tap("Collections")
+        // Tapped again until it takes: a tap during the way back from the film's page can be lost.
+        val collections = hasText("Collections") and isSelected()
+        rule.waitUntil(10_000) {
+            if (rule.onAllNodes(collections).fetchSemanticsNodes().isEmpty()) runCatching { tap("Collections") }
+            rule.onAllNodes(collections).fetchSemanticsNodes().isNotEmpty()
+        }
         rule.waitText("Test Saga", 10_000)
         shot("m7b-collections")
         tap("Test Saga")
         rule.waitText("In this collection", 10_000)
         rule.waitText("15 Thunder")
         tap("Settings")
-        tap("Your Stats")
+        openSetting("Your Stats")
         rule.waitUntilAtLeastOneExists(hasText("Plays") or hasText("Nothing played in this period."), 15_000)
         tap("All time")
         rule.waitText("Plays", 15_000)
@@ -737,9 +790,7 @@ class MarqueeUiTest {
             val secret = org.json.JSONObject(adminApi("POST", "/auth/totp/setup", "", token)).getString("secret")
             adminApi("POST", "/auth/totp/enable", """{"code":"${totp(secret)}"}""", token)
 
-            rule.waitUntilAtLeastOneExists(hasSetTextAction(), 10_000)
-            rule.onNode(hasSetTextAction()).performTextInput(server)
-            rule.onNodeWithText("Connect").performClick()
+            enterServer()
             rule.waitText("Who's watching?")
             tap("Sign in with a username")
             rule.waitText("Username")
@@ -750,7 +801,9 @@ class MarqueeUiTest {
             shot("t1-code-asked")
             rule.onNode(androidx.compose.ui.test.hasTestTag("totpCode")).performTextInput(totp(secret, 1)) // the enable code's step is used up
             rule.onAllNodesWithText("Sign In").onFirst().performClick()
-            rule.waitText("Recently Added", 20_000, substring = true)
+            // Home's first rows (seasonal and recommendation rows can push Recently Added below the fold).
+            rule.waitUntilAtLeastOneExists(hasText("Recently Added", substring = true) or hasText("Recommended for You") or hasText("Continue Watching")
+                or hasText(" Favourites", substring = true), 20_000)
             shot("t2-signed-in")
         } finally {
             adminApi("DELETE", "/users/$id")
@@ -918,9 +971,7 @@ class MarqueeUiTest {
     /** Connects, then signs in as the test admin (its token) instead of picking a profile. */
     private fun signInAsAdmin() {
         val token = adminToken ?: throw org.junit.AssumptionViolatedException("no admin token")
-        rule.waitUntilAtLeastOneExists(hasSetTextAction(), 10_000)
-        rule.onNode(hasSetTextAction()).performTextInput(server)
-        rule.onNodeWithText("Connect").performClick()
+        enterServer()
         rule.waitText("Who's watching?")
         val user = Serializer.kotlinxSerializationJson.decodeFromString(User.serializer(), adminApi("GET", "/me"))
         val app = context.applicationContext as MarqueeApplication
@@ -1002,7 +1053,7 @@ class MarqueeUiTest {
             rule.waitText("Play trailers before movies")
             rule.onNode(hasContentDescription("Play trailers before movies") and
                 SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, androidx.compose.ui.state.ToggleableState.On)).assertExists()
-            tap("Server settings")
+            openSetting("Server settings")
             rule.waitText("Cinema trailers")
             rule.waitUntilAtLeastOneExists(hasContentDescription("Trailers: Off"), 10_000)
             rule.onNode(hasContentDescription("More trailers")).performClick()
@@ -1116,9 +1167,10 @@ class MarqueeUiTest {
         // Start from the default layout (a failed run may have left changes).
         rule.waitText("Reset")
         tap("Reset")
-        rule.waitUntilAtLeastOneExists(hasContentDescription("Hide Recently Added Movies"), 10_000)
+        // The row may be below the fold (a holiday row comes first in its season).
+        rule.waitUntil(10_000) { scrollTo(hasContentDescription("Hide Recently Added Movies")) }
         rule.onNode(hasContentDescription("Hide Recently Added Movies")).performClick()
-        rule.waitUntilAtLeastOneExists(hasContentDescription("Show Recently Added Movies"), 10_000)
+        rule.waitUntil(10_000) { scrollTo(hasContentDescription("Show Recently Added Movies")) }
         rule.onAllNodes(hasContentDescription(" down", substring = true)).onFirst().performClick()
         shot("eh1-edit-home")
         tap("Done")
@@ -1142,9 +1194,10 @@ class MarqueeUiTest {
         rule.waitUntilAtLeastOneExists(hasContentDescription("Unpin from Home"), 10_000)
         shot("eh3-pinned")
         tap("Home")
-        rule.waitUntil(15_000) { scrollTo(hasText("Test Saga  ›")) }
+        // Every Home row has See all (USER-12): a pinned collection's opens the collection.
+        rule.waitUntil(15_000) { scrollTo(hasContentDescription("See all: Test Saga")) }
         shot("eh4-home-pinned")
-        tap("Test Saga  ›")
+        rule.onNode(hasContentDescription("See all: Test Saga")).performClick()
         rule.waitText("In this collection", 10_000)
         rule.onNode(hasContentDescription("Unpin from Home")).performClick()
         rule.waitUntilAtLeastOneExists(hasContentDescription("Pin to Home"), 10_000)
@@ -1154,7 +1207,7 @@ class MarqueeUiTest {
         tap("Edit Home")
         rule.waitText("Reset")
         tap("Reset")
-        rule.waitUntilAtLeastOneExists(hasContentDescription("Hide Recently Added Movies"), 10_000)
+        rule.waitUntil(10_000) { scrollTo(hasContentDescription("Hide Recently Added Movies")) }
         tap("Done")
         // Below the recommendation rows (USER-16).
         rule.waitUntil(15_000) { scrollTo(hasText("Recently Added Movies")) }
@@ -1163,6 +1216,7 @@ class MarqueeUiTest {
     /** The equaliser (Settings → Equaliser): a preset turns it on and reaches the platform effect. */
     @Test fun equaliser() {
         connectAndSignIn()
+        assumeTrue("Soundprint has analysed the test music", soundprintReady())
         val app = context.applicationContext as MarqueeApplication
         openLibrary("Music")
         rule.waitUntil(20_000) { scrollTo(hasText("Library Radio")) }
@@ -1255,7 +1309,7 @@ class MarqueeUiTest {
         signInAsAdmin()
         tap("Settings")
         rule.waitText("Users & sharing")
-        tap("Users & sharing")
+        openSetting("Users & sharing")
         rule.waitText("Friends", 10_000)
         tap("Invite a friend")
         rule.waitText("Who it's for")
@@ -1319,9 +1373,7 @@ class MarqueeUiTest {
 
     /** Connects and signs the app in with a token. */
     private fun signInWith(token: String) {
-        rule.waitUntilAtLeastOneExists(hasSetTextAction(), 10_000)
-        rule.onNode(hasSetTextAction()).performTextInput(server)
-        rule.onNodeWithText("Connect").performClick()
+        enterServer()
         rule.waitText("Who's watching?")
         val user = Serializer.kotlinxSerializationJson.decodeFromString(User.serializer(), adminApi("GET", "/me", asToken = token))
         val app = context.applicationContext as MarqueeApplication
@@ -1391,7 +1443,7 @@ class MarqueeUiTest {
             signInWith(tok)
             tap("Settings")
             rule.waitText("Subtitle appearance")
-            tap("Subtitle appearance")
+            openSetting("Subtitle appearance")
             rule.waitUntilAtLeastOneExists(hasContentDescription("Subtitle preview"), 10_000)
             rule.onNode(hasContentDescription("Subtitle preview") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "medium, #FFFFFF, outline, bottom")).assertExists()
             tap("Large")
@@ -1408,7 +1460,7 @@ class MarqueeUiTest {
             }
             // Signed in again (as if on another app), it's still there.
             back()
-            tap("Subtitle appearance")
+            openSetting("Subtitle appearance")
             rule.waitUntilAtLeastOneExists(chosen, 5_000)
             // The player uses it: a movie with an English subtitle track.
             if (!isTv) {
@@ -1548,7 +1600,7 @@ class MarqueeUiTest {
         signInAsAdmin()
         tap("Settings")
         rule.waitText("Library Health")
-        tap("Library Health")
+        openSetting("Library Health")
         rule.waitUntilAtLeastOneExists(hasContentDescription("Missing subtitles:", substring = true), 15_000)
         shot("lh1-checks")
         rule.onNode(hasContentDescription("Missing subtitles:", substring = true)).performClick()
@@ -1573,7 +1625,7 @@ class MarqueeUiTest {
         back()
         // Bazarr's address and whether its key is set, next to Seerr.
         rule.waitText("Server settings")
-        tap("Server settings")
+        openSetting("Server settings")
         rule.waitText("Cinema trailers")
         rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Save integrations"))
         rule.waitUntilAtLeastOneExists(androidx.compose.ui.test.hasTestTag("bazarrUrl") and hasText("32767", substring = true), 10_000)
@@ -1610,7 +1662,7 @@ class MarqueeUiTest {
         back()
         tap("Settings")
         rule.waitText("Library Health")
-        tap("Library Health")
+        openSetting("Library Health")
         rule.waitUntilAtLeastOneExists(hasContentDescription("Unmatched:", substring = true), 15_000)
         rule.onNode(hasContentDescription("Unmatched:", substring = true)).performClick()
         rule.waitUntilAtLeastOneExists(hasContentDescription("Fix match for 00 Long Test"), 15_000)
@@ -1639,7 +1691,7 @@ class MarqueeUiTest {
             signInAsAdmin()
             tap("Settings")
             rule.waitText("Library Health")
-            tap("Library Health")
+            openSetting("Library Health")
             rule.waitUntilAtLeastOneExists(hasContentDescription("Duplicates:", substring = true), 15_000)
             rule.onNode(hasContentDescription("Duplicates:", substring = true)).performClick()
             val copy = hasContentDescription("Duplicate file 66 Ghost (1954) copy.mp4")
@@ -1656,14 +1708,14 @@ class MarqueeUiTest {
             back()
             // The switch in Server settings.
             rule.waitText("Server settings")
-            tap("Server settings")
+            openSetting("Server settings")
             rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasContentDescription("Allow deleting media files"))
             rule.waitUntilAtLeastOneExists(hasContentDescription("Allow deleting media files") and androidx.compose.ui.test.isEnabled(), 10_000)
             rule.onNode(hasContentDescription("Allow deleting media files")).performClick()
             rule.waitUntil(10_000) { adminApi("GET", "/settings").contains("\"allowMediaDeletion\":true") }
             shot("dup2-setting")
             back()
-            tap("Library Health")
+            openSetting("Library Health")
             rule.waitUntilAtLeastOneExists(hasContentDescription("Duplicates:", substring = true), 15_000)
             rule.onNode(hasContentDescription("Duplicates:", substring = true)).performClick()
             val delete = hasContentDescription("Delete 66 Ghost (1954) copy.mp4")
@@ -1866,9 +1918,11 @@ class MarqueeUiTest {
         shot("mh1-home")
 
         // The Library list: rows with counts.
+        // Not the TV side menu's tab of the same name (Playlists), which is selectable.
         fun rowTexts(title: String): List<String> {
-            rule.waitUntil(15_000) { scrollTo(hasText(title) and hasClickAction()) }
-            return rule.onAllNodes(hasText(title) and hasClickAction()).onFirst().fetchSemanticsNode().config[SemanticsProperties.Text].map { it.text }
+            val row = hasText(title) and hasClickAction() and !SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected)
+            rule.waitUntil(15_000) { scrollTo(row) }
+            return rule.onAllNodes(row).onFirst().fetchSemanticsNode().config[SemanticsProperties.Text].map { it.text }
         }
         mapOf("Artists" to "artist", "Albums" to "album", "Songs" to "track").forEach { (title, type) ->
             val want = total(type).toString()
@@ -1876,7 +1930,11 @@ class MarqueeUiTest {
         }
         val playlists = org.json.JSONArray(adminApi("GET", "/playlists?kind=audio", asToken = appToken)).length()
         rule.waitUntil(10_000) { rowTexts("Playlists").contains(playlists.toString()) }
-        listOf("Genres", "Moods & Styles", "Muse & Stations").forEach { rowTexts(it) }
+        val soundprint = soundprintReady()
+        rowTexts("Genres")
+        if (soundprint) listOf("Moods & Styles", "Muse & Stations").forEach { rowTexts(it) }
+        // Nothing analysed yet: the pages that could only fail aren't offered.
+        else listOf("Moods & Styles", "Muse & Stations", "Decades").forEach { assertTrue("$it hidden", !scrollTo(hasText(it) and hasClickAction())) }
         shot("mh2-library-list")
 
         // No artist grid: any artist on the home is in the Top Artists shelf.
@@ -1907,10 +1965,12 @@ class MarqueeUiTest {
         rule.onNode(hasText("Genres") and hasClickAction()).performClick()
         rule.waitText("Most albums")
         back()
-        rule.waitUntil(10_000) { scrollTo(hasText("Moods & Styles") and hasClickAction()) }
-        rule.onNode(hasText("Moods & Styles") and hasClickAction()).performClick()
-        rule.waitUntilAtLeastOneExists(hasContentDescription("Chill mood"), 10_000)
-        back()
+        if (soundprint) {
+            rule.waitUntil(10_000) { scrollTo(hasText("Moods & Styles") and hasClickAction()) }
+            rule.onNode(hasText("Moods & Styles") and hasClickAction()).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Chill mood"), 10_000)
+            back()
+        }
 
         // "See all" on Recently Added opens Albums sorted by date added.
         rule.waitUntil(15_000) { scrollTo(hasContentDescription("See all: Recently Added")) }
@@ -2129,7 +2189,9 @@ class MarqueeUiTest {
             rule.waitText("Movies")
             tap("Movies")
             rule.waitUntilAtLeastOneExists(hasContentDescription("Sort and filter"), 15_000)
-            rule.onNode(hasText("My rating") and hasClickAction()).assertExists()
+            // The chip row scrolls (more sorts than fit).
+            rule.waitUntil(10_000) { scrollTo(hasText("My rating") and hasClickAction()) }
+            rule.waitUntil(10_000) { scrollTo(hasText("Rated 4★+") and hasClickAction()) }
             rule.onNode(hasText("Rated 4★+") and hasClickAction()).performClick()
             rule.waitText("Nothing rated 4★ or more yet.")
             shot("rf5-movies-filter")
@@ -2654,12 +2716,12 @@ class MarqueeUiTest {
 
     // ---------- Movies on demand (LIVE-6) ----------
 
-    /** The test films: an M3U on the host (scripts/e2e, `.e2e/vod/android` served on port 32611), added as a source if missing. */
+    /** The test films: an M3U on the host (scripts/fake-vod.py's /android.m3u on port 32621, started with the e2e server), added as a source if missing. */
     private fun ensureVodSource() {
         val settings = org.json.JSONObject(adminApi("GET", "/settings")).getJSONObject("integrations")
         val sources = settings.optJSONArray("vodSources") ?: org.json.JSONArray()
-        val has = (0 until sources.length()).any { sources.getJSONObject(it).optString("url").endsWith(":32611/movies.m3u") }
-        if (!has) sources.put(org.json.JSONObject().put("name", "Android test films").put("url", "http://127.0.0.1:32611/movies.m3u").put("enabled", true))
+        val has = (0 until sources.length()).any { sources.getJSONObject(it).optString("url").endsWith(":32621/android.m3u") }
+        if (!has) sources.put(org.json.JSONObject().put("name", "Android test films").put("url", "http://127.0.0.1:32621/android.m3u").put("enabled", true))
         if (!has || !settings.optBoolean("vodEnabled")) {
             adminApi("PATCH", "/settings", org.json.JSONObject().put("integrations", org.json.JSONObject().put("vodEnabled", true).put("vodSources", sources)).toString())
             adminApi("POST", "/livetv/vod/refresh")
@@ -2667,7 +2729,7 @@ class MarqueeUiTest {
         val found = (1..20).any {
             org.json.JSONObject(adminApi("GET", "/livetv/vod/movies?q=Droid")).getInt("total") >= 3 || run { Thread.sleep(500); false }
         }
-        assumeTrue("the test films' M3U isn't being served on port 32611", found)
+        assumeTrue("the test films' M3U isn't being served on port 32621 (scripts/fake-vod.py)", found)
     }
 
     private fun setVodEnabled(on: Boolean) = adminApi("PATCH", "/settings", """{"integrations":{"vodEnabled":$on}}""")
@@ -2818,6 +2880,41 @@ class MarqueeUiTest {
             rule.waitUntilAtLeastOneExists(playing, 30_000)
             onMainPosition { pos = it }
             assertTrue("from the start: $pos", pos < 10_000)
+            back()
+        } finally {
+            resetVodMovie(id)
+        }
+    }
+
+    /** The on-demand player has Playback settings: a speed picked there is the player's, and Back closes the panel, not the player. */
+    @Test fun vodPlayerSettings() {
+        ensureVodSource()
+        connectAndSignIn()
+        val id = vodMovieId("Droid Beta Film (1990)")
+        resetVodMovie(id)
+        try {
+            openVodTestFilms()
+            rule.onNode(hasContentDescription("Droid Beta Film (1990)")).performClick()
+            rule.waitText("Play", 15_000)
+            tap("Play")
+            val playing = hasContentDescription("Video player") and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Playing")
+            rule.waitUntilAtLeastOneExists(playing, 30_000)
+            showControls()
+            rule.onNode(hasContentDescription("Playback settings")).performClick()
+            rule.waitText("1.5×")
+            shot("vod9-settings")
+            back()
+            rule.waitUntil(5_000) { rule.onAllNodesWithText("1.5×").fetchSemanticsNodes().isEmpty() }
+            rule.onNode(hasContentDescription("Video player")).assertExists()
+            showControls()
+            rule.onNode(hasContentDescription("Playback settings")).performClick()
+            tap("1.5×")
+            // Picking closes the panel; opened again, it shows the speed chosen.
+            rule.waitUntil(5_000) { rule.onAllNodesWithText("1.5×").fetchSemanticsNodes().isEmpty() }
+            showControls()
+            rule.onNode(hasContentDescription("Playback settings")).performClick()
+            rule.waitUntilAtLeastOneExists(hasText("1.5×") and androidx.compose.ui.test.isSelected(), 5_000)
+            back()
             back()
         } finally {
             resetVodMovie(id)
@@ -3047,5 +3144,104 @@ class MarqueeUiTest {
         rule.waitUntil(20_000) { scrollTo(hasText("Also on VOD")) }
         rule.waitUntilAtLeastOneExists(hasText("Also on VOD"), 10_000)
         shot("vs-also-on-vod")
+    }
+
+    /** Libraries name what they hold; library grids sort by Recently added; Home's Recently Added See all opens it so (USER-12). */
+    @Test fun librariesAndSorts() {
+        connectAndSignIn()
+        if (!isTv) {
+            rule.waitUntil(20_000) { scrollTo(hasContentDescription("See all: Recently Added Movies")) }
+            rule.onNode(hasContentDescription("See all: Recently Added Movies")).performClick()
+            rule.waitUntilAtLeastOneExists(hasText("Recently added") and isSelected(), 15_000)
+            shot("ls1-recently-added")
+            back()
+        }
+        tap("Libraries")
+        rule.waitText("303 movies")
+        rule.waitText("1 show")
+        rule.waitText("10 artists")
+        assertTrue("no \"1 items\"", rule.onAllNodesWithText("1 items").fetchSemanticsNodes().isEmpty())
+        shot("ls2-libraries")
+        tap("Movies")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Sort and filter"), 15_000)
+        rule.waitUntil(10_000) { scrollTo(hasText("Release date") and hasClickAction()) }
+        rule.onNode(hasText("Release date") and hasClickAction()).performClick()
+        rule.waitUntilAtLeastOneExists(hasText("Release date") and isSelected(), 5_000)
+        rule.waitUntil(10_000) { scrollTo(hasText("Unwatched") and hasClickAction()) }
+        rule.onNode(hasText("Unwatched") and hasClickAction()).performClick()
+        rule.waitUntilAtLeastOneExists(hasText("Unwatched") and isSelected(), 5_000)
+        shot("ls3-sorted")
+    }
+
+    /** Search says when nothing matches, and its clear button empties it. */
+    @Test fun searchNoResults() {
+        connectAndSignIn()
+        tap("Search")
+        rule.waitUntilAtLeastOneExists(hasSetTextAction(), 10_000)
+        rule.onNode(hasSetTextAction()).performTextInput("zzqq")
+        rule.waitText("No results for “zzqq”.")
+        shot("sn1-no-results")
+        rule.onNode(hasContentDescription("Clear search")).performClick()
+        rule.waitUntil(5_000) { rule.onAllNodesWithText("No results", substring = true).fetchSemanticsNodes().isEmpty() }
+    }
+
+    /** Back closes the player's Playback panel, not the player (PLAY-3); on TV with the remote's Back. */
+    @Test fun playerSettingsBack() {
+        connectAndSignIn()
+        openLibrary("Movies")
+        rule.waitText("00 Preview Test")
+        tap("00 Preview Test")
+        rule.waitUntilAtLeastOneExists(hasText("Play") or hasText("Resume"), 10_000)
+        rule.onAllNodes(hasText("Play") or hasText("Resume")).onFirst().performClick()
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Video player"), 30_000)
+        showControls()
+        rule.onNode(hasContentDescription("Playback settings")).performClick()
+        rule.waitText("Night mode")
+        shot("pb1-panel")
+        if (isTv) key(KeyEvent.KEYCODE_BACK) else back()
+        rule.waitUntil(5_000) { rule.onAllNodesWithText("Night mode").fetchSemanticsNodes().isEmpty() }
+        rule.onNode(hasContentDescription("Video player")).assertExists()
+        shot("pb2-closed")
+    }
+
+    /** Settings → Link a TV approves a TV's Quick Connect code (USER-3). */
+    @Test fun linkATv() {
+        assumeTrue("phones and tablets", !isTv)
+        connectAndSignIn()
+        val start = okhttp3.Request.Builder().url("http://$server/api/v1/auth/quickconnect")
+            .post(okhttp3.RequestBody.create("application/json".toMediaType(),
+                """{"device":{"clientId":"uitest-link-tv","name":"UI test TV","platform":"androidtv"}}""")).build()
+        val code = okhttp3.OkHttpClient().newCall(start).execute().use { org.json.JSONObject(it.body!!.string()).getString("code") }
+        tap("Settings")
+        rule.waitUntilAtLeastOneExists(hasContentDescription("Link a TV"), 15_000)
+        rule.onNode(hasContentDescription("Link a TV")).performScrollTo()
+        rule.onNode(hasSetTextAction() and hasAnyAncestor(hasContentDescription("Link a TV"))).performTextInput(code)
+        rule.onNode(hasText("Link") and hasClickAction()).performClick()
+        rule.waitText("UI test TV is signed in.")
+        shot("lt1-linked")
+    }
+
+    /** A playlist can be renamed from its page's menu (USER-7). */
+    @Test fun playlistRename() {
+        assumeTrue("phones and tablets", !isTv)
+        connectAndSignIn()
+        val lists = org.json.JSONArray(adminApi("GET", "/playlists", asToken = appToken))
+        val id = (0 until lists.length()).map { lists.getJSONObject(it) }.first { it.getString("title") == "Road Trip" }.getLong("id")
+        try {
+            tap("Playlists")
+            rule.waitText("Road Trip")
+            tap("Road Trip")
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Playlist actions"), 10_000)
+            rule.onNode(hasContentDescription("Playlist actions")).performClick()
+            tap("Rename…")
+            rule.waitUntilAtLeastOneExists(hasSetTextAction(), 5_000)
+            rule.onNode(hasSetTextAction()).performTextReplacement("Road Trip Renamed")
+            rule.onNode(hasText("Rename") and hasClickAction()).performClick()
+            rule.waitText("Road Trip Renamed")
+            assertTrue(adminApi("GET", "/playlists/$id", asToken = appToken).contains("\"title\":\"Road Trip Renamed\""))
+            shot("pr1-renamed")
+        } finally {
+            adminApi("PATCH", "/playlists/$id", """{"title":"Road Trip"}""", asToken = appToken)
+        }
     }
 }

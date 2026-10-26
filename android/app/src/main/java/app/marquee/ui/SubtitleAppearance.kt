@@ -114,7 +114,7 @@ fun SubtitleAppearanceScreen() {
         scope.launch {
             withContext(Dispatchers.IO) { runCatching { marquee.auth.updateMe(MeUpdate(preferences = u.preferences.copy(subtitleStyle = full))) } }
                 .onSuccess { marquee.updated(it); status = "Saved" }
-                .onFailure { marquee.updated(u); status = "Couldn't save: ${it.message}" }
+                .onFailure { marquee.updated(u); status = "Couldn't save: ${serverMessage(it)}" }
         }
     }
 

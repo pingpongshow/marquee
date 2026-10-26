@@ -91,7 +91,7 @@ fun hideVodSuggestion(marquee: Marquee, context: Context, s: VodSuggestion, onHi
     marquee.scope.launch {
         withContext(Dispatchers.IO) { runCatching { marquee.livetv.hideVodSuggestion(kind, id) } }
             .onSuccess { withContext(Dispatchers.Main) { toast(context, "You won't be offered “$title” again.") } }
-            .onFailure { withContext(Dispatchers.Main) { onFailed(); toast(context, "Couldn't hide “$title”: ${it.message ?: ""}") } }
+            .onFailure { withContext(Dispatchers.Main) { onFailed(); toast(context, "Couldn't hide “$title”: ${serverMessage(it, "")}") } }
     }
 }
 
@@ -188,7 +188,7 @@ fun VodRecommendedScreen(nav: NavHostController, initialShows: Boolean) {
     val rows by cachedLoad<List<VodRecommendationRow>>("vodrecommended:$shows", changed) {
         withContext(Dispatchers.IO) {
             runCatching { marquee.livetv.vodRecommendations(if (shows) LivetvApi.KindVodRecommendations.SERIES else LivetvApi.KindVodRecommendations.MOVIE, 30) }
-                .onFailure { error.value = it.message ?: "Couldn't load recommendations" }.getOrNull()
+                .onFailure { error.value = serverMessage(it, "Couldn't load recommendations") }.getOrNull()
         }
     }
     val list = rows

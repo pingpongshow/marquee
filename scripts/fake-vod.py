@@ -3,7 +3,8 @@
 tests expect them:
 
   --m3u-port (default 32621)     /films.m3u: three films as an M3U playlist ("Apple Test Alpha (1985)",
-                                 Bravo, Charlie), each a minute long
+                                 Bravo, Charlie), each a minute long; /android.m3u: the Android
+                                 tests' three ("Droid Alpha Film (1985)", Beta (1990), Gamma (1995))
   --xtream-port (default 32622)  an Xtream Codes server, Dispatcharr-style (user "apple", password
                                  "apple-test"): the films "Apple XC Film One" (1994), "Apple XC Film
                                  Two" (2003) and "10 Xenon" (2014, which the e2e Movies library has
@@ -35,6 +36,11 @@ M3U_FILMS = [  # file, title, group
     ("bravo", "Apple Test Bravo (1999)", "Apple Films"),
     ("charlie", "Apple Test Charlie (2012)", "Apple Films"),
 ]
+ANDROID_FILMS = [  # file, title, group
+    ("droid-alpha", "Droid Alpha Film (1985)", "Droid Films"),
+    ("droid-beta", "Droid Beta Film (1990)", "Droid Films"),
+    ("droid-gamma", "Droid Gamma Film (1995)", "Droid Films"),
+]
 XC_FILMS = [  # stream id, title, year, category id, genre, minutes
     (9101, "Apple XC Film One", 1994, "1", "Drama", 1),
     (9102, "Apple XC Film Two", 2003, "2", "Comedy", 1),
@@ -56,7 +62,7 @@ def episode_id(series, season, n):
 def make_media(media):
     """Writes the test videos (H.264 + AAC MP4) unless they're there."""
     os.makedirs(media, exist_ok=True)
-    jobs = [(f"{name}.mp4", 60, i) for i, (name, _, _) in enumerate(M3U_FILMS)]
+    jobs = [(f"{name}.mp4", 60, i) for i, (name, _, _) in enumerate(M3U_FILMS + ANDROID_FILMS)]
     jobs += [(f"{sid}.mp4", 60 * minutes, i + 3) for i, (sid, _, _, _, _, minutes) in enumerate(XC_FILMS)]
     for sid, _, _, _, _, seasons in XC_SERIES:
         for season, count in seasons.items():
@@ -136,9 +142,9 @@ class M3UHandler(Handler):
     def do_GET(self):
         path = urllib.parse.urlparse(self.path).path
         host = self.headers.get("Host", f"127.0.0.1:{self.server.server_address[1]}")
-        if path == "/films.m3u":
+        if path in ("/films.m3u", "/android.m3u"):
             lines = ["#EXTM3U"]
-            for name, title, group in M3U_FILMS:
+            for name, title, group in (M3U_FILMS if path == "/films.m3u" else ANDROID_FILMS):
                 lines.append(f'#EXTINF:-1 group-title="{group}",{title}')
                 lines.append(f"http://{host}/films/{name}.mp4")
             return self.send(200, "\n".join(lines) + "\n", "audio/x-mpegurl")

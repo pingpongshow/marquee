@@ -204,7 +204,7 @@ fun DownloadButton(item: ItemSummary) {
         // The app's scope: leaving the page mustn't stop a season or album halfway.
         downloads.scope.launch {
             runCatching { if (single) downloads.download(item, q) else downloads.downloadAll(item, q) }
-                .onFailure { android.widget.Toast.makeText(context.applicationContext, it.message ?: "Couldn't download", android.widget.Toast.LENGTH_LONG).show() }
+                .onFailure { android.widget.Toast.makeText(context.applicationContext, serverMessage(it, "Couldn't download"), android.widget.Toast.LENGTH_LONG).show() }
         }
     }
     val e = entries[item.id]

@@ -1,6 +1,7 @@
 package app.marquee.music
 
 import androidx.compose.foundation.border
+import app.marquee.ui.serverMessage
 
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 
@@ -120,7 +121,7 @@ fun NowPlayingScreen(onClose: () -> Unit, onOpenPlaylist: ((Long) -> Unit)? = nu
     fun startRadio() {
         val id = n?.id ?: return
         scope.launch {
-            radioError = runCatching { music.startRadio(RadioRequest(RadioRequest.Seed.ITEM, itemId = id)) }.exceptionOrNull()?.message
+            radioError = runCatching { music.startRadio(RadioRequest(RadioRequest.Seed.ITEM, itemId = id)) }.exceptionOrNull()?.let { serverMessage(it) }
         }
     }
 

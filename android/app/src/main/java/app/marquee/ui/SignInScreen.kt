@@ -71,11 +71,12 @@ fun SignInScreen() {
         Text(marquee.server?.name ?: "", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 28.dp))
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 12.dp)) }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-            profiles?.forEach { p ->
-                Column(Modifier.width(110.dp).focusCard({
+            profiles?.forEachIndexed { i, p ->
+                // TV: the first profile has the focus from the start, so the D-pad has somewhere to begin.
+                Column(Modifier.width(110.dp).initialFocus(marquee.isTv && i == 0).focusCard({
                     error = null
                     if (p.requires == Profile.Requires.NONE) scope.launch {
-                        runCatching { marquee.signInProfile(p.id, null, null) }.onFailure { error = it.message }
+                        runCatching { marquee.signInProfile(p.id, null, null) }.onFailure { error = serverMessage(it) }
                     } else asking = p
                 }), horizontalAlignment = Alignment.CenterHorizontally) {
                     Avatar(p.displayName, marquee.absolute(p.avatarUrl), 96)
@@ -85,10 +86,11 @@ fun SignInScreen() {
         }
         Spacer(Modifier.height(32.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            TextButton(onClick = { manual = true }) { Text("Sign in with a username") }
-            TextButton(onClick = { quick = true }) { Text("Use Quick Connect") }
+            // No profiles to pick (the server lists none): signing in by name is where the D-pad starts.
+            TextButton(onClick = { manual = true }, Modifier.focusRing().initialFocus(marquee.isTv && profiles?.isEmpty() == true)) { Text("Sign in with a username") }
+            TextButton(onClick = { quick = true }, Modifier.focusRing()) { Text("Use Quick Connect") }
         }
-        TextButton(onClick = { marquee.forgetServer() }) { Text("Use a different server", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        TextButton(onClick = { marquee.forgetServer() }, Modifier.focusRing()) { Text("Use a different server", color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 
     asking?.let { p ->
@@ -216,7 +218,7 @@ private fun QuickConnectDialog(onDismiss: () -> Unit) {
                     else -> {}
                 }
             }
-        }.onFailure { error = it.message }
+        }.onFailure { error = serverMessage(it) }
     }
     AlertDialog(
         onDismissRequest = onDismiss,

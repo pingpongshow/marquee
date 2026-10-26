@@ -50,7 +50,7 @@ fun StatsScreen(nav: androidx.navigation.NavHostController? = null) {
         val s = stats
         when {
             s == null -> item { CircularProgressIndicator() }
-            s.isFailure -> item { Text(s.exceptionOrNull()?.message ?: "Couldn't load", color = MaterialTheme.colorScheme.error) }
+            s.isFailure -> item { Text(s.exceptionOrNull()?.let { serverMessage(it) } ?: "Couldn't load", color = MaterialTheme.colorScheme.error) }
             else -> {
                 val st = s.getOrThrow()
                 if (st.plays == 0) item { Text("Nothing played in this period.", color = MaterialTheme.colorScheme.onSurfaceVariant) }

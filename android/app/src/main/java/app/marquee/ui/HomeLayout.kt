@@ -74,8 +74,9 @@ object HomeRows {
      */
     fun seeAllRoute(hubId: String): String = when {
         hubId == CONTINUE_HUB -> CONTINUE_ROUTE
+        // A library's Recently Added and Recently Played rows: the library, in that order.
         hubId.startsWith("recent-") || hubId.startsWith("played-") ->
-            hubId.substringAfter('-').toLongOrNull()?.let { "library/$it" } ?: homeHubRoute(hubId)
+            hubId.substringAfter('-').toLongOrNull()?.let { "library/$it?sort=${if (hubId.startsWith("recent-")) "added" else "viewed"}" } ?: homeHubRoute(hubId)
         else -> route(hubId) ?: homeHubRoute(hubId)
     }
 
@@ -89,7 +90,7 @@ fun EditHomeScreen(nav: NavHostController) {
     val scope = rememberCoroutineScope()
     var rows by remember { mutableStateOf<List<HomeLayoutRow>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) { runCatching { HomeRows.load(marquee) }.onSuccess { rows = it }.onFailure { error = it.message } }
+    LaunchedEffect(Unit) { runCatching { HomeRows.load(marquee) }.onSuccess { rows = it }.onFailure { error = serverMessage(it) } }
 
     // Saves go one at a time, in order, so quick moves reach the server in the order they were made.
     val saving = remember { kotlinx.coroutines.sync.Mutex() }
@@ -101,7 +102,7 @@ fun EditHomeScreen(nav: NavHostController) {
         val n = ++latest
         scope.launch {
             saving.withLock { runCatching { HomeRows.save(marquee, next) } }
-                .onSuccess { if (n == latest) { rows = it; error = null } }.onFailure { error = it.message ?: "Couldn't save" }
+                .onSuccess { if (n == latest) { rows = it; error = null } }.onFailure { error = serverMessage(it, "Couldn't save") }
         }
     }
     fun move(i: Int, by: Int) {
@@ -121,7 +122,7 @@ fun EditHomeScreen(nav: NavHostController) {
                     val n = ++latest
                     scope.launch {
                         saving.withLock { runCatching { withContext(Dispatchers.IO) { marquee.hubs.setHomeLayout(HomeLayout(emptyList())).rows } } }
-                            .onSuccess { if (n == latest) rows = it }.onFailure { error = it.message }
+                            .onSuccess { if (n == latest) rows = it }.onFailure { error = serverMessage(it) }
                     }
                 }, Modifier.focusRing()) { Text("Reset") }
             }

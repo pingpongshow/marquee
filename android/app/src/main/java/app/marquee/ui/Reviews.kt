@@ -138,7 +138,7 @@ fun ReviewsSection(d: ItemDetail, reviews: ItemReviews?, isAdmin: Boolean, onCha
             busy = false
             r.onSuccess {
                 if (it != app.marquee.core.OfflineSync.Result.Queued) onChanged() // a queued comment syncs later, quietly
-            }.onFailure { Toast.makeText(context, it.message ?: "Couldn't $what", Toast.LENGTH_LONG).show() }
+            }.onFailure { Toast.makeText(context, serverMessage(it, "Couldn't $what"), Toast.LENGTH_LONG).show() }
         }
     }
     Column(Modifier.padding(horizontal = sidePadding).semantics { contentDescription = "Ratings & comments" }, verticalArrangement = Arrangement.spacedBy(10.dp)) {

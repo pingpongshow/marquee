@@ -71,7 +71,7 @@ fun tileActions(item: ItemSummary, continueWatching: Boolean = false, nav: NavHo
             scope.launch {
                 withContext(Dispatchers.IO) { runCatching { marquee.hubs.removeFromContinueWatching(item.id) } }
                     .onSuccess { withContext(Dispatchers.Main) { onRemoved(item.id) }; marquee.watch.changed() }
-                    .onFailure { toast(context, "Couldn't remove “${item.title}”: ${it.message ?: ""}") }
+                    .onFailure { toast(context, "Couldn't remove “${item.title}”: ${serverMessage(it, "")}") }
             }
         })
     }

@@ -131,7 +131,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
     }
     val p = page
     if (p == null) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }; return }
-    val pg = p.getOrElse { Text("Couldn't load: ${it.message}", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.error); return }
+    val pg = p.getOrElse { Text("Couldn't load: ${serverMessage(it)}", Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.error); return }
     val d = pg.detail
     fun leaves(shuffle: Boolean = false, unwatched: Boolean = false, then: (List<ItemSummary>) -> Unit) = scope.launch {
         val l = withContext(Dispatchers.IO) { runCatching { marquee.items.itemLeaves(d.id, shuffle, unwatched) }.getOrDefault(emptyList()) }
@@ -142,7 +142,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
     @Composable fun RadioButton() = OutlinedButton(modifier = Modifier.focusRing(), onClick = {
         scope.launch {
             runCatching { music.startRadio(RadioRequest(RadioRequest.Seed.ITEM, itemId = d.id)) }
-                .onFailure { toast(context, it.message ?: "Couldn't start a radio", long = true) }
+                .onFailure { toast(context, serverMessage(it, "Couldn't start a radio"), long = true) }
         }
     }) { Icon(Icons.Filled.Radio, null); Text("Radio") }
     /** The heart (USER-12), watchlist (USER-8) and watched state. */
@@ -249,8 +249,10 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                         l.firstOrNull()?.let { nav.navigate("player/${it.id}") } ?: leaves { all -> all.firstOrNull()?.let { nav.navigate("player/${it.id}?start=0") } }
                     }
                 }, modifier = Modifier.focusRing().initialFocus(marquee.isTv)) {
-                    Icon(Icons.Filled.PlayArrow, null)
-                    Text(if ((d.watchedLeafCount ?: 0) > 0) "Continue" else "Play")
+                    val seen = d.watchedLeafCount ?: 0
+                    val again = seen > 0 && seen >= d.leafCount
+                    Icon(if (again) Icons.Filled.Replay else Icons.Filled.PlayArrow, null)
+                    Text(when { again -> "Play again"; seen > 0 -> "Continue"; else -> "Play" })
                 }
                 ItemType.ALBUM, ItemType.ARTIST -> {
                     Button(onClick = { leaves { music.play(it, 0, source = d.title) } }, modifier = Modifier.focusRing().initialFocus(marquee.isTv)) { Icon(Icons.Filled.PlayArrow, null); Text("Play") }
@@ -319,6 +321,7 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                             style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
                     tracks.forEachIndexed { i, t ->
+                        val inRow = rememberInRowFocus()
                         ListItem(
                             headlineContent = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             supportingContent = t.audioFormat?.takeIf { showQuality }?.let { f -> {
@@ -328,14 +331,14 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
                             leadingContent = { Text("${t.index ?: i + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                             trailingContent = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    FavoriteButton(t, small = true)
+                                    FavoriteButton(t, Modifier.inRowFirst(inRow), small = true)
                                     app.marquee.music.TrackRating(t, Modifier.padding(end = 8.dp))
                                     Text(t.durationMs?.let { formatTime(it) } ?: "", maxLines = 1, softWrap = false)
                                     if (!marquee.isTv) TrackMenu(t, onMoved = { reload++ })
                                 }
                             },
                             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                            modifier = Modifier.focusCard({ music.play(tracks, i, source = d.title) }),
+                            modifier = Modifier.rowFocus(inRow).focusCard({ music.play(tracks, i, source = d.title) }),
                         )
                     }
                 }
@@ -436,7 +439,12 @@ private fun EpisodeRow(nav: NavHostController, ep: ItemSummary) {
 
 @Composable
 private fun Meta(d: ItemDetail) {
-    if (d.type == ItemType.EPISODE) d.grandparentTitle?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    // The show an episode or season belongs to, above its own title.
+    when (d.type) {
+        ItemType.EPISODE -> d.grandparentTitle
+        ItemType.SEASON -> d.parentTitle
+        else -> null
+    }?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     Text(d.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 3)
     // Smart collections (META-7) fill themselves from their rules.
     if (d.type == ItemType.COLLECTION && d.smartRules != null) Row(verticalAlignment = Alignment.CenterVertically) {
@@ -497,19 +505,20 @@ private fun PopularTracks(artist: String, tracks: List<ItemSummary>) {
     Column {
         Text("Popular", Modifier.padding(horizontal = sidePadding, vertical = 4.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         (if (all) tracks else tracks.take(5)).forEachIndexed { i, t ->
+            val inRow = rememberInRowFocus()
             ListItem(
                 headlineContent = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 supportingContent = { t.parentTitle?.let { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
                 leadingContent = { Text("${i + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 trailingContent = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        FavoriteButton(t, small = true)
+                        FavoriteButton(t, Modifier.inRowFirst(inRow), small = true)
                         app.marquee.music.TrackRating(t, Modifier.padding(end = 8.dp))
                         Text(t.durationMs?.let { formatTime(it) } ?: "", maxLines = 1, softWrap = false)
                     }
                 },
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                modifier = Modifier.focusCard({ music.play(tracks, i, source = "$artist – Popular") }),
+                modifier = Modifier.rowFocus(inRow).focusCard({ music.play(tracks, i, source = "$artist – Popular") }),
             )
         }
         if (tracks.size > 5) TextButton({ all = !all }, Modifier.padding(horizontal = sidePadding).focusRing()) { Text(if (all) "Show fewer" else "Show all ${tracks.size}") }

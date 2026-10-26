@@ -3,6 +3,11 @@ package app.marquee.ui
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.remember
@@ -66,6 +71,7 @@ private val tabs = listOf(
 )
 
 /** Phones: bottom navigation with the mini player above it. TV: a side rail (D-pad friendly). */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun MainScreen() {
     val marquee = LocalMarquee.current
@@ -84,10 +90,13 @@ fun MainScreen() {
 
     if (marquee.isTv) {
         Row(Modifier.fillMaxSize()) {
-            if (!fullScreen) Column(Modifier.fillMaxHeight().width(112.dp).padding(vertical = 24.dp, horizontal = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Left from a page lands on the tab that's showing, not whichever item is level with the focus.
+            val railFocus = remember { tabs.associate { it.route to FocusRequester() } }
+            if (!fullScreen) Column(Modifier.fillMaxHeight().width(112.dp).padding(vertical = 24.dp, horizontal = 10.dp)
+                .focusProperties { enter = { railFocus[tab] ?: FocusRequester.Default } }.focusGroup(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 // Who's watching, above Home: opens the profile picker.
                 ProfileButton(nav, tv = true, modifier = Modifier.padding(bottom = 8.dp))
-                tabs.forEach { t -> TvRailItem(t, tab == t.route) { go(t.route) } }
+                tabs.forEach { t -> TvRailItem(t, tab == t.route, Modifier.focusRequester(railFocus.getValue(t.route))) { go(t.route) } }
                 Spacer(Modifier.weight(1f))
                 TvNowPlaying { nav.navigate("nowplaying") }
             }
@@ -131,7 +140,10 @@ private fun Routes(nav: NavHostController) {
         composable("playlists") { PlaylistsScreen(nav) }
         composable("search") { SearchScreen(nav) }
         composable("settings") { SettingsScreen(nav) }
-        composable("library/{id}", listOf(navArgument("id") { type = NavType.LongType })) { LibraryScreen(nav, it.arguments!!.getLong("id")) }
+        composable("library/{id}?sort={sort}", listOf(navArgument("id") { type = NavType.LongType },
+            navArgument("sort") { type = NavType.StringType; nullable = true; defaultValue = null })) {
+            LibraryScreen(nav, it.arguments!!.getLong("id"), it.arguments!!.getString("sort"))
+        }
         composable("item/{id}", listOf(navArgument("id") { type = NavType.LongType })) { ItemScreen(nav, it.arguments!!.getLong("id")) }
         composable("playlist/{id}", listOf(navArgument("id") { type = NavType.LongType })) { PlaylistScreen(nav, it.arguments!!.getLong("id")) }
         composable(
@@ -197,14 +209,15 @@ val sidePadding get() = 16.dp
 
 /** A TV rail entry: gold when selected, a filled pill under the D-pad. */
 @Composable
-private fun TvRailItem(t: Dest, selected: Boolean, onClick: () -> Unit) {
+private fun TvRailItem(t: Dest, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val tint = when { focused -> MaterialTheme.colorScheme.background; selected -> Gold; else -> MaterialTheme.colorScheme.onSurfaceVariant }
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+        modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
             .background(if (focused) Gold else Color.Transparent)
             .onFocusChanged { focused = it.isFocused }
-            .clickable(onClick = onClick).padding(vertical = 10.dp),
+            // A tab, so TalkBack says which one is showing (as the phones' bottom bar does).
+            .selectable(selected, onClick = onClick, role = androidx.compose.ui.semantics.Role.Tab).padding(vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(t.icon, null, tint = tint)
@@ -218,5 +231,5 @@ private fun TvNowPlaying(onOpen: () -> Unit) {
     val music = LocalMusic.current
     val now by music.now.collectAsState()
     if (now == null) return
-    TvRailItem(Dest("nowplaying", "Playing", Icons.Filled.GraphicEq), false, onOpen)
+    TvRailItem(Dest("nowplaying", "Playing", Icons.Filled.GraphicEq), false, onClick = onOpen)
 }

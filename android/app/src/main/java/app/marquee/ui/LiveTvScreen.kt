@@ -118,7 +118,8 @@ import java.time.temporal.ChronoUnit
 
 private val clock = DateTimeFormatter.ofPattern("h:mm a")
 private fun OffsetDateTime.local() = atZoneSameInstant(ZoneId.systemDefault())
-private fun LiveProgramme.minutesLeft() = Duration.between(OffsetDateTime.now(), end).toMinutes().coerceAtLeast(0)
+// Rounded up: a programme in its last minute has "1m left", not "0m left".
+private fun LiveProgramme.minutesLeft() = ((Duration.between(OffsetDateTime.now(), end).seconds + 59) / 60).coerceAtLeast(0)
 private fun LiveProgramme.isOn(): Boolean { val n = OffsetDateTime.now(); return !start.isAfter(n) && end.isAfter(n) }
 private fun LiveProgramme.progress(): Float {
     val total = Duration.between(start, end).seconds.toFloat()
@@ -167,7 +168,9 @@ fun LiveTvScreen(nav: NavHostController) {
             else runCatching { marquee.livetv.liveGuide(start, start.plusHours(4), group, fav, recent).associate { it.channelId to it.programmes } }.getOrDefault(emptyMap())
         }
     }
-    fun watch(id: Long) = nav.navigate("live/$id")
+    // TV: the channel last watched has the focus on coming back (not the Guide tab).
+    var watched by rememberLastOpened("livetv")
+    fun watch(id: Long) { watched = id; nav.navigate("live/$id") }
     // Every connection of its source in use (LIVE-3): it can't be tuned now, so say why instead.
     fun unavailable(c: LiveChannel) = Toast.makeText(context, c.unavailableReason ?: "${c.name} isn't available right now.", Toast.LENGTH_LONG).show()
     fun pick(c: LiveChannel) {
@@ -199,7 +202,7 @@ fun LiveTvScreen(nav: NavHostController) {
             Text("Live TV", Modifier.padding(horizontal = sidePadding), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Row(Modifier.padding(horizontal = sidePadding), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 tabs.forEachIndexed { i, (key, label) ->
-                    FilterChip(current == key, { tab = key }, { Text(label) }, Modifier.focusRing(RoundedCornerShape(8.dp)).initialFocus(marquee.isTv && i == 0))
+                    FilterChip(current == key, { tab = key }, { Text(label) }, Modifier.focusRing(RoundedCornerShape(8.dp)).initialFocus(marquee.isTv && i == 0 && watched == null))
                 }
             }
         }
@@ -244,7 +247,7 @@ fun LiveTvScreen(nav: NavHostController) {
                 }
             }
             item {
-                Guide(list, guide, start, preview,
+                Guide(list, guide, start, preview, focus = watched.takeIf { marquee.isTv },
                     onChannel = ::pick,
                     onProgramme = { p, c ->
                         // On now: preview (phone) or watch (TV); the previewed channel's programme
@@ -269,7 +272,7 @@ fun LiveTvScreen(nav: NavHostController) {
                     })
             }
         } else {
-            items(list, key = { it.id }) { c -> WhatsOnRow(c) { if (c.available == false) unavailable(c) else watch(c.id) } }
+            items(list, key = { it.id }) { c -> WhatsOnRow(c, focus = marquee.isTv && watched == c.id) { if (c.available == false) unavailable(c) else watch(c.id) } }
         }
     }
     details?.let { (p, c) ->
@@ -308,7 +311,7 @@ fun ChannelLogo(c: LiveChannel, modifier: Modifier = Modifier) {
 
 @Composable
 private fun Guide(
-    channels: List<LiveChannel>, guide: Map<Long, List<LiveProgramme>>, start: OffsetDateTime, selected: Long?,
+    channels: List<LiveChannel>, guide: Map<Long, List<LiveProgramme>>, start: OffsetDateTime, selected: Long?, focus: Long? = null,
     onChannel: (LiveChannel) -> Unit, onProgramme: (LiveProgramme, LiveChannel) -> Unit, onFavorite: (LiveChannel) -> Unit,
 ) {
     val marquee = LocalMarquee.current
@@ -324,7 +327,7 @@ private fun Guide(
                 val off = c.available == false
                 Row(Modifier.height(row).fillMaxWidth().border(1.dp, if (selected == c.id) Gold else Color.Transparent, RoundedCornerShape(6.dp)),
                     verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f).focusCard({ onChannel(c) }).alpha(if (off) 0.4f else 1f).padding(4.dp)
+                    Column(Modifier.weight(1f).initialFocus(focus == c.id).focusCard({ onChannel(c) }).alpha(if (off) 0.4f else 1f).padding(4.dp)
                         .semantics { contentDescription = if (off) "${c.name}, unavailable: ${c.unavailableReason ?: "not available right now"}" else "Preview ${c.name}" },
                         horizontalAlignment = Alignment.CenterHorizontally) {
                         ChannelLogo(c, Modifier.width(56.dp).height(row * 0.45f))
@@ -374,9 +377,9 @@ private fun Guide(
 }
 
 @Composable
-private fun WhatsOnRow(c: LiveChannel, onWatch: () -> Unit) {
+private fun WhatsOnRow(c: LiveChannel, focus: Boolean = false, onWatch: () -> Unit) {
     val off = c.available == false
-    Column(Modifier.padding(horizontal = sidePadding).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Surface2).focusCard(onWatch, RoundedCornerShape(10.dp))
+    Column(Modifier.padding(horizontal = sidePadding).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Surface2).initialFocus(focus).focusCard(onWatch, RoundedCornerShape(10.dp))
         .alpha(if (off) 0.5f else 1f)
         .semantics { contentDescription = if (off) "${c.name}, unavailable" else "Watch ${c.name}" }.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

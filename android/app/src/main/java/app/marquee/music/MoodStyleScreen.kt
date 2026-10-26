@@ -1,6 +1,7 @@
 package app.marquee.music
 
 import androidx.compose.foundation.layout.Arrangement
+import app.marquee.ui.serverMessage
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -58,7 +59,7 @@ fun MoodStyleScreen(nav: NavHostController, libraryId: Long, kind: String, name:
     else RadioRequest(RadioRequest.Seed.GENRE, value = name, libraryId = libraryId, limit = 30)
     var error by remember { mutableStateOf<String?>(null) }
     val tracks by produceState<List<ItemSummary>?>(null) {
-        value = withContext(Dispatchers.IO) { runCatching { marquee.music.musicRadio(req).items }.onFailure { error = it.message }.getOrDefault(emptyList()) }
+        value = withContext(Dispatchers.IO) { runCatching { marquee.music.musicRadio(req).items }.onFailure { error = serverMessage(it) }.getOrDefault(emptyList()) }
     }
     val albums by produceState(emptyList<ItemSummary>(), tracks) {
         value = if (!isMood) withContext(Dispatchers.IO) {
@@ -73,7 +74,7 @@ fun MoodStyleScreen(nav: NavHostController, libraryId: Long, kind: String, name:
                 Text(name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Button({
                     scope.launch {
-                        runCatching { music.startRadio(req) }.onFailure { error = it.message }
+                        runCatching { music.startRadio(req) }.onFailure { error = serverMessage(it) }
                     }
                 }, Modifier.focusRing().initialFocus(marquee.isTv)) { Icon(Icons.Filled.Radio, null); Text("Play $name Radio") }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }

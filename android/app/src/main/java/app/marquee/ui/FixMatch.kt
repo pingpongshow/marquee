@@ -54,15 +54,24 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** The server's own message for a failed call ({code, message}), else the exception's. */
-fun serverMessage(e: Throwable): String {
+/**
+ * The server's own message for a failed call ({code, message}), capitalised, else the
+ * exception's, else [fallback]: never the client's "Client error : 409 Conflict" with its JSON.
+ */
+fun serverMessage(e: Throwable, fallback: String = "That didn't work"): String {
     val body = when (e) {
         is ClientException -> (e.response as? ClientError<*>)?.body
         is ServerException -> (e.response as? ServerError<*>)?.body
         else -> null
     }?.toString()
-    val msg = body?.let { runCatching { org.json.JSONObject(it).optString("message") }.getOrNull() }?.takeIf { it.isNotBlank() }
-    return msg ?: e.message ?: "That didn't work"
+    val msg = body?.let { b ->
+        runCatching { (kotlinx.serialization.json.Json.parseToJsonElement(b) as? kotlinx.serialization.json.JsonObject)?.get("message")
+            ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content } }.getOrNull()
+    }?.takeIf { it.isNotBlank() }
+    if (msg != null) return msg.replaceFirstChar { it.uppercase() }
+    // A failed call without a readable body: its status line alone says nothing useful.
+    if (e is ClientException || e is ServerException) return fallback
+    return e.message ?: fallback
 }
 
 /** Movies and shows can be matched again (TMDB). */
