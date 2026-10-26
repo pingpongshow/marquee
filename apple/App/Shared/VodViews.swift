@@ -649,6 +649,8 @@ struct VodMovieView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .task { await load() }
+        // Again once the player has recorded where they stopped (after the cover closed).
+        .onChange(of: HomeChanges.shared.version) { Task { await load() } }
         .fullScreenCover(item: $playing, onDismiss: { Task { await load() } }) { t in
             VodPlayerView(target: t)
         }
@@ -1184,6 +1186,9 @@ struct VodPlayerView: View {
         Task {
             if pos > 0 { await app.reportVod(id, positionMs: pos, durationMs: dur) }
             await app.stopVod(id)
+            // The film's or show's page loads again with where they stopped (its own reload on
+            // the cover closing can come before this report), and Continue Watching follows.
+            HomeChanges.shared.version += 1
         }
     }
 

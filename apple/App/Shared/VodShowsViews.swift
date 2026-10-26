@@ -123,6 +123,8 @@ struct VodSeriesView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .task { await load() }
+        // Again once the player has recorded where they stopped (after the cover closed).
+        .onChange(of: HomeChanges.shared.version) { Task { await load() } }
         .fullScreenCover(item: $playing, onDismiss: { Task { await load() } }) { t in
             VodPlayerView(target: t)
         }
