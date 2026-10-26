@@ -376,7 +376,7 @@ struct LibrariesList: View {
                         Label {
                             VStack(alignment: .leading) {
                                 Text(lib.name)
-                                Text("\(lib.itemCount) items").font(.caption).foregroundStyle(.secondary)
+                                Text(libraryCount(lib._type, lib.itemCount)).font(.caption).foregroundStyle(.secondary)
                             }
                         } icon: {
                             Image(systemName: icon(lib._type)).foregroundStyle(Color.marqueeGold)
@@ -452,6 +452,18 @@ struct LibrariesList: View {
 }
 
 /// An item opened from a link (the Apple TV Top Shelf).
+/// A library's size in what it holds: "303 movies", "1 show", "10 artists".
+func libraryCount(_ t: Schemas.LibraryType, _ n: Int) -> String {
+    let (one, many) = switch t {
+    case .movies: ("movie", "movies")
+    case .shows, .anime: ("show", "shows")
+    case .music: ("artist", "artists")
+    case .videos: ("video", "videos")
+    case .photos: ("photo", "photos")
+    }
+    return "\(n) \(n == 1 ? one : many)"
+}
+
 struct LinkedItem: Identifiable {
     let id: Int64
 }

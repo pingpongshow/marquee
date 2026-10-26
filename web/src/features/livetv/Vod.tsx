@@ -658,7 +658,24 @@ export function VodVideo({
     const stop = (id: string) =>
       void api.DELETE("/livetv/vod/sessions/{sessionId}", { params: { path: { sessionId: id } } }).catch(() => {});
     const onPause = () => void report();
-    const onEnd = () => void report().then(() => ended.current());
+    let finished = false;
+    const onEnd = () => {
+      if (finished) return;
+      finished = true;
+      void report().then(() => ended.current());
+    };
+    // A file a little shorter than its stated length ends early on the server, and hls.js then
+    // waits at the end for data that never comes: near the end, a stall that lasts is the end.
+    let stall: ReturnType<typeof setTimeout> | undefined;
+    const onWaiting = () => {
+      if (!v) return;
+      clearTimeout(stall);
+      const at = v.currentTime;
+      stall = setTimeout(() => {
+        const left = v.duration - v.currentTime;
+        if (!v.paused && Number.isFinite(left) && left < 60 && v.currentTime - at < 0.5) onEnd();
+      }, 5000);
+    };
     const onTime = () => {
       if (!v) return;
       setTime(v.currentTime);
@@ -666,6 +683,7 @@ export function VodVideo({
     };
     v?.addEventListener("pause", onPause);
     v?.addEventListener("ended", onEnd);
+    v?.addEventListener("waiting", onWaiting);
     v?.addEventListener("timeupdate", onTime);
     (async () => {
       // The player code loads while the session starts; if it fails to load, the session is ended.
@@ -718,8 +736,10 @@ export function VodVideo({
     return () => {
       cancelled = true;
       clearInterval(timer);
+      clearTimeout(stall);
       v?.removeEventListener("pause", onPause);
       v?.removeEventListener("ended", onEnd);
+      v?.removeEventListener("waiting", onWaiting);
       v?.removeEventListener("timeupdate", onTime);
       const id = session;
       // Record where they stopped before ending the session (the position is reported against it).

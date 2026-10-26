@@ -92,6 +92,7 @@ final class Batch5UITests: XCTestCase {
         app.secureTextFields["Password"].typeText(user.password)
         app.buttons["Sign In"].tap()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
+        app.dismissSavePassword()
     }
 
     private func openLibrary(_ name: String) {
@@ -251,7 +252,7 @@ final class Batch5UITests: XCTestCase {
         shot("d1-trailer-button")
         let before = try sessions(for: 362)
         trailer.tap()
-        XCTAssertTrue(app.buttons["Close player"].waitForExistence(timeout: 15), "the player opens")
+        XCTAssertTrue(app.videoPlayer.waitForExistence(timeout: 15), "the player opens")
         var now = try sessions(for: 362)
         for _ in 0..<15 where now <= before {
             sleep(1)
@@ -320,13 +321,14 @@ final class Batch5UITests: XCTestCase {
         let play = app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume'}")).firstMatch
         XCTAssertTrue(play.waitForExistence(timeout: 10))
         play.tap()
-        let close = app.buttons["Close player"]
-        XCTAssertTrue(close.waitForExistence(timeout: 15), "the overlay shows at start")
-        XCTAssertTrue(close.isHittable)
+        // The overlay's own buttons (from iOS 26 the close button is AVKit's, which comes and goes
+        // with AVKit's controls, so the settings button stands for the overlay).
         let settings = app.buttons["Playback settings"]
-        XCTAssertTrue(settings.exists)
+        XCTAssertTrue(settings.waitForExistence(timeout: 15), "the overlay shows at start")
+        XCTAssertTrue(settings.isHittable)
+        let ours = app.buttons["Close player"]
         // One background per button: the bubble is the button, 44 points round.
-        for b in [close, settings] {
+        for b in [settings] + (ours.exists ? [ours] : []) {
             XCTAssertEqual(b.frame.width, 44, accuracy: 2, "\(b.label): \(b.frame)")
             XCTAssertEqual(b.frame.height, 44, accuracy: 2, "\(b.label): \(b.frame)")
         }
@@ -334,17 +336,17 @@ final class Batch5UITests: XCTestCase {
 
         // Untouched while playing: gone after about 3 s.
         let gone = NSPredicate(format: "exists == false OR hittable == false")
-        let hidden = expectation(for: gone, evaluatedWith: close)
+        let hidden = expectation(for: gone, evaluatedWith: settings)
         wait(for: [hidden], timeout: 8)
-        XCTAssertFalse(settings.exists && settings.isHittable, "the other buttons hide with it")
+        XCTAssertFalse(ours.exists && ours.isHittable, "the other buttons hide with it")
         shot("e2-overlay-hidden")
 
         // A tap on the video brings them back.
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)).tap()
-        XCTAssertTrue(close.waitForExistence(timeout: 3), "a tap brings the overlay back")
-        XCTAssertTrue(close.isHittable)
+        XCTAssertTrue(settings.waitForExistence(timeout: 3), "a tap brings the overlay back")
+        XCTAssertTrue(settings.isHittable)
         shot("e3-overlay-back")
-        close.tap()
+        app.closePlayer()
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label IN {'Play', 'Resume'}")).firstMatch.waitForExistence(timeout: 10))
     }
 }

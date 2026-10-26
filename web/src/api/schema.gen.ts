@@ -2787,6 +2787,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/livetv/vod/movies/{movieId}/watchlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                movieId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Put a film on demand on your watchlist (USER-8). It's in the Your Watchlist Home row's mixedEntries (and its See all) with the library's titles, most recently added first. Like a library movie, it leaves the row once watched. */
+        put: operations["addVodMovieToWatchlist"];
+        post?: never;
+        /** Take a film on demand off your watchlist. */
+        delete: operations["removeVodMovieFromWatchlist"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/livetv/vod/movies/{movieId}/play": {
         parameters: {
             query?: never;
@@ -2988,6 +3008,26 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/vod/series/{seriesId}/watchlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Put a series on demand on your watchlist (USER-8). It's in the Your Watchlist Home row's mixedEntries (and its See all) with the library's titles, most recently added first. */
+        put: operations["addVodSeriesToWatchlist"];
+        post?: never;
+        /** Take a series on demand off your watchlist. */
+        delete: operations["removeVodSeriesFromWatchlist"];
         options?: never;
         head?: never;
         patch?: never;
@@ -5181,6 +5221,8 @@ export interface components {
             saveDestinations?: components["schemas"]["VodSaveDestinationRef"][];
             save?: components["schemas"]["VodSaveState"];
             library?: components["schemas"]["VodLibraryMatch"];
+            /** @description On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/movies/{id}/watchlist. */
+            watchlisted?: boolean;
         };
         VodMoviePage: {
             total: number;
@@ -5289,6 +5331,8 @@ export interface components {
             /** @description Admins: the extra save folders episodes can go to (vodSave.destinations of kind shows or both). */
             saveDestinations?: components["schemas"]["VodSaveDestinationRef"][];
             library?: components["schemas"]["VodLibraryRollup"];
+            /** @description On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/series/{id}/watchlist. */
+            watchlisted?: boolean;
         };
         VodSeason: {
             /** @description The season number (0 = specials). */
@@ -6885,7 +6929,7 @@ export interface components {
             total?: number;
             /** @description Watch on VOD (id vod-suggestions) only, sent when the request asks with vod=true: films and series on demand picked for the caller, best first (items is empty). */
             vodEntries?: components["schemas"]["VodSuggestion"][];
-            /** @description Sent when the request asks with mixed=true, on suggestion rows: library items and films and series on demand together, best first. When it's present show it instead of items (mark the on-demand ones as VOD). */
+            /** @description Sent when the request asks with mixed=true, on suggestion rows and the watchlist: library items and films and series on demand together, best first (the watchlist: most recently added first). When it's present show it instead of items (mark the on-demand ones as VOD). */
             mixedEntries?: components["schemas"]["HomeEntry"][];
         };
         /** @description One title in a mixed Home row: a library movie or show, or a film or series on demand. */
@@ -12852,6 +12896,52 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    addVodMovieToWatchlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                movieId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Added (or already there). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    removeVodMovieFromWatchlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                movieId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed (or wasn't there). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     playVodMovie: {
         parameters: {
             query?: never;
@@ -13205,6 +13295,52 @@ export interface operations {
                     "image/*": string;
                 };
             };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addVodSeriesToWatchlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Added (or already there). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    removeVodSeriesFromWatchlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed (or wasn't there). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };

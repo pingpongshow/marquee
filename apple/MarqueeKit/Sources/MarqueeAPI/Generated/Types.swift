@@ -967,6 +967,16 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /livetv/vod/movies/{movieId}/watched`.
     /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/watched/delete(markVodUnwatched)`.
     func markVodUnwatched(_ input: Operations.MarkVodUnwatched.Input) async throws -> Operations.MarkVodUnwatched.Output
+    /// Put a film on demand on your watchlist (USER-8). It's in the Your Watchlist Home row's mixedEntries (and its See all) with the library's titles, most recently added first. Like a library movie, it leaves the row once watched.
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/movies/{movieId}/watchlist`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/watchlist/put(addVodMovieToWatchlist)`.
+    func addVodMovieToWatchlist(_ input: Operations.AddVodMovieToWatchlist.Input) async throws -> Operations.AddVodMovieToWatchlist.Output
+    /// Take a film on demand off your watchlist.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/movies/{movieId}/watchlist`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/watchlist/delete(removeVodMovieFromWatchlist)`.
+    func removeVodMovieFromWatchlist(_ input: Operations.RemoveVodMovieFromWatchlist.Input) async throws -> Operations.RemoveVodMovieFromWatchlist.Output
     /// Start watching a film. Returns a seekable HLS session: an M3U source's own HLS passed through, or (Xtream Codes sources, whose films are files) the file made into HLS by the server, video copied when the device plays it and audio converted when needed.
     ///
     /// - Remark: HTTP `POST /livetv/vod/movies/{movieId}/play`.
@@ -1032,6 +1042,16 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /livetv/vod/series/{seriesId}/image`.
     /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/image/get(vodSeriesImage)`.
     func vodSeriesImage(_ input: Operations.VodSeriesImage.Input) async throws -> Operations.VodSeriesImage.Output
+    /// Put a series on demand on your watchlist (USER-8). It's in the Your Watchlist Home row's mixedEntries (and its See all) with the library's titles, most recently added first.
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/series/{seriesId}/watchlist`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watchlist/put(addVodSeriesToWatchlist)`.
+    func addVodSeriesToWatchlist(_ input: Operations.AddVodSeriesToWatchlist.Input) async throws -> Operations.AddVodSeriesToWatchlist.Output
+    /// Take a series on demand off your watchlist.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/series/{seriesId}/watchlist`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watchlist/delete(removeVodSeriesFromWatchlist)`.
+    func removeVodSeriesFromWatchlist(_ input: Operations.RemoveVodSeriesFromWatchlist.Input) async throws -> Operations.RemoveVodSeriesFromWatchlist.Output
     /// Mark every episode of a series (or of one season) watched.
     ///
     /// - Remark: HTTP `PUT /livetv/vod/series/{seriesId}/watched`.
@@ -3728,6 +3748,32 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// Put a film on demand on your watchlist (USER-8). It's in the Your Watchlist Home row's mixedEntries (and its See all) with the library's titles, most recently added first. Like a library movie, it leaves the row once watched.
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/movies/{movieId}/watchlist`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/watchlist/put(addVodMovieToWatchlist)`.
+    public func addVodMovieToWatchlist(
+        path: Operations.AddVodMovieToWatchlist.Input.Path,
+        headers: Operations.AddVodMovieToWatchlist.Input.Headers = .init()
+    ) async throws -> Operations.AddVodMovieToWatchlist.Output {
+        try await addVodMovieToWatchlist(Operations.AddVodMovieToWatchlist.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Take a film on demand off your watchlist.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/movies/{movieId}/watchlist`.
+    /// - Remark: Generated from `#/paths//livetv/vod/movies/{movieId}/watchlist/delete(removeVodMovieFromWatchlist)`.
+    public func removeVodMovieFromWatchlist(
+        path: Operations.RemoveVodMovieFromWatchlist.Input.Path,
+        headers: Operations.RemoveVodMovieFromWatchlist.Input.Headers = .init()
+    ) async throws -> Operations.RemoveVodMovieFromWatchlist.Output {
+        try await removeVodMovieFromWatchlist(Operations.RemoveVodMovieFromWatchlist.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// Start watching a film. Returns a seekable HLS session: an M3U source's own HLS passed through, or (Xtream Codes sources, whose films are files) the file made into HLS by the server, video copied when the device plays it and audio converted when needed.
     ///
     /// - Remark: HTTP `POST /livetv/vod/movies/{movieId}/play`.
@@ -3882,6 +3928,32 @@ extension APIProtocol {
         try await vodSeriesImage(Operations.VodSeriesImage.Input(
             path: path,
             query: query,
+            headers: headers
+        ))
+    }
+    /// Put a series on demand on your watchlist (USER-8). It's in the Your Watchlist Home row's mixedEntries (and its See all) with the library's titles, most recently added first.
+    ///
+    /// - Remark: HTTP `PUT /livetv/vod/series/{seriesId}/watchlist`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watchlist/put(addVodSeriesToWatchlist)`.
+    public func addVodSeriesToWatchlist(
+        path: Operations.AddVodSeriesToWatchlist.Input.Path,
+        headers: Operations.AddVodSeriesToWatchlist.Input.Headers = .init()
+    ) async throws -> Operations.AddVodSeriesToWatchlist.Output {
+        try await addVodSeriesToWatchlist(Operations.AddVodSeriesToWatchlist.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Take a series on demand off your watchlist.
+    ///
+    /// - Remark: HTTP `DELETE /livetv/vod/series/{seriesId}/watchlist`.
+    /// - Remark: Generated from `#/paths//livetv/vod/series/{seriesId}/watchlist/delete(removeVodSeriesFromWatchlist)`.
+    public func removeVodSeriesFromWatchlist(
+        path: Operations.RemoveVodSeriesFromWatchlist.Input.Path,
+        headers: Operations.RemoveVodSeriesFromWatchlist.Input.Headers = .init()
+    ) async throws -> Operations.RemoveVodSeriesFromWatchlist.Output {
+        try await removeVodSeriesFromWatchlist(Operations.RemoveVodSeriesFromWatchlist.Input(
+            path: path,
             headers: headers
         ))
     }

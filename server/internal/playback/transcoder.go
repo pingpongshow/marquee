@@ -17,6 +17,16 @@ import (
 
 var ErrSegmentTimeout = errors.New("transcoder didn't produce the segment in time")
 
+// ErrPastEnd is a segment the playlist lists after where the file really ends: FFmpeg reached
+// the end of its input without it. A remote file's stated length (a source's own figure, or
+// a probe that couldn't read the whole file) can be a few seconds longer than the file, and
+// the playlist's fixed-length segments then run past it.
+var ErrPastEnd = errors.New("segment past the end of the file")
+
+// pastEndSlack is how far short of its stated length a file may end for its missing last
+// segments to count as past the end rather than as a failure.
+const pastEndSlack = 60.0
+
 // Transcoder runs FFmpeg for one session, restarting it on seeks, pausing it when it runs too
 // far ahead of the viewer, and falling back to the next encoder if one fails.
 type Transcoder struct {
@@ -202,6 +212,19 @@ func (t *Transcoder) Init(ctx context.Context) (string, error) {
 	return p, nil
 }
 
+// endsNearStatedEnd reports whether the run that just finished cleanly ended within
+// pastEndSlack of the file's stated end (the playlist's), so the segments after its last one
+// are past the real end; t.mu is held. Further short, it's a failure (a source that cut off).
+func (t *Transcoder) endsNearStatedEnd() bool {
+	plan := t.plan()
+	if len(plan) == 0 {
+		return false
+	}
+	stated := plan[len(plan)-1] + SegmentSeconds // where the last listed segment ends, at most
+	ended := t.Job.SegmentStart(t.produced + 1)  // where the last produced one ends
+	return stated-ended <= pastEndSlack
+}
+
 // Segment returns the path of segment k once it exists.
 func (t *Transcoder) Segment(ctx context.Context, k int) (string, error) {
 	if k < 0 || k >= t.TotalSegments {
@@ -282,7 +305,12 @@ func (t *Transcoder) waitFor(ctx context.Context, p string, k int) error {
 		if exited && !exists(p) {
 			err := t.exitErr
 			msg := t.stderrText()
+			t.refreshProduced()
+			pastEnd := err == nil && k >= t.startSeg && k > t.produced && t.endsNearStatedEnd()
 			t.mu.Unlock()
+			if pastEnd {
+				return ErrPastEnd
+			}
 			if err == nil {
 				return fmt.Errorf("transcoder finished without producing %s", filepath.Base(p))
 			}

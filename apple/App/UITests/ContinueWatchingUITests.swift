@@ -165,12 +165,14 @@ final class ContinueWatchingUITests: XCTestCase {
         app.secureTextFields["Password"].typeText(user.password)
         app.buttons["Sign In"].tap()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
+        app.dismissSavePassword()
     }
 
     private func tile(_ key: String) -> XCUIElement { app.buttons["continue.\(key)"] }
 
     /// The row's title, a link to the page when there's more than the row holds.
-    private var rowTitle: XCUIElement { app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Continue Watching'")).firstMatch }
+    /// The row's See all link (the title itself is plain text).
+    private var rowTitle: XCUIElement { app.buttons["See all Continue Watching"].firstMatch }
 
     private func contextMenu(_ element: XCUIElement, _ entry: String) {
         element.press(forDuration: 1.2)
@@ -223,12 +225,12 @@ final class ContinueWatchingUITests: XCTestCase {
         XCTAssertTrue(last.waitForExistence(timeout: 10), "the oldest entry loads in")
         shot("4-page-end")
 
-        // The row's title opens the page too.
+        // The row's See all opens the page too.
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10))
         app.swipeDown()
         let title = rowTitle
-        XCTAssertTrue(title.waitForExistence(timeout: 10), "the row's title is a link")
+        XCTAssertTrue(title.waitForExistence(timeout: 10), "the row has See all")
         title.tap()
         XCTAssertTrue(app.navigationBars["Continue Watching"].waitForExistence(timeout: 10))
     }
@@ -243,7 +245,7 @@ final class ContinueWatchingUITests: XCTestCase {
         XCTAssertTrue(episode.waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["continue.viewMore"].exists, "no View more when the row holds everything")
         episode.tap()
-        XCTAssertTrue(app.buttons["Close player"].waitForExistence(timeout: 15), "the VOD player opens")
+        XCTAssertTrue(app.videoPlayer.waitForExistence(timeout: 15), "the VOD player opens")
         XCTAssertTrue(app.staticTexts["Apple Test Show · S1 · E1"].waitForExistence(timeout: 5), "with the episode")
         sleep(3)
         shot("1-episode-playing")
@@ -258,15 +260,12 @@ final class ContinueWatchingUITests: XCTestCase {
         let film = tile(keys.film)
         XCTAssertTrue(film.waitForExistence(timeout: 10))
         film.tap()
-        XCTAssertTrue(app.buttons["Close player"].waitForExistence(timeout: 20), "the film plays")
+        XCTAssertTrue(app.videoPlayer.waitForExistence(timeout: 20), "the film plays")
         XCTAssertTrue(app.staticTexts["Apple XC Film One"].waitForExistence(timeout: 5))
         sleep(3)
         shot("3-film-playing")
         // The player's controls hide while it plays: a tap brings them back.
-        let close = app.buttons["Close player"]
-        if !close.exists { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
-        XCTAssertTrue(close.waitForExistence(timeout: 5))
-        close.tap()
+        app.closePlayer()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10))
     }
 

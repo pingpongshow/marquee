@@ -62,10 +62,16 @@ struct ArtworkView: View {
         // In a circle the name sits in the middle: the bottom corner is clipped away.
         return LinearGradient(colors: [Color(hue: hue, saturation: 0.35, brightness: 0.3), Color(hue: hue, saturation: 0.3, brightness: 0.12)],
                               startPoint: .topLeading, endPoint: .bottomTrailing)
-            .overlay(alignment: round ? .center : .bottomLeading) {
-                Text(item.title).font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.85)).lineLimit(3)
-                    .multilineTextAlignment(round ? .center : .leading)
-                    .padding(round ? width * 0.16 : 8)
+            .overlay(alignment: round || width < 72 ? .center : .bottomLeading) {
+                // Too small for the title (song rows, the mini player): its first letter, not "Fl…".
+                if width < 72 {
+                    Text(item.title.first(where: { $0.isLetter || $0.isNumber }).map { String($0).uppercased() } ?? "")
+                        .font(.headline).foregroundStyle(.white.opacity(0.7))
+                } else {
+                    Text(item.title).font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.85)).lineLimit(3)
+                        .multilineTextAlignment(round ? .center : .leading)
+                        .padding(round ? width * 0.16 : 8)
+                }
             }
     }
 
@@ -678,7 +684,9 @@ struct AdaptiveLabelStyle: LabelStyle {
             }
             .labelStyle(.iconOnly)
         } else {
-            Label(configuration).labelStyle(.titleAndIcon)
+            // The same line height as icon-only: a labelled button beside an icon-only one was
+            // 2 points shorter (a line of text is under 22 points).
+            LineHeight { Label(configuration).labelStyle(.titleAndIcon) }
         }
     }
 }

@@ -251,7 +251,13 @@ func (h *Handlers) fillHub(r homeRow, mixed bool, n int) (Hub, bool, error) {
 	for i, it := range list {
 		hub.Items[i] = toAPISummary(it)
 	}
-	if mixed && r.vodFill != nil {
+	if mixed && r.vodFill != nil && r.merge != nil {
+		entries, err := r.merge(list, vod, mixedCap(n))
+		if err != nil {
+			return Hub{}, false, err
+		}
+		hub.MixedEntries = &entries
+	} else if mixed && r.vodFill != nil {
 		hub.MixedEntries = ptr(mixEntries(list, vod, mixedCap(n)))
 	} else if len(list) == 0 {
 		return Hub{}, false, nil // nothing older apps can show

@@ -19,6 +19,9 @@ struct StatsView: View {
             .pickerStyle(.segmented)
             // Year in music (MUSIC-22).
             RecapCard().listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
+                #if os(iOS)
+                .listRowSeparator(.hidden)
+                #endif
             if let error { Text(error).foregroundStyle(.red) }
             if let s = stats {
                 if s.plays == 0 {
@@ -39,6 +42,8 @@ struct StatsView: View {
                 ProgressView()
             }
         }
+        // Without a year in music the recap row is empty: no 44-point blank band for it.
+        .environment(\.defaultMinListRowHeight, 0)
         .navigationTitle("Your Stats")
         .task(id: days) {
             do { stats = try await app.stats(days: days); error = nil } catch { self.error = error.localizedDescription }

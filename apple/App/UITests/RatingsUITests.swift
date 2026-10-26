@@ -101,6 +101,7 @@ final class RatingsUITests: XCTestCase {
         app.secureTextFields["Password"].typeText(password)
         app.buttons["Sign In"].tap()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
+        app.dismissSavePassword()
     }
 
     private func openLibrary(_ name: String) {

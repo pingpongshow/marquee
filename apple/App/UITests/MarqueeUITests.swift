@@ -24,6 +24,9 @@ final class MarqueeUITests: XCTestCase {
 
     private func connectAndSignIn() {
         let address = app.textFields["Home address, e.g. 192.168.1.20:32500"]
+        // At large text sizes the field is below the fold, out of the (lazy) list until scrolled to.
+        _ = app.staticTexts["Welcome to Marquee"].waitForExistence(timeout: 10)
+        for _ in 0..<4 where !address.exists { app.swipeUp() }
         XCTAssertTrue(address.waitForExistence(timeout: 10))
         shot("01-connect")
         address.tap()
@@ -103,8 +106,7 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(play.waitForExistence(timeout: 10))
         shot("05-movie-detail")
         play.tap()
-        let close = app.buttons["Close player"]
-        XCTAssertTrue(close.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.videoPlayer.waitForExistence(timeout: 10))
         sleep(6)
         shot("06-video-playing")
         app.closePlayer()
@@ -223,7 +225,7 @@ final class MarqueeUITests: XCTestCase {
         XCTAssertTrue(entry.waitForExistence(timeout: 10))
         shot("d2-downloads")
         entry.tap()
-        XCTAssertTrue(app.buttons["Close player"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.videoPlayer.waitForExistence(timeout: 10))
         sleep(4)
         shot("d3-playing-offline")
         app.closePlayer()
@@ -802,6 +804,7 @@ final class MarqueeUITests: XCTestCase {
         code.typeText(totp(secret, ahead: 1)) // the enable code's step is used up
         app.buttons["Sign In"].tap()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
+        app.dismissSavePassword()
         shot("t2-signed-in")
     }
 
@@ -1140,7 +1143,8 @@ final class MarqueeUITests: XCTestCase {
         shot("ct1-trailer")
         app.buttons["Skip All"].tap()
         XCTAssertTrue(label.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["Playback settings"].waitForExistence(timeout: 10), "the movie plays")
+        // The overlay hides a few seconds into playback: playerControl brings it back.
+        XCTAssertTrue(app.playerControl("Playback settings").waitForExistence(timeout: 10), "the movie plays")
         sleep(2)
         shot("ct2-movie")
         app.closePlayer()
@@ -1167,11 +1171,15 @@ final class MarqueeUITests: XCTestCase {
     func testEditHomeAndPin() throws {
         let user = try temporaryUser()
         signIn(username: user.name, password: user.password)
+        // Home's rows load as they scroll in: Recently Added Movies is below the first ones.
         let movies = app.descendants(matching: .any)["Recently Added Movies"].firstMatch
-        XCTAssertTrue(movies.waitForExistence(timeout: 10))
+        for _ in 0..<8 where !movies.waitForExistence(timeout: 2) { app.swipeUp() }
+        XCTAssertTrue(movies.exists)
         app.buttons["Edit Home"].tap()
+        // Far down the list, below the newer rows: scrolled to.
         let hide = app.buttons["Hide Recently Added Movies"]
-        XCTAssertTrue(hide.waitForExistence(timeout: 10))
+        for _ in 0..<8 where !hide.waitForExistence(timeout: 2) { app.swipeUp() }
+        XCTAssertTrue(hide.exists)
         shot("eh1-edit-home")
         hide.tap()
         XCTAssertTrue(app.buttons["Show Recently Added Movies"].waitForExistence(timeout: 5))
@@ -1195,8 +1203,10 @@ final class MarqueeUITests: XCTestCase {
 
         // Home shows it; its title opens the collection.
         app.buttons["Home"].firstMatch.tap()
-        let row = app.buttons["Test Saga"].firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "the pinned collection is a Home row")
+        // Its See all (a row's title isn't a link).
+        let row = app.buttons["See all Test Saga"].firstMatch
+        for _ in 0..<10 where !row.waitForExistence(timeout: 2) { app.swipeUp() }
+        XCTAssertTrue(row.exists, "the pinned collection is a Home row")
         shot("eh4-home-pinned")
         row.tap()
         let unpin = app.buttons["Unpin from Home"]
@@ -1208,11 +1218,13 @@ final class MarqueeUITests: XCTestCase {
         // Back to the default layout.
         app.buttons["Edit Home"].tap()
         let reset = app.buttons["Reset to Default"]
-        XCTAssertTrue(reset.waitForExistence(timeout: 10))
+        for _ in 0..<10 where !reset.waitForExistence(timeout: 2) { app.swipeUp() } // at the end of the list
+        XCTAssertTrue(reset.exists)
         reset.tap()
-        XCTAssertTrue(hide.waitForExistence(timeout: 5))
+        sleep(2) // saved; Home shows the row again below (a pull down here would close the sheet)
         app.buttons["Done"].tap()
-        XCTAssertTrue(movies.waitForExistence(timeout: 10))
+        for _ in 0..<8 where !movies.waitForExistence(timeout: 2) { app.swipeUp() }
+        XCTAssertTrue(movies.exists)
     }
 
     /// Starts the Music library's radio and opens Now Playing.
@@ -1365,6 +1377,7 @@ final class MarqueeUITests: XCTestCase {
         app.secureTextFields["Password"].typeText(password)
         app.buttons["Sign In"].tap()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
+        app.dismissSavePassword()
     }
 
     /// A temporary account (other clients' tests share the server's profiles, and their Home
@@ -1412,7 +1425,15 @@ final class MarqueeUITests: XCTestCase {
         let copy = app.buttons["Copy"].firstMatch
         XCTAssertTrue(copy.waitForExistence(timeout: 10) || app.otherElements["ActivityListView"].waitForExistence(timeout: 2), "the share sheet opens")
         shot("inv4-share-sheet")
-        if copy.exists { copy.tap() } else { app.buttons["Close"].firstMatch.tap() }
+        let close = app.buttons["Close"].firstMatch
+        if copy.exists {
+            copy.tap()
+        } else if close.exists {
+            close.tap()
+        } else {
+            // iOS 26's sheet has neither as a button here: pull it down.
+            app.otherElements["ActivityListView"].firstMatch.swipeDown(velocity: .fast)
+        }
         XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5))
         app.buttons["Done"].tap()
 

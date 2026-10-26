@@ -134,6 +134,7 @@ final class VodUITests: XCTestCase {
         app.secureTextFields["Password"].typeText(user.password)
         app.buttons["Sign In"].tap()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
+        app.dismissSavePassword()
     }
 
     private func openLibrariesTab() {
@@ -234,7 +235,7 @@ final class VodUITests: XCTestCase {
         XCTAssertEqual(app.buttons["vod.play"].label, "Play")
         shot("1-page")
         app.buttons["vod.play"].tap()
-        XCTAssertTrue(app.buttons["Close player"].waitForExistence(timeout: 10), "the player opens")
+        XCTAssertTrue(app.videoPlayer.waitForExistence(timeout: 10), "the player opens")
         sleep(8)
         shot("2-playing")
         app.closePlayer()
@@ -259,12 +260,41 @@ final class VodUITests: XCTestCase {
         let resume = app.buttons["vod.play"]
         XCTAssertEqual(resume.label, "Resume from 0:20")
         resume.tap()
-        XCTAssertTrue(app.buttons["Close player"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.videoPlayer.waitForExistence(timeout: 10))
         sleep(6)
         app.closePlayer()
         // Carried on from 0:20, not from the start.
         try eventually(10, "resumed past the reported point") { (try movie(id, user.token)["positionMs"] as? Int ?? 0) > 20000 }
         shot("resumed")
+    }
+
+    /// A film on demand goes on the watchlist from its page and off again (USER-8); Home's Your
+    /// Watchlist row has it meanwhile.
+    func testWatchlistFilm() throws {
+        let id = try ensureVod()
+        let user = try temporaryUser()
+        signIn(user)
+        openFilm()
+        let toggle = app.buttons["vod.watchlist"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "the page offers Watchlist")
+        XCTAssertEqual(toggle.label, "Watchlist")
+        toggle.tap()
+        try eventually(10, "the server has it") { try movie(id, user.token)["watchlisted"] as? Bool == true }
+        XCTAssertEqual(app.buttons["vod.watchlist"].label, "On Watchlist")
+        shot("w1-on-watchlist")
+
+        app.tabBars.buttons["Home"].tap()
+        XCTAssertTrue(app.vodWatchlistTile(film).waitForExistence(timeout: 10), "Your Watchlist has the film")
+        shot("w2-home-row")
+
+        // Off again from the film's page.
+        app.vodWatchlistTile(film).tap()
+        let back = app.buttons["vod.watchlist"]
+        XCTAssertTrue(back.waitForExistence(timeout: 10))
+        XCTAssertEqual(back.label, "On Watchlist")
+        back.tap()
+        try eventually(10, "the server took it off") { try movie(id, user.token)["watchlisted"] as? Bool == false }
+        XCTAssertEqual(app.buttons["vod.watchlist"].label, "Watchlist")
     }
 
     /// Mark watched and unwatched from the film's page.

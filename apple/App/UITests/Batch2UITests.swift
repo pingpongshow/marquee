@@ -112,6 +112,7 @@ final class Batch2UITests: XCTestCase {
         app.secureTextFields["Password"].typeText(password)
         app.buttons["Sign In"].tap()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
+        app.dismissSavePassword()
     }
 
     private func signInAsKiddo() {
@@ -255,7 +256,7 @@ final class Batch2UITests: XCTestCase {
         play.tap()
         let skipAll = app.buttons["Skip All"]
         if skipAll.waitForExistence(timeout: 3) { skipAll.tap() }
-        XCTAssertTrue(app.buttons["Close player"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.videoPlayer.waitForExistence(timeout: 15))
         sleep(3)
         shot("sa2-playing")
         app.closePlayer()

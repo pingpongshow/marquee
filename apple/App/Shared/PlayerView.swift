@@ -50,6 +50,7 @@ struct PlayerView: View {
                                      trailer: trailerIndex == nil ? nil : TrailerActions(skip: nextTrailer, skipAll: skipTrailers),
                                      chrome: chromeModel)
                         .ignoresSafeArea()
+                        .accessibilityIdentifier("video.player")
                 }
                 overlays(p)
                 #if os(iOS)
@@ -100,6 +101,11 @@ struct PlayerView: View {
         .onDisappear {
             life.closed = true
             #if os(iOS)
+            // AVKit's own close button (iOS 26) dismisses the cover without close(): do the rest
+            // of it here (each step does nothing the second time).
+            askAfterClosing()
+            endUpNext()
+            if presenter.request?.id == request.id { presenter.request = nil }
             let cast = CastController.shared
             cast.videoActive = false
             cast.onVideoConnected = nil
@@ -177,8 +183,10 @@ struct PlayerView: View {
     /// Close at the left; settings, Cast and Watch Together at the right.
     private func topButtons(_ p: VideoPlayback) -> some View {
         HStack {
-            Button { close() } label: { PlayerBubble(systemImage: "xmark") }
-                .accessibilityLabel("Close player")
+            if !PlayerChrome.systemClose {
+                Button { close() } label: { PlayerBubble(systemImage: "xmark") }
+                    .accessibilityLabel("Close player")
+            }
             Spacer()
             if trailerIndex == nil {
                 if together?.group == nil { optionsMenu(p) }
@@ -488,6 +496,11 @@ final class PlayerChrome {
     static var hideAfter: Duration = .seconds(3)
     /// AVKit's inline top bar (PiP, volume) sits in the top 50 points or so; the overlay goes below it.
     static let topInset: CGFloat = 56
+    /// From iOS 26 AVKit's top bar has its own close button (at the left, with AirPlay), which
+    /// dismisses the player: ours would be a second one right below it.
+    static var systemClose: Bool {
+        if #available(iOS 26, tvOS 26, *) { true } else { false }
+    }
 
     private(set) var visible = true
     private(set) var pip = false

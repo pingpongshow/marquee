@@ -3528,6 +3528,28 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /livetv/vod/movies/{movieId}/watchlist:
+    parameters:
+      - { name: movieId, in: path, required: true, schema: { type: integer, format: int64 } }
+    put:
+      tags: [livetv]
+      operationId: addVodMovieToWatchlist
+      summary: "Put a film on demand on your watchlist (USER-8). It's in the Your Watchlist Home row's mixedEntries (and its See all) with the library's titles, most recently added first. Like a library movie, it leaves the row once watched."
+      responses:
+        "204": { description: Added (or already there). }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [livetv]
+      operationId: removeVodMovieFromWatchlist
+      summary: Take a film on demand off your watchlist.
+      responses:
+        "204": { description: Removed (or wasn't there). }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /livetv/vod/movies/{movieId}/play:
     parameters:
       - { name: movieId, in: path, required: true, schema: { type: integer, format: int64 } }
@@ -3762,6 +3784,28 @@ paths:
           content:
             image/*:
               schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /livetv/vod/series/{seriesId}/watchlist:
+    parameters:
+      - { name: seriesId, in: path, required: true, schema: { type: integer, format: int64 } }
+    put:
+      tags: [livetv]
+      operationId: addVodSeriesToWatchlist
+      summary: "Put a series on demand on your watchlist (USER-8). It's in the Your Watchlist Home row's mixedEntries (and its See all) with the library's titles, most recently added first."
+      responses:
+        "204": { description: Added (or already there). }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [livetv]
+      operationId: removeVodSeriesFromWatchlist
+      summary: Take a series on demand off your watchlist.
+      responses:
+        "204": { description: Removed (or wasn't there). }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /livetv/vod/series/{seriesId}/watched:
@@ -6197,6 +6241,7 @@ components:
               items: { $ref: "#/components/schemas/VodSaveDestinationRef" }
             save: { $ref: "#/components/schemas/VodSaveState" }
             library: { $ref: "#/components/schemas/VodLibraryMatch" }
+            watchlisted: { type: boolean, description: "On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/movies/{id}/watchlist." }
 
     VodMoviePage:
       type: object
@@ -6303,6 +6348,7 @@ components:
               description: "Admins: the extra save folders episodes can go to (vodSave.destinations of kind shows or both)."
               items: { $ref: "#/components/schemas/VodSaveDestinationRef" }
             library: { $ref: "#/components/schemas/VodLibraryRollup" }
+            watchlisted: { type: boolean, description: "On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/series/{id}/watchlist." }
 
     VodSeason:
       type: object
@@ -7758,7 +7804,7 @@ components:
           items: { $ref: "#/components/schemas/VodSuggestion" }
         mixedEntries:
           type: array
-          description: "Sent when the request asks with mixed=true, on suggestion rows: library items and films and series on demand together, best first. When it's present show it instead of items (mark the on-demand ones as VOD)."
+          description: "Sent when the request asks with mixed=true, on suggestion rows and the watchlist: library items and films and series on demand together, best first (the watchlist: most recently added first). When it's present show it instead of items (mark the on-demand ones as VOD)."
           items: { $ref: "#/components/schemas/HomeEntry" }
 
     HomeEntry:

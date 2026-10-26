@@ -64,7 +64,7 @@ struct HomeView: View {
                         // demand together, in the server's order; those on demand are marked VOD
                         // and open their own pages.
                         ShelfRow(title: hub.title, seeAll: seeAll(hub), seeAllSize: seeAllSize(hub)) {
-                            ForEach(Self.visible(mixed), id: \.key) { HomeEntryTile(entry: $0) }
+                            ForEach(Self.visible(mixed), id: \.key) { HomeEntryTile(entry: $0, watchlist: hub.id == "watchlist") }
                         }
                     } else if wide, let entries = hub.entries {
                         // Library titles and films and episodes on demand together, in the

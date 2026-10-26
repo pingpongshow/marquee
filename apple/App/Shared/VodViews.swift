@@ -456,8 +456,10 @@ struct VodBrowseView: View {
     private let tileWidth: CGFloat = 220
     private let gridSpacing: CGFloat = 48
     #else
-    private let tileWidth: CGFloat = 120
-    private let gridSpacing: CGFloat = 16
+    // As a library's grid: three across on a phone (at 120 and 16 only two fit, each tile
+    // narrower than its column).
+    private let tileWidth: CGFloat = 110
+    private let gridSpacing: CGFloat = 14
     #endif
 }
 
@@ -617,7 +619,8 @@ extension VodMovie {
     }
 }
 
-/// A film's page: backdrop, poster, details, Play or Resume, Play from Start and Watched.
+/// A film's page: backdrop, poster, details, Play or Resume, Play from Start, Watched and
+/// Watchlist.
 struct VodMovieView: View {
     @Environment(AppSession.self) private var app
     let id: Int64
@@ -626,6 +629,7 @@ struct VodMovieView: View {
     @State private var playing: VodPlayTarget?
     /// Shown at once when changed, before the server confirms.
     @State private var watched: Bool?
+    @State private var watchlisted: Bool?
 
     var body: some View {
         Group {
@@ -722,7 +726,8 @@ struct VodMovieView: View {
 
     private func actions(_ m: VodMovieDetail, isWatched: Bool, resumeMs: Int64) -> some View {
         let resume = resumeMs > 0
-        return HStack(spacing: 12) {
+        // As a library title's: labelled while they fit, else the secondary ones icon-only.
+        return HeaderActions {
             Button { playing = VodPlayTarget(movie: m, startMs: nil) } label: {
                 Label(resume ? "Resume from \(formatTime(seconds: Double(resumeMs) / 1000))" : "Play", systemImage: "play.fill")
             }
@@ -735,6 +740,14 @@ struct VodMovieView: View {
                 .buttonStyle(.bordered)
                 .accessibilityIdentifier("vod.fromStart")
             }
+        } secondary: {
+            let onList = watchlisted ?? m.info.watchlisted ?? false
+            Button { toggleWatchlist(m, now: !onList) } label: {
+                Label(onList ? "On Watchlist" : "Watchlist", systemImage: onList ? "bookmark.fill" : "bookmark")
+            }
+            .buttonStyle(.bordered)
+            .accessibilityLabel(onList ? "On Watchlist" : "Watchlist")
+            .accessibilityIdentifier("vod.watchlist")
             Button { toggleWatched(m, now: !isWatched) } label: {
                 Label(isWatched ? "Watched" : "Mark watched", systemImage: isWatched ? "checkmark.circle.fill" : "checkmark.circle")
             }
@@ -770,6 +783,22 @@ struct VodMovieView: View {
                         #endif
                     }
                 }
+            }
+        }
+    }
+
+    /// The watchlist (USER-8): shows at once, back as it was if the server refuses.
+    private func toggleWatchlist(_ m: VodMovieDetail, now: Bool) {
+        watchlisted = now
+        Task {
+            do {
+                try await app.setVodWatchlisted(m.id, now)
+                HomeChanges.shared.version += 1 // the Your Watchlist row
+                await load()
+                watchlisted = nil
+            } catch {
+                watchlisted = !now
+                ActionError.shared.message = error.localizedDescription
             }
         }
     }
@@ -946,7 +975,11 @@ struct VodPlayerView: View {
             if let timeLimit { TimeLimitScreen(reason: timeLimit, close: close) }
         }
         .task(id: "\(current.key)#\(plays)") { await start() }
-        .onDisappear { finish() }
+        .onDisappear {
+            // AVKit's own close button (iOS 26) dismisses the cover without close().
+            endUpNext()
+            finish()
+        }
         #if os(tvOS)
         .onExitCommand { close() }
         #endif
@@ -955,8 +988,10 @@ struct VodPlayerView: View {
     #if os(iOS)
     private var topBar: some View {
         HStack(spacing: 12) {
-            Button { close() } label: { PlayerBubble(systemImage: "xmark") }
-                .accessibilityLabel("Close player")
+            if !PlayerChrome.systemClose {
+                Button { close() } label: { PlayerBubble(systemImage: "xmark") }
+                    .accessibilityLabel("Close player")
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(current.title).font(.headline).lineLimit(1)
                 if !current.subtitle.isEmpty { Text(current.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1) }

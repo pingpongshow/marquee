@@ -133,6 +133,7 @@ final class VodShowsUITests: XCTestCase {
         app.secureTextFields["Password"].typeText(user.password)
         app.buttons["Sign In"].tap()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
+        app.dismissSavePassword()
     }
 
     private func openLibrariesTab() {
@@ -288,6 +289,35 @@ final class VodShowsUITests: XCTestCase {
         shot("3-in-library-page")
     }
 
+    /// A show on demand goes on the watchlist from its page (USER-8): Home's Your Watchlist row
+    /// has it, and its menu there takes it off.
+    func testWatchlistShow() throws {
+        let id = try ensureShows()
+        let user = try temporaryUser()
+        signIn(user)
+        openShow()
+        let toggle = app.buttons["vod.show.watchlist"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "the page offers Watchlist")
+        XCTAssertEqual(toggle.label, "Watchlist")
+        toggle.tap()
+        XCTAssertTrue(app.buttons.matching(identifier: "vod.show.watchlist").matching(NSPredicate(format: "label == 'On Watchlist'")).firstMatch
+            .waitForExistence(timeout: 5), "it shows as on the watchlist")
+        try eventually(10, "the server has it") { try series(id, user.token)["watchlisted"] as? Bool == true }
+        shot("w1-on-watchlist")
+
+        app.tabBars.buttons["Home"].tap()
+        let tile = app.vodWatchlistTile(show)
+        XCTAssertTrue(tile.waitForExistence(timeout: 10), "Your Watchlist has the show")
+        shot("w2-home-row")
+        tile.press(forDuration: 1.2)
+        let remove = app.buttons["vod.removeFromWatchlist"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 5), "its menu offers Remove from Watchlist")
+        XCTAssertFalse(app.buttons["vod.notInterested"].exists, "not Not interested")
+        remove.tap()
+        XCTAssertTrue(tile.waitForNonExistence(timeout: 10), "gone from the row")
+        try eventually(10, "the server took it off") { try series(id, user.token)["watchlisted"] as? Bool == false }
+    }
+
     /// A show's page: seasons and episodes, watched by episode, season and show; the next
     /// episode follows.
     func testShowPageWatched() throws {
@@ -299,7 +329,9 @@ final class VodShowsUITests: XCTestCase {
         XCTAssertEqual(play.label, "Start S1 · E1")
         // (The season picked last time on this device is kept: start from season 1.)
         app.buttons["vod.season"].tap()
-        app.buttons["Season 1"].tap()
+        // The menu's entry, not the picker (which is labelled with the season too).
+        app.buttons.matching(NSPredicate(format: "label == 'Season 1' AND identifier != 'vod.season'")).firstMatch.tap()
+        app.swipeUp() // the episodes load as they scroll in: all three on screen
         try eventually(5, "season 1's episodes") { app.buttons.matching(identifier: "vod.episode").count == 3 }
         shot("1-show-page")
         // An episode watched: the next one is up.
@@ -333,12 +365,13 @@ final class VodShowsUITests: XCTestCase {
         signIn(user)
         openShow()
         app.buttons["vod.show.play"].tap()
-        XCTAssertTrue(app.buttons["Close player"].waitForExistence(timeout: 15), "the player opens")
+        XCTAssertTrue(app.videoPlayer.waitForExistence(timeout: 15), "the player opens")
         sleep(4)
         shot("1-episode-playing")
         let upNext = app.buttons.matching(NSPredicate(format: "identifier == 'upNext.next' AND label CONTAINS 'Second'")).firstMatch
         XCTAssertTrue(upNext.waitForExistence(timeout: 40), "Up Next at the end")
-        XCTAssertTrue(app.staticTexts["upNext.countdown"].exists, "with a countdown")
+        // The countdown is on the Play next card (its value), not text of its own.
+        XCTAssertTrue((upNext.value as? String ?? "").hasPrefix("Plays in"), "with a countdown: \(String(describing: upNext.value))")
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier == 'upNext.previous' AND label CONTAINS 'First'")).firstMatch.exists,
                       "and the episode that ended, to play again")
         shot("2-up-next")

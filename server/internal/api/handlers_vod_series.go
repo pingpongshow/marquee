@@ -270,6 +270,9 @@ func (h *Handlers) GetVodSeries(ctx context.Context, req GetVodSeriesRequestObje
 	if episodesErr != nil && len(eps) == 0 {
 		out.EpisodesError = ptr(episodesErr.Error())
 	}
+	if on, err := h.VOD.Watchlisted(ctx, s.User.ID, true, m.ID); err == nil {
+		out.Watchlisted = ptr(on)
+	}
 	return GetVodSeries200JSONResponse(out), nil
 }
 

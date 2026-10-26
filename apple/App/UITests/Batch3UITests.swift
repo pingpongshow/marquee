@@ -118,6 +118,7 @@ final class Batch3UITests: XCTestCase {
         app.secureTextFields["Password"].typeText(password)
         app.buttons["Sign In"].tap()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
+        app.dismissSavePassword()
     }
 
     private func openSettings() {
@@ -529,9 +530,10 @@ final class Batch3UITests: XCTestCase {
                     XCTAssertFalse(f.intersects(other.frame), "\(name): \(b.label) overlaps \(other.label)")
                 }
             }
-            // Centred: the title's middle is the header's middle.
-            let header = buttons.map(\.frame).reduce(source.frame) { $0.union($1) }
-            XCTAssertEqual(source.frame.midX, header.midX, accuracy: 3, "\(name): the title is centred")
+            // Centred: the title's middle is the middle of its column (the buttons are all on
+            // the right since Play On went in 1.4.0; the panel picker spans the same column).
+            let column = app.segmentedControls["nowPlayingPanel"].firstMatch.frame
+            XCTAssertEqual(source.frame.midX, column.midX, accuracy: 3, "\(name): the title is centred")
         }
         XCUIDevice.shared.orientation = .portrait
         sleep(2)

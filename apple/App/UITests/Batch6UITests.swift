@@ -113,6 +113,7 @@ final class Batch6UITests: XCTestCase {
         app.secureTextFields["Password"].typeText(user.password)
         app.buttons["Sign In"].tap()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
+        app.dismissSavePassword()
     }
 
     private func openLibrariesTab() {
@@ -250,7 +251,7 @@ final class Batch6UITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["00 Long Test"].waitForExistence(timeout: 10), "its items")
         let before = try sessions(for: longTest)
         app.buttons["Play"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["Close player"].waitForExistence(timeout: 15), "the video player opens")
+        XCTAssertTrue(app.videoPlayer.waitForExistence(timeout: 15), "the video player opens")
         try eventually(20, "00 Long Test plays first") { try sessions(for: longTest) > before }
         shot("d2-playing")
         app.closePlayer()

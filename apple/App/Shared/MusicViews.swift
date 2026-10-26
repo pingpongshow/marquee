@@ -535,10 +535,13 @@ struct MoodStyleView: View {
         defer { loaded = true }
         error = nil
         do {
-            tracks = try await app.radio(request).items
+            // A style's albums come from their tags: first, so they show even when the radio
+            // can't (nothing analysed yet, or Soundprint off).
             if kind == .style {
                 albums = try await app.items(library: libraryID, sort: ._hyphen_rating, limit: 40, genre: name, type: .album).items
-            } else {
+            }
+            tracks = try await app.radio(request).items
+            if kind == .mood {
                 // The station's albums, in order of appearance.
                 var seen = Set<Int64>()
                 albums = tracks.compactMap { t in

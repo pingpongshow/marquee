@@ -20,7 +20,14 @@ public extension AppSession {
 
     /// A station (MUSIC-3); pass `exclude` to continue one.
     func radio(_ req: RadioRequest) async throws -> Station {
-        try await musicAPI.musicRadio(body: .json(req)).ok.body.json
+        switch try await musicAPI.musicRadio(body: .json(req)) {
+        case let .ok(ok): return try ok.body.json
+        // not_analyzed: Soundprint hasn't analysed the tracks the station needs (yet).
+        case let .conflict(e): throw MarqueeError((try? e.body.json.message) ?? "These tracks haven't been analysed yet")
+        case let .serviceUnavailable(e): throw MarqueeError((try? e.body.json.message) ?? "The Soundprint analysis service isn't running")
+        case let .badRequest(e): throw MarqueeError((try? e.body.json.message) ?? "Couldn't start the station")
+        default: throw MarqueeError("Couldn't start the station")
+        }
     }
 
     /// A playlist from a description (Muse, MUSIC-5).

@@ -210,13 +210,15 @@ struct LiveTVView: View {
             } label: {
                 Label(["all": "All Channels", "favorites": "Favorites", "recent": "Recently Watched", "hidden": "Hidden Channels"][filter] ?? filter,
                       systemImage: "line.3.horizontal.decrease.circle")
+                    .lineLimit(1) // on a phone it wrapped to two lines beside the time
             }
+            .layoutPriority(1)
             Spacer()
             if tab == .guide {
                 Button { start = start.addingTimeInterval(-90 * 60) } label: { Image(systemName: "chevron.left") }
                     .accessibilityLabel("Earlier")
                     .disabled(start < Date().addingTimeInterval(-3 * 3600))
-                Text(start, format: .dateTime.weekday(.abbreviated).hour().minute()).font(.callout).monospacedDigit()
+                Text(start, format: .dateTime.weekday(.abbreviated).hour().minute()).font(.callout).monospacedDigit().fixedSize()
                 Button { start = start.addingTimeInterval(90 * 60) } label: { Image(systemName: "chevron.right") }
                     .accessibilityLabel("Later")
                 Button("Now") { start = LiveTVView.defaultStart() }
@@ -622,6 +624,9 @@ struct LiveWatchView: View {
         }
         .buttonStyle(.bordered).tint(.white)
         .padding()
+        // Below AVKit's own top bar (AirPlay, volume), as in the video player: its AirPlay
+        // button sat on the close button whenever the player's controls showed.
+        .padding(.top, PlayerChrome.topInset - 16)
         .background(LinearGradient(colors: [.black.opacity(0.8), .clear], startPoint: .top, endPoint: .bottom))
     }
 

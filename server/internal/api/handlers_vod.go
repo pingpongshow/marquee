@@ -324,6 +324,9 @@ func (h *Handlers) GetVodMovie(ctx context.Context, req GetVodMovieRequestObject
 	for i, c := range m.Cast {
 		out.Cast[i].Name, out.Cast[i].Character = c.Name, nz(c.Character)
 	}
+	if on, err := h.VOD.Watchlisted(ctx, s.User.ID, false, m.ID); err == nil {
+		out.Watchlisted = ptr(on)
+	}
 	return GetVodMovie200JSONResponse(out), nil
 }
 

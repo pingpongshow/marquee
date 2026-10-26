@@ -333,14 +333,14 @@ struct IntegrationsView: View {
         Form {
             if let error { ErrorBanner(message: error) }
             Section {
-                TextField("Address, e.g. http://192.168.1.20:5055", text: $seerrURL)
+                TextField(text: $seerrURL) { Text(verbatim: "Address, e.g. http://192.168.1.20:5055") } // verbatim: a localized key showed the address as a blue link
                     .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                 SecureField(seerrKeySet ? "API key (set)" : "API key", text: $seerrKey)
             } header: {
                 Text("Seerr (requests)")
             }
             Section {
-                TextField("Address, e.g. http://192.168.1.20:6767", text: $bazarrURL)
+                TextField(text: $bazarrURL) { Text(verbatim: "Address, e.g. http://192.168.1.20:6767") } // verbatim: a localized key showed the address as a blue link
                     .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                     .accessibilityIdentifier("bazarrURL")
                 SecureField(bazarrKeySet ? "API key (set)" : "API key", text: $bazarrKey)

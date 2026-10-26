@@ -98,6 +98,8 @@ struct VodSeriesView: View {
     @State private var season: Int?
     /// Watched changes shown at once, before the server confirms (by episode id; the show's under 0).
     @State private var pending: [Int64: Bool] = [:]
+    /// The watchlist, shown at once when changed, before the server confirms.
+    @State private var watchlisted: Bool?
 
     var body: some View {
         Group {
@@ -215,7 +217,8 @@ struct VodSeriesView: View {
         let next = s.base.next
         let resumeMs = next?.positionMs ?? 0
         let watched = pending[0] ?? s.base.watched
-        return HStack(spacing: 12) {
+        // As a library title's: labelled while they fit, else the secondary ones icon-only.
+        return HeaderActions {
             if let next {
                 Button { playing = VodPlayTarget(episode: next, startMs: nil) } label: {
                     Label(resumeMs > 0 ? "Resume \(next.label) from \(formatTime(seconds: Double(resumeMs) / 1000))"
@@ -231,6 +234,14 @@ struct VodSeriesView: View {
                     .accessibilityIdentifier("vod.show.fromStart")
                 }
             }
+        } secondary: {
+            let onList = watchlisted ?? s.info.watchlisted ?? false
+            Button { toggleWatchlist(s, now: !onList) } label: {
+                Label(onList ? "On Watchlist" : "Watchlist", systemImage: onList ? "bookmark.fill" : "bookmark")
+            }
+            .buttonStyle(.bordered)
+            .accessibilityLabel(onList ? "On Watchlist" : "Watchlist")
+            .accessibilityIdentifier("vod.show.watchlist")
             if s.base.episodeCount > 0 {
                 Button { setWatched(key: 0, now: !watched) { try await app.setVodSeriesWatched(s.id, !watched) } } label: {
                     Label(watched ? "Watched" : "Mark watched", systemImage: watched ? "checkmark.circle.fill" : "checkmark.circle")
@@ -368,6 +379,22 @@ struct VodSeriesView: View {
     }
 
     /// Shows the change at once, saves it, then reloads the show (counts and next episode).
+    /// The watchlist (USER-8): shows at once, back as it was if the server refuses.
+    private func toggleWatchlist(_ s: VodSeriesDetail, now: Bool) {
+        watchlisted = now
+        Task {
+            do {
+                try await app.setVodSeriesWatchlisted(s.id, now)
+                HomeChanges.shared.version += 1 // the Your Watchlist row
+                await load()
+                watchlisted = nil
+            } catch {
+                watchlisted = !now
+                ActionError.shared.message = error.localizedDescription
+            }
+        }
+    }
+
     private func setWatched(key: Int64, now: Bool, _ save: @escaping () async throws -> Void) {
         pending[key] = now
         Task {

@@ -134,6 +134,9 @@ type homeRow struct {
 	vod bool
 	// vodFill, when set, loads films and series on demand to mix into the row (mixedEntries).
 	vodFill func() ([]VodSuggestion, error)
+	// merge, when set, puts the row's items and vodFill's together for mixedEntries (instead
+	// of mixEntries' two library titles to one on demand).
+	merge func(lib []items.Summary, vod []VodSuggestion, max int) ([]HomeEntry, error)
 }
 
 func (h *Handlers) savedLayout(ctx context.Context, uid int64) []savedRow {
@@ -196,7 +199,7 @@ func (h *Handlers) homeRows(ctx context.Context, uid int64, saved []savedRow, n 
 	}
 	defaults := []homeRow{
 		{id: "continue-watching", title: "Continue Watching", fill: func() ([]items.Summary, error) { return h.Items.ContinueWatching(ctx, acc, home, n) }},
-		{id: "watchlist", title: "Your Watchlist", fill: func() ([]items.Summary, error) { return h.Items.Watchlist(ctx, acc, max(n, 30)) }},
+		h.watchlistRow(ctx, acc, max(n, 30)),
 	}
 	// Recommendations (USER-16). Always offered, so a saved layout keeps their place; they
 	// stay empty until movies and shows are embedded.

@@ -3,8 +3,10 @@ package items
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strings"
+	"time"
 
 	"marquee/internal/scanner/naming"
 )
@@ -33,6 +35,31 @@ func (s *Store) Watchlist(ctx context.Context, acc Access, limit int) ([]Summary
 		return nil, err
 	}
 	return collect(rows)
+}
+
+// WatchlistAdded is when each of the items went on the user's watchlist (to order them with
+// the films and series on demand there).
+func (s *Store) WatchlistAdded(ctx context.Context, uid int64, ids []int64) (map[int64]time.Time, error) {
+	out := map[int64]time.Time{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	b, _ := json.Marshal(ids)
+	rows, err := s.db.QueryContext(ctx, `SELECT item_id, watchlisted_at FROM user_item_state
+		WHERE user_id = ? AND watchlisted_at IS NOT NULL AND item_id IN (SELECT value FROM json_each(?))`, uid, string(b))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var at string
+		if err := rows.Scan(&id, &at); err != nil {
+			return nil, err
+		}
+		out[id], _ = time.Parse(time.RFC3339Nano, at)
+	}
+	return out, rows.Err()
 }
 
 // ---------- Collections (META-7) ----------

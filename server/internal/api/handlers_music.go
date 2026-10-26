@@ -167,7 +167,7 @@ func (h *Handlers) MusicRadio(ctx context.Context, req MusicRadioRequestObject) 
 		o.Keep = func(t *soundprint.Track) bool { return t.Year >= dec && t.Year < dec+10 && inner(t) }
 		members := h.Soundprint.Index.Where(o.Keep)
 		if len(members) == 0 {
-			return MusicRadio409JSONResponse{ConflictJSONResponse(apiErr("not_analyzed", "no analysed tracks from the "+value))}, nil
+			return MusicRadio409JSONResponse{ConflictJSONResponse(apiErr("not_analyzed", "no analysed tracks from the "+strconv.Itoa(dec)+"s"))}, nil
 		}
 		st = h.Soundprint.RadioFromVector(soundprint.Mean(members), strconv.Itoa(dec)+"s Radio", o)
 	case RadioRequestSeedMood:

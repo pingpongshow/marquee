@@ -2,6 +2,7 @@ package playback
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -162,5 +163,41 @@ func TestNightModeRealFFmpeg(t *testing.T) {
 		if got := strings.Fields(string(probe)); !slices.Equal(got, []string{"h264", "aac,2"}) {
 			t.Errorf("%s: output streams %q", tc.layout, probe)
 		}
+	}
+}
+
+// A file a few seconds shorter than its stated length (a remote one whose source overstates
+// it): the playlist's last segment is past where FFmpeg ends, and comes back as ErrPastEnd
+// (served empty, so the player ends there) rather than a failure. Far short, it's still one.
+func TestTranscoderPastTheEnd(t *testing.T) {
+	ff := ffmpegPath(t)
+	dir := t.TempDir()
+	in := makeSample(t, ff, dir) // 40 s
+	m := Media{Container: "mkv", DurationMS: 40_000, BitrateKbps: 800,
+		Video: &VideoStream{Index: 0, Codec: "hevc", Width: 640, Height: 360, BitDepth: 8}, Audio: &AudioStream{Index: 1, Codec: "ac3", Channels: 2}}
+	d := Decide(m, chrome, Limits{})
+	run := func(name string, statedMS int64, k int) error {
+		t.Helper()
+		tr := &Transcoder{FFmpeg: ff, Job: Job{Input: in, Decision: d, VideoIndex: 0, AudioIndex: 1, SubIndex: -1, Dir: filepath.Join(dir, name), Preset: "speed"},
+			Encoders: []string{"software"}, TotalSegments: SegmentCount(statedMS), ThrottleAhead: 20}
+		defer tr.Stop()
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		if _, err := tr.Init(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tr.Segment(ctx, 6); err != nil { // 36-40 s: the file's last
+			t.Fatalf("%s: segment 6: %v", name, err)
+		}
+		_, err := tr.Segment(ctx, k)
+		return err
+	}
+	// Stated 46 s: segments 0-7, the file has 0-6.
+	if err := run("short", 46_000, 7); !errors.Is(err, ErrPastEnd) {
+		t.Errorf("46 s stated: segment 7: %v, want ErrPastEnd", err)
+	}
+	// Stated 140 s: well past the slack, so the missing segments are a failure.
+	if err := run("cut", 140_000, 7); err == nil || errors.Is(err, ErrPastEnd) {
+		t.Errorf("140 s stated: segment 7: %v, want a failure", err)
 	}
 }

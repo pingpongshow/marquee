@@ -130,6 +130,7 @@ final class RatingPromptUITests: XCTestCase {
         app.secureTextFields["Password"].typeText(user.password)
         app.buttons["Sign In"].tap()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
+        app.dismissSavePassword()
     }
 
     private func openLibrary(_ name: String) {
@@ -161,7 +162,7 @@ final class RatingPromptUITests: XCTestCase {
         XCTAssertTrue(playButton.waitForExistence(timeout: 10))
         try setServerPrompt(serverPrompt) // the player reads it when it opens
         playButton.tap()
-        XCTAssertTrue(app.buttons["Close player"].waitForExistence(timeout: 15), "the player opened")
+        XCTAssertTrue(app.videoPlayer.waitForExistence(timeout: 15), "the player opened")
     }
 
     private func byID(_ id: String) -> XCUIElement {
@@ -235,7 +236,7 @@ final class RatingPromptUITests: XCTestCase {
         signIn(user)
         try playToEnd(serverPrompt: false)
 
-        XCTAssertTrue(app.buttons["Close player"].waitForNonExistence(timeout: 45), "the player closes at the end")
+        XCTAssertTrue(app.videoPlayer.waitForNonExistence(timeout: 45), "the player closes at the end")
         XCTAssertTrue(playButton.waitForExistence(timeout: 10), "back on the item page")
         sleep(3)
         XCTAssertFalse(byID("ratingPrompt").exists, "no rating request")

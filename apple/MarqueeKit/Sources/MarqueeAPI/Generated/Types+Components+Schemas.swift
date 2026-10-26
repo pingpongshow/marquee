@@ -3889,6 +3889,10 @@ extension Components {
                 public var save: Components.Schemas.VodSaveState?
                 /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/library`.
                 public var library: Components.Schemas.VodLibraryMatch?
+                /// On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/movies/{id}/watchlist.
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2/watchlisted`.
+                public var watchlisted: Swift.Bool?
                 /// Creates a new `Value2Payload`.
                 ///
                 /// - Parameters:
@@ -3906,6 +3910,7 @@ extension Components {
                 ///   - saveDestinations: Admins: the extra save folders a film can go to (vodSave.destinations of kind movies or both).
                 ///   - save:
                 ///   - library:
+                ///   - watchlisted: On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/movies/{id}/watchlist.
                 public init(
                     overview: Swift.String? = nil,
                     tagline: Swift.String? = nil,
@@ -3920,7 +3925,8 @@ extension Components {
                     saveDefault: Swift.Bool? = nil,
                     saveDestinations: [Components.Schemas.VodSaveDestinationRef]? = nil,
                     save: Components.Schemas.VodSaveState? = nil,
-                    library: Components.Schemas.VodLibraryMatch? = nil
+                    library: Components.Schemas.VodLibraryMatch? = nil,
+                    watchlisted: Swift.Bool? = nil
                 ) {
                     self.overview = overview
                     self.tagline = tagline
@@ -3936,6 +3942,7 @@ extension Components {
                     self.saveDestinations = saveDestinations
                     self.save = save
                     self.library = library
+                    self.watchlisted = watchlisted
                 }
                 public enum CodingKeys: String, CodingKey {
                     case overview
@@ -3952,6 +3959,7 @@ extension Components {
                     case saveDestinations
                     case save
                     case library
+                    case watchlisted
                 }
             }
             /// - Remark: Generated from `#/components/schemas/VodMovieDetail/value2`.
@@ -4384,6 +4392,10 @@ extension Components {
                 public var saveDestinations: [Components.Schemas.VodSaveDestinationRef]?
                 /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/library`.
                 public var library: Components.Schemas.VodLibraryRollup?
+                /// On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/series/{id}/watchlist.
+                ///
+                /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2/watchlisted`.
+                public var watchlisted: Swift.Bool?
                 /// Creates a new `Value2Payload`.
                 ///
                 /// - Parameters:
@@ -4401,6 +4413,7 @@ extension Components {
                 ///   - saveDefault: Admins: saving without a destination works (vodSave.showsFolder is set).
                 ///   - saveDestinations: Admins: the extra save folders episodes can go to (vodSave.destinations of kind shows or both).
                 ///   - library:
+                ///   - watchlisted: On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/series/{id}/watchlist.
                 public init(
                     overview: Swift.String? = nil,
                     genres: [Swift.String],
@@ -4415,7 +4428,8 @@ extension Components {
                     canSave: Swift.Bool? = nil,
                     saveDefault: Swift.Bool? = nil,
                     saveDestinations: [Components.Schemas.VodSaveDestinationRef]? = nil,
-                    library: Components.Schemas.VodLibraryRollup? = nil
+                    library: Components.Schemas.VodLibraryRollup? = nil,
+                    watchlisted: Swift.Bool? = nil
                 ) {
                     self.overview = overview
                     self.genres = genres
@@ -4431,6 +4445,7 @@ extension Components {
                     self.saveDefault = saveDefault
                     self.saveDestinations = saveDestinations
                     self.library = library
+                    self.watchlisted = watchlisted
                 }
                 public enum CodingKeys: String, CodingKey {
                     case overview
@@ -4447,6 +4462,7 @@ extension Components {
                     case saveDefault
                     case saveDestinations
                     case library
+                    case watchlisted
                 }
             }
             /// - Remark: Generated from `#/components/schemas/VodSeriesDetail/value2`.
@@ -11334,7 +11350,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Hub/vodEntries`.
             public var vodEntries: [Components.Schemas.VodSuggestion]?
-            /// Sent when the request asks with mixed=true, on suggestion rows: library items and films and series on demand together, best first. When it's present show it instead of items (mark the on-demand ones as VOD).
+            /// Sent when the request asks with mixed=true, on suggestion rows and the watchlist: library items and films and series on demand together, best first (the watchlist: most recently added first). When it's present show it instead of items (mark the on-demand ones as VOD).
             ///
             /// - Remark: Generated from `#/components/schemas/Hub/mixedEntries`.
             public var mixedEntries: [Components.Schemas.HomeEntry]?
@@ -11348,7 +11364,7 @@ extension Components {
             ///   - entries: Continue Watching only: the row's entries, library items and films and episodes on demand together, newest first (up to 20; items stays library-only for older apps). When it's present show it instead of items. The row is sent when either has something.
             ///   - total: Continue Watching only: how many entries there are in all (GET /hubs/continue-watching); more than entries holds means a View more link.
             ///   - vodEntries: Watch on VOD (id vod-suggestions) only, sent when the request asks with vod=true: films and series on demand picked for the caller, best first (items is empty).
-            ///   - mixedEntries: Sent when the request asks with mixed=true, on suggestion rows: library items and films and series on demand together, best first. When it's present show it instead of items (mark the on-demand ones as VOD).
+            ///   - mixedEntries: Sent when the request asks with mixed=true, on suggestion rows and the watchlist: library items and films and series on demand together, best first (the watchlist: most recently added first). When it's present show it instead of items (mark the on-demand ones as VOD).
             public init(
                 id: Swift.String,
                 title: Swift.String,

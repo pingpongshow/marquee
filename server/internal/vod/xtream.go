@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -548,9 +549,25 @@ func (s *Service) applyXtream(ctx context.Context, x *xtream, id int64, in xtrea
 func (s *Service) PlayLink(m Movie) (link, userAgent string, hls bool) {
 	src, ok := s.source(m.SourceID)
 	if !ok || !src.Xtream() {
-		return m.StreamURL, src.UserAgent, true
+		// An M3U entry can be a plain file (an .mp4 or .mkv) as well as HLS: passed through
+		// as a playlist, a file reached the player as one and couldn't play.
+		return m.StreamURL, src.UserAgent, !isVideoFile(m.StreamURL)
 	}
 	return s.xtream(src).streamURL(m.StreamURL), src.UserAgent, false
+}
+
+// videoFileExts are the file types an M3U film can link to directly (anything else, such as
+// .m3u8 or no extension, is taken to be HLS).
+var videoFileExts = map[string]bool{".mp4": true, ".m4v": true, ".mkv": true, ".mov": true, ".avi": true,
+	".webm": true, ".ts": true, ".mpg": true, ".mpeg": true, ".wmv": true, ".flv": true}
+
+// isVideoFile is whether a link is a video file rather than an HLS playlist.
+func isVideoFile(link string) bool {
+	u, err := url.Parse(link)
+	if err != nil {
+		return false
+	}
+	return videoFileExts[strings.ToLower(path.Ext(u.Path))]
 }
 
 // Redact removes a film source's secrets from a message (FFmpeg's errors name the link).

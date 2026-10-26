@@ -128,6 +128,8 @@ struct VodSuggestionTile: View {
     var width: CGFloat = VodSuggestionTile.defaultWidth
     /// In a Home row beside library titles: a VOD badge on the poster, and one line under it.
     var mixed = false
+    /// In Your Watchlist (USER-8): its menu takes it off the watchlist instead of Not interested.
+    var watchlist = false
 
     #if os(tvOS)
     static let defaultWidth: CGFloat = 220
@@ -174,12 +176,27 @@ struct VodSuggestionTile: View {
     }
 
     @ViewBuilder private func menu(_ route: Route) -> some View {
-        Button(role: .destructive) { VodSuggestionHides.shared.hide(suggestion, app: app) } label: {
-            Label("Not interested", systemImage: "eye.slash")
+        if watchlist {
+            Button(role: .destructive) { removeFromWatchlist() } label: {
+                Label("Remove from Watchlist", systemImage: "bookmark.slash")
+            }
+            .accessibilityIdentifier("vod.removeFromWatchlist")
+        } else {
+            Button(role: .destructive) { VodSuggestionHides.shared.hide(suggestion, app: app) } label: {
+                Label("Not interested", systemImage: "eye.slash")
+            }
+            .accessibilityIdentifier("vod.notInterested")
         }
-        .accessibilityIdentifier("vod.notInterested")
         NavigationLink(value: route) {
             Label(suggestion.movie != nil ? "Go to film" : "Go to show", systemImage: suggestion.movie != nil ? "film" : "tv")
+        }
+    }
+
+    private func removeFromWatchlist() {
+        ActionError.run { [app, suggestion] in
+            if let m = suggestion.movie { try await app.setVodWatchlisted(m.id, false) }
+            if let s = suggestion.series { try await app.setVodSeriesWatchlisted(s.id, false) }
+            HomeChanges.shared.version += 1 // Home and See all load the row again
         }
     }
 

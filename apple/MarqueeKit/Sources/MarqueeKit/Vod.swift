@@ -76,6 +76,15 @@ public extension AppSession {
         }
     }
 
+    /// Puts a film on demand on the watchlist or takes it off (USER-8).
+    func setVodWatchlisted(_ id: Int64, _ on: Bool) async throws {
+        if on {
+            _ = try await vodAPI.addVodMovieToWatchlist(path: .init(movieId: id)).noContent
+        } else {
+            _ = try await vodAPI.removeVodMovieFromWatchlist(path: .init(movieId: id)).noContent
+        }
+    }
+
     /// The app's quality setting for VOD playback, as for the library (nil = original / automatic).
     private var vodMaxBitrate: Int? {
         let q = isRemote ? QualityPreference.remote : QualityPreference.local
@@ -197,6 +206,15 @@ public extension AppSession {
             _ = try await vodAPI.markVodSeriesWatched(path: .init(seriesId: id), query: .init(season: season)).noContent
         } else {
             _ = try await vodAPI.markVodSeriesUnwatched(path: .init(seriesId: id), query: .init(season: season)).noContent
+        }
+    }
+
+    /// Puts a show on demand on the watchlist or takes it off (USER-8).
+    func setVodSeriesWatchlisted(_ id: Int64, _ on: Bool) async throws {
+        if on {
+            _ = try await vodAPI.addVodSeriesToWatchlist(path: .init(seriesId: id)).noContent
+        } else {
+            _ = try await vodAPI.removeVodSeriesFromWatchlist(path: .init(seriesId: id)).noContent
         }
     }
 

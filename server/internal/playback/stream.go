@@ -285,6 +285,17 @@ func (m *Manager) serveFromTranscoder(w http.ResponseWriter, r *http.Request, s 
 	} else {
 		p, err = t.Segment(r.Context(), k)
 	}
+	if k >= 0 && errors.Is(err, ErrPastEnd) {
+		// The file ended a little before its stated length: an empty last segment, so the
+		// player reaches the end as at any other (a 503 made it retry, then fail at the very
+		// end; a 404 makes AVPlayer fail the whole item, as it fetches ahead).
+		slog.Info("segment past the end of the file", "session", s.ID, "segment", k)
+		w.Header().Set("Content-Type", "video/mp4")
+		w.Header().Set("Cache-Control", "private, max-age=300")
+		w.Header().Set("Content-Length", "0")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	if err != nil {
 		if !errors.Is(err, context.Canceled) && !errors.Is(err, errStopped) {
 			if s.redact != nil {
