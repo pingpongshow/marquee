@@ -1,14 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { clsx } from "clsx";
-import { EyeOff, Film, MoreHorizontal, Tv } from "lucide-react";
+import { BookmarkMinus, EyeOff, Film, MoreHorizontal, Tv } from "lucide-react";
 import { useState } from "react";
 import { Menu, MenuItem } from "@/components/Menu";
 import { toast } from "@/components/Toast";
 import { formatDuration } from "@/features/browse/format";
 import { Poster } from "@/features/browse/Poster";
 import { Spinner } from "@/components/ui";
-import { itemVodSimilarQuery, useHideVodSuggestion, vodRecommendationsQuery, vodStatusQuery, vodSuggestionsQuery, type VodSuggestion } from "./vodApi";
+import { itemVodSimilarQuery, useHideVodSuggestion, useVodWatchlist, vodRecommendationsQuery, vodStatusQuery, vodSuggestionsQuery, type VodSuggestion } from "./vodApi";
 
 // Suggestions from the films and series on demand: Home's Watch on VOD row, Also on VOD on
 // a movie's or show's page, the on-demand pages' Recommended for you, and Muse's on-demand
@@ -43,13 +43,17 @@ export function VodSuggestionTile({
   s,
   className = "w-36 shrink-0",
   badge,
+  watchlist,
 }: {
   s: VodSuggestion;
   className?: string;
   /** Marks it as on demand, among library titles. */
   badge?: boolean;
+  /** In Your Watchlist (USER-8): its menu takes it off the watchlist instead of Not interested. */
+  watchlist?: boolean;
 }) {
   const hide = useHideVodSuggestion();
+  const unlist = useVodWatchlist();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const m = s.movie;
@@ -99,17 +103,31 @@ export function VodSuggestionTile({
         )}
       >
         <Menu label={`More actions for ${title}`} trigger={<MoreHorizontal className="size-4" />} open={open} onOpenChange={setOpen} floating>
-          <MenuItem
-            icon={<EyeOff />}
-            onClick={() =>
-              hide.mutate(s, {
-                onSuccess: () => toast(`You won't be offered “${title}” again.`),
-                onError: (e) => toast(e.message, { tone: "error" }),
-              })
-            }
-          >
-            Not interested
-          </MenuItem>
+          {watchlist ? (
+            <MenuItem
+              icon={<BookmarkMinus />}
+              onClick={() =>
+                unlist.mutate(
+                  { kind: m ? "movie" : "series", id: m?.id ?? sh?.id ?? 0, on: false },
+                  { onError: (e) => toast(e.message, { tone: "error" }) },
+                )
+              }
+            >
+              Remove from watchlist
+            </MenuItem>
+          ) : (
+            <MenuItem
+              icon={<EyeOff />}
+              onClick={() =>
+                hide.mutate(s, {
+                  onSuccess: () => toast(`You won't be offered “${title}” again.`),
+                  onError: (e) => toast(e.message, { tone: "error" }),
+                })
+              }
+            >
+              Not interested
+            </MenuItem>
+          )}
           <MenuItem
             icon={m ? <Film /> : <Tv />}
             onClick={() =>

@@ -37,7 +37,7 @@ export function HomeRowPage() {
           {mixed
             ? mixed.map((e) =>
                 e.vod ? (
-                  <VodSuggestionTile key={e.key} s={e.vod} badge className="min-w-0" />
+                  <VodSuggestionTile key={e.key} s={e.vod} badge watchlist={hubId === "watchlist"} className="min-w-0" />
                 ) : e.item ? (
                   <HubItem key={e.key} it={e.item} wide={false} continueWatching={false} className="min-w-0" />
                 ) : null,

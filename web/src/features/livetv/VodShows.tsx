@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Check, ChevronRight, Play, RotateCcw, Tv } from "lucide-react";
+import { Bookmark, BookmarkCheck, Check, ChevronRight, Play, RotateCcw, Tv } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, unwrap } from "@/api/client";
+import { toast } from "@/components/Toast";
 import { Alert, Button, Select, Spinner } from "@/components/ui";
 import { formatDuration, formatTrackTime } from "@/features/browse/format";
 import { Poster } from "@/features/browse/Poster";
@@ -15,6 +16,7 @@ import {
   saveActive,
   useVodEpisodeWatched,
   useVodSeriesWatched,
+  useVodWatchlist,
   vodSeriesQuery,
 } from "./vodApi";
 
@@ -39,6 +41,7 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
           : false,
   });
   const seriesWatched = useVodSeriesWatched(seriesId);
+  const watchlist = useVodWatchlist();
   const episodeWatched = useVodEpisodeWatched();
   const navigate = useNavigate();
   const seasonKey = `marquee.vod.shows.season.${seriesId}`;
@@ -63,6 +66,8 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
       </div>
     );
   const s = show.data;
+  // Optimistic while the request is in flight; otherwise whatever the server says.
+  const listed = watchlist.isPending ? !!watchlist.variables?.on : !!s.watchlisted;
   const next = s.nextEpisode;
   const play = (e: VodEpisode, t?: number) =>
     navigate({
@@ -139,6 +144,13 @@ export function VodShowPage({ seriesId }: { seriesId: number }) {
                   <Check className={s.watched ? "size-4 text-success" : "size-4"} /> {s.watched ? "Watched" : "Mark watched"}
                 </Button>
               )}
+              <Button
+                variant="ghost"
+                onClick={() => watchlist.mutate({ kind: "series", id: s.id, on: !listed }, { onError: (e) => toast(e.message, { tone: "error" }) })}
+                aria-pressed={listed}
+              >
+                {listed ? <BookmarkCheck className="size-4 text-accent" /> : <Bookmark className="size-4" />} {listed ? "On watchlist" : "Watchlist"}
+              </Button>
               {s.canSave && <SaveSeriesButton seriesId={s.id} label="Save show" library={s.library} targets={s} />}
               <FollowControls show={s} />
             </div>

@@ -1,11 +1,12 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Check, ChevronLeft, ChevronRight, EyeOff, Filter, MoreHorizontal, Play, RotateCcw, Search, X } from "lucide-react";
+import { Bookmark, BookmarkCheck, Check, ChevronLeft, ChevronRight, EyeOff, Filter, MoreHorizontal, Play, RotateCcw, Search, X } from "lucide-react";
 import { clsx } from "clsx";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { api, unwrap } from "@/api/client";
 import type { ContinueEntry } from "@/api/types";
 import { Menu, MenuItem } from "@/components/Menu";
+import { toast } from "@/components/Toast";
 import { useRemoveVodFromContinue } from "@/features/home/ContinueWatching";
 import { Alert, Button, Input, Select, Spinner } from "@/components/ui";
 import { formatDuration, formatTrackTime } from "@/features/browse/format";
@@ -18,6 +19,7 @@ import {
   type VodSort,
   saveActive,
   useVodWatched,
+  useVodWatchlist,
   vodCategoriesQuery,
   vodContinueQuery,
   vodGenresQuery,
@@ -492,6 +494,7 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
       saveActive(q.state.data?.save?.state) ? 2000 : q.state.data?.library?.pending ? 4000 : false,
   });
   const watched = useVodWatched(movieId);
+  const watchlist = useVodWatchlist();
   const navigate = useNavigate();
   if (movie.isPending) return <Spinner />;
   if (movie.isError)
@@ -505,6 +508,8 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
     navigate({ to: "/vod/$movieId/play", params: { movieId: String(m.id) }, search: { t } });
   const resume = (m.positionMs ?? 0) > 0;
   const isWatched = watched.isPending ? !!watched.variables : m.watched;
+  // Optimistic while the request is in flight; otherwise whatever the server says.
+  const listed = watchlist.isPending ? !!watchlist.variables?.on : !!m.watchlisted;
   const meta = [m.year ? String(m.year) : "", m.contentRating ?? "", formatDuration(m.runtimeMs)].filter(Boolean);
 
   return (
@@ -560,6 +565,13 @@ export function VodMoviePage({ movieId }: { movieId: number }) {
                 title={isWatched ? "Mark as unwatched" : "Mark as watched"}
               >
                 <Check className={isWatched ? "size-4 text-success" : "size-4"} /> {isWatched ? "Watched" : "Mark watched"}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => watchlist.mutate({ kind: "movie", id: m.id, on: !listed }, { onError: (e) => toast(e.message, { tone: "error" }) })}
+                aria-pressed={listed}
+              >
+                {listed ? <BookmarkCheck className="size-4 text-accent" /> : <Bookmark className="size-4" />} {listed ? "On watchlist" : "Watchlist"}
               </Button>
               {m.canSave && <SaveMovieButton movieId={m.id} save={m.save} library={m.library} targets={m} />}
             </div>

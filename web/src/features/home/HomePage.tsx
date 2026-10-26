@@ -74,7 +74,7 @@ export function HomePage() {
               {mixed
                 ? mixed.map((e) =>
                     e.vod ? (
-                      <VodSuggestionTile key={e.key} s={e.vod} badge />
+                      <VodSuggestionTile key={e.key} s={e.vod} badge watchlist={hub.id === "watchlist"} />
                     ) : e.item ? (
                       <HubItem key={e.key} it={e.item} wide={false} continueWatching={false} />
                     ) : null,

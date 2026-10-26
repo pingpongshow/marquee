@@ -313,6 +313,28 @@ export const itemVodSimilarQuery = (itemId: number) =>
     staleTime: 5 * 60_000,
   });
 
+/** The watchlist (USER-8): a film or series on demand on or off it. Home's Your Watchlist row follows. */
+export function useVodWatchlist() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ kind, id, on }: { kind: "movie" | "series"; id: number; on: boolean }) => {
+      const run =
+        kind === "movie"
+          ? on
+            ? api.PUT("/livetv/vod/movies/{movieId}/watchlist", { params: { path: { movieId: id } } })
+            : api.DELETE("/livetv/vod/movies/{movieId}/watchlist", { params: { path: { movieId: id } } })
+          : on
+          ? api.PUT("/livetv/vod/series/{seriesId}/watchlist", { params: { path: { seriesId: id } } })
+          : api.DELETE("/livetv/vod/series/{seriesId}/watchlist", { params: { path: { seriesId: id } } });
+      return unwrap(run);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["vod"] });
+      qc.invalidateQueries({ queryKey: ["items", "hubs"] });
+    },
+  });
+}
+
 /** Not interested: stops suggesting a film or series (everywhere suggestions show). */
 export function useHideVodSuggestion() {
   const qc = useQueryClient();
