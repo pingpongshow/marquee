@@ -124,7 +124,7 @@ class MarqueeUiTest {
         shot("02-who-is-watching")
         tap(profile)
         // Home's first rows (recommendations can push Recently Added below the fold).
-        rule.waitUntilAtLeastOneExists(hasText("Recently Added", substring = true) or hasText("Recommended for You") or hasText("Continue Watching"), 20_000)
+        rule.waitUntilAtLeastOneExists(homeLoaded, 20_000)
         shot("03-home")
     }
 
@@ -313,6 +313,10 @@ class MarqueeUiTest {
         key(KeyEvent.KEYCODE_DPAD_LEFT)
         rule.waitUntilAtLeastOneExists(row and isFocused(), 5_000)
     }
+
+    /** One of Home's first rows (seasonal, new and suggestion rows can come before Recently Added). */
+    private val homeLoaded = hasText("Recently Added", substring = true) or hasText("Recommended for You") or hasText("Continue Watching") or
+        hasText("New Releases") or hasText(" Favourites", substring = true)
 
     private fun key(code: Int) {
         rule.waitForIdle()
@@ -802,8 +806,7 @@ class MarqueeUiTest {
             rule.onNode(androidx.compose.ui.test.hasTestTag("totpCode")).performTextInput(totp(secret, 1)) // the enable code's step is used up
             rule.onAllNodesWithText("Sign In").onFirst().performClick()
             // Home's first rows (seasonal and recommendation rows can push Recently Added below the fold).
-            rule.waitUntilAtLeastOneExists(hasText("Recently Added", substring = true) or hasText("Recommended for You") or hasText("Continue Watching")
-                or hasText(" Favourites", substring = true), 20_000)
+            rule.waitUntilAtLeastOneExists(homeLoaded, 20_000)
             shot("t2-signed-in")
         } finally {
             adminApi("DELETE", "/users/$id")
@@ -2916,6 +2919,71 @@ class MarqueeUiTest {
             rule.waitUntilAtLeastOneExists(hasText("1.5×") and androidx.compose.ui.test.isSelected(), 5_000)
             back()
             back()
+        } finally {
+            resetVodMovie(id)
+        }
+    }
+
+    /** The watchlist (USER-8): on from the film's page, in Home's Your Watchlist marked VOD, off from that tile's menu (phones). */
+    @Test fun vodWatchlist() {
+        ensureVodSource()
+        connectAndSignIn()
+        val id = vodMovieId("Droid Alpha Film (1985)")
+        adminApi("DELETE", "/livetv/vod/movies/$id/watchlist", asToken = appToken)
+        try {
+            openVodTestFilms()
+            rule.onNode(hasContentDescription("Droid Alpha Film (1985)")).performClick()
+            val add = hasContentDescription("Add Droid Alpha Film (1985) to watchlist")
+            rule.waitUntilAtLeastOneExists(add, 15_000)
+            rule.onNode(add).performClick()
+            rule.waitUntilAtLeastOneExists(hasContentDescription("Remove Droid Alpha Film (1985) from watchlist"), 5_000)
+            rule.waitUntil(10_000) { vodMovie(id).optBoolean("watchlisted") }
+            shot("vod10-on-watchlist")
+            if (isTv) return
+            reopenHome()
+            val tile = hasContentDescription("Droid Alpha Film (1985)", substring = true) and hasAction("Remove from watchlist")
+            rule.waitUntil(20_000) { scrollTo(tile) }
+            shot("vod11-home-watchlist")
+            rule.onNode(tile).performTouchInput { longClick() }
+            rule.onNode(hasText("Remove from watchlist") and hasClickAction()).performClick()
+            rule.waitUntil(10_000) { !vodMovie(id).optBoolean("watchlisted") }
+        } finally {
+            adminApi("DELETE", "/livetv/vod/movies/$id/watchlist", asToken = appToken)
+        }
+    }
+
+    /**
+     * A file that ends before its stated length (some IPTV files do: this one says 40 s and stops
+     * at 34 s, with no index) plays to its real end and the player closes as at any end, with no
+     * playback error (PLAY-3): the server answers the segments past the end with empty ones.
+     */
+    @Test fun vodShortFileEnds() {
+        ensureVodSource()
+        connectAndSignIn()
+        val title = "Short Ending Test (2001)"
+        val id = vodMovieId(title)
+        resetVodMovie(id)
+        try {
+            val session = org.json.JSONObject(adminApi("POST", "/livetv/vod/movies/$id/play", asToken = appToken)).getString("id")
+            adminApi("PATCH", "/livetv/vod/sessions/$session", """{"positionMs":26000,"durationMs":40000}""", asToken = appToken)
+            adminApi("DELETE", "/livetv/vod/sessions/$session", asToken = appToken)
+            tap("Libraries")
+            rule.waitUntil(15_000) { scrollTo(moviesEntry) }
+            rule.onNode(moviesEntry).performClick()
+            rule.waitUntilAtLeastOneExists(hasSetTextAction(), 15_000)
+            rule.onNode(hasSetTextAction()).performTextInput("Short Ending")
+            rule.waitUntilAtLeastOneExists(hasContentDescription(title), 15_000)
+            rule.onNode(hasContentDescription(title)).performClick()
+            rule.waitText("Resume from 0:26", 15_000)
+            tap("Resume from 0:26")
+            val player = hasContentDescription("Video player")
+            rule.waitUntilAtLeastOneExists(player and SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Playing"), 30_000)
+            // To the real end (about 8 s on) and closed, never a playback error on the way.
+            rule.waitUntil(45_000) {
+                assertTrue("a playback error at the end", rule.onAllNodes(hasContentDescription("Playback error")).fetchSemanticsNodes().isEmpty())
+                rule.onAllNodes(player).fetchSemanticsNodes().isEmpty()
+            }
+            shot("vod12-short-file-ended")
         } finally {
             resetVodMovie(id)
         }

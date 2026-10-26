@@ -4,7 +4,9 @@ tests expect them:
 
   --m3u-port (default 32621)     /films.m3u: three films as an M3U playlist ("Apple Test Alpha (1985)",
                                  Bravo, Charlie), each a minute long; /android.m3u: the Android
-                                 tests' three ("Droid Alpha Film (1985)", Beta (1990), Gamma (1995))
+                                 tests' three ("Droid Alpha Film (1985)", Beta (1990), Gamma (1995)) and "Short Ending
+                                 Test (2001)", an MKV that says 40 s but ends at about 34 s with no
+                                 index (as some IPTV files do: the server must end it cleanly)
   --xtream-port (default 32622)  an Xtream Codes server, Dispatcharr-style (user "apple", password
                                  "apple-test"): the films "Apple XC Film One" (1994), "Apple XC Film
                                  Two" (2003) and "10 Xenon" (2014, which the e2e Movies library has
@@ -40,7 +42,9 @@ ANDROID_FILMS = [  # file, title, group
     ("droid-alpha", "Droid Alpha Film (1985)", "Droid Films"),
     ("droid-beta", "Droid Beta Film (1990)", "Droid Films"),
     ("droid-gamma", "Droid Gamma Film (1995)", "Droid Films"),
+    ("short-ending", "Short Ending Test (2001)", "Droid Films"),
 ]
+SHORT = "short-ending"  # made as a cut-short MKV (see make_media), not an MP4
 XC_FILMS = [  # stream id, title, year, category id, genre, minutes
     (9101, "Apple XC Film One", 1994, "1", "Drama", 1),
     (9102, "Apple XC Film Two", 2003, "2", "Comedy", 1),
@@ -70,6 +74,9 @@ def make_media(media):
                 jobs.append((f"{episode_id(sid, season, n)}.mp4", 12, season * 10 + n))
     for name, seconds, i in jobs:
         path = os.path.join(media, name)
+        if name == f"{SHORT}.mp4":
+            make_short(media)
+            continue
         if os.path.exists(path):
             continue
         hue = (i * 47) % 360
@@ -77,6 +84,23 @@ def make_media(media):
                         "-f", "lavfi", "-i", f"sine=frequency={220 + 20 * (i % 10)}:duration={seconds}",
                         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast", "-c:a", "aac", "-shortest",
                         "-movflags", "+faststart", path], check=True)
+
+
+def make_short(media):
+    """An MKV whose header says 40 s but whose data stops at about 34 s, with no index (its cues
+    were at the end): the server's segments then run past the real end."""
+    path = os.path.join(media, f"{SHORT}.mkv")
+    if os.path.exists(path):
+        return
+    full = path + ".full"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=25:duration=40",
+                    "-f", "lavfi", "-i", "sine=frequency=330:duration=40", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                    "-preset", "veryfast", "-c:a", "aac", "-shortest", "-f", "matroska", full], check=True)
+    with open(full, "rb") as f:
+        data = f.read()
+    with open(path, "wb") as f:
+        f.write(data[: int(len(data) * 0.85)])
+    os.remove(full)
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -146,7 +170,7 @@ class M3UHandler(Handler):
             lines = ["#EXTM3U"]
             for name, title, group in (M3U_FILMS if path == "/films.m3u" else ANDROID_FILMS):
                 lines.append(f'#EXTINF:-1 group-title="{group}",{title}')
-                lines.append(f"http://{host}/films/{name}.mp4")
+                lines.append(f"http://{host}/films/{name}.{'mkv' if name == SHORT else 'mp4'}")
             return self.send(200, "\n".join(lines) + "\n", "audio/x-mpegurl")
         if path.startswith("/films/"):
             return self.send_media(path[len("/films/"):])

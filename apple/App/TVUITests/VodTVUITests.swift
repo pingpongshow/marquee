@@ -143,6 +143,7 @@ final class VodTVUITests: XCTestCase {
 
     // MARK: - Tests
 
+
     /// VOD sits right after Live TV in the sidebar; a film in Continue Watching opens, resumes from
     /// its point with the remote, and Menu closes the player and records where it got to;
     /// then Mark watched.
@@ -161,15 +162,21 @@ final class VodTVUITests: XCTestCase {
         let vod = try XCTUnwrap(app.sidebarItem("VOD Movies"), "VOD Movies is in the sidebar")
         XCTAssertLessThan(live.frame.midY, vod.frame.midY, "VOD comes right after Live TV")
         app.openSection("VOD Movies")
-        let tile = app.buttons.matching(identifier: "vod.tile").matching(NSPredicate(format: "label == %@", film)).firstMatch
-        XCTAssertTrue(tile.waitForExistence(timeout: 15), "the film is in Continue Watching")
+        let tiles = app.buttons.matching(identifier: "vod.tile").matching(NSPredicate(format: "label == %@", film))
+        XCTAssertTrue(tiles.firstMatch.waitForExistence(timeout: 15), "the film is on the page")
+        sleep(1)
+        // The film is in the grid too: Continue Watching's tile is the one higher up the page.
+        let tile = tiles.allElementsBoundByIndex.min { $0.frame.minY < $1.frame.minY } ?? tiles.firstMatch
+        XCTAssertGreaterThan(tiles.count, 1, "the film is in Continue Watching")
         sleep(1)
         shot("tv-vod-browse")
         XCTAssertFalse(app.buttons["Guide"].exists, "VOD is its own page, not inside Live TV")
         XCTAssertFalse(app.pageTitleShows("VOD Movies"), "no page title faded over VOD")
         // The tile can be above or below where focus starts.
-        for d in [XCUIRemote.Button.down, .up, .left] { for _ in 0..<6 where !tile.hasFocus { remote.press(d) } }
-        XCTAssertTrue(tile.hasFocus, "couldn't focus \(film); focus is on \(focused.label)")
+        // On a row the focus can sit on the tile's cell (no label) rather than the button: either counts.
+        let onTile = { tile.hasFocus || (self.focused.exists && self.focused.frame.contains(CGPoint(x: tile.frame.midX, y: tile.frame.midY))) }
+        for d in [XCUIRemote.Button.down, .up, .left] { for _ in 0..<6 where !onTile() { remote.press(d) } }
+        XCTAssertTrue(onTile(), "couldn't focus \(film); focus is on \(focused.label)")
         remote.press(.select)
 
         let play = app.buttons["vod.play"]

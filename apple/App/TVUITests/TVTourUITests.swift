@@ -317,7 +317,8 @@ final class TVTourUITests: XCTestCase {
         app.openSection("Music")
         let genres = app.buttons["musicLibrary.genres"]
         XCTAssertTrue(genres.waitForExistence(timeout: 10))
-        guard reach(genres) else { return }
+        // Below the music home's shelves (more of them once music has played): further than 8 presses.
+        guard reach(genres, tries: 16) else { return }
         remote.press(.select)
         sleep(3)
         shot("back-genres")
@@ -326,7 +327,7 @@ final class TVTourUITests: XCTestCase {
         XCTAssertTrue(genres.waitForExistence(timeout: 5), "Back from Genres returns to Music")
         XCTAssertTrue(genres.isHittable, "Back from Genres returns to Music")
         let decades = app.buttons["musicLibrary.decades"]
-        if decades.waitForExistence(timeout: 5), reach(decades) {
+        if decades.waitForExistence(timeout: 5), reach(decades, tries: 16) {
             remote.press(.select)
             sleep(3)
             shot("back-decades")
