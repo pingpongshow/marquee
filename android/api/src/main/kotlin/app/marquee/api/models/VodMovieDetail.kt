@@ -60,6 +60,7 @@ import kotlinx.serialization.Contextual
  * @param saveDestinations Admins: the extra save folders a film can go to (vodSave.destinations of kind movies or both).
  * @param save 
  * @param library 
+ * @param watchlisted On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/movies/{id}/watchlist.
  */
 @Serializable
 
@@ -148,7 +149,11 @@ data class VodMovieDetail (
     val save: VodSaveState? = null,
 
     @SerialName(value = "library")
-    val library: VodLibraryMatch? = null
+    val library: VodLibraryMatch? = null,
+
+    /* On the caller's watchlist (USER-8): PUT/DELETE /livetv/vod/movies/{id}/watchlist. */
+    @SerialName(value = "watchlisted")
+    val watchlisted: kotlin.Boolean? = null
 
 ) {
 

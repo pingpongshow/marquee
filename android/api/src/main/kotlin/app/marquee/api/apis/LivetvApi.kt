@@ -89,6 +89,148 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     }
 
     /**
+     * PUT /livetv/vod/movies/{movieId}/watchlist
+     * Put a film on demand on your watchlist (USER-8). It&#39;s in the Your Watchlist Home row&#39;s mixedEntries (and its See all) with the library&#39;s titles, most recently added first. Like a library movie, it leaves the row once watched.
+     * 
+     * @param movieId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun addVodMovieToWatchlist(movieId: kotlin.Long) : Unit {
+        val localVarResponse = addVodMovieToWatchlistWithHttpInfo(movieId = movieId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /livetv/vod/movies/{movieId}/watchlist
+     * Put a film on demand on your watchlist (USER-8). It&#39;s in the Your Watchlist Home row&#39;s mixedEntries (and its See all) with the library&#39;s titles, most recently added first. Like a library movie, it leaves the row once watched.
+     * 
+     * @param movieId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun addVodMovieToWatchlistWithHttpInfo(movieId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = addVodMovieToWatchlistRequestConfig(movieId = movieId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation addVodMovieToWatchlist
+     *
+     * @param movieId 
+     * @return RequestConfig
+     */
+    fun addVodMovieToWatchlistRequestConfig(movieId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/livetv/vod/movies/{movieId}/watchlist".replace("{"+"movieId"+"}", encodeURIComponent(movieId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /livetv/vod/series/{seriesId}/watchlist
+     * Put a series on demand on your watchlist (USER-8). It&#39;s in the Your Watchlist Home row&#39;s mixedEntries (and its See all) with the library&#39;s titles, most recently added first.
+     * 
+     * @param seriesId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun addVodSeriesToWatchlist(seriesId: kotlin.Long) : Unit {
+        val localVarResponse = addVodSeriesToWatchlistWithHttpInfo(seriesId = seriesId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /livetv/vod/series/{seriesId}/watchlist
+     * Put a series on demand on your watchlist (USER-8). It&#39;s in the Your Watchlist Home row&#39;s mixedEntries (and its See all) with the library&#39;s titles, most recently added first.
+     * 
+     * @param seriesId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun addVodSeriesToWatchlistWithHttpInfo(seriesId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = addVodSeriesToWatchlistRequestConfig(seriesId = seriesId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation addVodSeriesToWatchlist
+     *
+     * @param seriesId 
+     * @return RequestConfig
+     */
+    fun addVodSeriesToWatchlistRequestConfig(seriesId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/livetv/vod/series/{seriesId}/watchlist".replace("{"+"seriesId"+"}", encodeURIComponent(seriesId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * DELETE /livetv/recordings/{recordingId}
      * Cancel an upcoming recording, stop one in progress (keeping what was recorded), or remove a finished one from the list. Only whoever scheduled it, or an admin.
      * 
@@ -3392,6 +3534,148 @@ open class LivetvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/livetv/vod/refresh",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /livetv/vod/movies/{movieId}/watchlist
+     * Take a film on demand off your watchlist.
+     * 
+     * @param movieId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun removeVodMovieFromWatchlist(movieId: kotlin.Long) : Unit {
+        val localVarResponse = removeVodMovieFromWatchlistWithHttpInfo(movieId = movieId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /livetv/vod/movies/{movieId}/watchlist
+     * Take a film on demand off your watchlist.
+     * 
+     * @param movieId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun removeVodMovieFromWatchlistWithHttpInfo(movieId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = removeVodMovieFromWatchlistRequestConfig(movieId = movieId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation removeVodMovieFromWatchlist
+     *
+     * @param movieId 
+     * @return RequestConfig
+     */
+    fun removeVodMovieFromWatchlistRequestConfig(movieId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/livetv/vod/movies/{movieId}/watchlist".replace("{"+"movieId"+"}", encodeURIComponent(movieId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /livetv/vod/series/{seriesId}/watchlist
+     * Take a series on demand off your watchlist.
+     * 
+     * @param seriesId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun removeVodSeriesFromWatchlist(seriesId: kotlin.Long) : Unit {
+        val localVarResponse = removeVodSeriesFromWatchlistWithHttpInfo(seriesId = seriesId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /livetv/vod/series/{seriesId}/watchlist
+     * Take a series on demand off your watchlist.
+     * 
+     * @param seriesId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun removeVodSeriesFromWatchlistWithHttpInfo(seriesId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = removeVodSeriesFromWatchlistRequestConfig(seriesId = seriesId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation removeVodSeriesFromWatchlist
+     *
+     * @param seriesId 
+     * @return RequestConfig
+     */
+    fun removeVodSeriesFromWatchlistRequestConfig(seriesId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/livetv/vod/series/{seriesId}/watchlist".replace("{"+"seriesId"+"}", encodeURIComponent(seriesId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

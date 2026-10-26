@@ -105,6 +105,8 @@ import androidx.media3.common.Tracks
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.BookmarkAdd
+import androidx.compose.material.icons.filled.BookmarkAdded
 import androidx.compose.material3.TextButton
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -324,7 +326,9 @@ fun VodBrowse(nav: NavHostController, shows: Boolean, header: @Composable () -> 
         state.loadedFor = key
         fetch(key, 0, PAGE).onSuccess { (list, total) -> items = list; state.total.intValue = total }
             .onFailure { state.error.value = serverMessage(it, "Couldn't load the $noun"); items = emptyList() }
-        state.grid.scrollToItem(0)
+        // On the main thread: under the UI tests' dispatcher the effect could resume on the IO one,
+        // where scrolling throws ("The current thread must have a looper").
+        withContext(Dispatchers.Main.immediate) { state.grid.scrollToItem(0) }
     }
     fun loadMore() {
         val have = items ?: return
@@ -474,7 +478,33 @@ private fun Modifier.layoutOffset(inset: Dp): Modifier = this.then(
     },
 )
 
-/** A film's page: backdrop, poster, details from TMDB (or the source), Play, and watched. */
+/**
+ * The watchlist (USER-8) for a film or series on demand, as a library title's: it shows at once,
+ * goes back if the server refuses, and Home's Your Watchlist row follows.
+ */
+@Composable
+internal fun VodWatchlistButton(listed: Boolean?, title: String, set: suspend (Boolean) -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var on by remember(listed) { mutableStateOf(listed == true) }
+    OutlinedButton({
+        val now = !on
+        on = now
+        scope.launch {
+            withContext(Dispatchers.IO) { runCatching { set(now) } }
+                .onSuccess { VodChanges.bump() }
+                .onFailure { on = !now; toast(context, serverMessage(it, "Couldn't change the watchlist")) }
+        }
+    }, Modifier.focusRing().semantics {
+        contentDescription = if (on) "Remove $title from watchlist" else "Add $title to watchlist"
+        stateDescription = if (on) "On Watchlist" else "Not on watchlist"
+    }) {
+        Icon(if (on) Icons.Filled.BookmarkAdded else Icons.Filled.BookmarkAdd, null, tint = if (on) Gold else MaterialTheme.colorScheme.onSurface)
+        Text(if (on) "On Watchlist" else "Watchlist", Modifier.padding(start = 6.dp))
+    }
+}
+
+/** A film's page: backdrop, poster, details from TMDB (or the source), Play, watched and the watchlist. */
 @Composable
 fun VodMovieScreen(nav: NavHostController, movieId: Long) {
     val marquee = LocalMarquee.current
@@ -544,12 +574,17 @@ fun VodMovieScreen(nav: NavHostController, movieId: Long) {
                                 Text("Play from start", Modifier.padding(start = 6.dp))
                             }
                         }
-                        OutlinedButton({ setWatched(!watched) }, Modifier.focusRing().semantics {
-                            contentDescription = if (watched) "Mark as unwatched" else "Mark as watched"
-                            stateDescription = if (watched) "Watched" else "Not watched"
-                        }) {
-                            Icon(Icons.Filled.Check, null, tint = if (watched) Gold else MaterialTheme.colorScheme.onSurface)
-                            Text(if (watched) "Watched" else "Mark watched", Modifier.padding(start = 6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedButton({ setWatched(!watched) }, Modifier.focusRing().semantics {
+                                contentDescription = if (watched) "Mark as unwatched" else "Mark as watched"
+                                stateDescription = if (watched) "Watched" else "Not watched"
+                            }) {
+                                Icon(Icons.Filled.Check, null, tint = if (watched) Gold else MaterialTheme.colorScheme.onSurface)
+                                Text(if (watched) "Watched" else "Mark watched", Modifier.padding(start = 6.dp))
+                            }
+                            VodWatchlistButton(m.watchlisted, m.title) { on ->
+                                if (on) marquee.livetv.addVodMovieToWatchlist(m.id) else marquee.livetv.removeVodMovieFromWatchlist(m.id)
+                            }
                         }
                         // Part-way through: unwatched too, which forgets where it stopped (PLAY-5).
                         if (!watched && position > 0) OutlinedButton({ setWatched(false) }, Modifier.focusRing().semantics { contentDescription = "Mark as unwatched" }) {

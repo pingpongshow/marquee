@@ -96,6 +96,24 @@ fun hideVodSuggestion(marquee: Marquee, context: Context, s: VodSuggestion, onHi
 }
 
 /**
+ * Takes a film or series on demand off the watchlist (USER-8), from Home's Your Watchlist row.
+ * [onRemoved] runs at once (the tile goes), and [onFailed] puts it back if the call fails.
+ */
+fun removeVodFromWatchlist(marquee: Marquee, context: Context, s: VodSuggestion, onRemoved: () -> Unit = {}, onFailed: () -> Unit = {}) {
+    val title = s.title()
+    onRemoved()
+    marquee.scope.launch {
+        withContext(Dispatchers.IO) {
+            runCatching {
+                s.movie?.let { marquee.livetv.removeVodMovieFromWatchlist(it.id) } ?: s.series?.let { marquee.livetv.removeVodSeriesFromWatchlist(it.id) }
+            }
+        }
+            .onSuccess { VodChanges.bump() }
+            .onFailure { withContext(Dispatchers.Main) { onFailed(); toast(context, "Couldn't remove “$title”: ${serverMessage(it, "")}") } }
+    }
+}
+
+/**
  * The small "VOD" pill on a poster that's on demand rather than in a library (Home's mixed rows):
  * bold caps on a dark backing, legible over any artwork.
  */
@@ -107,11 +125,12 @@ fun VodBadge(modifier: Modifier = Modifier) {
 
 /**
  * One suggestion: the poster, the title (a film or show icon before it) and the reason under it.
- * [badge] marks the poster VOD, for rows that mix it with library titles.
+ * [badge] marks the poster VOD, for rows that mix it with library titles; [watchlist] is for Your
+ * Watchlist, where the menu removes it from the watchlist rather than Not interested.
  */
 @Composable
 fun VodSuggestionTile(nav: NavHostController, s: VodSuggestion, width: Dp?, autoFocus: Boolean = false, badge: Boolean = false,
-    onOpen: () -> Unit = {}, onHide: () -> Unit) {
+    watchlist: Boolean = false, onOpen: () -> Unit = {}, onHide: () -> Unit) {
     val marquee = LocalMarquee.current
     var menu by remember { mutableStateOf(false) }
     val m = s.movie
@@ -122,7 +141,8 @@ fun VodSuggestionTile(nav: NavHostController, s: VodSuggestion, width: Dp?, auto
     val inLibrary = m?.inLibrary ?: sh?.inLibrary
     val open = { onOpen(); vodRoute(s)?.let { nav.navigate(it) }; Unit }
     val actions = buildList {
-        if (!marquee.isOffline) add(TileAction("Not interested", onHide))
+        // In Your Watchlist (USER-8): [onHide] takes it off the watchlist instead.
+        if (!marquee.isOffline) add(TileAction(if (watchlist) "Remove from watchlist" else "Not interested", onHide))
         add(TileAction(if (m != null) "Go to film" else "Go to show") { vodRoute(s)?.let { nav.navigate(it) } })
     }
     Column(if (width != null) Modifier.width(width) else Modifier.fillMaxWidth()) {

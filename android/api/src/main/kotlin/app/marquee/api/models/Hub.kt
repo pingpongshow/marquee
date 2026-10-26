@@ -42,7 +42,7 @@ import kotlinx.serialization.Contextual
  * @param propertyEntries Continue Watching only: the row's entries, library items and films and episodes on demand together, newest first (up to 20; items stays library-only for older apps). When it's present show it instead of items. The row is sent when either has something.
  * @param total Continue Watching only: how many entries there are in all (GET /hubs/continue-watching); more than entries holds means a View more link.
  * @param vodEntries Watch on VOD (id vod-suggestions) only, sent when the request asks with vod=true: films and series on demand picked for the caller, best first (items is empty).
- * @param mixedEntries Sent when the request asks with mixed=true, on suggestion rows: library items and films and series on demand together, best first. When it's present show it instead of items (mark the on-demand ones as VOD).
+ * @param mixedEntries Sent when the request asks with mixed=true, on suggestion rows and the watchlist: library items and films and series on demand together, best first (the watchlist: most recently added first). When it's present show it instead of items (mark the on-demand ones as VOD).
  */
 @Serializable
 
@@ -72,7 +72,7 @@ data class Hub (
     @SerialName(value = "vodEntries")
     val vodEntries: kotlin.collections.List<VodSuggestion>? = null,
 
-    /* Sent when the request asks with mixed=true, on suggestion rows: library items and films and series on demand together, best first. When it's present show it instead of items (mark the on-demand ones as VOD). */
+    /* Sent when the request asks with mixed=true, on suggestion rows and the watchlist: library items and films and series on demand together, best first (the watchlist: most recently added first). When it's present show it instead of items (mark the on-demand ones as VOD). */
     @SerialName(value = "mixedEntries")
     val mixedEntries: kotlin.collections.List<HomeEntry>? = null
 

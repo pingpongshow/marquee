@@ -258,8 +258,10 @@ private fun MixedRow(nav: NavHostController, hub: Hub, entries: List<HomeEntry>,
         val vod = e.vod
         if (item != null) PosterCard(item, marquee.imageUrl(item.images?.poster, 300), cardWidth, { onOpenItem(item.id); openItem(nav, item) },
             shape = shapeFor(item), autoFocus = focus, actions = tileActions(item, nav = nav))
-        else if (vod != null) VodSuggestionTile(nav, vod, cardWidth, autoFocus = focus, badge = true, onOpen = { onOpenVod(vod.key) }) {
-            hideVodSuggestion(marquee, context, vod, onHidden = { hidden.add(e.key) }, onFailed = { hidden.remove(e.key) })
+        else if (vod != null) VodSuggestionTile(nav, vod, cardWidth, autoFocus = focus, badge = true, watchlist = hub.id == "watchlist",
+            onOpen = { onOpenVod(vod.key) }) {
+            if (hub.id == "watchlist") removeVodFromWatchlist(marquee, context, vod, onRemoved = { hidden.add(e.key) }, onFailed = { hidden.remove(e.key) })
+            else hideVodSuggestion(marquee, context, vod, onHidden = { hidden.add(e.key) }, onFailed = { hidden.remove(e.key) })
         }
     }
 }
