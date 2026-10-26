@@ -565,6 +565,9 @@ struct LiveWatchView: View {
     @State private var overlayToken = 0
     /// How far the view follows a swipe down from the top.
     @State private var pullDown: CGFloat = 0
+    /// The header's own controls (AVKit's are off: see LivePicture).
+    @State private var paused = false
+    @State private var muted = false
     #endif
 
     init(channels: [LiveChannel], start: Int64) {
@@ -592,12 +595,20 @@ struct LiveWatchView: View {
     private var content: some View {
         ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
+            #if os(iOS)
+            LivePicture(player: player).ignoresSafeArea()
+                .accessibilityLabel("Live TV")
+                .accessibilityValue(channel?.name ?? "")
+                .accessibilityIdentifier("liveWatch.player")
+            #else
             VideoPlayer(player: player).ignoresSafeArea()
                 .accessibilityLabel("Live TV")
                 .accessibilityValue(channel?.name ?? "")
                 .accessibilityIdentifier("liveWatch.player")
+            #endif
             #if os(iOS)
             header
+            controls.frame(maxHeight: .infinity, alignment: .bottom)
             if let c = overlayChannel { channelOverlay(c).frame(maxHeight: .infinity) }
             #endif
             if let error { Text(error).foregroundStyle(.red).padding(.top, 80) }
@@ -624,10 +635,51 @@ struct LiveWatchView: View {
         }
         .buttonStyle(.bordered).tint(.white)
         .padding()
-        // Below AVKit's own top bar (AirPlay, volume), as in the video player: its AirPlay
-        // button sat on the close button whenever the player's controls showed.
-        .padding(.top, PlayerChrome.topInset - 16)
         .background(LinearGradient(colors: [.black.opacity(0.8), .clear], startPoint: .top, endPoint: .bottom))
+    }
+
+    /// The live picture without AVKit's controls. A live stream has nothing to scrub, and AVKit's
+    /// empty scrub bar ran its live-edge thumb off the screen's right edge; the header has play,
+    /// mute and AirPlay instead.
+    private struct LivePicture: UIViewControllerRepresentable {
+        let player: AVPlayer
+
+        func makeUIViewController(context: Context) -> AVPlayerViewController {
+            let c = AVPlayerViewController()
+            c.player = player
+            c.showsPlaybackControls = false
+            c.canStartPictureInPictureAutomaticallyFromInline = true
+            c.view.backgroundColor = .black
+            return c
+        }
+
+        func updateUIViewController(_ c: AVPlayerViewController, context: Context) {
+            if c.player !== player { c.player = player }
+        }
+    }
+
+    /// Play/pause, mute and AirPlay, along the bottom where AVKit's controls were (the header
+    /// keeps its width for the programme's name).
+    private var controls: some View {
+        HStack(spacing: 28) {
+            Button {
+                paused.toggle()
+                if paused { player.pause() } else { player.play() }
+            } label: { Image(systemName: paused ? "play.fill" : "pause.fill").frame(width: 28, height: 28) }
+            .accessibilityLabel(paused ? "Play" : "Pause")
+            Button {
+                muted.toggle()
+                player.isMuted = muted
+            } label: { Image(systemName: muted ? "speaker.slash.fill" : "speaker.wave.2.fill").frame(width: 28, height: 28) }
+            .accessibilityLabel(muted ? "Unmute" : "Mute")
+            AirPlayButton().frame(width: 28, height: 28)
+        }
+        .font(.title3)
+        .foregroundStyle(.white)
+        .buttonStyle(.plain)
+        .padding(.horizontal, 24).padding(.vertical, 12)
+        .background(.black.opacity(0.55), in: Capsule())
+        .padding(.bottom, 24)
     }
 
     /// Number, logo and name of the channel being switched to.
@@ -648,9 +700,7 @@ struct LiveWatchView: View {
         .transition(.opacity)
     }
 
-    /// Swipe left/right to change channel; swipe down from the top quarter to close. Runs
-    /// alongside the player's own gestures, so a tap still shows or hides its controls; a
-    /// horizontal swipe along the bottom (where the player's scrub bar sits) is left to it.
+    /// Swipe left/right to change channel; swipe down from the top quarter to close.
     private func swipes(_ size: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 20, coordinateSpace: .local)
             .onChanged { v in
@@ -667,8 +717,7 @@ struct LiveWatchView: View {
                     return
                 }
                 withAnimation(.spring(duration: 0.25)) { pullDown = 0 }
-                let inScrubBar = v.startLocation.y > size.height - 110
-                guard !inScrubBar, abs(dx) > 60, abs(dx) > abs(dy) * 1.5 else { return }
+                guard abs(dx) > 60, abs(dx) > abs(dy) * 1.5 else { return }
                 step(dx < 0 ? 1 : -1)
                 showOverlay()
             }
@@ -708,6 +757,10 @@ struct LiveWatchView: View {
                 player.replaceCurrentItem(with: item)
                 music.pause() // live TV takes over from the music
                 player.play()
+                #if os(iOS)
+                paused = false
+                player.isMuted = muted
+                #endif
                 error = nil
                 // The server ended the stream: "Stopped: …" is shown; any other reason means
                 // tuning the channel again works, which is tried once.
