@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -373,4 +374,36 @@ func Available(ffmpeg string) func(name string) bool {
 		})
 		return !asked || names[name]
 	}
+}
+
+// VideoEnd is where a file's picture ends, in ms: the end of the last packet of its video
+// stream videoIndex, read from the last five minutes of the file (durationMS long). The
+// picture can stop before the file does, with audio or subtitles running on. ok=false when
+// FFprobe can't tell.
+func VideoEnd(ctx context.Context, ffprobe, path string, videoIndex int, durationMS int64) (ms int64, ok bool) {
+	if videoIndex < 0 || durationMS <= 0 {
+		return 0, false
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	from := max(0, durationMS/1000-300)
+	out, err := exec.CommandContext(ctx, ffprobe, "-v", "error", "-select_streams", strconv.Itoa(videoIndex),
+		"-read_intervals", strconv.FormatInt(from, 10)+"%", "-show_entries", "packet=pts_time,duration_time", "-of", "csv=p=0", path).Output()
+	if err != nil {
+		return 0, false
+	}
+	var end float64
+	for _, line := range strings.Split(string(out), "\n") {
+		pts, dur, _ := strings.Cut(strings.TrimSpace(line), ",")
+		p, err := strconv.ParseFloat(pts, 64)
+		if err != nil {
+			continue
+		}
+		d, _ := strconv.ParseFloat(dur, 64) // N/A: 0
+		end = max(end, p+d)
+	}
+	if end <= 0 {
+		return 0, false
+	}
+	return int64(math.Round(end * 1000)), true
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -419,6 +420,34 @@ func TestVerificationFailures(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// A film whose picture stops before its soundtrack does (seen: 1:41 before, from an IPTV
+// source) saves: its end is checked where the picture stops, not in the last seconds of sound.
+func TestVerificationPictureEndsFirst(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not installed")
+	}
+	out := filepath.Join(t.TempDir(), "film.mkv")
+	// 30 s of picture, 70 s of sound.
+	cmd := exec.Command("ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=24:duration=30",
+		"-f", "lavfi", "-i", "sine=frequency=440:duration=70", "-c:v", "libx264", "-preset", "ultrafast", "-g", "24",
+		"-c:a", "aac", "-ac", "2", out)
+	if b, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("%v: %s", err, b)
+	}
+	data, _ := os.ReadFile(out)
+	e := newEnv(t, oneFilm, nil)
+	e.src.files["movie/101.mkv"] = data
+	r, _ := e.s.SaveMovie(context.Background(), e.movieID("EN - Clip Film (2020)"), 1, false)
+	e.start()
+	v := e.wait(r.Saves[0].ID, Failed, Done)
+	if v.State != Done {
+		t.Fatalf("save: %+v", v)
+	}
+	if len(e.src.order) != 1 {
+		t.Errorf("downloads: %d, want 1", len(e.src.order))
 	}
 }
 

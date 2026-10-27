@@ -426,7 +426,7 @@ func (s *Service) verify(ctx context.Context, path string, src Source, plan Plan
 	// frame), with nothing to decode after it in the original either. The samples stop where
 	// the original's picture stops, so a result whose picture is cut short still fails.
 	end := float64(got.DurationMS) / 1000
-	if ms, ok := s.videoEnd(ctx, src); ok {
+	if ms, ok := encode.VideoEnd(ctx, or(s.FFprobe, "ffprobe"), src.Path, src.VideoIndex, src.DurationMS); ok {
 		end = min(end, float64(ms)/1000)
 	}
 	for _, at := range []float64{0, end * 0.5, max(0, end-min(30, end/3))} {
@@ -435,36 +435,6 @@ func (s *Service) verify(ctx context.Context, path string, src Source, plan Plan
 		}
 	}
 	return nil
-}
-
-// videoEnd is where the original's picture ends, in ms: the end of its last video packet,
-// read from the last five minutes of the file. ok=false when FFprobe can't tell.
-func (s *Service) videoEnd(ctx context.Context, src Source) (ms int64, ok bool) {
-	if src.VideoIndex < 0 || src.DurationMS <= 0 {
-		return 0, false
-	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-	from := max(0, src.DurationMS/1000-300)
-	out, err := exec.CommandContext(ctx, or(s.FFprobe, "ffprobe"), "-v", "error", "-select_streams", strconv.Itoa(src.VideoIndex),
-		"-read_intervals", strconv.FormatInt(from, 10)+"%", "-show_entries", "packet=pts_time,duration_time", "-of", "csv=p=0", src.Path).Output()
-	if err != nil {
-		return 0, false
-	}
-	var end float64
-	for _, line := range strings.Split(string(out), "\n") {
-		pts, dur, _ := strings.Cut(strings.TrimSpace(line), ",")
-		p, err := strconv.ParseFloat(pts, 64)
-		if err != nil {
-			continue
-		}
-		d, _ := strconv.ParseFloat(dur, 64) // N/A: 0
-		end = max(end, p+d)
-	}
-	if end <= 0 {
-		return 0, false
-	}
-	return int64(math.Round(end * 1000)), true
 }
 
 // swap puts the new file in the original's place, keeping the library's record (so the

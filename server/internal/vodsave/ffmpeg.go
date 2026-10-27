@@ -198,7 +198,7 @@ func (s *Service) ffmpeg(ctx context.Context, args []string, durationMS int64, p
 
 // verify checks a finished file before it goes into the library: it has video, its length
 // is what was expected (within 2%; a minute's slack for a runtime that isn't the file's own,
-// unless strict), and its first and last seconds decode without errors.
+// unless strict), and its first and last seconds of picture decode without errors.
 func (s *Service) verify(ctx context.Context, path string, mi mediaInfo, expectedMS int64, strict bool) (string, error) {
 	if mi.Video == 0 {
 		return "", errors.New("it has no video")
@@ -217,7 +217,14 @@ func (s *Service) verify(ctx context.Context, path string, mi mediaInfo, expecte
 			return "", fmt.Errorf("it is %s long; expected %s", clock(mi.DurationMS), clock(expectedMS))
 		}
 	}
+	// The picture can end before the file does, with the audio running on (seen: a film whose
+	// picture stops 1:41 before its soundtrack), so the end is checked where the picture
+	// stops. That's looked for in the file's last five minutes only: a picture that stops
+	// earlier is found nowhere there, and the file's own end is checked (and fails) as before.
 	secs := float64(mi.DurationMS) / 1000
+	if ms, ok := encode.VideoEnd(ctx, or2(s.FFprobe, "ffprobe"), path, mi.VideoIndex, mi.DurationMS); ok && ms < mi.DurationMS {
+		secs = float64(ms) / 1000
+	}
 	end := max(0, secs-min(30, secs/3)) // the last 30 s (the last third of a short file)
 	for _, at := range []float64{0, end} {
 		if err := s.decodeCheck(ctx, path, at); err != nil {
