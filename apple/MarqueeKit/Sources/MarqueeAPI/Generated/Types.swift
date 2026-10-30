@@ -637,6 +637,16 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /library-health/{checkId}/ignored/{itemId}`.
     /// - Remark: Generated from `#/paths//library-health/{checkId}/ignored/{itemId}/delete(unignoreHealthIssue)`.
     func unignoreHealthIssue(_ input: Operations.UnignoreHealthIssue.Input) async throws -> Operations.UnignoreHealthIssue.Output
+    /// Repair files whose frames are timed out of order (Library Health → Frame timing errors, ADM-11, admin only): the files listed, or every one that can be repaired. The frame order is worked out from the video and the file's timing rewritten; nothing is re-encoded, and the original goes to the media trash. Repairs run one at a time. Files already waiting are skipped; failed repairs are tried again.
+    ///
+    /// - Remark: HTTP `POST /library-health/frameTiming/repairs`.
+    /// - Remark: Generated from `#/paths//library-health/frameTiming/repairs/post(repairFrameTiming)`.
+    func repairFrameTiming(_ input: Operations.RepairFrameTiming.Input) async throws -> Operations.RepairFrameTiming.Output
+    /// Take a waiting or failed repair off the list (admin only). A running repair finishes.
+    ///
+    /// - Remark: HTTP `DELETE /library-health/frameTiming/repairs/{fileId}`.
+    /// - Remark: Generated from `#/paths//library-health/frameTiming/repairs/{fileId}/delete(cancelFrameTimingRepair)`.
+    func cancelFrameTimingRepair(_ input: Operations.CancelFrameTimingRepair.Input) async throws -> Operations.CancelFrameTimingRepair.Output
     /// Movie and episode files matching the Large files filters, biggest first, with the size each would be after a preset and totals for all that match (admin only). Read from what the library knows; nothing is probed.
     ///
     /// - Remark: HTTP `GET /optimize/files`.
@@ -2966,6 +2976,32 @@ extension APIProtocol {
         headers: Operations.UnignoreHealthIssue.Input.Headers = .init()
     ) async throws -> Operations.UnignoreHealthIssue.Output {
         try await unignoreHealthIssue(Operations.UnignoreHealthIssue.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Repair files whose frames are timed out of order (Library Health → Frame timing errors, ADM-11, admin only): the files listed, or every one that can be repaired. The frame order is worked out from the video and the file's timing rewritten; nothing is re-encoded, and the original goes to the media trash. Repairs run one at a time. Files already waiting are skipped; failed repairs are tried again.
+    ///
+    /// - Remark: HTTP `POST /library-health/frameTiming/repairs`.
+    /// - Remark: Generated from `#/paths//library-health/frameTiming/repairs/post(repairFrameTiming)`.
+    public func repairFrameTiming(
+        headers: Operations.RepairFrameTiming.Input.Headers = .init(),
+        body: Operations.RepairFrameTiming.Input.Body
+    ) async throws -> Operations.RepairFrameTiming.Output {
+        try await repairFrameTiming(Operations.RepairFrameTiming.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Take a waiting or failed repair off the list (admin only). A running repair finishes.
+    ///
+    /// - Remark: HTTP `DELETE /library-health/frameTiming/repairs/{fileId}`.
+    /// - Remark: Generated from `#/paths//library-health/frameTiming/repairs/{fileId}/delete(cancelFrameTimingRepair)`.
+    public func cancelFrameTimingRepair(
+        path: Operations.CancelFrameTimingRepair.Input.Path,
+        headers: Operations.CancelFrameTimingRepair.Input.Headers = .init()
+    ) async throws -> Operations.CancelFrameTimingRepair.Output {
+        try await cancelFrameTimingRepair(Operations.CancelFrameTimingRepair.Input(
             path: path,
             headers: headers
         ))

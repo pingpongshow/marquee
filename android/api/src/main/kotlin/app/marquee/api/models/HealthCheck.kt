@@ -37,6 +37,8 @@ import kotlinx.serialization.Contextual
  * @param count 
  * @param severity 
  * @param available False when the check can't run (e.g. missingSubtitles without Bazarr).
+ * @param repairable What the check finds can be repaired from Library Health (frameTiming: POST /library-health/frameTiming/repairs).
+ * @param repairing repairable checks: how many repairs are waiting or running.
  */
 @Serializable
 
@@ -59,14 +61,22 @@ data class HealthCheck (
 
     /* False when the check can't run (e.g. missingSubtitles without Bazarr). */
     @SerialName(value = "available")
-    val available: kotlin.Boolean? = null
+    val available: kotlin.Boolean? = null,
+
+    /* What the check finds can be repaired from Library Health (frameTiming: POST /library-health/frameTiming/repairs). */
+    @SerialName(value = "repairable")
+    val repairable: kotlin.Boolean? = null,
+
+    /* repairable checks: how many repairs are waiting or running. */
+    @SerialName(value = "repairing")
+    val repairing: kotlin.Int? = null
 
 ) {
 
     /**
      * 
      *
-     * Values: DUPLICATES,UNMATCHED,UNAVAILABLE,UNPLAYABLE,UPGRADES,PLAYBACK_ERRORS,MISSING_ARTWORK,MISSING_SUBTITLES
+     * Values: DUPLICATES,UNMATCHED,UNAVAILABLE,UNPLAYABLE,FRAME_TIMING,UPGRADES,PLAYBACK_ERRORS,MISSING_ARTWORK,MISSING_SUBTITLES
      */
     @Serializable
     enum class Id(val value: kotlin.String) {
@@ -74,6 +84,7 @@ data class HealthCheck (
         @SerialName(value = "unmatched") UNMATCHED("unmatched"),
         @SerialName(value = "unavailable") UNAVAILABLE("unavailable"),
         @SerialName(value = "unplayable") UNPLAYABLE("unplayable"),
+        @SerialName(value = "frameTiming") FRAME_TIMING("frameTiming"),
         @SerialName(value = "upgrades") UPGRADES("upgrades"),
         @SerialName(value = "playbackErrors") PLAYBACK_ERRORS("playbackErrors"),
         @SerialName(value = "missingArtwork") MISSING_ARTWORK("missingArtwork"),

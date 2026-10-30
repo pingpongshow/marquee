@@ -1,6 +1,6 @@
 // Package health finds library problems an admin can fix (ADM-11): duplicates, unmatched
-// titles, missing or unreadable files, titles worth upgrading, playback failures, missing
-// posters and missing subtitles. Each check is one query, so the overview stays fast on
+// titles, missing or unreadable files, files whose frames are timed out of order, titles
+// worth upgrading, playback failures, missing posters and missing subtitles. Each check is one query, so the overview stays fast on
 // large libraries (joins are CROSS JOINs to fix their order, so stale planner statistics
 // can't turn a lookup into a scan). Extras are left out everywhere.
 package health
@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"marquee/internal/bazarr"
+	"marquee/internal/frametiming"
 )
 
 var (
@@ -27,6 +28,10 @@ type Check struct {
 	Severity               string // info, warning, error
 	Count                  int
 	Available              bool
+	// Repairable: what the check finds can be repaired from Library Health (frameTiming);
+	// Repairing is how many repairs are waiting or running.
+	Repairable bool
+	Repairing  int
 }
 
 // Issue is one thing a check found.
@@ -37,6 +42,10 @@ type Issue struct {
 	// Files are the files involved, to compare: for duplicates every file of every copy
 	// (movies, episodes and videos; a show's copies list none), otherwise the issue's file.
 	Files []File
+	// Repairable: the file can be repaired (frameTiming: an MP4 or MOV); Repair is its repair
+	// when one is waiting, running or failed.
+	Repairable bool
+	Repair     *frametiming.State
 }
 
 // File is one file of an issue.
@@ -53,6 +62,8 @@ type Service struct {
 	DB *sql.DB
 	// Bazarr feeds missingSubtitles; nil or not set up makes that check unavailable.
 	Bazarr *bazarr.Service
+	// Repairs gives frameTiming its repairs' progress (nil: read from the database alone).
+	Repairs *frametiming.Service
 }
 
 type check struct {
@@ -87,6 +98,11 @@ var checks = []check{
 		WHERE f.available = 1 AND i.extra_type IS NULL AND i.type NOT IN ('photo')
 			AND (pf.path IS NOT NULL OR f.check_error IS NOT NULL OR COALESCE(f.duration_ms, 0) <= 0
 				OR NOT EXISTS (SELECT 1 FROM streams s WHERE s.file_id = f.id AND s.kind IN ('video', 'audio')))`},
+	{id: "frameTiming", title: "Frame timing errors", severity: "warning",
+		description: "Video files whose frames are timed in the order they're decoded instead of the order they're shown. Played as they are, the picture stutters, so Marquee converts them while playing. Repair puts the timing right without re-encoding anything (MP4 and MOV files); the original goes to the media trash.",
+		query: `SELECT i.id AS item_id, f.id AS file_id, f.path AS path, f.timing_error AS detail, 0 AS rank
+		FROM media_files f CROSS JOIN media_versions v ON v.id = f.version_id CROSS JOIN items i ON i.id = v.item_id
+		WHERE f.timing_error IS NOT NULL AND f.available = 1 AND i.extra_type IS NULL`},
 	{id: "playbackErrors", title: "Playback errors", severity: "error",
 		description: "Titles that failed to play in the last 30 days.",
 		query: `SELECT pe.item_id AS item_id, pe.file_id AS file_id, f.path AS path,
@@ -172,6 +188,10 @@ func (s *Service) Checks(ctx context.Context) ([]Check, error) {
 		} else if err := s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM (`+c.query+`) x`+notIgnored, c.id).Scan(&ck.Count); err != nil {
 			return nil, err
 		}
+		if c.id == "frameTiming" {
+			ck.Repairable = true
+			s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM timing_repairs WHERE state IN ('queued', 'running')`).Scan(&ck.Repairing)
+		}
 		out = append(out, ck)
 	}
 	return out, nil
@@ -216,6 +236,11 @@ func (s *Service) Issues(ctx context.Context, id string, offset, limit int) ([]I
 	}
 	if id == "duplicates" {
 		if err := s.related(ctx, out); err != nil {
+			return nil, 0, err
+		}
+	}
+	if id == "frameTiming" {
+		if err := s.repairs(ctx, out); err != nil {
 			return nil, 0, err
 		}
 	}
@@ -379,4 +404,30 @@ func RecordPlaybackError(ctx context.Context, db *sql.DB, itemID, fileID int64, 
 	}
 	_, err := db.ExecContext(ctx, `DELETE FROM playback_errors WHERE at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 days')`)
 	return err
+}
+
+// repairs fills in which frame timing issues can be repaired, and their repairs.
+func (s *Service) repairs(ctx context.Context, issues []Issue) error {
+	var ids []int64
+	for _, is := range issues {
+		ids = append(ids, is.FileID)
+	}
+	var live func(int64) (float64, bool)
+	if s.Repairs != nil {
+		live = s.Repairs.Live
+	}
+	states, err := frametiming.States(ctx, s.DB, ids, live)
+	if err != nil {
+		return err
+	}
+	for k := range issues {
+		is := &issues[k]
+		var container string
+		s.DB.QueryRowContext(ctx, `SELECT COALESCE(container, '') FROM media_files WHERE id = ?`, is.FileID).Scan(&container)
+		is.Repairable = frametiming.Repairable(container, is.Path)
+		if st, ok := states[is.FileID]; ok {
+			is.Repair = &st
+		}
+	}
+	return nil
 }

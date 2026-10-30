@@ -14,6 +14,7 @@ import (
 	"marquee/internal/bazarr"
 	"marquee/internal/commercials"
 	"marquee/internal/downloads"
+	"marquee/internal/frametiming"
 	"marquee/internal/health"
 	"marquee/internal/images"
 	"marquee/internal/items"
@@ -106,6 +107,9 @@ type Handlers struct {
 	Health *health.Service
 	// Trash deletes media files to the library's trash (ADM-11); made on demand when nil.
 	Trash *mediatrash.Service
+	// Repairs repairs files whose frames are timed out of order (Library Health → Frame
+	// timing errors); made on demand when nil (repairs then wait for a worker).
+	Repairs *frametiming.Service
 	// SpeedTest measures the internet speed (tests use a fake server).
 	SpeedTest *speedtest.Tester
 	// Mail sends email (reset links, test mail); Alerts is the admin alert list. Either may

@@ -1,10 +1,15 @@
-// Package filecheck finds damaged new video files (the Check new files task): each movie,
-// episode and personal video added to the library (or replaced) gets the playback check VOD
-// downloads get, at low priority and one file at a time. Its length must be plausible where
-// it is known, and a few seconds at its start and near its end must decode. Files that fail
-// are listed in Library Health → Unplayable files with the reason; files that pass keep only
-// media_files.checked_at. Files already in the library when the check arrived were marked
+// Package filecheck checks video files (the Check files task), at low priority and one file
+// at a time. Each movie, episode and personal video added to the library (or replaced) gets
+// the playback check VOD downloads get: its length must be plausible where it is known, and
+// a few seconds at its start and near its end must decode. Files that fail are listed in
+// Library Health → Unplayable files with the reason; files that pass keep only
+// media_files.checked_at. Files already in the library when that check arrived were marked
 // checked by the migration and aren't checked.
+//
+// Every video file, those already in the library included, also gets its frame timing
+// checked once (frametiming.Check): files whose frames are timed in decode order are listed
+// in Library Health → Frame timing errors, to be repaired (media_files.timing_checked_at and
+// timing_error).
 package filecheck
 
 import (
@@ -15,12 +20,14 @@ import (
 	"log/slog"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"marquee/internal/encode"
+	"marquee/internal/frametiming"
 	"marquee/internal/tasks"
 )
 
@@ -30,8 +37,8 @@ const TaskID = "check-new-files"
 // Task is the scheduled task: hourly (new files are also checked straight after a scan
 // adds them), at low priority, one file at a time.
 func (s *Service) Task() tasks.Task {
-	return tasks.Task{ID: TaskID, Name: "Check new files", Every: time.Hour,
-		Description: "Checks each movie, episode and personal video added to the library (or replaced) for damage: a few seconds at its start and near its end must decode. Damaged files are listed in Library Health → Unplayable files. Runs after a scan adds files, at low priority, one file at a time; files that were already in the library aren't checked.",
+	return tasks.Task{ID: TaskID, Name: "Check files", Every: time.Hour,
+		Description: "Checks each movie, episode and personal video added to the library (or replaced) for damage: a few seconds at its start and near its end must decode. Damaged files are listed in Library Health → Unplayable files. Also checks every video file's frame timing once, those already in the library included; files whose frames are timed out of order are listed in Library Health → Frame timing errors. Runs after a scan adds files, at low priority, one file at a time.",
 		Run:         s.Run, Progress: s.Progress}
 }
 
@@ -43,12 +50,15 @@ type Damaged struct {
 
 // Service checks new files.
 type Service struct {
-	DB     *sql.DB
-	FFmpeg string
+	DB      *sql.DB
+	FFmpeg  string
+	FFprobe string
 	// LookPath finds nice and ionice (nil = exec.LookPath).
 	LookPath func(string) (string, error)
 	// Decode replaces the decode test (tests); nil = encode.DecodeCheckLow.
 	Decode func(ctx context.Context, path string, at float64) error
+	// Timing replaces the frame timing check (tests); nil = frametiming.Check.
+	Timing func(ctx context.Context, path string) (string, error)
 	// OnDamaged, when set, hears the files a run found damaged (an admin alert).
 	OnDamaged func(ctx context.Context, files []Damaged)
 
@@ -65,11 +75,12 @@ const eligible = `i.type IN ('movie', 'episode', 'video') AND i.extra_type IS NU
 
 const now = `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`
 
-// Pending reports whether any file is waiting for its check (cheap: for triggering the task
+// Pending reports whether any file is waiting for a check (cheap: for triggering the task
 // after a scan).
 func (s *Service) Pending(ctx context.Context) bool {
 	var n int
-	s.DB.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM media_files WHERE checked_at IS NULL AND available = 1)`).Scan(&n)
+	s.DB.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM media_files WHERE checked_at IS NULL AND available = 1)
+		OR EXISTS (SELECT 1 FROM media_files WHERE timing_checked_at IS NULL AND available = 1)`).Scan(&n)
 	return n == 1
 }
 
@@ -104,8 +115,14 @@ func (s *Service) Run(ctx context.Context) (string, error) {
 			WHERE f.checked_at IS NULL AND `+eligible+`)`); err != nil {
 		return "", err
 	}
-	var total int
+	if err := s.skipTiming(ctx); err != nil {
+		return "", err
+	}
+	var total, timingTotal int
 	if err := s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_files WHERE checked_at IS NULL AND available = 1`).Scan(&total); err != nil {
+		return "", err
+	}
+	if err := s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_files WHERE timing_checked_at IS NULL AND available = 1`).Scan(&timingTotal); err != nil {
 		return "", err
 	}
 	var checked, skipped int
@@ -115,7 +132,7 @@ func (s *Service) Run(ctx context.Context) (string, error) {
 		if err := ctx.Err(); err != nil {
 			return "", err
 		}
-		s.setProgress(checked+skipped+len(damaged), max(total, checked+skipped+len(damaged)+1))
+		s.setProgress(checked+skipped+len(damaged), max(total, checked+skipped+len(damaged)+1)+timingTotal)
 		p, err := s.next(ctx, last)
 		if errors.Is(err, sql.ErrNoRows) {
 			break
@@ -157,14 +174,105 @@ func (s *Service) Run(ctx context.Context) (string, error) {
 	if len(damaged) > 0 && s.OnDamaged != nil {
 		s.OnDamaged(ctx, damaged)
 	}
-	if checked+len(damaged)+skipped == 0 {
+	done := checked + skipped + len(damaged)
+	timed, mistimed, timingSkipped, err := s.runTiming(ctx, func(n int) {
+		s.setProgress(done+n, done+max(timingTotal, n+1))
+	})
+	if err != nil {
+		return "", err
+	}
+	if done+timed+timingSkipped == 0 {
 		return "No new files", nil
 	}
-	msg := fmt.Sprintf("%d checked, %d damaged", checked+len(damaged), len(damaged))
-	if skipped > 0 {
-		msg += fmt.Sprintf(", %d couldn't be read (tried again next time)", skipped)
+	var parts []string
+	if done > 0 {
+		parts = append(parts, fmt.Sprintf("%d checked, %d damaged", checked+len(damaged), len(damaged)))
 	}
-	return msg, nil
+	if timed > 0 {
+		parts = append(parts, fmt.Sprintf("frame timing of %d checked, %d out of order", timed, mistimed))
+	}
+	if skipped+timingSkipped > 0 {
+		parts = append(parts, fmt.Sprintf("%d couldn't be read (tried again next time)", skipped+timingSkipped))
+	}
+	return capitalize(strings.Join(parts, "; ")), nil
+}
+
+// timingEligible is the condition for a file whose frame timing is checked: as for the
+// playback check, with a video stream, and not an AVI (frametiming.Checked).
+const timingEligible = eligible + ` AND EXISTS (SELECT 1 FROM streams st WHERE st.file_id = f.id AND st.kind = 'video')
+	AND LOWER(COALESCE(f.container, '')) <> 'avi' AND LOWER(f.path) NOT LIKE '%.avi'`
+
+// skipTiming marks the files whose frame timing isn't checked as done, so the waiting list
+// stays short.
+func (s *Service) skipTiming(ctx context.Context) error {
+	_, err := s.DB.ExecContext(ctx, `UPDATE media_files SET timing_checked_at = `+now+`, timing_error = NULL
+		WHERE timing_checked_at IS NULL AND id NOT IN (SELECT f.id FROM media_files f
+			CROSS JOIN media_versions v ON v.id = f.version_id CROSS JOIN items i ON i.id = v.item_id
+			CROSS JOIN libraries l ON l.id = i.library_id
+			WHERE f.timing_checked_at IS NULL AND `+timingEligible+`)`)
+	return err
+}
+
+// runTiming checks the frame timing of every file waiting for it, one at a time; progress
+// hears how many are done.
+func (s *Service) runTiming(ctx context.Context, progress func(int)) (checked, mistimed, skipped int, err error) {
+	var last int64
+	for {
+		if err := ctx.Err(); err != nil {
+			return 0, 0, 0, err
+		}
+		progress(checked + skipped)
+		var id, size, mtime int64
+		var path string
+		err := s.DB.QueryRowContext(ctx, `SELECT f.id, f.path, f.size, f.mtime
+			FROM media_files f CROSS JOIN media_versions v ON v.id = f.version_id CROSS JOIN items i ON i.id = v.item_id
+			CROSS JOIN libraries l ON l.id = i.library_id
+			WHERE f.timing_checked_at IS NULL AND f.available = 1 AND f.id > ? AND `+timingEligible+`
+			ORDER BY f.id LIMIT 1`, last).Scan(&id, &path, &size, &mtime)
+		if errors.Is(err, sql.ErrNoRows) {
+			return checked, mistimed, skipped, nil
+		}
+		if err != nil {
+			return 0, 0, 0, err
+		}
+		last = id
+		reason, err := s.timing(ctx, path)
+		if err != nil {
+			if ctx.Err() != nil {
+				return 0, 0, 0, ctx.Err()
+			}
+			slog.Info("frame timing check skipped", "path", path, "err", err)
+			skipped++
+			continue
+		}
+		var errVal any
+		if reason != "" {
+			errVal = reason
+		}
+		res, err := s.DB.ExecContext(ctx, `UPDATE media_files SET timing_checked_at = `+now+`, timing_error = ?
+			WHERE id = ? AND size = ? AND mtime = ? AND timing_checked_at IS NULL`, errVal, id, size, mtime)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			continue
+		}
+		checked++
+		if reason != "" {
+			slog.Warn("frame timing out of order", "path", path, "reason", reason)
+			mistimed++
+		}
+	}
+}
+
+func (s *Service) timing(ctx context.Context, path string) (string, error) {
+	if _, err := os.Stat(path); err != nil {
+		return "", err
+	}
+	if s.Timing != nil {
+		return s.Timing(ctx, path)
+	}
+	return frametiming.Check(ctx, s.LookPath, s.FFprobe, path)
 }
 
 // next is the first file after id waiting for its check, with its expected length when

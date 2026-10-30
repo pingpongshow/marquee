@@ -277,9 +277,44 @@ struct ItemDetailView: View {
                 Text(summary).font(.body).foregroundStyle(.primary.opacity(0.9)).frame(maxWidth: 900, alignment: .leading)
             }
             if d.base.isPlayableVideo { trackPickers(d) }
+            fileProblems(d)
         }
         .padding(.horizontal, sidePadding)
         .padding(.top, 24)
+    }
+
+    /// What Library Health found wrong with this title's files (admins only: the server sends
+    /// problems to them alone), with the way to fix it.
+    @ViewBuilder private func fileProblems(_ d: ItemDetail) -> some View {
+        let problems = d.info.versions.flatMap { $0.files.flatMap { $0.problems ?? [] } }
+        if !problems.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(problems.enumerated()), id: \.offset) { _, p in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(p.check == .frameTiming
+                                 ? "Its frames are timed out of order, so it stutters unless converted: Marquee converts it while playing until it's repaired."
+                                 : "The file is damaged and may not play properly.")
+                            Text(p.detail).font(.caption).foregroundStyle(.secondary)
+                            #if os(iOS)
+                            NavigationLink(value: Route.settings(.libraryHealth)) {
+                                Text(p.check == .frameTiming ? "Repair in Library Health" : "Open Library Health").font(.caption.weight(.semibold))
+                            }
+                            #else
+                            Text(p.check == .frameTiming ? "Repair it from Library Health in the web app or on iPhone or iPad." : "See Library Health in the web app or on iPhone or iPad.")
+                                .font(.caption).foregroundStyle(.secondary)
+                            #endif
+                        }
+                    }
+                    .padding(12)
+                    .frame(maxWidth: 900, alignment: .leading)
+                    .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("fileProblems")
+        }
     }
 
     /// The album's format when all its tracks share it.

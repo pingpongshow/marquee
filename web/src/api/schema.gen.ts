@@ -1767,6 +1767,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/library-health/frameTiming/repairs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Repair files whose frames are timed out of order (Library Health → Frame timing errors, ADM-11, admin only): the files listed, or every one that can be repaired. The frame order is worked out from the video and the file's timing rewritten; nothing is re-encoded, and the original goes to the media trash. Repairs run one at a time. Files already waiting are skipped; failed repairs are tried again. */
+        post: operations["repairFrameTiming"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library-health/frameTiming/repairs/{fileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Take a waiting or failed repair off the list (admin only). A running repair finishes. */
+        delete: operations["cancelFrameTimingRepair"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/optimize/files": {
         parameters: {
             query?: never;
@@ -6793,7 +6829,7 @@ export interface components {
         };
         HealthCheck: {
             /** @enum {string} */
-            id: "duplicates" | "unmatched" | "unavailable" | "unplayable" | "upgrades" | "playbackErrors" | "missingArtwork" | "missingSubtitles";
+            id: "duplicates" | "unmatched" | "unavailable" | "unplayable" | "frameTiming" | "upgrades" | "playbackErrors" | "missingArtwork" | "missingSubtitles";
             title: string;
             description: string;
             count: number;
@@ -6801,6 +6837,10 @@ export interface components {
             severity: "info" | "warning" | "error";
             /** @description False when the check can't run (e.g. missingSubtitles without Bazarr). */
             available?: boolean;
+            /** @description What the check finds can be repaired from Library Health (frameTiming: POST /library-health/frameTiming/repairs). */
+            repairable?: boolean;
+            /** @description repairable checks: how many repairs are waiting or running. */
+            repairing?: number;
         };
         HealthIssue: {
             item: components["schemas"]["ItemSummary"];
@@ -6813,6 +6853,33 @@ export interface components {
             related?: components["schemas"]["ItemSummary"][];
             /** @description The files involved, to compare. duplicates: every file of every copy (this item and the related ones). */
             files?: components["schemas"]["IssueFile"][];
+            /** @description frameTiming: the file can be repaired (an MP4 or MOV file). */
+            repairable?: boolean;
+            repair?: components["schemas"]["FileRepair"];
+        };
+        /** @description A file's repair (frameTiming), while it's waiting, running or failed. A repaired file leaves the check. */
+        FileRepair: {
+            /** @enum {string} */
+            state: "queued" | "running" | "failed";
+            /** @description running: 0–1. */
+            progress: number;
+            /** @description failed: why. The file was left as it was. */
+            error?: string;
+        };
+        /** @description The files to repair (fileIds), or all: every file in Frame timing errors that can be repaired. */
+        FrameTimingRepairRequest: {
+            fileIds?: number[];
+            all?: boolean;
+        };
+        /** @description Something Library Health found wrong with a file. */
+        FileProblem: {
+            /**
+             * @description The Library Health check that lists it.
+             * @enum {string}
+             */
+            check: "unplayable" | "frameTiming";
+            /** @example Frames are timed in decode order (82 of the first 190 out of order) */
+            detail: string;
         };
         IssueFile: {
             /** Format: int64 */
@@ -7531,6 +7598,8 @@ export interface components {
             partIndex: number;
             available: boolean;
             streams: components["schemas"]["MediaStream"][];
+            /** @description What Library Health found wrong with the file (damaged, frames timed out of order). Only returned to administrators. */
+            problems?: components["schemas"]["FileProblem"][];
         };
         MediaStream: {
             /** Format: int64 */
@@ -11134,6 +11203,59 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    repairFrameTiming: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FrameTimingRepairRequest"];
+            };
+        };
+        responses: {
+            /** @description Queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description How many repairs were added to the queue. */
+                        queued: number;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    cancelFrameTimingRepair: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fileId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listLargeFiles: {

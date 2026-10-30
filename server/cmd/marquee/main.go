@@ -31,6 +31,7 @@ import (
 	"marquee/internal/downloads"
 	"marquee/internal/encode"
 	"marquee/internal/filecheck"
+	"marquee/internal/frametiming"
 	"marquee/internal/images"
 	"marquee/internal/introdetect"
 	"marquee/internal/items"
@@ -373,8 +374,9 @@ func run() error {
 		Description: "Reads the descriptions of new and changed movies and shows so Muse, recommendations and related items include them.",
 		Run:         embedder.Run, Progress: embedder.Progress})
 	// New video files get a playback check (damaged files go to Library Health → Unplayable
-	// files), straight after the scan that added them.
-	fileCheck := &filecheck.Service{DB: database, FFmpeg: cfg.FFmpegPath,
+	// files), straight after the scan that added them; every video file gets its frame timing
+	// checked once (Library Health → Frame timing errors).
+	fileCheck := &filecheck.Service{DB: database, FFmpeg: cfg.FFmpegPath, FFprobe: cfg.FFprobePath,
 		OnDamaged: func(ctx context.Context, files []filecheck.Damaged) {
 			title := "New file is damaged: " + filepath.Base(files[0].Path)
 			if len(files) > 1 {
@@ -728,6 +730,10 @@ func run() error {
 	storageSvc := &storage.Service{DB: database, Folders: func(ctx context.Context) []storage.Folder { return storageFolders(ctx, &cfg, libraries) }}
 	go storageSvc.Run(ctx)
 	go optimizer.Run(ctx)
+	// Repairs of files whose frames are timed out of order, asked for in Library Health.
+	timingRepairs := &frametiming.Service{DB: database, FFprobe: cfg.FFprobePath, FFmpeg: cfg.FFmpegPath,
+		Trash: mediaTrash, Rescan: scans.Queue, Playing: ads.Playing}
+	go timingRepairs.Run(ctx)
 	go live.Run(ctx, liveWake)
 	// Two-way Plex sync (watch state, plays, ratings): off until the admin turns it on.
 	plexSync := &plexsync.Service{DB: database, Settings: store, Alerts: alerts}
@@ -776,6 +782,7 @@ func run() error {
 		MusicDocs:   musicDocs,
 		Reasons:     &muse.Reasons{},
 		Trash:       mediaTrash,
+		Repairs:     timingRepairs,
 		Mail:        mailer,
 		Alerts:      alerts,
 		Avatars:     &avatars.Store{DB: database, Dir: filepath.Join(cfg.ConfigDir, "avatars")},

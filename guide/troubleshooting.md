@@ -117,6 +117,7 @@ The Dashboard shows the encoder each session uses.
 - On the Dashboard, check whether the stream is transcoding and on which encoder. A CPU transcode of 4K HDR is slow; set up hardware transcoding.
 - Away from home, set **Internet upload speed** under **Settings → Remote Access** (use **Test internet speed**) so Marquee doesn't send more than your connection can carry.
 - The transcode scratch space is in RAM (8 GB by default). If the server is short of memory, make it smaller with `TRANSCODE_SIZE`, or the tmpfs size on Unraid.
+- If only the picture stutters at original quality, the sound is fine and a lower quality plays smoothly, the file's frames may be timed out of order. Look for it in **Settings → Library Health → Frame timing errors** and press **Repair** (MP4 and MOV files).
 </details>
 
 <details>

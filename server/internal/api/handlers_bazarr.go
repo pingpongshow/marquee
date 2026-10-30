@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"marquee/internal/bazarr"
+	"marquee/internal/frametiming"
 	"marquee/internal/health"
 	"marquee/internal/mediatrash"
 )
@@ -167,7 +168,16 @@ func (h *Handlers) health() *health.Service {
 	if h.Health != nil {
 		return h.Health
 	}
-	return &health.Service{DB: h.DB, Bazarr: h.Bazarr}
+	return &health.Service{DB: h.DB, Bazarr: h.Bazarr, Repairs: h.Repairs}
+}
+
+// repairs returns the frame timing repairs; one is made when not wired (it queues; nothing
+// works through the queue).
+func (h *Handlers) repairs() *frametiming.Service {
+	if h.Repairs != nil {
+		return h.Repairs
+	}
+	return &frametiming.Service{DB: h.DB}
 }
 
 func (h *Handlers) LibraryHealth(ctx context.Context, _ LibraryHealthRequestObject) (LibraryHealthResponseObject, error) {
@@ -185,6 +195,9 @@ func (h *Handlers) LibraryHealth(ctx context.Context, _ LibraryHealthRequestObje
 	for i, c := range list {
 		out[i] = HealthCheck{Id: HealthCheckId(c.ID), Title: c.Title, Description: c.Description, Count: c.Count,
 			Severity: HealthCheckSeverity(c.Severity), Available: ptr(c.Available)}
+		if c.Repairable {
+			out[i].Repairable, out[i].Repairing = ptr(true), ptr(c.Repairing)
+		}
 	}
 	return out, nil
 }
@@ -244,6 +257,12 @@ func (h *Handlers) LibraryHealthIssues(ctx context.Context, req LibraryHealthIss
 			continue // removed since the count
 		}
 		hi := HealthIssue{Item: item, Detail: is.Detail, FileId: nz(is.FileID), Path: nz(is.Path)}
+		if req.CheckId == "frameTiming" {
+			hi.Repairable = ptr(is.Repairable)
+		}
+		if r := is.Repair; r != nil {
+			hi.Repair = &FileRepair{State: FileRepairState(r.State), Progress: float32(r.Progress), Error: nz(r.Error)}
+		}
 		if len(is.Related) > 0 {
 			rel := make([]ItemSummary, 0, len(is.Related))
 			for _, id := range is.Related {
@@ -269,6 +288,50 @@ func (h *Handlers) LibraryHealthIssues(ctx context.Context, req LibraryHealthIss
 		out.Items = append(out.Items, hi)
 	}
 	return out, nil
+}
+
+// RepairFrameTiming queues repairs of files whose frames are timed out of order.
+func (h *Handlers) RepairFrameTiming(ctx context.Context, req RepairFrameTimingRequestObject) (RepairFrameTimingResponseObject, error) {
+	switch authed, admin := isAdmin(ctx); {
+	case !authed:
+		return RepairFrameTiming401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !admin:
+		return RepairFrameTiming403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	b := req.Body
+	all := b != nil && b.All != nil && *b.All
+	var ids []int64
+	if b != nil && b.FileIds != nil {
+		ids = *b.FileIds
+	}
+	if all == (len(ids) > 0) {
+		return RepairFrameTiming400JSONResponse{BadRequestJSONResponse(apiErr("invalid", "give either fileIds or all"))}, nil
+	}
+	if all {
+		ids = nil
+	}
+	n, err := h.repairs().Queue(ctx, ids)
+	if errors.Is(err, frametiming.ErrNotRepairable) {
+		return RepairFrameTiming404JSONResponse{NotFoundJSONResponse(apiErr("not_found", "none of those files has a frame timing error that can be repaired"))}, nil
+	}
+	if err != nil {
+		return nil, internal(ctx, "repairFrameTiming", err)
+	}
+	return RepairFrameTiming202JSONResponse{Queued: n}, nil
+}
+
+// CancelFrameTimingRepair takes a waiting or failed repair off the list.
+func (h *Handlers) CancelFrameTimingRepair(ctx context.Context, req CancelFrameTimingRepairRequestObject) (CancelFrameTimingRepairResponseObject, error) {
+	switch authed, admin := isAdmin(ctx); {
+	case !authed:
+		return CancelFrameTimingRepair401JSONResponse{UnauthorizedJSONResponse(errUnauthorized)}, nil
+	case !admin:
+		return CancelFrameTimingRepair403JSONResponse{ForbiddenJSONResponse(errForbidden)}, nil
+	}
+	if err := h.repairs().Cancel(ctx, req.FileId); err != nil {
+		return nil, internal(ctx, "cancelFrameTimingRepair", err)
+	}
+	return CancelFrameTimingRepair204Response{}, nil
 }
 
 // trash returns the media trash; it holds no state, so one is made when not wired.

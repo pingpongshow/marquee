@@ -92,6 +92,14 @@ type File struct {
 	BitrateKbps, Width, Height, DVProfile, PartIndex int
 	Available                                        bool
 	Streams                                          []Stream
+	// Problems are what Library Health found wrong with the file (details for admins only).
+	Problems []Problem
+}
+
+// Problem is something Library Health found wrong with a file: the check that lists it
+// (unplayable, frameTiming) and why.
+type Problem struct {
+	Check, Detail string
 }
 
 type Stream struct {
@@ -459,18 +467,26 @@ func (s *Store) Get(ctx context.Context, acc Access, id int64, withPaths bool) (
 	fileIdx := map[int64]*File{}
 	if err := eachRow(ctx, s.db, `SELECT v.id, v.label, f.id, f.path, f.size, COALESCE(f.duration_ms, 0), COALESCE(f.container, ''),
 			COALESCE(f.video_codec, ''), COALESCE(f.audio_codec, ''), COALESCE(f.hdr_format, ''), COALESCE(f.bitrate_kbps, 0),
-			COALESCE(f.width, 0), COALESCE(f.height, 0), COALESCE(f.dv_profile, 0), f.part_index, f.available
+			COALESCE(f.width, 0), COALESCE(f.height, 0), COALESCE(f.dv_profile, 0), f.part_index, f.available,
+			COALESCE(f.check_error, ''), COALESCE(f.timing_error, '')
 		FROM media_versions v JOIN media_files f ON f.version_id = v.id WHERE v.item_id = ? ORDER BY v.id, f.part_index`,
 		[]any{id}, func(r *sql.Rows) error {
 			var vid int64
-			var label string
+			var label, damaged, mistimed string
 			var f File
 			if err := r.Scan(&vid, &label, &f.ID, &f.Path, &f.Size, &f.DurationMS, &f.Container, &f.VideoCodec, &f.AudioCodec,
-				&f.HDRFormat, &f.BitrateKbps, &f.Width, &f.Height, &f.DVProfile, &f.PartIndex, &f.Available); err != nil {
+				&f.HDRFormat, &f.BitrateKbps, &f.Width, &f.Height, &f.DVProfile, &f.PartIndex, &f.Available, &damaged, &mistimed); err != nil {
 				return err
 			}
 			if !withPaths {
 				f.Path = ""
+			} else {
+				if damaged != "" {
+					f.Problems = append(f.Problems, Problem{Check: "unplayable", Detail: damaged})
+				}
+				if mistimed != "" {
+					f.Problems = append(f.Problems, Problem{Check: "frameTiming", Detail: mistimed})
+				}
 			}
 			if n := len(d.Versions); n == 0 || d.Versions[n-1].ID != vid {
 				d.Versions = append(d.Versions, Version{ID: vid, Label: label})

@@ -2330,6 +2330,43 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /library-health/frameTiming/repairs:
+    post:
+      tags: [libraries]
+      operationId: repairFrameTiming
+      summary: "Repair files whose frames are timed out of order (Library Health → Frame timing errors, ADM-11, admin only): the files listed, or every one that can be repaired. The frame order is worked out from the video and the file's timing rewritten; nothing is re-encoded, and the original goes to the media trash. Repairs run one at a time. Files already waiting are skipped; failed repairs are tried again."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FrameTimingRepairRequest" }
+      responses:
+        "202":
+          description: Queued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [queued]
+                properties:
+                  queued: { type: integer, description: How many repairs were added to the queue. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /library-health/frameTiming/repairs/{fileId}:
+    parameters:
+      - { name: fileId, in: path, required: true, schema: { type: integer, format: int64 } }
+    delete:
+      tags: [libraries]
+      operationId: cancelFrameTimingRepair
+      summary: "Take a waiting or failed repair off the list (admin only). A running repair finishes."
+      responses:
+        "204": { description: Cancelled. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
   # ---------- Library optimizer (Library Health → Large files, admins only) ----------
   /optimize/files:
     get:
@@ -7652,12 +7689,14 @@ components:
       type: object
       required: [id, title, description, count, severity]
       properties:
-        id: { type: string, enum: [duplicates, unmatched, unavailable, unplayable, upgrades, playbackErrors, missingArtwork, missingSubtitles] }
+        id: { type: string, enum: [duplicates, unmatched, unavailable, unplayable, frameTiming, upgrades, playbackErrors, missingArtwork, missingSubtitles] }
         title: { type: string }
         description: { type: string }
         count: { type: integer }
         severity: { type: string, enum: [info, warning, error] }
         available: { type: boolean, description: "False when the check can't run (e.g. missingSubtitles without Bazarr)." }
+        repairable: { type: boolean, description: "What the check finds can be repaired from Library Health (frameTiming: POST /library-health/frameTiming/repairs)." }
+        repairing: { type: integer, description: "repairable checks: how many repairs are waiting or running." }
 
     HealthIssue:
       type: object
@@ -7675,6 +7714,32 @@ components:
           type: array
           description: "The files involved, to compare. duplicates: every file of every copy (this item and the related ones)."
           items: { $ref: "#/components/schemas/IssueFile" }
+        repairable: { type: boolean, description: "frameTiming: the file can be repaired (an MP4 or MOV file)." }
+        repair: { $ref: "#/components/schemas/FileRepair" }
+
+    FileRepair:
+      type: object
+      description: "A file's repair (frameTiming), while it's waiting, running or failed. A repaired file leaves the check."
+      required: [state, progress]
+      properties:
+        state: { type: string, enum: [queued, running, failed] }
+        progress: { type: number, description: "running: 0–1." }
+        error: { type: string, description: "failed: why. The file was left as it was." }
+
+    FrameTimingRepairRequest:
+      type: object
+      description: "The files to repair (fileIds), or all: every file in Frame timing errors that can be repaired."
+      properties:
+        fileIds: { type: array, items: { type: integer, format: int64 } }
+        all: { type: boolean }
+
+    FileProblem:
+      type: object
+      description: "Something Library Health found wrong with a file."
+      required: [check, detail]
+      properties:
+        check: { type: string, enum: [unplayable, frameTiming], description: "The Library Health check that lists it." }
+        detail: { type: string, example: "Frames are timed in decode order (82 of the first 190 out of order)" }
 
     IssueFile:
       type: object
@@ -8439,6 +8504,10 @@ components:
         streams:
           type: array
           items: { $ref: "#/components/schemas/MediaStream" }
+        problems:
+          type: array
+          description: "What Library Health found wrong with the file (damaged, frames timed out of order). Only returned to administrators."
+          items: { $ref: "#/components/schemas/FileProblem" }
 
     MediaStream:
       type: object

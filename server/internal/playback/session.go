@@ -473,7 +473,8 @@ func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 	}
 
 	q := `SELECT f.id, f.path, COALESCE(f.container, ''), COALESCE(f.bitrate_kbps, 0), COALESCE(f.duration_ms, 0),
-		COALESCE(f.hdr_format, ''), f.available, COALESCE(f.probe_json, '') FROM media_files f JOIN media_versions v ON v.id = f.version_id
+		COALESCE(f.hdr_format, ''), f.available, COALESCE(f.probe_json, ''), f.timing_error IS NOT NULL
+		FROM media_files f JOIN media_versions v ON v.id = f.version_id
 		WHERE v.item_id = ?`
 	args := []any{r.ItemID}
 	if r.FileID > 0 {
@@ -485,7 +486,7 @@ func (m *Manager) load(ctx context.Context, s *Session, r Request) error {
 	var hdr, probeJSON string
 	var available bool
 	err = m.DB.QueryRowContext(ctx, q, args...).Scan(&s.FileID, &s.Path, &s.Media.Container, &s.Media.BitrateKbps,
-		&s.Media.DurationMS, &hdr, &available, &probeJSON)
+		&s.Media.DurationMS, &hdr, &available, &probeJSON, &s.Media.MistimedFrames)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNoMedia
 	}

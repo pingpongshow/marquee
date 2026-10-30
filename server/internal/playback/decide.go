@@ -49,6 +49,10 @@ type Media struct {
 	Video       *VideoStream
 	Audio       *AudioStream
 	Subtitle    *SubtitleStream // selected subtitle, nil = none
+	// MistimedFrames: the file's frames are timed in decode order (Library Health → Frame
+	// timing errors). Played or repackaged as it is, the picture stutters; converting it puts
+	// the frames back in order, so until it's repaired the video is always converted.
+	MistimedFrames bool
 }
 
 type VideoStream struct {
@@ -198,6 +202,10 @@ func Decide(m Media, p DeviceProfile, l Limits) Decision {
 		videoOK = false
 		reason("%dp is above the %dp limit", v.Height, maxH)
 	}
+	if m.MistimedFrames {
+		videoOK = false
+		reason("frames are timed out of order, so the video must be converted")
+	}
 	bitrateOK := l.MaxKbps == 0 || m.BitrateKbps == 0 || m.BitrateKbps <= l.MaxKbps
 	if !bitrateOK {
 		reason("bitrate %d kbps over the %d kbps limit", m.BitrateKbps, l.MaxKbps)
@@ -245,10 +253,11 @@ func Decide(m Media, p DeviceProfile, l Limits) Decision {
 	}
 
 	// Keep the original video, repackaged as HLS (audio converted if needed).
-	if (videoOK || d.retag) && bitrateOK && !d.BurnSubtitle && p.HLS && has(p.HLSVideoCodecs, v.Codec) && l.NoVideoCopy {
+	copyable := (videoOK || d.retag) && !m.MistimedFrames
+	if copyable && bitrateOK && !d.BurnSubtitle && p.HLS && has(p.HLSVideoCodecs, v.Codec) && l.NoVideoCopy {
 		reason("no keyframe index, so the video can't be repackaged")
 	}
-	if (videoOK || d.retag) && bitrateOK && !d.BurnSubtitle && p.HLS && has(p.HLSVideoCodecs, v.Codec) && !l.NoVideoCopy {
+	if copyable && bitrateOK && !d.BurnSubtitle && p.HLS && has(p.HLSVideoCodecs, v.Codec) && !l.NoVideoCopy {
 		d.Method = DirectStream
 		d.VideoCopy = true
 		d.AudioCopy = a == nil || (has(p.HLSAudioCodecs, a.Codec) && (p.MaxAudioChannels == 0 || a.Channels <= p.MaxAudioChannels) && !heAAC(a))

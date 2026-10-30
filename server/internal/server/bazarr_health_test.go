@@ -63,7 +63,7 @@ func TestBazarrAndLibraryHealth(t *testing.T) {
 	}
 	var checks []api.HealthCheck
 	h.do("GET", "/library-health", nil, &checks)
-	if len(checks) != 7 {
+	if len(checks) != 8 {
 		t.Fatalf("checks: %+v", checks)
 	}
 	for _, c := range checks {
@@ -71,6 +71,45 @@ func TestBazarrAndLibraryHealth(t *testing.T) {
 			t.Errorf("missingSubtitles without Bazarr: %+v", c)
 		}
 	}
+
+	// Frame timing errors: listed, repairable when an MP4, queued for repair (once), shown
+	// on the title's file to admins.
+	h.db.Exec(`UPDATE media_files SET timing_error = 'Frames are timed in decode order (82 of the first 190 out of order)',
+		container = 'mov,mp4,m4a,3gp,3g2,mj2' WHERE id = ?`, heatFile)
+	var timing api.HealthIssuePage
+	h.do("GET", "/library-health/frameTiming", nil, &timing)
+	if timing.Total != 1 || timing.Items[0].Item.Id != heat || timing.Items[0].Repairable == nil || !*timing.Items[0].Repairable || timing.Items[0].Repair != nil {
+		t.Fatalf("frame timing: %+v", timing)
+	}
+	if code := h.do("POST", "/library-health/frameTiming/repairs", map[string]any{}, nil); code != 400 {
+		t.Errorf("neither files nor all: %d", code)
+	}
+	if code := h.do("POST", "/library-health/frameTiming/repairs", map[string]any{"fileIds": []int64{heatFile + 1000}}, nil); code != 404 {
+		t.Errorf("a file without the error: %d", code)
+	}
+	var queued struct{ Queued int }
+	if code := h.do("POST", "/library-health/frameTiming/repairs", map[string]any{"all": true}, &queued); code != 202 || queued.Queued != 1 {
+		t.Errorf("repair all: %d %+v", code, queued)
+	}
+	h.do("GET", "/library-health/frameTiming", nil, &timing)
+	if r := timing.Items[0].Repair; r == nil || r.State != "queued" {
+		t.Errorf("repair state: %+v", r)
+	}
+	h.do("GET", "/library-health", nil, &checks)
+	for _, c := range checks {
+		if c.Id == "frameTiming" && (c.Count != 1 || c.Repairing == nil || *c.Repairing != 1) {
+			t.Errorf("frameTiming overview: %+v", c)
+		}
+	}
+	var detail api.ItemDetail
+	h.do("GET", fmt.Sprintf("/items/%d", heat), nil, &detail)
+	if ps := detail.Versions[0].Files[0].Problems; ps == nil || len(*ps) != 1 || (*ps)[0].Check != "frameTiming" {
+		t.Errorf("problems on the title: %+v", ps)
+	}
+	if code := h.do("DELETE", fmt.Sprintf("/library-health/frameTiming/repairs/%d", heatFile), nil, nil); code != 204 {
+		t.Errorf("cancel: %d", code)
+	}
+	h.db.Exec(`UPDATE media_files SET timing_error = NULL WHERE id = ?`, heatFile)
 
 	// Settings: the key is write-only.
 	if code := h.do("PATCH", "/settings", map[string]any{"integrations": map[string]any{"bazarrUrl": "not a url"}}, nil); code != 400 {

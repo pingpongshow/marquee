@@ -35,6 +35,7 @@ struct LibraryHealthView: View {
                 Text(c.title).font(.headline)
                 Text(c.description).font(.caption).foregroundStyle(.secondary)
                 if c.available == false { Text("Unavailable").font(.caption.weight(.semibold)).foregroundStyle(.secondary) }
+                if let n = c.repairing, n > 0 { Text("Repairing \(n.formatted())…").font(.caption.weight(.semibold)).foregroundStyle(.orange) }
             }
             Spacer()
             if c.available != false {
@@ -60,7 +61,8 @@ func severityColor(_ s: HealthCheck.SeverityPayload) -> Color {
 }
 
 /// What one check found, a page at a time, with Open, Refresh Metadata, Fix Match, Bazarr and
-/// Ignore (with undo). Duplicates open a side-by-side comparison of their files.
+/// Ignore (with undo). Duplicates open a side-by-side comparison of their files; Frame timing
+/// errors can be repaired, one file or all of them, and show their repairs' progress.
 struct HealthIssuesView: View {
     @Environment(AppSession.self) private var app
     let check: HealthCheck
@@ -76,12 +78,26 @@ struct HealthIssuesView: View {
     @State private var matching: Item?
     @State private var bazarr: Item?
     @State private var comparing: HealthIssue?
+    @State private var repairing = 0
+
+    /// Repairs move on by themselves: followed while any shown is waiting or running.
+    private var following: Bool {
+        issues.contains { $0.repair.map { $0.state != .failed } ?? false }
+    }
 
     var body: some View {
         List {
             if let error { ErrorBanner(message: error) }
             Section {
                 Text(check.description).font(.footnote).foregroundStyle(.secondary)
+                if check.repairable == true, total > 0 {
+                    Button("Repair All", systemImage: "wrench.and.screwdriver") { repair(nil) }
+                        .accessibilityIdentifier("repairAll")
+                }
+                if repairing > 0 {
+                    Text("\(repairing.formatted()) \(repairing == 1 ? "repair" : "repairs") waiting or running, one at a time.")
+                        .font(.footnote).foregroundStyle(.orange)
+                }
             }
             if loaded && issues.isEmpty {
                 ContentUnavailableView("Nothing to fix", systemImage: "checkmark.seal", description: Text("This check found nothing."))
@@ -100,6 +116,12 @@ struct HealthIssuesView: View {
         .sheet(item: $bazarr) { BazarrSheet(item: $0) }
         .navigationDestination(item: $comparing) { DuplicateCompareView(issue: $0, onDeleted: { await reload() }) }
         .task { await loadMore() }
+        .task(id: following) {
+            while following, !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3))
+                await refreshShown()
+            }
+        }
         .refreshable { await reload() }
     }
 
@@ -115,6 +137,10 @@ struct HealthIssuesView: View {
                 if let others = issue.related, !others.isEmpty {
                     Text("Other copies: " + others.map { [$0.title, $0.year.map(String.init)].compactMap { $0 }.joined(separator: " ") }.joined(separator: ", "))
                         .font(.caption).foregroundStyle(.secondary)
+                }
+                if let r = issue.repair { repairStatus(r) }
+                if check.id == .frameTiming, issue.repairable == false {
+                    Text("Only MP4 and MOV files can be repaired; this one is converted while playing.").font(.caption).foregroundStyle(.secondary)
                 }
                 if check.id == .duplicates, let files = issue.files, files.count > 1 {
                     Button("Compare \(files.count) Files", systemImage: "rectangle.split.3x1") { comparing = issue }
@@ -132,6 +158,12 @@ struct HealthIssuesView: View {
                 }
                 if check.id == .missingSubtitles {
                     Button("Download with Bazarr…", systemImage: "captions.bubble") { bazarr = it }
+                }
+                if issue.repairable == true, let file = issue.fileId, issue.repair == nil || issue.repair?.state == .failed {
+                    Button(issue.repair == nil ? "Repair" : "Try Again", systemImage: "wrench.and.screwdriver") { repair([file]) }
+                }
+                if let r = issue.repair, r.state != .running, let file = issue.fileId {
+                    Button(r.state == .failed ? "Dismiss" : "Cancel Repair", systemImage: "xmark") { cancelRepair(file) }
                 }
                 Button("Ignore", systemImage: "eye.slash") { ignore(issue) }
             } label: {
@@ -157,6 +189,59 @@ struct HealthIssuesView: View {
         }
     }
 
+    @ViewBuilder private func repairStatus(_ r: FileRepair) -> some View {
+        switch r.state {
+        case .failed:
+            Text("Repair failed: \(r.error ?? "unknown error")").font(.caption).foregroundStyle(.red)
+        case .queued:
+            Text("Waiting to be repaired").font(.caption.weight(.semibold)).foregroundStyle(.orange)
+        case .running:
+            HStack(spacing: 8) {
+                Text("Repairing… \(Int((r.progress * 100).rounded()))%").font(.caption.weight(.semibold)).foregroundStyle(.orange)
+                ProgressView(value: Double(r.progress)).tint(.orange).frame(maxWidth: 140)
+            }
+        }
+    }
+
+    private func repair(_ files: [Int64]?) {
+        Task {
+            do {
+                let n = try await app.repairFrameTiming(files)
+                if files == nil {
+                    notice = n == 0 ? "Every file that can be repaired is already queued." : "\(n.formatted()) \(n == 1 ? "file" : "files") queued for repair."
+                }
+                error = nil
+                await refreshShown()
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
+    }
+
+    private func cancelRepair(_ file: Int64) {
+        Task {
+            do {
+                try await app.cancelFrameTimingRepair(file)
+                await refreshShown()
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
+    }
+
+    /// Reads the issues shown again in place (repairs' progress; repaired files leave), and the
+    /// check's count of repairs waiting.
+    private func refreshShown() async {
+        do {
+            let page = try await app.healthIssues(check.id.rawValue, offset: 0, limit: max(50, issues.count))
+            issues = page.items
+            total = page.total
+            if check.repairable == true {
+                repairing = try await app.libraryHealth().first { $0.id == check.id }?.repairing ?? 0
+            }
+        } catch {}
+    }
+
     private func reload() async {
         issues = []
         total = 0
@@ -175,6 +260,7 @@ struct HealthIssuesView: View {
             total = page.total
             loaded = true
             error = nil
+            if check.repairable == true, repairing == 0 { repairing = check.repairing ?? 0 }
         } catch {
             self.error = error.localizedDescription
         }

@@ -5,7 +5,7 @@ import { AlertTriangle, Check, ChevronRight, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { api, imageUrl, personPhotoUrl, unwrap } from "@/api/client";
 import { itemChildrenQuery, itemQuery, meQuery } from "@/api/queries";
-import type { Credit, ItemDetail, ItemSummary, MediaStream } from "@/api/types";
+import type { Credit, FileProblem, ItemDetail, ItemSummary, MediaStream } from "@/api/types";
 import { Alert, Button, Spinner } from "@/components/ui";
 import { PinToHomeButton } from "../home/EditHome";
 import { describeRules, SmartRulesDialog } from "./SmartCollection";
@@ -49,6 +49,34 @@ function streamLabel(s: MediaStream) {
   return [languageName(s.language), s.codec.toUpperCase(), s.forced ? "Forced" : "", s.hearingImpaired ? "SDH" : "", s.external ? "External" : "", s.title ?? ""].filter(Boolean).join(" · ");
 }
 
+const problemText: Record<FileProblem["check"], string> = {
+  frameTiming: "Its frames are timed out of order, so it stutters unless converted: Marquee converts it while playing until it's repaired.",
+  unplayable: "The file is damaged and may not play properly.",
+};
+
+/** What Library Health found wrong with this title's files (admins only: the server sends
+ * problems to them alone), with a link to the check that can fix it. */
+function FileProblems({ item }: { item: ItemDetail }) {
+  const problems = item.versions.flatMap((v) => v.files.flatMap((f) => f.problems ?? []));
+  if (!problems.length) return null;
+  return (
+    <div className="mt-4 max-w-3xl space-y-2" data-testid="file-problems">
+      {problems.map((p, i) => (
+        <div key={i} className="flex gap-2.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2.5 text-sm">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
+          <div className="min-w-0 space-y-0.5">
+            <div>{problemText[p.check]}</div>
+            <div className="text-xs text-muted">{p.detail}</div>
+            <Link to="/settings/$section" params={{ section: "library-health" }} hash={`check-${p.check}`} className="inline-block pt-0.5 text-xs font-medium text-accent hover:underline">
+              {p.check === "frameTiming" ? "Repair in Library Health" : "Open in Library Health"}
+            </Link>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function MediaInfo({ item, isAdmin }: { item: ItemDetail; isAdmin: boolean }) {
   if (!item.versions.length) return null;
   return (
@@ -67,6 +95,11 @@ function MediaInfo({ item, isAdmin }: { item: ItemDetail; isAdmin: boolean }) {
                     .join(" · ")}
                   {!f.available && <span className="ml-2 text-danger">File unavailable</span>}
                 </div>
+                {f.problems?.map((p, i) => (
+                  <div key={i} className="flex items-center gap-1.5 text-accent">
+                    <AlertTriangle className="size-3.5 shrink-0" aria-hidden /> {p.detail}
+                  </div>
+                ))}
                 <ul className="space-y-1">
                   {f.streams.map((s) => (
                     <li key={s.id} className="flex gap-3">
@@ -494,6 +527,7 @@ export function ItemPage() {
               <AlertTriangle className="size-4" aria-hidden /> The files for this item are currently unavailable.
             </div>
           )}
+          <FileProblems item={d} />
           {d.summary ? (
             <p className="mt-5 max-w-3xl leading-relaxed text-text/90">{d.summary}</p>
           ) : (

@@ -23,6 +23,7 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.FileProblem
 import app.marquee.api.models.MediaStream
 
 import kotlinx.serialization.Serializable
@@ -47,6 +48,7 @@ import kotlinx.serialization.Contextual
  * @param audioCodec 
  * @param hdrFormat 
  * @param dvProfile 
+ * @param problems What Library Health found wrong with the file (damaged, frames timed out of order). Only returned to administrators.
  */
 @Serializable
 
@@ -96,7 +98,11 @@ data class MediaFile (
     val hdrFormat: MediaFile.HdrFormat? = null,
 
     @SerialName(value = "dvProfile")
-    val dvProfile: kotlin.Int? = null
+    val dvProfile: kotlin.Int? = null,
+
+    /* What Library Health found wrong with the file (damaged, frames timed out of order). Only returned to administrators. */
+    @SerialName(value = "problems")
+    val problems: kotlin.collections.List<FileProblem>? = null
 
 ) {
 

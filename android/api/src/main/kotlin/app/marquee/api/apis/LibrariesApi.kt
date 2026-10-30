@@ -30,6 +30,7 @@ import okhttp3.HttpUrl
 import app.marquee.api.models.ClearOptimizeJobs200Response
 import app.marquee.api.models.DeleteKeptOriginals200Response
 import app.marquee.api.models.Error
+import app.marquee.api.models.FrameTimingRepairRequest
 import app.marquee.api.models.HealthCheck
 import app.marquee.api.models.HealthIssuePage
 import app.marquee.api.models.LargeFilePage
@@ -42,6 +43,7 @@ import app.marquee.api.models.OptimizeQueueRequest
 import app.marquee.api.models.OptimizeQueueResult
 import app.marquee.api.models.OptimizeSettings
 import app.marquee.api.models.RemoveMissingTitles200Response
+import app.marquee.api.models.RepairFrameTiming202Response
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -67,6 +69,77 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
         val defaultBasePath: String by lazy {
             System.getProperties().getProperty(ApiClient.BASE_URL_KEY, "/api/v1")
         }
+    }
+
+    /**
+     * DELETE /library-health/frameTiming/repairs/{fileId}
+     * Take a waiting or failed repair off the list (admin only). A running repair finishes.
+     * 
+     * @param fileId 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun cancelFrameTimingRepair(fileId: kotlin.Long) : Unit {
+        val localVarResponse = cancelFrameTimingRepairWithHttpInfo(fileId = fileId)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /library-health/frameTiming/repairs/{fileId}
+     * Take a waiting or failed repair off the list (admin only). A running repair finishes.
+     * 
+     * @param fileId 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    fun cancelFrameTimingRepairWithHttpInfo(fileId: kotlin.Long) : ApiResponse<Unit?> {
+        val localVariableConfig = cancelFrameTimingRepairRequestConfig(fileId = fileId)
+
+        return request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation cancelFrameTimingRepair
+     *
+     * @param fileId 
+     * @return RequestConfig
+     */
+    fun cancelFrameTimingRepairRequestConfig(fileId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/library-health/frameTiming/repairs/{fileId}".replace("{"+"fileId"+"}", encodeURIComponent(fileId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
     }
 
     /**
@@ -1520,6 +1593,80 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/libraries/{libraryId}/remove-missing".replace("{"+"libraryId"+"}", encodeURIComponent(libraryId.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = true,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /library-health/frameTiming/repairs
+     * Repair files whose frames are timed out of order (Library Health → Frame timing errors, ADM-11, admin only): the files listed, or every one that can be repaired. The frame order is worked out from the video and the file&#39;s timing rewritten; nothing is re-encoded, and the original goes to the media trash. Repairs run one at a time. Files already waiting are skipped; failed repairs are tried again.
+     * 
+     * @param frameTimingRepairRequest 
+     * @return RepairFrameTiming202Response
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    fun repairFrameTiming(frameTimingRepairRequest: FrameTimingRepairRequest) : RepairFrameTiming202Response {
+        val localVarResponse = repairFrameTimingWithHttpInfo(frameTimingRepairRequest = frameTimingRepairRequest)
+
+        return when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as RepairFrameTiming202Response
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /library-health/frameTiming/repairs
+     * Repair files whose frames are timed out of order (Library Health → Frame timing errors, ADM-11, admin only): the files listed, or every one that can be repaired. The frame order is worked out from the video and the file&#39;s timing rewritten; nothing is re-encoded, and the original goes to the media trash. Repairs run one at a time. Files already waiting are skipped; failed repairs are tried again.
+     * 
+     * @param frameTimingRepairRequest 
+     * @return ApiResponse<RepairFrameTiming202Response?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    fun repairFrameTimingWithHttpInfo(frameTimingRepairRequest: FrameTimingRepairRequest) : ApiResponse<RepairFrameTiming202Response?> {
+        val localVariableConfig = repairFrameTimingRequestConfig(frameTimingRepairRequest = frameTimingRepairRequest)
+
+        return request<FrameTimingRepairRequest, RepairFrameTiming202Response>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation repairFrameTiming
+     *
+     * @param frameTimingRepairRequest 
+     * @return RequestConfig
+     */
+    fun repairFrameTimingRequestConfig(frameTimingRepairRequest: FrameTimingRepairRequest) : RequestConfig<FrameTimingRepairRequest> {
+        val localVariableBody = frameTimingRepairRequest
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/library-health/frameTiming/repairs",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = true,

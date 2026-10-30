@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { clsx } from "clsx";
-import { ArrowLeft, ChevronRight, EyeOff, ExternalLink, RefreshCw, Search, Subtitles } from "lucide-react";
+import { ArrowLeft, ChevronRight, EyeOff, ExternalLink, RefreshCw, Search, Subtitles, Wrench, X } from "lucide-react";
 import { useState } from "react";
 import { api, unwrap } from "@/api/client";
-import type { HealthCheck, HealthIssue, ItemDetail, ItemSummary } from "@/api/types";
+import type { FileRepair, HealthCheck, HealthIssue, ItemDetail, ItemSummary } from "@/api/types";
 import { Alert, Button, Spinner } from "@/components/ui";
 import { toast } from "@/components/Toast";
 import { FixMatchDialog } from "../browse/ItemActions";
@@ -28,12 +28,14 @@ const healthQuery = {
 
 /** Library Health (ADM-11): checks for problems in the libraries, and a way to fix or ignore each one. */
 export function LibraryHealthSettings() {
-  const checks = useQuery(healthQuery);
-  const [open, setOpen] = useState<HealthCheck | null>(null);
+  const checks = useQuery({ ...healthQuery, refetchInterval: (q) => (q.state.data?.some((c) => (c.repairing ?? 0) > 0) ? 5000 : false) });
+  // A title's page links to a check with #check-<id>.
+  const [openId, setOpenId] = useState<string | null>(() => (window.location.hash.startsWith("#check-") ? window.location.hash.slice(7) : null));
   // Alerts about failed conversions link to #large-files.
   const [largeFiles, setLargeFiles] = useState(() => window.location.hash === "#large-files");
+  const open = checks.data?.find((c) => c.id === openId);
   if (largeFiles) return <LargeFilesTool onBack={() => setLargeFiles(false)} />;
-  if (open) return <CheckIssues check={open} onBack={() => setOpen(null)} />;
+  if (open) return <CheckIssues check={open} onBack={() => setOpenId(null)} />;
   if (checks.isPending) return <Spinner />;
   if (checks.isError) return <Alert tone="error">{checks.error.message}</Alert>;
   return (
@@ -47,7 +49,7 @@ export function LibraryHealthSettings() {
             <li key={c.id}>
               <button
                 disabled={!available || clean}
-                onClick={() => setOpen(c)}
+                onClick={() => setOpenId(c.id)}
                 aria-label={`${c.title}: ${available ? c.count : "unavailable"}`}
                 className={clsx(
                   "flex w-full items-center gap-4 rounded-lg border border-l-4 border-border bg-surface px-4 py-3 text-left enabled:hover:bg-surface-2",
@@ -60,6 +62,7 @@ export function LibraryHealthSettings() {
                   <span className="block font-medium">{c.title}</span>
                   <span className="block text-sm text-muted">{c.description}</span>
                   {!available && <span className="mt-0.5 block text-xs text-faint">Unavailable on this server.</span>}
+                  {!!c.repairing && <span className="mt-0.5 block text-xs text-accent">Repairing {c.repairing.toLocaleString()}…</span>}
                 </span>
                 {available && (
                   <span className={clsx("text-lg font-semibold tabular-nums", clean ? "text-success" : "text-text")} data-testid={`health-count-${c.id}`}>
@@ -121,8 +124,24 @@ function CheckIssues({ check, onBack }: { check: HealthCheck; onBack: () => void
   const issues = useQuery({
     queryKey: key,
     queryFn: () => unwrap(api.GET("/library-health/{checkId}", { params: { path: { checkId: check.id }, query: { offset, limit: PAGE } } })),
+    // Repairs move on by themselves: follow them while any on this page is waiting or running.
+    refetchInterval: (q) => (q.state.data?.items.some((i) => i.repair && i.repair.state !== "failed") ? 3000 : false),
   });
   const refreshAll = () => qc.invalidateQueries({ queryKey: ["library-health"] });
+  const repair = useMutation({
+    mutationFn: (fileIds: number[] | "all") =>
+      unwrap(api.POST("/library-health/frameTiming/repairs", { body: fileIds === "all" ? { all: true } : { fileIds } })),
+    onSuccess: (r, ids) => {
+      if (ids === "all") toast(r.queued ? `${r.queued.toLocaleString()} ${r.queued === 1 ? "file" : "files"} queued for repair.` : "Every file that can be repaired is already queued.");
+      refreshAll();
+    },
+    onError: (e) => toast(e.message, { tone: "error" }),
+  });
+  const cancelRepair = useMutation({
+    mutationFn: (fileId: number) => unwrap(api.DELETE("/library-health/frameTiming/repairs/{fileId}", { params: { path: { fileId } } })),
+    onSettled: refreshAll,
+    onError: (e) => toast(e.message, { tone: "error" }),
+  });
   const unignore = useMutation({
     mutationFn: (itemId: number) => unwrap(api.DELETE("/library-health/{checkId}/ignored/{itemId}", { params: { path: { checkId: check.id, itemId } } })),
     onSettled: refreshAll,
@@ -162,8 +181,18 @@ function CheckIssues({ check, onBack }: { check: HealthCheck; onBack: () => void
         </Button>
         <h2 className="text-lg font-semibold">{check.title}</h2>
         {page && <span className="text-sm text-muted">{total.toLocaleString()} found</span>}
+        {check.repairable && total > 0 && (
+          <Button size="sm" className="ml-auto" onClick={() => repair.mutate("all")} disabled={repair.isPending}>
+            <Wrench className="size-4" /> Repair all
+          </Button>
+        )}
       </div>
       <p className="text-sm text-muted">{check.description}</p>
+      {!!check.repairing && (
+        <p className="text-sm text-accent" role="status">
+          {check.repairing.toLocaleString()} {check.repairing === 1 ? "repair" : "repairs"} waiting or running, one at a time. Each takes a few minutes for a film.
+        </p>
+      )}
       {issues.isPending && <Spinner />}
       {issues.isError && <Alert tone="error">{issues.error.message}</Alert>}
       {page?.items.length === 0 && <p className="text-muted">Nothing to fix here.</p>}
@@ -178,6 +207,8 @@ function CheckIssues({ check, onBack }: { check: HealthCheck; onBack: () => void
             onIgnore={() => ignore.mutate(iss.item)}
             onFixMatch={() => openMatch.mutate(iss.item)}
             onBazarr={() => setBazarrFor(iss.item)}
+            onRepair={() => iss.fileId && repair.mutate([iss.fileId])}
+            onCancelRepair={() => iss.fileId && cancelRepair.mutate(iss.fileId)}
           />
         ))}
       </ul>
@@ -225,6 +256,8 @@ function IssueRow({
   onIgnore,
   onFixMatch,
   onBazarr,
+  onRepair,
+  onCancelRepair,
 }: {
   issue: HealthIssue;
   checkId: HealthCheck["id"];
@@ -233,6 +266,8 @@ function IssueRow({
   onIgnore: () => void;
   onFixMatch: () => void;
   onBazarr: () => void;
+  onRepair: () => void;
+  onCancelRepair: () => void;
 }) {
   const it = issue.item;
   const matchable = it.type === "movie" || it.type === "show";
@@ -267,10 +302,24 @@ function IssueRow({
           </div>
         )}
         {compare && <DuplicateCompare files={issue.files!} />}
+        {issue.repair && <RepairStatus repair={issue.repair} />}
+        {checkId === "frameTiming" && !issue.repairable && (
+          <div className="text-xs text-muted">Only MP4 and MOV files can be repaired; this one is converted while playing.</div>
+        )}
         <div className="flex flex-wrap gap-1 pt-1.5">
           <Link to="/item/$itemId" params={{ itemId: String(it.id) }} className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted hover:bg-surface-2 hover:text-text">
             <ExternalLink className="size-4" /> Open
           </Link>
+          {issue.repairable && (!issue.repair || issue.repair.state === "failed") && (
+            <Button size="sm" variant="ghost" onClick={onRepair} aria-label={`Repair ${it.title}`}>
+              <Wrench className="size-4" /> {issue.repair ? "Try again" : "Repair"}
+            </Button>
+          )}
+          {issue.repair && issue.repair.state !== "running" && (
+            <Button size="sm" variant="ghost" onClick={onCancelRepair}>
+              <X className="size-4" /> {issue.repair.state === "failed" ? "Dismiss" : "Cancel repair"}
+            </Button>
+          )}
           {checkId === "missingSubtitles" && (
             <Button size="sm" variant="ghost" onClick={onBazarr}>
               <Subtitles className="size-4" /> Download with Bazarr
@@ -290,5 +339,20 @@ function IssueRow({
         </div>
       </div>
     </li>
+  );
+}
+
+/** A file's repair: waiting, running (with its progress) or failed (with why). */
+function RepairStatus({ repair }: { repair: FileRepair }) {
+  if (repair.state === "failed") return <div className="text-sm text-danger">Repair failed: {repair.error || "unknown error"}</div>;
+  if (repair.state === "queued") return <div className="text-sm text-accent">Waiting to be repaired</div>;
+  const pct = Math.round(repair.progress * 100);
+  return (
+    <div className="flex max-w-sm items-center gap-2 text-sm text-accent" role="status">
+      <span>Repairing… {pct}%</span>
+      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2" aria-hidden>
+        <span className="block h-full rounded-full bg-accent transition-[width]" style={{ width: `${pct}%` }} />
+      </span>
+    </div>
   );
 }

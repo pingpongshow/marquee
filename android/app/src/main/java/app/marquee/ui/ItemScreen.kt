@@ -8,6 +8,10 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.filled.RemoveDone
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Explore
@@ -303,6 +307,9 @@ fun ItemScreen(nav: NavHostController, itemId: Long) {
             }
             d.summary?.takeIf { it.isNotBlank() }?.let { s -> item { Text(s, Modifier.padding(horizontal = sidePadding), maxLines = 8, overflow = TextOverflow.Ellipsis) } }
         }
+        // What Library Health found wrong with the files (admins only: the server sends problems to them alone).
+        val problems = d.versions.flatMap { v -> v.files.flatMap { it.problems.orEmpty() } }
+        if (problems.isNotEmpty()) item { FileProblems(problems) { check -> nav.navigate("health/$check") } }
         if (pg.children.isNotEmpty()) item {
             when (d.type) {
                 ItemType.SEASON -> Column {
@@ -522,5 +529,25 @@ private fun PopularTracks(artist: String, tracks: List<ItemSummary>) {
             )
         }
         if (tracks.size > 5) TextButton({ all = !all }, Modifier.padding(horizontal = sidePadding).focusRing()) { Text(if (all) "Show fewer" else "Show all ${tracks.size}") }
+    }
+}
+
+/** Problems Library Health found with the title's files, each with the way to its check. */
+@Composable
+private fun FileProblems(problems: List<app.marquee.api.models.FileProblem>, onOpen: (String) -> Unit) {
+    Column(Modifier.padding(horizontal = sidePadding, vertical = 4.dp).testTag("fileProblems"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        problems.forEach { p ->
+            val timing = p.check == app.marquee.api.models.FileProblem.Check.FRAME_TIMING
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Gold.copy(alpha = 0.12f)).padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Filled.Warning, null, tint = Gold)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(if (timing) "Its frames are timed out of order, so it stutters unless converted: Marquee converts it while playing until it's repaired."
+                        else "The file is damaged and may not play properly.", style = MaterialTheme.typography.bodyMedium)
+                    Text(p.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    TextButton({ onOpen(p.check.value) }, Modifier.focusRing()) { Text(if (timing) "Repair in Library Health" else "Open Library Health") }
+                }
+            }
+        }
     }
 }

@@ -330,7 +330,8 @@ Running the import again updates everything without duplicating it. New users cr
 
 | Check | Severity | What it finds |
 |---|---|---|
-| Unplayable files | Problem | Files that couldn't be read (no audio or video, no duration, or ffprobe failed), and new video files that are damaged: the **Check new files** task found that their start or end doesn't decode, or that their length is wrong. The reason is shown with each file. |
+| Unplayable files | Problem | Files that couldn't be read (no audio or video, no duration, or ffprobe failed), and new video files that are damaged: the **Check files** task found that their start or end doesn't decode, or that their length is wrong. The reason is shown with each file. |
+| Frame timing errors | Warning | Video files whose frames are timed in the order they're decoded instead of the order they're shown. Played as they are, the picture stutters while the sound is fine (it plays smoothly at a lower quality, because converting puts the frames back in order). Marquee converts these files while playing until they're repaired. Found by the **Check files** task, which checks every video file once, including those already in the library. |
 | Playback errors | Problem | Titles that failed to play in the last 30 days. |
 | Duplicates | Warning | The same film or show more than once in a library, or a title with two files of the same resolution and edition. |
 | Unmatched | Warning | Movies, shows, artists and albums without online metadata. |
@@ -339,6 +340,14 @@ Running the import again updates everything without duplicating it. New users cr
 | Missing artwork | Info | Movies, shows and albums without a poster. |
 
 Damaged files are found only among movies, episodes and personal videos added (or replaced) since the check arrived; files that were already in the library aren't checked. Replacing a damaged file with a good copy clears it after the next scan and check. Live TV recordings are left to the DVR.
+
+### Repairing frame timing errors
+
+Files in **Frame timing errors** have **Repair**, and the check has **Repair all**. A repair works out the order the frames are shown in from the video itself and writes it into the file: nothing is re-encoded, so the picture and sound are exactly as they were. It reads the whole video once, which takes a few minutes for a film, at low priority, one file at a time; the list shows each repair's progress. The repaired file is checked before it replaces the original, which goes to the media trash. A file that's playing waits until it stops. Once repaired, the file leaves the list and plays as it is again (direct play).
+
+Only MP4 and MOV files can be repaired. Other files with this problem stay in the list and keep being converted while playing; replacing them with a good copy clears them. AVI files aren't checked, since AVI doesn't store when frames are shown.
+
+On a title's page, administrators see a notice when one of its files is in **Unplayable files** or **Frame timing errors**, with a link to Library Health; **Media info** shows the reason under the file.
 
 Each title in a check has **Open**, **Refresh metadata** and **Ignore** (which hides it from that check; **Undo** brings it back). Movies and shows also have **Fix match**, and **Missing subtitles** has **Download with Bazarr**.
 

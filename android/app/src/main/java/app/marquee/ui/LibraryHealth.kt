@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -44,6 +45,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import app.marquee.api.models.FileRepair
+import app.marquee.api.models.FrameTimingRepairRequest
 import app.marquee.api.models.HealthCheck
 import app.marquee.api.models.HealthIssue
 import app.marquee.api.models.IssueFile
@@ -55,6 +58,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.platform.testTag
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -98,6 +102,7 @@ fun LibraryHealthScreen(nav: NavHostController) {
                     Text(c.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3,
                         overflow = TextOverflow.Ellipsis)
                     if (!available) Text("Unavailable", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    c.repairing?.takeIf { n -> n > 0 }?.let { n -> Text("Repairing $n…", style = MaterialTheme.typography.labelSmall, color = Gold) }
                 }
                 if (available) Text("${c.count}", Modifier.padding(end = 16.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
                     color = if (c.count > 0) severityColour(c.severity) else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -109,7 +114,8 @@ fun LibraryHealthScreen(nav: NavHostController) {
 /**
  * One check's issues (ADM-11), a page at a time: the title, what's wrong, where the file is and,
  * for duplicates, the other copies. Open, Refresh metadata, Ignore (with Undo) and, for missing
- * subtitles, Download with Bazarr.
+ * subtitles, Download with Bazarr. Frame timing errors can be repaired, one file or all of them,
+ * and show their repairs' progress.
  */
 @Composable
 fun HealthIssuesScreen(nav: NavHostController, checkId: String) {
@@ -128,6 +134,8 @@ fun HealthIssuesScreen(nav: NavHostController, checkId: String) {
     var allowDeletion by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<IssueFile?>(null) }
     var deleting by remember { mutableStateOf(false) }
+    val repairable = checkId == HealthCheck.Id.FRAME_TIMING.value
+    var repairing by remember { mutableIntStateOf(0) }
     fun loadMore() {
         if (loading || (total >= 0 && offset >= total)) return
         loading = true
@@ -143,10 +151,43 @@ fun HealthIssuesScreen(nav: NavHostController, checkId: String) {
         issues.clear(); total = -1; offset = 0
         loadMore()
     }
+    /** Reads the issues shown again in place (repairs' progress; repaired files leave). */
+    suspend fun refreshShown() {
+        withContext(Dispatchers.IO) { runCatching { marquee.libraries.libraryHealthIssues(checkId, 0, maxOf(50, issues.size)) } }.onSuccess { p ->
+            issues.clear(); issues.addAll(p.items); total = p.total; offset = p.items.size
+        }
+        if (repairable) repairing = withContext(Dispatchers.IO) {
+            runCatching { marquee.libraries.libraryHealth().firstOrNull { it.id.value == checkId }?.repairing ?: 0 }
+        }.getOrDefault(repairing)
+    }
     LaunchedEffect(checkId) {
         allowDeletion = withContext(Dispatchers.IO) { runCatching { marquee.settings.getSettings().library.allowMediaDeletion == true } }.getOrDefault(false)
-        title = withContext(Dispatchers.IO) { runCatching { marquee.libraries.libraryHealth().firstOrNull { it.id.value == checkId }?.title } }.getOrNull() ?: ""
+        val check = withContext(Dispatchers.IO) { runCatching { marquee.libraries.libraryHealth().firstOrNull { it.id.value == checkId } } }.getOrNull()
+        title = check?.title ?: ""
+        repairing = check?.repairing ?: 0
         loadMore()
+    }
+    // Repairs move on by themselves: followed while any shown is waiting or running.
+    val following = issues.any { it.repair != null && it.repair?.state != FileRepair.State.FAILED }
+    LaunchedEffect(following) {
+        while (following) {
+            delay(3000)
+            refreshShown()
+        }
+    }
+    fun repair(fileIds: List<Long>?) = scope.launch {
+        val body = if (fileIds == null) FrameTimingRepairRequest(all = true) else FrameTimingRepairRequest(fileIds = fileIds)
+        withContext(Dispatchers.IO) { runCatching { marquee.libraries.repairFrameTiming(body) } }
+            .onSuccess { r ->
+                refreshShown()
+                if (fileIds == null) snackbar.showSnackbar(if (r.queued == 0) "Every file that can be repaired is already queued." else "${r.queued} ${if (r.queued == 1) "file" else "files"} queued for repair")
+            }
+            .onFailure { snackbar.showSnackbar("Couldn't queue the repair: ${serverMessage(it)}") }
+    }
+    fun cancelRepair(fileId: Long) = scope.launch {
+        withContext(Dispatchers.IO) { runCatching { marquee.libraries.cancelFrameTimingRepair(fileId) } }
+            .onSuccess { refreshShown() }
+            .onFailure { snackbar.showSnackbar("Couldn't cancel it: ${serverMessage(it)}") }
     }
     fun ignore(issue: HealthIssue) {
         val at = issues.indexOf(issue)
@@ -187,6 +228,9 @@ fun HealthIssuesScreen(nav: NavHostController, checkId: String) {
                 Column(Modifier.padding(horizontal = sidePadding, vertical = 8.dp)) {
                     Text(title.ifBlank { "Issues" }, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                     if (total >= 0) Text(if (total == 1) "1 issue" else "$total issues", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (repairable && total > 0) OutlinedButton({ repair(null) }, Modifier.padding(top = 8.dp).focusRing().testTag("repairAll")) { Text("Repair all") }
+                    if (repairing > 0) Text("$repairing ${if (repairing == 1) "repair" else "repairs"} waiting or running, one at a time.",
+                        Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodySmall, color = Gold)
                 }
             }
             error?.let { e -> item { Text(e, Modifier.padding(sidePadding), color = MaterialTheme.colorScheme.error) } }
@@ -198,7 +242,8 @@ fun HealthIssuesScreen(nav: NavHostController, checkId: String) {
                 if (i >= issues.size - 10) LaunchedEffect(i) { loadMore() }
                 IssueRow(issue, checkId,
                     onOpen = { openItem(nav, issue.item) }, onRefresh = { refresh(issue) }, onIgnore = { ignore(issue) },
-                    onBazarr = { bazarr = issue }, onRelated = { nav.navigate("item/${it}") }, onMatch = { match = issue })
+                    onBazarr = { bazarr = issue }, onRelated = { nav.navigate("item/${it}") }, onMatch = { match = issue },
+                    onRepair = { issue.fileId?.let { repair(listOf(it)) } }, onCancelRepair = { issue.fileId?.let { cancelRepair(it) } })
                 if (checkId == HealthCheck.Id.DUPLICATES.value && (issue.files?.size ?: 0) > 1)
                     DuplicateComparison(issue.files!!, allowDeletion) { pendingDelete = it }
                 HorizontalDivider()
@@ -235,7 +280,7 @@ fun HealthIssuesScreen(nav: NavHostController, checkId: String) {
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun IssueRow(issue: HealthIssue, checkId: String, onOpen: () -> Unit, onRefresh: () -> Unit, onIgnore: () -> Unit, onBazarr: () -> Unit, onRelated: (Long) -> Unit,
-    onMatch: () -> Unit) {
+    onMatch: () -> Unit, onRepair: () -> Unit, onCancelRepair: () -> Unit) {
     val marquee = LocalMarquee.current
     val it = issue.item
     Row(Modifier.fillMaxWidth().padding(horizontal = sidePadding, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -252,8 +297,17 @@ private fun IssueRow(issue: HealthIssue, checkId: String, onOpen: () -> Unit, on
                         style = MaterialTheme.typography.bodySmall, color = Gold)
                 }
             }
+            issue.repair?.let { r -> RepairStatus(r) }
+            if (checkId == HealthCheck.Id.FRAME_TIMING.value && issue.repairable == false)
+                Text("Only MP4 and MOV files can be repaired; this one is converted while playing.", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 TextButton(onOpen, Modifier.focusRing()) { Text("Open") }
+                val r = issue.repair
+                if (issue.repairable == true && (r == null || r.state == FileRepair.State.FAILED))
+                    TextButton(onRepair, Modifier.focusRing().semantics { contentDescription = "Repair ${it.title}" }) { Text(if (r == null) "Repair" else "Try again") }
+                if (r != null && r.state != FileRepair.State.RUNNING)
+                    TextButton(onCancelRepair, Modifier.focusRing()) { Text(if (r.state == FileRepair.State.FAILED) "Dismiss" else "Cancel repair") }
                 TextButton(onRefresh, Modifier.focusRing()) { Text("Refresh metadata") }
                 if (matchable(it.type)) TextButton(onMatch, Modifier.focusRing().semantics { contentDescription = "Fix match for ${it.title}" }) { Text("Fix match…") }
                 if (checkId == HealthCheck.Id.MISSING_SUBTITLES.value) TextButton(onBazarr, Modifier.focusRing()) { Text("Download with Bazarr") }
@@ -263,6 +317,19 @@ private fun IssueRow(issue: HealthIssue, checkId: String, onOpen: () -> Unit, on
     }
 }
 
+
+/** A file's repair: waiting, running (with its progress) or failed (with why). */
+@Composable
+private fun RepairStatus(r: FileRepair) {
+    when (r.state) {
+        FileRepair.State.FAILED -> Text("Repair failed: ${r.error ?: "unknown error"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        FileRepair.State.QUEUED -> Text("Waiting to be repaired", style = MaterialTheme.typography.bodySmall, color = Gold)
+        FileRepair.State.RUNNING -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Repairing… ${(r.progress * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = Gold)
+            LinearProgressIndicator(progress = { r.progress.toFloat() }, Modifier.width(120.dp), color = Gold)
+        }
+    }
+}
 
 /** One comparable fact about a file: what to show, and a score where higher is better (null: not compared). */
 private class Fact(val label: String, val text: String, val score: Double? = null)

@@ -152,14 +152,16 @@ func (w *writer) findMoved(c candidate) (int64, bool) {
 
 func (w *writer) updateFile(ctx context.Context, id int64, c candidate, res *probe.Result) error {
 	v, a := res.Video(), res.Audio()
-	// A file whose content changed (not one only moved) is checked again (Check new files).
+	// A file whose content changed (not one only moved) is checked again (Check files).
 	_, err := w.tx.ExecContext(ctx, `UPDATE media_files SET
 		checked_at = CASE WHEN size = ? AND mtime = ? THEN checked_at END,
 		check_error = CASE WHEN size = ? AND mtime = ? THEN check_error END,
+		timing_checked_at = CASE WHEN size = ? AND mtime = ? THEN timing_checked_at END,
+		timing_error = CASE WHEN size = ? AND mtime = ? THEN timing_error END,
 		path = ?, size = ?, mtime = ?, container = ?, duration_ms = ?,
 		bitrate_kbps = ?, width = ?, height = ?, video_codec = ?, audio_codec = ?, hdr_format = ?, dv_profile = ?,
 		available = 1, missing_since = NULL, probed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), probe_json = ? WHERE id = ?`,
-		c.Size, c.MTime, c.Size, c.MTime,
+		c.Size, c.MTime, c.Size, c.MTime, c.Size, c.MTime, c.Size, c.MTime,
 		c.Path, c.Size, c.MTime, res.Container, res.DurationMS, res.BitrateKbps,
 		vint(v, func(s *probe.Stream) int { return s.Width }), vint(v, func(s *probe.Stream) int { return s.Height }),
 		vstr(v, func(s *probe.Stream) string { return s.Codec }), vstr(a, func(s *probe.Stream) string { return s.Codec }),

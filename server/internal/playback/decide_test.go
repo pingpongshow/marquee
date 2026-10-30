@@ -2,6 +2,7 @@ package playback
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -181,5 +182,23 @@ func TestNightModeConvertsAudioAndKeepsVideo(t *testing.T) {
 	// Off: unchanged.
 	if d := Decide(m, chrome, Limits{}); d.Method != DirectPlay || d.NightMode {
 		t.Fatalf("off: %+v", d)
+	}
+}
+
+// A file whose frames are timed in decode order (Library Health → Frame timing errors) is
+// never played or repackaged as it is: copied, it stutters; converted, the frames come out
+// in order. That holds for the hev1 file Safari would have had repackaged.
+func TestMistimedFramesAreConverted(t *testing.T) {
+	m := Media{Container: "mp4", BitrateKbps: 2230, MistimedFrames: true,
+		Video: &VideoStream{Codec: "hevc", Tag: "hev1", Height: 806, BitDepth: 10}, Audio: &AudioStream{Codec: "aac", Channels: 2}}
+	for _, p := range []DeviceProfile{appleTV, chrome} {
+		d := Decide(m, p, Limits{})
+		if d.Method != Transcode || d.VideoCopy || !strings.Contains(strings.Join(d.Reasons, "; "), "frames are timed out of order") {
+			t.Errorf("%+v", d)
+		}
+	}
+	m.MistimedFrames = false
+	if d := Decide(m, appleTV, Limits{}); d.Method == Transcode {
+		t.Errorf("without the error: %s %v", d.Method, d.Reasons)
 	}
 }

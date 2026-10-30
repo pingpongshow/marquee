@@ -10744,6 +10744,7 @@ extension Components {
                 case unmatched = "unmatched"
                 case unavailable = "unavailable"
                 case unplayable = "unplayable"
+                case frameTiming = "frameTiming"
                 case upgrades = "upgrades"
                 case playbackErrors = "playbackErrors"
                 case missingArtwork = "missingArtwork"
@@ -10769,6 +10770,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/HealthCheck/available`.
             public var available: Swift.Bool?
+            /// What the check finds can be repaired from Library Health (frameTiming: POST /library-health/frameTiming/repairs).
+            ///
+            /// - Remark: Generated from `#/components/schemas/HealthCheck/repairable`.
+            public var repairable: Swift.Bool?
+            /// repairable checks: how many repairs are waiting or running.
+            ///
+            /// - Remark: Generated from `#/components/schemas/HealthCheck/repairing`.
+            public var repairing: Swift.Int?
             /// Creates a new `HealthCheck`.
             ///
             /// - Parameters:
@@ -10778,13 +10787,17 @@ extension Components {
             ///   - count:
             ///   - severity:
             ///   - available: False when the check can't run (e.g. missingSubtitles without Bazarr).
+            ///   - repairable: What the check finds can be repaired from Library Health (frameTiming: POST /library-health/frameTiming/repairs).
+            ///   - repairing: repairable checks: how many repairs are waiting or running.
             public init(
                 id: Components.Schemas.HealthCheck.IdPayload,
                 title: Swift.String,
                 description: Swift.String,
                 count: Swift.Int,
                 severity: Components.Schemas.HealthCheck.SeverityPayload,
-                available: Swift.Bool? = nil
+                available: Swift.Bool? = nil,
+                repairable: Swift.Bool? = nil,
+                repairing: Swift.Int? = nil
             ) {
                 self.id = id
                 self.title = title
@@ -10792,6 +10805,8 @@ extension Components {
                 self.count = count
                 self.severity = severity
                 self.available = available
+                self.repairable = repairable
+                self.repairing = repairing
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -10800,6 +10815,8 @@ extension Components {
                 case count
                 case severity
                 case available
+                case repairable
+                case repairing
             }
         }
         /// - Remark: Generated from `#/components/schemas/HealthIssue`.
@@ -10820,6 +10837,12 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/HealthIssue/files`.
             public var files: [Components.Schemas.IssueFile]?
+            /// frameTiming: the file can be repaired (an MP4 or MOV file).
+            ///
+            /// - Remark: Generated from `#/components/schemas/HealthIssue/repairable`.
+            public var repairable: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/HealthIssue/repair`.
+            public var repair: Components.Schemas.FileRepair?
             /// Creates a new `HealthIssue`.
             ///
             /// - Parameters:
@@ -10829,13 +10852,17 @@ extension Components {
             ///   - detail:
             ///   - related: duplicates: the other copies.
             ///   - files: The files involved, to compare. duplicates: every file of every copy (this item and the related ones).
+            ///   - repairable: frameTiming: the file can be repaired (an MP4 or MOV file).
+            ///   - repair:
             public init(
                 item: Components.Schemas.ItemSummary,
                 fileId: Swift.Int64? = nil,
                 path: Swift.String? = nil,
                 detail: Swift.String,
                 related: [Components.Schemas.ItemSummary]? = nil,
-                files: [Components.Schemas.IssueFile]? = nil
+                files: [Components.Schemas.IssueFile]? = nil,
+                repairable: Swift.Bool? = nil,
+                repair: Components.Schemas.FileRepair? = nil
             ) {
                 self.item = item
                 self.fileId = fileId
@@ -10843,6 +10870,8 @@ extension Components {
                 self.detail = detail
                 self.related = related
                 self.files = files
+                self.repairable = repairable
+                self.repair = repair
             }
             public enum CodingKeys: String, CodingKey {
                 case item
@@ -10851,6 +10880,108 @@ extension Components {
                 case detail
                 case related
                 case files
+                case repairable
+                case repair
+            }
+        }
+        /// A file's repair (frameTiming), while it's waiting, running or failed. A repaired file leaves the check.
+        ///
+        /// - Remark: Generated from `#/components/schemas/FileRepair`.
+        public struct FileRepair: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/FileRepair/state`.
+            @frozen public enum StatePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case queued = "queued"
+                case running = "running"
+                case failed = "failed"
+            }
+            /// - Remark: Generated from `#/components/schemas/FileRepair/state`.
+            public var state: Components.Schemas.FileRepair.StatePayload
+            /// running: 0–1.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FileRepair/progress`.
+            public var progress: Swift.Double
+            /// failed: why. The file was left as it was.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FileRepair/error`.
+            public var error: Swift.String?
+            /// Creates a new `FileRepair`.
+            ///
+            /// - Parameters:
+            ///   - state:
+            ///   - progress: running: 0–1.
+            ///   - error: failed: why. The file was left as it was.
+            public init(
+                state: Components.Schemas.FileRepair.StatePayload,
+                progress: Swift.Double,
+                error: Swift.String? = nil
+            ) {
+                self.state = state
+                self.progress = progress
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case state
+                case progress
+                case error
+            }
+        }
+        /// The files to repair (fileIds), or all: every file in Frame timing errors that can be repaired.
+        ///
+        /// - Remark: Generated from `#/components/schemas/FrameTimingRepairRequest`.
+        public struct FrameTimingRepairRequest: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/FrameTimingRepairRequest/fileIds`.
+            public var fileIds: [Swift.Int64]?
+            /// - Remark: Generated from `#/components/schemas/FrameTimingRepairRequest/all`.
+            public var all: Swift.Bool?
+            /// Creates a new `FrameTimingRepairRequest`.
+            ///
+            /// - Parameters:
+            ///   - fileIds:
+            ///   - all:
+            public init(
+                fileIds: [Swift.Int64]? = nil,
+                all: Swift.Bool? = nil
+            ) {
+                self.fileIds = fileIds
+                self.all = all
+            }
+            public enum CodingKeys: String, CodingKey {
+                case fileIds
+                case all
+            }
+        }
+        /// Something Library Health found wrong with a file.
+        ///
+        /// - Remark: Generated from `#/components/schemas/FileProblem`.
+        public struct FileProblem: Codable, Hashable, Sendable {
+            /// The Library Health check that lists it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FileProblem/check`.
+            @frozen public enum CheckPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case unplayable = "unplayable"
+                case frameTiming = "frameTiming"
+            }
+            /// The Library Health check that lists it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FileProblem/check`.
+            public var check: Components.Schemas.FileProblem.CheckPayload
+            /// - Remark: Generated from `#/components/schemas/FileProblem/detail`.
+            public var detail: Swift.String
+            /// Creates a new `FileProblem`.
+            ///
+            /// - Parameters:
+            ///   - check: The Library Health check that lists it.
+            ///   - detail:
+            public init(
+                check: Components.Schemas.FileProblem.CheckPayload,
+                detail: Swift.String
+            ) {
+                self.check = check
+                self.detail = detail
+            }
+            public enum CodingKeys: String, CodingKey {
+                case check
+                case detail
             }
         }
         /// - Remark: Generated from `#/components/schemas/IssueFile`.
@@ -14145,6 +14276,10 @@ extension Components {
             public var available: Swift.Bool
             /// - Remark: Generated from `#/components/schemas/MediaFile/streams`.
             public var streams: [Components.Schemas.MediaStream]
+            /// What Library Health found wrong with the file (damaged, frames timed out of order). Only returned to administrators.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MediaFile/problems`.
+            public var problems: [Components.Schemas.FileProblem]?
             /// Creates a new `MediaFile`.
             ///
             /// - Parameters:
@@ -14163,6 +14298,7 @@ extension Components {
             ///   - partIndex:
             ///   - available:
             ///   - streams:
+            ///   - problems: What Library Health found wrong with the file (damaged, frames timed out of order). Only returned to administrators.
             public init(
                 id: Swift.Int64,
                 path: Swift.String? = nil,
@@ -14178,7 +14314,8 @@ extension Components {
                 dvProfile: Swift.Int? = nil,
                 partIndex: Swift.Int,
                 available: Swift.Bool,
-                streams: [Components.Schemas.MediaStream]
+                streams: [Components.Schemas.MediaStream],
+                problems: [Components.Schemas.FileProblem]? = nil
             ) {
                 self.id = id
                 self.path = path
@@ -14195,6 +14332,7 @@ extension Components {
                 self.partIndex = partIndex
                 self.available = available
                 self.streams = streams
+                self.problems = problems
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -14212,6 +14350,7 @@ extension Components {
                 case partIndex
                 case available
                 case streams
+                case problems
             }
         }
         /// - Remark: Generated from `#/components/schemas/MediaStream`.

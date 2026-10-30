@@ -11,6 +11,8 @@ public typealias IntegrationSettings = Components.Schemas.IntegrationSettings
 public typealias IssueFile = Components.Schemas.IssueFile
 public typealias MediaFile = Components.Schemas.MediaFile
 public typealias MediaStream = Components.Schemas.MediaStream
+public typealias FileProblem = Components.Schemas.FileProblem
+public typealias FileRepair = Components.Schemas.FileRepair
 
 /// Bazarr subtitles (META-12), library health (ADM-11), deleting media files, Fix Match, metadata refresh and the
 /// integration settings they need (admin).
@@ -93,6 +95,25 @@ public extension AppSession {
             guard case .noContent = try await adminAPI.unignoreHealthIssue(path: .init(checkId: check, itemId: itemID)) else {
                 throw MarqueeError("Couldn't undo.")
             }
+        }
+    }
+
+    /// Queues repairs of files whose frames are timed out of order (Frame timing errors): these
+    /// files, or every one that can be repaired when fileIDs is nil. Returns how many were queued.
+    func repairFrameTiming(_ fileIDs: [Int64]?) async throws -> Int {
+        let body = Components.Schemas.FrameTimingRepairRequest(fileIds: fileIDs, all: fileIDs == nil ? true : nil)
+        switch try await adminAPI.repairFrameTiming(body: .json(body)) {
+        case .accepted(let a): return try a.body.json.queued
+        case .notFound: throw MarqueeError("That file can't be repaired.")
+        case .forbidden: throw MarqueeError("Only admins can repair files.")
+        default: throw MarqueeError("Couldn't queue the repair.")
+        }
+    }
+
+    /// Takes a waiting or failed repair off the list.
+    func cancelFrameTimingRepair(_ fileID: Int64) async throws {
+        guard case .noContent = try await adminAPI.cancelFrameTimingRepair(path: .init(fileId: fileID)) else {
+            throw MarqueeError("Couldn't cancel the repair.")
         }
     }
 

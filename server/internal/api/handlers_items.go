@@ -369,6 +369,13 @@ func toAPIMediaFile(f items.File) MediaFile {
 	if f.HDRFormat != "" {
 		mf.HdrFormat = ptr(MediaFileHdrFormat(f.HDRFormat))
 	}
+	if len(f.Problems) > 0 {
+		ps := make([]FileProblem, len(f.Problems))
+		for i, p := range f.Problems {
+			ps[i] = FileProblem{Check: FileProblemCheck(p.Check), Detail: p.Detail}
+		}
+		mf.Problems = &ps
+	}
 	for k, st := range f.Streams {
 		mf.Streams[k] = MediaStream{
 			Id: st.ID, Kind: MediaStreamKind(st.Kind), Codec: st.Codec, Profile: nz(st.Profile), Language: nz(st.Language),

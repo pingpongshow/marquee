@@ -23,6 +23,7 @@
 
 package app.marquee.api.models
 
+import app.marquee.api.models.FileRepair
 import app.marquee.api.models.IssueFile
 import app.marquee.api.models.ItemSummary
 
@@ -39,6 +40,8 @@ import kotlinx.serialization.Contextual
  * @param path 
  * @param related duplicates: the other copies.
  * @param files The files involved, to compare. duplicates: every file of every copy (this item and the related ones).
+ * @param repairable frameTiming: the file can be repaired (an MP4 or MOV file).
+ * @param repair 
  */
 @Serializable
 
@@ -62,7 +65,14 @@ data class HealthIssue (
 
     /* The files involved, to compare. duplicates: every file of every copy (this item and the related ones). */
     @SerialName(value = "files")
-    val files: kotlin.collections.List<IssueFile>? = null
+    val files: kotlin.collections.List<IssueFile>? = null,
+
+    /* frameTiming: the file can be repaired (an MP4 or MOV file). */
+    @SerialName(value = "repairable")
+    val repairable: kotlin.Boolean? = null,
+
+    @SerialName(value = "repair")
+    val repair: FileRepair? = null
 
 ) {
 

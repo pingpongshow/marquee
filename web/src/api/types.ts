@@ -57,3 +57,5 @@ export type RecapEntry = S["RecapEntry"];
 export type MuseVideoResult = S["MuseVideoResult"];
 export type HealthCheck = S["HealthCheck"];
 export type HealthIssue = S["HealthIssue"];
+export type FileRepair = S["FileRepair"];
+export type FileProblem = S["FileProblem"];

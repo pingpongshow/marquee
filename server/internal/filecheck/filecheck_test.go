@@ -52,7 +52,8 @@ func (e *env) library(typ string, recordings bool) int64 {
 }
 
 // file adds an item of type typ with one file at path (with a video stream unless typ is
-// track). checked marks it checked, as the migration does for files already there.
+// track). checked marks it checked, as the migration does for files already there. Its frame
+// timing counts as checked (TestRunChecksFrameTiming clears that).
 func (e *env) file(lib int64, typ, path string, durationMS int64, checked bool) int64 {
 	item := e.exec(`INSERT INTO items(library_id, type, title, sort_title) VALUES (?, ?, ?, ?)`, lib, typ, filepath.Base(path), filepath.Base(path))
 	v := e.exec(`INSERT INTO media_versions(item_id) VALUES (?)`, item)
@@ -64,7 +65,8 @@ func (e *env) file(lib int64, typ, path string, durationMS int64, checked bool) 
 	if checked {
 		at = "2026-01-01T00:00:00.000Z"
 	}
-	f := e.exec(`INSERT INTO media_files(version_id, library_id, path, size, mtime, duration_ms, checked_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+	f := e.exec(`INSERT INTO media_files(version_id, library_id, path, size, mtime, duration_ms, checked_at, timing_checked_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, '2026-01-01T00:00:00.000Z')`,
 		v, lib, path, size, mtime, durationMS, at)
 	kind := "video"
 	if typ == "track" {
@@ -230,5 +232,73 @@ func TestTaskTurnedOff(t *testing.T) {
 	}
 	if _, r := e.state(id); r.String != "It is 0:10:00 long; expected 1:30:00" || decodes != 0 {
 		t.Errorf("error %q, %d decodes", r.String, decodes)
+	}
+}
+
+// Every video file's frame timing is checked once, those already in the library included:
+// one timed in decode order is listed in Library Health → Frame timing errors; music and AVI
+// files are marked done without a look; a changed file is checked again.
+func TestRunChecksFrameTiming(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	movies, music := e.library("movies", false), e.library("music", false)
+	path := func(name string) string {
+		p := filepath.Join(e.dir, name)
+		if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	goodID := e.file(movies, "movie", path("Good (2020).mp4"), 40_000, true)
+	badID := e.file(movies, "movie", path("Sunshine (2007).mp4"), 40_000, true)
+	aviID := e.file(movies, "movie", path("Old (1999).avi"), 40_000, true)
+	trackID := e.file(music, "track", path("Song.flac"), 40_000, true)
+	e.exec(`UPDATE media_files SET timing_checked_at = NULL`)
+	var looked []string
+	s := &Service{DB: e.db, Timing: func(_ context.Context, p string) (string, error) {
+		looked = append(looked, filepath.Base(p))
+		if strings.Contains(p, "Sunshine") {
+			return "Frames are timed in decode order (86 of the first 190 out of order)", nil
+		}
+		return "", nil
+	}}
+	if !s.Pending(ctx) {
+		t.Fatal("nothing pending")
+	}
+	msg, err := s.Run(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg != "Frame timing of 2 checked, 1 out of order" {
+		t.Errorf("result %q", msg)
+	}
+	if strings.Join(looked, ",") != "Good (2020).mp4,Sunshine (2007).mp4" {
+		t.Errorf("looked at %v", looked)
+	}
+	timing := func(id int64) (checked bool, reason string) {
+		var at, r sql.NullString
+		e.db.QueryRow(`SELECT timing_checked_at, timing_error FROM media_files WHERE id = ?`, id).Scan(&at, &r)
+		return at.Valid, r.String
+	}
+	for _, id := range []int64{goodID, aviID, trackID} {
+		if checked, reason := timing(id); !checked || reason != "" {
+			t.Errorf("file %d: checked %v, reason %q", id, checked, reason)
+		}
+	}
+	if _, reason := timing(badID); !strings.HasPrefix(reason, "Frames are timed in decode order") {
+		t.Errorf("reason %q", reason)
+	}
+	if s.Pending(ctx) {
+		t.Error("still pending")
+	}
+	hs := &health.Service{DB: e.db}
+	issues, total, err := hs.Issues(ctx, "frameTiming", 0, 10)
+	if err != nil || total != 1 || issues[0].FileID != badID || !strings.HasPrefix(issues[0].Detail, "Frames are timed") {
+		t.Fatalf("health: %v %d %+v", err, total, issues)
+	}
+	// Nothing more to look at.
+	looked = nil
+	if msg, _ := s.Run(ctx); msg != "No new files" || len(looked) > 0 {
+		t.Errorf("second run %q, looked at %v", msg, looked)
 	}
 }
