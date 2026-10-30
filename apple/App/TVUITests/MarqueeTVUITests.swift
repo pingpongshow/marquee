@@ -835,8 +835,10 @@ extension MarqueeTVUITests {
 // MARK: - Batch 8: rating request when a movie or episode ends (USER-19)
 
 extension MarqueeTVUITests {
-    /// 00 Long Test resumed 10 s from the end plays out; the card over the page starts on the
-    /// middle star, right moves to the fourth and OK saves 8; then it says thanks and goes.
+    /// 00 Long Test resumed 10 s from the end plays out; the request comes up as a screen of
+    /// its own, starting on the middle star, right moves to the fourth and OK saves 8; then it
+    /// says thanks and goes. It's resumed from Continue Watching: a marquee:// link relaunches
+    /// the app, which signs the TV out again.
     func testRatingPromptTV() throws {
         let token = try temporaryAccount()
         try api("PUT", "/items/322/rating", ["rating": NSNull()], token: token)
@@ -846,21 +848,29 @@ extension MarqueeTVUITests {
             Self.send("PATCH", settings, token: admin, ["general": ["ratingPrompt": false]])
             Self.send("PUT", rating, token: token, ["rating": NSNull()])
         }
-        try signIn(as: token)
-        app.launchArguments = [] // opening the link relaunches the app: keep the sign-in
         try api("PATCH", "/settings", ["general": ["ratingPrompt": true]]) // read when the player opens
-        app.open(URL(string: "marquee://play/322")!)
+        try signIn(as: token)
+
+        let tile = app.buttons["continue.322"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 20), "00 Long Test is in Continue Watching")
+        for _ in 0..<8 where !tile.hasFocus { remote.press(.down) }
+        for _ in 0..<8 where !tile.hasFocus { remote.press(.left) }
+        XCTAssertTrue(tile.hasFocus, "focus is on \(focused.label)")
+        remote.press(.select)
 
         let card = app.descendants(matching: .any)["ratingPrompt"]
-        XCTAssertTrue(card.waitForExistence(timeout: 45), "the rating request shows when the movie ends")
+        XCTAssertTrue(card.waitForExistence(timeout: 60), "the rating request shows when the movie ends")
         let star3 = app.buttons["ratingPromptStar3"], star4 = app.buttons["ratingPromptStar4"]
         let started = NSPredicate(format: "hasFocus == true")
-        wait(for: [expectation(for: started, evaluatedWith: star3)], timeout: 5)
+        wait(for: [expectation(for: started, evaluatedWith: star3)], timeout: 8)
+        XCTAssertTrue(app.buttons["ratingPromptNotNow"].exists, "and the ways out")
+        XCTAssertTrue(app.buttons["ratingPromptNever"].exists)
         shot("tv-b8-rating-card")
         remote.press(.right)
         XCTAssertTrue(star4.hasFocus, "right moves to the fourth star")
         remote.press(.select)
         XCTAssertTrue(app.descendants(matching: .any)["ratingPromptThanks"].waitForExistence(timeout: 3), "a brief thanks")
+        shot("tv-b8-rating-thanks")
         try eventually(10, "rating 8 saved") { try api("GET", "/items/322", token: token)["userRating"] as? Double == 8 }
         XCTAssertTrue(card.waitForNonExistence(timeout: 6), "the card goes")
     }

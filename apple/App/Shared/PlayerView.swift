@@ -463,12 +463,17 @@ struct PlayerView: View {
     }
 
     /// A movie or episode that played to the end, or far enough to count as watched, asks for
-    /// a rating over the page once the player has gone (USER-19).
+    /// a rating over the page once the player has gone (USER-19). It waits for the player's
+    /// cover to go: on the TV the request is a cover of its own, and one view can't present
+    /// two at once.
     private func askAfterClosing() {
         guard !prompted, trailerIndex == nil, let p = playback, watchedEnough(p),
               let ask = RatingPrompt.wanted(p.item, app: app) else { return }
         prompted = true
-        RatingPrompt.shared.pending = ask
+        Task { @MainActor in
+            try? await Task.sleep(for: RatingPrompt.afterPlayer)
+            RatingPrompt.shared.pending = ask
+        }
     }
 
     /// Played to the end, or 90% of the way (as the server counts a play).

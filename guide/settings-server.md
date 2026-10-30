@@ -25,7 +25,7 @@ Everything here is under **Settings** in the web app and needs an administrator 
 |---|---|---|
 | Server name | `Marquee` | Shown in every Marquee app, and in emails the server sends. |
 | Default metadata language | English (US) | Titles, summaries and artwork are fetched in this language. Each library can override it. |
-| Ask people to rate movies and episodes when they finish them | Off | Shows a small card with stars when a movie or episode ends. Each person can turn it off for themselves under **Account → Ask me to rate after watching**. |
+| Ask people to rate movies and episodes when they finish them | Off | Shows a card with stars when a movie or episode ends (on the Apple TV, a screen of its own, so the remote reaches the stars). Each person can turn it off for themselves under **Account → Ask me to rate after watching**. |
 
 **Restart server** stops all playback and restarts Marquee. Docker starts it again within a few seconds, and the page reloads when it's back. Anyone watching or listening is interrupted.
 
