@@ -29,7 +29,8 @@ type Options struct {
 	Favour map[int64]float64
 	// PerArtist and PerAlbum cap how many tracks of one artist or album Pick chooses (0 = no
 	// cap). When the caps would leave the list short they're raised a step at a time. With
-	// either set, Pick's order also keeps an artist's tracks apart.
+	// either set, Pick's order also keeps an artist's tracks apart. Flow holds an artist to
+	// their share of a station the same way: PerArtist, or a tenth of it (at least 3) when unset.
 	PerArtist, PerAlbum int
 }
 
@@ -49,17 +50,28 @@ func (o *Options) allowed(t *Track) bool {
 
 // Flow builds a radio-style sequence: each next track is close to both the current one and
 // the station's sound (anchor), with variety rules (no artist twice within three tracks, no
-// album twice within six) and a little randomness so stations don't repeat.
+// album twice within six, no artist more than its share of the station) and a little
+// randomness so stations don't repeat.
 func (x *Index) Flow(anchor []float32, first *Track, o Options) []*Track {
 	if o.Length <= 0 {
 		o.Length = 50
 	}
 	pool := x.Nearest(anchor, max(400, o.Length*8), o.allowed)
 	used := map[int64]bool{}
+	// The spacing penalties alone let an artist back every fourth track, so a station started
+	// from an artist (whose sound fills the pool) played mostly that artist. Past their share
+	// each more track counts against them, more each time: enough for another artist of that
+	// sound to win, not enough to leave the sound once its other artists have played.
+	perArtist := o.PerArtist
+	if perArtist <= 0 {
+		perArtist = max(3, o.Length/10)
+	}
+	byArtist := map[int64]int{}
 	var out []*Track
 	if first != nil {
 		out = append(out, first)
 		used[first.ItemID] = true
+		byArtist[first.ArtistID]++
 	}
 	r := o.rng()
 	for len(out) < o.Length {
@@ -84,6 +96,9 @@ func (x *Index) Flow(anchor []float32, first *Track, o Options) []*Track {
 					s -= 0.2
 				}
 			}
+			if over := byArtist[c.ArtistID] - perArtist + 1; over > 0 && c.ArtistID != 0 {
+				s -= 0.35 * float64(over)
+			}
 			s -= 0.3 * o.Avoid[c.ItemID]
 			s += o.Favour[c.ItemID]
 			s += r.Float64() * 0.04
@@ -95,6 +110,7 @@ func (x *Index) Flow(anchor []float32, first *Track, o Options) []*Track {
 			break
 		}
 		used[pool[best].ItemID] = true
+		byArtist[pool[best].ArtistID]++
 		out = append(out, pool[best].Track)
 	}
 	return out

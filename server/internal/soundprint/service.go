@@ -507,10 +507,41 @@ func oneEach(ts []*Track) []*Track {
 	return out
 }
 
+// spreadOut takes up to n of ts in order, at most per tracks of any one artist, letting one
+// more of each in at a time only when that leaves the list short (Pick's caps, for a list
+// that isn't picked).
+func spreadOut(ts []*Track, n, per int) []*Track {
+	n = min(n, len(ts))
+	out := make([]*Track, 0, n)
+	in := make([]bool, len(ts))
+	byArtist := map[int64]int{}
+	for ; len(out) < n; per++ {
+		for i, t := range ts {
+			if len(out) == n {
+				break
+			}
+			if in[i] || (t.ArtistID != 0 && byArtist[t.ArtistID] >= per) {
+				continue
+			}
+			in[i] = true
+			byArtist[t.ArtistID]++
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// mixPerArtist and mixPerAlbum cap one artist's and one album's share of a mix: the tracks
+// nearest a taste are mostly a few artists' albums (and Favour lifts a favourite artist's
+// whole catalogue), so without caps a mix read like those albums back to back instead of a
+// dozen or more artists. Pick raises them a step at a time where the artists run out.
+const mixPerArtist, mixPerAlbum = 2, 1
+
 // pick chooses n tracks none of the day's other mixes has taken, and remembers them. A mix
 // that leaves fewer than least tracks that way is picked again without the restriction: a
 // mix too short to offer is worse than one sharing a few tracks (least 0 never gives way).
 func (s *Service) pick(v []float32, n, least int, o Options, used *taken) []*Track {
+	o.PerArtist, o.PerAlbum = mixPerArtist, mixPerAlbum
 	strict := o
 	strict.Exclude, strict.ExcludeCopy = used.ids, used.copies
 	ts := s.Index.Pick(v, n, strict)
@@ -680,9 +711,9 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 		if free = oneEach(free); len(free) < 10 {
 			free = oneEach(old)
 		}
-		old = free[:min(25, len(free))]
+		old = spreadOut(free, 25, mixPerArtist)
 		used.add(old)
-		out = append(out, Mix{Station: Station{Title: "Rediscover", IDs: TrackIDs(order(old, Mean(old)))}, ID: "rediscover",
+		out = append(out, Mix{Station: Station{Title: "Rediscover", IDs: TrackIDs(orderApart(old, Mean(old)))}, ID: "rediscover",
 			Description: "Favourites you haven't played in a while"})
 	}
 
