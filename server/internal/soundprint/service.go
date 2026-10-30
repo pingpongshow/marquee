@@ -245,8 +245,10 @@ func (s *Service) indexOne(ctx context.Context, itemID int64, r Analysis) {
 	if r.Mode != nil {
 		t.Mode = *r.Mode
 	}
-	s.DB.QueryRowContext(ctx, `SELECT COALESCE(i.parent_id, 0), COALESCE(i.grandparent_id, 0), i.library_id, COALESCE(i.year, a.year, 0)
-		FROM items i LEFT JOIN items a ON a.id = i.parent_id WHERE i.id = ?`, itemID).Scan(&t.AlbumID, &t.ArtistID, &t.LibraryID, &t.Year)
+	var title string
+	s.DB.QueryRowContext(ctx, `SELECT COALESCE(i.parent_id, 0), COALESCE(i.grandparent_id, 0), i.library_id, COALESCE(i.year, a.year, 0), COALESCE(i.title, '')
+		FROM items i LEFT JOIN items a ON a.id = i.parent_id WHERE i.id = ?`, itemID).Scan(&t.AlbumID, &t.ArtistID, &t.LibraryID, &t.Year, &title)
+	t.Copy = CopyKey(title, t.ArtistID)
 	s.Index.Put(t)
 }
 
@@ -464,6 +466,61 @@ type mixHistoryKey struct {
 	scope string
 }
 
+// taken remembers what the day's mixes have already used, so no two of them offer the same
+// track, and no mix offers a second copy of a recording another one has (MUSIC-17).
+type taken struct {
+	ids    map[int64]bool
+	copies map[string]bool
+}
+
+func newTaken() *taken { return &taken{ids: map[int64]bool{}, copies: map[string]bool{}} }
+
+func (t *taken) add(ts []*Track) {
+	for _, tr := range ts {
+		t.ids[tr.ItemID] = true
+		if tr.Copy != "" {
+			t.copies[tr.Copy] = true
+		}
+	}
+}
+
+func (t *taken) has(tr *Track) bool {
+	return t.ids[tr.ItemID] || (tr.Copy != "" && t.copies[tr.Copy])
+}
+
+// oneEach drops the second copy of a recording (and any track listed twice), keeping the
+// first of each in order. Picked lists come this way already; lists read from the database
+// don't (MUSIC-17).
+func oneEach(ts []*Track) []*Track {
+	seen, copies := map[int64]bool{}, map[string]bool{}
+	out := make([]*Track, 0, len(ts))
+	for _, t := range ts {
+		if seen[t.ItemID] || (t.Copy != "" && copies[t.Copy]) {
+			continue
+		}
+		seen[t.ItemID] = true
+		if t.Copy != "" {
+			copies[t.Copy] = true
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
+// pick chooses n tracks none of the day's other mixes has taken, and remembers them. A mix
+// that leaves fewer than least tracks that way is picked again without the restriction: a
+// mix too short to offer is worse than one sharing a few tracks (least 0 never gives way).
+func (s *Service) pick(v []float32, n, least int, o Options, used *taken) []*Track {
+	strict := o
+	strict.Exclude, strict.ExcludeCopy = used.ids, used.copies
+	ts := s.Index.Pick(v, n, strict)
+	if len(ts) < least {
+		ts = s.Index.Pick(v, n, o)
+	}
+	used.add(ts)
+	return ts
+}
+
 func (s *Service) dailyMixes(ctx context.Context, userID int64, scope string, keep Filter, now time.Time) []Mix {
 	day := now.Format("2006-01-02")
 	key := mixCacheKey{userID, day, scope}
@@ -502,17 +559,14 @@ func (s *Service) dailyMixes(ctx context.Context, userID int64, scope string, ke
 	}
 	recentMu.Unlock()
 	var mixes []Mix
-	used := map[int64]bool{}
+	used := newTaken()
 	favour := s.Favour(ctx, userID)
 	for i, c := range Clusters(keepLiked, k, r) {
-		o := Options{Keep: keep, Avoid: avoid, Exclude: used, Rand: r, Jitter: mixJitter, Favour: favour}
-		ts := s.Index.Pick(dayCentre(c, keepLiked, r), 25, o)
-		for _, t := range ts {
-			used[t.ItemID] = true
-		}
+		o := Options{Keep: keep, Avoid: avoid, Rand: r, Jitter: mixJitter, Favour: favour}
+		ts := s.pick(dayCentre(c, keepLiked, r), 25, 0, o, used)
 		mixes = append(mixes, Mix{Station: Station{Title: fmt.Sprintf("Daily Mix %d", i+1), IDs: TrackIDs(ts)}, ID: fmt.Sprintf("daily-%d", i+1)})
 	}
-	mixes = append(mixes, s.historyMixes(ctx, userID, keep, keepLiked, avoid, favour, r)...)
+	mixes = append(mixes, s.historyMixes(ctx, userID, keep, keepLiked, avoid, favour, r, used)...)
 	var today []int64
 	for _, m := range mixes {
 		today = append(today, m.IDs...)
@@ -563,7 +617,7 @@ func dayCentre(centre []float32, liked []*Track, r *rand.Rand) []float32 {
 // Discovery (never-played tracks close to their taste, favouring artists they rarely play),
 // Rediscover (favourites not played for six months), New Music (recent additions that fit
 // their taste) and their favourite decade.
-func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, liked []*Track, avoid, favour map[int64]float64, r *rand.Rand) []Mix {
+func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, liked []*Track, avoid, favour map[int64]float64, r *rand.Rand, used *taken) []Mix {
 	taste := s.Taste(ctx, userID, liked)
 	if taste == nil {
 		return nil
@@ -593,7 +647,7 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 			disc.Avoid[t.ItemID] = min(0.8, float64(n)/40)
 		}
 	}
-	if ts := s.Index.Pick(taste, 25, disc); len(ts) >= 10 {
+	if ts := s.pick(taste, 25, 10, disc, used); len(ts) >= 10 {
 		out = append(out, Mix{Station: Station{Title: "Discovery Mix", IDs: TrackIDs(ts)}, ID: "discovery",
 			Description: "Tracks in your library you haven't played yet, close to what you love"})
 	}
@@ -615,7 +669,19 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 	}
 	if len(old) >= 10 {
 		r.Shuffle(len(old), func(i, j int) { old[i], old[j] = old[j], old[i] })
-		old = old[:min(25, len(old))]
+		// One copy of each recording, and nothing another of the day's mixes has already
+		// taken — unless that leaves too few favourites to offer (as Service.pick does).
+		var free []*Track
+		for _, t := range old {
+			if !used.has(t) {
+				free = append(free, t)
+			}
+		}
+		if free = oneEach(free); len(free) < 10 {
+			free = oneEach(old)
+		}
+		old = free[:min(25, len(free))]
+		used.add(old)
 		out = append(out, Mix{Station: Station{Title: "Rediscover", IDs: TrackIDs(order(old, Mean(old)))}, ID: "rediscover",
 			Description: "Favourites you haven't played in a while"})
 	}
@@ -634,7 +700,7 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 	}
 	if len(fresh) >= 10 {
 		o := Options{Keep: func(t *Track) bool { return allowed(t) && fresh[t.ItemID] }, Avoid: avoid, Rand: r, Jitter: mixJitter, Favour: favour}
-		if ts := s.Index.Pick(taste, 25, o); len(ts) >= 10 {
+		if ts := s.pick(taste, 25, 10, o, used); len(ts) >= 10 {
 			out = append(out, Mix{Station: Station{Title: "New Music Mix", IDs: TrackIDs(ts)}, ID: "new",
 				Description: "Recently added music that fits your taste"})
 		}
@@ -661,7 +727,7 @@ func (s *Service) historyMixes(ctx context.Context, userID int64, keep Filter, l
 				inDecade = append(inDecade, t)
 			}
 		}
-		if ts := s.Index.Pick(Mean(inDecade), 25, o); len(ts) >= 10 {
+		if ts := s.pick(Mean(inDecade), 25, 10, o, used); len(ts) >= 10 {
 			label := fmt.Sprintf("%ds", best%100)
 			if best < 1950 || best >= 2000 {
 				label = fmt.Sprintf("%ds", best)

@@ -6,7 +6,10 @@ import (
 	"encoding/binary"
 	"math"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
+	"unicode"
 )
 
 // Track is one analysed track in memory.
@@ -16,6 +19,25 @@ type Track struct {
 	Vec                                  []float32
 	BPM, Energy                          float64
 	Key, Mode                            string
+	// Copy tells the copies of one recording apart from other tracks: the same song by the
+	// same artist on an album and on a compilation (or imported twice) is one song to a
+	// listener, so a mix takes only one of them. Empty when there's nothing to compare.
+	Copy string
+}
+
+// CopyKey identifies a recording across its copies: the artist and the title, letters and
+// digits only, so "Song (Remastered)" still counts as another song. Empty without both.
+func CopyKey(title string, artistID int64) string {
+	t := strings.Map(func(r rune) rune {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+			return unicode.ToLower(r)
+		}
+		return -1
+	}, title)
+	if t == "" || artistID == 0 {
+		return ""
+	}
+	return strconv.FormatInt(artistID, 10) + ":" + t
 }
 
 // Index holds every analysed track's embedding for fast similarity search (16k tracks of
@@ -46,7 +68,8 @@ func decode(b []byte) []float32 {
 // Load reads every embedding from the database.
 func (x *Index) Load(ctx context.Context, db *sql.DB) error {
 	rows, err := db.QueryContext(ctx, `SELECT s.item_id, COALESCE(i.parent_id, 0), COALESCE(i.grandparent_id, 0), i.library_id,
-		COALESCE(i.year, a.year, 0), s.embedding, COALESCE(s.bpm, 0), COALESCE(s.energy, 0), COALESCE(s.musical_key, ''), COALESCE(s.mode, '')
+		COALESCE(i.year, a.year, 0), s.embedding, COALESCE(s.bpm, 0), COALESCE(s.energy, 0), COALESCE(s.musical_key, ''), COALESCE(s.mode, ''),
+		COALESCE(i.title, '')
 		FROM soundprint s JOIN items i ON i.id = s.item_id LEFT JOIN items a ON a.id = i.parent_id WHERE s.embedding IS NOT NULL`)
 	if err != nil {
 		return err
@@ -56,10 +79,12 @@ func (x *Index) Load(ctx context.Context, db *sql.DB) error {
 	for rows.Next() {
 		t := &Track{}
 		var emb []byte
-		if err := rows.Scan(&t.ItemID, &t.AlbumID, &t.ArtistID, &t.LibraryID, &t.Year, &emb, &t.BPM, &t.Energy, &t.Key, &t.Mode); err != nil {
+		var title string
+		if err := rows.Scan(&t.ItemID, &t.AlbumID, &t.ArtistID, &t.LibraryID, &t.Year, &emb, &t.BPM, &t.Energy, &t.Key, &t.Mode, &title); err != nil {
 			return err
 		}
 		t.Vec = decode(emb)
+		t.Copy = CopyKey(title, t.ArtistID)
 		m[t.ItemID] = t
 	}
 	x.mu.Lock()

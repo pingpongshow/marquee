@@ -13,8 +13,11 @@ type Options struct {
 	Avoid map[int64]float64
 	// Exclude never returns these tracks (already queued).
 	Exclude map[int64]bool
-	Keep    Filter
-	Rand    *rand.Rand
+	// ExcludeCopy never returns another copy of these recordings (Track.Copy): the same song
+	// from a second file is the same song to whoever is listening.
+	ExcludeCopy map[string]bool
+	Keep        Filter
+	Rand        *rand.Rand
 	// Jitter adds up to this much randomness to each candidate's score (Rand's), so picks
 	// vary between runs; 0 keeps Pick deterministic (radios, prompts).
 	Jitter float64
@@ -38,7 +41,7 @@ func (o *Options) rng() *rand.Rand {
 }
 
 func (o *Options) allowed(t *Track) bool {
-	if o.Exclude[t.ItemID] {
+	if o.Exclude[t.ItemID] || (t.Copy != "" && o.ExcludeCopy[t.Copy]) {
 		return false
 	}
 	return o.Keep == nil || o.Keep(t)
@@ -124,13 +127,16 @@ func (x *Index) Pick(v []float32, n int, o Options) []*Track {
 	}
 	var chosen []*Track
 	used := map[int]bool{}
+	// The copies of a recording already chosen: the same song twice is a duplicate however
+	// many files of it the library holds (MUSIC-17).
+	copies := map[string]bool{}
 	perArtist, perAlbum := o.PerArtist, o.PerAlbum
 	byArtist, byAlbum := map[int64]int{}, map[int64]int{}
 	for len(chosen) < n {
 		best, bestScore := -1, math.Inf(-1)
 		artistFull, albumFull := false, false // some candidate waits on that cap alone
 		for i, c := range pool {
-			if used[i] {
+			if used[i] || (c.Copy != "" && copies[c.Copy]) {
 				continue
 			}
 			if perArtist > 0 && c.ArtistID != 0 && byArtist[c.ArtistID] >= perArtist {
@@ -169,6 +175,9 @@ func (x *Index) Pick(v []float32, n int, o Options) []*Track {
 			continue
 		}
 		used[best] = true
+		if c := pool[best].Copy; c != "" {
+			copies[c] = true
+		}
 		chosen = append(chosen, pool[best].Track)
 		byArtist[pool[best].ArtistID]++
 		byAlbum[pool[best].AlbumID]++
