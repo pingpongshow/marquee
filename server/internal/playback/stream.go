@@ -63,7 +63,11 @@ func (m *Manager) StreamHandler(subtitleCache string) http.Handler {
 		case file == "index.m3u8":
 			w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
 			w.Header().Set("Cache-Control", "no-cache")
-			w.Write(PlanPlaylist(s.Plan, s.Media.DurationMS))
+			pl := PlanPlaylist(s.Plan, s.Media.DurationMS)
+			if s.External { // VOD: the player starts at the resume point however it seeks
+				pl = StartAt(pl, s.StartMS)
+			}
+			w.Write(pl)
 		case file == "init.mp4":
 			m.serveFromTranscoder(w, r, s, rung, -1)
 		case strings.HasSuffix(file, ".m4s"):

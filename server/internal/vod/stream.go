@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"marquee/internal/playback"
 )
 
 // Films stream through the server: the source's HLS is passed on as it is (no transcode),
@@ -295,7 +297,7 @@ func (st *Streams) proxy(w http.ResponseWriter, r *http.Request, s *Stream, targ
 			http.Error(w, "the source's playlist didn't load", http.StatusBadGateway)
 			return
 		}
-		out := s.rewrite(body, resp.Request.URL)
+		out := playback.StartAt(s.rewrite(body, resp.Request.URL), s.StartMS)
 		w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Length", strconv.Itoa(len(out)))

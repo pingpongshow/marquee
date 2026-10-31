@@ -121,3 +121,23 @@ func TestCopySegmentsMatchAcrossRestarts(t *testing.T) {
 		}
 	}
 }
+
+func TestStartAt(t *testing.T) {
+	media := []byte("#EXTM3U\n#EXT-X-VERSION:7\n#EXTINF:6.000,\n0.m4s\n#EXT-X-ENDLIST\n")
+	if got := string(StartAt(media, 754_321)); got != "#EXTM3U\n#EXT-X-START:TIME-OFFSET=754.321\n#EXT-X-VERSION:7\n#EXTINF:6.000,\n0.m4s\n#EXT-X-ENDLIST\n" {
+		t.Errorf("media:\n%s", got)
+	}
+	for name, c := range map[string]struct {
+		pl    string
+		start int64
+	}{
+		"from the beginning": {string(media), 0},
+		"master":             {"#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1\nindex.m3u8\n", 5000},
+		"already says":       {"#EXTM3U\n#EXT-X-START:TIME-OFFSET=1\n#EXTINF:6,\n0.ts\n", 5000},
+		"not a playlist":     {"<html>#EXTINF</html>", 5000},
+	} {
+		if got := string(StartAt([]byte(c.pl), c.start)); got != c.pl {
+			t.Errorf("%s changed:\n%s", name, got)
+		}
+	}
+}

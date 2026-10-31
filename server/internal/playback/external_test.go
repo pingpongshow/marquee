@@ -139,6 +139,9 @@ func TestExternalCopiesVideoAndSeeks(t *testing.T) {
 		strings.Count(index, ".m4s") != len(s.Plan) {
 		t.Fatalf("index:\n%s", index)
 	}
+	if !strings.Contains(index, "#EXT-X-START:TIME-OFFSET=30.000\n") {
+		t.Fatalf("index doesn't start at the resume point:\n%s", index)
+	}
 	// The player starts at the resume point.
 	initRec := get(t, h, base+"init.mp4")
 	if initRec.Code != http.StatusOK || initRec.Body.Len() == 0 {

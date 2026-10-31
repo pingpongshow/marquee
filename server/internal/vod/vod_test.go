@@ -278,6 +278,7 @@ func TestStreamRewritesAndProxies(t *testing.T) {
 	defer upstream.Close()
 	st := &Streams{}
 	sess := st.Start(1, 7, upstream.URL+"/ep/master.m3u8?jwt=x", "Marquee-UA")
+	sess.StartMS = 95_500
 	h := httptest.NewServer(st.Handler())
 	defer h.Close()
 	get := func(name string) (string, string) {
@@ -296,9 +297,16 @@ func TestStreamRewritesAndProxies(t *testing.T) {
 	if strings.Contains(master, upstream.URL) {
 		t.Error("the master still links to the source")
 	}
+	if strings.Contains(master, "EXT-X-START") {
+		t.Errorf("the master says where to start:\n%s", master)
+	}
 	variant, _ := get("1.m3u8")
 	if !strings.Contains(variant, `URI="2.bin"`) || !strings.Contains(variant, "\n3.ts") || !strings.Contains(variant, "\n4.ts") {
 		t.Fatalf("variant:\n%s", variant)
+	}
+	// The player starts at the resume point without seeking there.
+	if !strings.HasPrefix(variant, "#EXTM3U\n#EXT-X-START:TIME-OFFSET=95.500\n") {
+		t.Errorf("variant doesn't start at the resume point:\n%s", variant)
 	}
 	if seg, ct := get("3.ts"); seg != "segment-zero" || ct != "video/mp2t" {
 		t.Errorf("segment = %q (%s)", seg, ct)

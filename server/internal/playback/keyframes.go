@@ -485,6 +485,25 @@ func FixedPlan(durationMS int64) []float64 {
 	return plan
 }
 
+// StartAt marks a media playlist to start playing at startMS (EXT-X-START), so a player
+// begins at a resume point without seeking there itself: one that seeks late, or gives up
+// waiting and doesn't, would otherwise play from the beginning. Master playlists, a start
+// of 0 and playlists that already say where to start are left as they are.
+func StartAt(playlist []byte, startMS int64) []byte {
+	if startMS <= 0 || !bytes.Contains(playlist, []byte("#EXTINF")) || bytes.Contains(playlist, []byte("#EXT-X-START")) {
+		return playlist
+	}
+	head, rest, ok := bytes.Cut(playlist, []byte("\n"))
+	if !ok || !bytes.HasPrefix(bytes.TrimSpace(head), []byte("#EXTM3U")) {
+		return playlist
+	}
+	var b bytes.Buffer
+	b.Write(head)
+	fmt.Fprintf(&b, "\n#EXT-X-START:TIME-OFFSET=%.3f\n", float64(startMS)/1000)
+	b.Write(rest)
+	return b.Bytes()
+}
+
 // PlanPlaylist renders a VOD media playlist for a plan.
 func PlanPlaylist(plan []float64, durationMS int64) []byte {
 	total := float64(durationMS) / 1000
